@@ -236,12 +236,26 @@ func repo(ref string) string {
 // pinBases makes every FROM image of in's builds the one stack.lock records
 // (D36): a ref with no digest is pulled and recorded; one whose local image
 // is missing or differs is pulled by digest and tagged. With repull, every
-// ref is pulled by tag and the new digest recorded. It returns the refs
+// ref is pulled by tag and the new digest recorded. A ref already pinned by
+// digest (repo@sha256:…) is its own pin: it is pulled as is when missing,
+// never re-tagged, and nothing is recorded for it. It returns the refs
 // whose recorded digest changed.
 func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) ([]string, error) {
 	p, lock := l.podman(), l.WS.Lock
 	var changed []string
 	for _, ref := range fromRefs(in.Builds) {
+		if strings.Contains(ref, "@") {
+			ok, err := p.ImageExists(ctx, ref)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				if err := p.PullOnly(ctx, ref); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
 		old := lock.BaseDigest(ref)
 		if old == "" || repull {
 			dg, err := p.Pull(ctx, ref)

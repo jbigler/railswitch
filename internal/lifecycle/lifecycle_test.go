@@ -16,6 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 	"github.com/jbigler/railswitch/internal/testfixture"
@@ -899,4 +900,38 @@ func TestUpTraefikStaleRestarted(t *testing.T) {
 		"systemctl --user daemon-reload",
 		"systemctl --user restart railswitch-traefik.service",
 		"systemctl --user start filial-feat-rails.service")
+}
+
+// TestPinBasesDigestRef: a FROM pinned by digest is pulled as is when
+// missing, never re-tagged, and nothing is recorded for it.
+func TestPinBasesDigestRef(t *testing.T) {
+	e := setup(t)
+	ref := "docker.io/library/ruby@sha256:bb"
+	in := &render.Instance{Builds: []render.BuildStep{{Name: "base", From: []string{ref}}}}
+	e.missing("podman", "image", "exists", ref)
+	for _, repull := range []bool{false, true} {
+		e.reset()
+		changed, err := e.l.pinBases(ctx, in, repull)
+		if err != nil || len(changed) != 0 {
+			t.Fatalf("pinBases(repull=%v) = %v, %v", repull, changed, err)
+		}
+		calls := e.calls()
+		if got := count(calls, "podman pull -q "+ref); got != 1 {
+			t.Errorf("repull=%v: pulls of %s = %d; calls:\n%s", repull, ref, got, dump(calls))
+		}
+		if n := count(calls, "podman tag") + count(calls, "podman image inspect"); n != 0 {
+			t.Errorf("repull=%v: tagged or inspected:\n%s", repull, dump(calls))
+		}
+		if dg := e.l.WS.Lock.BaseDigest(ref); dg != "" {
+			t.Errorf("recorded %q for %s", dg, ref)
+		}
+	}
+	e.reset()
+	e.f.On([]string{"podman", "image", "exists", ref}, sys.Result{}, nil)
+	if _, err := e.l.pinBases(ctx, in, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(e.calls(), "podman pull"); n != 0 {
+		t.Errorf("pulled a present digest ref:\n%s", dump(e.calls()))
+	}
 }

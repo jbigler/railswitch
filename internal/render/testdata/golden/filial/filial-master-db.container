@@ -5,6 +5,7 @@
 Description=filial db of worktree master
 
 [Container]
+Label=filial.unit-hash=126ab6e94d69
 Image=docker.io/library/postgres:16
 ContainerName=filial-master-db
 Network=filial-master-dev.network:alias=db

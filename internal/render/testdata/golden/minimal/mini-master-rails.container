@@ -8,6 +8,7 @@ Wants=railswitch-traefik.service
 After=mini-master-deps.service railswitch-traefik.service
 
 [Container]
+Label=mini.unit-hash=bcffd94a6622
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-11d1777c
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails

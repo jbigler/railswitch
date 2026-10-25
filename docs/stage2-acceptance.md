@@ -122,10 +122,13 @@ Expected: `PASS`.
 - **nvim on the ruby base (glibc):** the nvim tool is built on Debian trixie
   and runs on the ruby base image. A glibc mismatch shows up as a loader
   error when nvim starts.
-- **NeedDaemonReload:** after railswitch writes Quadlet units, systemd must
+- **Stale containers:** after railswitch writes Quadlet units, systemd must
   reload. A unit that still reports `NeedDaemonReload=yes`
   (`systemctl --user show -p NeedDaemonReload <unit>`) runs the old
-  definition.
+  definition. `up` restarts a running container whose
+  `<prefix>.unit-hash` label (`railswitch.unit-hash` for Traefik) differs
+  from its rendered unit's; check with
+  `podman container inspect --format '{{index .Config.Labels "<prefix>.unit-hash"}}' <name>`.
 - **`BINDING` honoured by `rails server`:** this is an unverified assumption.
   The rails pack sets `BINDING=0.0.0.0` and expects `rails server` to bind
   every container address. The `curl` 200 in Steps 4 and 7 checks it.

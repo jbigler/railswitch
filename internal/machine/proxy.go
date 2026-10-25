@@ -12,6 +12,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/tomlfile"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 // Marker starts the first line of every rendered unit file. It lives here
@@ -83,7 +84,7 @@ func ProxyUnits(r *Registry) map[string][]byte {
 		"",
 		"[Service]",
 		"Restart=on-failure")
-	return map[string][]byte{ProxyUnitName: []byte(b.String())}
+	return map[string][]byte{ProxyUnitName: unithash.Stamp([]byte(b.String()), unithash.Key("railswitch"))}
 }
 
 // RefreshProxyUnits brings the machine-wide units already in quadletDir in

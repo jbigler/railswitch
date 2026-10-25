@@ -5,6 +5,7 @@
 Description=filial db of worktree feat
 
 [Container]
+Label=filial.unit-hash=3e72bc09ca96
 Image=docker.io/library/postgres:17
 ContainerName=filial-feat-db
 Network=filial-feat-dev.network:alias=db

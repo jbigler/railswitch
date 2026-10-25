@@ -7,6 +7,7 @@ Wants=railswitch-traefik.service
 After=railswitch-traefik.service
 
 [Container]
+Label=filial.unit-hash=2b0a0bc19e6a
 Image=localhost/filial/playwright:1.54.0-8ed7a43c
 ContainerName=filial-master-browser
 Network=filial-master-dev.network:alias=browser

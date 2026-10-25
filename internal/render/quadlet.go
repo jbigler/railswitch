@@ -15,6 +15,7 @@ import (
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 // Marker starts the first line of every rendered unit file. It is defined in
@@ -28,6 +29,7 @@ const traefikUnit = "railswitch-traefik.service"
 // network, and for every worktree its dev network and one .container per
 // service. Every value railswitch did not write itself as a literal key is
 // escaped for systemd (% → %%, $ → $$); nothing is left for systemd to expand.
+// Every .container is stamped with its <prefix>.unit-hash label (unithash).
 // Output that fails Lint is an error wrapping every Finding.
 func Quadlet(m *Model) (map[string][]byte, error) {
 	out := map[string][]byte{}
@@ -60,9 +62,11 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("worktree %s: service %s: %w", wt.Slug, s.ID, err)
 			}
-			if err := put(naming.Container(m.Prefix, wt.Slug, s.ID)+".container", u); err != nil {
+			name := naming.Container(m.Prefix, wt.Slug, s.ID) + ".container"
+			if err := put(name, u); err != nil {
 				return nil, err
 			}
+			out[name] = unithash.Stamp(out[name], unithash.Key(m.Prefix))
 		}
 	}
 	if fs := Lint(out); len(fs) > 0 {

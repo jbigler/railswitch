@@ -31,6 +31,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D43: `docs/superpowers/plans/2026-10-
 - `internal/placeholder`, `internal/config`, `internal/pack` (+ `builtin`), `internal/version`.
 - `internal/machine` — dirs, registry, proxy, machine config.
 - `internal/render` — model, env, images, quadlet, lint, diff, apply.
+- `internal/unithash` — the `<prefix>.unit-hash` label that tells `up` a container runs an older unit.
 - `internal/podman`, `internal/firewall`, `internal/worktree`, `internal/workspace`, `internal/lifecycle`, `internal/doctor`.
 
 ## Rules

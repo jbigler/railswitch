@@ -8,6 +8,7 @@ Requires=demo-proxy-network.service
 After=demo-proxy-network.service
 
 [Container]
+Label=railswitch.unit-hash=32b658f396f0
 Image=docker.io/traefik:v3.7
 ContainerName=railswitch-traefik
 Network=api-proxy.network:ip=10.214.3.2

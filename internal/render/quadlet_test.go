@@ -16,6 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/testfixture"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 var update = flag.Bool("update", false, "rewrite testdata/golden")
@@ -59,15 +60,23 @@ func noLinePrefix(t *testing.T, units map[string][]byte, file, prefix string) {
 	}
 }
 
+var unitHashRe = regexp.MustCompile(`(?m)^Label=([a-z0-9-]+\.unit-hash)=[0-9a-f]{12}\n`)
+
 func TestGolden(t *testing.T) {
 	for _, dir := range []string{fixtureDir, minimalDir} {
 		name := filepath.Base(dir)
 		t.Run(name, func(t *testing.T) {
 			ws, units := renderUnits(t, dir, nil)
 			golden := filepath.Join("testdata", "golden", name)
-			// The workspace is a temp dir: goldens hold it as /WORKSPACES/<name>.
+			// The workspace is a temp dir: goldens hold it as /WORKSPACES/<name>,
+			// with each unit-hash label re-computed for that path.
 			norm := func(b []byte) []byte {
-				return bytes.ReplaceAll(b, []byte(filepath.Dir(ws)), []byte("/WORKSPACES"))
+				m := unitHashRe.FindSubmatch(b)
+				if m == nil {
+					return bytes.ReplaceAll(b, []byte(filepath.Dir(ws)), []byte("/WORKSPACES"))
+				}
+				b = bytes.Replace(b, m[0], nil, 1)
+				return unithash.Stamp(bytes.ReplaceAll(b, []byte(filepath.Dir(ws)), []byte("/WORKSPACES")), string(m[1]))
 			}
 			if *update {
 				if err := os.RemoveAll(golden); err != nil {
@@ -477,4 +486,24 @@ func readGolden(t *testing.T, dir, file string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// TestUnitHashLabel: every .container carries <prefix>.unit-hash, the hash
+// of the unit with that label line excluded; networks carry none.
+func TestUnitHashLabel(t *testing.T) {
+	_, units := renderUnits(t, fixtureDir, nil)
+	key := unithash.Key("filial")
+	for file, data := range units {
+		h := unithash.Read(data, key)
+		if !strings.HasSuffix(file, ".container") {
+			if h != "" {
+				t.Errorf("%s has a unit-hash label", file)
+			}
+			continue
+		}
+		rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1)
+		if h == "" || unithash.Sum(rest) != h {
+			t.Errorf("%s: unit-hash %q; want %q", file, h, unithash.Sum(rest))
+		}
+	}
 }

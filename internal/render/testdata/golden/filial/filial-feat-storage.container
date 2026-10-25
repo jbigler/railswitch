@@ -7,6 +7,7 @@ Wants=railswitch-traefik.service
 After=railswitch-traefik.service
 
 [Container]
+Label=filial.unit-hash=8a2d620cb4ef
 Image=docker.io/rustfs/rustfs:1.0.0-alpha.83
 ContainerName=filial-feat-storage
 Network=filial-feat-dev.network:alias=storage

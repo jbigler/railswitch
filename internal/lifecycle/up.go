@@ -16,13 +16,15 @@ import (
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/unithash"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 // traefikUnit is the shared proxy's unit file and service.
 const (
-	traefikUnit    = machine.ProxyUnitName
-	traefikService = "railswitch-traefik.service"
+	traefikUnit      = machine.ProxyUnitName
+	traefikService   = "railswitch-traefik.service"
+	traefikContainer = "railswitch-traefik"
 )
 
 // L runs lifecycle commands for one workspace.
@@ -148,9 +150,12 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 	// What systemd has loaded, read before any reload: a unit file changed
 	// by an earlier render (railswitch render, wt add, a failed up) is
-	// not loaded yet or loaded stale (NeedDaemonReload).
+	// not loaded yet or loaded stale (NeedDaemonReload). Whether a running
+	// container is stale is told by its unit-hash label (unithash), not by
+	// NeedDaemonReload, which any other daemon-reload clears.
 	reload, restartTraefik := ch.units, ch.traefik
-	var restart []string // active units of this worktree running a stale unit
+	var restart []string // active units of this worktree running an older unit
+	key := unithash.Key(m.Prefix)
 	for _, u := range append(names.Units, traefikService) {
 		st, err := sd.UnitState(ctx, u)
 		if err != nil {
@@ -159,12 +164,25 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		if st.Load != "loaded" || st.NeedReload {
 			reload = true
 		}
+		if st.Active != "active" {
+			continue
+		}
+		ctr := strings.TrimSuffix(u, ".service")
 		switch {
-		case !st.NeedReload:
 		case u == traefikService:
-			restartTraefik = true
-		case st.Active == "active":
-			restart = append(restart, u)
+			stale, err := l.staleContainer(ctx, traefikContainer, traefikUnit, unithash.Key("railswitch"))
+			if err != nil {
+				return err
+			}
+			restartTraefik = restartTraefik || stale
+		case slices.Contains(names.Containers, ctr):
+			stale, err := l.staleContainer(ctx, ctr, ctr+".container", key)
+			if err != nil {
+				return err
+			}
+			if stale {
+				restart = append(restart, u)
+			}
 		}
 	}
 	if reload {
@@ -183,6 +201,20 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		}
 	}
 	return sd.Start(ctx, unitOf(m, slug, m.Services[0].ID))
+}
+
+// staleContainer reports whether container ctr was created from another
+// unit than the rendered unitFile: its key label differs from the file's.
+func (l *L) staleContainer(ctx context.Context, ctr, unitFile, key string) (bool, error) {
+	data, err := os.ReadFile(filepath.Join(l.WS.Dirs.Quadlet, unitFile))
+	if err != nil {
+		return false, err
+	}
+	have, err := l.podman().Label(ctx, ctr, key)
+	if err != nil {
+		return false, err
+	}
+	return have != unithash.Read(data, key), nil
 }
 
 func unitOf(m *render.Model, slug, svc string) string {

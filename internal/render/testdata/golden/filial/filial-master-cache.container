@@ -5,6 +5,7 @@
 Description=filial cache of worktree master
 
 [Container]
+Label=filial.unit-hash=6ee8690ac1bd
 Image=docker.io/library/redis:8-alpine
 ContainerName=filial-master-cache
 Network=filial-master-dev.network:alias=cache

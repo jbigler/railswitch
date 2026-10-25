@@ -366,3 +366,18 @@ func TestFindQuadlet(t *testing.T) {
 		t.Errorf("FindQuadlet with only the Arch path = %q, %v", p, ok)
 	}
 }
+
+func TestLabel(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"podman", "container", "inspect"}, sys.Result{Stdout: []byte("0123456789ab\n")}, nil)
+	v, err := Podman{R: f}.Label(ctx, "api-app", "api.unit-hash")
+	if v != "0123456789ab" || err != nil {
+		t.Fatalf("got %q %v", v, err)
+	}
+	wantCalls(t, f, []string{"podman", "container", "inspect", "--format", `{{index .Config.Labels "api.unit-hash"}}`, "api-app"})
+	r, e := exitErr(125, "Error: no such container api-app")
+	f.On([]string{"podman", "container", "inspect"}, r, e)
+	if v, err := (Podman{R: f}).Label(ctx, "api-app", "api.unit-hash"); v != "" || err != nil {
+		t.Fatalf("missing: got %q %v", v, err)
+	}
+}

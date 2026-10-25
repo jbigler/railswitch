@@ -20,6 +20,7 @@ import (
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 	"github.com/jbigler/railswitch/internal/testfixture"
+	"github.com/jbigler/railswitch/internal/unithash"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -312,6 +313,7 @@ func TestUpSecondRunNoPull(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.reset()
+	e.labels(t)
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
@@ -870,35 +872,92 @@ func upTwice(t *testing.T, e *tenv) {
 	e.reset()
 }
 
-func TestUpStaleLoadedUnitRestarted(t *testing.T) {
+// labels makes every container's unit-hash label inspect answer the hash
+// of its rendered unit, except those in stale, which answer "old".
+func (e *tenv) labels(t *testing.T, stale ...string) {
+	t.Helper()
+	dir := e.l.WS.Dirs.Quadlet
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, en := range entries {
+		ctr, ok := strings.CutSuffix(en.Name(), ".container")
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, en.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := unithash.Key("filial")
+		if ctr == "railswitch-traefik" {
+			key = unithash.Key("railswitch")
+		}
+		h := unithash.Read(data, key)
+		if slices.Contains(stale, ctr) {
+			h = "old"
+		}
+		e.f.On([]string{"podman", "container", "inspect", "--format", `{{index .Config.Labels "` + key + `"}}`, ctr}, sys.Result{Stdout: []byte(h + "\n")}, nil)
+	}
+}
+
+// TestUpStaleLabelRestarted: an active unit whose container was created
+// from an older unit (its unit-hash label differs) is restarted, even with
+// NeedDaemonReload cleared by another daemon-reload; an inactive one is not.
+func TestUpStaleLabelRestarted(t *testing.T) {
+	e := setup(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n", "filial-feat-cache.service")
+	e.labels(t, "filial-feat-db", "filial-feat-cache")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user restart filial-feat-db.service",
+		"systemctl --user start filial-feat-rails.service")
+	calls := e.calls()
+	if n := count(calls, "systemctl --user restart filial-feat-cache") + count(calls, "systemctl --user restart railswitch-traefik") + count(calls, "systemctl --user daemon-reload"); n != 0 {
+		t.Fatalf("restarted an inactive unit or traefik, or reloaded:\n%s", dump(calls))
+	}
+	if r := find(t, calls, "systemctl --user restart"); len(r) != 4 {
+		t.Errorf("restart = %q; want only the db", r)
+	}
+}
+
+// TestUpTraefikStaleLabelRestarted: Traefik running an older unit is
+// restarted, with no NeedDaemonReload to tell.
+func TestUpTraefikStaleLabelRestarted(t *testing.T) {
+	e := setup(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.labels(t, "railswitch-traefik")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user restart railswitch-traefik.service",
+		"systemctl --user start filial-feat-rails.service")
+	if n := count(e.calls(), "systemctl --user restart filial-"); n != 0 {
+		t.Fatalf("restarted a current unit:\n%s", dump(e.calls()))
+	}
+}
+
+// TestUpStaleReloadedAndRestarted: a unit loaded stale is reloaded, and
+// restarted because its container's label differs.
+func TestUpStaleReloadedAndRestarted(t *testing.T) {
 	e := setup(t)
 	upTwice(t, e)
 	e.units(loadedClean)
 	e.units("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=active\n", "filial-feat-db.service")
-	e.units("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=inactive\n", "filial-feat-redis.service")
+	e.labels(t, "filial-feat-db")
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
 	wantInOrder(t, e.calls(),
 		"systemctl --user daemon-reload",
 		"systemctl --user restart filial-feat-db.service",
-		"systemctl --user start filial-feat-rails.service")
-	if n := count(e.calls(), "systemctl --user restart filial-feat-redis") + count(e.calls(), "systemctl --user restart railswitch-traefik"); n != 0 {
-		t.Fatalf("restarted an inactive unit or traefik:\n%s", dump(e.calls()))
-	}
-}
-
-func TestUpTraefikStaleRestarted(t *testing.T) {
-	e := setup(t)
-	upTwice(t, e)
-	e.units(loadedClean)
-	e.units("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=active\n", "railswitch-traefik.service")
-	if err := e.l.Up(ctx, "feat"); err != nil {
-		t.Fatal(err)
-	}
-	wantInOrder(t, e.calls(),
-		"systemctl --user daemon-reload",
-		"systemctl --user restart railswitch-traefik.service",
 		"systemctl --user start filial-feat-rails.service")
 }
 

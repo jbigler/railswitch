@@ -266,3 +266,9 @@ func (p Podman) SecretCreated(ctx context.Context, name string) (time.Time, erro
 	}
 	return time.Unix(sec, 0), nil
 }
+
+// Label returns the running container's label key, or "" for a missing
+// container or label.
+func (p Podman) Label(ctx context.Context, name, key string) (string, error) {
+	return p.inspectContainer(ctx, `{{index .Config.Labels "`+key+`"}}`, name)
+}

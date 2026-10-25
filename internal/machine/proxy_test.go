@@ -1,6 +1,7 @@
 package machine_test
 
 import (
+	"bytes"
 	"flag"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 var update = flag.Bool("update", false, "rewrite testdata/golden")
@@ -57,6 +59,18 @@ func TestProxyUnitsNoProjects(t *testing.T) {
 func TestProxyUnitsLintClean(t *testing.T) {
 	if fs := render.Lint(machine.ProxyUnits(twoProjects())); len(fs) != 0 {
 		t.Fatalf("lint: %+v", fs)
+	}
+}
+
+// TestProxyUnitHashLabel: Traefik's unit carries railswitch.unit-hash, the
+// hash of the unit with that label line excluded.
+func TestProxyUnitHashLabel(t *testing.T) {
+	data := machine.ProxyUnits(twoProjects())[machine.ProxyUnitName]
+	key := unithash.Key("railswitch")
+	h := unithash.Read(data, key)
+	rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1)
+	if h == "" || unithash.Sum(rest) != h {
+		t.Errorf("unit-hash %q; want %q", h, unithash.Sum(rest))
 	}
 }
 

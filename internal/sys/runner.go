@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 // DefaultTimeout applies when Cmd.Timeout is 0.
@@ -68,7 +69,8 @@ func deadlineFor(c Cmd) (time.Duration, bool) {
 // Run executes c. A timeout or cancellation returns an error wrapping
 // ctx.Err(); a non-zero exit returns an error wrapping ErrExit.
 func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
-	if d, ok := deadlineFor(c); ok {
+	d, timed := deadlineFor(c)
+	if timed {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, d)
 		defer cancel()
@@ -85,10 +87,14 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	if c.Stderr == nil {
 		cmd.Stderr = &stderr
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		// Kill the whole process group, not just the leader.
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	if timed {
+		// A timed call gets its own process group so a timeout kills the
+		// whole group. Untimed (interactive) calls stay in the caller's
+		// foreground group so tty reads and Ctrl-C keep working.
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.Cancel = func() error {
+			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
 	}
 	cmd.WaitDelay = 2 * time.Second
 
@@ -107,7 +113,14 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	if errors.As(err, &exitErr) {
 		tail := strings.TrimSpace(string(res.Stderr))
 		if len(tail) > stderrTail {
-			tail = "…" + tail[len(tail)-stderrTail:]
+			i := len(tail) - stderrTail
+			for i < len(tail) && !utf8.RuneStart(tail[i]) {
+				i++
+			}
+			tail = "…" + tail[i:]
+		}
+		if tail == "" {
+			return res, fmt.Errorf("%s: %w (exit %d)", c.Name, ErrExit, res.ExitCode)
 		}
 		return res, fmt.Errorf("%s: %w (exit %d): %s", c.Name, ErrExit, res.ExitCode, tail)
 	}

@@ -3,8 +3,12 @@ package sys
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestExecArgvLiteral(t *testing.T) {
@@ -65,5 +69,43 @@ func TestExecNoTimeoutCancel(t *testing.T) {
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want Canceled", err)
+	}
+}
+
+func childPgrp(t *testing.T, timeout time.Duration) int {
+	t.Helper()
+	r, err := Exec{}.Run(context.Background(), Cmd{Name: "cat", Args: []string{"/proc/self/stat"}, Timeout: timeout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := strings.Fields(string(r.Stdout))
+	n, err := strconv.Atoi(f[4])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestExecProcessGroup(t *testing.T) {
+	if got := childPgrp(t, NoTimeout); got != syscall.Getpgrp() {
+		t.Errorf("NoTimeout pgrp = %d, want caller's %d", got, syscall.Getpgrp())
+	}
+	if got := childPgrp(t, 0); got == syscall.Getpgrp() {
+		t.Errorf("timed cmd shares caller's pgrp %d", got)
+	}
+}
+
+func TestExecExitErrorMessage(t *testing.T) {
+	_, err := Exec{}.Run(context.Background(), Cmd{Name: "false"})
+	if strings.HasSuffix(err.Error(), ": ") || strings.HasSuffix(err.Error(), ":") {
+		t.Errorf("empty tail suffix: %q", err)
+	}
+	long := strings.Repeat("é", 600) + "x"
+	_, err = Exec{}.Run(context.Background(), Cmd{Name: "sh", Args: []string{"-c", `printf %s "$1" >&2; exit 3`, "sh", long}})
+	if !utf8.ValidString(err.Error()) {
+		t.Errorf("tail not cut at rune boundary: %q", err)
+	}
+	if !strings.Contains(err.Error(), "exit 3") {
+		t.Errorf("err = %q", err)
 	}
 }

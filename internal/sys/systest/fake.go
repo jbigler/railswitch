@@ -2,7 +2,9 @@
 package systest
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"slices"
 
 	"github.com/jbigler/railswitch/internal/sys"
@@ -18,6 +20,8 @@ type rule struct {
 type Fake struct {
 	Passthrough []string   // binary names run for real (e.g. "git")
 	Calls       [][]string // argv of each call, Name first
+	Cmds        []sys.Cmd  // full Cmd of each call
+	Stdins      [][]byte   // stdin of each call; nil when Cmd.Stdin is nil
 	rules       []rule
 }
 
@@ -27,10 +31,22 @@ func (f *Fake) On(prefix []string, r sys.Result, err error) {
 	f.rules = append(f.rules, rule{prefix: slices.Clone(prefix), res: r, err: err})
 }
 
-// Run implements sys.Runner.
+// Run implements sys.Runner. Like sys.Exec, scripted output goes to
+// c.Stdout/c.Stderr when set, and is returned in Result otherwise.
 func (f *Fake) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
 	argv := append([]string{c.Name}, c.Args...)
 	f.Calls = append(f.Calls, argv)
+	f.Cmds = append(f.Cmds, c)
+	var stdin []byte
+	if c.Stdin != nil {
+		b, err := io.ReadAll(c.Stdin)
+		if err != nil {
+			return sys.Result{}, err
+		}
+		stdin = b
+		c.Stdin = bytes.NewReader(b)
+	}
+	f.Stdins = append(f.Stdins, stdin)
 	if slices.Contains(f.Passthrough, c.Name) {
 		return sys.Exec{}.Run(ctx, c)
 	}
@@ -44,5 +60,18 @@ func (f *Fake) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
 	if best < 0 {
 		return sys.Result{}, nil
 	}
-	return f.rules[best].res, f.rules[best].err
+	res, err := f.rules[best].res, f.rules[best].err
+	if c.Stdout != nil {
+		if _, werr := c.Stdout.Write(res.Stdout); werr != nil {
+			return sys.Result{}, werr
+		}
+		res.Stdout = nil
+	}
+	if c.Stderr != nil {
+		if _, werr := c.Stderr.Write(res.Stderr); werr != nil {
+			return sys.Result{}, werr
+		}
+		res.Stderr = nil
+	}
+	return res, err
 }

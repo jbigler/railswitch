@@ -1,6 +1,7 @@
 package systest
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"reflect"
@@ -46,5 +47,29 @@ func TestFakePassthrough(t *testing.T) {
 	}
 	if !reflect.DeepEqual(f.Calls, [][]string{{"git", "--version"}}) {
 		t.Fatalf("Calls = %v", f.Calls)
+	}
+}
+
+func TestFakeRecordsCmdsAndStdin(t *testing.T) {
+	f := &Fake{Passthrough: []string{"cat"}}
+	ctx := context.Background()
+	f.On([]string{"podman"}, sys.Result{Stdout: []byte("out"), Stderr: []byte("err")}, nil)
+	var so, se bytes.Buffer
+	r, err := f.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"secret", "create"}, Stdin: strings.NewReader("s3cret"), Stdout: &so, Stderr: &se, Timeout: sys.NoTimeout})
+	if err != nil || len(r.Stdout) != 0 || len(r.Stderr) != 0 || so.String() != "out" || se.String() != "err" {
+		t.Fatalf("got %+v %v so=%q se=%q", r, err, so.String(), se.String())
+	}
+	r, err = f.Run(ctx, sys.Cmd{Name: "cat", Stdin: strings.NewReader("piped")})
+	if err != nil || string(r.Stdout) != "piped" {
+		t.Fatalf("passthrough got %q %v", r.Stdout, err)
+	}
+	if _, err := f.Run(ctx, sys.Cmd{Name: "podman"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Cmds) != 3 || f.Cmds[0].Timeout != sys.NoTimeout || f.Cmds[1].Name != "cat" {
+		t.Fatalf("Cmds = %+v", f.Cmds)
+	}
+	if !reflect.DeepEqual(f.Stdins, [][]byte{[]byte("s3cret"), []byte("piped"), nil}) {
+		t.Fatalf("Stdins = %q", f.Stdins)
 	}
 }

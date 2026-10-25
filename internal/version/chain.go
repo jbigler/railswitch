@@ -17,8 +17,29 @@ import (
 	"github.com/jbigler/railswitch/internal/safefile"
 )
 
-// ValidVersion matches runtime versions and pins.
-var ValidVersion = regexp.MustCompile(`^[0-9][0-9A-Za-z._-]{0,39}$`)
+// Validator accepts a value read from a version source; String describes
+// what it accepts, for error messages.
+type Validator interface {
+	MatchString(string) bool
+	String() string
+}
+
+// ValidVersion matches runtime versions and pins: no range or wildcard
+// (`20.x`, `^20`, `>=20`, `20 || 22`).
+var ValidVersion Validator = versionValidator{}
+
+var (
+	versionRe  = regexp.MustCompile(`^[0-9][0-9A-Za-z._-]{0,39}$`)
+	wildcardRe = regexp.MustCompile(`(^|\.)[xX](\.|$)`)
+)
+
+type versionValidator struct{}
+
+func (versionValidator) MatchString(s string) bool {
+	return versionRe.MatchString(s) && !wildcardRe.MatchString(s)
+}
+
+func (versionValidator) String() string { return versionRe.String() + " with no x wildcard part" }
 
 // ValidDBName matches a [db_name] value (D16).
 var ValidDBName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,62}$`)
@@ -37,7 +58,7 @@ type Resolved struct {
 // refused or unreadable file, an unknown source or an invalid value is
 // skipped with a warning. When every source is skipped the result is
 // fallback with Source "fallback".
-func Resolve(dir string, from []string, fallback string, valid *regexp.Regexp) Resolved {
+func Resolve(dir string, from []string, fallback string, valid Validator) Resolved {
 	var r Resolved
 	for _, src := range from {
 		file, key, _ := strings.Cut(src, ":")

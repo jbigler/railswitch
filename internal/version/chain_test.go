@@ -3,7 +3,6 @@ package version
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"syscall"
 	"testing"
@@ -51,7 +50,7 @@ func TestSkippedFallsThrough(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.dir, func(t *testing.T) {
-			for _, v := range []*regexp.Regexp{ValidVersion, ValidDBName} {
+			for _, v := range []Validator{ValidVersion, ValidDBName} {
 				r := Resolve(fixture(c.dir), []string{c.src}, "fb", v)
 				if r.Value != "fb" || r.Source != "fallback" {
 					t.Fatalf("got %+v, want fallback", r)
@@ -142,5 +141,30 @@ func TestDBNameValidator(t *testing.T) {
 	}
 	if r := Resolve(fixture("database-yml-hostile"), src, "fb", ValidDBName); r.Source != "fallback" || !hasWarning(r, "invalid") {
 		t.Fatalf("hostile: got %+v", r)
+	}
+}
+
+// TestWildcardVersionFallsThrough: a range or wildcard ("20.x", the common
+// engines value) is not a version: the chain moves on to the next source.
+func TestWildcardVersionFallsThrough(t *testing.T) {
+	dir := t.TempDir()
+	for name, data := range map[string]string{"package.json": `{"engines": {"node": "20.x"}}`, ".nvmrc": "22.1.0\n"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := Resolve(dir, []string{"package.json", ".nvmrc"}, "fb", ValidVersion)
+	if r.Value != "22.1.0" || r.Source != ".nvmrc" || !hasWarning(r, "invalid") {
+		t.Fatalf("got %+v", r)
+	}
+	for _, v := range []string{"20.x", "20.X", "20.x.1", "x", "20.*", "^20.1", "~20.1", ">=20", "<21", "20 || 22", "20.1 - 20.4"} {
+		if ValidVersion.MatchString(v) {
+			t.Errorf("ValidVersion accepts %q", v)
+		}
+	}
+	for _, v := range []string{"20", "3.3.6", "22.11.0", "3.4.0-preview1", "1.2.x86", "16"} {
+		if !ValidVersion.MatchString(v) {
+			t.Errorf("ValidVersion refuses %q", v)
+		}
 	}
 }

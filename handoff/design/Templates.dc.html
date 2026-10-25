@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stack library</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border-radius:8px;border:1px solid #CECDC3;background:#FFFFFF;color:#100F0F;font:inherit;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">Stack library</span>
+    <span style="flex-grow: 1"></span>
+    <a href="Main.dc.html" style="font-size: 14px">New project</a>
+  </header>
+
+  <main style="display: flex; flex-direction: column; gap: 24px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px">
+      <div style="flex: 1 1 520px; min-width: 0">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Stack library</h1>
+        <p style="margin: 6px 0 0; color: #575653; font-size: 15px; max-width: 780px">Three kinds of thing you can share. A <strong>pack</strong> knows one framework. An <strong>option</strong> is one choice for a slot, such as MySQL for the database. A <strong>template</strong> is a pack plus a set of options and your changes, ready to start a project from.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button type="button" class="btn">Import file…</button>
+        <button type="button" class="btn">Add a library repository…</button>
+      </div>
+    </div>
+
+    <div role="tablist" aria-label="Kind" style="display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #CECDC3">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+        <button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="min-height: 44px; padding: 8px 16px; border: 0; border-bottom: 3px solid {{t.line}}; margin-bottom: -1px; background: transparent; font: inherit; font-weight: 800; font-size: 15px; color: {{t.fg}}; cursor: pointer">{{t.label}} <span style="font-weight: 600; color: #575653; font-size: 13px">{{t.count}}</span></button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{isTemplates}}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+        <section aria-label="Templates" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+          <sc-for list="{{templates}}" as="t" hint-placeholder-count="4">
+            <button type="button" aria-pressed="{{t.pressed}}" onClick="{{t.pick}}" style="display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 14px 16px; border-radius: 10px; border: 1.5px solid {{t.border}}; background: {{t.bg}}; font: inherit; color: #100F0F; cursor: pointer">
+              <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%">
+                <span class="mono" style="font-weight: 600; font-size: 15px">{{t.id}}</span>
+                <span class="chip mono">v{{t.version}}</span>
+                <span style="flex-grow: 1"></span>
+                <span style="font-size: 12px; color: #575653">{{t.where}}</span>
+              </span>
+              <span style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center">
+                <span class="chip" style="border-color: #BC5215; color: #9A4210; background: #FDF1E8">{{t.packLabel}}</span>
+                <sc-for list="{{t.optLabels}}" as="o" hint-placeholder-count="3"><span class="chip">{{o}}</span></sc-for>
+              </span>
+              <sc-if value="{{t.update}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #205EA6; font-weight: 700">v{{t.latest}} available</span></sc-if>
+            </button>
+          </sc-for>
+        </section>
+
+        <section aria-labelledby="d-h" style="flex: 999 1 620px; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding: 24px; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+            <div style="flex: 1 1 260px; min-width: 0">
+              <h2 id="d-h" class="mono" style="margin: 0; font-size: 20px; font-weight: 600">{{sel.id}} <span style="color: #575653; font-weight: 400">v{{sel.version}}</span></h2>
+              <p style="margin: 4px 0 0; font-size: 14px; color: #575653">{{sel.origin}}</p>
+            </div>
+            <a href="Main.dc.html" class="btn" style="background: #BC5215; border-color: #BC5215; color: #FFFFFF">New project from this</a>
+            <button type="button" class="btn">Export</button>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <h3 class="eyebrow" style="margin: 0">Built from</h3>
+            <div style="overflow-x: auto; border: 1px solid #E6E4D9; border-radius: 8px">
+              <table style="border-collapse: collapse; width: 100%; min-width: 520px; font-size: 13px">
+                <tbody>
+                  <sc-for list="{{sel.refs}}" as="r" hint-placeholder-count="5">
+                    <tr>
+                      <td style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9; color: #575653; font-weight: 700; white-space: nowrap">{{r.slot}}</td>
+                      <td class="mono" style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9">{{r.ref}}</td>
+                      <td style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9; color: {{r.color}}; font-weight: 700; text-align: right; white-space: nowrap">{{r.status}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 12px; border-radius: 8px; background: #F2F0E5">
+              <span style="flex: 1 1 320px; font-size: 13px; color: #34332F">Everything here is locked in <span class="mono">stack.lock</span> by commit and content hash. Fetching a missing pack or option, or taking an update, opens a review of every file first.</span>
+              <a href="Install.dc.html" class="btn" style="min-height: 40px; font-size: 13px">{{sel.reviewLabel}}</a>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <h3 class="eyebrow" style="margin: 0">Asks when used</h3>
+              <sc-for list="{{sel.params}}" as="p" hint-placeholder-count="4">
+                <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #E6E4D9">
+                  <span class="mono" style="font-weight: 600">{{p.k}}</span>
+                  <span style="color: #575653; text-align: right">{{p.d}}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <h3 class="eyebrow" style="margin: 0">Package contents</h3>
+              <div style="padding: 12px 14px; border-radius: 8px; background: #F2F0E5">
+                <sc-for list="{{sel.files}}" as="f" hint-placeholder-count="5">
+                  <div class="mono" style="font-size: 12px; line-height: 20px; white-space: pre; color: #34332F">{{f}}</div>
+                </sc-for>
+              </div>
+              <span style="font-size: 12px; color: #575653">Small on purpose: the pack and options hold everything else.</span>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <h3 class="eyebrow" style="margin: 0">Projects using it</h3>
+            <sc-if value="{{sel.hasUsers}}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{sel.users}}" as="u" hint-placeholder-count="2">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 14px; border: 1px solid #E6E4D9; border-radius: 8px">
+                  <span style="font-weight: 700">{{u.name}}</span>
+                  <span class="chip mono">from v{{u.from}}</span>
+                  <span style="flex: 1 1 200px; font-size: 13px; color: #34332F">{{u.drift}}</span>
+                  <button type="button" class="btn" style="min-height: 40px; font-size: 13px">{{u.action}}</button>
+                </div>
+              </sc-for>
+            </sc-if>
+            <sc-if value="{{sel.noUsers}}" hint-placeholder-val="{{ false }}">
+              <p style="margin: 0; font-size: 14px; color: #575653">No project on this host uses it.</p>
+            </sc-if>
+          </div>
+          <p style="margin: 0; font-size: 13px; color: #575653">A project records its template, pack and options with their versions. A newer version of any of them is shown as a diff against <span class="mono">project.toml</span> and applied with <span class="mono">units:install</span>, never silently.</p>
+        </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isPacks}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Stack packs" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px">
+        <sc-for list="{{packs}}" as="p" hint-placeholder-count="6">
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+              <span style="font-weight: 800; font-size: 16px">{{p.label}}</span>
+              <span class="chip mono">{{p.id}}@1</span>
+              <span style="flex-grow: 1"></span>
+              <span style="font-size: 12px; color: #575653">{{p.where}}</span>
+            </div>
+            <dl style="margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px">
+              <dt style="color: #575653; font-weight: 700">Server</dt><dd class="mono" style="margin: 0">{{p.server}}</dd>
+              <dt style="color: #575653; font-weight: 700">Versions</dt><dd class="mono" style="margin: 0">{{p.versions}}</dd>
+              <dt style="color: #575653; font-weight: 700">Hosts</dt><dd style="margin: 0">{{p.hosts}}</dd>
+              <dt style="color: #575653; font-weight: 700">Tasks</dt><dd class="mono" style="margin: 0">{{p.tasks}}</dd>
+              <dt style="color: #575653; font-weight: 700">Brings</dt><dd style="margin: 0">Containerfile.app, entrypoints, deps.allow</dd>
+            </dl>
+            <div style="display: flex; gap: 8px"><button type="button" class="btn" style="min-height: 40px; font-size: 13px">View</button><button type="button" class="btn" style="min-height: 40px; font-size: 13px">Export</button></div>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isOptions}}" hint-placeholder-val="{{ false }}">
+      <section aria-label="Options" style="display: flex; flex-direction: column; gap: 20px">
+        <sc-for list="{{optionGroups}}" as="g" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <h2 class="eyebrow" style="margin: 0">{{g.slot}}</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px">
+              <sc-for list="{{g.items}}" as="o" hint-placeholder-count="3">
+                <div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+                    <span style="font-weight: 800; font-size: 15px">{{o.label}}</span>
+                    <span class="chip mono">{{o.id}}@1</span>
+                    <span style="flex-grow: 1"></span>
+                    <span style="font-size: 12px; color: {{o.whereColor}}">{{o.where}}</span>
+                  </div>
+                  <span class="mono" style="font-size: 12px; color: #34332F; overflow-wrap: anywhere">{{o.image}}</span>
+                  <span style="font-size: 13px; color: #34332F">Gives the app <span class="mono">{{o.gives}}</span></span>
+                  <span style="font-size: 12px; color: #575653">Works with {{o.packs}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'templates', sel: 'rails-postgres-redis-rustfs' };
+  }
+  renderVals() {
+    const st = this.state;
+    const ok = (ref, slot) => ({ slot, ref, status: 'locked, on this host', color: '#536907' });
+    const fetch = (ref, slot, from) => ({ slot, ref, status: 'fetched from ' + from + ' after review', color: '#205EA6' });
+    const T = {
+      'rails-postgres-redis-rustfs': {
+        version: '3', latest: '3', update: false, where: 'this host', origin: 'Saved from Filial Rails on this host',
+        pack: 'Rails', opts: ['PostgreSQL', 'Redis', 'RustFS', 'Playwright'],
+        refs: [ok('rails@1', 'Pack'), ok('postgres@1', 'Database'), ok('redis@1', 'Cache'), ok('rustfs@1', 'Storage'), ok('playwright@1', 'Browser')],
+        params: [{ k: 'name, prefix, repo', d: 'always' }, { k: 'database', d: 'default PostgreSQL' }, { k: 'postgres', d: 'pinned, default 16' }, { k: 'TZ', d: 'default Asia/Bangkok' }, { k: 'DB_PASSWORD, S3_SECRET_KEY', d: 'secrets' }],
+        files: ['rails-postgres-redis-rustfs.stack/', '  stack.toml        pack, options, overrides', '  containerfiles/', '    Containerfile.app   edited from the pack', '  README.md'],
+        users: [{ name: 'Filial Rails', from: '3', drift: 'Up to date.', action: 'Compare' }, { name: 'Billing sandbox', from: '2', drift: 'v3 moves rustfs-init to a volume seed.', action: 'Review update' }]
+      },
+      'phoenix-postgres': {
+        version: '1', latest: '1', update: false, where: 'built in', origin: 'Ships with the workspace',
+        pack: 'Phoenix', opts: ['PostgreSQL', 'Oban', 'Playwright'],
+        refs: [ok('phoenix@1', 'Pack'), ok('postgres@1', 'Database'), ok('oban@1', 'Jobs'), ok('playwright@1', 'Browser')],
+        params: [{ k: 'name, prefix, repo', d: 'always' }, { k: 'postgres', d: 'pinned, default 16' }, { k: 'DB_PASSWORD', d: 'secret' }],
+        files: ['phoenix-postgres.stack/', '  stack.toml', '  README.md'],
+        users: []
+      },
+      'django-celery': {
+        version: '2', latest: '3', update: true, where: 'template repository', origin: 'From git@github.com:[ORG]/stack-library.git · v3 is available',
+        pack: 'Django', opts: ['PostgreSQL', 'Valkey', 'Celery', 'Mailpit'],
+        refs: [fetch('django@1', 'Pack', 'stack-library'), ok('postgres@1', 'Database'), ok('valkey@1', 'Cache'), fetch('celery@1', 'Jobs', 'stack-library'), ok('mailpit@1', 'Mail')],
+        params: [{ k: 'name, prefix, repo', d: 'always' }, { k: 'DJANGO_SETTINGS_MODULE', d: 'default [project].settings' }, { k: 'CELERY_CONCURRENCY', d: 'default 2' }, { k: 'DB_PASSWORD', d: 'secret' }],
+        files: ['django-celery.stack/', '  stack.toml', '  README.md'],
+        users: []
+      },
+      'rails-mysql-sidekiq': {
+        version: '1', latest: '1', update: false, where: 'template repository', origin: 'From git@github.com:[ORG]/stack-library.git',
+        pack: 'Rails', opts: ['MySQL', 'Redis', 'Sidekiq', 'Playwright'],
+        refs: [ok('rails@1', 'Pack'), ok('mysql@1', 'Database'), ok('redis@1', 'Cache'), ok('sidekiq@1', 'Jobs'), ok('playwright@1', 'Browser')],
+        params: [{ k: 'name, prefix, repo', d: 'always' }, { k: 'mysql', d: 'pinned, default 8.4' }, { k: 'DB_PASSWORD', d: 'secret' }],
+        files: ['rails-mysql-sidekiq.stack/', '  stack.toml', '  options/', '    sidekiq.toml   queues and concurrency', '  README.md'],
+        users: []
+      }
+    };
+    const templates = Object.keys(T).map((id) => {
+      const t = T[id];
+      const on = id === st.sel;
+      return { id, version: t.version, latest: t.latest, update: t.update, where: t.where, packLabel: t.pack, optLabels: t.opts, pressed: on ? 'true' : 'false', pick: () => this.setState({ sel: id }), border: on ? '#BC5215' : '#CECDC3', bg: on ? '#FFFFFF' : '#FFFCF0' };
+    });
+    const s = T[st.sel];
+    const sel = { reviewLabel: s.update ? 'Review the update to v' + s.latest : s.refs.some((r) => r.status.indexOf('fetched') === 0) ? 'Review what will be fetched' : 'View locked files', id: st.sel, version: s.version, origin: s.origin, refs: s.refs, params: s.params, files: s.files, users: s.users, hasUsers: s.users.length > 0, noUsers: s.users.length === 0 };
+
+    const packs = [
+      { id: 'rails', label: 'Rails', server: 'bin/dev :3000', versions: 'ruby, node', hosts: 'DEV_HOSTS, DOMAIN', tasks: 'console, test, test:system', where: 'built in' },
+      { id: 'hanami', label: 'Hanami', server: 'hanami dev :2300', versions: 'ruby, node', hosts: 'none needed', tasks: 'console, test', where: 'built in' },
+      { id: 'phoenix', label: 'Phoenix', server: 'mix phx.server :4000', versions: 'elixir, erlang', hosts: 'PHX_HOST', tasks: 'console (iex), test', where: 'built in' },
+      { id: 'django', label: 'Django', server: 'runserver :8000', versions: 'python', hosts: 'ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS', tasks: 'console, test, migrate', where: 'stack-library' },
+      { id: 'flask', label: 'Flask', server: 'flask run :5000', versions: 'python', hosts: 'SERVER_NAME', tasks: 'console, test', where: 'built in' },
+      { id: 'node', label: 'Node', server: 'npm run dev :3000', versions: 'node', hosts: 'ALLOWED_HOSTS', tasks: 'console, test', where: 'built in' }
+    ];
+    const o = (id, label, image, gives, packsTxt, where) => ({ id, label, image, gives, packs: packsTxt, where: where || 'built in', whereColor: where === 'this host' ? '#BC5215' : '#575653' });
+    const optionGroups = [
+      { slot: 'Database', items: [o('postgres', 'PostgreSQL', 'docker.io/library/postgres:{postgres}', 'DATABASE_URL', 'every pack'), o('mysql', 'MySQL', 'docker.io/library/mysql:{mysql}', 'DATABASE_URL', 'every pack'), o('mariadb', 'MariaDB', 'docker.io/library/mariadb:{mariadb}', 'DATABASE_URL', 'every pack'), o('sqlite', 'SQLite', 'no container', 'DATABASE_URL (a file)', 'every pack')] },
+      { slot: 'Cache and queues', items: [o('redis', 'Redis', 'docker.io/library/redis:{redis}-alpine', 'REDIS_URL', 'every pack'), o('valkey', 'Valkey', 'docker.io/valkey/valkey:{valkey}-alpine', 'REDIS_URL', 'every pack'), o('memcached', 'Memcached', 'docker.io/library/memcached:{memcached}-alpine', 'MEMCACHE_SERVERS', 'Rails, Django, Flask, Node', 'this host')] },
+      { slot: 'Object storage', items: [o('rustfs', 'RustFS', 'docker.io/rustfs/rustfs:{rustfs}', 'S3_ENDPOINT, S3_ACCESS_KEY', 'every pack'), o('minio', 'MinIO', 'quay.io/minio/minio:{minio}', 'S3_ENDPOINT, S3_ACCESS_KEY', 'every pack')] },
+      { slot: 'Background jobs', items: [o('sidekiq', 'Sidekiq', 'app image: bundle exec sidekiq', 'needs REDIS_URL', 'Rails, Hanami'), o('solid-queue', 'Solid Queue', 'app image: bin/jobs', 'uses DATABASE_URL', 'Rails'), o('goodjob', 'GoodJob', 'app image: good_job start', 'PostgreSQL only', 'Rails'), o('oban', 'Oban', 'in the app process', 'uses DATABASE_URL', 'Phoenix'), o('celery', 'Celery', 'app image: celery worker', 'needs REDIS_URL', 'Django, Flask', 'stack-library'), o('rq', 'RQ', 'app image: rq worker', 'needs REDIS_URL', 'Django, Flask'), o('bullmq', 'BullMQ', 'app image: npm run worker', 'needs REDIS_URL', 'Node')] },
+      { slot: 'Mail and browser', items: [o('mailpit', 'Mailpit', 'docker.io/axllent/mailpit:{mailpit}', 'SMTP_HOST, SMTP_PORT', 'every pack'), o('playwright', 'Playwright + VNC', 'Containerfile.playwright', 'PLAYWRIGHT_HOST', 'every pack')] }
+    ];
+    const optCount = optionGroups.reduce((n, g) => n + g.items.length, 0);
+    const TABS = [['templates', 'Templates', templates.length], ['packs', 'Stack packs', packs.length], ['options', 'Options', optCount]];
+    const tabs = TABS.map((t) => ({ label: t[1], count: String(t[2]), selected: st.tab === t[0] ? 'true' : 'false', pick: () => this.setState({ tab: t[0] }), line: st.tab === t[0] ? '#BC5215' : 'transparent', fg: st.tab === t[0] ? '#100F0F' : '#575653' }));
+    return { tabs, isTemplates: st.tab === 'templates', isPacks: st.tab === 'packs', isOptions: st.tab === 'options', templates, sel, packs, optionGroups };
+  }
+}
+</script>
+</body>
+</html>

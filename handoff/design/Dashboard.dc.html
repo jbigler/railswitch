@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dashboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+a{color:#205EA6}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.hbtn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 12px;border-radius:8px;border:1px solid #CECDC3;background:#FFFCF0;color:#100F0F;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.kbd{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;padding:0 5px;border:1px solid #CECDC3;border-bottom-width:2px;border-radius:4px;color:#575653;background:#FFFFFF}
+.row{display:grid;grid-template-columns:150px 1fr 70px 34px 150px;gap:10px;align-items:center;padding:7px 14px;font-size:14px;cursor:pointer;border-left:3px solid transparent}
+.row:hover{background:#F2F0E5}
+.lh{display:grid;grid-template-columns:150px 1fr 70px 34px 150px;gap:10px;padding:6px 14px 6px 17px;font-size:12px;color:#575653}
+.ph{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid #CECDC3;background:#F2F0E5}
+.sec{font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#575653;margin:0}
+.note{font-size:13px;color:#575653;line-height:1.5}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="position: relative; height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <button type="button" class="hbtn" onClick="{{toggleOpen}}" aria-expanded="{{open}}" aria-haspopup="dialog" style="font-weight: 800; background: {{switchBg}}">
+      {{currentLabel}}<span class="mono" style="font-weight: 400; font-size: 12px; color: #575653">{{currentPrefix}}</span>
+      <span aria-hidden="true" style="color: #575653">▾</span>
+    </button>
+    <span class="kbd" title="open the project switcher">P</span>
+    <sc-if value="{{hasNeed}}" hint-placeholder-val="{{ true }}">
+      <span style="color: #BC5215; font-weight: 800; font-size: 14px" title="across every project">◆ {{needTotal}} need input</span>
+    </sc-if>
+    <span style="flex-grow: 1"></span>
+    <a href="Main.dc.html" class="hbtn">New project</a>
+    <button type="button" class="hbtn">tasks <span class="kbd">:</span></button>
+    <a class="hbtn" href="#">logs</a>
+    <a class="hbtn" href="Machine.dc.html">This machine</a>
+    <button type="button" class="hbtn" onClick="{{toggleTheme}}" aria-expanded="{{themeOpen}}" aria-haspopup="dialog" title="Colours" style="background: {{themeBtnBg}}">⚙</button>
+
+    <sc-if value="{{open}}" hint-placeholder-val="{{ true }}">
+      <div role="dialog" aria-label="Switch project" style="position: absolute; top: 52px; left: 56px; z-index: 5; width: 520px; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; box-shadow: 0 12px 32px rgba(16,15,15,0.16); overflow: hidden">
+        <div style="padding: 12px 12px 8px">
+          <input type="search" value="{{query}}" onInput="{{setQuery}}" placeholder="Go to a project, or a worktree in any project…" aria-label="Go to a project or worktree" style="width: 100%; box-sizing: border-box; font: inherit; font-size: 15px; padding: 9px 12px; border: 1.5px solid #205EA6; border-radius: 8px; background: #FFFCF0; color: #100F0F">
+        </div>
+        <div role="listbox" style="display: flex; flex-direction: column; padding: 0 6px 6px">
+          <sc-for list="{{menu}}" as="m" hint-placeholder-count="4">
+            <div role="option" aria-selected="{{m.on}}" onClick="{{m.pick}}" style="display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 8px; cursor: pointer; background: {{m.bg}}">
+              <span class="kbd" style="text-align: center">{{m.key}}</span>
+              <span style="display: flex; flex-direction: column; gap: 1px; min-width: 0">
+                <span style="display: flex; align-items: baseline; gap: 8px"><span style="font-weight: 800; font-size: 15px">{{m.label}}</span><span class="mono" style="font-size: 12px; color: #575653">{{m.prefix}}</span></span>
+                <span style="font-size: 12px; color: #575653">{{m.sub}}</span>
+              </span>
+              <span style="display: flex; gap: 8px; align-items: center; font-size: 13px">
+                <sc-if value="{{m.hasNeed}}" hint-placeholder-val="{{ false }}"><span style="color: #BC5215; font-weight: 800">◆ {{m.need}}</span></sc-if>
+                <sc-if value="{{m.hasWorking}}" hint-placeholder-val="{{ false }}"><span style="color: #205EA6">● {{m.working}}</span></sc-if>
+                <span class="chip">{{m.stack}}</span>
+              </span>
+            </div>
+          </sc-for>
+          <sc-if value="{{hasHits}}" hint-placeholder-val="{{ false }}">
+            <p class="sec" style="padding: 10px 10px 4px">Worktrees</p>
+            <sc-for list="{{hits}}" as="h" hint-placeholder-count="2">
+              <div role="option" onClick="{{h.pick}}" style="display: flex; gap: 10px; align-items: baseline; padding: 8px 10px; border-radius: 8px; cursor: pointer">
+                <span style="font-weight: 700; font-size: 14px">{{h.name}}</span>
+                <span class="mono" style="font-size: 12px; color: #575653">{{h.path}}</span>
+                <span style="flex-grow: 1"></span>
+                <span style="font-size: 13px; color: {{h.agentColor}}">{{h.agent}}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{noHits}}" hint-placeholder-val="{{ false }}">
+            <p class="note" style="padding: 8px 10px; margin: 0">Nothing matches “{{query}}”.</p>
+          </sc-if>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 12px; border-top: 1px solid #E6E4D9; background: #FFFCF0; font-size: 13px">
+          <a href="Main.dc.html" class="hbtn" style="min-height: 32px">New project…</a>
+          <a href="Adopt.dc.html" class="hbtn" style="min-height: 32px">Adopt a workspace…</a>
+          <span style="flex-grow: 1"></span>
+          <span class="note" style="align-self: center"><span class="kbd">1</span>–<span class="kbd">3</span> jump · <span class="kbd">Esc</span> close</span>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{themeOpen}}" hint-placeholder-val="{{ true }}">
+      <div role="dialog" aria-label="Colours" style="position: absolute; top: 52px; right: 20px; z-index: 5; width: 440px; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; box-shadow: 0 12px 32px rgba(16,15,15,0.16); display: flex; flex-direction: column; gap: 14px; padding: 16px">
+        <div style="display: flex; align-items: baseline; gap: 8px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 800">Colours</h2>
+          <span class="note">for this dashboard, on this machine</span>
+        </div>
+        <div role="radiogroup" aria-label="Palette" style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{palettes}}" as="pl" hint-placeholder-count="4">
+            <button type="button" role="radio" aria-checked="{{pl.on}}" onClick="{{pl.pick}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 10px; border-radius: 8px; border: 1.5px solid {{pl.border}}; background: {{pl.bg}}; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: #100F0F">
+              <span aria-hidden="true" style="display: inline-flex; border-radius: 4px; overflow: hidden; border: 1px solid #CECDC3"><span style="width: 10px; height: 16px; background: {{pl.c1}}"></span><span style="width: 10px; height: 16px; background: {{pl.c2}}"></span><span style="width: 10px; height: 16px; background: {{pl.c3}}"></span></span>
+              {{pl.label}}
+            </button>
+          </sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px">
+          <sc-for list="{{tokens}}" as="t" hint-placeholder-count="8">
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; min-height: 32px">
+              <input type="color" value="{{t.value}}" onInput="{{t.set}}" style="width: 32px; height: 28px; padding: 0; border: 1px solid #CECDC3; border-radius: 6px; background: none; cursor: pointer">
+              <span style="display: flex; flex-direction: column; line-height: 1.2"><span style="font-weight: 700">{{t.label}}</span><span style="font-size: 11px; color: #575653">{{t.use}}</span></span>
+            </label>
+          </sc-for>
+        </div>
+        <div aria-label="Preview" style="border: 1px solid {{pv.border}}; border-radius: 8px; overflow: hidden; background: {{pv.bg}}; color: {{pv.text}}; font-size: 13px">
+          <div style="display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: {{pv.bg2}}; border-bottom: 1px solid {{pv.border}}"><strong style="color: {{pv.accent}}">wt</strong><strong>Filial Rails</strong><span style="color: {{pv.accent}}; font-weight: 800">◆ 2 need input</span></div>
+          <div style="display: grid; grid-template-columns: 1fr auto; padding: 5px 10px; background: {{pv.sel}}; border-left: 3px solid {{pv.accent}}"><strong>patient-photos</strong><span style="color: {{pv.accent}}; font-weight: 800">◆ needs permission</span></div>
+          <div style="display: grid; grid-template-columns: 1fr auto; padding: 5px 10px"><span>billing-export</span><span style="color: {{pv.blue}}">● working</span></div>
+          <div style="display: grid; grid-template-columns: 1fr auto; padding: 5px 10px"><span>pdf-reports <span style="color: {{pv.green}}">●</span></span><span style="color: {{pv.yellow}}">· your turn</span></div>
+          <div style="display: grid; grid-template-columns: 1fr auto; padding: 5px 10px"><span>ui-refresh</span><span style="color: {{pv.muted}}">○ off</span></div>
+        </div>
+        <sc-if value="{{hasContrast}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 8px 10px; border-radius: 8px; background: #FAF1D9; color: #6B5100; font-size: 13px">⚠ {{contrastMsg}}</p>
+        </sc-if>
+        <div style="display: flex; gap: 8px; align-items: center">
+          <button type="button" onClick="{{saveTheme}}" style="min-height: 40px; padding: 6px 16px; border-radius: 8px; border: 0; background: #BC5215; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer">{{saveLabel}}</button>
+          <button type="button" class="hbtn" onClick="{{resetTheme}}">Reset to {{baseLabel}}</button>
+          <span style="flex-grow: 1"></span>
+          <button type="button" class="hbtn" onClick="{{toggleToml}}" aria-expanded="{{showToml}}">Copy as TOML</button>
+        </div>
+        <sc-if value="{{showToml}}" hint-placeholder-val="{{ false }}">
+          <pre class="mono" style="margin: 0; padding: 10px 12px; border-radius: 8px; background: #F2F0E5; font-size: 12px; line-height: 1.5; white-space: pre-wrap">{{toml}}</pre>
+        </sc-if>
+        <p class="note" style="margin: 0">Saved to <span class="mono">~/.config/wt/dashboard.toml</span>, so every browser on this machine gets it. Dark mode keeps its own set: switch the system to dark and the same editor edits that one.</p>
+      </div>
+    </sc-if>
+  </header>
+
+  <main style="flex-grow: 1; display: grid; grid-template-columns: 560px 1fr; min-height: 0">
+    <nav aria-label="Worktrees" style="border-right: 1px solid #CECDC3; display: flex; flex-direction: column">
+      <sc-if value="{{hasElsewhere}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; background: #FBEDE4; border-bottom: 1px solid #E6C7B3">
+          <span style="font-size: 12px; font-weight: 800; color: #BC5215">Other projects need you</span>
+          <sc-for list="{{elsewhere}}" as="e" hint-placeholder-count="1">
+            <button type="button" onClick="{{e.pick}}" style="display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border: 0; background: none; font: inherit; font-size: 14px; color: #100F0F; cursor: pointer; text-align: left">
+              <span style="color: #BC5215; font-weight: 800">◆</span><span style="font-weight: 700">{{e.project}}</span><span style="color: #575653">/</span><span>{{e.name}}</span><span style="color: #575653">· {{e.why}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div class="lh" aria-hidden="true"><span>worktree</span><span>branch</span><span>PR</span><span>svc</span><span>agent</span></div>
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="1">
+        <div>
+          <div class="ph">
+            <span style="font-weight: 800; font-size: 15px">{{g.name}}</span>
+            <span class="mono" style="font-size: 12px; color: #575653">{{g.prefix}}</span>
+            <span class="chip">{{g.stack}}</span>
+            <span style="font-size: 13px; color: #575653">{{g.summary}}</span>
+            <span style="flex-grow: 1"></span>
+            <a href="Settings.dc.html" title="Project settings" style="font-size: 13px; padding: 4px">settings</a>
+          </div>
+          <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="4">
+              <div class="row" onClick="{{r.pick}}" aria-current="{{r.current}}" style="background: {{r.bg}}; border-left-color: {{r.bar}}">
+                <span style="font-weight: {{r.weight}}">{{r.name}}</span>
+                <span style="color: #575653; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{r.branch}}</span>
+                <span style="color: {{r.prColor}}">{{r.pr}}</span>
+                <span title="services {{r.svcWord}}" style="color: {{r.svcColor}}">{{r.svc}}</span>
+                <span style="color: {{r.agentColor}}; font-weight: {{r.agentWeight}}">{{r.agent}}</span>
+              </div>
+          </sc-for>
+        </div>
+      </sc-for>
+      <p class="note" style="padding: 10px 14px; margin: 0">↑↓ moves through this project’s worktrees. Another project is one keypress away: <span class="kbd">P</span> then its number.</p>
+    </nav>
+
+    <section aria-label="Worktree" style="display: flex; flex-direction: column; gap: 18px; padding: 20px 28px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #575653">
+        <span class="mono">wt.localhost:7700{{selUrl}}</span>
+        <span>·</span>
+        <span>a worktree’s page is /&lt;prefix&gt;/&lt;slug&gt;, so links and bookmarks name the project</span>
+      </div>
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <h1 style="margin: 0; font-size: 26px; font-weight: 800">{{selName}}</h1>
+          <span style="font-size: 14px; color: #575653">in <strong style="color: #100F0F">{{selProject}}</strong></span>
+        </div>
+        <p style="margin: 4px 0 0; color: #5E409D; font-size: 14px">⎇ {{selBranch}}</p>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <p class="sec">Links</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{selLinks}}" as="l" hint-placeholder-count="4">
+            <a href="#" title="{{l.url}}" class="hbtn" style="min-height: 32px; font-size: 13px; background: #FFFFFF">{{l.label}}</a>
+          </sc-for>
+        </div>
+        <span class="note">From the project’s Worktree links setting, so each project shows its own.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <p class="sec">Services</p>
+        <table style="border-collapse: collapse; font-size: 14px; max-width: 560px">
+          <tbody>
+            <sc-for list="{{selServices}}" as="s" hint-placeholder-count="4">
+              <tr>
+                <td style="padding: 5px 16px 5px 0">{{s.name}}</td>
+                <td style="padding: 5px 16px 5px 0; color: {{s.color}}">{{s.state}}</td>
+                <td class="mono" style="padding: 5px 16px 5px 0; font-size: 12px; color: #575653">{{s.unit}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; max-width: 720px; padding: 14px 16px; border: 1px dashed #CECDC3; border-radius: 10px">
+        <p class="sec">How switching behaves</p>
+        <ul class="note" style="margin: 0; padding-left: 18px">
+          <li>One project at a time. The page opens on the project you used last; a worktree’s URL names its project, so a bookmark opens that one instead.</li>
+          <li>Agents waiting in other projects still show: in the strip above the list, in the switcher’s ◆ counts and in the header’s total. Notifications fire for every project.</li>
+          <li>Searching the switcher finds worktrees in any project, and picking one switches to its project.</li>
+          <li>The task palette (<span class="kbd">:</span>) runs tasks for the selected worktree’s project; project-wide tasks say which project they act on.</li>
+          <li>Each job in the actions panel is labelled with its project.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { view: 'filial', open: true, query: '', sel: 'filial/patient-photos', themeOpen: true, base: 'flexoki', custom: null, saved: false, showToml: false };
+  }
+  renderVals() {
+    const st = this.state;
+    const AG = {
+      permission: ['◆ needs permission', '#BC5215', 800, true],
+      reply: ['◆ waiting for reply', '#BC5215', 800, true],
+      working: ['● working', '#205EA6', 400, false],
+      turn: ['· your turn', '#8E6B01', 400, false],
+      idle: ['· idle', '#575653', 400, false],
+      off: ['○ off', '#575653', 400, false]
+    };
+    const SV = { up: ['●', '#536907', 'up'], down: ['○', '#575653', 'stopped'], part: ['◐', '#8E6B01', 'partly up'] };
+    const P = [
+      { name: 'Filial Rails', prefix: 'filial', stack: 'rails@1', svcs: ['app', 'deps', 'db', 'cache', 'storage', 'browser'], wts: [
+        ['master', 'master', '', 'up', 'idle'],
+        ['patient-photos', 'jb/patient-photos', '#2141', 'up', 'permission'],
+        ['billing-export', 'jb/billing-export', '#2138', 'up', 'working'],
+        ['pdf-reports', 'jb/pdf-reports', '#2120', 'part', 'turn'],
+        ['ui-refresh', 'jb/ui-refresh', '', 'down', 'off']
+      ] },
+      { name: 'Billing sandbox', prefix: 'billing', stack: 'rails@1', svcs: ['app', 'deps', 'db', 'cache', 'mail'], wts: [
+        ['main', 'main', '', 'up', 'reply'],
+        ['stripe-webhooks', 'stripe-webhooks', '#88', 'down', 'off']
+      ] },
+      { name: 'Phoenix demo', prefix: 'phx', stack: 'phoenix@1', svcs: ['app', 'deps', 'db'], wts: [
+        ['main', 'main', '', 'up', 'idle']
+      ] }
+    ];
+    const id = (p, w) => p.prefix + '/' + w[0];
+    
+    const needOf = (p) => p.wts.filter((w) => AG[w[4]][3]).length;
+    const workingOf = (p) => p.wts.filter((w) => w[4] === 'working').length;
+    const upOf = (p) => p.wts.filter((w) => w[3] !== 'down').length;
+    const needTotal = P.reduce((n, p) => n + needOf(p), 0);
+    const q = st.query.trim().toLowerCase();
+
+    const menu = P.map((p, i) => ({ label: p.name, prefix: p.prefix, key: String(i + 1), stack: p.stack, sub: p.wts.length + ' worktrees · ' + upOf(p) + ' running', need: String(needOf(p)), hasNeed: needOf(p) > 0, working: String(workingOf(p)), hasWorking: workingOf(p) > 0, on: st.view === p.prefix, v: p.prefix }))
+      .filter((m) => !q || (m.label + ' ' + m.prefix).toLowerCase().includes(q))
+      .map((m) => ({ ...m, bg: m.on ? '#E6E4D9' : 'transparent', pick: () => this.setState({ view: m.v, open: false, query: '' }) }));
+    const hits = [];
+    if (q) P.forEach((p) => p.wts.forEach((w) => {
+      if ((w[0] + ' ' + w[1]).toLowerCase().includes(q)) hits.push({ name: w[0], path: '/' + id(p, w), agent: AG[w[4]][0], agentColor: AG[w[4]][1], pick: () => this.setState({ sel: id(p, w), open: false, query: '', view: p.prefix }) });
+    }));
+
+    const groups = P.filter((p) => p.prefix === st.view).map((p) => ({
+      name: p.name, prefix: p.prefix, stack: p.stack, summary: p.wts.length + ' worktrees · ' + upOf(p) + ' running',
+      rows: p.wts.map((w) => {
+        const cur = st.sel === id(p, w);
+        const a = AG[w[4]], s = SV[w[3]];
+        return { name: w[0], branch: w[1], pr: w[2] || '—', prColor: w[2] ? '#100F0F' : '#575653', svc: s[0], svcColor: s[1], svcWord: s[2], agent: a[0], agentColor: a[1], agentWeight: a[2], current: cur ? 'page' : 'false', bg: cur ? '#E6E4D9' : 'transparent', bar: cur ? '#BC5215' : 'transparent', weight: cur ? 800 : 600, pick: () => this.setState({ sel: id(p, w) }) };
+      })
+    }));
+
+    const elsewhere = [];
+    P.filter((p) => p.prefix !== st.view).forEach((p) => p.wts.forEach((w) => {
+      if (AG[w[4]][3]) elsewhere.push({ project: p.name, name: w[0], why: AG[w[4]][0].slice(2), pick: () => this.setState({ view: p.prefix, sel: id(p, w) }) });
+    }));
+
+    let sp = P[0], sw = P[0].wts[1];
+    P.forEach((p) => p.wts.forEach((w) => { if (id(p, w) === st.sel) { sp = p; sw = w; } }));
+    const host = sw[0] + '.' + sp.prefix + '.localhost';
+    const selLinks = [{ label: 'App', url: host }];
+    if (sp.prefix === 'filial') selLinks.push({ label: 'Letter opener', url: host + '/letter_opener' }, { label: 'Storage console', url: 's3-ui.' + host }, { label: 'Browser (VNC)', url: 'vnc.' + host }, { label: 'Admin', url: host + '/admin' });
+    if (sp.prefix === 'billing') selLinks.push({ label: 'Mailpit', url: 'mail.' + host }, { label: 'Sidekiq', url: host + '/sidekiq' });
+    if (sp.prefix === 'phx') selLinks.push({ label: 'LiveDashboard', url: host + '/dev/dashboard' }, { label: 'Mailbox', url: host + '/dev/mailbox' });
+    selLinks.push({ label: 'Logs', url: 'logs.localhost' });
+    const svState = sw[3];
+    const selServices = sp.svcs.map((n, i) => {
+      const on = svState === 'up' || (svState === 'part' && i < 3);
+      const oneshot = n === 'deps';
+      return { name: n, state: oneshot ? (on ? '✓ done' : '○ not run') : (on ? '● running' : '○ stopped'), color: on ? '#536907' : '#575653', unit: sp.prefix + '-' + n + '@' + sw[0] };
+    });
+
+    const PAL = {
+      flexoki: { label: 'Flexoki', bg: '#FFFCF0', bg2: '#F2F0E5', sel: '#E6E4D9', border: '#CECDC3', text: '#100F0F', muted: '#6F6E69', accent: '#BC5215', blue: '#205EA6', green: '#536907', yellow: '#8E6B01' },
+      paper: { label: 'Paper', bg: '#FFFFFF', bg2: '#F4F4F5', sel: '#E4E4E7', border: '#D4D4D8', text: '#18181B', muted: '#62626B', accent: '#7C3AED', blue: '#1D4ED8', green: '#15803D', yellow: '#A16207' },
+      solar: { label: 'Solarized', bg: '#FDF6E3', bg2: '#EEE8D5', sel: '#E4DCC4', border: '#D3CBB2', text: '#073642', muted: '#586E75', accent: '#B03F0F', blue: '#1B6699', green: '#5C6B00', yellow: '#7A5C00' },
+      contrast: { label: 'High contrast', bg: '#FFFFFF', bg2: '#F0F0F0', sel: '#DADADA', border: '#7A7A7A', text: '#000000', muted: '#3D3D3D', accent: '#B3261E', blue: '#0040A8', green: '#1E5E00', yellow: '#6B4E00' }
+    };
+    const TOK = [
+      ['bg', 'Background', 'page'], ['bg2', 'Panels', 'header, headings'], ['text', 'Text', 'names, values'], ['muted', 'Muted', 'secondary text'],
+      ['accent', 'Accent', '◆ needs you, selection'], ['blue', 'Working', '● working, links'], ['green', 'Running', '● services up'], ['yellow', 'Your turn', 'warnings']
+    ];
+    const base = PAL[st.base];
+    const pal = { ...base, ...(st.custom || {}) };
+    const edited = !!st.custom && Object.keys(st.custom).length > 0;
+    const palettes = Object.keys(PAL).map((k) => ({ label: PAL[k].label, c1: PAL[k].bg, c2: PAL[k].accent, c3: PAL[k].blue, on: st.base === k && !edited, border: st.base === k ? (edited ? '#CECDC3' : '#205EA6') : '#CECDC3', bg: st.base === k && !edited ? '#EAF1FA' : '#FFFFFF', pick: () => this.setState({ base: k, custom: null, saved: false }) }))
+      .concat(edited ? [{ label: 'Custom', c1: pal.bg, c2: pal.accent, c3: pal.blue, on: true, border: '#205EA6', bg: '#EAF1FA', pick: () => {} }] : []);
+    const tokens = TOK.map(([k, label, use]) => ({ label, use, value: pal[k], set: (e) => this.setState({ custom: { ...(st.custom || {}), [k]: e.target.value }, saved: false }) }));
+    const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const weak = TOK.filter(([k]) => !['bg', 'bg2'].includes(k)).filter(([k]) => ratio(pal[k], pal.bg) < 4.5).map(([, label]) => label);
+    const toml = '[colors.light]\nbase = "' + st.base + '"' + (edited ? '\n' + Object.keys(st.custom).map((k) => k + ' = "' + st.custom[k] + '"').join('\n') : '');
+    const cur = P.find((p) => p.prefix === st.view);
+    return {
+      open: st.open, toggleOpen: () => this.setState({ open: !st.open }), switchBg: st.open ? '#E6E4D9' : '#FFFCF0',
+      themeOpen: st.themeOpen, toggleTheme: () => this.setState({ themeOpen: !st.themeOpen }), themeBtnBg: st.themeOpen ? '#E6E4D9' : '#FFFCF0',
+      palettes, tokens, pv: pal, hasContrast: weak.length > 0,
+      contrastMsg: weak.join(', ') + (weak.length === 1 ? ' is' : ' are') + ' hard to read on this background (under 4.5:1). Saving still works.',
+      saveLabel: st.saved ? 'Saved ✓' : 'Save', saveTheme: () => this.setState({ saved: true }),
+      baseLabel: base.label, resetTheme: () => this.setState({ custom: null, saved: false }),
+      showToml: st.showToml, toggleToml: () => this.setState({ showToml: !st.showToml }), toml,
+      currentLabel: cur.name, currentPrefix: cur.prefix,
+      needTotal: String(needTotal), hasNeed: needTotal > 0,
+      query: st.query, setQuery: (e) => this.setState({ query: e.target.value }),
+      menu, hits, hasHits: hits.length > 0, noHits: !!q && !menu.length && !hits.length,
+      groups, elsewhere, hasElsewhere: elsewhere.length > 0,
+      selName: sw[0], selProject: sp.name, selBranch: sw[1], selUrl: '/' + id(sp, sw), selLinks, selServices
+    };
+  }
+}
+</script>
+</body>
+</html>

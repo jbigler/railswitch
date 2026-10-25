@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New project: environment</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.step{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;text-decoration:none;color:#575653;font-weight:600;font-size:14px;min-height:44px;box-sizing:border-box}
+.step:hover{background:#F2F0E5;color:#100F0F}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+th{text-align:left;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#575653;padding:10px 12px;border-bottom:1px solid #CECDC3;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid #E6E4D9;font-size:14px;vertical-align:top}
+.inp{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:44px;box-sizing:border-box;min-width:0}
+.mini{font:inherit;font-size:13px;padding:6px 8px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:36px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">New project</span>
+    <span style="flex-grow: 1"></span>
+    <a href="#" style="font-size: 14px; color: #575653">Cancel</a>
+  </header>
+
+  <nav aria-label="Setup" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 12px 24px; border-bottom: 1px solid #E6E4D9">
+    <a class="step" href="Main.dc.html"><span class="mono" style="font-size: 12px">1</span>Stack &amp; options</a>
+    <a class="step" href="Review.dc.html"><span class="mono" style="font-size: 12px">2</span>Review &amp; create</a>
+    <span aria-hidden="true" style="width: 1px; height: 24px; background: #CECDC3; margin: 0 10px"></span>
+    <span style="font-size: 12px; color: #575653; margin-right: 4px">Advanced, optional:</span>
+    <a href="Images.dc.html" style="display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #575653; font-weight: 600; font-size: 13px; min-height: 40px; box-sizing: border-box">Images</a>
+    <a href="Environment.dc.html" aria-current="page" style="display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; background: #100F0F; color: #FFFCF0; font-weight: 600; font-size: 13px; min-height: 40px; box-sizing: border-box">Environment</a>
+  </nav>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 24px; background: #F2F0E5; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+    <span style="font-weight: 800">Choices from step 1</span>
+    <span style="color: #575653">(switch here to preview)</span>
+    <sc-for list="{{bar}}" as="b" hint-placeholder-count="5">
+      <span style="display: inline-flex; align-items: center; gap: 6px"><label for="{{b.id}}" style="color: #575653">{{b.label}}</label><select id="{{b.id}}" class="mini" value="{{b.value}}" onChange="{{b.change}}"><sc-for list="{{b.options}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></span>
+    </sc-for>
+  </div>
+
+  <main style="display: flex; flex-wrap: wrap; gap: 32px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box; align-items: flex-start">
+    <div style="flex: 999 1 680px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+      <div>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Environment</h1>
+        <p style="margin: 6px 0 0; color: #575653; font-size: 15px; max-width: 760px">Most of it comes with the {{packLabel}} pack and the options you picked. You only add what is particular to this project. A later layer wins over an earlier one for the same name.</p>
+      </div>
+
+      <div role="tablist" aria-label="Service" style="display: flex; flex-wrap: wrap; gap: 6px">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="6">
+          <button type="button" role="tab" aria-selected="{{t.selected}}" onClick="{{t.pick}}" style="min-height: 40px; padding: 6px 14px; border-radius: 8px; border: 1px solid {{t.border}}; background: {{t.bg}}; color: {{t.fg}}; font: inherit; font-size: 14px; cursor: pointer"><span class="mono">{{t.id}}</span> <span style="font-size: 12px; opacity: 0.75">{{t.role}}</span></button>
+        </sc-for>
+      </div>
+
+      <div style="overflow-x: auto; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+        <table style="border-collapse: collapse; width: 100%; min-width: 760px">
+          <caption style="text-align: left; padding: 14px 12px 4px; font-size: 15px; font-weight: 800">Effective environment for <span class="mono">{{svc}}</span> <span style="font-weight: 600; color: #575653; font-size: 13px">· {{count}} variables</span></caption>
+          <thead><tr><th scope="col">Name</th><th scope="col">Value</th><th scope="col">Layer</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+          <tbody>
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+              <tr style="opacity: {{r.opacity}}">
+                <td class="mono" style="font-size: 13px; font-weight: 600; text-decoration: {{r.strike}}">{{r.k}}</td>
+                <td class="mono" style="font-size: 13px; overflow-wrap: anywhere; text-decoration: {{r.strike}}">{{r.v}}</td>
+                <td><span class="chip" style="border-color: {{r.color}}; color: {{r.color}}; background: #FFFFFF">{{r.layer}}</span><sc-if value="{{r.over}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #575653"> overridden</span></sc-if></td>
+                <td style="text-align: right"><sc-if value="{{r.editable}}" hint-placeholder-val="{{ true }}"><button type="button" aria-label="Override {{r.k}}" style="width: 36px; height: 36px; border: 0; background: transparent; color: #575653; cursor: pointer; border-radius: 6px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg></button></sc-if></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: #575653">Editing a pack or option variable adds an override at the project or service layer; the original stays visible, struck through.</p>
+
+      <form style="display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 16px; border: 1px dashed #CECDC3; border-radius: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px">
+          <label for="nk" style="font-size: 13px; font-weight: 700">Name</label>
+          <input id="nk" class="inp mono" type="text" placeholder="SENTRY_DSN">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 2 1 260px">
+          <label for="nv" style="font-size: 13px; font-weight: 700">Value</label>
+          <input id="nv" class="inp mono" type="text" placeholder="a value, or a reference like worktree.host">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px">
+          <label for="ns" style="font-size: 13px; font-weight: 700">Set for</label>
+          <select id="ns" class="inp"><option>Every service</option><option selected="selected">This service only</option><option>Secret (stored locally)</option></select>
+        </div>
+        <button type="button" style="min-height: 44px; padding: 8px 18px; border-radius: 8px; border: 0; background: #100F0F; color: #FFFCF0; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Add</button>
+      </form>
+    </div>
+
+    <aside aria-labelledby="layers-h" style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #F2F0E5">
+      <h2 id="layers-h" style="margin: 0; font-size: 16px; font-weight: 800">Layers, lowest first</h2>
+      <sc-for list="{{layers}}" as="l" hint-placeholder-count="7">
+        <div style="display: flex; gap: 12px">
+          <span class="mono" aria-hidden="true" style="flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; background: {{l.color}}; color: #FFFFFF; font-size: 12px; display: flex; align-items: center; justify-content: center">{{l.n}}</span>
+          <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+            <span style="font-weight: 800; font-size: 14px">{{l.name}}</span>
+            <span style="font-size: 13px; color: #34332F">{{l.desc}}</span>
+            <span class="mono" style="font-size: 12px; color: #575653; overflow-wrap: anywhere">{{l.where}}</span>
+          </div>
+        </div>
+      </sc-for>
+      <p style="margin: 0; padding-top: 12px; border-top: 1px solid #CECDC3; font-size: 13px; color: #34332F">Build args are not runtime environment. They live on the image (step 2) and change its tag.</p>
+      <a href="Review.dc.html" style="display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; background: #BC5215; color: #FFFFFF; font-weight: 700; text-decoration: none; font-size: 15px">Next: review</a>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { stack: 'rails', database: 'postgres', cache: 'redis', storage: 'rustfs', browser: 'playwright', svc: 'app' };
+  }
+  renderVals() {
+    const st = this.state;
+    const H = 'my-feature.localhost';
+    const PACKS = {
+      rails: { label: 'Rails', app: 'rails', env: [['RAILS_ENV', 'development']], hosts: [['DEV_HOSTS', '{worktree.host}'], ['DOMAIN', '{worktree.host}']], debug: [['RUBY_DEBUG_PORT', '33007']], db: { postgres: 'postgres://', mysql: 'mysql2://', mariadb: 'mysql2://', sqlite: 'sqlite3:storage/development.sqlite3' } },
+      hanami: { label: 'Hanami', app: 'web', env: [['HANAMI_ENV', 'development']], hosts: [], debug: [['RUBY_DEBUG_PORT', '33007']], db: { postgres: 'postgres://', mysql: 'mysql2://', mariadb: 'mysql2://', sqlite: 'sqlite://db/development.sqlite' } },
+      phoenix: { label: 'Phoenix', app: 'web', env: [['MIX_ENV', 'dev']], hosts: [['PHX_HOST', '{worktree.host}']], debug: [], db: { postgres: 'ecto://', mysql: 'ecto://', mariadb: 'ecto://', sqlite: 'dev.db' } },
+      django: { label: 'Django', app: 'web', env: [['DJANGO_SETTINGS_MODULE', '[project].settings'], ['DEBUG', '1']], hosts: [['ALLOWED_HOSTS', '{worktree.host}'], ['CSRF_TRUSTED_ORIGINS', 'http://{worktree.host}']], debug: [], db: { postgres: 'postgres://', mysql: 'mysql://', mariadb: 'mysql://', sqlite: 'sqlite:///db.sqlite3' } },
+      flask: { label: 'Flask', app: 'web', env: [['FLASK_APP', '[app]'], ['FLASK_DEBUG', '1']], hosts: [['SERVER_NAME', '{worktree.host}']], debug: [], db: { postgres: 'postgresql+psycopg://', mysql: 'mysql+pymysql://', mariadb: 'mysql+pymysql://', sqlite: 'sqlite:///instance/dev.db' } },
+      node: { label: 'Node', app: 'web', env: [['NODE_ENV', 'development']], hosts: [['ALLOWED_HOSTS', '{worktree.host}']], debug: [], db: { postgres: 'postgres://', mysql: 'mysql://', mariadb: 'mysql://', sqlite: 'file:./dev.db' } }
+    };
+    const pack = PACKS[st.stack];
+    const DB = {
+      postgres: { own: [['PGTZ', '{TZ}']], secret: [['POSTGRES_PASSWORD', '••••••••']], user: 'postgres' },
+      mysql: { own: [['MYSQL_DATABASE', '[db]']], secret: [['MYSQL_ROOT_PASSWORD', '••••••••']], user: 'root' },
+      mariadb: { own: [['MARIADB_DATABASE', '[db]']], secret: [['MARIADB_ROOT_PASSWORD', '••••••••']], user: 'root' }
+    };
+    const STORE = {
+      rustfs: { own: [['RUSTFS_ADDRESS', '0.0.0.0:9000'], ['RUSTFS_ACCESS_KEY', 'rustfsadmin'], ['RUSTFS_CHECK_UPDATE', 'false'], ['RUSTFS_TELEMETRY', 'off']], secret: [['RUSTFS_SECRET_KEY', '••••••••']] },
+      minio: { own: [['MINIO_ROOT_USER', 'minioadmin']], secret: [['MINIO_ROOT_PASSWORD', '••••••••']] }
+    };
+    const hasDb = !!DB[st.database];
+    const set = (k) => (e) => this.setState({ [k]: e.target.value, svc: k === 'stack' ? 'app' : st.svc });
+    const bar = [
+      { id: 'e-stack', label: 'Stack', value: st.stack, change: set('stack'), options: Object.keys(PACKS).map((k) => ({ v: k, l: PACKS[k].label })) },
+      { id: 'e-db', label: 'Database', value: st.database, change: set('database'), options: [['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) },
+      { id: 'e-cache', label: 'Cache', value: st.cache, change: set('cache'), options: [['redis', 'Redis'], ['valkey', 'Valkey'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) },
+      { id: 'e-storage', label: 'Storage', value: st.storage, change: set('storage'), options: [['rustfs', 'RustFS'], ['minio', 'MinIO'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) },
+      { id: 'e-browser', label: 'Browser', value: st.browser, change: set('browser'), options: [['playwright', 'Playwright'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) }
+    ];
+
+    const services = [['app', pack.app, 'app'], ['deps', 'deps', 'deps']];
+    if (hasDb) services.push(['db', 'db', 'data']);
+    if (st.cache !== 'none') services.push(['cache', 'cache', 'data']);
+    if (st.storage !== 'none') services.push(['storage', 'storage', 'data']);
+    if (st.browser !== 'none') services.push(['browser', 'browser', 'tool']);
+    services.push(['nvim', 'nvim', 'tool'], ['claude', 'claude', 'tool']);
+    const svcKey = services.some((s) => s[0] === st.svc) ? st.svc : 'app';
+    const svcName = services.find((s) => s[0] === svcKey)[1];
+
+    // Option-provided connection env for the app (and tools that run app code)
+    const conn = [];
+    const connSecret = [];
+    if (hasDb) { conn.push(['DATABASE_URL', pack.db[st.database] + DB[st.database].user + ':${DB_PASSWORD}@db/[db]']); connSecret.push(['DB_PASSWORD', '••••••••']); }
+    if (st.database === 'sqlite') conn.push(['DATABASE_URL', pack.db.sqlite]);
+    if (st.cache !== 'none') conn.push(['REDIS_URL', 'redis://cache:6379/1']);
+    if (st.storage !== 'none') { conn.push(['S3_ENDPOINT', 'http://storage:9000'], ['S3_ACCESS_KEY', st.storage === 'rustfs' ? 'rustfsadmin' : 'minioadmin']); connSecret.push(['S3_SECRET_KEY', '••••••••']); }
+    if (st.browser !== 'none') conn.push(['PLAYWRIGHT_HOST', 'ws://browser:8888/connect']);
+
+    const L = {
+      pack: { name: pack.label + ' pack', color: '#BC5215' },
+      option: { name: 'Option', color: '#205EA6' },
+      project: { name: 'Project', color: '#536907' },
+      service: { name: 'Service', color: '#3E6E8E' },
+      worktree: { name: 'Worktree', color: '#5E409D' },
+      secret: { name: 'Secret', color: '#AF3029' },
+      share: { name: 'wt:share', color: '#8E6B01' }
+    };
+    const layered = [];
+    const push = (list, key) => (list || []).forEach((kv) => layered.push({ k: kv[0], v: kv[1], key }));
+    const runsApp = svcKey === 'app' || svcKey === 'nvim' || svcKey === 'claude';
+    if (runsApp) { push(pack.env, 'pack'); push(pack.hosts, 'pack'); }
+    if (svcKey === 'deps') push(pack.env, 'pack');
+    if (runsApp) push(conn, 'option');
+    if (svcKey === 'db' && hasDb) push(DB[st.database].own, 'option');
+    if (svcKey === 'storage' && STORE[st.storage]) push(STORE[st.storage].own, 'option');
+    if (svcKey === 'browser') push([['HEADLESS_SYSTEM_TESTS', '0'], ['CHROME_START_URL', 'http://{worktree.host}']], 'option');
+    push([['TZ', 'Asia/Bangkok']], 'project');
+    if (svcKey === 'app' && st.browser !== 'none') push([['HEADLESS_SYSTEM_TESTS', '0']], 'service');
+    if (svcKey === 'deps' && st.browser !== 'none') push([['PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD', '1']], 'service');
+    if (svcKey === 'nvim' || svcKey === 'claude') push([['EDITOR', 'nvim'], ['SSH_AUTH_SOCK', '/tmp/ssh-agent.sock']], 'service');
+    if (svcKey === 'claude') push([['CLAUDE_FIREWALL_ALLOW', '']], 'service');
+    if (runsApp || svcKey === 'browser') push([['WORKTREE_HOST', H]], 'worktree');
+    if (svcKey === 'app') push(pack.debug, 'worktree');
+    if (svcKey === 'db') push([['DB_PORT', '55439 (127.0.0.1 only)']], 'worktree');
+    if (runsApp) push(connSecret, 'secret');
+    if (svcKey === 'db' && hasDb) push(DB[st.database].secret, 'secret');
+    if (svcKey === 'storage' && STORE[st.storage]) push(STORE[st.storage].secret, 'secret');
+    if (svcKey === 'nvim' || svcKey === 'claude') push([['GH_TOKEN', 'passed through from host']], 'secret');
+    if (svcKey === 'app' && pack.hosts.length) push([[pack.hosts[0][0], 'my-feature.tail1234.ts.net']], 'share');
+
+    const lastIdx = {};
+    layered.forEach((r, i) => { lastIdx[r.k] = i; });
+    const rows = layered.map((r, i) => {
+      const over = lastIdx[r.k] !== i;
+      return { k: r.k, v: r.v || '(empty)', layer: L[r.key].name, color: L[r.key].color, over, strike: over ? 'line-through' : 'none', opacity: over ? '0.6' : '1', editable: r.key !== 'worktree' && r.key !== 'share' };
+    });
+    const tabs = services.map((s) => ({
+      id: s[1], role: s[2], selected: s[0] === svcKey ? 'true' : 'false', pick: () => this.setState({ svc: s[0] }),
+      border: s[0] === svcKey ? '#100F0F' : '#CECDC3', bg: s[0] === svcKey ? '#100F0F' : '#FFFFFF', fg: s[0] === svcKey ? '#FFFCF0' : '#34332F'
+    }));
+    const layers = [
+      { n: '1', name: 'Pack', color: L.pack.color, desc: 'The framework’s own variables: environment name, allowed hosts, link host. Written in terms of the worktree.', where: 'stack pack (' + pack.label + ')' },
+      { n: '2', name: 'Option', color: L.option.color, desc: 'What each option on step 1 gives the app (DATABASE_URL, REDIS_URL…) and needs itself.', where: 'the option definitions' },
+      { n: '3', name: 'Project', color: L.project.color, desc: 'Every service. Saved in templates.', where: 'project.toml [env]' },
+      { n: '4', name: 'Service', color: L.service.color, desc: 'One service only. Saved in templates.', where: 'project.toml [services.<id>.env]' },
+      { n: '5', name: 'Worktree', color: L.worktree.color, desc: 'Hosts and ports worked out per worktree. Read-only.', where: '.unit-env/<slug>.env' },
+      { n: '6', name: 'Secret', color: L.secret.color, desc: 'Names in project.toml, values only on this host, never in a template.', where: 'mise.local.toml' },
+      { n: '7', name: 'wt:share', color: L.share.color, desc: 'Only while a worktree is shared over the tailnet; replaces the pack’s host variable.', where: '.unit-env/<slug>.share.env' }
+    ];
+    return { bar, packLabel: pack.label, svc: svcName, tabs, rows, count: rows.filter((r) => !r.over).length, layers };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New project: stack and options</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.step{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;text-decoration:none;color:#575653;font-weight:600;font-size:14px;min-height:44px;box-sizing:border-box}
+.step:hover{background:#F2F0E5;color:#100F0F}
+.adv{display:flex;align-items:center;padding:8px 12px;border-radius:8px;text-decoration:none;color:#575653;font-weight:600;font-size:13px;min-height:40px;box-sizing:border-box}
+.adv:hover{background:#F2F0E5;color:#100F0F}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field input{font:inherit;font-size:15px;padding:10px 12px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:44px;box-sizing:border-box}
+.field input:focus{outline:2px solid #205EA6;outline-offset:1px}
+.kv{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:6px 16px;font-size:13px}
+.kv dt{color:#575653;font-weight:700}
+.kv dd{margin:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">New project</span>
+    <span style="flex-grow: 1"></span>
+    <a href="Templates.dc.html" style="font-size: 14px">Library</a>
+    <a href="Machine.dc.html" style="font-size: 14px">This machine</a>
+    <a href="#" style="font-size: 14px; color: #575653">Cancel</a>
+  </header>
+
+  <nav aria-label="Setup" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 12px 24px; border-bottom: 1px solid #E6E4D9">
+    <a class="step" href="Main.dc.html" aria-current="step" style="background: #100F0F; color: #FFFCF0"><span class="mono" style="font-size: 12px">1</span>Stack &amp; options</a>
+    <a class="step" href="Review.dc.html"><span class="mono" style="font-size: 12px">2</span>Review &amp; create</a>
+    <span aria-hidden="true" style="width: 1px; height: 24px; background: #CECDC3; margin: 0 10px"></span>
+    <span style="font-size: 12px; color: #575653; margin-right: 4px">Advanced, optional:</span>
+    <a class="adv" href="Images.dc.html">Images</a>
+    <a class="adv" href="Environment.dc.html">Environment</a>
+  </nav>
+
+  <main style="display: flex; flex-wrap: wrap; gap: 32px; padding: 28px 24px 48px; max-width: 1400px; width: 100%; margin: 0 auto; box-sizing: border-box; align-items: flex-start">
+    <div style="flex: 999 1 680px; min-width: 0; display: flex; flex-direction: column; gap: 32px">
+
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 16px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF">
+        <span style="flex: 1 1 360px; font-size: 14px">Already set this workspace up by hand? Adopt it instead of starting over: it keeps your worktrees, volumes and changes.</span>
+        <a href="Adopt.dc.html" style="display: inline-flex; align-items: center; min-height: 40px; padding: 6px 14px; border-radius: 8px; border: 1px solid #CECDC3; font-weight: 700; font-size: 14px; text-decoration: none; color: #100F0F">Adopt this workspace</a>
+      </div>
+
+      <section style="display: flex; flex-direction: column; gap: 16px">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Start a new project</h1>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px">
+          <div class="field" style="grid-column: span 2">
+            <label for="repo" style="font-weight: 700; font-size: 14px">Repository</label>
+            <input id="repo" class="mono" type="text" value="git@github.com:[ORG]/[REPO].git">
+            <span style="font-size: 12px; color: #575653">Cloned into master/ and read to suggest everything below.</span>
+          </div>
+          <div class="field">
+            <label for="branch" style="font-weight: 700; font-size: 14px">Base branch</label>
+            <input id="branch" class="mono" type="text" value="master">
+          </div>
+          <div class="field">
+            <label for="pname" style="font-weight: 700; font-size: 14px">Project name</label>
+            <input id="pname" type="text" value="{{name}}" onChange="{{setName}}">
+          </div>
+          <div class="field">
+            <label for="prefix" style="font-weight: 700; font-size: 14px">Prefix</label>
+            <input id="prefix" class="mono" type="text" value="{{prefix}}" onChange="{{setPrefix}}" aria-describedby="prefix-help">
+            <span id="prefix-help" style="font-size: 12px; color: #575653">Names <span class="mono">{{prefix}}-&lt;slug&gt;-db</span> and hosts <span class="mono">&lt;slug&gt;.{{prefix}}.localhost</span>. Must be unused on <a href="Machine.dc.html">this machine</a>.</span>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="stack-h" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px">
+          <h2 id="stack-h" style="margin: 0; font-size: 20px; font-weight: 800">Stack</h2>
+          <span style="font-size: 13px; color: #575653">Read from master. Check it, change only what is wrong.</span>
+          <span style="flex-grow: 1"></span>
+          <button type="button" style="min-height: 36px; padding: 4px 12px; border-radius: 8px; border: 1px solid #CECDC3; background: #FFFFFF; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Read the repository again</button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 16px; border: 1.5px solid #BC5215; border-radius: 10px; background: #FFFFFF">
+          <div style="flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+            <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 800; font-size: 17px">{{pack.label}}</span><span class="chip mono">{{pack.id}}@1</span><span style="font-size: 12px; font-weight: 700; color: {{stackSrcColor}}">{{stackSrc}}</span></span>
+            <span style="font-size: 13px; color: #34332F">App service <span class="mono">{{appName}}</span> runs <span class="mono">{{pack.server}}</span> on :{{pack.port}} at <span class="mono">{{appHost}}</span>; <span class="mono">deps</span> runs <span class="mono">{{pack.install}}</span> before each start.</span>
+          </div>
+          <label for="stacksel" style="font-size: 13px; color: #575653">Stack</label>
+          <select id="stacksel" value="{{stack}}" onChange="{{setStack}}" style="min-height: 40px; padding: 6px 10px; border: 1px solid #CECDC3; border-radius: 6px; background: #FFFFFF; font: inherit; font-size: 14px">
+            <sc-for list="{{stacks}}" as="s" hint-placeholder-count="6"><option value="{{s.id}}">{{s.label}}</option></sc-for>
+          </select>
+        </div>
+        <sc-if value="{{showPack}}" hint-placeholder-val="{{ false }}">
+          <dl class="kv" style="margin: 0; padding: 14px 16px; border: 1px solid #E6E4D9; border-radius: 10px; background: #FFFFFF">
+            <dt>Version files</dt><dd class="mono">{{pack.versions}}</dd>
+            <dt>Caches</dt><dd>{{pack.caches}}</dd>
+            <dt>Allowed hosts</dt><dd>{{pack.hosts}}</dd>
+            <dt>Console, tests</dt><dd class="mono">{{pack.console}} · {{pack.tests}}</dd>
+            <dt>Registries</dt><dd class="mono">{{pack.registries}}</dd>
+          </dl>
+        </sc-if>
+        <button type="button" onClick="{{togglePack}}" aria-expanded="{{packExpanded}}" style="align-self: flex-start; min-height: 32px; padding: 0; border: 0; background: transparent; color: #205EA6; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">{{packToggleLabel}}</button>
+      </section>
+
+      <section aria-labelledby="svc-h" style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px">
+          <h2 id="svc-h" style="margin: 0; font-size: 20px; font-weight: 800">Beside the app</h2>
+          <span style="font-size: 13px; color: #575653">{{detectedCount}} of {{slotCount}} read from the repository</span>
+        </div>
+        <div style="display: flex; flex-direction: column; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; overflow: hidden">
+          <sc-for list="{{slots}}" as="sl" hint-placeholder-count="6">
+            <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #E6E4D9">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px">
+                <span style="width: 150px; flex-shrink: 0; font-weight: 800; font-size: 14px">{{sl.label}}</span>
+                <span style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                  <span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span style="font-weight: 700; font-size: 15px">{{sl.selLabel}}</span><span class="mono" style="font-size: 12px; color: #575653">{{sl.selSub}}</span></span>
+                  <span style="font-size: 12px; font-weight: 700; color: {{sl.srcColor}}">{{sl.src}}</span>
+                </span>
+                <button type="button" onClick="{{sl.toggle}}" aria-expanded="{{sl.expandedStr}}" style="min-height: 36px; padding: 4px 12px; border-radius: 8px; border: 1px solid #CECDC3; background: #FFFFFF; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer">{{sl.toggleLabel}}</button>
+              </div>
+              <sc-if value="{{sl.expanded}}" hint-placeholder-val="{{ false }}">
+                <fieldset style="margin: 0; padding: 0 0 4px; border: 0; display: flex; flex-direction: column; gap: 8px">
+                  <legend class="eyebrow" style="margin-bottom: 6px">{{sl.label}} options · role {{sl.role}}</legend>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px">
+                    <sc-for list="{{sl.options}}" as="o" hint-placeholder-count="4">
+                      <label style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; border: 1.5px solid {{o.border}}; background: {{o.bg}}; cursor: pointer; min-height: 44px">
+                        <span style="display: flex; align-items: center; gap: 8px"><input type="radio" name="{{sl.id}}" checked="{{o.on}}" onChange="{{o.pick}}" style="width: 16px; height: 16px; margin: 0"><span style="font-weight: 700; font-size: 14px">{{o.label}}</span></span>
+                        <span class="mono" style="font-size: 11px; color: #575653; overflow-wrap: anywhere">{{o.sub}}</span>
+                      </label>
+                    </sc-for>
+                  </div>
+                  <p style="margin: 0; font-size: 13px; color: #34332F">{{sl.detail}}</p>
+                  <a href="Images.dc.html" style="align-self: flex-start; font-size: 13px; font-weight: 700">Add another option…</a>
+                </fieldset>
+              </sc-if>
+            </div>
+          </sc-for>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 12px 16px">
+            <span style="width: 150px; flex-shrink: 0; font-weight: 800; font-size: 14px">Tools</span>
+            <sc-for list="{{tools}}" as="t" hint-placeholder-count="2">
+              <label style="display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; min-height: 36px"><input type="checkbox" checked="{{t.on}}" onChange="{{t.toggle}}" style="width: 16px; height: 16px; margin: 0"><span class="mono" style="font-weight: 600">{{t.label}}</span><span style="font-size: 12px; color: #575653">{{t.desc}}</span></label>
+            </sc-for>
+          </div>
+        </div>
+        <button type="button" style="align-self: flex-start; min-height: 40px; padding: 6px 14px; border-radius: 8px; border: 1px dashed #A8A69E; background: transparent; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Add a service: a second web app, or a custom container…</button>
+      </section>
+    </div>
+
+    <aside aria-labelledby="sum-h" style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #F2F0E5">
+      <h2 id="sum-h" style="margin: 0; font-size: 16px; font-weight: 800">Each worktree gets</h2>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span class="eyebrow">Routes</span>
+        <sc-for list="{{routes}}" as="r" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; font-size: 13px"><span class="mono" style="font-weight: 600; overflow-wrap: anywhere">{{r.host}}</span><span class="mono" style="color: #575653">→ {{r.to}}</span></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span class="eyebrow">Containers</span>
+        <sc-for list="{{units}}" as="u" hint-placeholder-count="6">
+          <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 13px"><span class="mono" style="overflow-wrap: anywhere">{{u.name}}</span><span style="color: #575653; white-space: nowrap">{{u.role}}</span></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span class="eyebrow">The app’s environment</span>
+        <sc-for list="{{appEnv}}" as="e" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; font-size: 12px"><span class="mono" style="font-weight: 600">{{e.k}}</span><span class="mono" style="color: #575653; overflow-wrap: anywhere">{{e.v}}</span></div>
+        </sc-for>
+      </div>
+      <sc-if value="{{hasWarnings}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid #CECDC3">
+          <span class="eyebrow" style="color: #8E6B01">Needs attention</span>
+          <sc-for list="{{warnings}}" as="w" hint-placeholder-count="1"><p style="margin: 0; font-size: 13px; color: #34332F">{{w}}</p></sc-for>
+        </div>
+      </sc-if>
+      <a href="Review.dc.html" style="display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; background: #BC5215; color: #FFFFFF; font-weight: 700; text-decoration: none; font-size: 15px">Next: review &amp; create</a>
+      <span style="font-size: 12px; color: #575653; text-align: center">Images and environment are filled in from these choices. Open them only to change something.</span>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      name: 'Filial Rails', prefix: 'filial', stack: 'rails', packOpen: false, open: '',
+      pick: { database: 'postgres', cache: 'redis', storage: 'rustfs', worker: 'none', mail: 'none', browser: 'playwright' },
+      tools: { claude: true, nvim: true }
+    };
+  }
+  renderVals() {
+    const st = this.state;
+    const p = st.prefix || 'prefix';
+    const PACKS = {
+      rails: { label: 'Rails', app: 'rails', install: 'bundle install · npm install', server: 'bin/dev', port: 3000, versions: '.ruby-version, .nvmrc', caches: 'gems (shared per Ruby version), node_modules per worktree, npm cache', hosts: 'config.hosts ← DEV_HOSTS; links from DOMAIN', hostEnv: ['DEV_HOSTS', 'DOMAIN'], console: 'bin/rails console', tests: 'bin/rails test', registries: 'rubygems.org, registry.npmjs.org', evidence: 'Gemfile: rails, config/application.rb', db: { postgres: 'postgres://', mysql: 'mysql2://', mariadb: 'mysql2://', sqlite: 'sqlite3:storage/development.sqlite3' }, workers: [['sidekiq', 'Sidekiq', 'bundle exec sidekiq', 'cache'], ['solid', 'Solid Queue', 'bin/jobs', 'database'], ['goodjob', 'GoodJob', 'bundle exec good_job start', 'postgres']] },
+      hanami: { label: 'Hanami', app: 'web', install: 'bundle install · npm install', server: 'bundle exec hanami dev', port: 2300, versions: '.ruby-version, .nvmrc', caches: 'gems (shared per Ruby version), node_modules per worktree', hosts: 'no host check; links from the request', hostEnv: [], console: 'bundle exec hanami console', tests: 'bundle exec rspec', registries: 'rubygems.org, registry.npmjs.org', db: { postgres: 'postgres://', mysql: 'mysql2://', mariadb: 'mysql2://', sqlite: 'sqlite://db/development.sqlite' }, workers: [['sidekiq', 'Sidekiq', 'bundle exec sidekiq', 'cache']] },
+      phoenix: { label: 'Phoenix', app: 'web', install: 'mix deps.get · npm install --prefix assets', server: 'mix phx.server', port: 4000, versions: '.tool-versions (elixir, erlang)', caches: 'hex + mix (shared per Elixir version), deps/ and _build/ per worktree', hosts: 'check_origin and url host ← PHX_HOST', hostEnv: ['PHX_HOST'], console: 'iex -S mix', tests: 'mix test', registries: 'hex.pm, repo.hex.pm, builds.hex.pm', db: { postgres: 'ecto://', mysql: 'ecto://', mariadb: 'ecto://', sqlite: 'path to dev.db (ecto_sqlite3)' }, workers: [['oban', 'Oban', 'in-process', 'database']] },
+      django: { label: 'Django', app: 'web', install: 'uv sync', server: 'manage.py runserver 0.0.0.0:8000', port: 8000, versions: '.python-version', caches: 'uv cache (shared), .venv per worktree', hosts: 'ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS', hostEnv: ['ALLOWED_HOSTS', 'CSRF_TRUSTED_ORIGINS'], console: 'manage.py shell', tests: 'pytest', registries: 'pypi.org, files.pythonhosted.org', db: { postgres: 'postgres://', mysql: 'mysql://', mariadb: 'mysql://', sqlite: 'sqlite:///db.sqlite3' }, workers: [['celery', 'Celery', 'celery -A [project] worker', 'cache'], ['rq', 'RQ', 'rq worker', 'redis']] },
+      flask: { label: 'Flask', app: 'web', install: 'uv sync', server: 'flask run --host 0.0.0.0', port: 5000, versions: '.python-version', caches: 'uv cache (shared), .venv per worktree', hosts: 'no host check; SERVER_NAME for links', hostEnv: ['SERVER_NAME'], console: 'flask shell', tests: 'pytest', registries: 'pypi.org, files.pythonhosted.org', db: { postgres: 'postgresql+psycopg://', mysql: 'mysql+pymysql://', mariadb: 'mysql+pymysql://', sqlite: 'sqlite:///instance/dev.db' }, workers: [['celery', 'Celery', 'celery -A [app] worker', 'cache'], ['rq', 'RQ', 'rq worker', 'redis']] },
+      node: { label: 'Node', app: 'web', install: 'npm ci', server: 'npm run dev', port: 3000, versions: '.nvmrc, .node-version', caches: 'node_modules per worktree, npm cache (shared)', hosts: 'the framework’s allowed-hosts setting (Vite: server.allowedHosts)', hostEnv: ['ALLOWED_HOSTS'], console: 'node', tests: 'npm test', registries: 'registry.npmjs.org', db: { postgres: 'postgres://', mysql: 'mysql://', mariadb: 'mysql://', sqlite: 'file:./dev.db' }, workers: [['bullmq', 'BullMQ', 'npm run worker', 'cache']] }
+    };
+    const pack = { ...PACKS[st.stack], id: st.stack };
+    const pk = st.pick;
+    // What reading master found (this repo is Rails). Evidence per slot.
+    const DETECT = st.stack === 'rails' ? {
+      database: ['postgres', 'Gemfile: pg'], cache: ['redis', 'Gemfile: redis'], storage: ['rustfs', 'Gemfile: aws-sdk-s3; config/storage.yml uses S3'],
+      worker: ['none', 'no job runner gem'], mail: ['none', 'Gemfile: letter_opener (no SMTP)'], browser: ['playwright', 'Gemfile: capybara-playwright-driver']
+    } : {};
+    const OPTS = {
+      database: [['postgres', 'PostgreSQL', 'postgres:{postgres}'], ['mysql', 'MySQL', 'mysql:{mysql}'], ['mariadb', 'MariaDB', 'mariadb:{mariadb}'], ['sqlite', 'SQLite', 'no container'], ['none', 'None', '']],
+      cache: [['redis', 'Redis', 'redis:{redis}-alpine'], ['valkey', 'Valkey', 'valkey/valkey:{valkey}'], ['none', 'None', '']],
+      storage: [['rustfs', 'RustFS', 'rustfs/rustfs:{rustfs}'], ['minio', 'MinIO', 'minio/minio:{minio}'], ['none', 'None', '']],
+      mail: [['mailpit', 'Mailpit', 'axllent/mailpit:{mailpit}'], ['none', 'None', '']],
+      browser: [['playwright', 'Playwright + VNC', 'Containerfile.playwright'], ['none', 'None', '']]
+    };
+    const DETAIL = {
+      database: { postgres: 'Health check pg_isready. Dump with pg_dump, restored on a fresh volume named for the major version.', mysql: 'Health check mysqladmin ping. Dump with mysqldump.', mariadb: 'Health check healthcheck.sh --connect. Dump with mariadb-dump.', sqlite: 'No container: a file in each worktree.', none: 'The app gets no DATABASE_URL.' },
+      cache: { redis: 'No persistence, dev network only.', valkey: 'Speaks the Redis protocol; REDIS_URL works unchanged.', none: 'The app gets no REDIS_URL.' },
+      storage: { rustfs: 'S3-compatible, routed at s3.<slug>. Volume seeded from db-dumps/ when created.', minio: 'S3-compatible, routed at s3.<slug>.', none: 'Use local disk storage in the app.' },
+      mail: { mailpit: 'Catches every email; read them at mail.<slug>.localhost.', none: 'Mail goes wherever the app’s development config sends it.' },
+      browser: { playwright: 'Browser server for system tests, watched at vnc.<slug>.localhost.', none: 'No system-test browser.' },
+      worker: {}
+    };
+    const workerOpts = [['none', 'None', '']].concat(pack.workers.map((w) => [w[0], w[1], w[2]]));
+    const workerSel = pack.workers.find((w) => w[0] === pk.worker);
+    const SLOTS = [['database', 'Database', 'data', OPTS.database], ['cache', 'Cache and queues', 'data', OPTS.cache], ['storage', 'Object storage', 'data', OPTS.storage], ['worker', 'Background jobs', 'worker', workerOpts], ['mail', 'Mail catcher', 'tool', OPTS.mail], ['browser', 'Browser', 'tool', OPTS.browser]];
+    let detectedCount = 0;
+    const slots = SLOTS.map((s) => {
+      const id = s[0];
+      const opts = s[3];
+      const sel = opts.find((o) => o[0] === pk[id]) || opts[0];
+      const det = DETECT[id];
+      const isDet = !!det && det[0] === pk[id];
+      if (isDet) detectedCount += 1;
+      const expanded = st.open === id;
+      let detail = (DETAIL[id] && DETAIL[id][pk[id]]) || '';
+      if (id === 'worker') detail = !workerSel ? 'No job runner.' : workerSel[2] === 'in-process' ? workerSel[1] + ' runs inside the app; no extra container.' : 'A worker container from the app image, running ' + workerSel[2] + '.';
+      return {
+        id, label: s[1], role: s[2], expanded, expandedStr: expanded ? 'true' : 'false',
+        toggle: () => this.setState({ open: expanded ? '' : id }), toggleLabel: expanded ? 'Done' : 'Change',
+        selLabel: sel[1], selSub: sel[2],
+        src: isDet ? 'Read from the repository · ' + det[1] : det ? 'Changed by you · the repository suggests ' + (opts.find((o) => o[0] === det[0]) || ['', det[0]])[1] : 'Chosen by you',
+        srcColor: isDet ? '#536907' : '#8E6B01',
+        detail,
+        options: opts.map((o) => ({ label: o[1], sub: o[2], on: pk[id] === o[0], pick: () => this.setState({ pick: { ...pk, [id]: o[0] } }), border: pk[id] === o[0] ? '#BC5215' : '#CECDC3', bg: pk[id] === o[0] ? '#FFFFFF' : '#FFFCF0' }))
+      };
+    });
+
+    const stacks = Object.keys(PACKS).map((id) => ({ id, label: PACKS[id].label }));
+    const tools = [
+      { id: 'claude', label: 'claude', desc: 'agent, on demand' },
+      { id: 'nvim', label: 'nvim', desc: 'editor server' }
+    ].map((t) => ({ ...t, on: !!st.tools[t.id], toggle: () => this.setState({ tools: { ...st.tools, [t.id]: !st.tools[t.id] } }) }));
+
+    const app = pack.app;
+    const H = '<slug>.' + p + '.localhost';
+    const routes = [{ host: H, to: app + ':' + pack.port }];
+    if (pk.storage !== 'none') routes.push({ host: 's3.' + H, to: 'storage:9000' });
+    if (pk.mail !== 'none') routes.push({ host: 'mail.' + H, to: 'mail:8025' });
+    if (pk.browser !== 'none') routes.push({ host: 'vnc.' + H, to: 'browser (noVNC)' });
+    const u = (svc, role) => ({ name: p + '-' + svc + '@<slug>', role });
+    const units = [u(app, 'app'), u('deps', 'deps')];
+    if (workerSel && workerSel[2] !== 'in-process') units.push(u('worker', 'worker'));
+    if (pk.database !== 'none' && pk.database !== 'sqlite') units.push(u('db', 'data'));
+    if (pk.cache !== 'none') units.push(u('cache', 'data'));
+    if (pk.storage !== 'none') units.push(u('storage', 'data'));
+    if (pk.mail !== 'none') units.push(u('mail', 'tool'));
+    if (pk.browser !== 'none') units.push(u('browser', 'tool'));
+    if (st.tools.nvim) units.push(u('nvim', 'tool'));
+    if (st.tools.claude) units.push({ name: 'claude (on demand)', role: 'tool' });
+    const appEnv = [];
+    if (pk.database !== 'none') appEnv.push({ k: 'DATABASE_URL', v: pk.database === 'sqlite' ? pack.db.sqlite : pack.db[pk.database] + '…@db/[db]' });
+    if (pk.cache !== 'none') appEnv.push({ k: 'REDIS_URL', v: 'redis://cache:6379/1' });
+    if (pk.storage !== 'none') appEnv.push({ k: 'S3_ENDPOINT', v: 'http://storage:9000 (browser: s3.' + H + ')' });
+    if (pk.mail !== 'none') appEnv.push({ k: 'SMTP_HOST, SMTP_PORT', v: 'mail, 1025' });
+    if (pk.browser !== 'none') appEnv.push({ k: 'PLAYWRIGHT_HOST', v: 'ws://browser:8888/connect' });
+    pack.hostEnv.forEach((k) => appEnv.push({ k, v: H }));
+
+    const warnings = [];
+    if (workerSel && workerSel[3] === 'cache' && pk.cache === 'none') warnings.push(workerSel[1] + ' needs Redis or Valkey.');
+    if (workerSel && workerSel[3] === 'redis' && pk.cache === 'none') warnings.push('RQ needs Redis or Valkey.');
+    if (workerSel && workerSel[3] === 'postgres' && pk.database !== 'postgres') warnings.push('GoodJob only runs on PostgreSQL.');
+    if (workerSel && workerSel[3] === 'database' && pk.database === 'none') warnings.push(workerSel[1] + ' stores jobs in the database.');
+    slots.forEach((s) => { if (s.srcColor === '#8E6B01' && DETECT[s.id]) warnings.push(s.label + ': you picked ' + s.selLabel + ', but the repository’s dependencies suggest otherwise. The app may need a different driver.'); });
+
+    return {
+      name: st.name, prefix: st.prefix,
+      setName: (e) => this.setState({ name: e.target.value }),
+      setPrefix: (e) => this.setState({ prefix: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) }),
+      stack: st.stack, stacks, pack, appName: app, appHost: H,
+      setStack: (e) => {
+        const id = e.target.value;
+        const valid = PACKS[id].workers.some((w) => w[0] === pk.worker);
+        this.setState({ stack: id, pick: { ...pk, worker: valid ? pk.worker : 'none' } });
+      },
+      stackSrc: st.stack === 'rails' ? 'Read from the repository · ' + PACKS.rails.evidence : 'Changed by you · the repository looks like Rails',
+      stackSrcColor: st.stack === 'rails' ? '#536907' : '#8E6B01',
+      showPack: st.packOpen, packExpanded: st.packOpen ? 'true' : 'false',
+      togglePack: () => this.setState({ packOpen: !st.packOpen }),
+      packToggleLabel: st.packOpen ? 'Hide what the ' + pack.label + ' pack does' : 'Show what the ' + pack.label + ' pack does',
+      slots, slotCount: String(slots.length), detectedCount: String(detectedCount), tools,
+      routes, units, appEnv, warnings, hasWarnings: warnings.length > 0
+    };
+  }
+}
+</script>
+</body>
+</html>

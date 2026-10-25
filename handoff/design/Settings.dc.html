@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Project settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid #CECDC3;background:#FFFFFF;color:#100F0F;font:inherit;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none}
+.card{display:flex;flex-direction:column;gap:12px;padding:18px 20px;border:1px solid #CECDC3;border-radius:12px;background:#FFFFFF}
+.kv{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:8px 16px;font-size:13px;margin:0;align-items:baseline}
+.kv dt{color:#575653;font-weight:700}
+.kv dd{margin:0}
+.mini{font:inherit;font-size:13px;padding:6px 8px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:36px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-size: 14px">Filial Rails</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">Settings</span>
+    <span style="flex-grow: 1"></span>
+    <a href="Machine.dc.html" style="font-size: 14px">This machine</a>
+  </header>
+
+  <nav aria-label="Advanced" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 10px 24px; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+    <span style="font-weight: 700; padding: 8px 12px; border-radius: 8px; background: #100F0F; color: #FFFCF0">Settings</span>
+    <a href="Images.dc.html" style="padding: 8px 12px; color: #575653; text-decoration: none; font-weight: 600">Images</a>
+    <a href="Environment.dc.html" style="padding: 8px 12px; color: #575653; text-decoration: none; font-weight: 600">Environment</a>
+    <a href="Review.dc.html" style="padding: 8px 12px; color: #575653; text-decoration: none; font-weight: 600">project.toml</a>
+  </nav>
+
+  <main style="display: flex; flex-wrap: wrap; gap: 28px; padding: 28px 24px 48px; max-width: 1400px; width: 100%; margin: 0 auto; box-sizing: border-box; align-items: flex-start">
+    <div style="flex: 999 1 680px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+      <div>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Filial Rails settings</h1>
+        <p style="margin: 6px 0 0; color: #575653; font-size: 15px; max-width: 720px">Changes are staged, not applied. The panel on the right shows what each one does to data and to running worktrees before anything happens.</p>
+      </div>
+
+      <section aria-labelledby="proj-h" class="card">
+        <h2 id="proj-h" style="margin: 0; font-size: 18px; font-weight: 800">Project</h2>
+        <dl class="kv">
+          <dt>Name</dt><dd>Filial Rails</dd>
+          <dt>Repository</dt><dd class="mono">git@github.com:[ORG]/[REPO].git · base branch master</dd>
+          <dt>Prefix</dt><dd><span class="mono">filial</span> <span style="color: #575653">· fixed: it names every container, volume, network and hostname. Save as a template and start a new project to use another.</span></dd>
+          <dt>Hostnames</dt><dd><span class="mono">&lt;slug&gt;.filial.localhost</span>, short names on · <a href="Machine.dc.html">change on This machine</a></dd>
+          <dt>Started from</dt><dd><span class="mono">rails-postgres-redis-rustfs v3</span> · <a href="Templates.dc.html">library</a></dd>
+        </dl>
+      </section>
+
+      <section aria-labelledby="stack-h" style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px">
+          <h2 id="stack-h" style="margin: 0; font-size: 20px; font-weight: 800">Stack and options</h2>
+          <span style="font-size: 13px; color: #575653">Pack <span class="mono">rails@1</span>, locked at <span class="mono">wt [version]</span></span>
+        </div>
+        <div style="display: flex; flex-direction: column; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; overflow: hidden">
+          <sc-for list="{{slots}}" as="sl" hint-placeholder-count="6">
+            <div style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #E6E4D9; background: {{sl.rowBg}}">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px">
+                <span style="width: 150px; flex-shrink: 0; font-weight: 800; font-size: 14px">{{sl.label}}</span>
+                <span style="flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+                  <span style="font-weight: 700; font-size: 15px; text-decoration: {{sl.curStrike}}; color: {{sl.curColor}}">{{sl.curLabel}}</span>
+                  <sc-if value="{{sl.changed}}" hint-placeholder-val="{{ false }}">
+                    <span aria-hidden="true" style="color: #6F6E69">→</span>
+                    <span style="font-weight: 800; font-size: 15px; color: #9A4210">{{sl.newLabel}}</span>
+                    <span class="chip" style="border-color: #BC5215; color: #9A4210; background: #FDF1E8">staged · {{sl.scopeLabel}}</span>
+                  </sc-if>
+                </span>
+                <button type="button" onClick="{{sl.toggle}}" aria-expanded="{{sl.expandedStr}}" class="btn" style="min-height: 36px; padding: 4px 12px">{{sl.toggleLabel}}</button>
+              </div>
+              <sc-if value="{{sl.expanded}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <fieldset style="margin: 0; padding: 0; border: 0">
+                    <legend class="sr" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">{{sl.label}}</legend>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px">
+                      <sc-for list="{{sl.options}}" as="o" hint-placeholder-count="4">
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; border: 1.5px solid {{o.border}}; background: {{o.bg}}; cursor: pointer; min-height: 44px">
+                          <input type="radio" name="{{sl.id}}" checked="{{o.on}}" onChange="{{o.pick}}" style="width: 16px; height: 16px; margin: 0"><span style="font-weight: 700; font-size: 14px">{{o.label}}</span><sc-if value="{{o.isCurrent}}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; color: #575653">current</span></sc-if>
+                        </label>
+                      </sc-for>
+                    </div>
+                  </fieldset>
+                  <sc-if value="{{sl.changed}}" hint-placeholder-val="{{ false }}">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px">
+                      <label for="{{sl.scopeId}}" style="font-size: 13px; font-weight: 700">Apply to</label>
+                      <select id="{{sl.scopeId}}" class="mini" value="{{sl.scope}}" onChange="{{sl.setScope}}">
+                        <option value="all">Every worktree</option>
+                        <option value="trial">Only pg17-trial, to try it</option>
+                        <option value="patient-photos">Only patient-photos, to try it</option>
+                      </select>
+                      <span style="font-size: 12px; color: #575653">A one-worktree change is an override in project.toml; promote it to every worktree, or drop it, later.</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-labelledby="links-h" class="card">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px">
+          <h2 id="links-h" style="margin: 0; font-size: 18px; font-weight: 800">Worktree links</h2>
+          <span style="font-size: 13px; color: #575653">Shown on each worktree’s dashboard page and in the task palette. The pack and options suggest some; add your own.</span>
+        </div>
+        <div style="overflow-x: auto; border: 1px solid #E6E4D9; border-radius: 10px">
+          <table style="border-collapse: collapse; width: 100%; min-width: 720px; font-size: 13px">
+            <thead><tr>
+              <th scope="col" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid #CECDC3; font-size: 12px; color: #575653">Show</th>
+              <th scope="col" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid #CECDC3; font-size: 12px; color: #575653">Label</th>
+              <th scope="col" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid #CECDC3; font-size: 12px; color: #575653">Address</th>
+              <th scope="col" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid #CECDC3; font-size: 12px; color: #575653">From</th>
+              <th scope="col" style="padding: 8px 12px; border-bottom: 1px solid #CECDC3"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Actions</span></th>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{links}}" as="l" hint-placeholder-count="8">
+                <tr style="opacity: {{l.opacity}}">
+                  <td style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9"><input type="checkbox" checked="{{l.on}}" onChange="{{l.toggle}}" aria-label="Show {{l.label}}" style="width: 16px; height: 16px; margin: 0"></td>
+                  <td style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9; font-weight: 700">{{l.label}}</td>
+                  <td class="mono" style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9; overflow-wrap: anywhere">{{l.url}}</td>
+                  <td style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9"><span class="chip" style="border-color: {{l.fromColor}}; color: {{l.fromColor}}; background: #FFFFFF">{{l.from}}</span><sc-if value="{{l.hasWhy}}" hint-placeholder-val="{{ false }}"><br><span style="font-size: 12px; color: #575653">{{l.why}}</span></sc-if></td>
+                  <td style="padding: 8px 12px; border-bottom: 1px solid #E6E4D9; text-align: right"><sc-if value="{{l.removable}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{l.remove}}" aria-label="Remove {{l.label}}" style="min-height: 32px; padding: 0 8px; border: 0; background: transparent; color: #AF3029; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Remove</button></sc-if></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 12px; border: 1px dashed #CECDC3; border-radius: 10px">
+          <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 160px">
+            <label for="nl" style="font-size: 13px; font-weight: 700">Label</label>
+            <input id="nl" type="text" value="{{draftLabel}}" onChange="{{setDraftLabel}}" style="font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid #CECDC3; border-radius: 6px; min-height: 40px; box-sizing: border-box">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px; flex: 3 1 280px">
+            <label for="nu" style="font-size: 13px; font-weight: 700">Address</label>
+            <input id="nu" class="mono" type="text" value="{{draftUrl}}" onChange="{{setDraftUrl}}" aria-describedby="nu-help" style="font-size: 13px; padding: 8px 10px; border: 1px solid #CECDC3; border-radius: 6px; min-height: 40px; box-sizing: border-box">
+          </div>
+          <button type="button" onClick="{{addLink}}" disabled="{{draftBlocked}}" style="min-height: 40px; padding: 6px 16px; border-radius: 8px; border: 0; background: {{draftBg}}; color: #FFFCF0; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Add link</button>
+          <span id="nu-help" style="flex: 1 1 100%; font-size: 12px; color: #575653">Use <span class="mono">{worktree.host}</span>, <span class="mono">{worktree.slug}</span> or <span class="mono">{branch}</span>; they are filled in per worktree. Links to other sites are fine too. Saved in project.toml and carried by templates.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span class="eyebrow">On the dashboard, worktree patient-photos</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 14px; border: 1px solid #E6E4D9; border-radius: 10px; background: #FFFCF0">
+            <sc-for list="{{shownLinks}}" as="s" hint-placeholder-count="6">
+              <a href="#" title="{{s.resolved}}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid #CECDC3; border-radius: 999px; background: #FFFFFF; font-size: 13px; font-weight: 700; text-decoration: none; color: #205EA6"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6"></path><path d="M20 4l-9 9"></path><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"></path></svg>{{s.label}}</a>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="upd-h" class="card">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px">
+          <h2 id="upd-h" style="margin: 0; font-size: 18px; font-weight: 800">Updates</h2>
+          <span style="font-size: 13px; color: #575653">Checked against each library; nothing updates without a review.</span>
+        </div>
+        <sc-for list="{{updates}}" as="u" hint-placeholder-count="4">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 0; border-bottom: 1px solid #E6E4D9">
+            <span class="mono" style="font-weight: 600; width: 170px">{{u.ref}}</span>
+            <span style="flex: 1 1 260px; font-size: 13px; color: {{u.color}}">{{u.state}}</span>
+            <sc-if value="{{u.hasUpdate}}" hint-placeholder-val="{{ false }}"><a href="Install.dc.html" class="btn">Review update</a></sc-if>
+          </div>
+        </sc-for>
+      </section>
+
+      <section aria-labelledby="rm-h" class="card" style="border-color: #AF3029">
+        <h2 id="rm-h" style="margin: 0; font-size: 18px; font-weight: 800; color: #AF3029">Remove this project</h2>
+        <p style="margin: 0; font-size: 14px; color: #34332F">Stops every worktree, removes the project’s units and its proxy network, and frees its worktree IDs and subnet on this machine. Worktree folders, volumes and images are kept unless you choose otherwise; the repository is never touched.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px">
+          <label style="display: flex; gap: 8px; align-items: center; cursor: pointer"><input type="checkbox" style="width: 16px; height: 16px; margin: 0">Also delete volumes (databases, storage)</label>
+          <label style="display: flex; gap: 8px; align-items: center; cursor: pointer"><input type="checkbox" style="width: 16px; height: 16px; margin: 0">Also delete worktree folders without uncommitted changes</label>
+        </div>
+        <button type="button" class="btn" style="align-self: flex-start; min-height: 44px; border-color: #AF3029; color: #AF3029">Remove project…</button>
+      </section>
+    </div>
+
+    <aside aria-labelledby="plan-h" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #F2F0E5">
+      <h2 id="plan-h" style="margin: 0; font-size: 16px; font-weight: 800">Staged changes <span style="font-weight: 600; color: #575653; font-size: 13px">· {{changeCount}}</span></h2>
+      <sc-if value="{{noChanges}}" hint-placeholder-val="{{ false }}">
+        <p style="margin: 0; font-size: 14px; color: #575653">Nothing staged. Change an option on the left to see what it would do.</p>
+      </sc-if>
+      <sc-for list="{{plan}}" as="c" hint-placeholder-count="2">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 10px; border: 1.5px solid {{c.border}}; background: #FFFFFF">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+            <span style="font-weight: 800; font-size: 14px; flex: 1 1 auto">{{c.title}}</span>
+            <span style="font-size: 12px; font-weight: 800; color: {{c.color}}">{{c.level}}</span>
+          </div>
+          <span style="font-size: 12px; color: #575653">{{c.scope}}</span>
+          <sc-for list="{{c.effects}}" as="e" hint-placeholder-count="2"><p style="margin: 0; font-size: 13px; color: #34332F">{{e}}</p></sc-for>
+          <button type="button" onClick="{{c.undo}}" style="align-self: flex-start; min-height: 32px; padding: 0; border: 0; background: transparent; color: #205EA6; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">Undo this change</button>
+        </div>
+      </sc-for>
+      <sc-if value="{{hasChanges}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid #CECDC3">
+          <span class="eyebrow">When you apply</span>
+          <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #34332F">
+            <li>project.toml and stack.lock are written; new options are reviewed first if they come from a library.</li>
+            <li>units:install renders the changed units.</li>
+            <li>{{restartText}}</li>
+          </ol>
+          <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer"><input type="checkbox" checked="{{restartNow}}" onChange="{{toggleRestart}}" style="width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0"><span>Restart the {{runningCount}} affected running worktrees now</span></label>
+          <a href="Review.dc.html" class="btn">See the project.toml diff</a>
+          <button type="button" style="min-height: 48px; border-radius: 8px; border: 0; background: #BC5215; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer">Apply {{changeCount}} changes</button>
+        </div>
+      </sc-if>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      open: '', restartNow: false, hidden: {}, custom: [{ label: 'Admin', url: '{worktree.host}/admin' }], draftLabel: 'Feature flags', draftUrl: '{worktree.host}/flipper',
+      staged: { database: 'postgres', cache: 'valkey', storage: 'rustfs', worker: 'none', mail: 'mailpit', browser: 'playwright' },
+      scope: {}
+    };
+  }
+  renderVals() {
+    const st = this.state;
+    const CURRENT = { database: 'postgres', cache: 'redis', storage: 'rustfs', worker: 'none', mail: 'none', browser: 'playwright' };
+    const OPTS = {
+      database: [['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'], ['none', 'None']],
+      cache: [['redis', 'Redis'], ['valkey', 'Valkey'], ['none', 'None']],
+      storage: [['rustfs', 'RustFS'], ['minio', 'MinIO'], ['none', 'None']],
+      worker: [['none', 'None'], ['sidekiq', 'Sidekiq'], ['solid', 'Solid Queue'], ['goodjob', 'GoodJob']],
+      mail: [['mailpit', 'Mailpit'], ['none', 'None']],
+      browser: [['playwright', 'Playwright + VNC'], ['none', 'None']]
+    };
+    const LABELS = { database: 'Database', cache: 'Cache and queues', storage: 'Object storage', worker: 'Background jobs', mail: 'Mail catcher', browser: 'Browser' };
+    const name = (slot, v) => (OPTS[slot].find((o) => o[0] === v) || ['', v])[1];
+    const SCOPES = { all: 'every worktree', trial: 'pg17-trial only', 'patient-photos': 'patient-photos only' };
+    const slots = Object.keys(OPTS).map((id) => {
+      const cur = CURRENT[id];
+      const nv = st.staged[id];
+      const changed = cur !== nv;
+      const expanded = st.open === id;
+      const scope = st.scope[id] || 'all';
+      return {
+        id, label: LABELS[id], changed, expanded, expandedStr: expanded ? 'true' : 'false',
+        curLabel: name(id, cur), newLabel: name(id, nv),
+        curStrike: changed ? 'line-through' : 'none', curColor: changed ? '#6F6E69' : '#100F0F',
+        rowBg: changed ? '#FFFBF5' : '#FFFFFF',
+        toggle: () => this.setState({ open: expanded ? '' : id }), toggleLabel: expanded ? 'Done' : 'Change',
+        scope, scopeId: 'scope-' + id, scopeLabel: SCOPES[scope],
+        setScope: (e) => this.setState({ scope: { ...st.scope, [id]: e.target.value } }),
+        options: OPTS[id].map((o) => ({ label: o[1], isCurrent: o[0] === cur, on: o[0] === nv, pick: () => this.setState({ staged: { ...st.staged, [id]: o[0] } }), border: o[0] === nv ? '#BC5215' : '#CECDC3', bg: o[0] === nv ? '#FFFFFF' : '#FFFCF0' }))
+      };
+    });
+
+    const LVL = { safe: ['No data affected', '#536907', '#CECDC3'], care: ['Check before applying', '#8E6B01', '#D9B23A'], data: ['Data not carried over', '#AF3029', '#AF3029'] };
+    const effects = (slot, from, to) => {
+      const N = name(slot, to);
+      if (slot === 'cache') {
+        if (to === 'none') return ['care', ['The cache container and REDIS_URL go.', st.staged.worker === 'sidekiq' ? 'Sidekiq needs it: this change is blocked until jobs change too.' : 'Anything in the app using Action Cable or Rails.cache with Redis needs another adapter.']];
+        if (from === 'none') return ['safe', ['A ' + N + ' container starts; the app gets REDIS_URL.']];
+        return ['safe', [N + ' speaks the same protocol; REDIS_URL stays the same. The cache keeps nothing on disk, so there is nothing to move.']];
+      }
+      if (slot === 'mail') {
+        if (to === 'mailpit') return ['care', ['A Mailpit container starts, routed at mail.<slug>.filial.localhost; the app gets SMTP_HOST and SMTP_PORT.', 'The app uses letter_opener in development today, so it keeps opening mail itself until its delivery method is SMTP.']];
+        return ['safe', ['The Mailpit container and its route go; caught mail is discarded.']];
+      }
+      if (slot === 'database') {
+        if (to === 'none') return ['data', ['The db container stops being started. Its volumes are kept until clean.']];
+        if (to === 'sqlite') return ['data', ['Each worktree starts with an empty SQLite file. Existing PostgreSQL volumes are kept until clean.', 'The app needs the sqlite3 gem and an sqlite3 adapter in database.yml.']];
+        return ['data', ['Data is not converted. A new ' + N + ' volume starts empty, and db-dumps/ holds PostgreSQL dumps, which ' + N + ' cannot load.', 'The app needs the ' + (to === 'postgres' ? 'pg' : 'mysql2 or trilogy') + ' gem; the repository has pg.', 'PostgreSQL volumes are kept until clean, so switching back finds your data.', 'Try it on one worktree first.']];
+      }
+      if (slot === 'storage') {
+        if (to === 'none') return ['care', ['The storage container and s3 routes go; Active Storage must use a local service.']];
+        return ['data', ['Objects are not copied. The new volume is seeded from db-dumps/rustfs_data.tar.gz when it is created, as RustFS was.']];
+      }
+      if (slot === 'browser') {
+        if (to === 'none') return ['care', ['The playwright container, the vnc route and test:system go. The agent loses its browser tools.']];
+        return ['safe', ['A playwright container starts with VNC at vnc.<slug>.filial.localhost.']];
+      }
+      if (slot === 'worker') {
+        if (to === 'none') return ['safe', ['The worker container goes; queued jobs stay in ' + (from === 'sidekiq' ? 'the cache' : 'the database') + '.']];
+        const needs = to === 'sidekiq' ? (st.staged.cache === 'none' ? 'Needs a cache: choose Redis or Valkey.' : 'Uses the cache for its queue.') : to === 'goodjob' ? 'Uses PostgreSQL for its queue.' : 'Uses the database for its queue.';
+        return ['care', ['A worker container starts from the app image.', needs, 'The app needs the ' + N + ' gem configured as its queue adapter.']];
+      }
+      return ['safe', []];
+    };
+    const changedSlots = slots.filter((s) => s.changed);
+    const plan = changedSlots.map((s) => {
+      const r = effects(s.id, CURRENT[s.id], st.staged[s.id]);
+      const L = LVL[r[0]];
+      return {
+        title: s.label + ': ' + s.curLabel + ' → ' + s.newLabel, level: L[0], color: L[1], border: L[2],
+        scope: s.scope === 'all' ? 'Every worktree' : 'Only ' + SCOPES[s.scope].replace(' only', '') + ' (override)',
+        effects: r[1],
+        undo: () => this.setState({ staged: { ...st.staged, [s.id]: CURRENT[s.id] } })
+      };
+    });
+    const allScopes = changedSlots.map((s) => s.scope);
+    const everyWorktree = allScopes.indexOf('all') >= 0;
+    const running = everyWorktree ? 3 : 1;
+    const updates = [
+      { ref: 'rails@1', state: 'Built in, locked to wt [version]. Up to date.', color: '#536907', hasUpdate: false },
+      { ref: 'postgres@1', state: 'Built in. Up to date.', color: '#536907', hasUpdate: false },
+      { ref: 'rustfs@1', state: 'Built in. Image pinned at 1.0.0-alpha.83; newer tags exist on the registry.', color: '#8E6B01', hasUpdate: true },
+      { ref: 'template v3', state: 'rails-postgres-redis-rustfs: up to date.', color: '#536907', hasUpdate: false }
+    ];
+    // Links: suggested by the pack (when the app has the gem) and by each option; plus the user's own.
+    const S = st.staged;
+    const suggested = [
+      ['app', 'App', '{worktree.host}', 'core', ''],
+      ['lo', 'Letter opener', '{worktree.host}/letter_opener', 'Rails pack', 'the app has letter_opener_web'],
+      ['mailers', 'Mailer previews', '{worktree.host}/rails/mailers', 'Rails pack', ''],
+      ['routes', 'Routes', '{worktree.host}/rails/info/routes', 'Rails pack', '']
+    ];
+    if (S.mail === 'mailpit') suggested.push(['mailpit', 'Mailpit', 'mail.{worktree.host}', 'Mailpit option', 'staged']);
+    if (S.storage !== 'none') suggested.push(['s3ui', 'Storage console', 's3-ui.{worktree.host}', name('storage', S.storage) + ' option', '']);
+    if (S.browser !== 'none') suggested.push(['vnc', 'Browser (VNC)', 'vnc.{worktree.host}', 'Playwright option', '']);
+    if (S.worker === 'sidekiq') suggested.push(['sidekiq', 'Sidekiq', '{worktree.host}/sidekiq', 'Sidekiq option', 'staged']);
+    if (S.worker === 'goodjob') suggested.push(['goodjob', 'GoodJob', '{worktree.host}/good_job', 'GoodJob option', 'staged']);
+    suggested.push(['logs', 'Logs', 'logs.localhost (filtered to this worktree)', 'core', '']);
+    const colorFor = (from) => from === 'core' ? '#575653' : from === 'you' ? '#5E409D' : from.indexOf('pack') > 0 ? '#BC5215' : '#205EA6';
+    const allLinks = suggested.map((s) => ({ key: s[0], label: s[1], url: s[2], from: s[3], why: s[4], custom: false }))
+      .concat(st.custom.map((c, i) => ({ key: 'c' + i, label: c.label, url: c.url, from: 'you', why: '', custom: true, idx: i })));
+    const links = allLinks.map((l) => {
+      const on = !st.hidden[l.key];
+      return {
+        ...l, on, opacity: on ? '1' : '0.55', fromColor: colorFor(l.from), hasWhy: !!l.why,
+        toggle: () => this.setState({ hidden: { ...st.hidden, [l.key]: on } }),
+        removable: l.custom,
+        remove: () => this.setState({ custom: st.custom.filter((_, j) => j !== l.idx) })
+      };
+    });
+    const shownLinks = links.filter((l) => l.on).map((l) => ({ label: l.label, resolved: l.url.replace('{worktree.host}', 'patient-photos.filial.localhost') }));
+    const draftBlocked = !st.draftLabel || !st.draftUrl;
+    return {
+      links, shownLinks,
+      draftLabel: st.draftLabel, draftUrl: st.draftUrl,
+      setDraftLabel: (e) => this.setState({ draftLabel: e.target.value }),
+      setDraftUrl: (e) => this.setState({ draftUrl: e.target.value }),
+      addLink: () => this.setState({ custom: st.custom.concat([{ label: st.draftLabel, url: st.draftUrl }]), draftLabel: '', draftUrl: '' }),
+      draftBlocked, draftBg: draftBlocked ? '#A8A69E' : '#100F0F',
+      slots, plan, updates,
+      changeCount: String(plan.length), hasChanges: plan.length > 0, noChanges: plan.length === 0,
+      runningCount: String(running),
+      restartNow: st.restartNow, toggleRestart: () => this.setState({ restartNow: !st.restartNow }),
+      restartText: st.restartNow ? 'The ' + running + ' affected running worktrees restart now, one at a time.' : 'Running worktrees keep their current containers until their next restart; the dashboard marks them as waiting for a restart.'
+    };
+  }
+}
+</script>
+</body>
+</html>

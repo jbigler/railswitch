@@ -1,0 +1,171 @@
+# railswitch: roadmap and decisions
+
+**Spec:** `handoff/HANDOFF.md` (the spec), `/tmp/rails-dev-podman/AGENTS.md` at commit `fd7336b` (the old tool's spec, which records its gotchas), `docs/reference/design-data.md` (the values pulled from the `handoff/design/*.dc.html` mock-ups).
+**Detailed plan for Stages 0–2:** `docs/superpowers/plans/2026-10-25-railswitch-stages-0-2.md`.
+Each later stage gets its own detailed plan after the stage before it is accepted. Stages 3–7 depend on design questions that HANDOFF §9 leaves open; each stage below lists the ones it must settle first.
+
+## Decisions
+
+### Confirmed by the user (2026-10-25)
+
+| Topic | Decision |
+|---|---|
+| Tool name | `railswitch`. It is the binary, the CLI, `~/.config/railswitch/`, `~/.local/share/railswitch/`, the shared proxy `railswitch-traefik`, the dashboard unit `railswitch-dashboard.service`, and the dashboard address `railswitch.localhost:7700` |
+| Module / repo | `github.com/jbigler/railswitch`, a repo at `/home/jbigler/workspace/railswitch` |
+| Per-worktree units | Render writes one unit file per worktree and service: `<prefix>-<slug>-<svc>.container`, with every value written in. There are no `@` templates and no `${VAR}`. Revised 2026-10-25 (it was `@` templates plus env files, chosen to support Adopt) |
+| Adopt | Dropped. A project starts only from a fresh clone of the repo declared in `railswitch new`; worktrees are recreated with `wt add`. Nothing in railswitch is specific to any one project (Filial included). This overrides HANDOFF §1 rule 2 and §8 Stage 4 |
+| Agents | Generic. An agent is a package with a `Containerfile.agent` whose own entrypoint starts the agent. railswitch only knows "agent" (`railswitch agent`); no command, file or setting names a specific agent. Claude is a built-in agent template (`claude@1`), the default for new projects (D30) |
+| Containerfiles | Every Containerfile a project builds is a file in its `containerfiles/` directory, freely editable. Built-in Containerfiles (the rails pack's base, option addons, tools, agents) are only defaults: `railswitch new` ejects the ones the stack uses, and railswitch never builds a built-in directly. Addons extend the base as image layers (D31) |
+| Plan scope | A roadmap for all stages (this file), and a detailed plan for Stages 0–2 |
+
+### Made in this plan (resolving gaps and conflicts between the mock-ups)
+
+| # | Topic | Decision | Why |
+|---|---|---|---|
+| D1 | Jobs slot name | `jobs` (not `worker`) | HANDOFF §3.2/§3.5 say `jobs`. The spec wins over the mock-ups |
+| D2 | Solid Queue id | `solid-queue` | Review and Templates boards; reads better as a ref |
+| D3 | Service ids for options | Fixed per slot: `db`, `cache`, `storage`, `mail`, `browser`, `worker`. Not renamable | One name per slot; apps read the URLs options give, not hostnames. YAGNI |
+| D4 | Image refs | Always fully qualified (`docker.io/library/postgres:{postgres}`). Valkey is `docker.io/valkey/valkey:{valkey}-alpine` | Rootless podman with short-name mode can prompt or fail on a short name |
+| D5 | Hostnames | `<slug>.<prefix>.localhost` only. Route prefixes are `s3.`, `s3-ui.`, `vnc.`, `mail.`. No short names (`<slug>.localhost`) | HANDOFF §4's short names existed only to keep one existing project's URLs. Projects are recreated, so OAuth callbacks are registered for the new hosts |
+| D6 | Object names | unit = container = `<prefix>-<slug>-<svc>` (`.container` → `<prefix>-<slug>-<svc>.service`); per-worktree volume `<prefix>-<slug>-<vol>`; dev network unit `<prefix>-<slug>-dev.network` with `NetworkName=<prefix>-<slug>-dev`; proxy network unit `<prefix>-proxy.network` with `NetworkName=<prefix>_proxy`; shared object `<prefix>_<what>`. Names are never parsed back into prefix/slug/service: `api-v2-db` could be slug `api`, service `v2-db`. The registry, the model and the unit marker are the only sources | One name for the unit and its container. The `_` rule is HANDOFF §7 |
+| D7 | Prefix syntax | `^[a-z][a-z0-9]{1,15}$`: no `-` or `_` | Both are separators in object names. A `-` in a prefix makes exact-name matching ambiguous |
+| D8 | Values in units | Rendered units contain no `${VAR}`. Every per-worktree value is written in literally: image ref (with digest), ports, hosts, `AddHost=` entries, versions, volume names, firewall mode, podman secret names. Every `$` in unit text is written `$$` | systemd expands `$`. With nothing left for it to expand, the env-expansion and backreference gotchas become one lint: no single `$` |
+| D9 | Built image tags | Base: `localhost/<prefix>/base:<pack tag format>-<hash8>`, e.g. `localhost/filial/base:ruby3.3.6-node22.11.0-1a2b3c4d`. Derived (D31): `localhost/<prefix>/<name>:<base's version part>-<hash8>`, e.g. `localhost/filial/nvim:ruby3.3.6-node22.11.0-9f8e7d6c`. `hash8` is the first 8 hex digits of the sha256 of the Containerfile and its sorted build args. A derived image's args include `BASE_IMAGE`, so rebuilding the base gives every derived image a new tag | Editing a Containerfile, or the base under it, must give a new tag, or a stale image keeps running. The versions stay in the tag (HANDOFF §3.6) |
+| D10 | Env files | `<workspace>/.railswitch/env/<slug>/<svc>.env` (mode 0600; dir 0700) holds one service's fully resolved process env (layers 1–6), loaded under `[Container]` only. Secrets never appear in unit files, which live in `~/.config/containers/systemd/` at mode 0644 | Today one `.unit-env/<slug>.env` gives `POSTGRES_PASSWORD` to every container. Per-service files keep secrets with the services that use them |
+| D11 | `deps` env | Only the pack layer, the service layer, and `[services.deps.env]`. Never option-given env, the worktree layer, or secrets | AGENTS.md: install scripts run in `deps`; nothing secret belongs there |
+| D12 | Package format | A directory with `pack.toml`, `option.toml`, `tool.toml` or `agent.toml`, plus its assets (`Containerfile.<name>`, `entrypoints/`, `deps.allow`, `initdb/`). A package's Containerfiles are defaults to eject (D32): the pack's `Containerfile.base`, an option's `[app_addon]`, a tool's or agent's own file. Built-ins are embedded from `internal/pack/builtin/` | Install board shows `pack.toml` and `option.toml` |
+| D13 | Workspace overrides of entrypoints | `<workspace>/entrypoints/<name>` replaces the package's entrypoint of the same name. Containerfiles are never replaced by filename; they are chosen and extended explicitly in `[image]` (D31) | Lets a project change a start script without forking the pack; an explicit `[image]` is easier to review than a file shadowing another |
+| D14 | Content hash | sha256 over the pack directory: for each file in sorted slash-path order, `path \x00 len \x00 bytes`. Lowercase hex | Deterministic whatever the walk order |
+| D15 | `stack.lock` images | `[[image]]` entries with `ref`, `digest`. `up` records the digest on first pull; from then on, units use `ref@digest` | HANDOFF §3.11. Array of tables avoids quoting refs as keys |
+| D16 | Database name | The pack's `db_name` chain (Rails: `config/database.yml:development.database`), falling back to `{project.prefix}_development` | HANDOFF §9 leaves this open. It reuses the version-chain mechanism |
+| D17 | Generated service passwords | Options list the passwords they need (`generated = ["DB_PASSWORD"]` in `option.toml`) and use them as `{generated.X}`. `railswitch new` writes random values (32 hex chars) into `[env]` of `<workspace>/mise.local.toml` (0600). A missing value stops render with an error. Users never declare these; their own values are `[secrets]` (D33) | HANDOFF §3.7 layer 6. These values are composed into env such as `DATABASE_URL`, which podman secrets (one value per variable) can't express. They unlock nothing outside the worktree's dev network. Not calling them "secrets" leaves one meaning for that word in `project.toml` |
+| D18 | Seeds | An option volume can name `seed = "<file>"`, relative to `<workspace>/db-dumps/`. `up` runs `podman volume import` once, when it creates the volume. DB restore stays an option asset mounted into `/docker-entrypoint-initdb.d` | HANDOFF §3.8 |
+| D19 | Firewall | `hook.sh` and `firewall.sh` stay shell, embedded and written to `<workspace>/.railswitch/firewall/` by render. Go generates the descriptor JSON. Annotations stay `<prefix>.firewall*` | HANDOFF §6/§7; the hook is proven, so keep its interface |
+| D20 | Machine registry | `~/.local/share/railswitch/registry.toml`, locked with `flock` on `registry.lock`. It holds projects (prefix, workspace, subnet index) and worktrees (prefix, slug, id). This starts in Stage 1, because render needs IDs | HANDOFF §4 |
+| D21 | Proxy before Stage 3 | Stage 2 renders `railswitch-traefik.container` with a `Network=<prefix>-proxy.network:ip=10.214.<n>.2` line for each registered project. Adding a project restarts Traefik. Stage 3 adds live `podman network connect --ip` | A fresh project must route in Stage 2; Stage 3 removes the restart |
+| D22 | Base worktree directory | `<workspace>/<sanitize(base_branch)>/` | `master/` for Filial; `main/` elsewhere |
+| D23 | Tools | `nvim` is a core tool package (`tools/nvim/`), opt-in (`[tools] nvim = true`, `railswitch new --tool nvim`). Its default `Containerfile.nvim` is ejected to `containerfiles/Containerfile.nvim` and built on the base image (D31), so it works with every pack. No default Containerfile contains agent software. Agents are D30 | Old repo's nvim was a target of the Rails Dockerfile. Always-on was one user's workflow, not a generic need |
+| D24 | CLI framework | stdlib `flag` with a dispatch table in `internal/cli` | HANDOFF §2a prefers the stdlib |
+| D25 | TOML library | `github.com/BurntSushi/toml` (strict decode via `MetaData.Undecoded`, sorted encode) | HANDOFF §2a allows it |
+| D26 | Share layer (7) | Not rendered until the tailnet-share redesign (Stage 3) | HANDOFF §9: `tailscale serve reset` affects every project |
+| D27 | Unit dependencies on networks | `Network=` always names the `.network` unit (`Network=<prefix>-<slug>-dev.network:alias=<svc>`), so Quadlet adds `Requires=`/`After=` on its network service itself | Templates could not reference a per-instance `.network`, so the old units had to list the dependency by hand (HANDOFF §7 gotcha 5) |
+| D28 | Unit cleanup | The first line of every rendered unit is a marker naming its prefix and worktree. Render deletes marked units whose worktree is no longer registered; `wt rm` stops the units first, then renders and runs `daemon-reload` | A removed worktree leaves no unit files behind |
+| D29 | Postgres client env | The postgres option gives the standard libpq variables (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) alongside `DATABASE_URL`, to app, worker and tools only, never to the db service | Generic: psql and any libpq-based client use them. The db service must not get them: `PGHOST=db` breaks its initdb scripts (`fd7336b` `db@.container`) |
+| D30 | Agent packages | **Package:** `agents/<name>/` with `agent.toml` and a default `Containerfile.agent`, ejected to `containerfiles/Containerfile.agent` like every other Containerfile (D32). It begins `ARG BASE_IMAGE` / `FROM ${BASE_IMAGE}`; railswitch passes the worktree's base image (D31), so the agent sees the app's runtimes and OS packages. Its `ENTRYPOINT`/`CMD` starts the agent; railswitch never names the agent's program. **`agent.toml` fields:** `allow` (firewall hosts), `mounts` (package files, read-only), `shared` (dirs shared by every worktree), `env`, `secrets` (the secrets it needs, e.g. an API key, declared into the project's `[secrets]` with `services = ["agent"]`, D33; no host env is passed through). **Choosing one:** `project.toml [agent] use = "claude@1"` (built in), `use = "none"`, or `path = "agents/<name>"` for the project's own package, locked by content hash. **Running it:** `railswitch agent [-- args…]` is `podman run --rm -it` with the image's own entrypoint, plus any args. It starts the app first. It is not a unit: an interactive container cannot be one (AGENTS.md). **Core gives every agent the same things:** the worktree at its host path, so git's worktree paths resolve; a per-worktree home `<ws>/.railswitch/home/<slug>`; firewall profile `agent` in enforce mode; and `RAILSWITCH_STATUS_FILE` (Stage 4 contract) | User, 2026-10-25: nothing agent-specific in core. Answers HANDOFF §9 "tools image layer" for agents |
+| D31 | Image layering and addons | **The base chain.** The image `app`, `deps` and `worker` run is built from workspace files only, as a chain of steps, each its own `podman build` with `containerfiles/` as context:<br>1. `[image] base` (required; `railswitch new` ejects the pack's default there);<br>2. each `[image] addons` file, in listed order. A chosen option's default addon (e.g. postgres's `pg-client`: `libpq-dev postgresql-client`) is ejected and listed when the option is chosen. If it's missing from the list, render only warns, since the user's base may already cover it.<br>Each step after the first is a normal Containerfile that begins `ARG BASE_IMAGE` and whose last stage is `FROM ${BASE_IMAGE}`. railswitch passes it the previous step's tag. **Built on the result:** tools (`containerfiles/Containerfile.nvim`) and the agent use the same contract on the chain's last image. **Checks:** the `FROM ${BASE_IMAGE}` shape and a final `USER` of `appuser`/1000 are render errors; an option addon's `os` must match the pack's `[image] os` when it is ejected. Images unrelated to the app's runtimes (playwright) stay standalone | User, 2026-10-25: defaults are ejected and edited, and addons extend them. Layering rather than text merging: every addon is a valid Containerfile you can build and read alone; no Containerfile is rewritten (stage names, `COPY --from`, `ARG` scope stay intact); each step is cached separately, so changing one addon rebuilds only it and what follows. Replaces `fd7336b`'s 286-line multi-target Dockerfile |
+| D32 | Ejecting defaults | `railswitch containerfile`:<br>- `list` shows the build chain and warnings;<br>- `show <name> [--default]` prints the workspace file, or the built-in default;<br>- `eject <name> [--force]` writes a default (`base`, an option addon, a tool) into `containerfiles/Containerfile.<name>` and wires `[image]` for base and addons;<br>- `new <name>` writes an addon skeleton and appends it to `[image] addons`.<br>`railswitch new` ejects every default the stack uses. An ejected file's header records the default's package ref and sha256, so a later stage can show the default's updates as a diff against the user's file (HANDOFF §3.9); nothing is ever applied silently. Built-in Containerfiles never read the build context (only `COPY --from=`), so an ejected file builds unchanged. `project.toml` edits touch only the `[image]` table and keep comments | User, 2026-10-25: even the default is ejected, used from the workspace, and editable |
+| D33 | Secrets | **What changes:** nothing from the host's identity reaches a container. There's no SSH agent socket, no `~/.ssh`, no host gitconfig, no host env passthrough (`GH_TOKEN` etc.). **Declaring one:** every value a user provides (a GitHub token, an agent's API key, an app's dev-only keys such as Twilio's) is declared in `project.toml [secrets.<name>]` with `services` (which containers receive it). It is stored as a podman secret, `<prefix>_<name>` (or `railswitch_<name>` with `scope = "machine"`). **Delivery:** only to the listed services, and to `exec` containers for them. Either as a file `/run/secrets/<name>` (default), or with `env = "VAR"` as that env var (Quadlet `Secret=…,type=env`; `podman run --secret`). A secret env var that collides with one from the env layers is a render error. **Git:** a secret with `git_host` makes its services push and pull over HTTPS via a credential helper set through `GIT_CONFIG_*` env (never written into the shared `.git/config`), with `insteadOf` rewriting ssh remotes. Commit identity comes from the host's `user.name`/`user.email`. **CLI:** `secret add <name> --service <id>… [--env VAR]` declares and sets it; `secret set` replaces a value; `secret ls` shows set/unset, delivery and the date; `secret rm`. Values arrive on stdin only (no-echo prompt on a TTY); never on argv, in files railswitch writes, or in logs. The Stage 6 UI's password fields run the same commands with the value on stdin. **Recommended token:** a fine-grained GitHub PAT limited to the project's repo (Contents and Pull requests read/write) with an expiry | User, 2026-10-25: best practice over forwarding, and dev-only app keys need the same protection. A forwarded SSH agent lets anything in the container (agent-written code included) use **every** host key, for any host, while it runs, with no scoping or expiry. A repo-scoped token limits the damage to one repo. Per-service delivery keeps an app key out of the editor, deps and data containers. File delivery keeps a token out of the environment every child process inherits; use `env` when the app reads `ENV`. It also removes HANDOFF §7's stale-`SSH_AUTH_SOCK` gotcha. Limit: podman's default secret driver stores values unencrypted on disk, protected only by file permissions ([Red Hat](https://www.redhat.com/en/blog/new-podman-secrets-command)), the same protection as `mise.local.toml`. `--replace` changes only newly created containers ([docs](https://docs.podman.io/en/latest/markdown/podman-secret-create.1.html)) |
+| D34 | Container hardening, limits, app health | **Hardening:** every container gets `NoNewPrivileges=true`. App, deps, worker, tool and agent containers also get `DropCapability=all`; they run as uid 1000 and need no capabilities. Data containers keep podman's defaults, because their entrypoints switch users. The browser keeps `NET_ADMIN`/`NET_RAW` for its own firewall. **Limits:** `Memory=`/`PidsLimit=` on every container, from `[services.<id>] memory`/`pids_limit`, else the pack/option `[unit]`, else the role default (app 4g/4096, worker 2g/4096, deps 4g/4096, data 2g/1024, tool 2g/4096). **App health:** the pack declares `[app] health` (Rails: `curl -fsS http://localhost:3000/up`) and `health_start_period`. The app unit gets `HealthCmd=` and `Notify=healthy`, with `TimeoutStartSec` above the start period ([podman #27290](https://github.com/podman-container-tools/podman/issues/27290)). So `up` returns once the app answers. `[services.<app>] health` replaces the command, or `"none"` disables it | User, 2026-10-25. Containers run agent-written code: no privilege escalation, and a runaway process can't take the host down. `up` reports a usable app, not a started container. Keys verified in [podman-systemd.unit(5)](https://man.archlinux.org/man/podman-systemd.unit.5.en) |
+| D35 | Frozen-lockfile installs | The deps service installs exactly the lockfiles. Each pack declares a frozen install: Rails `bundle install` under `BUNDLE_FROZEN=true` (the pack's `[deps] frozen_env`) and `npm ci`; later packs `uv sync --frozen`, `mix deps.get --check-locked`. Dependencies change only through `railswitch deps -- <cmd>`: a transient deps container (registry-only firewall profile) without `frozen_env` | User, 2026-10-25. No silent lockfile drift. An install never resolves new versions behind your back. Changing a dependency is an explicit command whose result shows up as a lockfile diff |
+| D36 | Base images pinned by digest | Every `FROM` in a built Containerfile must be fully qualified (a render error otherwise). `up` records each FROM ref's digest at first pull in `stack.lock` `[[base_image]]`. Later, it prepares the pinned image (`podman pull <repo>@<digest>` + `podman tag`) and builds with `--pull=never`. `railswitch build --pull` is the only way to take an upstream update: it re-pulls by tag, prints old → new digests, records them, and rebuilds from the first changed step | User, 2026-10-25. Two machines, or the same machine a month later, build from the same base bytes. Short names can't be pinned, and resolve differently per `registries.conf` |
+| D37 | Encrypted secret storage (opt-in) | Machine config `~/.config/railswitch/config.toml` `[secrets] driver = "pass"` with `driver_opts = { key = "<GPG key id>", root = … }` makes `secret add`/`set` use podman's `pass` driver (GPG-encrypted at rest). The default stays `file`. `secret ls` shows each secret's driver and flags ones stored under another driver; `doctor` checks `pass`, `gpg` and the key. Caveat: podman decrypts when it creates a container, so gpg-agent must hold the key unlocked when units start | User, 2026-10-25. podman's default store is plaintext on disk. Driver options per the [podman docs](https://docs.podman.io/en/v5.7.1/_sources/markdown/podman-secret-create.1.md.txt) and [discussion #27897](https://github.com/podman-container-tools/podman/discussions/27897) |
+| D38 | Workspace is its own git repo; `init` joins | `railswitch new` runs `git init` in the workspace with an allowlist `.gitignore` (`/*`, then `!/.gitignore`, `!/project.toml`, `!/stack.lock`, `!/containerfiles/`, `!/entrypoints/`, `!/packs/`, `!/options/`). Worktrees, `.railswitch/`, `mise.local.toml` and `db-dumps/` are never tracked. `railswitch init` in a clone of that repo clones the app repo, generates local passwords, registers the project, and lists the secrets to set | User, 2026-10-25. Containerfile, local pack (D43) and config edits get history and review. Answers HANDOFF §9 "joining a project" for the workspace-repo case |
+| D39 | Schema versions | `schema = 1` in `project.toml`, `stack.lock`, `registry.toml` and the machine `config.toml`. A higher schema is refused; future schema changes ship an explicit migration that shows a diff | User, 2026-10-25. An old binary must never misread a newer file |
+| D40 | `--json` | Global flag. `env`, `status`, `wt ls`, `secret ls`, `containerfile list` and `doctor` print one JSON document, with fields documented in `docs/json.md` | User, 2026-10-25. The Stage 6 UI and scripts read structured output instead of parsing text |
+| D41 | railswitch's own CI and releases | GitHub Actions on push and PR: `make check`, plus the Quadlet dry-run integration test in `quay.io/podman/stable`. Tags `v*`: static `linux/amd64` and `linux/arm64` binaries (`-trimpath`, version embedded) with `SHA256SUMS`. The end-to-end test stays manual (it needs a systemd user session). railswitch never generates or touches a project's CI | User, 2026-10-25 |
+| D42 | Generic defaults | Defaults that were one project's preferences are removed: the rails pack's env is only what Rails reads (`RAILS_ENV`, `BINDING`; no `DEV_HOSTS`/`DOMAIN`); the rails pack defaults to `browser = "none"`; nvim is opt-in (D23); the playwright option defines no `HEADLESS_SYSTEM_TESTS`. Projects that use such names set them in `[env]`/`[services.<id>.env]`. Postgres keeps its dev tuning flags | User, 2026-10-25: Filial is a test example, not the base requirements |
+| D43 | User-supplied local packs | A project can use a pack it supplies: `[stack] pack = "local:<name>@<N>"` reads `<workspace>/packs/<name>/` (`pack.toml`, `Containerfile.base`, `entrypoints/`, `deps.allow`), in exactly the format of the built-ins (D12). It is locked in `stack.lock` by content hash (`source = "local"`), so an edit shows up as a lock change that `railswitch lock` must accept. `railswitch pack eject <ref> --as <name>` copies a built-in pack as a starting point; `railswitch pack new <name>` writes a skeleton `pack.toml` with every field commented. Local options (`options/<name>/`, `local:<name>@N` in `[options]`) work the same way. No framework ships in railswitch for this | User, 2026-10-25: bring your own stack (e.g. Phoenix) without waiting for a built-in. It's HANDOFF §3.11's "local ones are locked by hash", available before the Stage 7 library |
+
+## Stages
+
+| Stage | Plan | Done when (HANDOFF §8) |
+|---|---|---|
+| 0 Set up | detailed | `make check` passes on an empty module; repo initialised |
+| 1 Engine and lint | detailed | The Filial fixture renders units that behave like `.container-config/quadlet/*`. **The user reviews `docs/stage1-equivalence.md`** |
+| 2 Lifecycle CLI | detailed | A fresh Rails project runs end to end on one machine: `railswitch new` → `up` → app at `http://master.<prefix>.localhost` → `wt add` → `down` → `wt rm` |
+| 3 Machine layer | later | Two projects run at once without collisions |
+| 4 Run the Filial stack | later | The Filial repo runs end to end from a fresh `new`, using only generic features and its own settings. **v1 acceptance** |
+| 5 Local packs | later | A Phoenix app runs end to end from a pack the user wrote (`local:phoenix@1`), with no framework knowledge added to core |
+| 6 UI | later | Dashboard (switcher, palette, links), Settings, New project, Library, Install review; the UI only calls the CLI |
+| 7 Library and trust | later | Library repos, signing and signers, update review |
+
+### Stage 3 — Machine layer
+
+- Must settle first (§9): Traefik router/service names (already `<prefix>-<slug>-<route>` from Stage 1; confirm), the share redesign (one `:443` for the machine, no `serve reset`), and the port list coming from packs.
+- Build:
+  - live `podman network connect --ip 10.214.<n>.2 railswitch-traefik <prefix>_proxy` when a project is registered;
+  - `railswitch-dozzle` at `logs.localhost`;
+  - a check that no two projects route the same hostname;
+  - before an ID is handed out, its ports are checked against listening sockets (`/proc/net/tcp{,6}`);
+  - subnets checked against `podman network ls`;
+  - `railswitch machine` (projects, hosts, port registry, who-can-reach-whom);
+  - `share`/`unshare` with per-project serve handling (D26).
+- Test: two fixture projects; their ports, subnets, router names and hostnames are disjoint. Integration: both stacks up at once, and each app is unreachable from the other project's containers.
+
+### Stage 4 — Run the Filial stack (v1 acceptance)
+
+Filial is an ordinary project. It is created with `railswitch new` from its repo and `wt add` for the branches needed. Nothing in railswitch's code, packs or defaults is specific to it. Anything it needs is either a generic feature built here or a setting in its own project: `project.toml` (including `[image] base`/`addons`, D31), `mise.local.toml`, or entrypoint overrides (D13).
+
+- Must settle first:
+  - **machine-local mounts:** e.g. a terminal's socket into the nvim container. These are per user and machine, so they live outside `project.toml`;
+  - **agent status contract:** the agent writes JSON to `$RAILSWITCH_STATUS_FILE`. Proposal: `{"v":1,"state":"permission|question|working|done|idle|off","message":"…","ts":<unix>}`. The dashboard derives "waiting for reply" vs "your turn" from `done` plus a message ending in `?` (HANDOFF §6);
+  - **agent ↔ browser:** what the browser option exposes for an agent's browser tools (a CDP endpoint env, e.g. `BROWSER_CDP_URL`), so no agent template hard-codes the playwright container;
+  - **git-guard:** `hooks backup/restore` and the git config allowlist;
+  - **commit signing:** a per-project SSH *signing* key as a secret (`git_signing = true`: `gpg.format=ssh`, `user.signingkey=/run/secrets/<name>`, `commit.gpgsign=true` via `GIT_CONFIG_*`). It is registered on GitHub as a signing key, which cannot authenticate. Or no signing inside containers.
+- Build:
+  - the `agent` package kind (D30), `railswitch agent [--new-term] [-- args…]` (`--new-term` is the `newterm.sh` port), and `railswitch nvim`;
+  - the built-in `claude@1` agent template, holding everything Claude-specific:
+    - the Claude Code install;
+    - the entrypoint (MCP setup, then `claude --dangerously-skip-permissions`);
+    - the status hook (port of `claude-status-hook.sh`), mapping Claude's hook events to the status contract;
+    - its instructions file;
+    - its firewall hosts (`claude.ai`, `api.anthropic.com`, `statsig.com`, `sentry.io`);
+  - `railswitch new` writes `[agent] use = "claude@1"` unless `--agent <ref>|none` is given. With a `github.com` repo, `[secrets.github_token]` lists `services = ["agent"]` (plus `"nvim"` with `--tool nvim`);
+  - git-guard;
+  - `railswitch db dump`, writing `<workspace>/db-dumps/<db>.dump`. A fresh volume restores from it (the postgres option's initdb restore).
+- Done:
+  - the Filial repo runs end to end from a fresh `new`;
+  - `grep -ri filial` over the code and built-in packs finds nothing outside test fixtures;
+  - `grep -ri claude` over the code finds nothing outside `internal/pack/builtin/agents/claude/`;
+  - a minimal test agent package (`CMD ["sh"]`) runs through the same `railswitch agent` path;
+  - every gap Filial hit is closed by a generic feature.
+- Moving over is the user's job and needs no tool support: stop the old stack (only one Traefik can own `127.0.0.1:80`), then `new`, `wt add`, `up`. Worktree IDs and host ports are new.
+
+### Stage 5 — User-supplied local packs, proven with Phoenix (D43)
+
+- Must settle first, as pack-contract fields every pack can set:
+  - the dev server's bind address. Phoenix's generated `config/dev.exs` binds `127.0.0.1` (from the generator's defaults; verify), so the pack needs a way to tell the app to bind `0.0.0.0`, e.g. an env the app reads;
+  - HMR/websocket ports and their routing;
+  - which browser protocol each pack's test driver uses;
+  - how a pack documents app-side changes it needs. For Phoenix's generated dev Repo config: drop the hard-coded `hostname`/`username`/`password` so that Postgrex falls back to the `PG*` env the postgres option gives (D29).
+- Build:
+  - `local:` refs in `[stack]` and `[options]`, with hash locking;
+  - `railswitch pack eject|new|show`;
+  - pack-format validation errors that name the field and file.
+- Done when, with no change to `internal/render` or `internal/config` for Phoenix:
+  - a user-written `packs/phoenix/` (in a test fixture, not shipped) runs a fresh `mix phx.new` app;
+  - it uses `mix phx.server` on :4000, `mix deps.get --check-locked` in deps, elixir/erlang from `.tool-versions`, hex registries in `deps.allow`, and a health command the pack declares.
+
+  Any core change Phoenix needs is a leak: move that knowledge into the pack format instead.
+
+### Stage 6 — UI (`internal/web`, `internal/jobs`, `internal/gitsafe`, embedded `web/`)
+
+- Port from `.dashboard/`:
+  - `guard.rb` (Host/Origin/token checks, no framing);
+  - `runner/` (`systemd-run --user --scope --collect`, logs capped at 8/16 MiB, last 20 jobs, 5000 lines, 4 MiB per job, 64 KiB per line, TERM then KILL after 3 s);
+  - `child_env.rb`/`session_env.rb`;
+  - `git_safety*` (the shadow `GIT_COMMON_DIR` with an allowlisted config, fails closed past 2,000 entries);
+  - agent states (permission/question/reply/working/your turn/idle/off), read only from the Stage 4 status contract, never from an agent's own files.
+- The fixtures from `.dashboard/test/fixtures/` become Go testdata.
+- Screens in order:
+  1. the dashboard, with switcher (`P`, `1`–`9`) and palette (four presets, eight colours, `~/.config/railswitch/dashboard.toml`);
+  2. Settings (staged slot changes with data-impact labels; Secrets: one row per declared secret with its services and delivery, set/unset and its date, never the value, plus "Add a secret". Value fields run `railswitch secret add|set` with the value on stdin, so it never reaches argv or a job log);
+  3. New project (repo detection: `Gemfile: pg` etc.). The boards' "Adopt this workspace" banner, the "Adopt a workspace…" switcher entry, and the short-name settings on the Machine and Settings boards are dropped;
+  4. Library, including a "New pack" form: the `pack.toml` fields (server, port, install, runtimes and version files, env, caches, registries, health) plus pasted Containerfiles. It runs `railswitch pack new`, then writes the files;
+  5. Install review.
+- Test (secret form, with the command runner faked):
+  - a POST without the dashboard token or with a foreign Origin is answered 403, and no command runs;
+  - a valid POST runs `railswitch secret set <name>` (or `add` with its flags), and the value is exactly the child's stdin;
+  - the value appears in no recorded argv, no job log file, no `slog` output, and no response body or SSE event;
+  - the GET page for Secrets contains no stored value. The dashboard never reads podman secret values, so it has none to leak.
+- Must settle first: the tasks screen, a preview of generated files, and the dark palette values (none exist in the mock-ups).
+
+### Stage 7 — Library and trust
+
+- Must settle first: signer trust, rotation and revocation; how tool upgrades affect built-ins locked to the tool's version.
+- Build:
+  - library git repos;
+  - capability checks: new firewall hosts, `curl | sh` in `RUN`, host mounts, non-loopback publishes, privileges, images;
+  - per-file diffs;
+  - the "I've read N flagged items" gate;
+  - `stack.lock` commit + sha256 verification.

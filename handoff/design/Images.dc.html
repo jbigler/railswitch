@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New project: images</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.step{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;text-decoration:none;color:#575653;font-weight:600;font-size:14px;min-height:44px;box-sizing:border-box}
+.step:hover{background:#F2F0E5;color:#100F0F}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+th{text-align:left;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#575653;padding:10px 12px;border-bottom:1px solid #CECDC3;white-space:nowrap}
+td{padding:12px;border-bottom:1px solid #E6E4D9;font-size:14px;vertical-align:top}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid #CECDC3;background:#FFFFFF;color:#100F0F;font:inherit;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none}
+.inp{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:44px;box-sizing:border-box;min-width:0;width:100%}
+.lbl{font-size:13px;font-weight:700}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.mini{font:inherit;font-size:13px;padding:6px 8px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:36px}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">New project</span>
+    <span style="flex-grow: 1"></span>
+    <a href="#" style="font-size: 14px; color: #575653">Cancel</a>
+  </header>
+
+  <nav aria-label="Setup" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 12px 24px; border-bottom: 1px solid #E6E4D9">
+    <a class="step" href="Main.dc.html"><span class="mono" style="font-size: 12px">1</span>Stack &amp; options</a>
+    <a class="step" href="Review.dc.html"><span class="mono" style="font-size: 12px">2</span>Review &amp; create</a>
+    <span aria-hidden="true" style="width: 1px; height: 24px; background: #CECDC3; margin: 0 10px"></span>
+    <span style="font-size: 12px; color: #575653; margin-right: 4px">Advanced, optional:</span>
+    <a href="Images.dc.html" aria-current="page" style="display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; background: #100F0F; color: #FFFCF0; font-weight: 600; font-size: 13px; min-height: 40px; box-sizing: border-box">Images</a>
+    <a href="Environment.dc.html" style="display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #575653; font-weight: 600; font-size: 13px; min-height: 40px; box-sizing: border-box">Environment</a>
+  </nav>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 24px; background: #F2F0E5; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+    <span style="font-weight: 800">Choices from step 1</span>
+    <span style="color: #575653">(switch here to preview)</span>
+    <sc-for list="{{bar}}" as="b" hint-placeholder-count="5">
+      <span style="display: inline-flex; align-items: center; gap: 6px"><label for="{{b.id}}" style="color: #575653">{{b.label}}</label><select id="{{b.id}}" class="mini" value="{{b.value}}" onChange="{{b.change}}"><sc-for list="{{b.options}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></span>
+    </sc-for>
+  </div>
+
+  <main style="display: flex; flex-direction: column; gap: 36px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px">
+      <div style="flex: 1 1 520px; min-width: 0">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Images</h1>
+        <p style="margin: 6px 0 0; color: #575653; font-size: 15px; max-width: 780px">Nothing here is chosen on its own. The {{pack.label}} pack brings the app’s Containerfile, and each option picked on step 1 brings its image. Adding an image here adds an option to step 1.</p>
+      </div>
+      <button type="button" onClick="{{addOption}}" style="min-height: 44px; padding: 8px 18px; border-radius: 8px; border: 0; background: #BC5215; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Add an option…</button>
+    </div>
+
+    <section aria-labelledby="img-h" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="img-h" style="margin: 0; font-size: 20px; font-weight: 800">Images this stack uses</h2>
+      <div style="overflow-x: auto; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+        <table style="border-collapse: collapse; width: 100%; min-width: 1040px">
+          <thead><tr><th scope="col">Image</th><th scope="col">Source</th><th scope="col">From</th><th scope="col">Versions</th><th scope="col">Brought by</th><th scope="col">Used by</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+          <tbody>
+            <sc-for list="{{images}}" as="im" hint-placeholder-count="7">
+              <tr>
+                <td class="mono" style="font-weight: 600">{{im.name}}</td>
+                <td><span class="chip" style="border-color: {{im.kindColor}}; color: {{im.kindColor}}; background: #FFFFFF">{{im.kindLabel}}</span></td>
+                <td class="mono" style="font-size: 13px; overflow-wrap: anywhere">{{im.from}}</td>
+                <td class="mono" style="font-size: 13px">{{im.ver}}</td>
+                <td style="font-size: 13px">{{im.by}}</td>
+                <td class="mono" style="font-size: 13px">{{im.used}}</td>
+                <td style="text-align: right"><button type="button" class="btn" onClick="{{im.edit}}" aria-label="Edit image {{im.name}}">Edit</button></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: #575653">Editing an image the pack or an option brought keeps your change in <span class="mono">project.toml</span>; the pack’s own copy is untouched, so a pack update shows up as a diff.</p>
+    </section>
+
+    <section aria-labelledby="cf-h" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="cf-h" style="margin: 0; font-size: 20px; font-weight: 800">Containerfiles</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px">
+        <sc-for list="{{containerfiles}}" as="c" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+              <span class="mono" style="font-weight: 600; font-size: 15px">{{c.file}}</span>
+              <span class="chip">from {{c.by}}</span>
+              <span style="flex-grow: 1"></span>
+              <button type="button" class="btn" onClick="{{c.edit}}" aria-label="Edit {{c.file}}">Edit</button>
+            </div>
+            <span class="mono" style="font-size: 12px; color: #34332F">{{c.base}}</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center"><span style="font-size: 12px; color: #575653">Builds</span><sc-for list="{{c.builds}}" as="b" hint-placeholder-count="2"><span class="chip mono">{{b}}</span></sc-for></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center"><span style="font-size: 12px; color: #575653">Args</span><sc-for list="{{c.args}}" as="a" hint-placeholder-count="2"><span class="chip mono">{{a}}</span></sc-for></div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="ver-h" style="display: flex; flex-direction: column; gap: 12px">
+      <div>
+        <h2 id="ver-h" style="margin: 0; font-size: 20px; font-weight: 800">Versions</h2>
+        <p style="margin: 4px 0 0; font-size: 14px; color: #575653; max-width: 780px">The pack says which versions the app’s own files control, read per worktree. Each option brings a pinned version of its image.</p>
+      </div>
+      <div style="overflow-x: auto; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+        <table style="border-collapse: collapse; width: 100%; min-width: 960px">
+          <thead><tr><th scope="col">Version</th><th scope="col">Comes from</th><th scope="col">Value</th><th scope="col">Used by</th><th scope="col">Notes</th></tr></thead>
+          <tbody>
+            <sc-for list="{{versions}}" as="v" hint-placeholder-count="5">
+              <tr>
+                <td class="mono" style="font-weight: 600">{{v.name}}</td>
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <span><span class="chip" style="border-color: {{v.color}}; color: {{v.color}}; background: #FFFFFF">{{v.kind}}</span></span>
+                    <sc-if value="{{v.hasChain}}" hint-placeholder-val="{{ true }}">
+                      <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; color: #6F6E69">
+                        <sc-for list="{{v.chain}}" as="c" hint-placeholder-count="3"><span class="mono" style="padding: 1px 6px; border-radius: 4px; background: {{c.bg}}; color: {{c.fg}}; font-weight: {{c.weight}}">{{c.l}}</span><span aria-hidden="true">›</span></sc-for>
+                        <span>fallback <span class="mono">{{v.fallback}}</span></span>
+                      </div>
+                    </sc-if>
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <span class="mono" style="font-size: 13px; font-weight: 600">{{v.value}}</span>
+                    <sc-if value="{{v.changeable}}" hint-placeholder-val="{{ false }}"><button type="button" class="btn" onClick="{{openPin}}" style="min-height: 36px; padding: 4px 12px">Change…</button></sc-if>
+                  </div>
+                </td>
+                <td class="mono" style="font-size: 13px">{{v.used}}</td>
+                <td style="font-size: 13px; color: #34332F">{{v.note}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="wt-h" style="display: flex; flex-direction: column; gap: 12px">
+      <div>
+        <h2 id="wt-h" style="margin: 0; font-size: 20px; font-weight: 800">Built images per worktree</h2>
+        <p style="margin: 4px 0 0; font-size: 14px; color: #575653; max-width: 780px">Each tag carries its versions, so worktrees on the same versions share an image. Rebuilding one worktree only rebuilds the tags it uses.</p>
+      </div>
+      <div style="overflow-x: auto; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+        <table style="border-collapse: collapse; width: 100%; min-width: 860px">
+          <thead><tr><th scope="col">Worktree</th><sc-for list="{{wtCols}}" as="c" hint-placeholder-count="2"><th scope="col">{{c}}</th></sc-for><th scope="col">Images</th><th scope="col"><span class="sr">Actions</span></th></tr></thead>
+          <tbody>
+            <sc-for list="{{wtRows}}" as="r" hint-placeholder-count="4">
+              <tr>
+                <td class="mono" style="font-weight: 600">{{r.name}}</td>
+                <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="2"><td class="mono" style="font-size: 13px"><span style="padding: 1px 6px; border-radius: 4px; background: {{c.bg}}; color: {{c.fg}}">{{c.v}}</span></td></sc-for>
+                <td style="font-size: 13px; color: {{r.statusColor}}; font-weight: {{r.statusWeight}}">{{r.status}}</td>
+                <td style="text-align: right"><button type="button" class="btn">{{r.action}}</button></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <sc-if value="{{dlgOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(16, 15, 15, 0.4); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; z-index: 10">
+      <div role="dialog" aria-modal="true" aria-labelledby="dlg-h" style="width: 100%; max-width: 1120px; display: flex; flex-direction: column; gap: 20px; padding: 24px; border-radius: 12px; background: #FFFCF0; border: 1px solid #CECDC3; box-sizing: border-box">
+        <div style="display: flex; align-items: flex-start; gap: 12px">
+          <div style="flex-grow: 1; min-width: 0">
+            <h2 id="dlg-h" style="margin: 0; font-size: 20px; font-weight: 800">{{dlgTitle}}</h2>
+            <p style="margin: 4px 0 0; font-size: 14px; color: #575653">{{dlgSub}}</p>
+          </div>
+          <button type="button" onClick="{{closeDlg}}" aria-label="Close" style="width: 40px; height: 40px; border: 0; background: transparent; border-radius: 8px; cursor: pointer; color: #575653"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <label for="offer" class="lbl">Offer it as</label>
+            <select id="offer" class="inp" value="{{offer}}" onChange="{{setOffer}}">
+              <option value="cache">An option under Cache and queues</option>
+              <option value="database">An option under Database</option>
+              <option value="storage">An option under Object storage</option>
+              <option value="mail">An option under Mail catcher</option>
+              <option value="worker">An option under Background jobs</option>
+              <option value="service">A new service on step 1</option>
+              <option value="image">An image only, to build other images on</option>
+            </select>
+            <span style="font-size: 12px; color: #575653">{{offerHelp}}</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <label for="oname" class="lbl">Name</label>
+            <input id="oname" class="inp mono" type="text" value="{{optName}}" onChange="{{setOptName}}">
+            <span style="font-size: 12px; color: #575653">Shown on step 1 and used for the image.</span>
+          </div>
+        </div>
+
+        <fieldset style="margin: 0; padding: 0; border: 0">
+          <legend class="lbl" style="margin-bottom: 8px">Where its image comes from</legend>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px">
+            <sc-for list="{{sources}}" as="s" hint-placeholder-count="2">
+              <label style="display: flex; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1.5px solid {{s.border}}; background: {{s.bg}}; cursor: pointer">
+                <input type="radio" name="src" checked="{{s.on}}" onChange="{{s.pick}}" style="width: 18px; height: 18px; margin: 2px 0 0; flex-shrink: 0">
+                <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 800; font-size: 15px">{{s.label}}</span><span style="font-size: 13px; color: #575653">{{s.desc}}</span></span>
+              </label>
+            </sc-for>
+          </div>
+        </fieldset>
+
+        <sc-if value="{{isRegistry}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+            <div style="flex: 3 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <label for="iref" class="lbl">Image on the registry</label>
+                <div style="display: flex; gap: 8px">
+                  <input id="iref" class="inp mono" type="text" value="{{reg.ref}}">
+                  <button type="button" class="btn" style="min-height: 44px; flex-shrink: 0">Look up tags</button>
+                </div>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 12px">
+                <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px">
+                  <label for="tpin" class="lbl">Pinned version</label>
+                  <input id="tpin" class="inp mono" type="text" value="{{reg.pin}}">
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 4px; flex: 2 1 220px">
+                  <label for="tfmt" class="lbl">Tag</label>
+                  <input id="tfmt" class="inp mono" type="text" value="{{reg.fmt}}">
+                </div>
+              </div>
+              <span style="font-size: 12px; color: #575653">The tag follows the pin, so changing the pin changes the image. Use a digest for anything you share.</span>
+            </div>
+            <div style="flex: 2 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 10px; background: #F2F0E5">
+              <span class="eyebrow">Resolves to</span>
+              <span class="mono" style="font-size: 13px; font-weight: 600; overflow-wrap: anywhere">{{reg.resolved}}</span>
+              <span class="eyebrow" style="margin-top: 6px">Tags on the registry</span>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px"><sc-for list="{{reg.tags}}" as="t" hint-placeholder-count="4"><span class="chip mono">{{t}}</span></sc-for></div>
+              <span style="font-size: 12px; color: #575653">Sample results; the real list comes from Look up tags.</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isBuild}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+            <div style="flex: 3 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <label for="cfname" class="lbl">Containerfile name</label>
+                <div style="display: flex; align-items: center; border: 1px solid #CECDC3; border-radius: 6px; background: #FFFFFF; min-height: 44px; overflow: hidden">
+                  <span class="mono" aria-hidden="true" style="padding: 0 0 0 10px; font-size: 14px; color: #575653">Containerfile.</span>
+                  <input id="cfname" class="mono" type="text" value="{{cfName}}" onChange="{{setCfName}}" style="flex: 1 1 auto; min-width: 0; border: 0; padding: 8px 10px 8px 0; font-size: 14px; background: transparent; color: #100F0F; min-height: 42px">
+                </div>
+                <span style="font-size: 12px; color: {{cfNameColor}}">{{cfNameHelp}}</span>
+              </div>
+              <div role="group" aria-label="Containerfile content" style="display: flex; flex-wrap: wrap; gap: 6px">
+                <sc-for list="{{contentModes}}" as="cm" hint-placeholder-count="4">
+                  <button type="button" aria-pressed="{{cm.pressed}}" onClick="{{cm.pick}}" style="min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1.5px solid {{cm.border}}; background: {{cm.bg}}; color: {{cm.fg}}; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">{{cm.label}}</button>
+                </sc-for>
+              </div>
+              <label for="cftext" class="sr">Containerfile contents</label>
+              <textarea id="cftext" class="mono" spellcheck="false" defaultValue="{{build.text}}" key="{{buildKey}}" style="min-height: 320px; resize: vertical; padding: 12px 14px; border: 1px solid #CECDC3; border-radius: 8px; background: #FFFFFF; color: #100F0F; font-size: 12.5px; line-height: 1.55; white-space: pre; overflow: auto"></textarea>
+            </div>
+            <div style="flex: 2 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 10px; background: #F2F0E5">
+              <span class="eyebrow">What we found</span>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <span style="font-size: 14px; font-weight: 800">Targets → images</span>
+                <sc-for list="{{build.targets}}" as="tg" hint-placeholder-count="2">
+                  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 10px; border-radius: 8px; background: #FFFFFF; border: 1px solid #E6E4D9">
+                    <span class="mono" style="font-size: 13px; font-weight: 600">{{tg.stage}}</span><span aria-hidden="true" style="color: #6F6E69">→</span><span class="mono" style="font-size: 13px">{{tg.image}}</span>
+                    <span class="mono" style="flex: 1 1 100%; font-size: 12px; color: #575653">{{tg.cmd}}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px">
+                <span style="font-size: 14px; font-weight: 800">Build args</span>
+                <sc-for list="{{build.args}}" as="a" hint-placeholder-count="2">
+                  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 10px; padding: 6px 0; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+                    <span class="mono" style="font-weight: 600">{{a.name}}</span><span style="color: {{a.color}}">{{a.link}}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 12px 14px; border-radius: 8px; background: #FFF6D6; display: flex; flex-direction: column; gap: 8px">
+            <p style="margin: 0; font-size: 14px; color: #6B5000"><span style="font-weight: 700">Every RUN line runs on this machine during the build,</span> outside the containers’ firewall. Read the whole file before saving.</p>
+            <label style="display: flex; gap: 10px; align-items: center; font-size: 14px; color: #100F0F; cursor: pointer"><input type="checkbox" checked="{{ack}}" onChange="{{toggleAck}}" style="width: 18px; height: 18px; margin: 0">I’ve read this file</label>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{providesSomething}}" hint-placeholder-val="{{ true }}">
+          <fieldset style="margin: 0; padding: 18px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF; display: flex; flex-direction: column; gap: 14px">
+            <legend class="lbl" style="padding: 0 6px">What it provides</legend>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+              <sc-for list="{{provides}}" as="pv" hint-placeholder-count="4">
+                <div style="display: flex; flex-direction: column; gap: 4px">
+                  <label for="{{pv.id}}" class="lbl">{{pv.label}}</label>
+                  <input id="{{pv.id}}" class="inp mono" type="text" value="{{pv.value}}">
+                  <span style="font-size: 12px; color: #575653">{{pv.help}}</span>
+                </div>
+              </sc-for>
+            </div>
+          </fieldset>
+        </sc-if>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+          <span style="flex: 1 1 260px; font-size: 13px; color: #34332F">{{resultNote}}</span>
+          <button type="button" class="btn" onClick="{{closeDlg}}" style="min-height: 44px; font-size: 14px">Cancel</button>
+          <button type="button" onClick="{{closeDlg}}" disabled="{{saveDisabled}}" style="min-height: 44px; padding: 8px 18px; border-radius: 8px; border: 0; background: {{saveBg}}; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer">{{saveLabel}}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{pinOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; background: rgba(16, 15, 15, 0.4); display: flex; align-items: flex-start; justify-content: center; padding: 64px 16px; overflow-y: auto; z-index: 10">
+      <div role="dialog" aria-modal="true" aria-labelledby="pin-h" style="width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 18px; padding: 24px; border-radius: 12px; background: #FFFCF0; border: 1px solid #CECDC3">
+        <div style="display: flex; align-items: flex-start; gap: 12px">
+          <h2 id="pin-h" style="margin: 0; flex-grow: 1; font-size: 20px; font-weight: 800">Change the {{db.label}} version</h2>
+          <button type="button" onClick="{{closePin}}" aria-label="Close" style="width: 40px; height: 40px; border: 0; background: transparent; border-radius: 8px; cursor: pointer; color: #575653"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; gap: 4px"><span class="lbl">Now</span><span class="mono" style="min-height: 44px; display: flex; align-items: center; font-size: 15px">{{db.pin}}</span></div>
+          <div style="display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px">
+            <label for="pinnew" class="lbl">New version</label>
+            <select id="pinnew" class="inp mono"><sc-for list="{{db.choices}}" as="c" hint-placeholder-count="3"><option>{{c}}</option></sc-for><option>Image digest…</option></select>
+          </div>
+        </div>
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+          <legend class="lbl" style="margin-bottom: 8px">Apply to</legend>
+          <sc-for list="{{scopes}}" as="sc" hint-placeholder-count="2">
+            <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer">
+              <input type="radio" name="pinscope" checked="{{sc.on}}" onChange="{{sc.pick}}" style="width: 18px; height: 18px; margin: 1px 0 0">
+              <span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 700">{{sc.label}}</span><span style="font-size: 13px; color: #575653">{{sc.desc}}</span></span>
+            </label>
+          </sc-for>
+        </fieldset>
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 10px; background: #F2F0E5">
+          <span class="eyebrow">What happens</span>
+          <p style="margin: 0; font-size: 14px; color: #34332F">A major version change gives {{who}} a new volume, <span class="mono">{{db.newVol}}</span>, restored with the option’s restore command ({{db.restore}}). The old volume is kept until <span class="mono">clean</span>; switching back picks it up again.</p>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 8px; background: #FFF6D6">
+            <p style="margin: 0; font-size: 14px; color: #6B5000"><span style="font-weight: 700">The dump is 9 days old.</span> Anything newer stays behind in the old volume.</p>
+            <label style="display: flex; gap: 10px; align-items: center; font-size: 14px; color: #100F0F; cursor: pointer"><input type="checkbox" checked="checked" style="width: 18px; height: 18px; margin: 0">Dump master first ({{db.dump}})</label>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+          <span class="mono" style="flex: 1 1 220px; font-size: 12px; color: #575653">{{pinCommand}}</span>
+          <button type="button" class="btn" onClick="{{closePin}}" style="min-height: 44px; font-size: 14px">Cancel</button>
+          <button type="button" onClick="{{closePin}}" style="min-height: 44px; padding: 8px 18px; border-radius: 8px; border: 0; background: #BC5215; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer">{{pinSave}}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      stack: 'rails', database: 'postgres', cache: 'redis', storage: 'rustfs', browser: 'playwright',
+      dlgOpen: false, mode: 'add', offer: 'cache', optName: 'memcached', src: 'registry', cfName: 'search', content: 'paste', ack: false, presetKey: 'memcached', buildKey: 'search',
+      pinOpen: false, pinScope: 'all'
+    };
+  }
+  renderVals() {
+    const st = this.state;
+    const chain = (files, hit) => files.map((f, i) => ({ l: f, bg: i === hit ? '#EDF3E0' : 'transparent', fg: i === hit ? '#3D4F05' : '#6F6E69', weight: i === hit ? '600' : '400' }));
+    const PACKS = {
+      rails: { label: 'Rails', app: 'rails', base: 'FROM ruby:${RUBY_VERSION}-slim · copies node', args: ['RUBY_VERSION ← ruby', 'NODE_VERSION ← node'], tag: 'ruby{ruby}-node{node}',
+        runtimes: [{ name: 'ruby', files: ['.ruby-version', '.tool-versions', 'Gemfile', 'Gemfile.lock'], hit: 0, fallback: '3.4.2', val: '3.4.2', bump: '3.4.4' }, { name: 'node', files: ['.nvmrc', '.node-version', '.tool-versions'], hit: 0, fallback: '22.11.0', val: '22.11.0', bump: '22.12.0' }],
+        pw: 'Gemfile.lock › playwright-ruby-client', cmd: 'bin/dev' },
+      hanami: { label: 'Hanami', app: 'web', base: 'FROM ruby:${RUBY_VERSION}-slim · copies node', args: ['RUBY_VERSION ← ruby', 'NODE_VERSION ← node'], tag: 'ruby{ruby}-node{node}',
+        runtimes: [{ name: 'ruby', files: ['.ruby-version', '.tool-versions', 'Gemfile', 'Gemfile.lock'], hit: 0, fallback: '3.4.2', val: '3.4.2', bump: '3.4.4' }, { name: 'node', files: ['.nvmrc', '.node-version', '.tool-versions'], hit: 0, fallback: '22.11.0', val: '22.11.0', bump: '22.12.0' }],
+        pw: 'Gemfile.lock › playwright-ruby-client', cmd: 'bundle exec hanami dev' },
+      phoenix: { label: 'Phoenix', app: 'web', base: 'FROM elixir:${ELIXIR_VERSION}-otp-${OTP_MAJOR}-slim', args: ['ELIXIR_VERSION ← elixir', 'OTP_MAJOR ← erlang.major'], tag: 'elixir{elixir}-otp{erlang.major}',
+        runtimes: [{ name: 'elixir', files: ['.tool-versions:elixir', '.elixir-version'], hit: 0, fallback: '1.17.3', val: '1.17.3', bump: '1.18.1' }, { name: 'erlang', files: ['.tool-versions:erlang'], hit: 0, fallback: '27.1', val: '27.1', bump: '27.2' }],
+        pw: 'pinned (Elixir has no Playwright lockfile)', cmd: 'mix phx.server' },
+      django: { label: 'Django', app: 'web', base: 'FROM python:${PYTHON_VERSION}-slim · copies uv', args: ['PYTHON_VERSION ← python'], tag: 'python{python}',
+        runtimes: [{ name: 'python', files: ['.python-version', '.tool-versions:python'], hit: 0, fallback: '3.12', val: '3.12', bump: '3.13' }],
+        pw: 'uv.lock › playwright', cmd: 'manage.py runserver 0.0.0.0:8000' },
+      flask: { label: 'Flask', app: 'web', base: 'FROM python:${PYTHON_VERSION}-slim · copies uv', args: ['PYTHON_VERSION ← python'], tag: 'python{python}',
+        runtimes: [{ name: 'python', files: ['.python-version', '.tool-versions:python'], hit: 0, fallback: '3.12', val: '3.12', bump: '3.13' }],
+        pw: 'uv.lock › playwright', cmd: 'flask run --host 0.0.0.0' },
+      node: { label: 'Node', app: 'web', base: 'FROM node:${NODE_VERSION}-slim', args: ['NODE_VERSION ← node'], tag: 'node{node}',
+        runtimes: [{ name: 'node', files: ['.nvmrc', '.node-version', '.tool-versions:nodejs'], hit: 0, fallback: '22.11.0', val: '22.11.0', bump: '22.12.0' }],
+        pw: 'package-lock.json › @playwright/test', cmd: 'npm run dev' }
+    };
+    const pack = PACKS[st.stack];
+    const OPT = {
+      database: {
+        postgres: { label: 'PostgreSQL', svc: 'db', ref: 'docker.io/library/postgres', ver: 'postgres', pin: '16', fmt: '{postgres}', choices: ['15', '16.4 (exact)', '17'], vol: 'db-data-pg16', newVol: 'db-data-pg17', dump: 'pg_dump', restore: 'pg_restore' },
+        mysql: { label: 'MySQL', svc: 'db', ref: 'docker.io/library/mysql', ver: 'mysql', pin: '8.4', fmt: '{mysql}', choices: ['8.0', '8.4.3 (exact)', '9.1'], vol: 'db-data-mysql8', newVol: 'db-data-mysql9', dump: 'mysqldump', restore: 'mysql < dump' },
+        mariadb: { label: 'MariaDB', svc: 'db', ref: 'docker.io/library/mariadb', ver: 'mariadb', pin: '11.4', fmt: '{mariadb}', choices: ['10.11', '11.4.4 (exact)', '11.8'], vol: 'db-data-mariadb11', newVol: 'db-data-mariadb12', dump: 'mariadb-dump', restore: 'mariadb < dump' }
+      },
+      cache: {
+        redis: { label: 'Redis', svc: 'cache', ref: 'docker.io/library/redis', ver: 'redis', pin: '8', fmt: '{redis}-alpine' },
+        valkey: { label: 'Valkey', svc: 'cache', ref: 'docker.io/valkey/valkey', ver: 'valkey', pin: '8', fmt: '{valkey}-alpine' }
+      },
+      storage: {
+        rustfs: { label: 'RustFS', svc: 'storage', ref: 'docker.io/rustfs/rustfs', ver: 'rustfs', pin: '1.0.0-alpha.83', fmt: '{rustfs}' },
+        minio: { label: 'MinIO', svc: 'storage', ref: 'quay.io/minio/minio', ver: 'minio', pin: 'RELEASE.[date]', fmt: '{minio}' }
+      }
+    };
+
+    const set = (k) => (e) => this.setState({ [k]: e.target.value });
+    const bar = [
+      { id: 'b-stack', label: 'Stack', value: st.stack, change: set('stack'), options: Object.keys(PACKS).map((k) => ({ v: k, l: PACKS[k].label })) },
+      { id: 'b-db', label: 'Database', value: st.database, change: set('database'), options: [['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) },
+      { id: 'b-cache', label: 'Cache', value: st.cache, change: set('cache'), options: [['redis', 'Redis'], ['valkey', 'Valkey'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) },
+      { id: 'b-storage', label: 'Storage', value: st.storage, change: set('storage'), options: [['rustfs', 'RustFS'], ['minio', 'MinIO'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) },
+      { id: 'b-browser', label: 'Browser', value: st.browser, change: set('browser'), options: [['playwright', 'Playwright'], ['none', 'None']].map((o) => ({ v: o[0], l: o[1] })) }
+    ];
+
+    const open = (preset) => () => this.setState({ dlgOpen: true, ack: false, ...preset });
+    const verNames = pack.runtimes.map((r) => r.name).join(', ');
+    const chosen = [];
+    if (OPT.database[st.database]) chosen.push(['database', OPT.database[st.database]]);
+    if (OPT.cache[st.cache]) chosen.push(['cache', OPT.cache[st.cache]]);
+    if (OPT.storage[st.storage]) chosen.push(['storage', OPT.storage[st.storage]]);
+
+    const images = [
+      { name: pack.app, kind: 'build', from: 'Containerfile.app › ' + pack.app, ver: verNames, by: pack.label + ' pack', used: pack.app + ', deps', preset: { mode: 'edit', offer: 'image', src: 'build', cfName: 'app', optName: pack.app, content: 'edit', buildKey: 'app-' + st.stack } },
+      { name: 'nvim', kind: 'build', from: 'Containerfile.app › nvim', ver: verNames, by: pack.label + ' pack (tool target)', used: 'nvim', preset: { mode: 'edit', offer: 'image', src: 'build', cfName: 'app', optName: 'nvim', content: 'edit', buildKey: 'app-' + st.stack } },
+      { name: 'claude', kind: 'build', from: 'Containerfile.app › claude', ver: verNames, by: pack.label + ' pack (tool target)', used: 'claude', preset: { mode: 'edit', offer: 'image', src: 'build', cfName: 'app', optName: 'claude', content: 'edit', buildKey: 'app-' + st.stack } }
+    ];
+    if (st.browser === 'playwright') images.push({ name: 'playwright', kind: 'build', from: 'Containerfile.playwright', ver: 'playwright', by: 'Playwright option', used: 'browser', preset: { mode: 'edit', offer: 'image', src: 'build', cfName: 'playwright', optName: 'playwright', content: 'edit', buildKey: 'pw' } });
+    chosen.forEach((c) => {
+      const o = c[1];
+      images.push({ name: o.ver, kind: 'registry', from: o.ref + ':' + o.fmt, ver: o.ver + ' = ' + o.pin, by: o.label + ' option', used: o.svc, preset: { mode: 'edit', offer: c[0], src: 'registry', optName: o.ver, presetKey: o.ver } });
+    });
+    const imagesOut = images.map((im) => ({ ...im, kindLabel: im.kind === 'build' ? 'built' : 'registry', kindColor: im.kind === 'build' ? '#5E409D' : '#205EA6', edit: open(im.preset) }));
+
+    const containerfiles = [{ file: 'Containerfile.app', by: pack.label + ' pack', base: pack.base, builds: [pack.app, 'nvim', 'claude'], args: pack.args, edit: open({ mode: 'edit', offer: 'image', src: 'build', cfName: 'app', optName: pack.app, content: 'edit', buildKey: 'app-' + st.stack }) }];
+    if (st.browser === 'playwright') containerfiles.push({ file: 'Containerfile.playwright', by: 'Playwright option', base: 'FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble', builds: ['playwright'], args: ['PLAYWRIGHT_VERSION ← playwright'], edit: open({ mode: 'edit', offer: 'image', src: 'build', cfName: 'playwright', optName: 'playwright', content: 'edit', buildKey: 'pw' }) });
+
+    const versions = pack.runtimes.map((r) => ({
+      name: r.name, kind: 'app files, first found', color: '#5E409D', hasChain: true, chain: chain(r.files, r.hit), fallback: r.fallback,
+      value: 'per worktree', changeable: false, used: pack.app + ', nvim, claude', note: 'Master: found in ' + r.files[r.hit] + ' (green).'
+    }));
+    if (st.browser === 'playwright') {
+      const pinned = st.stack === 'phoenix';
+      versions.push({ name: 'playwright', kind: pinned ? 'pinned' : 'app lockfile', color: pinned ? '#205EA6' : '#5E409D', hasChain: !pinned, chain: chain([pack.pw], 0), fallback: '1.60.0', value: pinned ? '1.60.0' : 'per worktree', changeable: false, used: 'playwright', note: pinned ? 'Set by hand; the app has no Playwright dependency to read it from.' : 'Read from ' + pack.pw + '.' });
+    }
+    chosen.forEach((c) => {
+      const o = c[1];
+      versions.push({ name: o.ver, kind: 'pinned by the ' + o.label + ' option', color: '#205EA6', hasChain: false, chain: [], fallback: '', value: o.pin, changeable: c[0] === 'database', used: o.svc, note: c[0] === 'database' ? 'Data volume named for the major version (' + o.vol + '); a new major starts a fresh volume restored from the dump.' : 'Keeps no data that matters, so any change is safe.' });
+    });
+
+    const cols = pack.runtimes.map((r) => r.name).concat(st.browser === 'playwright' && st.stack !== 'phoenix' ? ['playwright'] : []);
+    const base = pack.runtimes.map((r) => r.val).concat(cols.length > pack.runtimes.length ? ['1.60.0'] : []);
+    const cell = (v, kind) => ({ v, bg: kind === 'diff' ? '#F3E9FB' : kind === 'fb' ? '#FFF6D6' : 'transparent', fg: kind === 'diff' ? '#5E409D' : kind === 'fb' ? '#6B5000' : '#100F0F' });
+    const wtRows = [
+      { name: 'master', cells: base.map((v) => cell(v)), status: 'Built', statusColor: '#536907', statusWeight: '700', action: 'Rebuild' },
+      { name: 'patient-photos', cells: base.map((v) => cell(v)), status: 'Shares master’s', statusColor: '#34332F', statusWeight: '400', action: 'Rebuild' },
+      { name: pack.runtimes[0].name + '-bump', cells: base.map((v, i) => i === 0 ? cell(pack.runtimes[0].bump, 'diff') : cell(v)), status: 'Own ' + pack.app + ', nvim, claude tags', statusColor: '#34332F', statusWeight: '400', action: 'Rebuild' },
+      { name: 'legacy-import', cells: base.map((v, i) => i === 0 ? cell(pack.runtimes[0].fallback + ' (fallback)', 'fb') : cell(v)), status: 'No version file; shares master’s', statusColor: '#34332F', statusWeight: '400', action: 'Rebuild' }
+    ];
+
+    // Dialog
+    const isEdit = st.mode === 'edit';
+    const isBuild = st.src === 'build';
+    const REG = {
+      memcached: { ref: 'docker.io/library/memcached', pin: '1.6', fmt: '{memcached}-alpine', tags: ['latest', '1.6', '1.6-alpine', '1.6.34'] },
+      postgres: { ref: 'docker.io/library/postgres', pin: '16', fmt: '{postgres}', tags: ['17', '16', '16.4', '15'] },
+      mysql: { ref: 'docker.io/library/mysql', pin: '8.4', fmt: '{mysql}', tags: ['9.1', '8.4', '8.0'] },
+      mariadb: { ref: 'docker.io/library/mariadb', pin: '11.4', fmt: '{mariadb}', tags: ['11.8', '11.4', '10.11'] },
+      redis: { ref: 'docker.io/library/redis', pin: '8', fmt: '{redis}-alpine', tags: ['8', '8-alpine', '7-alpine'] },
+      valkey: { ref: 'docker.io/valkey/valkey', pin: '8', fmt: '{valkey}-alpine', tags: ['8', '8-alpine', '7.2'] },
+      rustfs: { ref: 'docker.io/rustfs/rustfs', pin: '1.0.0-alpha.83', fmt: '{rustfs}', tags: ['latest', '1.0.0-alpha.83'] },
+      minio: { ref: 'quay.io/minio/minio', pin: 'RELEASE.[date]', fmt: '{minio}', tags: ['latest', 'RELEASE.[date]'] }
+    };
+    const r = REG[st.presetKey] || REG.memcached;
+    const vname = st.optName || 'image';
+    const reg = { ...r, resolved: r.ref + ':' + r.fmt.replace(/\{[a-z]+\}/, r.pin) };
+
+    const APPTEXT = {
+      rails: ['ARG RUBY_VERSION', 'ARG NODE_VERSION', 'FROM node:${NODE_VERSION}-slim AS node', 'FROM ruby:${RUBY_VERSION}-slim AS base', 'COPY --from=node /usr/local/bin /usr/local/bin', 'RUN …', '', 'FROM base AS rails', 'CMD ["bin/dev"]', '', 'FROM base AS nvim', '…', 'FROM base AS claude', '…'],
+      hanami: ['ARG RUBY_VERSION', 'ARG NODE_VERSION', 'FROM node:${NODE_VERSION}-slim AS node', 'FROM ruby:${RUBY_VERSION}-slim AS base', 'COPY --from=node /usr/local/bin /usr/local/bin', 'RUN …', '', 'FROM base AS web', 'CMD ["bundle", "exec", "hanami", "dev"]', '', 'FROM base AS nvim', '…', 'FROM base AS claude', '…'],
+      phoenix: ['ARG ELIXIR_VERSION', 'ARG OTP_MAJOR', 'FROM elixir:${ELIXIR_VERSION}-otp-${OTP_MAJOR}-slim AS base', 'RUN apt-get update && apt-get install -y --no-install-recommends \\', '  build-essential git inotify-tools nodejs npm && rm -rf /var/lib/apt/lists/*', 'RUN mix local.hex --force && mix local.rebar --force', '', 'FROM base AS web', 'CMD ["mix", "phx.server"]', '', 'FROM base AS nvim', '…', 'FROM base AS claude', '…'],
+      django: ['ARG PYTHON_VERSION', 'FROM python:${PYTHON_VERSION}-slim AS base', 'COPY --from=ghcr.io/astral-sh/uv:[version] /uv /usr/local/bin/uv', 'ENV UV_PROJECT_ENVIRONMENT=/venv', '', 'FROM base AS web', 'CMD ["uv", "run", "manage.py", "runserver", "0.0.0.0:8000"]', '', 'FROM base AS nvim', '…', 'FROM base AS claude', '…'],
+      flask: ['ARG PYTHON_VERSION', 'FROM python:${PYTHON_VERSION}-slim AS base', 'COPY --from=ghcr.io/astral-sh/uv:[version] /uv /usr/local/bin/uv', 'ENV UV_PROJECT_ENVIRONMENT=/venv', '', 'FROM base AS web', 'CMD ["uv", "run", "flask", "run", "--host", "0.0.0.0"]', '', 'FROM base AS nvim', '…', 'FROM base AS claude', '…'],
+      node: ['ARG NODE_VERSION', 'FROM node:${NODE_VERSION}-slim AS base', '', 'FROM base AS web', 'CMD ["npm", "run", "dev"]', '', 'FROM base AS nvim', '…', 'FROM base AS claude', '…']
+    };
+    const BUILDS = {
+      app: { text: APPTEXT[st.stack].join('\n'), targets: [{ stage: pack.app, image: pack.app, cmd: 'CMD ' + pack.cmd }, { stage: 'nvim', image: 'nvim', cmd: 'editor server' }, { stage: 'claude', image: 'claude', cmd: 'agent' }], args: pack.args.map((a) => ({ name: a.split(' ← ')[0], link: 'linked to ' + a.split(' ← ')[1], color: '#536907' })) },
+      playwright: { text: ['ARG PLAYWRIGHT_VERSION=1.60.0', 'FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble', 'RUN apt-get update -qq && apt-get install --no-install-recommends -y \\', '  xvfb x11vnc novnc websockify x11-utils socat iptables && rm -rf /var/lib/apt/lists/*', 'ARG PLAYWRIGHT_VERSION', 'RUN npm install -g playwright-core@${PLAYWRIGHT_VERSION}', 'EXPOSE 8888 8080 9223'].join('\n'), targets: [{ stage: '(only stage)', image: 'playwright', cmd: 'entrypoint mounted by the unit' }], args: [{ name: 'PLAYWRIGHT_VERSION', link: 'linked to playwright', color: '#536907' }] },
+      search: { text: ['FROM docker.io/getmeili/meilisearch:[version] AS search', 'COPY search-settings.json /meili/settings.json', 'CMD ["meilisearch", "--env", "development"]'].join('\n'), targets: [{ stage: 'search', image: 'search', cmd: 'CMD meilisearch --env development' }], args: [{ name: '(none)', link: 'no build args', color: '#575653' }] }
+    };
+    const bkey = BUILDS[st.cfName] ? st.cfName : 'search';
+    const build = BUILDS[bkey];
+    const contentModes = (isEdit ? [['edit', 'Current file']] : []).concat([['paste', 'Paste'], ['upload', 'Upload'], ['template', 'From a template'], ['repo', 'From app repo']]).map((m) => ({
+      label: m[1], pressed: st.content === m[0] ? 'true' : 'false', pick: () => this.setState({ content: m[0], ack: false }),
+      border: st.content === m[0] ? '#100F0F' : '#CECDC3', bg: st.content === m[0] ? '#100F0F' : '#FFFFFF', fg: st.content === m[0] ? '#FFFCF0' : '#34332F'
+    }));
+    const cfName = st.cfName || '';
+    const taken = ['app', 'playwright'];
+    let cfNameHelp = 'Saved as .container-config/Containerfile.' + (cfName || '<name>') + '. Name it for what it builds.';
+    let cfNameColor = '#575653';
+    let bad = false;
+    if (!cfName) { cfNameHelp = 'A name is required.'; cfNameColor = '#AF3029'; bad = true; }
+    else if (!isEdit && taken.indexOf(cfName) >= 0) { cfNameHelp = 'Containerfile.' + cfName + ' already exists. Edit it instead, or pick another name.'; cfNameColor = '#AF3029'; bad = true; }
+
+    const SLOTNAMES = { database: 'Database', cache: 'Cache and queues', storage: 'Object storage', mail: 'Mail catcher', worker: 'Background jobs' };
+    const PROVIDES = {
+      cache: [['Port', '11211', 'Inside the dev network.'], ['Health check', 'nc -z localhost 11211', 'Gates the app’s start.'], ['Gives the app', 'MEMCACHE_SERVERS=cache:11211', 'Environment the app reads.'], ['Works with', 'Rails, Django, Flask, Node', 'Packs whose cache settings can use it.']],
+      database: [['Port', '5432', 'Inside the dev network.'], ['Health check', 'pg_isready', 'Gates the app’s start.'], ['Gives the app', 'DATABASE_URL={scheme}…@db/{db}', 'The pack fills in its URL scheme.'], ['Data volume', '/var/lib/postgresql/data', 'Named for the major version.'], ['Dump', 'pg_dump -Fc {db}', 'Used by db:dump.'], ['Restore', 'pg_restore -d {db}', 'Runs on a fresh volume.']],
+      storage: [['Ports', '9000 api, 9001 console', 'Routed at s3. and s3-ui.<slug>.'], ['Health check', 'curl -f localhost:9000/health', ''], ['Gives the app', 'S3_ENDPOINT, S3_ACCESS_KEY', 'Secret key stays local.'], ['Data volume', '/data', 'Seeded from db-dumps/ when created.']],
+      mail: [['Ports', '1025 smtp, 8025 web', 'Web UI routed at mail.<slug>.'], ['Gives the app', 'SMTP_HOST=mail, SMTP_PORT=1025', '']],
+      worker: [['Command', 'from the app image', 'Same mounts as the app, not routed.'], ['Needs', 'cache', 'Step 1 warns when missing.']],
+      service: [['Port', '7700', ''], ['Route', 'search.<slug>.localhost', 'Leave empty for an unrouted service.'], ['Health check', 'curl -f localhost:7700/health', ''], ['Gives the app', 'SEARCH_URL=http://search:7700', '']],
+      image: []
+    };
+    const provides = (PROVIDES[st.offer] || []).map((p, i) => ({ id: 'pv-' + i, label: p[0], value: p[1], help: p[2] }));
+    const offerHelp = st.offer === 'image' ? 'Not shown on step 1. Other Containerfiles can build FROM it.' : st.offer === 'service' ? 'Shown on step 1 as its own service, with its own checkbox.' : 'Shown on step 1 as another choice in that slot.';
+    const resultNote = st.offer === 'image' ? 'Adds an image only.' : st.offer === 'service' ? 'Appears on step 1 under Beside the app as “' + vname + '”.' : 'Appears on step 1 as a choice under ' + SLOTNAMES[st.offer] + ': “' + vname + '”.';
+    const sources = [
+      { id: 'registry', label: 'Pull from a registry', desc: 'An existing image on Docker Hub, GHCR, Quay or another registry.' },
+      { id: 'build', label: 'Build from a Containerfile', desc: 'Paste, upload, or bring one from a template or the app repository.' }
+    ].map((s) => ({ ...s, on: st.src === s.id, pick: () => this.setState({ src: s.id, ack: false }), border: st.src === s.id ? '#BC5215' : '#CECDC3', bg: st.src === s.id ? '#FFFFFF' : '#FFFCF0' }));
+    const blocked = isBuild && (bad || (!st.ack && st.content !== 'edit'));
+
+    const db = OPT.database[st.database] || OPT.database.postgres;
+    const one = st.pinScope === 'one';
+    const scopes = [
+      { id: 'all', label: 'Every worktree', desc: 'Changes the pin in project.toml.' },
+      { id: 'one', label: 'One worktree, to try it', desc: 'Adds an override for that worktree; the pin stays ' + db.pin + '.' }
+    ].map((s) => ({ ...s, on: st.pinScope === s.id, pick: () => this.setState({ pinScope: s.id }) }));
+
+    return {
+      bar, pack, images: imagesOut, containerfiles, versions, wtCols: cols, wtRows,
+      addOption: open({ mode: 'add', offer: 'cache', optName: 'memcached', src: 'registry', presetKey: 'memcached', cfName: 'search', content: 'paste', buildKey: 'search' }),
+      dlgOpen: st.dlgOpen, closeDlg: () => this.setState({ dlgOpen: false }),
+      dlgTitle: isEdit ? 'Edit ' + vname : 'Add an option',
+      dlgSub: isEdit ? 'Changes are kept in project.toml, on top of what the pack or option brought.' : 'An image plus what it provides. Once added, it can be picked on step 1.',
+      offer: st.offer, setOffer: (e) => this.setState({ offer: e.target.value, ...(e.target.value === 'service' ? { src: 'build', cfName: 'search', optName: 'search', buildKey: 'search', content: 'paste' } : {}) }),
+      offerHelp, optName: st.optName, setOptName: (e) => this.setState({ optName: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }),
+      sources, isRegistry: !isBuild, isBuild, reg,
+      cfName, setCfName: (e) => this.setState({ cfName: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }), cfNameHelp, cfNameColor,
+      contentModes, build, buildKey: st.buildKey + '-' + bkey,
+      ack: st.ack, toggleAck: () => this.setState({ ack: !st.ack }),
+      providesSomething: provides.length > 0, provides, resultNote,
+      saveDisabled: blocked, saveBg: blocked ? '#A8A69E' : '#BC5215', saveLabel: isEdit ? 'Save changes' : 'Add option',
+      pinOpen: st.pinOpen, openPin: () => this.setState({ pinOpen: true }), closePin: () => this.setState({ pinOpen: false }),
+      db, scopes, who: one ? 'that worktree' : 'every worktree',
+      pinCommand: 'mise run versions:set ' + db.ver + ' ' + db.choices[2].split(' ')[0] + (one ? ' --worktree <name>' : ''),
+      pinSave: one ? 'Add override' : 'Change pin'
+    };
+  }
+}
+</script>
+</body>
+</html>

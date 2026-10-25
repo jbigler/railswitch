@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New project: review and create</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.step{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;text-decoration:none;color:#575653;font-weight:600;font-size:14px;min-height:44px;box-sizing:border-box}
+.step:hover{background:#F2F0E5;color:#100F0F}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+.inp{font:inherit;font-size:14px;padding:8px 10px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:44px;box-sizing:border-box;min-width:0;width:100%}
+.mini{font:inherit;font-size:13px;padding:6px 8px;border:1px solid #CECDC3;border-radius:6px;background:#FFFFFF;color:#100F0F;min-height:36px}
+.opt{display:flex;gap:10px;align-items:flex-start;font-size:14px;min-height:28px}
+.opt input{width:18px;height:18px;margin:1px 0 0;flex-shrink:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">New project</span>
+    <span style="flex-grow: 1"></span>
+    <a href="#" style="font-size: 14px; color: #575653">Cancel</a>
+  </header>
+
+  <nav aria-label="Setup" style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 12px 24px; border-bottom: 1px solid #E6E4D9">
+    <a class="step" href="Main.dc.html"><span class="mono" style="font-size: 12px">1</span>Stack &amp; options</a>
+    <a class="step" href="Review.dc.html" aria-current="step" style="background: #100F0F; color: #FFFCF0"><span class="mono" style="font-size: 12px">2</span>Review &amp; create</a>
+    <span aria-hidden="true" style="width: 1px; height: 24px; background: #CECDC3; margin: 0 10px"></span>
+    <span style="font-size: 12px; color: #575653; margin-right: 4px">Advanced, optional:</span>
+    <a href="Images.dc.html" style="display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #575653; font-weight: 600; font-size: 13px; min-height: 40px; box-sizing: border-box">Images</a>
+    <a href="Environment.dc.html" style="display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #575653; font-weight: 600; font-size: 13px; min-height: 40px; box-sizing: border-box">Environment</a>
+  </nav>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 24px; background: #F2F0E5; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+    <span style="font-weight: 800">Choices from step 1</span>
+    <span style="color: #575653">(switch here to preview)</span>
+    <sc-for list="{{bar}}" as="b" hint-placeholder-count="6">
+      <span style="display: inline-flex; align-items: center; gap: 6px"><label for="{{b.id}}" style="color: #575653">{{b.label}}</label><select id="{{b.id}}" class="mini" value="{{b.value}}" onChange="{{b.change}}"><sc-for list="{{b.options}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.l}}</option></sc-for></select></span>
+    </sc-for>
+  </div>
+
+  <main style="display: flex; flex-wrap: wrap; gap: 32px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box; align-items: flex-start">
+    <section aria-labelledby="mf-h" style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+      <div>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Review &amp; create</h1>
+        <p style="margin: 6px 0 0; color: #575653; font-size: 15px; max-width: 760px">The project is one short file: the pack, the options, and only what you changed. <span class="mono" style="font-size: 13px">units:install</span> expands it into units, images and environment, so editing it later and re-running that is the same as coming back here.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+        <h2 id="mf-h" class="mono" style="margin: 0; font-size: 15px; font-weight: 600">project.toml</h2>
+        <span style="font-size: 13px; color: #575653">{{lineCount}} lines</span>
+        <span style="flex-grow: 1"></span>
+        <div role="group" aria-label="View" style="display: flex; border: 1px solid #CECDC3; border-radius: 8px; overflow: hidden">
+          <sc-for list="{{views}}" as="v" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{v.pressed}}" onClick="{{v.pick}}" style="min-height: 40px; padding: 6px 14px; border: 0; border-left: 1px solid #CECDC3; margin-left: -1px; background: {{v.bg}}; color: {{v.fg}}; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">{{v.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; overflow-x: auto; padding: 14px 0">
+        <sc-for list="{{lines}}" as="l" hint-placeholder-count="30">
+          <div class="mono" style="display: flex; gap: 14px; padding: 0 16px; font-size: 13px; line-height: 21px; white-space: pre; background: {{l.bg}}; color: {{l.fg}}; text-decoration: {{l.strike}}">
+            <span aria-hidden="true" style="width: 24px; text-align: right; color: #A8A69E; flex-shrink: 0">{{l.n}}</span><span>{{l.t}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: #575653">{{legend}}</p>
+    </section>
+
+    <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #F2F0E5">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800">Create runs</h2>
+        <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #34332F">
+          <sc-for list="{{steps}}" as="s" hint-placeholder-count="5"><li>{{s}}</li></sc-for>
+        </ol>
+        <button type="button" style="min-height: 48px; border-radius: 8px; border: 0; background: #BC5215; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer">Create project</button>
+        <span style="font-size: 12px; color: #575653">Runs as a workspace job. Output streams in the job panel.</span>
+      </div>
+
+      <form aria-labelledby="tpl-h" style="display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+        <div>
+          <h2 id="tpl-h" style="margin: 0; font-size: 16px; font-weight: 800">Save as a template</h2>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #575653">Records the pack and options by name and version, plus your changes. Whoever uses it gets the same stack for their own repo.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <label for="tn" style="font-size: 13px; font-weight: 700">Template name</label>
+          <input id="tn" class="inp mono" type="text" value="{{tplName}}">
+        </div>
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+          <legend class="eyebrow" style="margin-bottom: 8px">Include</legend>
+          <label class="opt"><input type="checkbox" checked="checked" disabled="disabled"><span>Pack and options: <span class="mono" style="font-size: 13px">{{tplRefs}}</span></span></label>
+          <label class="opt"><input type="checkbox" checked="checked">Your environment and overrides</label>
+          <label class="opt"><input type="checkbox" checked="checked">Containerfiles you edited, and options you added</label>
+          <label class="opt"><input type="checkbox" checked="checked">Secret names, as questions to answer</label>
+          <label class="opt"><input type="checkbox">Seed list and Claude home template</label>
+        </fieldset>
+        <p style="margin: 0; padding: 10px 12px; border-radius: 8px; background: #F2F0E5; font-size: 13px; color: #34332F">Never included: secret values, project name, prefix, repository, ports registry, per-worktree overrides, db dumps.</p>
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px">
+          <legend class="eyebrow" style="margin-bottom: 8px">Save to</legend>
+          <label class="opt"><input type="radio" name="dest" checked="checked">This host’s library</label>
+          <label class="opt"><input type="radio" name="dest">Download as <span class="mono" style="font-size: 13px">.stack.tar.gz</span></label>
+          <label class="opt"><input type="radio" name="dest">Push to a template repository</label>
+        </fieldset>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" style="flex: 1 1 140px; min-height: 44px; border-radius: 8px; border: 0; background: #100F0F; color: #FFFCF0; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Save template</button>
+          <a href="Templates.dc.html" style="flex: 1 1 140px; display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; border: 1px solid #CECDC3; font-weight: 700; font-size: 14px; text-decoration: none; color: #100F0F">Open library</a>
+        </div>
+      </form>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { stack: 'rails', database: 'postgres', cache: 'redis', storage: 'rustfs', jobs: 'none', browser: 'playwright', view: 'project' };
+  }
+  renderVals() {
+    const st = this.state;
+    const PACKS = {
+      rails: { label: 'Rails', app: 'rails', port: 3000, server: 'bin/dev', install: 'bundle install && npm install', runtimes: ['ruby', 'node'], jobs: [['sidekiq', 'Sidekiq'], ['solid-queue', 'Solid Queue'], ['goodjob', 'GoodJob']] },
+      hanami: { label: 'Hanami', app: 'web', port: 2300, server: 'bundle exec hanami dev', install: 'bundle install && npm install', runtimes: ['ruby', 'node'], jobs: [['sidekiq', 'Sidekiq']] },
+      phoenix: { label: 'Phoenix', app: 'web', port: 4000, server: 'mix phx.server', install: 'mix deps.get', runtimes: ['elixir', 'erlang'], jobs: [['oban', 'Oban']] },
+      django: { label: 'Django', app: 'web', port: 8000, server: 'uv run manage.py runserver 0.0.0.0:8000', install: 'uv sync', runtimes: ['python'], jobs: [['celery', 'Celery'], ['rq', 'RQ']] },
+      flask: { label: 'Flask', app: 'web', port: 5000, server: 'uv run flask run --host 0.0.0.0', install: 'uv sync', runtimes: ['python'], jobs: [['celery', 'Celery'], ['rq', 'RQ']] },
+      node: { label: 'Node', app: 'web', port: 3000, server: 'npm run dev', install: 'npm ci', runtimes: ['node'], jobs: [['bullmq', 'BullMQ']] }
+    };
+    const OPT = {
+      postgres: { label: 'PostgreSQL', ver: 'postgres', pin: '16', next: '17', image: 'docker.io/library/postgres:{postgres}', health: 'pg_isready', secret: 'POSTGRES_PASSWORD', vol: 'db-data-pg{postgres.major}' },
+      mysql: { label: 'MySQL', ver: 'mysql', pin: '8.4', next: '9.1', image: 'docker.io/library/mysql:{mysql}', health: 'mysqladmin ping', secret: 'MYSQL_ROOT_PASSWORD', vol: 'db-data-mysql{mysql.major}' },
+      mariadb: { label: 'MariaDB', ver: 'mariadb', pin: '11.4', next: '11.8', image: 'docker.io/library/mariadb:{mariadb}', health: 'healthcheck.sh --connect', secret: 'MARIADB_ROOT_PASSWORD', vol: 'db-data-mariadb{mariadb.major}' },
+      sqlite: { label: 'SQLite' },
+      redis: { label: 'Redis', ver: 'redis', pin: '8', image: 'docker.io/library/redis:{redis}-alpine', health: 'redis-cli ping' },
+      valkey: { label: 'Valkey', ver: 'valkey', pin: '8', image: 'docker.io/valkey/valkey:{valkey}-alpine', health: 'valkey-cli ping' },
+      rustfs: { label: 'RustFS', ver: 'rustfs', pin: '1.0.0-alpha.83', image: 'docker.io/rustfs/rustfs:{rustfs}', secret: 'RUSTFS_SECRET_KEY' },
+      minio: { label: 'MinIO', ver: 'minio', pin: 'RELEASE.[date]', image: 'quay.io/minio/minio:{minio}', secret: 'MINIO_ROOT_PASSWORD' }
+    };
+    const pack = PACKS[st.stack];
+    const jobsValid = pack.jobs.some((j) => j[0] === st.jobs) ? st.jobs : 'none';
+    const set = (k) => (e) => this.setState({ [k]: e.target.value });
+    const opts = (list) => list.map((o) => ({ v: o[0], l: o[1] }));
+    const bar = [
+      { id: 'r-stack', label: 'Stack', value: st.stack, change: (e) => this.setState({ stack: e.target.value, jobs: 'none' }), options: Object.keys(PACKS).map((k) => ({ v: k, l: PACKS[k].label })) },
+      { id: 'r-db', label: 'Database', value: st.database, change: set('database'), options: opts([['postgres', 'PostgreSQL'], ['mysql', 'MySQL'], ['mariadb', 'MariaDB'], ['sqlite', 'SQLite'], ['none', 'None']]) },
+      { id: 'r-cache', label: 'Cache', value: st.cache, change: set('cache'), options: opts([['redis', 'Redis'], ['valkey', 'Valkey'], ['none', 'None']]) },
+      { id: 'r-storage', label: 'Storage', value: st.storage, change: set('storage'), options: opts([['rustfs', 'RustFS'], ['minio', 'MinIO'], ['none', 'None']]) },
+      { id: 'r-jobs', label: 'Jobs', value: jobsValid, change: set('jobs'), options: opts([['none', 'None']].concat(pack.jobs)) },
+      { id: 'r-browser', label: 'Browser', value: st.browser, change: set('browser'), options: opts([['playwright', 'Playwright'], ['none', 'None']]) }
+    ];
+
+    const chosen = { database: st.database, cache: st.cache, storage: st.storage, jobs: jobsValid, mail: 'none', browser: st.browser };
+    const ref = (v) => v === 'none' ? '"none"' : '"' + v + '@1"';
+    const pins = [st.database, st.cache, st.storage].map((k) => OPT[k]).filter((o) => o && o.ver);
+    const secrets = [];
+    if (OPT[st.database] && OPT[st.database].secret) secrets.push('DB_PASSWORD');
+    if (OPT[st.storage] && OPT[st.storage].secret) secrets.push('S3_SECRET_KEY');
+    const app = pack.app;
+    const tplName = st.stack + '-' + [st.database, st.cache, st.storage, jobsValid].filter((x) => x !== 'none').join('-');
+
+    // p: project-specific, s: becomes a template question, c: comment, x: expanded (filled in by units:install)
+    const L = [];
+    const add = (kind, text) => L.push([kind, text]);
+    add('c', '# Rendered by units:install. Edit here, then re-run it.');
+    add('p', 'from = "' + tplName + '@1"');
+    add('', '');
+    add('p', '[project]');
+    add('p', 'name        = "Filial Rails"');
+    add('p', 'prefix      = "filial"');
+    add('p', 'repo        = "git@github.com:[ORG]/[REPO].git"');
+    add('p', 'base_branch = "master"');
+    add('', '');
+    add('', '[stack]');
+    add('', 'pack = "' + st.stack + '@1"');
+    add('', 'app  = "' + app + '"   # the service with role app');
+    add('', '');
+    add('', '[options]');
+    Object.keys(chosen).forEach((slot) => add('s', (slot + '         ').slice(0, 9) + '= ' + ref(chosen[slot])));
+    if (pins.length) {
+      add('', '');
+      add('', '[versions]   # runtimes (' + pack.runtimes.join(', ') + ') come from the app’s files');
+      pins.forEach((o) => add('s', (o.ver + '         ').slice(0, 9) + '= "' + o.pin + '"'));
+    }
+    if (st.view === 'expanded') {
+      add('', '');
+      add('c', '# ── filled in by units:install from the pack and options ──');
+      add('x', '[services.' + app + ']');
+      add('x', 'role    = "app"');
+      add('x', 'image   = "' + app + '"   # Containerfile.app › ' + app);
+      add('x', 'command = "' + pack.server + '"');
+      add('x', 'route   = "{worktree.host} -> ' + pack.port + '"');
+      add('x', '');
+      add('x', '[services.deps]');
+      add('x', 'role    = "deps"');
+      add('x', 'command = "' + pack.install + '"');
+      [['database', 'db'], ['cache', 'cache'], ['storage', 'storage']].forEach((s) => {
+        const o = OPT[chosen[s[0]]];
+        if (!o || !o.image) return;
+        add('x', '');
+        add('x', '[services.' + s[1] + ']   # from ' + o.label);
+        add('x', 'role   = "data"');
+        add('x', 'image  = "' + o.image + '"');
+        if (o.health) add('x', 'health = "' + o.health + '"');
+        if (o.vol) add('x', 'volume = "' + o.vol + ':…"');
+      });
+      if (jobsValid !== 'none' && jobsValid !== 'oban') { add('x', ''); add('x', '[services.worker]   # from ' + pack.jobs.find((j) => j[0] === jobsValid)[1]); add('x', 'role  = "worker"'); add('x', 'image = "' + app + '"'); }
+      if (st.browser !== 'none') { add('x', ''); add('x', '[services.browser]   # from Playwright'); add('x', 'role  = "tool"'); add('x', 'route = "vnc.{worktree.host} -> novnc"'); }
+    }
+    add('', '');
+    add('c', '# Only what differs from the pack and options:');
+    add('', '[env]');
+    add('s', 'TZ = "Asia/Bangkok"');
+    if (st.browser !== 'none') { add('', ''); add('', '[services.' + app + '.env]'); add('', 'HEADLESS_SYSTEM_TESTS = "0"'); }
+    if (OPT[st.database] && OPT[st.database].next) { add('', ''); add('p', '[worktrees.' + OPT[st.database].ver + '-trial.versions]'); add('p', OPT[st.database].ver + ' = "' + OPT[st.database].next + '"'); }
+    if (secrets.length) { add('', ''); add('', '[secrets]   # values live in mise.local.toml'); add('', 'names = [' + secrets.map((s) => '"' + s + '"').join(', ') + ']'); }
+
+    const tpl = st.view === 'template';
+    const lines = L.map((r, i) => {
+      const k = r[0];
+      let bg = 'transparent', fg = '#100F0F', strike = 'none';
+      if (k === 'c') fg = '#6F6E69';
+      if (k === 'x') { bg = '#F4F1FA'; fg = '#4B3780'; }
+      if (tpl && k === 'p') { bg = '#FBEDE9'; fg = '#AF3029'; strike = 'line-through'; }
+      if (tpl && k === 's') { bg = '#FFF6D6'; fg = '#6B5000'; }
+      return { n: String(i + 1), t: r[1] || ' ', bg, fg, strike };
+    });
+    const VIEWS = [['project', 'As project'], ['expanded', 'Expanded'], ['template', 'As template']];
+    const views = VIEWS.map((v) => ({ label: v[1], pressed: st.view === v[0] ? 'true' : 'false', pick: () => this.setState({ view: v[0] }), bg: st.view === v[0] ? '#100F0F' : '#FFFFFF', fg: st.view === v[0] ? '#FFFCF0' : '#34332F' }));
+    const legend = st.view === 'template'
+      ? 'Red lines belong to this project and are dropped. Yellow lines become questions when someone uses the template, with this value as the default: which option for each slot, and each pin.'
+      : st.view === 'expanded'
+        ? 'Purple lines are not stored. units:install fills them in from the ' + pack.label + ' pack and the options; they are shown so you can see what will run.'
+        : 'Switch to Expanded to see what the pack and options fill in, or As template to see what a template keeps.';
+
+    const built = 3 + (st.browser !== 'none' ? 1 : 0);
+    const pulled = pins.length;
+    const steps = [
+      'Clone the repository into master/',
+      'Write project.toml, stack.lock (every pack, option and image pinned), and secrets to mise.local.toml',
+      'mise run units:install: expand the ' + pack.label + ' pack and ' + Object.keys(chosen).filter((k) => chosen[k] !== 'none').length + ' options into units',
+      'mise run doctor',
+      'Build ' + built + ' images, pull ' + pulled + ', then mise run up in master'
+    ];
+    const tplRefs = [st.stack + '@1'].concat(Object.keys(chosen).filter((k) => chosen[k] !== 'none').map((k) => chosen[k] + '@1')).join(', ');
+    const visible = lines.length;
+    return { bar, lines, views, legend, steps, tplName, tplRefs, lineCount: st.view === 'expanded' ? L.filter((r) => r[0] !== 'x').length + ' stored, ' + visible : visible };
+  }
+}
+</script>
+</body>
+</html>

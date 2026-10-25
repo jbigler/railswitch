@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Adopt this workspace</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+th{text-align:left;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#575653;padding:10px 12px;border-bottom:1px solid #CECDC3;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid #E6E4D9;font-size:13px;vertical-align:top}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border-radius:8px;border:1px solid #CECDC3;background:#FFFFFF;color:#100F0F;font:inherit;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
+.opt{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
+.opt input{width:18px;height:18px;margin:1px 0 0;flex-shrink:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">Adopt this workspace</span>
+    <span style="flex-grow: 1"></span>
+    <a href="#" style="font-size: 14px; color: #575653">Cancel</a>
+  </header>
+
+  <main style="display: flex; flex-direction: column; gap: 28px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box">
+    <div style="max-width: 880px">
+      <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">Adopt this workspace</h1>
+      <p style="margin: 6px 0 0; color: #575653; font-size: 15px">This workspace was set up by hand. Adopting it writes a <span class="mono" style="font-size: 13px">project.toml</span> that reproduces it with a pack and options, so you can change it from the dashboard, save it as a template, and take pack updates. Nothing changes until you press Adopt, and running worktrees keep running until their next restart.</p>
+    </div>
+
+    <section aria-labelledby="scan-h" style="display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; padding: 18px 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+      <div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+        <h2 id="scan-h" style="margin: 0; font-size: 16px; font-weight: 800">Scanned: filial, master and every linked worktree</h2>
+        <span style="font-size: 14px; color: #34332F">12 unit templates · 2 Containerfiles · 5 entrypoints · <span class="mono">.env</span> · <span class="mono">local.toml.template</span> · 2 firewall allowlists · <span class="mono">ports.registry</span></span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span class="eyebrow">Closest match</span>
+        <span style="display: flex; gap: 6px; flex-wrap: wrap"><span class="chip" style="border-color: #BC5215; color: #9A4210; background: #FDF1E8">rails@1</span><span class="chip">postgres@1</span><span class="chip">redis@1</span><span class="chip">rustfs@1</span><span class="chip">playwright@1</span></span>
+      </div>
+      <button type="button" class="btn">Scan again</button>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+      <section aria-labelledby="map-h" style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px">
+          <h2 id="map-h" style="margin: 0; font-size: 20px; font-weight: 800">What we found, and what it becomes</h2>
+          <div role="group" aria-label="Filter" style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+              <button type="button" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}" style="min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid {{f.border}}; background: {{f.bg}}; color: {{f.fg}}; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">{{f.label}} <span style="opacity: 0.75">{{f.count}}</span></button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="overflow-x: auto; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+          <table style="border-collapse: collapse; width: 100%; min-width: 820px">
+            <thead><tr><th scope="col">In this workspace</th><th scope="col">Becomes</th><th scope="col">Status</th></tr></thead>
+            <tbody>
+              <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+                <tr>
+                  <td><span class="mono" style="font-weight: 600; overflow-wrap: anywhere">{{r.found}}</span><br><span style="color: #575653">{{r.what}}</span></td>
+                  <td style="color: #34332F">{{r.becomes}}</td>
+                  <td><span class="chip" style="border-color: {{r.color}}; color: {{r.color}}; background: #FFFFFF">{{r.status}}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside aria-labelledby="dec-h" style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #F2F0E5">
+        <h2 id="dec-h" style="margin: 0; font-size: 16px; font-weight: 800">Decide before adopting <span style="font-weight: 600; color: #575653; font-size: 13px">· {{openCount}} open</span></h2>
+        <sc-for list="{{decisions}}" as="d" hint-placeholder-count="4">
+          <fieldset style="margin: 0; padding: 14px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+            <legend style="padding: 0 4px; font-weight: 800; font-size: 14px">{{d.title}}</legend>
+            <p style="margin: 0; font-size: 13px; color: #34332F">{{d.why}}</p>
+            <sc-for list="{{d.choices}}" as="c" hint-placeholder-count="2">
+              <label class="opt"><input type="radio" name="{{d.id}}" checked="{{c.on}}" onChange="{{c.pick}}"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 700">{{c.label}}</span><span style="font-size: 12px; color: #575653">{{c.desc}}</span></span></label>
+            </sc-for>
+          </fieldset>
+        </sc-for>
+      </aside>
+    </div>
+
+    <section aria-labelledby="diff-h" style="display: flex; flex-direction: column; gap: 12px">
+      <div>
+        <h2 id="diff-h" style="margin: 0; font-size: 20px; font-weight: 800">What units:install would change</h2>
+        <p style="margin: 4px 0 0; font-size: 14px; color: #575653">Rendered from the new project.toml and compared with the units installed now. This is the dry run; adopting runs the same thing for real.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+        <div role="listbox" aria-label="Changed files" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{files}}" as="f" hint-placeholder-count="8">
+            <button type="button" role="option" aria-selected="{{f.selected}}" onClick="{{f.pick}}" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 8px; border: 1px solid {{f.border}}; background: {{f.bg}}; font: inherit; text-align: left; cursor: pointer; color: #100F0F">
+              <span class="mono" style="font-size: 13px; flex: 1 1 auto; overflow-wrap: anywhere">{{f.name}}</span>
+              <span style="font-size: 12px; font-weight: 700; color: {{f.color}}; white-space: nowrap">{{f.summary}}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="flex: 3 1 560px; min-width: 0; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; overflow-x: auto; padding: 12px 0">
+          <div class="mono" style="padding: 0 16px 8px; font-size: 13px; font-weight: 600">{{diff.name}}</div>
+          <sc-for list="{{diff.lines}}" as="l" hint-placeholder-count="10">
+            <div class="mono" style="padding: 0 16px; font-size: 12.5px; line-height: 20px; white-space: pre; background: {{l.bg}}; color: {{l.fg}}">{{l.t}}</div>
+          </sc-for>
+          <p style="margin: 10px 16px 0; font-size: 13px; color: #575653">{{diff.note}}</p>
+        </div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 18px 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: #34332F">
+        <span><span style="font-weight: 800">Adopt</span> writes <span class="mono">project.toml</span> and <span class="mono">stack.lock</span>, then runs <span class="mono">units:install</span>. Worktrees pick it up on their next restart; volumes and worktree IDs are untouched.</span>
+        <span style="color: #575653">Your current files stay in <span class="mono">.container-config/</span>, so backing out is deleting project.toml and running units:install again.</span>
+      </div>
+      <a href="Review.dc.html" class="btn">Open in Review</a>
+      <button type="button" disabled="{{blocked}}" style="min-height: 48px; padding: 8px 22px; border-radius: 8px; border: 0; background: {{adoptBg}}; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer">{{adoptLabel}}</button>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'all', file: 'rustfs', d: { pg: '', vols: 'keep', init: 'seed', hosts: 'keep' } };
+  }
+  renderVals() {
+    const st = this.state;
+    const S = {
+      match: ['Matches', '#536907'],
+      core: ['Core', '#205EA6'],
+      override: ['Kept as override', '#5E409D'],
+      local: ['This machine only', '#8E6B01'],
+      change: ['Changes', '#AF3029']
+    };
+    const R = [
+      ['rails@.container', 'bin/dev on :3000, routed by Traefik, worktree at /app', 'Service rails, role app, from the Rails pack', 'match'],
+      ['deps@.container + entrypoint-deps.sh', 'bundle install, npm install, foreman, retest', 'Role deps. The pack installs gems and npm; foreman and retest stay as your additions', 'override'],
+      ['Dockerfile (targets rails, nvim, claude)', 'Ruby + Node base, Neovim built from source, Claude Code', 'Containerfile.app. Differs from the pack’s, so it is kept as your edited copy', 'override'],
+      ['Dockerfile.playwright + entrypoint-playwright.sh', 'Playwright server, Xvfb, VNC, its own firewall', 'Containerfile.playwright from the Playwright option', 'match'],
+      ['db@.container + initdb/restore-dump.sh', 'postgres:16, fsync off, restore on an empty volume', 'database = postgres@1, pin 16', 'match'],
+      ['redis@.container', 'redis:8-alpine, no persistence', 'cache = redis@1, pin 8', 'match'],
+      ['rustfs@ + rustfs-init@', 'RustFS 1.0.0-alpha.83, restore from rustfs_data.tar.gz', 'storage = rustfs@1. rustfs-init becomes a volume seed (see decisions)', 'change'],
+      ['.container-config/.env', 'RAILS_ENV, DEV_HOSTS, PG*, REDIS_URL, PLAYWRIGHT_HOST, TZ, and 23 more', 'Split: pack (RAILS_ENV, DEV_HOSTS), options (PG*, REDIS_URL, PLAYWRIGHT_HOST), the rest as project env', 'override'],
+      ['local.toml.template', 'Ports 55432+ID, 13000+ID…, hosts, versions from .ruby-version, .nvmrc, Gemfile.lock', 'Worktree layer and version sources. Same formulas, same values', 'match'],
+      ['firewall/deps.allow, agent.allow', 'Registries for deps; agent allowlist', 'The pack’s deps.allow plus your extra entries; agent.allow stays core', 'override'],
+      ['nvim@.container, podman-claude.sh', 'Editor server and agent, SSH agent and git config mounts', 'Tools, from core', 'core'],
+      ['Kitty socket and kitten mounts on nvim and claude', '%h/.local/state/kitty, /usr/bin/kitten', 'Local override in mise.local.toml. Never in a template', 'local'],
+      ['traefik, dozzle, proxy.network, dashboard.service', 'Proxy, logs, dashboard, run by this project alone', 'Replaced by the machine’s shared wt-traefik, wt-dozzle and wt-dashboard. filial_proxy stays as this project’s own network; wt-traefik joins it at 10.214.0.2', 'change'],
+      ['ports.registry, .home/, claude-memory/, git-hooks/', 'Worktree IDs, agent homes, shared memory, hook backups', 'Unchanged', 'core']
+    ];
+    const counts = {};
+    R.forEach((r) => { counts[r[3]] = (counts[r[3]] || 0) + 1; });
+    const FILTERS = [['all', 'All', R.length], ['match', 'Matches', counts.match || 0], ['override', 'Overrides', (counts.override || 0) + (counts.local || 0)], ['change', 'Changes', counts.change || 0], ['core', 'Core', counts.core || 0]];
+    const filters = FILTERS.map((f) => ({ label: f[1], count: String(f[2]), pressed: st.filter === f[0] ? 'true' : 'false', pick: () => this.setState({ filter: f[0] }), border: st.filter === f[0] ? '#100F0F' : '#CECDC3', bg: st.filter === f[0] ? '#100F0F' : '#FFFFFF', fg: st.filter === f[0] ? '#FFFCF0' : '#34332F' }));
+    const rows = R.filter((r) => st.filter === 'all' || r[3] === st.filter || (st.filter === 'override' && r[3] === 'local')).map((r) => ({ found: r[0], what: r[1], becomes: r[2], status: S[r[3]][0], color: S[r[3]][1] }));
+
+    const D = st.d;
+    const pick = (id, v) => () => this.setState({ d: { ...D, [id]: v } });
+    const DEC = [
+      { id: 'pg', title: 'The app reads PGHOST, not DATABASE_URL', why: 'Today the app gets PGHOST, PGPORT and PGUSER from .env. The postgres option gives DATABASE_URL.', choices: [['pg', 'Also give the PG* variables', 'The option sets PGHOST=db, PGPORT, PGUSER as well. Nothing in the app changes.'], ['url', 'Switch the app to DATABASE_URL', 'A change to database.yml in the app repo, made on a branch first.']] },
+      { id: 'vols', title: 'Volume names', why: 'Existing volumes are named filial-<slug>-db-data. The option names them by major version (db-data-pg16).', choices: [['keep', 'Keep the existing names', 'No data moves. Version-named volumes start with the next major version change.'], ['rename', 'Rename on each worktree’s next restart', 'Copies the data into the new volume, then keeps the old one until clean.']] },
+      { id: 'init', title: 'rustfs-init', why: 'A oneshot that untars rustfs_data.tar.gz into an empty volume.', choices: [['seed', 'Replace it with a volume seed', 'Same result: the tarball is unpacked when the volume is first created.'], ['keep', 'Keep it as a oneshot', 'Stays as a service of its own.']] },
+      { id: 'hosts', title: 'Proxy and hostnames', why: 'filial runs its own Traefik on :80, so no second project can. Adopting moves it to the machine’s shared proxy (see This machine), where every worktree is <slug>.filial.localhost.', choices: [['keep', 'Shared proxy, keep short names', 'Worktrees answer at <slug>.filial.localhost and still at <slug>.localhost, so current URLs and OAuth callbacks keep working.'], ['project', 'Shared proxy, project names only', 'Only <slug>.filial.localhost. Bookmarks, OAuth callbacks and DEV_HOSTS change.']] }
+    ];
+    const decisions = DEC.map((d) => ({ id: 'dec-' + d.id, title: d.title, why: d.why, choices: d.choices.map((c) => ({ label: c[1], desc: c[2], on: D[d.id] === c[0], pick: pick(d.id, c[0]) })) }));
+    const openCount = DEC.filter((d) => !D[d.id]).length;
+
+    const minus = (t) => ({ t: '- ' + t, bg: '#FBEDE9', fg: '#8C2620' });
+    const plus = (t) => ({ t: '+ ' + t, bg: '#EDF3E0', fg: '#3D4F05' });
+    const same = (t) => ({ t: '  ' + t, bg: 'transparent', fg: '#575653' });
+    const keepInit = D.init === 'keep';
+    const FILES = {
+      rustfs: { name: 'filial-rustfs@.container', summary: keepInit ? 'header only' : '2 lines', color: '#8E6B01',
+        lines: keepInit ? [same('[Unit]'), minus('Description=RustFS S3 storage for worktree %i'), plus('Description=RustFS S3 storage for worktree %i (rustfs@1)'), same('Requires=filial-net-network@%i.service filial-rustfs-init@%i.service')] : [same('[Unit]'), same('Description=RustFS S3 storage for worktree %i'), minus('Requires=filial-net-network@%i.service filial-rustfs-init@%i.service'), minus('After=filial-net-network@%i.service filial-rustfs-init@%i.service'), plus('Requires=filial-net-network@%i.service'), plus('After=filial-net-network@%i.service'), plus('# rustfs-data is seeded by `up` when the volume is first created')],
+        note: keepInit ? 'Only the generated header changes.' : 'The ordering on rustfs-init goes; up seeds the volume instead.' },
+      init: { name: 'filial-rustfs-init@.container', summary: keepInit ? 'unchanged' : 'removed', color: keepInit ? '#536907' : '#AF3029',
+        lines: keepInit ? [same('(no change)')] : [minus('[Unit]'), minus('Description=Restore RustFS data for worktree %i if a backup exists'), minus('…'), minus('Type=oneshot'), minus('RemainAfterExit=yes')],
+        note: keepInit ? '' : 'Removed when units:install runs. A worktree already running keeps its restored data.' },
+      env: { name: '.container-config/.env', summary: 'split', color: '#5E409D',
+        lines: [same('RAILS_ENV=development           → from the Rails pack'), same('DEV_HOSTS=rails                → from the Rails pack'), same('PGHOST=db                      → from the postgres option' + (D.pg === 'url' ? ' (replaced by DATABASE_URL)' : '')), same('REDIS_URL=redis://redis:6379/1 → from the redis option'), minus('REDIS_URL=redis://redis:6379/1'), plus('REDIS_URL=redis://cache:6379/1'), same('TZ=Asia/Bangkok                → project env'), same('TAILWINDCSS_DEBUG=1            → project env')],
+        note: 'The cache service is called cache in the new model. Keeping its old name, redis, is one line in project.toml if anything else refers to it.' },
+      db: { name: 'filial-db@.container', summary: D.vols === 'rename' ? '1 line' : 'header only', color: '#8E6B01',
+        lines: D.vols === 'rename' ? [same('[Container]'), same('Image=docker.io/library/postgres:16'), minus('Volume=filial-%i-db-data:/var/lib/postgresql/data'), plus('Volume=filial-%i-db-data-pg16:/var/lib/postgresql/data')] : [same('[Container]'), same('Image=docker.io/library/postgres:16'), same('Volume=filial-%i-db-data:/var/lib/postgresql/data')],
+        note: D.vols === 'rename' ? 'Each worktree copies its data into the new volume on its next restart.' : 'Volume name kept.' },
+      rails: { name: 'filial-rails@.container', summary: 'header only', color: '#536907', lines: [plus('# Rendered from project.toml (rails@1). Edit project.toml, not this file.'), same('[Unit]'), same('Description=Rails dev server for worktree %i')], note: 'Every rendered unit gets this header; the rest is identical.' },
+      others: { name: '8 other units', summary: 'header only', color: '#536907', lines: [same('deps@, redis@, playwright@, nvim@, net@.network,'), same('traefik, dozzle, proxy.network')], note: 'Identical apart from the generated header.' }
+    };
+    const order = ['rustfs', 'init', 'env', 'db', 'rails', 'others'];
+    const files = order.map((k) => ({ name: FILES[k].name, summary: FILES[k].summary, color: FILES[k].color, selected: st.file === k ? 'true' : 'false', pick: () => this.setState({ file: k }), border: st.file === k ? '#100F0F' : '#CECDC3', bg: st.file === k ? '#FFFFFF' : '#FFFCF0' }));
+    const f = FILES[st.file];
+    const blocked = openCount > 0;
+    return {
+      filters, rows, decisions, openCount: String(openCount), files,
+      diff: { name: f.name, lines: f.lines, note: f.note },
+      blocked, adoptBg: blocked ? '#A8A69E' : '#BC5215', adoptLabel: blocked ? 'Decide ' + openCount + ' more to adopt' : 'Adopt'
+    };
+  }
+}
+</script>
+</body>
+</html>

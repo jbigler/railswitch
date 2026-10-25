@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Review before installing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 16px;border-radius:8px;border:1px solid #CECDC3;background:#FFFFFF;color:#100F0F;font:inherit;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
+.kv{display:grid;grid-template-columns:minmax(110px,auto) 1fr;gap:6px 16px;font-size:13px;margin:0}
+.kv dt{color:#575653;font-weight:700}
+.kv dd{margin:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <a href="Templates.dc.html" style="font-size: 14px">Stack library</a>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">Review before installing</span>
+  </header>
+
+  <main style="display: flex; flex-direction: column; gap: 24px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-start">
+      <div style="flex: 1 1 560px; min-width: 0">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">{{title}}</h1>
+        <p style="margin: 6px 0 0; color: #575653; font-size: 15px; max-width: 760px">Packs and options run code on this machine and in your containers, and can change what the firewall lets out. Nothing from a library is installed or updated until you have seen it here, and what you install is locked to exactly these bytes.</p>
+      </div>
+      <dl class="kv" style="flex: 1 1 340px; padding: 14px 16px; border: 1px solid #CECDC3; border-radius: 10px; background: #FFFFFF">
+        <dt>Library</dt><dd class="mono" style="overflow-wrap: anywhere">git@github.com:[ORG]/stack-library.git</dd>
+        <dt>Commit</dt><dd class="mono">{{commit}}</dd>
+        <dt>Signed by</dt><dd>{{signer}}</dd>
+      </dl>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+      <div role="group" aria-label="Show" style="display: flex; border: 1px solid #CECDC3; border-radius: 8px; overflow: hidden">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+          <button type="button" aria-pressed="{{m.pressed}}" onClick="{{m.pick}}" style="min-height: 40px; padding: 6px 14px; border: 0; border-left: 1px solid #CECDC3; margin-left: -1px; background: {{m.bg}}; color: {{m.fg}}; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer">{{m.label}}</button>
+        </sc-for>
+      </div>
+      <span style="font-size: 13px; color: #575653">{{modeNote}}</span>
+    </div>
+
+    <section aria-labelledby="flags-h" style="display: flex; flex-direction: column; gap: 10px">
+      <h2 id="flags-h" style="margin: 0; font-size: 20px; font-weight: 800">What it can do</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px">
+        <sc-for list="{{checks}}" as="c" hint-placeholder-count="6">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 10px; border: 1.5px solid {{c.border}}; background: {{c.bg}}">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="font-weight: 800; font-size: 14px; flex-grow: 1">{{c.label}}</span>
+              <span style="font-size: 12px; font-weight: 800; color: {{c.color}}">{{c.verdict}}</span>
+            </div>
+            <span style="font-size: 13px; color: #34332F">{{c.text}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-labelledby="files-h" style="display: flex; flex-direction: column; gap: 10px">
+      <h2 id="files-h" style="margin: 0; font-size: 20px; font-weight: 800">Every file it brings</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+        <div role="listbox" aria-label="Files" style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+          <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+            <span class="eyebrow" style="margin-top: 8px">{{g.label}}</span>
+            <sc-for list="{{g.files}}" as="f" hint-placeholder-count="3">
+              <button type="button" role="option" aria-selected="{{f.selected}}" onClick="{{f.pick}}" style="display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px; border-radius: 8px; border: 1px solid {{f.border}}; background: {{f.bg}}; font: inherit; text-align: left; cursor: pointer; color: #100F0F">
+                <span class="mono" style="font-size: 13px; flex: 1 1 auto; overflow-wrap: anywhere">{{f.name}}</span>
+                <span style="font-size: 12px; font-weight: 700; color: {{f.color}}; white-space: nowrap">{{f.tag}}</span>
+              </button>
+            </sc-for>
+          </sc-for>
+        </div>
+        <div style="flex: 3 1 560px; min-width: 0; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; overflow-x: auto; padding: 12px 0">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 16px 8px">
+            <span class="mono" style="font-size: 13px; font-weight: 600">{{file.name}}</span>
+            <span style="font-size: 12px; color: #575653">{{file.what}}</span>
+          </div>
+          <sc-for list="{{file.lines}}" as="l" hint-placeholder-count="10">
+            <div class="mono" style="padding: 0 16px; font-size: 12.5px; line-height: 20px; white-space: pre; background: {{l.bg}}; color: {{l.fg}}">{{l.t}}</div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="lock-h" style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+      <div style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <h2 id="lock-h" style="margin: 0; font-size: 20px; font-weight: 800">What gets locked</h2>
+        <p style="margin: 0; font-size: 14px; color: #34332F">Each pack and option is recorded with its commit and a hash of its content; each image with the digest it resolved to on first pull. Until you review an update, every worktree and every teammate gets exactly these. A library that later changes a published version cannot change your project: the hash would no longer match and install stops.</p>
+        <div style="border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF; overflow-x: auto; padding: 12px 0">
+          <div class="mono" style="padding: 0 16px 8px; font-size: 13px; font-weight: 600">stack.lock</div>
+          <sc-for list="{{lock}}" as="l" hint-placeholder-count="12">
+            <div class="mono" style="padding: 0 16px; font-size: 12.5px; line-height: 20px; white-space: pre; color: {{l.fg}}; background: {{l.bg}}">{{l.t}}</div>
+          </sc-for>
+        </div>
+      </div>
+      <aside style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1px solid #CECDC3; border-radius: 12px; background: #F2F0E5">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 800">Install</h2>
+        <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #34332F">
+          <li>Built-in packs and options are locked to the version of wt itself.</li>
+          <li>Ones you made on this host are locked by content hash.</li>
+          <li>An unsigned library, or a signer you have not trusted before, is shown but cannot be installed until you trust it.</li>
+        </ul>
+        <label style="display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer"><input type="checkbox" checked="{{ack}}" onChange="{{toggleAck}}" style="width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0"><span>I’ve read the {{flagCount}} flagged items</span></label>
+        <button type="button" disabled="{{blocked}}" style="min-height: 48px; border-radius: 8px; border: 0; background: {{installBg}}; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer">{{installLabel}}</button>
+        <a href="Templates.dc.html" class="btn">Not now</a>
+      </aside>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: 'update', file: 'deps', ack: false };
+  }
+  renderVals() {
+    const st = this.state;
+    const upd = st.mode === 'update';
+    const ctx = (t) => ({ t: '  ' + t, bg: 'transparent', fg: '#34332F' });
+    const add = (t) => ({ t: '+ ' + t, bg: '#EDF3E0', fg: '#3D4F05' });
+    const del = (t) => ({ t: '- ' + t, bg: '#FBEDE9', fg: '#8C2620' });
+    const flag = (t) => ({ t: '+ ' + t, bg: '#FFF1C2', fg: '#6B5000' });
+    const F = {
+      deps: { group: 'django@1', name: 'firewall/deps.allow', what: 'hosts deps@ may reach while installing', tag: '1 flagged', color: '#8E6B01', changed: true,
+        all: [ctx('pypi.org'), ctx('files.pythonhosted.org'), ctx('github.com'), flag('objects.githubusercontent.com    # not a package registry')],
+        diff: [ctx('pypi.org'), ctx('files.pythonhosted.org'), ctx('github.com'), flag('objects.githubusercontent.com    # not a package registry')] },
+      cf: { group: 'django@1', name: 'Containerfile.app', what: 'RUN lines run on this machine during the build', tag: '1 flagged', color: '#8E6B01', changed: true,
+        all: [ctx('ARG PYTHON_VERSION'), ctx('FROM python:${PYTHON_VERSION}-slim AS base'), ctx('COPY --from=ghcr.io/astral-sh/uv:[version] /uv /usr/local/bin/uv'), ctx('RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \\'), ctx('  && rm -rf /var/lib/apt/lists/*'), flag('RUN curl -fsSL https://[host]/install-tools.sh | sh    # downloads and runs a script'), ctx('FROM base AS web'), ctx('CMD ["uv", "run", "manage.py", "runserver", "0.0.0.0:8000"]')],
+        diff: [ctx('RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \\'), ctx('  && rm -rf /var/lib/apt/lists/*'), flag('RUN curl -fsSL https://[host]/install-tools.sh | sh    # downloads and runs a script'), ctx('FROM base AS web')] },
+      entry: { group: 'django@1', name: 'entrypoints/entrypoint-app.sh', what: 'runs in the app container at every start', tag: 'changed', color: '#205EA6', changed: true,
+        all: [ctx('#!/bin/sh'), ctx('set -eu'), ctx('uv run manage.py migrate --noinput'), add('uv run manage.py collectstatic --noinput --clear'), ctx('exec "$@"')],
+        diff: [ctx('uv run manage.py migrate --noinput'), add('uv run manage.py collectstatic --noinput --clear'), ctx('exec "$@"')] },
+      pack: { group: 'django@1', name: 'pack.toml', what: 'install, server, tasks, version sources, env', tag: 'unchanged', color: '#536907', changed: false,
+        all: [ctx('[app]'), ctx('server  = "uv run manage.py runserver 0.0.0.0:8000"'), ctx('port    = 8000'), ctx('install = "uv sync"'), ctx('[versions]'), ctx('python  = { from = [".python-version", ".tool-versions:python"], fallback = "3.12" }'), ctx('[env]'), ctx('ALLOWED_HOSTS = "{worktree.host}"')],
+        diff: [ctx('(no change since v2)')] },
+      opt: { group: 'celery@1', name: 'option.toml', what: 'image, command, needs, env', tag: 'changed', color: '#205EA6', changed: true,
+        all: [ctx('slot    = "worker"'), ctx('image   = "app"'), del('command = "celery -A {project} worker"'), add('command = "celery -A {project} worker --concurrency {CELERY_CONCURRENCY}"'), ctx('needs   = ["cache"]'), add('ask     = { CELERY_CONCURRENCY = "2" }')],
+        diff: [del('command = "celery -A {project} worker"'), add('command = "celery -A {project} worker --concurrency {CELERY_CONCURRENCY}"'), add('ask     = { CELERY_CONCURRENCY = "2" }')] }
+    };
+    const keys = Object.keys(F).filter((k) => !upd || F[k].changed);
+    const fileKey = keys.indexOf(st.file) >= 0 ? st.file : keys[0];
+    const groupNames = ['django@1', 'celery@1'];
+    const groups = groupNames.map((g) => ({ label: g, files: keys.filter((k) => F[k].group === g).map((k) => ({ name: F[k].name, tag: F[k].tag, color: F[k].color, selected: k === fileKey ? 'true' : 'false', pick: () => this.setState({ file: k }), border: k === fileKey ? '#100F0F' : '#CECDC3', bg: k === fileKey ? '#FFFFFF' : '#FFFCF0' })) })).filter((g) => g.files.length);
+    const f = F[fileKey];
+
+    const C = (label, verdict, text, kind) => ({ label, verdict, text, color: kind === 'flag' ? '#8E6B01' : kind === 'stop' ? '#AF3029' : '#536907', border: kind === 'flag' ? '#D9B23A' : kind === 'stop' ? '#AF3029' : '#CECDC3', bg: kind === 'flag' ? '#FFFBEB' : '#FFFFFF' });
+    const checks = [
+      C('Firewall', '1 new host', 'deps.allow adds objects.githubusercontent.com, which is not a package registry. The agent allowlist is unchanged.', 'flag'),
+      C('Runs on this machine', '1 flagged', 'Containerfile.app downloads a script with curl and pipes it to sh during the build, outside any firewall.', 'flag'),
+      C('Host mounts', 'none', 'Mounts only the worktree and its own volumes. Nothing from your home directory or /.', 'ok'),
+      C('Published ports', 'none', 'Nothing is published beyond loopback; routing goes through Traefik.', 'ok'),
+      C('Privileges', 'none', 'No added capabilities, no privileged mode, no devices.', 'ok'),
+      C('Images', '2 pulled', 'python:3.12-slim and ghcr.io/astral-sh/uv; digests recorded on first pull.', 'ok')
+    ];
+    const flagCount = checks.filter((c) => c.color === '#8E6B01').length;
+
+    const lk = (t, kind) => ({ t, fg: kind === 'c' ? '#6F6E69' : kind === 'n' ? '#3D4F05' : '#100F0F', bg: kind === 'n' ? '#EDF3E0' : 'transparent' });
+    const lock = [
+      lk('# Written by wt. Do not edit; review updates in the dashboard.', 'c'),
+      lk('[pack.django]'),
+      lk('version = "1"'),
+      lk('source  = "git@github.com:[ORG]/stack-library.git"'),
+      lk('commit  = "' + (upd ? '9b1e4a7' : '9b1e4a7') + '"', upd ? 'n' : ''),
+      lk('sha256  = "[content hash]"', upd ? 'n' : ''),
+      lk(''),
+      lk('[option.celery]'),
+      lk('version = "1"'),
+      lk('commit  = "9b1e4a7"', upd ? 'n' : ''),
+      lk('sha256  = "[content hash]"', upd ? 'n' : ''),
+      lk(''),
+      lk('[option.postgres]'),
+      lk('source  = "built in (wt [version])"'),
+      lk(''),
+      lk('[image.postgres]'),
+      lk('ref     = "docker.io/library/postgres:16"'),
+      lk('digest  = "sha256:[digest at first pull]"')
+    ];
+    const blocked = !st.ack;
+    const modes = [['update', 'Changes since v2'], ['all', 'Everything']].map((m) => ({ label: m[1], pressed: st.mode === m[0] ? 'true' : 'false', pick: () => this.setState({ mode: m[0] }), bg: st.mode === m[0] ? '#100F0F' : '#FFFFFF', fg: st.mode === m[0] ? '#FFFCF0' : '#34332F' }));
+    return {
+      title: 'Update django-celery from v2 to v3',
+      commit: upd ? '3c7d012 → 9b1e4a7' : '9b1e4a7',
+      signer: 'A key you trusted on first install',
+      modes, modeNote: upd ? 'Only files that changed. Unchanged files were reviewed when you installed v2.' : 'Every file, as on a first install.',
+      checks, flagCount: String(flagCount), groups,
+      file: { name: f.name, what: f.what, lines: upd ? f.diff : f.all },
+      lock, ack: st.ack, toggleAck: () => this.setState({ ack: !st.ack }),
+      blocked, installBg: blocked ? '#A8A69E' : '#BC5215', installLabel: upd ? 'Update and lock' : 'Install and lock'
+    };
+  }
+}
+</script>
+</body>
+</html>

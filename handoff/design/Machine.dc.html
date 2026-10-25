@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>This machine</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFCF0;color:#100F0F;font-family:"Nunito",system-ui,sans-serif}
+a{color:#205EA6}a:hover{color:#1A4F8C}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border:1px solid #CECDC3;border-radius:999px;font-size:12px;line-height:18px;color:#575653;background:#F2F0E5;white-space:nowrap}
+.eyebrow{font-size:12px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#575653}
+th{text-align:left;font-size:12px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#575653;padding:10px 12px;border-bottom:1px solid #CECDC3;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid #E6E4D9;font-size:13px;vertical-align:top}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid #CECDC3;background:#FFFFFF;color:#100F0F;font:inherit;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none}
+.card{display:flex;flex-direction:column;gap:12px;padding:18px 20px;border:1px solid #CECDC3;border-radius:12px;background:#FFFFFF}
+.kv{display:grid;grid-template-columns:minmax(130px,auto) 1fr;gap:6px 16px;font-size:13px;margin:0}
+.kv dt{color:#575653;font-weight:700}
+.kv dd{margin:0}
+.opt{display:flex;gap:10px;align-items:flex-start;font-size:14px;cursor:pointer}
+.opt input{width:18px;height:18px;margin:1px 0 0;flex-shrink:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-direction: column">
+  <header style="height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #CECDC3; background: #F2F0E5">
+    <span style="font-weight: 800; font-size: 18px; color: #BC5215">wt</span>
+    <span style="color: #575653; font-size: 14px">Dashboard</span>
+    <span aria-hidden="true" style="color: #A8A69E">/</span>
+    <span style="font-weight: 700; font-size: 14px">This machine</span>
+    <span style="flex-grow: 1"></span>
+    <a href="Main.dc.html" style="font-size: 14px">New project</a>
+  </header>
+
+  <main style="display: flex; flex-direction: column; gap: 28px; padding: 32px 24px 48px; max-width: 1360px; width: 100%; margin: 0 auto; box-sizing: border-box">
+    <div style="max-width: 860px">
+      <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em">This machine</h1>
+      <p style="margin: 6px 0 0; color: #575653; font-size: 15px">One proxy, one dashboard and one set of ports, shared by every project here. A project never runs its own: it registers its worktrees, and the machine gives them hostnames and ports that cannot collide with another project’s.</p>
+    </div>
+
+    <section aria-labelledby="proj-h" style="display: flex; flex-direction: column; gap: 12px">
+      <h2 id="proj-h" style="margin: 0; font-size: 20px; font-weight: 800">Projects</h2>
+      <div style="overflow-x: auto; border: 1px solid #CECDC3; border-radius: 12px; background: #FFFFFF">
+        <table style="border-collapse: collapse; width: 100%; min-width: 900px">
+          <thead><tr><th scope="col">Project</th><th scope="col">Prefix</th><th scope="col">Worktree hostnames</th><th scope="col">Proxy network</th><th scope="col">Worktrees</th><th scope="col">Worktree IDs</th><th scope="col">Stack</th></tr></thead>
+          <tbody>
+            <sc-for list="{{projects}}" as="p" hint-placeholder-count="3">
+              <tr>
+                <td style="font-weight: 700; font-size: 14px">{{p.name}}</td>
+                <td class="mono">{{p.prefix}}</td>
+                <td class="mono">{{p.hosts}}<sc-if value="{{p.short}}" hint-placeholder-val="{{ false }}"><br><span style="color: #8E6B01">also &lt;slug&gt;.localhost</span></sc-if></td>
+                <td class="mono">{{p.net}}<br><span style="color: #575653">{{p.subnet}} · Traefik {{p.traefik}}</span></td>
+                <td>{{p.count}}</td>
+                <td class="mono">{{p.ids}}</td>
+                <td><span class="chip">{{p.stack}}</span></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; align-items: start">
+      <section aria-labelledby="host-h" class="card">
+        <h2 id="host-h" style="margin: 0; font-size: 18px; font-weight: 800">Hostnames</h2>
+        <p style="margin: 0; font-size: 13px; color: #34332F">Every worktree is named under its project, so the same branch in two projects never claims the same host. Browsers and systemd-resolved send every <span class="mono">*.localhost</span> name to this machine, so nothing needs adding to /etc/hosts.</p>
+        <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 10px">
+          <legend class="eyebrow" style="margin-bottom: 8px">Short names</legend>
+          <sc-for list="{{shortChoices}}" as="c" hint-placeholder-count="2">
+            <label class="opt"><input type="radio" name="short" checked="{{c.on}}" onChange="{{c.pick}}"><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 700">{{c.label}}</span><span style="font-size: 12px; color: #575653">{{c.desc}}</span></span></label>
+          </sc-for>
+        </fieldset>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span class="eyebrow">Example: a worktree called master in each project</span>
+          <div style="border: 1px solid #E6E4D9; border-radius: 8px; overflow: hidden">
+            <sc-for list="{{examples}}" as="e" hint-placeholder-count="4">
+              <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 12px; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+                <span class="mono" style="font-weight: 600; overflow-wrap: anywhere">{{e.host}}</span>
+                <span style="color: #575653">{{e.to}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #575653">Only one project can have short names: two would both claim <span class="mono">master.localhost</span>. wt:share’s tailnet names are not affected.</p>
+      </section>
+
+      <section aria-labelledby="proxy-h" class="card">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+          <h2 id="proxy-h" style="margin: 0; font-size: 18px; font-weight: 800">Proxy</h2>
+          <span class="chip" style="border-color: #536907; color: #536907; background: #FFFFFF">running</span>
+          <span style="flex-grow: 1"></span>
+          <button type="button" class="btn">Restart</button>
+        </div>
+        <dl class="kv">
+          <dt>Unit</dt><dd class="mono">wt-traefik.service</dd>
+          <dt>Listens on</dt><dd class="mono">127.0.0.1:80, API 127.0.0.1:8080</dd>
+          <dt>Networks</dt><dd>One per project, <span class="mono">&lt;prefix&gt;_proxy</span>. Traefik joins all of them, always at <span class="mono">.2</span></dd>
+          <dt>Subnet pool</dt><dd class="mono">10.214.0.0/16, one /24 per project · next free 10.214.3.0/24</dd>
+          <dt>Logs</dt><dd class="mono">logs.localhost (Dozzle, every project; filter by prefix)</dd>
+          <dt>Routes</dt><dd>{{routeCount}} from {{projectCount}} projects</dd>
+        </dl>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span class="eyebrow">Who can reach whom</span>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+            <sc-for list="{{nets}}" as="n" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1.5px solid #CECDC3; border-radius: 8px; background: #FFFCF0; min-width: 0">
+                <span class="mono" style="font-size: 12px; font-weight: 600; overflow-wrap: anywhere">{{n.net}}</span>
+                <span style="font-size: 12px; color: #575653">wt-traefik {{n.traefik}}</span>
+                <span style="font-size: 12px; color: #575653">{{n.prefix}} worktrees only</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #34332F">A worktree joins only its own project’s proxy and dev networks, so no container can reach another project’s. Only Traefik sits on all of them. Each container carries a <span class="mono">traefik.docker.network=&lt;prefix&gt;_proxy</span> label so Traefik routes to it over the right network, and its <span class="mono">--add-host</span> entries point at Traefik’s <span class="mono">.2</span> on that same network.</p>
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; background: #F2F0E5; font-size: 13px">
+          <span><span style="font-weight: 700">New project:</span> its subnet is taken from the pool and Traefik is connected to the new network at <span class="mono">.2</span> (<span class="mono">podman network connect --ip</span>), so running projects are not interrupted.</span>
+          <span><span style="font-weight: 700">Checks:</span> port 80 allowed for rootless podman (<span class="mono">allow-ports</span>), every pool subnet free or ours, Traefik on every project network, <span class="mono">podman.socket</span> on.</span>
+        </div>
+      </section>
+
+      <section aria-labelledby="ports-h" class="card">
+        <h2 id="ports-h" style="margin: 0; font-size: 18px; font-weight: 800">Ports</h2>
+        <p style="margin: 0; font-size: 13px; color: #34332F">Worktree IDs are handed out by the machine, not each project, so the same formulas never give two worktrees the same port. Existing IDs keep their numbers.</p>
+        <div style="border: 1px solid #E6E4D9; border-radius: 8px; overflow: hidden">
+          <sc-for list="{{ports}}" as="p" hint-placeholder-count="6">
+            <div style="display: flex; justify-content: space-between; gap: 12px; padding: 7px 12px; border-bottom: 1px solid #E6E4D9; font-size: 13px">
+              <span>{{p.what}}</span><span class="mono">{{p.formula}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <dl class="kv">
+          <dt>Registry</dt><dd class="mono">~/.local/share/wt/ports.registry (project:slug:ID)</dd>
+          <dt>Next free ID</dt><dd class="mono">{{nextId}}</dd>
+          <dt>Before each new ID</dt><dd>its ports are checked against what is already listening on this machine</dd>
+        </dl>
+      </section>
+
+      <section aria-labelledby="dash-h" class="card">
+        <h2 id="dash-h" style="margin: 0; font-size: 18px; font-weight: 800">Dashboard</h2>
+        <dl class="kv">
+          <dt>Address</dt><dd class="mono">http://wt.localhost:7700</dd>
+          <dt>Unit</dt><dd class="mono">wt-dashboard.service</dd>
+          <dt>Shows</dt><dd>Every project, with a project switcher; a worktree’s page is /&lt;prefix&gt;/&lt;slug&gt;</dd>
+          <dt>Start at login</dt><dd><label style="display: inline-flex; gap: 8px; align-items: center; cursor: pointer"><input type="checkbox" checked="checked" style="width: 16px; height: 16px; margin: 0">On</label></dd>
+        </dl>
+        <p style="margin: 0; font-size: 13px; color: #575653">Actions still run in the project’s own workspace root with its own mise tasks.</p>
+      </section>
+    </div>
+
+    <section aria-labelledby="mig-h" class="card" style="border-color: #8E6B01; background: #FFFBEB">
+      <h2 id="mig-h" style="margin: 0; font-size: 18px; font-weight: 800">Moving from one proxy per project</h2>
+      <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #34332F">
+        <li><span class="mono">filial_proxy</span> stays as Filial’s proxy network, with the same subnet (10.214.0.0/24) and the first slot in the pool.</li>
+        <li><span class="mono">filial-traefik</span>, <span class="mono">filial-dozzle</span> and <span class="mono">filial-dashboard</span> stop; <span class="mono">wt-traefik</span> starts on the same ports and joins <span class="mono">filial_proxy</span> at the address the old one had, 10.214.0.2.</li>
+        <li>Worktrees need no restart: their network, firewall annotation and <span class="mono">--add-host</span> entries are unchanged. Routes drop for the seconds between the two Traefiks.</li>
+        <li>With short names on for Filial, every current URL keeps working.</li>
+      </ol>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button type="button" style="min-height: 44px; padding: 8px 18px; border-radius: 8px; border: 0; background: #BC5215; color: #FFFFFF; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer">Move to the shared proxy</button>
+        <a href="Adopt.dc.html" class="btn" style="min-height: 44px">Back to Adopt</a>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { short: 'filial' };
+  }
+  renderVals() {
+    const st = this.state;
+    const P = [
+      { name: 'Filial Rails', prefix: 'filial', count: 6, ids: '1–6', stack: 'rails@1', n: 0 },
+      { name: 'Billing sandbox', prefix: 'billing', count: 2, ids: '7, 8', stack: 'rails@1', n: 1 },
+      { name: 'Phoenix demo', prefix: 'phx', count: 1, ids: '9', stack: 'phoenix@1', n: 2 }
+    ].map((p) => ({ ...p, net: p.prefix + '_proxy', subnet: '10.214.' + p.n + '.0/24', traefik: '10.214.' + p.n + '.2' }));
+    const nets = P.map((p) => ({ net: p.net, traefik: p.traefik, prefix: p.prefix }));
+    const projects = P.map((p) => ({ ...p, count: String(p.count), hosts: '<slug>.' + p.prefix + '.localhost', short: st.short === p.prefix }));
+    const shortChoices = [
+      { id: 'filial', label: 'Filial Rails keeps <slug>.localhost too', desc: 'Its existing URLs, bookmarks and OAuth callbacks keep working.' },
+      { id: 'none', label: 'No short names', desc: 'Every project uses <slug>.<prefix>.localhost only.' }
+    ].map((c) => ({ ...c, on: st.short === c.id, pick: () => this.setState({ short: c.id }) }));
+    const examples = [];
+    P.forEach((p) => {
+      examples.push({ host: 'master.' + p.prefix + '.localhost', to: p.name + ' · app' });
+      if (st.short === p.prefix) examples.push({ host: 'master.localhost', to: p.name + ' · app (short name)' });
+    });
+    examples.push({ host: 's3.master.filial.localhost', to: 'Filial Rails · storage' });
+    examples.push({ host: 'vnc.master.phx.localhost', to: 'Phoenix demo · browser' });
+    const ports = [
+      ['App, for wt:share', '13000 + ID'], ['Database', '55432 + ID'], ['Ruby debugger', '33000 + ID'],
+      ['Neovim', '17000 + ID'], ['Playwright', '18888 + ID'], ['Storage, for wt:share', '19000 + ID']
+    ].map((p) => ({ what: p[0], formula: p[1] }));
+    return { projects, nets, shortChoices, examples, ports, nextId: '10', routeCount: '27', projectCount: String(P.length) };
+  }
+}
+</script>
+</body>
+</html>

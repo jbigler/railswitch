@@ -80,12 +80,14 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	cmd.Env = c.Env
 	cmd.Stdin = c.Stdin
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = c.Stdout, c.Stderr
+	var tail tailBuffer // the caller's Stderr, kept for the exit error
+	cmd.Stdout = c.Stdout
 	if c.Stdout == nil {
 		cmd.Stdout = &stdout
 	}
-	if c.Stderr == nil {
-		cmd.Stderr = &stderr
+	cmd.Stderr = &stderr
+	if c.Stderr != nil {
+		cmd.Stderr = io.MultiWriter(c.Stderr, &tail)
 	}
 	if timed {
 		// A timed call gets its own process group so a timeout kills the
@@ -111,7 +113,11 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		tail := strings.TrimSpace(string(res.Stderr))
+		errText := res.Stderr
+		if c.Stderr != nil {
+			errText = tail.b
+		}
+		tail := strings.TrimSpace(string(errText))
 		if len(tail) > stderrTail {
 			i := len(tail) - stderrTail
 			for i < len(tail) && !utf8.RuneStart(tail[i]) {
@@ -125,4 +131,42 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		return res, fmt.Errorf("%s: %w (exit %d): %s", c.Name, ErrExit, res.ExitCode, tail)
 	}
 	return res, fmt.Errorf("%s: %w", c.Name, err)
+}
+
+// tailBuffer keeps the last few KiB written to it.
+type tailBuffer struct{ b []byte }
+
+const tailKeep = 4 * stderrTail // room to cut at a rune start and trim
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.b = append(t.b, p...)
+	if len(t.b) > tailKeep {
+		t.b = append(t.b[:0], t.b[len(t.b)-tailKeep:]...)
+	}
+	return len(p), nil
+}
+
+// GitBatchEnv is environ for a git call that may touch the network, made
+// non-interactive: a timed call runs in its own process group, where a
+// credential, passphrase or host-key prompt would stop git silently until
+// the deadline. GIT_TERMINAL_PROMPT=0, and ssh in batch mode unless the
+// user's environment already chooses an ssh (GIT_SSH_COMMAND or GIT_SSH).
+func GitBatchEnv(environ []string) []string {
+	env := make([]string, 0, len(environ)+2)
+	userSSH := false
+	for _, kv := range environ {
+		k, _, _ := strings.Cut(kv, "=")
+		switch k {
+		case "GIT_TERMINAL_PROMPT":
+			continue
+		case "GIT_SSH_COMMAND", "GIT_SSH":
+			userSSH = true
+		}
+		env = append(env, kv)
+	}
+	env = append(env, "GIT_TERMINAL_PROMPT=0")
+	if !userSSH {
+		env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
+	}
+	return env
 }

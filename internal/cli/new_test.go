@@ -522,3 +522,31 @@ func TestInitJoin(t *testing.T) {
 		t.Errorf("second init: exit %d, stderr %q; want %q", code, errs, want)
 	}
 }
+
+// TestNewGitNonInteractive: git calls that may touch the network (ls-remote,
+// clone) cannot prompt: GIT_TERMINAL_PROMPT=0 and ssh in batch mode.
+func TestNewGitNonInteractive(t *testing.T) {
+	newEnv(t)
+	t.Setenv("GIT_SSH_COMMAND", "")
+	os.Unsetenv("GIT_SSH_COMMAND")
+	repo := bareRepo(t, "main")
+	f := gitHost()
+	ws := filepath.Join(t.TempDir(), "shop")
+	if code, _, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
+		t.Fatalf("new: exit %d: %s", code, errs)
+	}
+	seen := 0
+	for i, c := range f.Calls {
+		if !slices.Contains(c, "clone") && !slices.Contains(c, "ls-remote") {
+			continue
+		}
+		seen++
+		env := f.Cmds[i].Env
+		if !slices.Contains(env, "GIT_TERMINAL_PROMPT=0") || !slices.Contains(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
+			t.Errorf("%v env lacks the batch settings: %q", c, env)
+		}
+	}
+	if seen == 0 {
+		t.Fatal("no clone or ls-remote call")
+	}
+}

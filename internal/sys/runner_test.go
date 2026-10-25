@@ -3,6 +3,7 @@ package sys
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -107,5 +108,37 @@ func TestExecExitErrorMessage(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exit 3") {
 		t.Errorf("err = %q", err)
+	}
+}
+
+// TestExecStderrTailWithCallerStderr: a caller-supplied Stderr still gets
+// everything, and the exit error still carries the stderr tail.
+func TestExecStderrTailWithCallerStderr(t *testing.T) {
+	var buf strings.Builder
+	_, err := Exec{}.Run(context.Background(), Cmd{Name: "sh", Args: []string{"-c", "echo boom >&2; exit 4"}, Stderr: &buf})
+	if buf.String() != "boom\n" {
+		t.Errorf("caller stderr = %q", buf.String())
+	}
+	if err == nil || !strings.Contains(err.Error(), "exit 4): boom") {
+		t.Errorf("err = %v; want the stderr tail", err)
+	}
+}
+
+func TestGitBatchEnv(t *testing.T) {
+	has := func(env []string, kv string) bool { return slices.Contains(env, kv) }
+	env := GitBatchEnv([]string{"HOME=/h"})
+	if !has(env, "HOME=/h") || !has(env, "GIT_TERMINAL_PROMPT=0") || !has(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
+		t.Errorf("plain env = %q", env)
+	}
+	for _, user := range []string{"GIT_SSH_COMMAND=my-ssh", "GIT_SSH=/usr/bin/my-ssh"} {
+		env := GitBatchEnv([]string{user, "GIT_TERMINAL_PROMPT=1"})
+		if !has(env, user) || !has(env, "GIT_TERMINAL_PROMPT=0") || has(env, "GIT_TERMINAL_PROMPT=1") {
+			t.Errorf("env with %s = %q", user, env)
+		}
+		for _, kv := range env {
+			if strings.HasPrefix(kv, "GIT_SSH_COMMAND=ssh") {
+				t.Errorf("env with %s overrode it: %q", user, env)
+			}
+		}
 	}
 }

@@ -1,0 +1,57 @@
+package lifecycle
+
+import (
+	"context"
+	"errors"
+	"os"
+	"time"
+
+	"github.com/jbigler/railswitch/internal/render"
+)
+
+// DepsTimeout bounds `railswitch deps`: an install can be slow.
+const DepsTimeout = 30 * time.Minute
+
+// Deps runs argv in a transient container of worktree slug's deps service
+// (D35): its image, mounts and firewall profile, with its env minus the
+// pack's [deps] frozen_env names, so argv may change the lockfiles. The env
+// goes through a temporary 0600 file, removed afterwards.
+func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
+	if len(argv) == 0 {
+		return errors.New("deps: no command")
+	}
+	m, in, err := l.load(ctx, slug)
+	if err != nil {
+		return err
+	}
+	s, err := service(m, "deps")
+	if err != nil {
+		return err
+	}
+	frozen := m.Inputs.Stack.Pack.Deps.FrozenEnv
+	var env []render.EnvVar
+	for _, v := range in.Env[s.ID] {
+		if _, ok := frozen[v.Name]; !ok {
+			env = append(env, v)
+		}
+	}
+	f, err := os.CreateTemp("", "railswitch-deps-*.env") // 0600
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	for _, v := range env {
+		if _, err := f.WriteString(v.Name + "=" + v.Value + "\n"); err != nil {
+			f.Close()
+			return err
+		}
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	args, err := l.transient(m, in, s, f.Name(), argv)
+	if err != nil {
+		return err
+	}
+	return l.interactive(ctx, DepsTimeout, args)
+}

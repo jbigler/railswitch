@@ -1,5 +1,5 @@
-// Package lifecycle runs a worktree's containers: up, stop, down, status,
-// logs, exec and build, and the checks before them.
+// Package lifecycle runs a worktree's containers: up, stop, down, restart,
+// status, logs, exec, build and deps, and the checks before them.
 package lifecycle
 
 import (
@@ -7,8 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 
+	"github.com/jbigler/railswitch/internal/firewall"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 )
@@ -42,4 +46,50 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// hookDescriptor is the firewall's OCI hook descriptor in workspace ws.
+func hookDescriptor(ws, prefix string) string {
+	return filepath.Join(ws, firewall.Dir, "hooks.d", prefix+"-firewall.json")
+}
+
+// requireDescriptor refuses when the firewall hook descriptor is missing.
+func requireDescriptor(ws, prefix string) error {
+	d := hookDescriptor(ws, prefix)
+	if _, err := os.Stat(d); err != nil {
+		return fmt.Errorf("no firewall hook descriptor %s: containers would start unfirewalled (run railswitch render)", d)
+	}
+	return nil
+}
+
+// Preflight checks what worktree slug's containers need before anything
+// starts: every absolute bind-mount source exists, the firewall hook
+// descriptor exists, the worktree dir exists and every secret its services
+// receive is set.
+func (l *L) Preflight(ctx context.Context, m *render.Model, slug string) error {
+	in, err := instance(m, slug)
+	if err != nil {
+		return err
+	}
+	for _, s := range m.Services {
+		for _, mt := range s.Mounts {
+			src, err := pack.Expand(mt.Source, in.Scope(s.ID))
+			if err != nil {
+				return fmt.Errorf("%s: mount %s: %w", s.ID, mt.Source, err)
+			}
+			if !filepath.IsAbs(src) {
+				continue
+			}
+			if _, err := os.Stat(src); err != nil {
+				return fmt.Errorf("%s: bind mount source %s is missing: %w", s.ID, src, err)
+			}
+		}
+	}
+	if err := requireDescriptor(m.Inputs.Workspace, m.Prefix); err != nil {
+		return err
+	}
+	if fi, err := os.Stat(in.Worktree.Dir); err != nil || !fi.IsDir() {
+		return fmt.Errorf("worktree dir %s is missing", in.Worktree.Dir)
+	}
+	return CheckSecrets(ctx, l.podman(), m, slug)
 }

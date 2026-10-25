@@ -101,3 +101,24 @@ on a machine with one project). It is an array with one object per worktree.
 | `branch` | string | The branch checked out in it; `""` when detached, or when its directory is missing or not a git worktree. |
 | `dir` | string | Its directory, `<workspace>/<slug>`. |
 | `dirty` | boolean | `git status --porcelain` lists changes or untracked files. `false` when its directory is missing or not a git worktree. |
+
+## `status`
+
+The services of the current worktree (`-w <slug>`, or the worktree the
+working directory is in), in model order (app, deps, worker, data services,
+tools). It is an array with one object per service.
+
+```json
+[
+  {"service": "rails", "role": "app", "state": "active/running", "health": "healthy"},
+  {"service": "deps", "role": "deps", "state": "inactive/dead", "health": ""},
+  {"service": "db", "role": "data", "state": "active/running", "health": "starting"}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `service` | string | Service id, e.g. `rails`, `db`. |
+| `role` | string | `app`, `deps`, `worker`, `data` or `tool`. |
+| `state` | string | The unit's systemd state, `<ActiveState>/<SubState>`, e.g. `active/running`, `inactive/dead`, `failed/failed`. |
+| `health` | string | podman's health status of the container (`starting`, `healthy`, `unhealthy`) for a service with a health check (the app included, D34); `""` for a service without one, or when its container does not exist. |

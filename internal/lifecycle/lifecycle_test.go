@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -1015,5 +1017,32 @@ func TestUpBuildsTagsOfRecordedDigests(t *testing.T) {
 	}
 	if !built {
 		t.Fatalf("no build of the rails unit's image; builds %q\nunit:\n%s", builds(e.calls()), unit)
+	}
+}
+
+// TestStartTimeoutCoversUnits: systemctl start of the app waits for the
+// deps oneshot and then the app's own start, so its deadline is at least
+// the sum of their TimeoutStartSec.
+func TestStartTimeoutCoversUnits(t *testing.T) {
+	e := setup(t)
+	e.render(t)
+	total := 0
+	for _, svc := range []string{"deps", "rails"} {
+		data, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-"+svc+".container"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if v, ok := strings.CutPrefix(line, "TimeoutStartSec="); ok {
+				n, err := strconv.Atoi(v)
+				if err != nil {
+					t.Fatal(err)
+				}
+				total += n
+			}
+		}
+	}
+	if want := time.Duration(total) * time.Second; total < 900 || podman.StartTimeout < want {
+		t.Errorf("StartTimeout = %v; want at least %v (deps + app TimeoutStartSec)", podman.StartTimeout, want)
 	}
 }

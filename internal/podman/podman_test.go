@@ -265,10 +265,10 @@ func TestSystemd(t *testing.T) {
 		[]string{"systemctl", "--user", "stop", "a.service"},
 		[]string{"systemctl", "--user", "restart", "a.service"},
 		[]string{"systemctl", "--user", "reset-failed", "a.service", "b.service"})
-	if f.Cmds[1].Timeout != 10*time.Minute {
+	if f.Cmds[1].Timeout != 20*time.Minute {
 		t.Fatalf("start Timeout = %v", f.Cmds[1].Timeout)
 	}
-	if f.Cmds[3].Timeout != 10*time.Minute {
+	if f.Cmds[3].Timeout != 20*time.Minute {
 		t.Fatalf("restart Timeout = %v", f.Cmds[3].Timeout)
 	}
 }

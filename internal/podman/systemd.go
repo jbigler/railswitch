@@ -10,8 +10,9 @@ import (
 )
 
 // StartTimeout bounds `systemctl --user start` (it waits for image pulls
-// and healthy dependencies).
-const StartTimeout = 10 * time.Minute
+// and healthy dependencies): at least the deps oneshot's TimeoutStartSec
+// (900 s) plus the app's own (180 s by default).
+const StartTimeout = 20 * time.Minute
 
 // Systemd runs `systemctl --user` through R.
 type Systemd struct{ R sys.Runner }

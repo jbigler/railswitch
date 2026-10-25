@@ -1,0 +1,11 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial). Edit project.toml, not this file.
+
+[Unit]
+Description=Proxy network of project filial
+
+[Network]
+NetworkName=filial_proxy
+Subnet=10.214.3.0/24
+Gateway=10.214.3.1
+IPRange=10.214.3.128/25
+Options=mtu=1400

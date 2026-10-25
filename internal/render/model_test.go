@@ -18,16 +18,22 @@ import (
 
 const fixtureDir = "../../testdata/fixtures/filial"
 
-// fixtureWS copies the Filial fixture to a temp workspace and writes the
-// built-in default Containerfiles into its containerfiles/, as railswitch new
-// ejects them, so the fixture can't drift from the built-ins.
+// fixtureWS copies the Filial fixture to a temp workspace (see fixtureWSOf).
 func fixtureWS(t *testing.T) string {
 	t.Helper()
-	ws := filepath.Join(t.TempDir(), "filial")
-	if err := os.CopyFS(ws, os.DirFS(fixtureDir)); err != nil {
+	return fixtureWSOf(t, fixtureDir)
+}
+
+// fixtureWSOf copies the fixture dir to a temp workspace and writes the
+// built-in default Containerfiles into its containerfiles/, as railswitch new
+// ejects them, so the fixture can't drift from the built-ins.
+func fixtureWSOf(t *testing.T, dir string) string {
+	t.Helper()
+	ws := filepath.Join(t.TempDir(), filepath.Base(dir))
+	if err := os.CopyFS(ws, os.DirFS(dir)); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(filepath.Join(ws, "db-dumps"), 0o700); err != nil {
+	if err := os.Chmod(filepath.Join(ws, "db-dumps"), 0o700); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal(err)
 	}
 	cat, err := pack.LoadBuiltins()
@@ -68,8 +74,18 @@ func writeFile(t *testing.T, path, data string) {
 
 // fixtureInputs loads the workspace's project.toml, applies mutate (may be
 // nil), and resolves it against the built-ins, with worktrees master (ID 1)
-// and feat (ID 2).
+// and feat (ID 2), each when the workspace has its directory.
 func fixtureInputs(t *testing.T, ws string, mutate func(*config.Project)) Inputs {
+	t.Helper()
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return catalogInputs(t, ws, cat, mutate)
+}
+
+// catalogInputs is fixtureInputs resolved against cat.
+func catalogInputs(t *testing.T, ws string, cat *pack.Catalog, mutate func(*config.Project)) Inputs {
 	t.Helper()
 	p, err := config.Load(filepath.Join(ws, "project.toml"))
 	if err != nil {
@@ -81,10 +97,6 @@ func fixtureInputs(t *testing.T, ws string, mutate func(*config.Project)) Inputs
 	if err := p.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadBuiltins()
-	if err != nil {
-		t.Fatal(err)
-	}
 	st, err := cat.Resolve(p)
 	if err != nil {
 		t.Fatal(err)
@@ -93,16 +105,20 @@ func fixtureInputs(t *testing.T, ws string, mutate func(*config.Project)) Inputs
 	if err != nil {
 		t.Fatal(err)
 	}
+	var wts []Worktree
+	for i, slug := range []string{"master", "feat"} {
+		dir := filepath.Join(ws, slug)
+		if _, err := os.Stat(dir); err == nil {
+			wts = append(wts, Worktree{Slug: slug, ID: i + 1, Dir: dir, Branch: slug})
+		}
+	}
 	return Inputs{
 		Workspace: ws,
 		Project:   p,
 		Stack:     st,
 		Lock:      &config.Lock{Schema: config.LockSchemaVersion},
-		Machine:   machine.ProjectEntry{Prefix: "filial", Workspace: ws, Subnet: 3},
-		Worktrees: []Worktree{
-			{Slug: "master", ID: 1, Dir: filepath.Join(ws, "master"), Branch: "master"},
-			{Slug: "feat", ID: 2, Dir: filepath.Join(ws, "feat"), Branch: "feat"},
-		},
+		Machine:   machine.ProjectEntry{Prefix: p.Project.Prefix, Workspace: ws, Subnet: 3},
+		Worktrees: wts,
 		Generated: gen,
 		Host:      Host{CPUs: 8, Home: "/home/dev", GitName: "Dev Eloper", GitEmail: "dev@example.com"},
 	}

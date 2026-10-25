@@ -1,0 +1,52 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree master). Edit project.toml, not this file.
+# role: data
+
+[Unit]
+Description=filial storage of worktree master
+Wants=railswitch-traefik.service
+After=railswitch-traefik.service
+
+[Container]
+Image=docker.io/rustfs/rustfs:1.0.0-alpha.83
+ContainerName=filial-master-storage
+Network=filial-master-dev.network:alias=storage
+Network=filial-proxy.network
+EnvironmentFile=/WORKSPACES/filial/.railswitch/env/master/storage.env
+AddHost=master.filial.localhost:10.214.3.2
+AddHost=s3.master.filial.localhost:10.214.3.2
+AddHost=s3-ui.master.filial.localhost:10.214.3.2
+AddHost=vnc.master.filial.localhost:10.214.3.2
+PublishPort=127.0.0.1:19001:9000
+Volume=filial-master-rustfs-data:/data
+NoNewPrivileges=true
+Memory=2g
+PidsLimit=1024
+Label=traefik.enable=true
+Label=traefik.docker.network=filial_proxy
+Label=traefik.http.routers.filial-master-s3.rule=Host(`s3.master.filial.localhost`)
+Label=traefik.http.routers.filial-master-s3.entrypoints=web
+Label=traefik.http.routers.filial-master-s3.service=filial-master-s3
+Label=traefik.http.services.filial-master-s3.loadbalancer.server.port=9000
+Label=traefik.http.routers.filial-master-s3-ui.rule=Host(`s3-ui.master.filial.localhost`)
+Label=traefik.http.routers.filial-master-s3-ui.entrypoints=web
+Label=traefik.http.routers.filial-master-s3-ui.service=filial-master-s3-ui
+Label=traefik.http.services.filial-master-s3-ui.loadbalancer.server.port=9001
+Label=traefik.http.routers.filial-master-s3-ui.middlewares=filial-master-s3-ui-root
+Label=traefik.http.middlewares.filial-master-s3-ui-root.redirectregex.regex=^http://([^/]+)/?$$
+Label=traefik.http.middlewares.filial-master-s3-ui-root.redirectregex.replacement=http://$${1}/rustfs/console/index.html
+HealthCmd=curl -f http://localhost:9000/health
+HealthInterval=5s
+HealthTimeout=3s
+HealthRetries=5
+HealthStartPeriod=15s
+Notify=healthy
+GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
+Annotation=filial.firewall=none
+Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
+Annotation=filial.firewall.mode=log
+LogDriver=k8s-file
+LogOpt=max-size=20m
+
+[Service]
+Restart=on-failure
+RestartSec=5

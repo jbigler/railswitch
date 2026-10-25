@@ -1,0 +1,8 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
+
+[Unit]
+Description=Dev network of filial worktree feat
+
+[Network]
+NetworkName=filial-feat-dev
+Options=mtu=1400

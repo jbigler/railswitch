@@ -1,0 +1,11 @@
+# railswitch: rendered from /WORKSPACES/minimal/project.toml (prefix mini). Edit project.toml, not this file.
+
+[Unit]
+Description=Proxy network of project mini
+
+[Network]
+NetworkName=mini_proxy
+Subnet=10.214.3.0/24
+Gateway=10.214.3.1
+IPRange=10.214.3.128/25
+Options=mtu=1400

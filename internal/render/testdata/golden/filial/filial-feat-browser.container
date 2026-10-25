@@ -1,0 +1,42 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
+# role: tool
+
+[Unit]
+Description=filial browser of worktree feat
+Wants=railswitch-traefik.service
+After=railswitch-traefik.service
+
+[Container]
+Image=localhost/filial/playwright:1.54.0-8ed7a43c
+ContainerName=filial-feat-browser
+Network=filial-feat-dev.network:alias=browser
+Network=filial-proxy.network
+EnvironmentFile=/WORKSPACES/filial/.railswitch/env/feat/browser.env
+AddHost=feat.filial.localhost:10.214.3.2
+AddHost=s3.feat.filial.localhost:10.214.3.2
+AddHost=s3-ui.feat.filial.localhost:10.214.3.2
+AddHost=vnc.feat.filial.localhost:10.214.3.2
+PublishPort=127.0.0.1:18890:8888
+Volume=/WORKSPACES/filial/.railswitch/assets/playwright/init-firewall-playwright.sh:/usr/local/bin/init-firewall-playwright.sh:ro,z
+Volume=/WORKSPACES/filial/.railswitch/assets/playwright/entrypoints/entrypoint-playwright.sh:/usr/local/bin/entrypoint-playwright.sh:ro,z
+ShmSize=1g
+RunInit=true
+AddCapability=NET_ADMIN
+AddCapability=NET_RAW
+NoNewPrivileges=true
+Memory=2g
+PidsLimit=4096
+Label=traefik.enable=true
+Label=traefik.docker.network=filial_proxy
+Label=traefik.http.routers.filial-feat-vnc.rule=Host(`vnc.feat.filial.localhost`)
+Label=traefik.http.routers.filial-feat-vnc.entrypoints=web
+Label=traefik.http.routers.filial-feat-vnc.service=filial-feat-vnc
+Label=traefik.http.services.filial-feat-vnc.loadbalancer.server.port=8080
+PodmanArgs=--cpus=2
+LogDriver=k8s-file
+LogOpt=max-size=20m
+Entrypoint=/usr/local/bin/entrypoint-playwright.sh
+
+[Service]
+Restart=on-failure
+RestartSec=5

@@ -1,0 +1,41 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
+# role: tool
+
+[Unit]
+Description=filial nvim of worktree feat
+
+[Container]
+Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-d2ae020d
+ContainerName=filial-feat-nvim
+Network=filial-feat-dev.network:alias=nvim
+UserNS=keep-id:uid=1000,gid=1000
+User=1000:1000
+EnvironmentFile=/WORKSPACES/filial/.railswitch/env/feat/nvim.env
+PublishPort=127.0.0.1:17002:7777
+Volume=/WORKSPACES/filial/feat:/app:z
+Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
+Volume=/WORKSPACES/filial/.railswitch/home/feat:/home/appuser:z
+Volume=/WORKSPACES/filial/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh:/usr/local/bin/entrypoint-nvim.sh:ro,z
+Volume=filial-feat-node-modules:/app/node_modules:U
+Volume=filial_gems_ruby3.3.6:/usr/local/bundle
+Volume=filial_npm_cache:/home/appuser/.npm:U
+Volume=filial_nvim_config:/home/appuser/.config/nvim:U
+Volume=filial_nvim_share:/home/appuser/.local/share/nvim:U
+DropCapability=all
+NoNewPrivileges=true
+Memory=2g
+PidsLimit=4096
+GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
+Annotation=filial.firewall=agent,deps
+Annotation=filial.firewall.networks=filial-feat-dev
+Annotation=filial.firewall.mode=log
+PodmanArgs=--cpus=2 --tty --interactive
+LogDriver=k8s-file
+LogOpt=max-size=20m
+Entrypoint=/usr/local/bin/entrypoint-nvim.sh
+Exec=/usr/local/bin/nvim --headless --listen 0.0.0.0:7777
+
+[Service]
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=1

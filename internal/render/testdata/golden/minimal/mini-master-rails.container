@@ -1,0 +1,55 @@
+# railswitch: rendered from /WORKSPACES/minimal/project.toml (prefix mini, worktree master). Edit project.toml, not this file.
+# role: app
+
+[Unit]
+Description=mini rails of worktree master
+Requires=mini-master-deps.service
+Wants=railswitch-traefik.service
+After=mini-master-deps.service railswitch-traefik.service
+
+[Container]
+Image=localhost/mini/base:ruby3.3.6-node22.11.0-11d1777c
+ContainerName=mini-master-rails
+Network=mini-master-dev.network:alias=rails
+Network=mini-proxy.network
+UserNS=keep-id:uid=1000,gid=1000
+User=1000:1000
+EnvironmentFile=/WORKSPACES/minimal/.railswitch/env/master/rails.env
+AddHost=master.mini.localhost:10.214.3.2
+PublishPort=127.0.0.1:33001:38698
+PublishPort=127.0.0.1:13001:3000
+Volume=/WORKSPACES/minimal/master:/app:z
+Volume=/WORKSPACES/minimal/master/.git:/WORKSPACES/minimal/master/.git:ro,z
+Volume=/WORKSPACES/minimal/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
+Volume=mini_gems_ruby3.3.6:/usr/local/bundle
+Volume=mini_npm_cache:/home/appuser/.npm:U
+Volume=mini-master-node-modules:/app/node_modules:U
+DropCapability=all
+NoNewPrivileges=true
+Memory=4g
+PidsLimit=4096
+Label=traefik.enable=true
+Label=traefik.docker.network=mini_proxy
+Label=traefik.http.routers.mini-master-app.rule=Host(`master.mini.localhost`)
+Label=traefik.http.routers.mini-master-app.entrypoints=web
+Label=traefik.http.routers.mini-master-app.service=mini-master-app
+Label=traefik.http.services.mini-master-app.loadbalancer.server.port=3000
+HealthCmd=curl -fsS http://localhost:3000/up
+HealthInterval=10s
+HealthRetries=3
+HealthStartPeriod=120s
+Notify=healthy
+GlobalArgs=--hooks-dir=/WORKSPACES/minimal/.railswitch/firewall/hooks.d
+Annotation=mini.firewall=none
+Annotation=mini.firewall.networks=mini-master-dev,mini_proxy
+Annotation=mini.firewall.mode=log
+PodmanArgs=--cpus=6
+LogDriver=k8s-file
+LogOpt=max-size=20m
+Entrypoint=/usr/local/bin/entrypoint-app.sh
+Exec=bin/dev
+
+[Service]
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=180

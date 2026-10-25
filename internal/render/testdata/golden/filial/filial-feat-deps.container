@@ -1,0 +1,33 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
+# role: deps
+
+[Unit]
+Description=filial deps of worktree feat
+
+[Container]
+Image=localhost/filial/base:ruby3.3.6-node22.11.0-ba118cc2
+ContainerName=filial-feat-deps
+Network=filial-feat-dev.network:alias=deps
+UserNS=keep-id:uid=1000,gid=1000
+User=1000:1000
+EnvironmentFile=/WORKSPACES/filial/.railswitch/env/feat/deps.env
+Volume=/WORKSPACES/filial/feat:/app:z
+Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
+Volume=filial_gems_ruby3.3.6:/usr/local/bundle
+Volume=filial_npm_cache:/home/appuser/.npm:U
+Volume=filial-feat-node-modules:/app/node_modules:U
+DropCapability=all
+NoNewPrivileges=true
+Memory=4g
+PidsLimit=4096
+GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
+Annotation=filial.firewall=deps
+Annotation=filial.firewall.networks=filial-feat-dev
+Annotation=filial.firewall.mode=log
+PodmanArgs=--cpus=6
+LogDriver=passthrough
+Entrypoint=/usr/local/bin/entrypoint-deps.sh
+
+[Service]
+Type=oneshot
+TimeoutStartSec=900

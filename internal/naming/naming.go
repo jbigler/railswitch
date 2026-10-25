@@ -105,3 +105,8 @@ func DevNetwork(prefix, slug string) string {
 func ProxyNetwork(prefix string) string {
 	return Shared(prefix, "proxy")
 }
+
+// ProxyNetworkUnit is the project's proxy network unit file: "filial-proxy.network".
+func ProxyNetworkUnit(prefix string) string {
+	return prefix + "-proxy.network"
+}

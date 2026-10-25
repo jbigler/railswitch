@@ -1,0 +1,18 @@
+schema = 1
+
+[project]
+name        = "minimal"
+prefix      = "mini"
+base_branch = "master"
+
+[stack]
+pack = "rails@1"
+app  = "rails"
+
+[options]
+database = "none"
+cache    = "none"
+browser  = "none"
+
+[image]
+base = "containerfiles/Containerfile.base"

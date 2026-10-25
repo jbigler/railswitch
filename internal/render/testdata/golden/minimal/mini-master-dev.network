@@ -1,0 +1,8 @@
+# railswitch: rendered from /WORKSPACES/minimal/project.toml (prefix mini, worktree master). Edit project.toml, not this file.
+
+[Unit]
+Description=Dev network of mini worktree master
+
+[Network]
+NetworkName=mini-master-dev
+Options=mtu=1400

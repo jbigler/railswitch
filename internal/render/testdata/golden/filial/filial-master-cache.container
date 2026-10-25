@@ -1,0 +1,30 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree master). Edit project.toml, not this file.
+# role: data
+
+[Unit]
+Description=filial cache of worktree master
+
+[Container]
+Image=docker.io/library/redis:8-alpine
+ContainerName=filial-master-cache
+Network=filial-master-dev.network:alias=cache
+EnvironmentFile=/WORKSPACES/filial/.railswitch/env/master/cache.env
+NoNewPrivileges=true
+Memory=2g
+PidsLimit=1024
+HealthCmd=redis-cli ping
+HealthInterval=5s
+HealthTimeout=3s
+HealthRetries=5
+Notify=healthy
+GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
+Annotation=filial.firewall=none
+Annotation=filial.firewall.networks=filial-master-dev
+Annotation=filial.firewall.mode=log
+LogDriver=k8s-file
+LogOpt=max-size=20m
+Exec=redis-server --loglevel warning --save "" --appendonly no
+
+[Service]
+Restart=on-failure
+RestartSec=5

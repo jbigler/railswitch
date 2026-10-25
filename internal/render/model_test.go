@@ -508,6 +508,38 @@ func TestWorktreeLayerReachesTools(t *testing.T) {
 	}
 }
 
+// Controller ruling: pack env and options' [gives] reach tool packages only,
+// never a role-tool option such as the browser (least privilege).
+func TestBrowserGetsNoCredentials(t *testing.T) {
+	_, in := filial(t, func(p *config.Project) {
+		p.Services["browser"] = config.ServiceOverride{Env: map[string]string{"BROWSER_ALLOW_HOSTS": "example.com"}}
+	})
+	for _, name := range []string{"DATABASE_URL", "PGPASSWORD", "S3_SECRET_KEY", "REDIS_URL", "RAILS_ENV"} {
+		if e, ok := envVar(in, "browser", name); ok {
+			t.Errorf("browser has %s (%s)", name, e.Source)
+		}
+		if _, ok := envVar(in, "nvim", name); !ok {
+			t.Errorf("nvim lacks %s", name)
+		}
+	}
+	for name, want := range map[string]string{
+		"WORKTREE_HOST":        "master.filial.localhost",
+		"CHROME_START_URL":     "http://master.filial.localhost",
+		"TZ":                   "Asia/Bangkok",
+		"BROWSER_ALLOW_HOSTS":  "example.com",
+		"PLAYWRIGHT_HOST_PORT": "18889",
+	} {
+		if e, _ := envVar(in, "browser", name); e.Value != want {
+			t.Errorf("browser %s = %q; want %q", name, e.Value, want)
+		}
+	}
+	for _, e := range in.Env["browser"] {
+		if strings.Contains(e.Value, "s3cret") {
+			t.Errorf("browser %s carries a generated value", e.Name)
+		}
+	}
+}
+
 func TestAssets(t *testing.T) {
 	m, _ := filial(t, nil)
 	cat, err := pack.LoadBuiltins()

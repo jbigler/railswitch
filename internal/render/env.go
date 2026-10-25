@@ -72,13 +72,17 @@ func optionSource(o *pack.Option) string {
 
 // envSpecs fills each service's EnvSpec, lowest layer first (HANDOFF §3.7;
 // D10, D11 decide who gets what):
-//   - pack [env]: app, worker, deps and tools; deps also gets [deps] frozen_env;
-//   - options' [gives]: app, worker and tools, never the giver itself;
+//   - pack [env]: app, worker, deps and tool packages (nvim); deps also gets
+//     [deps] frozen_env;
+//   - options' [gives]: app, worker and tool packages, never the giver itself
+//     and never a role-tool option (the browser): least privilege, it needs
+//     no data-service credentials;
 //   - an option's or tool's own [env]: its own service;
 //   - project [env]: every service but deps;
 //   - [services.<id>.env]: that service;
-//   - worktree: WORKTREE_ID/SLUG/HOST to app, worker and tools, plus every
-//     service's own published ports (deps publishes none);
+//   - worktree: WORKTREE_ID/SLUG/HOST to app, worker and every tool service
+//     (tool options included: the browser's entrypoint needs WORKTREE_HOST),
+//     plus every service's own published ports (deps publishes none);
 //   - secret: git wiring for the services of a secret with git_host.
 func (b *builder) envSpecs() {
 	p, st := b.in.Project, b.in.Stack
@@ -91,7 +95,8 @@ func (b *builder) envSpecs() {
 				s.EnvSpec = append(s.EnvSpec, EnvVar{Name: k, Value: vars[k], Layer: layer, Source: src, svc: svc, scheme: scheme})
 			}
 		}
-		consumer := s.Role == RoleApp || s.Role == RoleWorker || s.Role == RoleTool
+		consumer := s.Role == RoleApp || s.Role == RoleWorker || b.tools[s.ID] != nil
+		worktreeEnv := consumer || s.Role == RoleTool
 
 		if consumer || s.Role == RoleDeps {
 			add(LayerPack, packSrc+" [env]", s.ID, s.scheme, pk.Env)
@@ -118,7 +123,7 @@ func (b *builder) envSpecs() {
 			add(LayerProject, "project.toml [env]", s.ID, s.scheme, p.Env)
 		}
 		add(LayerService, "project.toml [services."+s.ID+".env]", s.ID, s.scheme, p.Services[s.ID].Env)
-		if consumer {
+		if worktreeEnv {
 			add(LayerWorktree, "worktree", s.ID, s.scheme, map[string]string{
 				"WORKTREE_ID": "{worktree.id}", "WORKTREE_SLUG": "{worktree.slug}", "WORKTREE_HOST": "{worktree.host}",
 			})

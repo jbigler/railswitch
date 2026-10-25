@@ -23,10 +23,14 @@ jobs:
 
   quadlet:
     runs-on: ubuntu-latest
-    container: quay.io/podman/stable
+    # Moving tag: no tag of quay.io/podman/stable could be confirmed from the
+    # dev sandbox (quay.io unreachable). Pin a major once one is confirmed.
+    container: quay.io/podman/stable:latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test -tags integration ./internal/render/ -run TestQuadletDryRun
+      - run: go test -v -tags integration ./internal/render/ -run TestQuadletDryRun
+        env:
+          RAILSWITCH_QUADLET: /usr/libexec/podman/quadlet

@@ -14,20 +14,21 @@ import (
 	"time"
 )
 
-// quadletBin is podman's Quadlet generator, overridable by RAILSWITCH_QUADLET.
-func quadletBin() string {
-	if p := os.Getenv("RAILSWITCH_QUADLET"); p != "" {
-		return p
-	}
-	return "/usr/libexec/podman/quadlet"
-}
+const defaultQuadlet = "/usr/libexec/podman/quadlet"
 
 // TestQuadletDryRun feeds the rendered Filial units to the real Quadlet
 // generator (`quadlet -dryrun -user`) and checks the generated services.
+// RAILSWITCH_QUADLET names the generator; when it is set (as in CI) a missing
+// binary fails the test, when unset a missing default binary skips it.
 func TestQuadletDryRun(t *testing.T) {
-	bin := quadletBin()
-	if _, err := os.Stat(bin); err != nil {
-		t.Skipf("quadlet generator %s: %v", bin, err)
+	bin := os.Getenv("RAILSWITCH_QUADLET")
+	if bin == "" {
+		bin = defaultQuadlet
+		if _, err := os.Stat(bin); err != nil {
+			t.Skipf("quadlet generator %s: %v (set RAILSWITCH_QUADLET to require it)", bin, err)
+		}
+	} else if _, err := os.Stat(bin); err != nil {
+		t.Fatalf("RAILSWITCH_QUADLET=%s: %v", bin, err)
 	}
 	_, units := renderUnits(t, fixtureDir, nil)
 	dir := t.TempDir()
@@ -48,32 +49,40 @@ func TestQuadletDryRun(t *testing.T) {
 	}
 	services := splitDryRun(stdout.String())
 
-	rails, ok := services["filial-feat-rails.service"]
-	if !ok {
-		t.Fatalf("no filial-feat-rails.service in dry-run output; got %v\nstderr:\n%s", keys(services), stderr.String())
-	}
-	for _, want := range []string{
-		"--hooks-dir=",
-		"--health-cmd",
-		"curl -fsS http://localhost:3000/up",
-		"--sdnotify=healthy",
+	rails := execStart(t, services, "filial-feat-rails.service")
+	// Quadlet writes the health command quoted with spaces as \x20.
+	for _, want := range []*regexp.Regexp{
+		regexp.MustCompile(`--hooks-dir=\S+`),
+		regexp.MustCompile(`--health-cmd "?curl(\\x20| )-fsS(\\x20| )http://localhost:3000/up"?(\s|$)`),
+		regexp.MustCompile(`--sdnotify=healthy(\s|$)`),
 	} {
-		if !strings.Contains(rails, want) {
-			t.Errorf("filial-feat-rails.service lacks %q:\n%s", want, rails)
+		if !want.MatchString(rails) {
+			t.Errorf("filial-feat-rails.service ExecStart does not match %s:\n%s", want, rails)
 		}
 	}
 	requires := regexp.MustCompile(`(?m)^Requires=.*\bfilial-feat-dev-network\.service\b`)
-	if !requires.MatchString(rails) {
-		t.Errorf("filial-feat-rails.service has no Requires= naming filial-feat-dev-network.service:\n%s", rails)
+	if !requires.MatchString(services["filial-feat-rails.service"]) {
+		t.Errorf("filial-feat-rails.service has no Requires= naming filial-feat-dev-network.service:\n%s", services["filial-feat-rails.service"])
 	}
 
-	deps, ok := services["filial-feat-deps.service"]
+	if deps := execStart(t, services, "filial-feat-deps.service"); strings.Contains(deps, "--health-cmd") {
+		t.Errorf("filial-feat-deps.service ExecStart has --health-cmd:\n%s", deps)
+	}
+}
+
+// execStart is the generated ExecStart= line of unit name; the dry-run output
+// also echoes the source keys in [X-Container], which must not satisfy checks.
+func execStart(t *testing.T, services map[string]string, name string) string {
+	t.Helper()
+	svc, ok := services[name]
 	if !ok {
-		t.Fatalf("no filial-feat-deps.service in dry-run output; got %v", keys(services))
+		t.Fatalf("no %s in dry-run output; got %v", name, keys(services))
 	}
-	if strings.Contains(deps, "--health-cmd") {
-		t.Errorf("filial-feat-deps.service has --health-cmd:\n%s", deps)
+	line := regexp.MustCompile(`(?m)^ExecStart=.*$`).FindString(svc)
+	if line == "" {
+		t.Fatalf("%s has no ExecStart=:\n%s", name, svc)
 	}
+	return line
 }
 
 // splitDryRun splits `quadlet -dryrun` output, a "---name.service---" header

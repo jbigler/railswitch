@@ -93,7 +93,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `-Annotation=@@P@@.firewall.mode=${FIREWALL_MODE}` / `+…=log` | **intended change (D8)** | Same value as the old default (`FIREWALL_MODE:-log` in `units-env.sh`), written in. |
 | `-GlobalArgs=--hooks-dir=@@ROOT@@/.firewall/hooks.d` / `+…/.railswitch/firewall/hooks.d` | **intended change (D19)** + **gap → Stage 2** | Path moves under `.railswitch/`. The hook descriptor, `hook.sh` and `firewall.sh` are not written by Stage 1 render (the rendered workspace has only `.railswitch/assets` and `.railswitch/env`); Task 16 writes them. |
 | `+NoNewPrivileges=true`, `+Memory=…`, `+PidsLimit=…` | **intended change (D34)** | New hardening and limits on every container. |
-| `+Notify=healthy` on every unit with a `HealthCmd=` | **intended change (D34)** | The old rails@ comment says its `Requires=` on db/redis/rustfs is a health gate *because* of `Notify=healthy`, but no old unit set it: the gate was `--sdnotify=conmon` (started, not healthy). Now real; the dry-run shows `--sdnotify=healthy`. |
+| `+Notify=healthy` on every unit with a `HealthCmd=` | **intended change**: app unit **D34**; data units (db, cache, storage) plan Task 9 ("Data services: health keys from the option, plus `Notify=healthy`"; no D#) | The old rails@ comment says its `Requires=` on db/redis/rustfs is a health gate *because* of `Notify=healthy`, but no old unit set it: the gate was `--sdnotify=conmon` (started, not healthy). Now real; the dry-run shows `--sdnotify=healthy`. |
 | `-NetworkAlias=x` + `-Network=@@P@@-%i-dev` / `+Network=filial-feat-dev.network:alias=x` | **intended change (D27)** | Same alias scope for single-network containers; per-network alias for two-network containers, as the old rails@ already did. |
 | `-Entrypoint=entrypoint-x.sh` / `+Entrypoint=/usr/local/bin/entrypoint-x.sh` | **same behaviour** | Same file (mounted at `/usr/local/bin/`), absolute instead of found on `PATH`. |
 | `-PodmanArgs=--cpus=${CPUS_75}` / `+PodmanArgs=--cpus=6` (25% → `2`) | **intended change (D8)** | Same share of the host CPUs, computed at render. The golden host has 8 CPUs; a `railswitch render` on this 16-CPU sandbox wrote `12`/`4`. |
@@ -460,7 +460,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 
 | Lines in the hunk | Verdict | Why |
 |---|---|---|
-| `-Image=docker.io/library/postgres:16` / `+…:17` | **intended change (D4)**; version from fixture | `feat` is pinned to 17 by the fixture's `[worktrees.feat.versions]`. `filial-master-db.container` has `postgres:16`. |
+| `-Image=docker.io/library/postgres:16` / `+…:17` | **intended change**: per-worktree version override (`[worktrees.<slug>.versions]`, HANDOFF §3.2; plan Task 9 `TestWorktreeVersionOverride`) | `feat` is pinned to 17 by the fixture's `[worktrees.feat.versions]`. `filial-master-db.container` has `postgres:16`. |
 | `-NetworkAlias=db` / `+Network=filial-feat-dev.network:alias=db` | **same behaviour** | Same alias, `db` (D3 slot id equals the old name). |
 | `-EnvironmentFile=…/.unit-env/%i.env`, `-Environment=TZ=…`, `-Environment=PGTZ=…` / `+EnvironmentFile=…/env/feat/db.env` | **intended change (D10, D29)** | `db.env` = `DB_PORT`, `PGTZ`, `POSTGRES_PASSWORD` (generated, D17), `TZ`. It has no `PGHOST`, which the old comment says breaks initdb. The old file passed every worktree var to db. |
 | `-PublishPort=127.0.0.1:${DB_PORT}:5432` / `+127.0.0.1:55434:5432` | **intended change (D8)** | 55432+ID. |

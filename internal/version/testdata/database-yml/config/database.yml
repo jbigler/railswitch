@@ -1,0 +1,10 @@
+default: &default
+  adapter: postgresql
+  database: wrong_default
+
+development:
+  <<: *default
+  database: filial_dev
+
+test:
+  database: filial_test

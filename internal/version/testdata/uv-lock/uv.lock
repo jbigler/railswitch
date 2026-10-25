@@ -1,0 +1,9 @@
+version = 1
+
+[[package]]
+name = "other"
+version = "0.1.0"
+
+[[package]]
+name = "playwright"
+version = "1.54.0"

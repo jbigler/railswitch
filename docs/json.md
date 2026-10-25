@@ -122,3 +122,28 @@ tools). It is an array with one object per service.
 | `role` | string | `app`, `deps`, `worker`, `data` or `tool`. |
 | `state` | string | The unit's systemd state, `<ActiveState>/<SubState>`, e.g. `active/running`, `inactive/dead`, `failed/failed`. |
 | `health` | string | podman's health status of the container (`starting`, `healthy`, `unhealthy`) for a service with a health check (the app included, D34); `""` for a service without one, or when its container does not exist. |
+
+## `doctor`
+
+The host checks, and inside a workspace the current worktree's firewall
+descriptor and units (`-w <slug>`, or the worktree the working directory is
+in). It is an array with one object per check, in a fixed order. The pass
+secret driver's checks (`pass`, `gpg`, `gpg secret key`) are listed only
+when the machine config's `[secrets] driver` is `pass` (D37); a machine
+config that can't be read is a failed `machine config` check. `doctor` exits
+1 when any check fails.
+
+```json
+[
+  {"name": "podman >= 5.0", "ok": true, "detail": "podman 5.2.1", "fix": ""},
+  {"name": "unprivileged port 80", "ok": false, "detail": "net.ipv4.ip_unprivileged_port_start = 1024", "fix": "railswitch allow-ports"},
+  {"name": "units current", "ok": true, "detail": "render would change nothing", "fix": ""}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The check: `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `firewall descriptor`, `units current`, `cgroup v2`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. |
+| `ok` | boolean | The check passed. |
+| `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
+| `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`); `""` for a passed check. |

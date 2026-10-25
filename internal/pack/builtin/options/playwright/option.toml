@@ -1,0 +1,44 @@
+name = "playwright"
+version = 1
+slot = "browser"
+service = "browser"
+works_with = ["*"]
+firewall = "self"             # init-firewall-playwright.sh restricts its own egress; no hook
+entrypoint = "entrypoints/entrypoint-playwright.sh"
+
+[image]                       # standalone (D31): not on the base chain, no BASE_IMAGE
+build = "Containerfile.playwright"
+tag = "{playwright}"
+args = { PLAYWRIGHT_VERSION = "{playwright}" }
+
+[gives]
+PLAYWRIGHT_HOST = "ws://{service}:8888/connect"
+
+[env]
+CHROME_START_URL = "http://{worktree.host}"
+
+[[mounts]]
+source = "init-firewall-playwright.sh"
+target = "/usr/local/bin/init-firewall-playwright.sh"
+options = "ro,z"
+
+[[ports]]                     # host-side system tests connect here
+name = "playwright"
+env = "PLAYWRIGHT_HOST_PORT"
+base = 18888
+container = 8888
+
+[[routes]]                    # noVNC view of the headed browser
+name = "vnc"
+host = "vnc.{worktree.host}"
+port = 8080
+
+[[links]]
+label = "Browser (VNC)"
+url = "vnc.{worktree.host}"
+
+[unit]
+add_capability = ["NET_ADMIN", "NET_RAW"]   # for its own firewall (D34)
+run_init = true
+# A cap on a tmpfs, not a reservation: pages are allocated on write.
+shm_size = "1g"

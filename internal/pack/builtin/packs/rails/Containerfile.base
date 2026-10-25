@@ -1,0 +1,67 @@
+# The rails pack's default base image (D31): app, deps and worker run it, and
+# every addon and tool image is built on top of it. railswitch passes
+# RUBY_VERSION and NODE_VERSION from the worktree's own version files.
+#
+# Database clients are not here: the database option's addon adds them
+# (postgres: Containerfile.pg-client). Nothing is read from the build context.
+ARG RUBY_VERSION
+ARG NODE_VERSION
+
+# Node, only to copy its runtime into the image below.
+FROM docker.io/library/node:${NODE_VERSION}-slim AS node
+
+FROM docker.io/library/ruby:${RUBY_VERSION}-slim
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# What a Rails app needs to build its gems and run: compilers and headers for
+# native extensions, git for git-sourced gems, curl for the health check,
+# libvips for Active Storage variants, jemalloc for a smaller Ruby heap.
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y \
+  build-essential \
+  ca-certificates \
+  curl \
+  git \
+  libffi-dev \
+  libjemalloc2 \
+  libssl-dev \
+  libvips \
+  libyaml-dev \
+  pkg-config \
+  sqlite3 \
+  tzdata \
+  zlib1g-dev && \
+  rm -rf /var/lib/apt/lists/* && \
+  ln -s "/usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2" /usr/local/lib/libjemalloc.so
+
+ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so
+
+COPY --from=node /usr/local/bin /usr/local/bin
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+RUN gem update --system && \
+  gem install -N bundler
+
+# appuser is uid/gid 1000: keep-id maps the host user onto it. The directories
+# volumes are mounted on exist and belong to appuser, so a fresh volume copies
+# up appuser ownership; a parent the runtime had to create for a nested mount
+# would belong to root and nothing else could write there.
+RUN groupadd --gid 1000 appuser && \
+  useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home appuser && \
+  mkdir -p /app \
+  /usr/local/bundle \
+  /home/appuser/.npm \
+  /home/appuser/.npm-global \
+  /home/appuser/.cache/ms-playwright && \
+  chown -R 1000:1000 /app /usr/local/bundle /home/appuser
+
+ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global
+ENV PATH=/home/appuser/.local/bin:/home/appuser/.npm-global/bin:${PATH}:/app/node_modules/.bin
+ENV SHELL=/bin/bash
+
+WORKDIR /app
+USER appuser
+
+EXPOSE 3000
+CMD ["bin/dev"]

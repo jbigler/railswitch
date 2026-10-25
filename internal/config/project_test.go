@@ -109,6 +109,7 @@ func TestValidate(t *testing.T) {
 		{"prefix short", func(p *Project) { p.Project.Prefix = "f" }, []string{"project.prefix"}},
 		{"unknown slot", func(p *Project) { p.Options["worker"] = "sidekiq@1" }, []string{"options.worker"}},
 		{"ref without major", func(p *Project) { p.Options["database"] = "postgres" }, []string{"options.database", `"postgres"`}},
+		{"ref version zero", func(p *Project) { p.Options["database"] = "postgres@0" }, []string{"options.database", `"postgres@0"`}},
 		{"stack app hsts", func(p *Project) { p.Stack.App = "app" }, []string{"stack.app", "HSTS"}},
 		{"secret dash", func(p *Project) { setSecret(p, "db-pass", ok) }, []string{"secrets.db-pass"}},
 		{"env newline", func(p *Project) { p.Env["TZ"] = "Asia\nBangkok" }, []string{"env.TZ", "newline"}},

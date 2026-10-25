@@ -1,0 +1,94 @@
+name = "rails"
+version = 1
+
+[app]
+service = "rails"
+server = "bin/dev"
+port = 3000
+install = "bundle install && npm ci"            # what deps runs; lockfile-frozen (D35)
+health = "curl -fsS http://localhost:3000/up"   # Rails 7.1+ health route (D34)
+health_start_period = "120s"
+entrypoint = "entrypoints/entrypoint-app.sh"
+deps_entrypoint = "entrypoints/entrypoint-deps.sh"
+
+[deps]
+frozen_env = { BUNDLE_FROZEN = "true" }         # set on the deps service; `railswitch deps` leaves it out (D35)
+
+[image]                    # the base image (D31); app, deps and worker run it
+file = "Containerfile.base"
+tag = "ruby{ruby}-node{node}"
+os = "debian"
+args = { RUBY_VERSION = "{ruby}", NODE_VERSION = "{node}" }
+
+[runtimes.ruby]
+from = [".ruby-version", ".tool-versions:ruby", "Gemfile", "Gemfile.lock"]
+fallback = "3.4.2"
+
+[runtimes.node]
+from = [".nvmrc", ".node-version", ".tool-versions:nodejs", "package.json"]
+fallback = "22.11.0"
+
+[runtimes.playwright]
+from = ["Gemfile.lock:playwright-ruby-client"]
+fallback = "1.60.0"
+
+[db_name]
+from = ["config/database.yml:development.database"]
+fallback = "{project.prefix}_development"
+
+[env]                      # only what Rails itself reads; app-specific names go in the project's [env]
+RAILS_ENV = "development"
+BINDING = "0.0.0.0"
+
+[db_scheme]
+postgres = "postgres://"
+mysql = "mysql2://"
+mariadb = "mysql2://"
+
+[[caches]]                 # shared across worktrees: <prefix>_<name>
+name = "gems_ruby{ruby}"
+mount = "/usr/local/bundle"
+chown = false
+
+[[caches]]
+name = "npm_cache"
+mount = "/home/appuser/.npm"
+chown = true
+
+[[worktree_volumes]]       # per worktree: <prefix>-<slug>-<name>
+name = "node-modules"
+mount = "/app/node_modules"
+chown = true
+
+[[ports]]
+name = "debug"
+env = "RUBY_DEBUG_PORT"
+base = 33000
+container = 38698
+
+[[ports]]
+name = "app"
+env = "APP_PORT"
+base = 13000
+container = 3000
+
+[defaults]
+database = "postgres@1"
+cache = "redis@1"
+storage = "none"
+jobs = "none"
+mail = "none"
+browser = "none"           # opt-in: --option browser=playwright@1
+
+[tasks]
+console = "bin/rails console"
+test = "bin/rails test"
+"test:system" = "bin/rails test:system"
+
+[[links]]
+label = "Mailer previews"
+url = "{worktree.host}/rails/mailers"
+
+[[links]]
+label = "Routes"
+url = "{worktree.host}/rails/info/routes"

@@ -88,7 +88,7 @@ type Firewall struct {
 }
 
 var (
-	refRe           = regexp.MustCompile(`^[a-z][a-z0-9-]*@[0-9]+$`)
+	refRe           = regexp.MustCompile(`^[a-z][a-z0-9-]*@[1-9][0-9]{0,8}$`) // same grammar as pack.ParseRef
 	envNameRe       = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	secretNameRe    = regexp.MustCompile(`^[a-z][a-z0-9_]{0,40}$`)
 	memoryRe        = regexp.MustCompile(`^[0-9]+[kmg]$`)

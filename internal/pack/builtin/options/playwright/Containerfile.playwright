@@ -1,0 +1,34 @@
+# Playwright browser server with a live VNC view (standalone, D31).
+#
+# Clients connect to the browser server at ws://<service>:8888/connect; the
+# headed browser renders into Xvfb, which x11vnc + noVNC expose on :8080.
+# PLAYWRIGHT_VERSION comes from the worktree's Gemfile.lock
+# (playwright-ruby-client): the client refuses a server of another version.
+#
+# The entrypoint and init-firewall-playwright.sh are bind-mounted package
+# assets; nothing is read from the build context. The image runs as root (the
+# base image's default user): the entrypoint applies the firewall first.
+ARG PLAYWRIGHT_VERSION
+FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble
+
+# nftables + iproute2: init-firewall-playwright.sh. The rest: Xvfb, the VNC
+# server, the noVNC web client, and socat for the loopback and CDP shims.
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y \
+  iproute2 \
+  nftables \
+  novnc \
+  socat \
+  websockify \
+  x11-utils \
+  x11vnc \
+  xvfb && \
+  rm -rf /var/lib/apt/lists/*
+
+# playwright-core provides chromium.launchServer, used by the entrypoint. It
+# has no browser-download postinstall: the browsers ship in this image.
+ARG PLAYWRIGHT_VERSION
+RUN npm install -g "playwright-core@${PLAYWRIGHT_VERSION}"
+
+# 8888: Playwright server   8080: noVNC   9223: CDP of the interactive Chromium
+EXPOSE 8888 8080 9223

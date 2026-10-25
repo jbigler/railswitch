@@ -1,0 +1,63 @@
+name = "rustfs"
+version = 1
+slot = "storage"
+service = "storage"
+works_with = ["*"]
+generated = ["S3_SECRET_KEY"]   # D17
+
+[pin]
+name = "rustfs"
+default = "1.0.0-alpha.83"
+
+[image]
+pull = "docker.io/rustfs/rustfs:{rustfs}"
+
+[health]
+cmd = "curl -f http://localhost:9000/health"
+interval = "5s"
+timeout = "3s"
+retries = 5
+start_period = "15s"
+
+[gives]
+S3_ENDPOINT = "http://{service}:9000"
+S3_ACCESS_KEY = "rustfsadmin"
+S3_SECRET_KEY = "{generated.S3_SECRET_KEY}"
+
+[env]
+RUSTFS_VOLUMES = "/data/rustfs{0..3}"
+RUSTFS_ACCESS_KEY = "rustfsadmin"
+RUSTFS_SECRET_KEY = "{generated.S3_SECRET_KEY}"
+RUSTFS_CONSOLE_ENABLE = "true"
+RUSTFS_ADDRESS = "0.0.0.0:9000"
+RUSTFS_CONSOLE_ADDRESS = "0.0.0.0:9001"
+RUSTFS_CHECK_UPDATE = "false"
+RUSTFS_TELEMETRY = "off"
+
+[[volumes]]
+name = "rustfs-data"
+mount = "/data"
+seed = "rustfs_data.tar.gz"   # D18: imported from <workspace>/db-dumps/ when the volume is created
+
+[[ports]]                     # for tailnet share (D26)
+name = "s3"
+env = "S3_PORT"
+base = 19000
+container = 9000
+
+[[routes]]                    # S3 API
+name = "s3"
+host = "s3.{worktree.host}"
+port = 9000
+
+[[routes]]                    # console
+name = "s3-ui"
+host = "s3-ui.{worktree.host}"
+port = 9001
+# RustFS serves the console at /rustfs/console/index.html; a bare / on 9001
+# falls through to the S3 API handler and answers 403 AccessDenied.
+root_redirect = "/rustfs/console/index.html"
+
+[[links]]
+label = "Storage console"
+url = "s3-ui.{worktree.host}"

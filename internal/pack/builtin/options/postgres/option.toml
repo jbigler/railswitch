@@ -1,0 +1,92 @@
+name = "postgres"
+version = 1
+slot = "database"
+service = "db"
+works_with = ["*"]
+generated = ["DB_PASSWORD"]   # D17: railswitch generates the value into mise.local.toml; never user-declared
+
+[pin]
+name = "postgres"
+default = "16"
+
+[image]
+pull = "docker.io/library/postgres:{postgres}"
+
+[app_addon]             # D31: extends the app's base image with the client libraries the app needs
+file = "Containerfile.pg-client"
+os = "debian"
+
+[health]
+cmd = "pg_isready -U postgres"
+interval = "5s"
+timeout = "3s"
+retries = 5
+start_period = "30s"
+
+[gives]                 # layer 2, to app/worker/tool services
+DATABASE_URL = "{scheme}postgres:{generated.DB_PASSWORD}@{service}/{db}"
+PGHOST = "{service}"   # D29: libpq vars, never given to the db service itself
+PGPORT = "5432"
+PGUSER = "postgres"
+PGPASSWORD = "{generated.DB_PASSWORD}"
+PGDATABASE = "{db}"
+
+[env]                   # the option's own service
+POSTGRES_PASSWORD = "{generated.DB_PASSWORD}"
+PGTZ = "{env.TZ}"
+
+[[volumes]]
+name = "db-data-pg{postgres.major}"
+mount = "/var/lib/postgresql/data"
+
+[[mounts]]              # a relative source is a package asset (Task 8 writes it to .railswitch/assets/postgres/…)
+source = "initdb/restore-dump.sh"
+target = "/docker-entrypoint-initdb.d/restore-dump.sh"
+options = "ro,z"
+
+[[mounts]]
+source = "{dumps}"
+target = "/db-dumps"
+options = "ro,z"
+
+[[ports]]
+name = "db"
+env = "DB_PORT"
+base = 55432
+container = 5432
+
+[unit]
+# Parallel query DSM segments come out of /dev/shm, and the parallel settings
+# below make parallel plans routine; the 64mb default is too small.
+shm_size = "256mb"
+# Dev tuning (D42 keeps it): durability off, generous memory, parallel plans.
+exec = [
+  "postgres",
+  "-c", "shared_preload_libraries=pg_stat_statements",
+  "-c", "pg_stat_statements.track=all",
+  "-c", "max_connections=200",
+  "-c", "max_locks_per_transaction=256",
+  "-c", "shared_buffers=256MB",
+  "-c", "temp_buffers=128MB",
+  "-c", "work_mem=64MB",
+  "-c", "maintenance_work_mem=256MB",
+  "-c", "fsync=off",
+  "-c", "synchronous_commit=off",
+  "-c", "full_page_writes=off",
+  "-c", "max_wal_senders=0",
+  "-c", "wal_level=minimal",
+  "-c", "wal_compression=off",
+  "-c", "checkpoint_timeout=1h",
+  "-c", "max_wal_size=4GB",
+  "-c", "checkpoint_completion_target=0.9",
+  "-c", "autovacuum=off",
+  "-c", "random_page_cost=1.0",
+  "-c", "seq_page_cost=0.1",
+  "-c", "log_statement=none",
+  "-c", "log_checkpoints=off",
+  "-c", "log_autovacuum_min_duration=-1",
+  "-c", "log_temp_files=-1",
+  "-c", "max_parallel_workers_per_gather=4",
+  "-c", "parallel_setup_cost=0",
+  "-c", "parallel_tuple_cost=0",
+]

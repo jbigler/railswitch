@@ -1,0 +1,25 @@
+name = "redis"
+version = 1
+slot = "cache"
+service = "cache"
+works_with = ["*"]
+
+[pin]
+name = "redis"
+default = "8"
+
+[image]
+pull = "docker.io/library/redis:{redis}-alpine"
+
+[health]
+cmd = "redis-cli ping"
+interval = "5s"
+timeout = "3s"
+retries = 5
+
+[gives]
+REDIS_URL = "redis://{service}:6379/1"
+
+[unit]
+# No persistence; reachable on the worktree's dev network only, never published.
+exec = ["redis-server", "--loglevel", "warning", "--save", "", "--appendonly", "no"]

@@ -1,0 +1,36 @@
+name = "nvim"
+service = "nvim"
+entrypoint = "entrypoints/entrypoint-nvim.sh"
+# The editor installs its own plugins and language servers (npm, gems, GitHub).
+firewall = ["agent", "deps"]
+
+# Mounts, and nothing else (D33: no ~/.ssh, SSH agent socket or host gitconfig):
+worktree = true               # the worktree at /app, the base worktree's .git, the pack's [[worktree_volumes]]
+home = true                   # a per-worktree home at /home/appuser
+caches = true                 # the pack's shared [[caches]]
+
+[image]                       # built on the base image (D31)
+file = "Containerfile.nvim"
+
+[[shared]]                    # shared by every worktree: <prefix>_<name>
+name = "nvim_config"          # configure nvim from inside the container; it persists
+mount = "/home/appuser/.config/nvim"
+chown = true
+
+[[shared]]
+name = "nvim_share"           # plugins and their state
+mount = "/home/appuser/.local/share/nvim"
+chown = true
+
+[[ports]]                     # loopback only: nvim RPC allows arbitrary command execution
+name = "nvim"
+env = "NVIM_PORT"
+base = 17000
+container = 7777
+
+[unit]
+exec = ["/usr/local/bin/nvim", "--headless", "--listen", "0.0.0.0:7777"]
+tty = true                    # --tty --interactive, as fd7336b ran it
+# Neovim has no clean exit on a signal: SIGTERM ends it with status 1, so
+# every stop would leave the unit failed. Status 1 counts as a clean exit.
+success_exit_status = 1

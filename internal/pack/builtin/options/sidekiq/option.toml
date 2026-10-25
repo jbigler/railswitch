@@ -1,0 +1,14 @@
+name = "sidekiq"
+version = 1
+slot = "jobs"
+service = "worker"
+works_with = ["rails", "hanami"]
+needs = ["cache"]             # REDIS_URL
+command = "bundle exec sidekiq"
+
+[image]
+use = "app"                   # runs the app's base image
+
+[[links]]
+label = "Sidekiq"
+url = "{worktree.host}/sidekiq"

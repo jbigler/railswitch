@@ -1,0 +1,67 @@
+# nvim tool (D23): a headless Neovim server on the worktree's base image, so
+# the editor sees the app's runtimes and OS packages. railswitch passes
+# BASE_IMAGE, the base chain's last image (D31). No agent software (D30).
+ARG BASE_IMAGE
+
+# Neovim, built from source.
+FROM docker.io/library/debian:trixie-slim AS build-nvim
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TARGET=stable
+
+RUN apt-get update -qq && \
+  apt-get install -y --no-install-recommends \
+  autoconf \
+  automake \
+  binutils \
+  build-essential \
+  ca-certificates \
+  cmake \
+  curl \
+  g++ \
+  gettext \
+  git \
+  libtool \
+  libtool-bin \
+  ninja-build \
+  pkg-config \
+  unzip && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch "${TARGET}" https://github.com/neovim/neovim.git /tmp/neovim
+
+WORKDIR /tmp/neovim
+
+RUN make CMAKE_BUILD_TYPE=RelWithDebInfo CMAKE_INSTALL_PREFIX=/usr/local/ && \
+  make install && \
+  strip /usr/local/bin/nvim
+
+FROM ${BASE_IMAGE}
+USER root
+
+COPY --from=build-nvim /usr/local/bin/nvim /usr/local/bin/nvim
+COPY --from=build-nvim /usr/local/lib/nvim /usr/local/lib/nvim
+COPY --from=build-nvim /usr/local/share/nvim /usr/local/share/nvim
+
+# Editor tooling: search, fuzzy finding, tags, clipboard, Lua for plugins.
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y \
+  fd-find \
+  fzf \
+  lua5.4 \
+  luarocks \
+  netbase \
+  ripgrep \
+  universal-ctags \
+  unzip \
+  xclip && \
+  rm -rf /var/lib/apt/lists/*
+
+# The volumes mounted under ~ need their parents to belong to appuser.
+RUN mkdir -p /home/appuser/.config /home/appuser/.local/share && \
+  chown -R 1000:1000 /home/appuser/.config /home/appuser/.local
+
+USER appuser
+
+EXPOSE 7777
+CMD ["/usr/local/bin/nvim", "--headless", "--listen", "0.0.0.0:7777"]

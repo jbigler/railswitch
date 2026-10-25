@@ -1,0 +1,9 @@
+# postgres option addon (D31): the PostgreSQL client library and tools the
+# app needs (the pg gem builds against libpq; psql, pg_dump for db tasks).
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER root
+RUN apt-get update -qq && \
+  apt-get install -y --no-install-recommends libpq-dev postgresql-client && \
+  rm -rf /var/lib/apt/lists/*
+USER appuser

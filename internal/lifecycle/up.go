@@ -342,7 +342,8 @@ func (l *L) seedVolumes(ctx context.Context, m *render.Model, in *render.Instanc
 			}
 			if err := p.VolumeImport(ctx, name, seed); err != nil {
 				// An unseeded volume would never be seeded: the next up re-creates it.
-				if rmErr := p.RemoveVolume(ctx, name); rmErr != nil {
+				// Ctrl-C cancelled ctx; the cleanup still runs, bounded by its own timeout.
+				if rmErr := p.RemoveVolume(context.WithoutCancel(ctx), name); rmErr != nil {
 					return errors.Join(err, fmt.Errorf("removing unseeded volume %s: %w", name, rmErr))
 				}
 				return err

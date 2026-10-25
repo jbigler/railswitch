@@ -812,3 +812,41 @@ func TestTransientMatchesUnit(t *testing.T) {
 		}
 	}
 }
+
+// cancelRunner cancels the run's ctx when podman volume import starts (as
+// Ctrl-C would) and, like exec.CommandContext, refuses to start a command
+// with a cancelled ctx.
+type cancelRunner struct {
+	*systest.Fake
+	cancel  context.CancelFunc
+	removed bool
+}
+
+func (r *cancelRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
+	if err := ctx.Err(); err != nil {
+		return sys.Result{}, err
+	}
+	if len(c.Args) > 1 && c.Args[0] == "volume" && c.Args[1] == "import" {
+		r.cancel()
+		return sys.Result{}, context.Canceled
+	}
+	if len(c.Args) > 1 && c.Args[0] == "volume" && c.Args[1] == "rm" {
+		r.removed = true
+	}
+	return r.Fake.Run(ctx, c)
+}
+
+func TestUpImportCancelledRemovesVolume(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "volume", "exists")
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	r := &cancelRunner{Fake: e.f, cancel: cancel}
+	e.l.R = r
+	if err := e.l.Up(cctx, "feat"); err == nil {
+		t.Fatal("want error")
+	}
+	if !r.removed {
+		t.Fatalf("unseeded volume not removed after cancellation:\n%s", dump(e.calls()))
+	}
+}

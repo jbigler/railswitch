@@ -92,6 +92,20 @@ func TestSecretSetStdin(t *testing.T) {
 	noValue(t, f, "tok123", out, errs)
 }
 
+// TestSecretSetCRLF: a value ending in CRLF (a file saved on Windows) loses
+// the \r with the newline.
+func TestSecretSetCRLF(t *testing.T) {
+	ws, _ := lockedWS(t)
+	f := fakeHost()
+	unset(f, "filial_github_token")
+	if code, out, errs := runStdin(t, f, "tok123\r\n", "-C", ws, "secret", "set", "github_token"); code != 0 {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	if _, stdins := secretCalls(f); len(stdins) != 2 || stdins[1] != "tok123" {
+		t.Fatalf("stdins = %q", stdins)
+	}
+}
+
 func TestSecretSetReplace(t *testing.T) {
 	ws, _ := lockedWS(t)
 	f := fakeHost()
@@ -355,5 +369,20 @@ func TestSecretSetDriverMove(t *testing.T) {
 	calls, _ = secretCalls(f)
 	if last := calls[len(calls)-1]; !slices.Contains(last, "--replace") || slices.ContainsFunc(calls, func(c []string) bool { return c[2] == "rm" }) {
 		t.Fatalf("calls = %q", calls)
+	}
+}
+
+// TestSecretSetDriverMoveCreateFails: when the create after removing the
+// old driver's copy fails, the error says the secret is now unset and how
+// to set it.
+func TestSecretSetDriverMoveCreateFails(t *testing.T) {
+	ws, dirs := lockedWS(t)
+	writeConfig(t, dirs.Config, passConfig)
+	f := fakeHost()
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("file\n")}, nil)
+	f.On([]string{"podman", "secret", "create"}, sys.Result{ExitCode: 125}, fmt.Errorf("podman: %w (exit 125): pass: no key", sys.ErrExit))
+	code, _, errs := runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token")
+	if code == 0 || !strings.Contains(errs, "filial_github_token is now unset") || !strings.Contains(errs, "railswitch secret set github_token") {
+		t.Fatalf("exit %d, stderr %q", code, errs)
 	}
 }

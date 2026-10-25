@@ -174,7 +174,8 @@ func (e *env) model(ctx context.Context, w *workspace.Workspace) (*render.Model,
 }
 
 // readSecretValue reads one secret value: on a terminal from a no-echo
-// prompt, else all of stdin with one trailing newline stripped. An empty
+// prompt, else all of stdin with one trailing newline stripped; a \r
+// before that newline (CRLF) goes with it. An empty
 // value or one holding a newline is refused.
 func (e *env) readSecretValue(ctx context.Context, name string) ([]byte, error) {
 	var value []byte
@@ -193,6 +194,7 @@ func (e *env) readSecretValue(ctx context.Context, name string) ([]byte, error) 
 		}
 		value = bytes.TrimSuffix(v, []byte("\n"))
 	}
+	value = bytes.TrimSuffix(value, []byte("\r"))
 	if err := ctx.Err(); err != nil {
 		clear(value)
 		return nil, err
@@ -229,7 +231,7 @@ func (e *env) storeSecret(ctx context.Context, w *workspace.Workspace, m *render
 	// under another driver is removed first, so its old copy is gone; podman
 	// secret rm does not check for containers using it, and running ones
 	// keep the copy they got at creation.
-	replace := exists
+	replace, removed := exists, "" // removed: the driver of a copy removed first
 	if exists {
 		stored, err := p.SecretDriver(ctx, pname)
 		if err != nil {
@@ -240,10 +242,13 @@ func (e *env) storeSecret(ctx context.Context, w *workspace.Workspace, m *render
 				return e.fail(fmt.Errorf("secret %s: removing the %s copy: %w", name, stored, err))
 			}
 			fmt.Fprintf(e.stdout, "removed podman secret %s stored with driver %s\n", pname, stored)
-			replace = false
+			replace, removed = false, stored
 		}
 	}
 	if err := p.SecretCreate(ctx, pname, bytes.NewReader(value), replace, d); err != nil {
+		if removed != "" {
+			return e.fail(fmt.Errorf("secret %s: %w\npodman secret %s is now unset: its %s copy was removed; fix the %s driver and run railswitch secret set %s", name, err, pname, removed, configuredDriver(cfg), name))
+		}
 		return e.fail(fmt.Errorf("secret %s: %w", name, err))
 	}
 	fmt.Fprintf(e.stdout, "secret %s stored in podman secret %s\n", name, pname)

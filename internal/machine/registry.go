@@ -182,6 +182,18 @@ func (r *Registry) Project(prefix string) (ProjectEntry, bool) {
 	return r.Projects[i], true
 }
 
+// RemoveProject drops prefix's entry and every worktree entry of it. An
+// absent project is an error wrapping fs.ErrNotExist.
+func (r *Registry) RemoveProject(prefix string) error {
+	i := slices.IndexFunc(r.Projects, func(p ProjectEntry) bool { return p.Prefix == prefix })
+	if i < 0 {
+		return fmt.Errorf("project %s: %w", prefix, fs.ErrNotExist)
+	}
+	r.Projects = slices.Delete(r.Projects, i, i+1)
+	r.Worktrees = slices.DeleteFunc(r.Worktrees, func(w WorktreeEntry) bool { return w.Prefix == prefix })
+	return nil
+}
+
 // WorktreesOf returns prefix's worktrees sorted by ID.
 func (r *Registry) WorktreesOf(prefix string) []WorktreeEntry {
 	var out []WorktreeEntry

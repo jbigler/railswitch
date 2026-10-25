@@ -29,6 +29,8 @@ type command func(ctx context.Context, e *env, args []string) int
 
 var commands = map[string]command{
 	"version":       cmdVersion,
+	"new":           cmdNew,
+	"init":          cmdInit,
 	"lock":          cmdLock,
 	"render":        cmdRender,
 	"env":           cmdEnv,

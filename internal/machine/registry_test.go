@@ -91,6 +91,24 @@ func TestPrefixTaken(t *testing.T) {
 	}
 }
 
+func TestRemoveProject(t *testing.T) {
+	r := newRegistry(t, "api", "apiv2")
+	addWT(t, r, "api", "master")
+	addWT(t, r, "apiv2", "master")
+	if err := r.RemoveProject("api"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := r.Project("api"); ok || len(r.WorktreesOf("api")) != 0 {
+		t.Errorf("api is still registered: %+v", r)
+	}
+	if _, ok := r.Project("apiv2"); !ok || len(r.WorktreesOf("apiv2")) != 1 {
+		t.Errorf("apiv2 was touched: %+v", r)
+	}
+	if err := r.RemoveProject("api"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("second RemoveProject(api) = %v; want ErrNotExist", err)
+	}
+}
+
 func TestSubnets(t *testing.T) {
 	r := newRegistry(t, "a", "b", "c")
 	for i, p := range []string{"a", "b", "c"} {

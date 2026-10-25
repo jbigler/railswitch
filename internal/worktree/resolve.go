@@ -30,8 +30,21 @@ func (m *Manager) gitT(ctx context.Context, timeout time.Duration, dir string, a
 
 // gitRun is the one place a git argv is built.
 func (m *Manager) gitRun(ctx context.Context, timeout time.Duration, dir string, args ...string) (sys.Result, error) {
+	return m.R.Run(ctx, m.gitCmd(timeout, dir, args...))
+}
+
+func (m *Manager) gitCmd(timeout time.Duration, dir string, args ...string) sys.Cmd {
 	argv := append([]string{"-C", dir, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"}, args...)
-	return m.R.Run(ctx, sys.Cmd{Name: "git", Args: argv, Timeout: timeout})
+	return sys.Cmd{Name: "git", Args: argv, Timeout: timeout}
+}
+
+// fetch fetches refspec from origin into the repo at dir, unable to prompt
+// (sys.GitBatchEnv).
+func (m *Manager) fetch(ctx context.Context, dir, refspec string) error {
+	c := m.gitCmd(gitLong, dir, "fetch", "origin", refspec)
+	c.Env = sys.GitBatchEnv(os.Environ())
+	_, err := m.R.Run(ctx, c)
+	return err
 }
 
 // hasRef reports whether ref exists in the repo at dir.

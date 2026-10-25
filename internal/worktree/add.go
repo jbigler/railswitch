@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -216,26 +217,78 @@ func (m *Manager) baseSlug() (string, error) {
 	return slug, nil
 }
 
-// branchFor is target's branch: a PR number's head branch, else target.
-// fetched: a PR head that was neither local nor on origin was fetched
-// into a new local branch.
+// branchFor is target's branch: a PR number's branch, else target.
+// fetched: Add fetched a new local branch (deleted on rollback).
 func (m *Manager) branchFor(ctx context.Context, base, target string) (branch string, fetched bool, err error) {
-	branch = target
 	if isPR(target) {
-		res, err := m.R.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"pr", "view", target, "--json", "headRefName", "-q", ".headRefName"}, Dir: base})
-		if err != nil {
-			return "", false, fmt.Errorf("PR %s: %w", target, err)
-		}
-		branch = strings.TrimSpace(string(res.Stdout))
+		return m.prBranch(ctx, base, target)
 	}
+	if err := m.checkBranch(ctx, base, target); err != nil {
+		return "", false, err
+	}
+	return target, false, nil
+}
+
+func (m *Manager) checkBranch(ctx context.Context, base, branch string) error {
 	if branch == "" || strings.HasPrefix(branch, "-") {
-		return "", false, fmt.Errorf("%q is not a branch name", branch)
+		return fmt.Errorf("%q is not a branch name", branch)
 	}
 	if _, err := m.git(ctx, base, "check-ref-format", "--branch", branch); err != nil {
-		return "", false, fmt.Errorf("%q is not a branch name: %w", branch, err)
+		return fmt.Errorf("%q is not a branch name: %w", branch, err)
 	}
-	if !isPR(target) {
+	return nil
+}
+
+// prBranch is PR n's branch. A same-repository PR is its head branch:
+// local, else origin's (gitWorktreeAdd tracks it), else fetched from
+// refs/pull/<n>/head. A fork's PR is never matched by its head branch's
+// name, which may well be ours (main): its head is fetched from
+// refs/pull/<n>/head into pr-<n>, and an existing pr-<n> is used only
+// when it is that head.
+func (m *Manager) prBranch(ctx context.Context, base, n string) (string, bool, error) {
+	res, err := m.R.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"pr", "view", n, "--json", "headRefName,isCrossRepository"}, Dir: base})
+	if err != nil {
+		return "", false, fmt.Errorf("PR %s: %w", n, err)
+	}
+	var pr struct {
+		HeadRefName       string `json:"headRefName"`
+		IsCrossRepository bool   `json:"isCrossRepository"`
+	}
+	if err := json.Unmarshal(res.Stdout, &pr); err != nil {
+		return "", false, fmt.Errorf("PR %s: gh pr view: %w", n, err)
+	}
+	pull := "refs/pull/" + n + "/head"
+	if pr.IsCrossRepository {
+		branch := "pr-" + n
+		local, err := m.hasRef(ctx, base, "refs/heads/"+branch)
+		if err != nil {
+			return "", false, err
+		}
+		if !local {
+			if err := m.fetch(ctx, base, pull+":refs/heads/"+branch); err != nil {
+				return "", false, fmt.Errorf("fetch PR %s: %w", n, err)
+			}
+			return branch, true, nil
+		}
+		if err := m.fetch(ctx, base, pull); err != nil {
+			return "", false, fmt.Errorf("fetch PR %s: %w", n, err)
+		}
+		head, err := m.git(ctx, base, "rev-parse", "--verify", "-q", "FETCH_HEAD^{commit}")
+		if err != nil {
+			return "", false, fmt.Errorf("PR %s head: %w", n, err)
+		}
+		have, err := m.git(ctx, base, "rev-parse", "--verify", "-q", "refs/heads/"+branch+"^{commit}")
+		if err != nil {
+			return "", false, fmt.Errorf("branch %s: %w", branch, err)
+		}
+		if strings.TrimSpace(head) != strings.TrimSpace(have) {
+			return "", false, fmt.Errorf("PR %s comes from a fork, but local branch %s is not its head; delete or rename %s and retry", n, branch, branch)
+		}
 		return branch, false, nil
+	}
+	branch := pr.HeadRefName
+	if err := m.checkBranch(ctx, base, branch); err != nil {
+		return "", false, err
 	}
 	for _, ref := range []string{"refs/heads/" + branch, "refs/remotes/origin/" + branch} {
 		ok, err := m.hasRef(ctx, base, ref)
@@ -243,9 +296,8 @@ func (m *Manager) branchFor(ctx context.Context, base, target string) (branch st
 			return branch, false, err // gitWorktreeAdd tracks origin/<branch>
 		}
 	}
-	// A fork's PR: its head, fetched.
-	if _, err := m.gitT(ctx, gitLong, base, "fetch", "origin", "refs/pull/"+target+"/head:refs/heads/"+branch); err != nil {
-		return "", false, fmt.Errorf("fetch PR %s: %w", target, err)
+	if err := m.fetch(ctx, base, pull+":refs/heads/"+branch); err != nil {
+		return "", false, fmt.Errorf("fetch PR %s: %w", n, err)
 	}
 	return branch, true, nil
 }

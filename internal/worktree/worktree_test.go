@@ -362,7 +362,7 @@ func TestAddPrompt(t *testing.T) {
 func TestAddPR(t *testing.T) {
 	e := setup(t)
 	git(t, e.base, "branch", "pr-head")
-	e.f.On([]string{"gh", "pr", "view", "42", "--json", "headRefName", "-q", ".headRefName"}, sys.Result{Stdout: []byte("pr-head\n")}, nil)
+	e.f.On([]string{"gh", "pr", "view", "42", "--json", "headRefName,isCrossRepository"}, sys.Result{Stdout: []byte(`{"headRefName":"pr-head","isCrossRepository":false}`)}, nil)
 	w := e.add(t, "42", "")
 	if w.Slug != "pr-head" || w.Branch != "pr-head" {
 		t.Errorf("Add(42) = %+v; want pr-head", w)
@@ -375,7 +375,7 @@ func TestAddPRSameRepo(t *testing.T) {
 	e := setup(t)
 	git(t, e.base, "push", "-q", "origin", "HEAD:refs/heads/pr-head")
 	git(t, e.base, "fetch", "-q", "origin")
-	e.f.On([]string{"gh", "pr", "view", "7", "--json", "headRefName", "-q", ".headRefName"}, sys.Result{Stdout: []byte("pr-head\n")}, nil)
+	e.f.On([]string{"gh", "pr", "view", "7", "--json", "headRefName,isCrossRepository"}, sys.Result{Stdout: []byte(`{"headRefName":"pr-head","isCrossRepository":false}`)}, nil)
 	w := e.add(t, "7", "")
 	if up := strings.TrimSpace(git(t, w.Dir, "rev-parse", "--abbrev-ref", "pr-head@{upstream}")); up != "origin/pr-head" {
 		t.Errorf("upstream = %q; want origin/pr-head", up)
@@ -384,6 +384,77 @@ func TestAddPRSameRepo(t *testing.T) {
 		if slices.Contains(c, "fetch") {
 			t.Errorf("fetched: %q", c)
 		}
+	}
+}
+
+// forkPR publishes a commit as origin's refs/pull/<n>/head, on no branch,
+// like GitHub does for a PR from a fork; it returns the commit.
+func (e *tenv) forkPR(t *testing.T, n string) string {
+	t.Helper()
+	git(t, e.base, "checkout", "-q", "-b", "fork-tmp")
+	writeFile(t, filepath.Join(e.base, "FORK"), n+"\n")
+	git(t, e.base, "add", "FORK")
+	git(t, e.base, "commit", "-q", "-m", "fork "+n)
+	sha := strings.TrimSpace(git(t, e.base, "rev-parse", "HEAD"))
+	git(t, e.base, "push", "-q", "origin", "HEAD:refs/pull/"+n+"/head")
+	git(t, e.base, "checkout", "-q", "master")
+	git(t, e.base, "branch", "-q", "-D", "fork-tmp")
+	e.f.On([]string{"gh", "pr", "view", n, "--json", "headRefName,isCrossRepository"}, sys.Result{Stdout: []byte(`{"headRefName":"master","isCrossRepository":true}`)}, nil)
+	return sha
+}
+
+// TestAddPRFork: a fork's PR (head branch "master", which is also ours) is
+// fetched from refs/pull/<n>/head into pr-<n>, never matched by name, with
+// git unable to prompt.
+func TestAddPRFork(t *testing.T) {
+	e := setup(t)
+	sha := e.forkPR(t, "5")
+	w := e.add(t, "5", "")
+	if w.Slug != "pr-5" || w.Branch != "pr-5" {
+		t.Errorf("Add(5) = %+v; want pr-5", w)
+	}
+	if got := strings.TrimSpace(git(t, w.Dir, "rev-parse", "HEAD")); got != sha {
+		t.Errorf("HEAD = %s; want the PR head %s", got, sha)
+	}
+	fetched := false
+	for i, c := range e.f.Calls {
+		if slices.Contains(c, "fetch") {
+			fetched = true
+			if !slices.Contains(c, "refs/pull/5/head:refs/heads/pr-5") {
+				t.Errorf("fetch = %q", c)
+			}
+			if env := e.f.Cmds[i].Env; !slices.Contains(env, "GIT_TERMINAL_PROMPT=0") {
+				t.Errorf("fetch env lacks GIT_TERMINAL_PROMPT=0: %q", env)
+			}
+		}
+	}
+	if !fetched {
+		t.Error("no fetch")
+	}
+	// Re-adding after wt rm keeps the same pr-5 branch: it points at the head.
+	if err := e.m.Remove(context.Background(), "pr-5", false); err != nil {
+		t.Fatal(err)
+	}
+	if w := e.add(t, "5", ""); w.Branch != "pr-5" {
+		t.Errorf("second Add(5) = %+v", w)
+	}
+}
+
+// TestAddPRForkBranchElsewhere: a local pr-<n> that is not the PR's head is
+// refused, and nothing is registered.
+func TestAddPRForkBranchElsewhere(t *testing.T) {
+	e := setup(t)
+	e.forkPR(t, "6")
+	git(t, e.base, "branch", "pr-6") // master's commit, not the PR head
+	_, err := e.m.Add(context.Background(), "6", "")
+	if err == nil || !strings.Contains(err.Error(), "pr-6") {
+		t.Fatalf("Add(6) = %v; want a refusal naming pr-6", err)
+	}
+	if got := e.slugs(t); !slices.Equal(got, []string{"master"}) {
+		t.Errorf("registry = %v", got)
+	}
+	if got := strings.TrimSpace(git(t, e.base, "rev-parse", "pr-6")); got != strings.TrimSpace(git(t, e.base, "rev-parse", "master")) {
+		t.Errorf("pr-6 moved to %s", got)
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
-	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/placeholder"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -167,7 +167,7 @@ func cmdEnv(ctx context.Context, e *env, args []string) int {
 	}
 	rows := []envRow{}
 	for _, svc := range svcs {
-		rows = append(rows, envRows(w.Project, w.Stack.Options, m.Inputs.Generated, in, svc)...)
+		rows = append(rows, envRows(w.Project, m, in, svc)...)
 	}
 
 	if e.json {
@@ -195,19 +195,21 @@ func cmdEnv(ctx context.Context, e *env, args []string) int {
 // envRows is service svc's env, sorted by name: its effective env vars, a
 // value holding a generated value masked, and every secret delivered to it
 // as an env var, without a value.
-func envRows(p *config.Project, opts map[string]*pack.Chosen, gen map[string]string, in *render.Instance, svc string) []envRow {
-	var secretVals []string // generated values the stack uses
-	for _, ch := range opts {
-		for _, g := range ch.Option.Generated {
-			if v := gen[g]; v != "" {
-				secretVals = append(secretVals, v)
-			}
+func envRows(p *config.Project, m *render.Model, in *render.Instance, svc string) []envRow {
+	var genVals []string // every generated value in mise.local.toml, used or not
+	for _, v := range m.Inputs.Generated {
+		if v != "" {
+			genVals = append(genVals, v)
 		}
+	}
+	var spec []render.EnvVar
+	if i := slices.IndexFunc(m.Services, func(s render.Service) bool { return s.ID == svc }); i >= 0 {
+		spec = m.Services[i].EnvSpec
 	}
 	var rows []envRow
 	for _, v := range in.Env[svc] {
 		val := v.Value
-		if slices.ContainsFunc(secretVals, func(g string) bool { return strings.Contains(val, g) }) {
+		if usesGenerated(spec, v) || slices.ContainsFunc(genVals, func(g string) bool { return strings.Contains(val, g) }) {
 			val = masked
 		}
 		rows = append(rows, envRow{Service: svc, Name: v.Name, Value: &val, Layer: v.Layer.String(), Source: v.Source})
@@ -220,4 +222,18 @@ func envRows(p *config.Project, opts map[string]*pack.Chosen, gen map[string]str
 	}
 	slices.SortStableFunc(rows, func(a, b envRow) int { return strings.Compare(a.Name, b.Name) })
 	return rows
+}
+
+// usesGenerated reports whether the template v was expanded from names a
+// {generated.*} placeholder.
+func usesGenerated(spec []render.EnvVar, v render.EnvVar) bool {
+	for _, s := range spec {
+		if s.Name != v.Name || s.Layer != v.Layer || s.Source != v.Source {
+			continue
+		}
+		if slices.ContainsFunc(placeholder.Names(s.Value), func(n string) bool { return strings.HasPrefix(n, "generated.") }) {
+			return true
+		}
+	}
+	return false
 }

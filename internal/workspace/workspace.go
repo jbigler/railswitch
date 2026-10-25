@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
@@ -23,10 +24,6 @@ import (
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
 )
-
-// Version is railswitch's version, recorded in stack.lock for built-in
-// packages. internal/cli sets it from cli.Version, the -ldflags target.
-var Version = "dev"
 
 const (
 	projectFile = "project.toml"
@@ -71,8 +68,8 @@ func absDir(dir string) (string, error) {
 
 // Load finds the workspace from startDir and loads it. The worktree is slug
 // when set (-w), else the first path element of startDir below the root.
-// stack.lock must exist (an error wrapping config.ErrNoLock otherwise) and
-// match the resolved stack.
+// stack.lock must exist (an error wrapping config.ErrNoLock otherwise); it
+// may be out of date (see CheckLock), so teardown and diagnosis still work.
 func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
 	root, err := Root(startDir)
 	if err != nil {
@@ -102,13 +99,6 @@ func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
 		if errors.Is(err, config.ErrNoLock) {
 			return nil, fmt.Errorf("%w: run railswitch lock", err)
 		}
-		return nil, err
-	}
-	want, err := lockEntries(st)
-	if err != nil {
-		return nil, err
-	}
-	if err := checkLock(lock, want); err != nil {
 		return nil, err
 	}
 	dirs, err := machine.DefaultDirs()
@@ -182,7 +172,7 @@ func Lock(_ context.Context, root string) error {
 
 // lockEntries is the lock's pack and option entries for st.
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
-	src := "built in (railswitch " + Version + ")"
+	src := "built in (railswitch " + buildinfo.Version + ")"
 	entry := func(version int, files fs.FS) (config.LockEntry, error) {
 		sum, err := pack.ContentHash(files)
 		return config.LockEntry{Version: strconv.Itoa(version), Source: src, SHA256: sum}, err
@@ -204,9 +194,15 @@ func lockEntries(st *pack.Stack) (*config.Lock, error) {
 	return l, nil
 }
 
-// checkLock refuses a lock whose packs or options differ from want by
-// version or content hash, or that lacks or has an extra one.
-func checkLock(have, want *config.Lock) error {
+// CheckLock refuses a stack.lock whose packs or options differ from the
+// resolved stack by version or content hash, or that lacks or has an extra
+// one: the hash exists to stop unreviewed package content (HANDOFF §3.11).
+func (w *Workspace) CheckLock() error {
+	want, err := lockEntries(w.Stack)
+	if err != nil {
+		return err
+	}
+	have := w.Lock
 	var stale []string
 	cmp := func(have, want map[string]config.LockEntry) {
 		for _, name := range sortedKeys(want) {
@@ -237,7 +233,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 	if !ok {
 		return nil, fmt.Errorf("project %s is not registered on this machine", prefix)
 	}
-	if filepath.Clean(pe.Workspace) != w.Root {
+	if !samePath(pe.Workspace, w.Root) {
 		return nil, fmt.Errorf("project prefix %s is registered for workspace %s, not %s", prefix, pe.Workspace, w.Root)
 	}
 	var wts []render.Worktree
@@ -261,10 +257,24 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 	})
 }
 
-// Render opens the registry, builds the Model, merges every source into one
-// render.Plan and Applies it; with check it writes nothing. It is the only
-// path that writes units.
+// samePath reports whether a and b name the same directory, through
+// symlinks when both resolve.
+func samePath(a, b string) bool {
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	if errA != nil || errB != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return ra == rb
+}
+
+// Render checks stack.lock (CheckLock), opens the registry, builds the
+// Model, merges every source into one render.Plan and Applies it; with check
+// it writes nothing. It is the only path that writes units.
 func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*render.Diff, error) {
+	if err := w.CheckLock(); err != nil {
+		return nil, err
+	}
 	host, err := ReadHost(ctx, r)
 	if err != nil {
 		return nil, err

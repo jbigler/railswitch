@@ -5,7 +5,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D43: `docs/superpowers/plans/2026-10-
 
 ## Commands
 - `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...`, `go test ./...`.
-- `make build` → `./railswitch` (`VERSION=` sets `cli.Version`).
+- `make build` → `./railswitch` (`VERSION=` sets `buildinfo.Version`).
 - Integration tests carry `//go:build integration`; the full end-to-end test needs a systemd user session and is a manual run.
 
 ## Global constraints

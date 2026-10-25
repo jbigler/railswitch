@@ -10,15 +10,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/sys"
-	"github.com/jbigler/railswitch/internal/workspace"
 )
-
-// Version is set at build time with
-// -ldflags "-X github.com/jbigler/railswitch/internal/cli.Version=…".
-var Version = "dev"
-
-func init() { workspace.Version = Version } // stack.lock records it
 
 // env carries the I/O streams and global flags for one invocation.
 type env struct {
@@ -91,12 +85,12 @@ func cmdVersion(_ context.Context, e *env, args []string) int {
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(struct {
 			Version string `json:"version"`
-		}{Version}); err != nil {
+		}{buildinfo.Version}); err != nil {
 			fmt.Fprintf(e.stderr, "railswitch: %v\n", err)
 			return 1
 		}
 		return 0
 	}
-	fmt.Fprintf(e.stdout, "railswitch %s\n", Version)
+	fmt.Fprintf(e.stdout, "railswitch %s\n", buildinfo.Version)
 	return 0
 }

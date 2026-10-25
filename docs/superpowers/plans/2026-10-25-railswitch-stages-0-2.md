@@ -117,7 +117,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
 **Interfaces:**
 - Produces:
   - `func cli.Main(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int`
-  - `var cli.Version = "dev"` (set with `-ldflags "-X github.com/jbigler/railswitch/internal/cli.Version=…"`)
+  - `var buildinfo.Version = "dev"` (package `internal/buildinfo`) (set with `-ldflags "-X github.com/jbigler/railswitch/internal/buildinfo.Version=…"`)
 
 - [ ] **Step 1: Prerequisites (user action).** Go is not installed on this host: `sudo pacman -S go`. Then `go install honnef.co/go/tools/cmd/staticcheck@latest`.
   - Check: `go version` and `staticcheck -version` both print a version.
@@ -132,7 +132,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
   - Global flags parsed before the command: `-C <dir>` (start dir for workspace discovery), `-w <slug>` (worktree), and `--json` (D40; carried in `env`).
 - [ ] **Step 6: Write the Makefile and workflows.**
   - `make check` runs `test -z "$(gofmt -l .)"`, `go vet ./...`, `staticcheck ./...` and `go test ./...`.
-  - `make build` runs `CGO_ENABLED=0 go build -trimpath -ldflags "-X github.com/jbigler/railswitch/internal/cli.Version=$(VERSION)" -o railswitch ./cmd/railswitch`.
+  - `make build` runs `CGO_ENABLED=0 go build -trimpath -ldflags "-X github.com/jbigler/railswitch/internal/buildinfo.Version=$(VERSION)" -o railswitch ./cmd/railswitch`.
   - `ci.yml`, on push and pull request: job `check`: `make check` on `ubuntu-latest` (Go version from `go.mod`). This is its only job here; Task 13 adds the `quadlet` job.
   - `release.yml`, on tags `v*`:
     - `make build` for `linux/amd64` and `linux/arm64` with `VERSION=${tag}`;

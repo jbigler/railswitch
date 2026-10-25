@@ -12,4 +12,4 @@ test:
 	go test ./...
 
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags "-X github.com/jbigler/railswitch/internal/cli.Version=$(VERSION)" -o railswitch ./cmd/railswitch
+	CGO_ENABLED=0 go build -trimpath -ldflags "-X github.com/jbigler/railswitch/internal/buildinfo.Version=$(VERSION)" -o railswitch ./cmd/railswitch

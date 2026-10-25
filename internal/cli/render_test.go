@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/fs"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
-	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys/systest"
+	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
 const filialFixture = "../../testdata/fixtures/filial"
@@ -25,46 +26,16 @@ func runIn(t *testing.T, args ...string) (int, string, string) {
 	return code, out.String(), errb.String()
 }
 
-// filialWS copies the Filial fixture to a temp workspace with the built-in
-// default Containerfiles ejected into containerfiles/, points XDG_CONFIG_HOME
-// and XDG_DATA_HOME into the temp dir, and registers the project with its
-// master (ID 1) and feat (ID 2) worktrees.
+// filialWS is the Filial fixture workspace (testfixture.Workspace) with
+// XDG_CONFIG_HOME and XDG_DATA_HOME pointing into a temp dir, and the project
+// registered with its master (ID 1) and feat (ID 2) worktrees.
 func filialWS(t *testing.T) (ws string, dirs machine.Dirs) {
 	t.Helper()
 	tmp := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
-	ws = filepath.Join(tmp, "filial")
-	if err := os.CopyFS(ws, os.DirFS(filialFixture)); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(filepath.Join(ws, "db-dumps"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	cat, err := pack.LoadBuiltins()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(filepath.Join(ws, "containerfiles"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, d := range []struct {
-		files fs.FS
-		name  string
-	}{
-		{cat.Packs[pack.Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"},
-		{cat.Options[pack.Ref{Name: "postgres", Version: 1}].Files, "Containerfile.pg-client"},
-		{cat.Tools["nvim"].Files, "Containerfile.nvim"},
-		{cat.Options[pack.Ref{Name: "playwright", Version: 1}].Files, "Containerfile.playwright"},
-	} {
-		data, err := fs.ReadFile(d.files, d.name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(ws, "containerfiles", d.name), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
+	ws = testfixture.Workspace(t, filialFixture)
+	var err error
 
 	dirs, err = machine.DefaultDirs()
 	if err != nil {
@@ -207,5 +178,78 @@ func TestEnvJSON(t *testing.T) {
 	}
 	if r := byName["TZ"]; r["value"] != "Asia/Bangkok" || r["layer"] != "project" || r["source"] != "project.toml [env]" {
 		t.Errorf("TZ = %v", r)
+	}
+}
+
+// TestRenderStaleLock: a lock whose hash differs from the built-in stops
+// render, but not commands that only Load the workspace (env).
+func TestRenderStaleLock(t *testing.T) {
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	path := filepath.Join(ws, "stack.lock")
+	l, err := config.ReadLock(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := l.Options["redis"]
+	e.SHA256 = strings.Repeat("0", 64)
+	l.Options["redis"] = e
+	if err := l.Write(path); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"render"}, {"render", "--check"}} {
+		code, _, errs := runIn(t, append([]string{"-C", ws}, args...)...)
+		if code != 1 || !strings.Contains(errs, "stack.lock is out of date for redis@1: run railswitch lock") {
+			t.Errorf("%v: exit %d, stderr %q", args, code, errs)
+		}
+	}
+	mustRun(t, "-C", ws, "-w", "master", "env", "rails")
+}
+
+// TestEnvMasksProjectGenerated: a project [env] value using a generated value
+// no option declares is masked too.
+func TestEnvMasksProjectGenerated(t *testing.T) {
+	ws, _ := filialWS(t)
+	appendFile(t, filepath.Join(ws, "mise.local.toml"), "MY_TOKEN = \"tok-123456\"\n")
+	data, err := os.ReadFile(filepath.Join(ws, "project.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(data), "[env]\n", "[env]\nMY_URL = \"https://u:{generated.MY_TOKEN}@x\"\n", 1)
+	if err := os.WriteFile(filepath.Join(ws, "project.toml"), []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "lock")
+	for _, args := range [][]string{{"env", "rails"}, {"--json", "env", "rails"}} {
+		out := mustRun(t, append([]string{"-C", ws, "-w", "master"}, args...)...)
+		if strings.Contains(out, "tok-123456") || !strings.Contains(out, "MY_URL") || !strings.Contains(out, masked) {
+			t.Errorf("%v:\n%s", args, out)
+		}
+	}
+}
+
+// TestRenderThroughSymlink: a workspace reached through a symlink is the
+// registered one.
+func TestRenderThroughSymlink(t *testing.T) {
+	ws, _ := filialWS(t)
+	link := filepath.Join(t.TempDir(), "ws-link")
+	if err := os.Symlink(ws, link); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", link, "lock")
+	mustRun(t, "-C", link, "render")
+}
+
+func appendFile(t *testing.T, path, data string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fmt.Fprint(f, data); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
 	}
 }

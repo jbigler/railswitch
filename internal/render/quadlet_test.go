@@ -15,6 +15,7 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
+	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
 var update = flag.Bool("update", false, "rewrite testdata/golden")
@@ -24,7 +25,7 @@ const minimalDir = "../../testdata/fixtures/minimal"
 // renderUnits renders the fixture dir's units with mutate applied.
 func renderUnits(t *testing.T, dir string, mutate func(*config.Project)) (string, map[string][]byte) {
 	t.Helper()
-	ws := fixtureWSOf(t, dir)
+	ws := testfixture.Workspace(t, dir)
 	units, err := Quadlet(mustBuild(t, fixtureInputs(t, ws, mutate)))
 	if err != nil {
 		t.Fatalf("Quadlet: %v", err)

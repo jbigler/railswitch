@@ -10,6 +10,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/sys/systest"
 )
 
 const fixtureDir = "../../testdata/fixtures/filial"
@@ -132,7 +133,9 @@ func TestLoadNoLock(t *testing.T) {
 	}
 }
 
-func TestLoadStaleLock(t *testing.T) {
+// TestStaleLock: Load accepts a stale lock (teardown and doctor still run);
+// CheckLock and Render refuse it.
+func TestStaleLock(t *testing.T) {
 	root := projectRoot(t)
 	ctx := context.Background()
 	if err := Lock(ctx, root); err != nil {
@@ -149,9 +152,21 @@ func TestLoadStaleLock(t *testing.T) {
 	if err := l.Write(path); err != nil {
 		t.Fatal(err)
 	}
-	_, err = Load(ctx, root, "")
-	if err == nil || !strings.Contains(err.Error(), "stack.lock is out of date for redis@1: run railswitch lock") {
-		t.Fatalf("err = %v", err)
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatalf("Load on a stale lock: %v", err)
+	}
+	if err := w.CheckLock(); err == nil || !strings.Contains(err.Error(), "stack.lock is out of date for redis@1: run railswitch lock") {
+		t.Errorf("CheckLock: %v", err)
+	}
+	if _, err := w.Render(ctx, &systest.Fake{}, true); err == nil || !strings.Contains(err.Error(), "run railswitch lock") {
+		t.Errorf("Render: %v", err)
+	}
+	if err := Lock(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	if w, err = Load(ctx, root, ""); err != nil || w.CheckLock() != nil {
+		t.Errorf("after re-lock: %v", err)
 	}
 }
 

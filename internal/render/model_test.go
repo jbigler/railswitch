@@ -14,52 +14,15 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
 const fixtureDir = "../../testdata/fixtures/filial"
 
-// fixtureWS copies the Filial fixture to a temp workspace (see fixtureWSOf).
+// fixtureWS copies the Filial fixture to a temp workspace (see testfixture.Workspace).
 func fixtureWS(t *testing.T) string {
 	t.Helper()
-	return fixtureWSOf(t, fixtureDir)
-}
-
-// fixtureWSOf copies the fixture dir to a temp workspace and writes the
-// built-in default Containerfiles into its containerfiles/, as railswitch new
-// ejects them, so the fixture can't drift from the built-ins.
-func fixtureWSOf(t *testing.T, dir string) string {
-	t.Helper()
-	ws := filepath.Join(t.TempDir(), filepath.Base(dir))
-	if err := os.CopyFS(ws, os.DirFS(dir)); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(filepath.Join(ws, "db-dumps"), 0o700); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		t.Fatal(err)
-	}
-	cat, err := pack.LoadBuiltins()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defaults := []struct {
-		files fs.FS
-		name  string
-	}{
-		{cat.Packs[pack.Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"},
-		{cat.Options[pack.Ref{Name: "postgres", Version: 1}].Files, "Containerfile.pg-client"},
-		{cat.Tools["nvim"].Files, "Containerfile.nvim"},
-		{cat.Options[pack.Ref{Name: "playwright", Version: 1}].Files, "Containerfile.playwright"},
-	}
-	if err := os.Mkdir(filepath.Join(ws, "containerfiles"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, d := range defaults {
-		data, err := fs.ReadFile(d.files, d.name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		writeFile(t, filepath.Join(ws, "containerfiles", d.name), string(data))
-	}
-	return ws
+	return testfixture.Workspace(t, fixtureDir)
 }
 
 func writeFile(t *testing.T, path, data string) {

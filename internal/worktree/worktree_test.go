@@ -433,7 +433,7 @@ func TestNeverPrune(t *testing.T) {
 	}
 	_ = e.m.Remove(ctx, "gone", true)
 	if _, err := e.m.List(ctx); err != nil {
-		t.Logf("List: %v", err)
+		t.Errorf("List with a missing worktree dir: %v", err)
 	}
 	for _, c := range e.f.Calls {
 		if slices.ContainsFunc(c, func(a string) bool { return strings.Contains(a, "prune") }) {

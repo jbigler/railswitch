@@ -35,9 +35,18 @@ HEADLESS_SYSTEM_TESTS = "0"
 [worktrees.postgres-trial.versions]        # per-worktree override
 postgres = "17"
 
+[worktrees.feat.versions]
+postgres = "17"
+
 [secrets.twilio_auth_token]                # values live in podman secrets
 services = ["rails"]
 env      = "TWILIO_AUTH_TOKEN"
+
+[tools]
+nvim = true
+
+[firewall]
+allow.deps = ["github.com"]
 
 [[links]]                                  # Worktree links (see 3.10)
 label = "Admin"
@@ -45,3 +54,4 @@ url   = "{worktree.host}/admin"
 
 [image]
 base = "containerfiles/Containerfile.base"
+addons = ["containerfiles/Containerfile.pg-client"]

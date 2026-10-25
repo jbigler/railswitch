@@ -1,0 +1,5 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    playwright-ruby-client (1.54.0)
+      concurrent-ruby (>= 1.1.6)

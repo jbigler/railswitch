@@ -1,0 +1,3 @@
+[env]
+DB_PASSWORD = "s3cret"
+S3_SECRET_KEY = "s3cret-s3"

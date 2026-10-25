@@ -26,6 +26,7 @@ const traefikUnit = "railswitch-traefik.service"
 // network, and for every worktree its dev network and one .container per
 // service. Every value railswitch did not write itself as a literal key is
 // escaped for systemd (% → %%, $ → $$); nothing is left for systemd to expand.
+// Output that fails Lint is an error wrapping every Finding.
 func Quadlet(m *Model) (map[string][]byte, error) {
 	out := map[string][]byte{}
 	put := func(name string, u *unit) error {
@@ -61,6 +62,13 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 				return nil, err
 			}
 		}
+	}
+	if fs := Lint(out); len(fs) > 0 {
+		errs := make([]error, len(fs))
+		for i, f := range fs {
+			errs[i] = f
+		}
+		return nil, fmt.Errorf("rendered units fail lint: %w", errors.Join(errs...))
 	}
 	return out, nil
 }

@@ -1,0 +1,21 @@
+# railswitch: rendered from /WS/demo/project.toml (prefix demo, worktree main). Edit project.toml, not this file.
+# role: data
+
+[Unit]
+Description=demo x of worktree main
+
+[Container]
+Image=docker.io/library/x:1
+ContainerName=demo-main-x
+Network=demo-main-dev.network:alias=x
+NoNewPrivileges=true
+Memory=1g
+PidsLimit=1024
+Network=demo-proxy.network
+GlobalArgs=--hooks-dir=/WS/demo/.railswitch/firewall/hooks.d
+Annotation=demo.firewall=none
+Annotation=demo.firewall.networks=demo-main-dev
+Annotation=demo.firewall.mode=log
+
+[Service]
+Restart=on-failure

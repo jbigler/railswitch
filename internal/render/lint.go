@@ -137,7 +137,7 @@ func (u *lintUnit) lint(units map[string]*lintUnit) []Finding {
 			}
 		}
 	}
-	u.lintNetworkDeps(add)
+	u.lintNetworkDeps(units, add)
 	u.lintFirewall(units, add)
 	return out
 }
@@ -167,8 +167,8 @@ func (u *lintUnit) lintDollar(add func(int, string, string, ...any)) {
 	}
 }
 
-// specifierPath is a path starting with a systemd specifier, e.g. %t/ or %h/.
-var specifierPath = regexp.MustCompile(`^%[A-Za-z]/`)
+// specifierPath is a path under the runtime dir (%t/) or the home dir (%h/).
+var specifierPath = regexp.MustCompile(`^%[th]/`)
 
 func (u *lintUnit) volumeOK(src string) bool {
 	switch {
@@ -197,9 +197,15 @@ func (u *lintUnit) volumeForms() string {
 	}
 }
 
-// lintNetworkDeps: a Network= that is not a .network unit gets no automatic
-// dependency from Quadlet, so the unit must name its network service itself.
-func (u *lintUnit) lintNetworkDeps(add func(int, string, string, ...any)) {
+// networkModes are podman's built-in network modes; they need no network
+// service (container:<id> and ns:<path> are cut at the ':').
+var networkModes = []string{"none", "host", "private", "bridge", "slirp4netns", "pasta", "container", "ns"}
+
+// lintNetworkDeps: Quadlet orders a unit after its network only for a
+// Network=<name>.network reference (D27). A bare network name must belong to
+// a .network unit among the files, and Requires=/After= must both name that
+// unit's <base>-network.service.
+func (u *lintUnit) lintNetworkDeps(units map[string]*lintUnit, add func(int, string, string, ...any)) {
 	var requires, after []string
 	for _, e := range u.values("Unit", "Requires") {
 		requires = append(requires, splitWords(e.Value)...)
@@ -209,12 +215,23 @@ func (u *lintUnit) lintNetworkDeps(add func(int, string, string, ...any)) {
 	}
 	for _, e := range u.values("Container", "Network") {
 		x, _, _ := strings.Cut(e.Value, ":")
-		if strings.HasSuffix(x, ".network") {
+		if strings.HasSuffix(x, ".network") || slices.Contains(networkModes, x) {
 			continue
 		}
-		svc := x + "-network.service"
+		file := ""
+		for _, name := range slices.Sorted(maps.Keys(units)) {
+			if strings.HasSuffix(name, ".network") && networkName(units, name) == x {
+				file = name
+				break
+			}
+		}
+		if file == "" {
+			add(e.Line, "network-dependency", "Network=%s names no .network unit: reference the .network unit so Quadlet orders it (D27)", x)
+			continue
+		}
+		svc := strings.TrimSuffix(file, ".network") + "-network.service"
 		if !slices.Contains(requires, svc) || !slices.Contains(after, svc) {
-			add(e.Line, "network-dependency", "Network=%s is not a .network unit and Requires=/After= do not both name %s", x, svc)
+			add(e.Line, "network-dependency", "Network=%s is not a .network reference and Requires=/After= do not both name %s", x, svc)
 		}
 	}
 }

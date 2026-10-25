@@ -3,7 +3,7 @@
 
 [Unit]
 Description=demo x of worktree main
-After=demo_proxy-network.service
+After=demo-proxy-network.service
 
 [Container]
 Image=docker.io/library/x:1

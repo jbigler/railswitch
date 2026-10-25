@@ -46,7 +46,14 @@ func TestLintUnquotedSpace(t *testing.T) {
 }
 
 func TestLintNetworkDependency(t *testing.T) {
-	wantOnly(t, Lint(lintFiles(t, "network-dependency.container")), "network-dependency")
+	// Network=demo_proxy (demo-proxy.network's NetworkName) with only After=.
+	wantOnly(t, Lint(lintFiles(t, "network-dependency.container", "demo-main-dev.network", "demo-proxy.network")), "network-dependency")
+	// A bare name that no .network unit creates.
+	wantOnly(t, Lint(lintFiles(t, "network-dependency-ok.container", "demo-main-dev.network")), "network-dependency")
+	// Requires= and After= both name the creating unit's service.
+	if fs := Lint(lintFiles(t, "network-dependency-ok.container", "demo-main-dev.network", "demo-proxy.network")); len(fs) != 0 {
+		t.Errorf("network-dependency-ok.container: %+v", fs)
+	}
 }
 
 func TestLintLoopbackPublish(t *testing.T) {
@@ -56,8 +63,9 @@ func TestLintLoopbackPublish(t *testing.T) {
 func TestLintFirewallNetworks(t *testing.T) {
 	// The annotation omits demo_proxy, the NetworkName of demo-proxy.network.
 	wantOnly(t, Lint(lintFiles(t, "firewall-networks.container", "demo-main-dev.network", "demo-proxy.network")), "firewall-networks")
-	// --hooks-dir without the profile annotation.
+	// --hooks-dir without the profile annotation, and vice versa.
 	wantOnly(t, Lint(lintFiles(t, "firewall-hooks.container", "demo-main-dev.network")), "firewall-networks")
+	wantOnly(t, Lint(lintFiles(t, "firewall-profile.container", "demo-main-dev.network")), "firewall-networks")
 }
 
 func TestLintSharedUnderscore(t *testing.T) {

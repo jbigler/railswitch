@@ -234,6 +234,16 @@ func TestLineBreakRefused(t *testing.T) {
 	}
 }
 
+func TestQuadletLintGate(t *testing.T) {
+	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), nil))
+	rails := m.service("rails")
+	rails.Mounts = append(rails.Mounts, Mount{Source: "foo", Target: "/x"})
+	units, err := Quadlet(m)
+	if err == nil || units != nil || !strings.Contains(err.Error(), "shared-underscore") || !strings.Contains(err.Error(), "filial-master-rails.container") {
+		t.Fatalf("Quadlet = %d units, %v; want no units and a shared-underscore error naming filial-master-rails.container", len(units), err)
+	}
+}
+
 // TestWorkspaceWithSpace: keys Quadlet splits into words are quoted; keys it
 // reads whole are not.
 func TestWorkspaceWithSpace(t *testing.T) {

@@ -168,7 +168,9 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		u.add(c, "UserNS", "keep-id:uid=1000,gid=1000")
 		u.add(c, "User", "1000:1000")
 	}
-	u.add(c, "EnvironmentFile", filepath.Join(ws, ".railswitch", "env", slug, s.ID+".env"))
+	// Quadlet splits EnvironmentFile= into words; Volume=, AddHost=,
+	// Entrypoint= and HealthCmd= it reads whole.
+	u.add(c, "EnvironmentFile", quoteWord(filepath.Join(ws, ".railswitch", "env", slug, s.ID+".env")))
 	if onProxy {
 		for _, h := range hosts {
 			u.add(c, "AddHost", h+":"+in.Values["traefik.ip"])

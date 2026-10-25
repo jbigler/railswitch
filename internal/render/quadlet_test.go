@@ -184,7 +184,10 @@ func TestNoNonLoopbackPublish(t *testing.T) {
 	hasLine(t, units, "filial-feat-db.container", "PublishPort=127.0.0.1:55434:5432")
 }
 
-func TestPercentEscaped(t *testing.T) {
+// serverUnits renders the filial fixture with the rails pack's server
+// replaced by server.
+func serverUnits(t *testing.T, server string) map[string][]byte {
+	t.Helper()
 	mfs := fstest.MapFS{}
 	err := fs.WalkDir(builtin.FS, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -192,7 +195,7 @@ func TestPercentEscaped(t *testing.T) {
 		}
 		data, err := fs.ReadFile(builtin.FS, p)
 		if p == "packs/rails/pack.toml" {
-			data = bytes.Replace(data, []byte(`server = "bin/dev"`), []byte(`server = "echo 100%"`), 1)
+			data = bytes.Replace(data, []byte(`server = "bin/dev"`), []byte(`server = "`+server+`"`), 1)
 		}
 		mfs[p] = &fstest.MapFile{Data: data, Mode: 0o644}
 		return err
@@ -209,7 +212,63 @@ func TestPercentEscaped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hasLine(t, units, "filial-master-rails.container", "Exec=echo 100%%")
+	return units
+}
+
+func TestPercentEscaped(t *testing.T) {
+	hasLine(t, serverUnits(t, "echo 100%"), "filial-master-rails.container", "Exec=echo 100%%")
+}
+
+func TestDollarEscaped(t *testing.T) {
+	// "{{" is a literal "{" in the placeholder grammar.
+	hasLine(t, serverUnits(t, "echo $HOME ${{HOME}"), "filial-master-rails.container", "Exec=echo $$HOME $${HOME}")
+}
+
+func TestLineBreakRefused(t *testing.T) {
+	ws := fixtureWS(t)
+	m := mustBuild(t, fixtureInputs(t, ws, nil))
+	m.service("rails").Command = "bin/dev\nrm -rf ~"
+	_, err := Quadlet(m)
+	if err == nil || !strings.Contains(err.Error(), "Exec=") || !strings.Contains(err.Error(), "line break") {
+		t.Fatalf("Quadlet = %v, want a line-break error naming Exec=", err)
+	}
+}
+
+// TestWorkspaceWithSpace: keys Quadlet splits into words are quoted; keys it
+// reads whole are not.
+func TestWorkspaceWithSpace(t *testing.T) {
+	ws := filepath.Join(t.TempDir(), "My Projects", "filial")
+	if err := os.MkdirAll(filepath.Dir(ws), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(fixtureWS(t), ws); err != nil {
+		t.Fatal(err)
+	}
+	units, err := Quadlet(mustBuild(t, fixtureInputs(t, ws, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const rails = "filial-master-rails.container"
+	hasLine(t, units, rails, `EnvironmentFile="`+ws+`/.railswitch/env/master/rails.env"`)
+	hasLine(t, units, rails, `GlobalArgs="--hooks-dir=`+ws+`/.railswitch/firewall/hooks.d"`)
+	hasLine(t, units, rails, "Volume="+ws+"/master:/app:z")
+	hasLine(t, units, rails, "Volume="+ws+"/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z")
+	hasLine(t, units, "filial-master-nvim.container", "Volume="+ws+"/.railswitch/home/master:/home/appuser:z")
+}
+
+func TestWorker(t *testing.T) {
+	_, units := renderUnits(t, fixtureDir, func(p *config.Project) { p.Options["jobs"] = "sidekiq@1" })
+	const w = "filial-master-worker.container"
+	if l := unitLines(t, units, w); l[1] != "# role: worker" {
+		t.Errorf("line 2 = %q", l[1])
+	}
+	for _, l := range []string{
+		"Requires=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service",
+		"PodmanArgs=--cpus=6", "DropCapability=all", "NoNewPrivileges=true", "Memory=2g", "PidsLimit=4096",
+		"UserNS=keep-id:uid=1000,gid=1000", "Exec=bundle exec sidekiq",
+	} {
+		hasLine(t, units, w, l)
+	}
 }
 
 func TestQuoting(t *testing.T) {

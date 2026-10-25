@@ -287,6 +287,25 @@ func TestMissingSecret(t *testing.T) {
 		}
 	}
 
+	// Present but empty (a hand-cleared line): missing too, never
+	// DATABASE_URL=postgres://postgres:@db/… (Review Focus 3).
+	for _, name := range []string{"DB_PASSWORD", "S3_SECRET_KEY"} {
+		ws = fixtureWS(t)
+		body := "[env]\nDB_PASSWORD = \"s3cret\"\nS3_SECRET_KEY = \"s3cret-s3\"\n"
+		body = strings.Replace(body, name+` = "`, name+` = "" # `, 1)
+		writeFile(t, filepath.Join(ws, "mise.local.toml"), body)
+		err := buildErr(fixtureInputs(t, ws, nil))
+		if err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), "mise.local.toml") {
+			t.Errorf("%s = \"\": error = %v; want one naming %s and mise.local.toml", name, err, name)
+		}
+	}
+
+	// An empty value an option doesn't declare in generated: missing at use.
+	sc := scope{gen: map[string]string{"X": ""}}
+	if _, ok := sc.Lookup("generated.X"); ok {
+		t.Errorf("an empty generated value resolves")
+	}
+
 	// No mise.local.toml at all.
 	ws = fixtureWS(t)
 	if err := os.Remove(filepath.Join(ws, "mise.local.toml")); err != nil {
@@ -735,7 +754,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 	for target, want := range map[string]string{
 		"/app":                              filepath.Join(ws, "master") + " z",
 		git:                                 git + " z",
-		"/home/appuser":                     filepath.Join(ws, ".home", "master") + " z",
+		"/home/appuser":                     filepath.Join(ws, ".railswitch", "home", "master") + " z",
 		"/usr/local/bin/entrypoint-nvim.sh": filepath.Join(ws, ".railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh") + " ro,z",
 	} {
 		if mounts[target] != want {

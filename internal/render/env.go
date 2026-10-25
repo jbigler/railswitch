@@ -59,8 +59,8 @@ func (s scope) Lookup(name string) (string, bool) {
 		return s.scheme, s.scheme != ""
 	}
 	if g, ok := strings.CutPrefix(name, "generated."); ok {
-		v, ok := s.gen[g]
-		return v, ok
+		v := s.gen[g] // empty = missing: never postgres://postgres:@db/…
+		return v, v != ""
 	}
 	v, ok := s.values[name]
 	return v, ok
@@ -268,7 +268,7 @@ func (m *Model) expandEnv(in *Instance) error {
 	}
 	file := filepath.Join(m.Inputs.Workspace, "mise.local.toml")
 	missing := func(name string) error {
-		return fmt.Errorf("%s is not set in %s (railswitch new generates it; restore it under [env])", name, file)
+		return fmt.Errorf("%s is not set (or empty) in %s (railswitch new generates it; restore it under [env])", name, file)
 	}
 	var errs []error
 	for _, slot := range config.Slots {
@@ -277,7 +277,7 @@ func (m *Model) expandEnv(in *Instance) error {
 			continue
 		}
 		for _, g := range ch.Option.Generated {
-			if _, ok := gen[g]; !ok {
+			if gen[g] == "" {
 				errs = append(errs, fmt.Errorf("%s: %w", ch.Option.Name, missing(g)))
 			}
 		}

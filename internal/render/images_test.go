@@ -67,9 +67,6 @@ func TestImageChain(t *testing.T) {
 	}
 	for i := 1; i <= 3; i++ {
 		prev := b[i-1].Tag
-		if i == 3 {
-			prev = b[2].Tag // nvim builds on the chain's last step
-		}
 		if got := b[i].Args["BASE_IMAGE"]; got != prev {
 			t.Errorf("%s BASE_IMAGE = %q; want %q", b[i].Name, got, prev)
 		}

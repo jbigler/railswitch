@@ -82,6 +82,18 @@ func TestLoadNewerSchema(t *testing.T) {
 	}
 }
 
+func TestLoadNewerSchemaChangedType(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "project.toml")
+	src := "schema = 2\nlinks = \"x\"\n"
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "newer railswitch") {
+		t.Fatalf("Load = %v; want a newer-railswitch error", err)
+	}
+}
+
 func TestValidate(t *testing.T) {
 	setSecret := func(p *Project, name string, s Secret) {
 		p.Secrets = map[string]Secret{name: s}

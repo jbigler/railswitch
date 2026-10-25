@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -96,15 +97,27 @@ var (
 )
 
 // Load decodes path strictly: a key project.toml does not define is an error
-// naming its dotted path. Load does not validate values; see Validate.
+// naming its dotted path. The schema is read first, on its own, so a file from
+// a newer railswitch is refused as such even when it changes a known key's
+// type. Load does not validate values; see Validate.
 func Load(path string) (*Project, error) {
-	var p Project
-	md, err := toml.DecodeFile(path, &p)
+	data, err := os.ReadFile(path)
 	if err != nil {
+		return nil, err
+	}
+	var head struct {
+		Schema int `toml:"schema"`
+	}
+	if _, err := toml.Decode(string(data), &head); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	if p.Schema > SchemaVersion {
-		return nil, fmt.Errorf("%s: %w", path, newerSchema(p.Schema))
+	if head.Schema > SchemaVersion {
+		return nil, fmt.Errorf("%s: %w", path, newerSchema(head.Schema))
+	}
+	var p Project
+	md, err := toml.Decode(string(data), &p)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if und := md.Undecoded(); len(und) > 0 {
 		errs := make([]error, len(und))

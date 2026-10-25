@@ -143,23 +143,32 @@ func (r *Registry) AddProject(prefix, workspace string) (ProjectEntry, error) {
 	return ProjectEntry{}, fmt.Errorf("%s: no free subnet in 10.214.0.0/16", prefix)
 }
 
-// AddWorktree registers slug under a registered project. Its ID is one above
-// the highest ID on the machine (1 for the first), so an ID is not reused
-// while a higher one exists.
+// MaxWorktreeID caps worktree IDs so the per-worktree port ranges
+// (base+ID) of different services never overlap (playwright 18888+ID vs
+// storage 19000+ID).
+const MaxWorktreeID = 99
+
+// AddWorktree registers slug under a registered project on the lowest free
+// ID in 1..MaxWorktreeID, machine-wide.
 func (r *Registry) AddWorktree(prefix, slug string) (WorktreeEntry, error) {
 	if _, ok := r.Project(prefix); !ok {
 		return WorktreeEntry{}, fmt.Errorf("project %s is not registered", prefix)
 	}
-	id := 0
+	used := make(map[int]bool, len(r.Worktrees))
 	for _, w := range r.Worktrees {
 		if w.Prefix == prefix && w.Slug == slug {
 			return WorktreeEntry{}, fmt.Errorf("%s/%s: %w", prefix, slug, ErrSlugTaken)
 		}
-		id = max(id, w.ID)
+		used[w.ID] = true
 	}
-	e := WorktreeEntry{Prefix: prefix, Slug: slug, ID: id + 1}
-	r.Worktrees = append(r.Worktrees, e)
-	return e, nil
+	for id := 1; id <= MaxWorktreeID; id++ {
+		if !used[id] {
+			e := WorktreeEntry{Prefix: prefix, Slug: slug, ID: id}
+			r.Worktrees = append(r.Worktrees, e)
+			return e, nil
+		}
+	}
+	return WorktreeEntry{}, fmt.Errorf("%s/%s: at most %d worktrees per machine; remove one with railswitch wt rm", prefix, slug, MaxWorktreeID)
 }
 
 // RemoveWorktree drops the exact (prefix, slug) entry. An absent entry is an

@@ -41,7 +41,7 @@ func TestWorktreeIDsMachineWide(t *testing.T) {
 	}
 }
 
-func TestWorktreeIDNotReused(t *testing.T) {
+func TestWorktreeIDLowestFree(t *testing.T) {
 	r := newRegistry(t, "a", "b")
 	addWT(t, r, "a", "master")
 	addWT(t, r, "b", "master")
@@ -49,11 +49,34 @@ func TestWorktreeIDNotReused(t *testing.T) {
 	if err := r.RemoveWorktree("b", "master"); err != nil {
 		t.Fatal(err)
 	}
-	if w := addWT(t, r, "b", "other"); w.ID != 4 {
-		t.Errorf("ID after removing 2 = %d; want 4", w.ID)
+	if w := addWT(t, r, "b", "other"); w.ID != 2 {
+		t.Errorf("ID after removing 2 = %d; want 2 (lowest free)", w.ID)
+	}
+	if w := addWT(t, r, "b", "next"); w.ID != 4 {
+		t.Errorf("next ID = %d; want 4", w.ID)
 	}
 	if got := r.WorktreesOf("a"); len(got) != 2 || got[0].ID != 1 || got[1].ID != 3 {
 		t.Errorf("WorktreesOf(a) = %+v", got)
+	}
+}
+
+// TestWorktreeIDCeiling: IDs stay in 1..99 so per-worktree port ranges
+// (playwright 18888+ID, storage 19000+ID) never overlap; the 100th
+// worktree is refused.
+func TestWorktreeIDCeiling(t *testing.T) {
+	r := newRegistry(t, "a")
+	for i := 1; i <= 99; i++ {
+		addWT(t, r, "a", fmt.Sprintf("w%d", i))
+	}
+	_, err := r.AddWorktree("a", "w100")
+	if err == nil || !strings.Contains(err.Error(), "at most 99 worktrees per machine; remove one with railswitch wt rm") {
+		t.Fatalf("100th AddWorktree = %v", err)
+	}
+	if err := r.RemoveWorktree("a", "w50"); err != nil {
+		t.Fatal(err)
+	}
+	if w := addWT(t, r, "a", "w100"); w.ID != 50 {
+		t.Errorf("ID = %d; want 50", w.ID)
 	}
 }
 

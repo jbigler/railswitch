@@ -64,7 +64,7 @@ func (m *Model) Plan() (*Plan, error) {
 			return nil, fmt.Errorf("worktree %s: %w", wt.Slug, err)
 		}
 		for _, s := range m.Services {
-			files[path.Join(envDir, wt.Slug, s.ID+".env")] = File{Data: envFile(in.Env[s.ID]), Mode: 0o600}
+			files[path.Join(envDir, wt.Slug, s.ID+".env")] = File{Data: EnvFile(in.Env[s.ID]), Mode: 0o600}
 		}
 		if mountsHome {
 			homes = append(homes, path.Join(homeDir, wt.Slug))
@@ -76,9 +76,9 @@ func (m *Model) Plan() (*Plan, error) {
 	return &Plan{Units: units, Files: files, Homes: homes}, nil
 }
 
-// envFile is a podman env file: NAME=value per line, the value verbatim
+// EnvFile is a podman env file: NAME=value per line, the value verbatim
 // (expandEnv refuses a value with a line break).
-func envFile(env []EnvVar) []byte {
+func EnvFile(env []EnvVar) []byte {
 	b := []byte{} // an env file with no var is still written: its unit names it
 	for _, e := range env {
 		b = append(b, e.Name...)

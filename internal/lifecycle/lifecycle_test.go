@@ -299,6 +299,7 @@ func TestUpLocalDigestDiffers(t *testing.T) {
 
 func TestUpSecondRunNoPull(t *testing.T) {
 	e := setup(t)
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "LoadState"}, sys.Result{Stdout: []byte("loaded\n")}, nil)
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
@@ -693,6 +694,121 @@ func TestExecNoTTYNoT(t *testing.T) {
 	for _, c := range e.calls() {
 		if slices.Contains(c, "-t") {
 			t.Errorf("-t without a TTY: %q", c)
+		}
+	}
+}
+
+func TestUpReloadsUnloadedUnits(t *testing.T) {
+	e := setup(t)
+	// Units and digests on disk, as after wt add or an earlier failed up.
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	e.reset()
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "LoadState"}, sys.Result{Stdout: []byte("not-found\n")}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user show -p LoadState --value filial-feat-rails.service",
+		"systemctl --user daemon-reload",
+		"systemctl --user start filial-feat-rails.service")
+	if n := count(e.calls(), "podman pull"); n != 0 {
+		t.Fatalf("render was expected to report no change:\n%s", dump(e.calls()))
+	}
+}
+
+func TestUpImportFailRemovesVolume(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "volume", "exists")
+	e.f.On([]string{"podman", "volume", "import"}, sys.Result{ExitCode: 125}, fmt.Errorf("podman: %w (exit 125)", sys.ErrExit))
+	if err := e.l.Up(ctx, "feat"); err == nil {
+		t.Fatal("want error")
+	}
+	wantInOrder(t, e.calls(),
+		"podman volume create filial-feat-rustfs-data",
+		"podman volume import filial-feat-rustfs-data",
+		"podman volume rm -f filial-feat-rustfs-data")
+	if n := count(e.calls(), "systemctl --user start"); n != 0 {
+		t.Fatal("started after a failed import")
+	}
+}
+
+// unitValues are the values of key in the [Container] section of a unit,
+// with Quadlet's word quoting stripped.
+func unitValues(unit, key string) []string {
+	var out []string
+	for _, line := range strings.Split(unit, "\n") {
+		if v, ok := strings.CutPrefix(line, key+"="); ok {
+			out = append(out, strings.Trim(v, `"`))
+		}
+	}
+	return out
+}
+
+// flagValues are the values of every flag in argv.
+func flagValues(argv []string, flag string) []string {
+	var out []string
+	for i := 0; i+1 < len(argv); i++ {
+		if argv[i] == flag {
+			out = append(out, argv[i+1])
+		}
+	}
+	return out
+}
+
+func TestTransientMatchesUnit(t *testing.T) {
+	e := setup(t)
+	e.render(t)
+	m, in, err := e.l.load(ctx, "feat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"rails", "deps"} {
+		svc, err := service(m, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		argv, err := e.l.transient(m, in, svc, "/env", []string{"true"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-"+s+".container"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		unit := string(b)
+		nets := flagValues(argv, "--network")
+		if !slices.Equal(nets, []string{"filial-feat-dev"}) {
+			t.Errorf("%s: networks %q", s, nets)
+		}
+		var wantAnn []string
+		for _, a := range unitValues(unit, "Annotation") {
+			if strings.HasPrefix(a, "filial.firewall.networks=") {
+				a = "filial.firewall.networks=" + strings.Join(nets, ",") // what the transient one joins
+			}
+			wantAnn = append(wantAnn, a)
+		}
+		if got := flagValues(argv, "--annotation"); !slices.Equal(got, wantAnn) {
+			t.Errorf("%s: annotations %q, unit %q", s, got, wantAnn)
+		}
+		if got, want := flagValues(argv, "-v"), unitValues(unit, "Volume"); !slices.Equal(got, want) {
+			t.Errorf("%s: mounts %q, unit %q", s, got, want)
+		}
+		if got, want := flagValues(argv, "--userns"), unitValues(unit, "UserNS"); !slices.Equal(got, want) {
+			t.Errorf("%s: userns %q, unit %q", s, got, want)
+		}
+		if got, want := flagValues(argv, "--user"), unitValues(unit, "User"); !slices.Equal(got, want) {
+			t.Errorf("%s: user %q, unit %q", s, got, want)
+		}
+		if got, want := flagValues(argv, "--cap-drop"), unitValues(unit, "DropCapability"); !slices.Equal(got, want) {
+			t.Errorf("%s: cap-drop %q, unit %q", s, got, want)
+		}
+		if got, want := flagValues(argv, "--cap-add"), unitValues(unit, "AddCapability"); !slices.Equal(got, want) {
+			t.Errorf("%s: cap-add %q, unit %q", s, got, want)
+		}
+		if argAfter(argv, "--hooks-dir") != strings.TrimPrefix(unitValues(unit, "GlobalArgs")[0], "--hooks-dir=") {
+			t.Errorf("%s: hooks dir differs", s)
 		}
 	}
 }

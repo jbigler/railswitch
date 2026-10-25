@@ -132,7 +132,13 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 
 	sd := l.systemd()
-	if ch.units {
+	reload := ch.units
+	if !reload {
+		if reload, err = l.anyUnloaded(ctx, m, slug); err != nil {
+			return err
+		}
+	}
+	if reload {
 		if err := sd.DaemonReload(ctx); err != nil {
 			return err
 		}
@@ -143,6 +149,27 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		}
 	}
 	return sd.Start(ctx, unitOf(m, slug, m.Services[0].ID))
+}
+
+// anyUnloaded reports whether a unit Up starts (every service of the
+// worktree, its dev network and Traefik) is not loaded by systemd: a unit
+// written by an earlier render (wt add, render, a failed up) that no
+// daemon-reload has generated yet.
+func (l *L) anyUnloaded(ctx context.Context, m *render.Model, slug string) (bool, error) {
+	names, err := m.NamesFor(slug)
+	if err != nil {
+		return false, err
+	}
+	for _, u := range append(names.Units, traefikService) {
+		st, err := l.systemd().LoadState(ctx, u)
+		if err != nil {
+			return false, err
+		}
+		if st != "loaded" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func unitOf(m *render.Model, slug, svc string) string {
@@ -228,9 +255,12 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) ([]s
 			if err := lock.Write(l.lockPath()); err != nil {
 				return nil, err
 			}
-			if old != "" {
+			switch {
+			case old != "":
 				fmt.Fprintf(l.Out, "%s: %s → %s\n", ref, old, dg)
 				changed = append(changed, ref)
+			case repull:
+				fmt.Fprintf(l.Out, "%s: (none) → %s\n", ref, dg)
 			}
 			continue
 		}
@@ -242,7 +272,7 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) ([]s
 			continue
 		}
 		pinned := repo(ref) + "@" + old
-		if _, err := p.R.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"pull", "-q", pinned}, Timeout: podman.PullTimeout}); err != nil {
+		if err := p.PullOnly(ctx, pinned); err != nil {
 			return nil, err
 		}
 		if err := p.Tag(ctx, pinned, ref); err != nil {
@@ -294,20 +324,27 @@ func (l *L) seedVolumes(ctx context.Context, m *render.Model, in *render.Instanc
 			if ok {
 				continue
 			}
-			if err := p.VolumeCreate(ctx, name); err != nil {
-				return err
-			}
 			seed := filepath.Join(m.Inputs.Workspace, "db-dumps", v.Seed)
 			fi, err := os.Stat(seed)
 			switch {
 			case errors.Is(err, fs.ErrNotExist):
-				continue
+				seed = ""
 			case err != nil:
 				return err
 			case !fi.Mode().IsRegular():
 				return fmt.Errorf("seed %s: not a regular file", seed)
 			}
+			if err := p.VolumeCreate(ctx, name); err != nil {
+				return err
+			}
+			if seed == "" {
+				continue
+			}
 			if err := p.VolumeImport(ctx, name, seed); err != nil {
+				// An unseeded volume would never be seeded: the next up re-creates it.
+				if rmErr := p.RemoveVolume(ctx, name); rmErr != nil {
+					return errors.Join(err, fmt.Errorf("removing unseeded volume %s: %w", name, rmErr))
+				}
 				return err
 			}
 		}

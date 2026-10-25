@@ -5,12 +5,8 @@ import (
 	"errors"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/jbigler/railswitch/internal/firewall"
-	"github.com/jbigler/railswitch/internal/naming"
-	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 )
@@ -57,68 +53,50 @@ func (l *L) interactive(ctx context.Context, timeout time.Duration, args []strin
 }
 
 // transient is the podman argv of a throwaway container of service s
-// running argv: s's image, env file, secrets, mounts, volumes, hardening and
-// firewall annotations, on the worktree's dev network only, with no Traefik
-// route. It refuses without the firewall hook descriptor.
+// running argv: s's image, env file, secrets, volumes, hardening and
+// firewall annotations (render's shared run settings), on the worktree's
+// dev network only, with no Traefik route. It refuses without the firewall
+// hook descriptor.
 func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, envFile string, argv []string) ([]string, error) {
-	ws, prefix, slug := m.Inputs.Workspace, m.Prefix, in.Worktree.Slug
-	if err := requireDescriptor(ws, prefix); err != nil {
+	ws := m.Inputs.Workspace
+	if err := requireDescriptor(ws, m.Prefix); err != nil {
 		return nil, err
 	}
 	image := in.Values["image."+s.ID]
 	if image == "" {
 		return nil, errors.New(s.ID + ": no image")
 	}
-	sc := in.Scope(s.ID)
-	var errs []error
-	x := func(t string) string {
-		v, err := pack.Expand(t, sc)
-		errs = append(errs, err)
-		return v
+	vols, err := in.VolumeSpecs(s)
+	if err != nil {
+		return nil, err
 	}
-	dev := naming.DevNetwork(prefix, slug)
-	mode := m.Inputs.Project.Firewall.Mode
-	if mode == "" {
-		mode = "log"
-	}
-	args := []string{"--hooks-dir", filepath.Join(ws, firewall.Dir, "hooks.d"), "run", "--rm", "-i"}
+	networks := in.Networks(s)[:1] // the dev network: no proxy, no route
+	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i"}
 	if l.TTY {
 		args = append(args, "-t")
 	}
-	args = append(args,
-		"--label", "traefik.enable=false",
-		"--annotation", prefix+".firewall="+strings.Join(s.Firewall, ","),
-		"--annotation", prefix+".firewall.networks="+dev,
-		"--annotation", prefix+".firewall.mode="+mode,
-		"--network", dev)
-	if s.Worktree {
-		args = append(args, "--userns", "keep-id:uid=1000,gid=1000", "--user", "1000:1000")
+	args = append(args, "--label", "traefik.enable=false")
+	for _, a := range in.FirewallAnnotations(s, networks) {
+		args = append(args, "--annotation", a)
 	}
-	if s.Role != render.RoleData && len(s.Unit.AddCapability) == 0 {
+	for _, n := range networks {
+		args = append(args, "--network", n)
+	}
+	if s.Worktree {
+		args = append(args, "--userns", render.WorktreeUserNS, "--user", render.WorktreeUser)
+	}
+	for _, c := range s.Unit.AddCapability {
+		args = append(args, "--cap-add", c)
+	}
+	if s.DropsAllCaps() {
 		args = append(args, "--cap-drop", "all")
 	}
 	args = append(args, "--security-opt", "no-new-privileges",
 		"--memory", s.Unit.Memory, "--pids-limit", strconv.Itoa(s.Unit.PidsLimit),
 		"--env-file", envFile)
 	args = append(args, in.SecretArgs(s.ID)...)
-	for _, mt := range s.Mounts {
-		v := x(mt.Source) + ":" + x(mt.Target)
-		if mt.Options != "" {
-			v += ":" + mt.Options
-		}
+	for _, v := range vols {
 		args = append(args, "-v", v)
-	}
-	for _, vol := range s.Volumes {
-		name, err := in.VolumeName(s.ID, vol)
-		errs = append(errs, err)
-		v := name + ":" + x(vol.Mount)
-		if vol.Chown {
-			v += ":U"
-		}
-		args = append(args, "-v", v)
-	}
-	if err := errors.Join(errs...); err != nil {
-		return nil, err
 	}
 	args = append(args, "-w", "/app", image)
 	return append(args, argv...), nil

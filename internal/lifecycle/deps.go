@@ -40,11 +40,9 @@ func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
 		return err
 	}
 	defer os.Remove(f.Name())
-	for _, v := range env {
-		if _, err := f.WriteString(v.Name + "=" + v.Value + "\n"); err != nil {
-			f.Close()
-			return err
-		}
+	if _, err := f.Write(render.EnvFile(env)); err != nil {
+		f.Close()
+		return err
 	}
 	if err := f.Close(); err != nil {
 		return err

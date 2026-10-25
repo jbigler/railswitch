@@ -70,9 +70,15 @@ func (p Podman) ImageExists(ctx context.Context, ref string) (bool, error) {
 	return p.exists(ctx, "image", "exists", ref)
 }
 
+// PullOnly runs `podman pull -q <ref>`.
+func (p Podman) PullOnly(ctx context.Context, ref string) error {
+	_, err := p.run(ctx, PullTimeout, "pull", "-q", ref)
+	return err
+}
+
 // Pull runs `podman pull -q <ref>` and returns the pulled image's digest.
 func (p Podman) Pull(ctx context.Context, ref string) (string, error) {
-	if _, err := p.run(ctx, PullTimeout, "pull", "-q", ref); err != nil {
+	if err := p.PullOnly(ctx, ref); err != nil {
 		return "", err
 	}
 	return p.out(ctx, "image", "inspect", "--format", "{{.Digest}}", ref)

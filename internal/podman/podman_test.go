@@ -323,3 +323,24 @@ func TestSecrets(t *testing.T) {
 		t.Fatalf("stdins = %q", f.Stdins)
 	}
 }
+
+func TestLoadState(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"systemctl", "--user", "show"}, sys.Result{Stdout: []byte("not-found\n")}, nil)
+	st, err := Systemd{R: f}.LoadState(ctx, "a.service")
+	if err != nil || st != "not-found" {
+		t.Fatalf("got %q %v", st, err)
+	}
+	wantCalls(t, f, []string{"systemctl", "--user", "show", "-p", "LoadState", "--value", "a.service"})
+}
+
+func TestPullOnly(t *testing.T) {
+	f := &systest.Fake{}
+	if err := (Podman{R: f}).PullOnly(ctx, "x@sha256:aa"); err != nil {
+		t.Fatal(err)
+	}
+	wantCalls(t, f, []string{"podman", "pull", "-q", "x@sha256:aa"})
+	if f.Cmds[0].Timeout != 30*time.Minute {
+		t.Fatalf("Timeout = %v", f.Cmds[0].Timeout)
+	}
+}

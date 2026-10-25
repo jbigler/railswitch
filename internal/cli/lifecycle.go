@@ -18,9 +18,12 @@ func (e *env) lifecycle(ctx context.Context, cmd string) (*lifecycle.L, string, 
 	if w.Slug == "" {
 		return nil, "", e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
 	}
+	// -t only when both ends are a terminal: redirected output gets no tty mangling.
 	tty := false
-	if f, ok := e.stdin.(*os.File); ok && isTerminal(f) {
-		tty = true
+	if in, ok := e.stdin.(*os.File); ok && isTerminal(in) {
+		if out, ok := e.stdout.(*os.File); ok && isTerminal(out) {
+			tty = true
+		}
 	}
 	return &lifecycle.L{R: e.run, WS: w, Out: e.stdout, Err: e.stderr, In: e.stdin, TTY: tty}, w.Slug, 0
 }

@@ -195,15 +195,14 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 	}
 	u.add(c, "Image", image)
 	u.add(c, "ContainerName", naming.Container(prefix, slug, s.ID))
-	networks := []string{naming.DevNetwork(prefix, slug)}
+	networks := in.Networks(s)
 	u.add(c, "Network", naming.DevNetworkUnit(prefix, slug)+":alias="+s.ID)
 	if onProxy {
-		networks = append(networks, naming.ProxyNetwork(prefix))
 		u.add(c, "Network", naming.ProxyNetworkUnit(prefix))
 	}
 	if s.Worktree {
-		u.add(c, "UserNS", "keep-id:uid=1000,gid=1000")
-		u.add(c, "User", "1000:1000")
+		u.add(c, "UserNS", WorktreeUserNS)
+		u.add(c, "User", WorktreeUser)
 	}
 	// Quadlet splits EnvironmentFile= into words; Volume=, AddHost=,
 	// Entrypoint= and HealthCmd= it reads whole.
@@ -220,24 +219,11 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		}
 		u.add(c, "PublishPort", "127.0.0.1:"+host+":"+ctr)
 	}
-	for _, mt := range s.Mounts {
-		v := x(mt.Source) + ":" + x(mt.Target)
-		if mt.Options != "" {
-			v += ":" + mt.Options
-		}
-		u.add(c, "Volume", v)
+	vols, err := in.VolumeSpecs(s)
+	if err != nil {
+		return nil, err
 	}
-	for _, vol := range s.Volumes {
-		name, err := in.VolumeName(s.ID, vol)
-		if err != nil {
-			return nil, err
-		}
-		v := name + ":" + x(vol.Mount)
-		if vol.Chown {
-			v += ":U"
-		}
-		u.add(c, "Volume", v)
-	}
+	u.add(c, "Volume", vols...)
 	u.add(c, "Secret", in.SecretSpecs(s.ID)...)
 
 	ux := s.Unit
@@ -248,9 +234,7 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		u.add(c, "RunInit", "true")
 	}
 	u.add(c, "AddCapability", ux.AddCapability...)
-	// D34: data images switch users in their entrypoints and keep podman's
-	// defaults; a service that adds capabilities (the browser) drops none.
-	if s.Role != RoleData && len(ux.AddCapability) == 0 {
+	if s.DropsAllCaps() {
 		u.add(c, "DropCapability", "all")
 	}
 	u.add(c, "NoNewPrivileges", "true")
@@ -294,16 +278,13 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		u.add(c, "Notify", "healthy")
 	}
 
-	if !(len(s.Firewall) == 1 && s.Firewall[0] == "self") {
-		mode := m.Inputs.Project.Firewall.Mode
-		if mode == "" {
-			mode = "log"
+	if s.Firewalled() {
+		u.add(c, "GlobalArgs", quoteWord("--hooks-dir="+HooksDir(ws)))
+		var ann []string
+		for _, a := range in.FirewallAnnotations(s, networks) {
+			ann = append(ann, quoteWord(a))
 		}
-		u.add(c, "GlobalArgs", quoteWord("--hooks-dir="+filepath.Join(ws, ".railswitch", "firewall", "hooks.d")))
-		u.add(c, "Annotation",
-			quoteWord(prefix+".firewall="+strings.Join(s.Firewall, ",")),
-			quoteWord(prefix+".firewall.networks="+strings.Join(networks, ",")),
-			quoteWord(prefix+".firewall.mode="+mode))
+		u.add(c, "Annotation", ann...)
 	}
 
 	var args []string

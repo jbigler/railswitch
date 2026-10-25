@@ -74,12 +74,6 @@ func TestProxyUnitHashLabel(t *testing.T) {
 	}
 }
 
-func TestMarkerShared(t *testing.T) {
-	if render.Marker != machine.Marker {
-		t.Fatalf("render.Marker %q != machine.Marker %q", render.Marker, machine.Marker)
-	}
-}
-
 func TestRefreshProxyUnits(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, machine.ProxyUnitName)

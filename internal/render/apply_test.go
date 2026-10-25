@@ -168,6 +168,29 @@ func TestApplyOrphanUnits(t *testing.T) {
 	}
 }
 
+// TestApplyOrphanUnitsPrefixExtends (Review Focus 2): applying filial never
+// removes a unit of filial2, a prefix that extends it.
+func TestApplyOrphanUnitsPrefixExtends(t *testing.T) {
+	p, ws, qdir := filialPlan(t)
+	var theirs []string
+	for _, slug := range []string{"master", "gone"} {
+		path := filepath.Join(qdir, "filial2-"+slug+"-rails.container")
+		writeFile(t, path, markedUnit("filial2", slug))
+		theirs = append(theirs, path)
+	}
+	d := mustApply(t, p, ws, qdir, false)
+	for i, path := range theirs {
+		if got, err := os.ReadFile(path); err != nil || string(got) != markedUnit("filial2", []string{"master", "gone"}[i]) {
+			t.Errorf("%s touched: %q %v", path, got, err)
+		}
+	}
+	for _, n := range d.Removed {
+		if strings.HasPrefix(n, "filial2-") {
+			t.Errorf("Removed = %v", d.Removed)
+		}
+	}
+}
+
 func TestApplyOrphanEnvDir(t *testing.T) {
 	p, ws, qdir := filialPlan(t)
 	dir := filepath.Join(ws, ".railswitch", "env", "gone")

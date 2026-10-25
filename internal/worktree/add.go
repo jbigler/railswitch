@@ -19,6 +19,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -97,19 +98,8 @@ func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktr
 		return render.Worktree{}, err
 	}
 	u.slug = slug
-	for _, p := range m.WorktreeVolumes {
-		if !filepath.IsLocal(p) {
-			return render.Worktree{}, fmt.Errorf("worktree volume mount %q is not below /app", p)
-		}
-		root, err := os.OpenRoot(dir)
-		if err != nil {
-			return render.Worktree{}, err
-		}
-		err = root.MkdirAll(p, 0o755)
-		root.Close()
-		if err != nil {
-			return render.Worktree{}, fmt.Errorf("create %s for its worktree volume: %w", filepath.Join(dir, p), err)
-		}
+	if err := PrecreateVolumes(dir, m.WorktreeVolumes); err != nil {
+		return render.Worktree{}, err
 	}
 	if err := m.seed(base, dir); err != nil {
 		return render.Worktree{}, err
@@ -119,6 +109,40 @@ func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktr
 		return render.Worktree{}, err
 	}
 	return render.Worktree{Slug: slug, ID: e.ID, Dir: dir, Branch: branch}, nil
+}
+
+// VolumeDirs are the mounts of pk's [[worktree_volumes]] below /app,
+// relative to it (e.g. "node_modules"): what PrecreateVolumes creates.
+func VolumeDirs(pk *pack.Pack) []string {
+	var rels []string
+	for _, v := range pk.WorktreeVolumes {
+		if rel, ok := strings.CutPrefix(v.Mount, "/app/"); ok {
+			rels = append(rels, rel)
+		}
+	}
+	return rels
+}
+
+// PrecreateVolumes creates each worktree volume's mount point rels (see
+// VolumeDirs) in the worktree dir, through an os.Root so a checked-out
+// symlink can't redirect the write: a volume under a bind mount needs its
+// mount point to exist.
+func PrecreateVolumes(dir string, rels []string) error {
+	for _, p := range rels {
+		if !filepath.IsLocal(p) {
+			return fmt.Errorf("worktree volume mount %q is not below /app", p)
+		}
+		root, err := os.OpenRoot(dir)
+		if err != nil {
+			return err
+		}
+		err = root.MkdirAll(p, 0o755)
+		root.Close()
+		if err != nil {
+			return fmt.Errorf("create %s for its worktree volume: %w", filepath.Join(dir, p), err)
+		}
+	}
+	return nil
 }
 
 // undo is what a failed Add has done so far.

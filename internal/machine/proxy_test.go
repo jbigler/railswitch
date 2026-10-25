@@ -65,3 +65,59 @@ func TestMarkerShared(t *testing.T) {
 		t.Fatalf("render.Marker %q != machine.Marker %q", render.Marker, machine.Marker)
 	}
 }
+
+func TestRefreshProxyUnits(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, machine.ProxyUnitName)
+	both := twoProjects()
+	write := func(data []byte) {
+		t.Helper()
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func() string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+
+	// Not on disk: left absent.
+	if err := machine.RefreshProxyUnits(both, dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("absent unit was written: %v", err)
+	}
+
+	// Names demo and api; api is unregistered: rewritten without it.
+	write(machine.ProxyUnits(both)[machine.ProxyUnitName])
+	demo := &machine.Registry{Schema: machine.SchemaVersion, Projects: both.Projects[:1]}
+	if err := machine.RefreshProxyUnits(demo, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(), string(machine.ProxyUnits(demo)[machine.ProxyUnitName]); got != want {
+		t.Errorf("unit =\n%s\nwant\n%s", got, want)
+	}
+
+	// No project left: the railswitch-written unit goes.
+	empty := &machine.Registry{Schema: machine.SchemaVersion}
+	if err := machine.RefreshProxyUnits(empty, dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("unit with no project left: %v; want removed", err)
+	}
+
+	// A file railswitch did not write is never removed.
+	write([]byte("[Container]\n"))
+	if err := machine.RefreshProxyUnits(empty, dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(); got != "[Container]\n" {
+		t.Errorf("user file = %q", got)
+	}
+}

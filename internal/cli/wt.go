@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/render"
@@ -44,12 +43,6 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 	if f, ok := e.stdin.(*os.File); ok && isTerminal(f) {
 		tty = true
 	}
-	var vols []string
-	for _, v := range w.Stack.Pack.WorktreeVolumes {
-		if rel, ok := strings.CutPrefix(v.Mount, "/app/"); ok {
-			vols = append(vols, rel)
-		}
-	}
 	return &worktree.Manager{
 		R:         e.run,
 		WS:        w.Root,
@@ -71,7 +64,7 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 			}
 			return m.NamesFor(slug)
 		},
-		WorktreeVolumes: vols,
+		WorktreeVolumes: worktree.VolumeDirs(w.Stack.Pack),
 	}, nil
 }
 

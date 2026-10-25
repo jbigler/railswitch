@@ -1,11 +1,17 @@
 package machine
 
 import (
+	"bytes"
 	"cmp"
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/naming"
+	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
 // Marker starts the first line of every rendered unit file. It lives here
@@ -78,4 +84,34 @@ func ProxyUnits(r *Registry) map[string][]byte {
 		"[Service]",
 		"Restart=on-failure")
 	return map[string][]byte{ProxyUnitName: []byte(b.String())}
+}
+
+// RefreshProxyUnits brings the machine-wide units already in quadletDir in
+// line with r, for a change of r made without a render (a project
+// unregistered after its render failed): a changed unit is replaced, one r
+// no longer renders is removed when railswitch wrote it (Marker first). A
+// unit not on disk is left absent; the next render writes it.
+func RefreshProxyUnits(r *Registry, quadletDir string) error {
+	want := ProxyUnits(r)
+	for _, name := range []string{ProxyUnitName} {
+		path := filepath.Join(quadletDir, name)
+		old, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		data, ok := want[name]
+		switch {
+		case ok && !bytes.Equal(old, data):
+			err = tomlfile.WriteAtomic(path, data, 0o644)
+		case !ok && bytes.HasPrefix(old, []byte(Marker)):
+			err = os.Remove(path)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

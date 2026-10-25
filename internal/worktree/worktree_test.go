@@ -16,6 +16,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -584,5 +585,29 @@ func TestList(t *testing.T) {
 	}
 	if !slices.Equal(rows, want) {
 		t.Errorf("List = %+v; want %+v", rows, want)
+	}
+}
+
+func TestVolumeDirs(t *testing.T) {
+	pk := &pack.Pack{WorktreeVolumes: []pack.Volume{
+		{Name: "node-modules", Mount: "/app/node_modules"},
+		{Name: "tmp", Mount: "/app/tmp/cache"},
+		{Name: "outside", Mount: "/home/appuser/x"},
+	}}
+	if got, want := VolumeDirs(pk), []string{"node_modules", "tmp/cache"}; !slices.Equal(got, want) {
+		t.Errorf("VolumeDirs = %v; want %v", got, want)
+	}
+}
+
+func TestPrecreateVolumesRefusesEscape(t *testing.T) {
+	dir := t.TempDir()
+	if err := PrecreateVolumes(dir, []string{"../x"}); err == nil {
+		t.Error("PrecreateVolumes(../x) succeeded")
+	}
+	if err := os.Symlink(t.TempDir(), filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := PrecreateVolumes(dir, []string{"link/x"}); err == nil {
+		t.Error("PrecreateVolumes through a symlink out of the worktree succeeded")
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
+	"github.com/jbigler/railswitch/internal/worktree"
 )
 
 const newUsage = "usage: railswitch new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim]"
@@ -315,7 +316,7 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 // [versions] and [tools].
 func projectTOML(p *config.Project) []byte {
 	var b strings.Builder
-	kv := func(k, v string) { fmt.Fprintf(&b, "%s = %s\n", k, tomlQuote(v)) }
+	kv := func(k, v string) { fmt.Fprintf(&b, "%s = %s\n", k, config.QuoteString(v)) }
 	fmt.Fprintf(&b, "schema = %d\n\n[project]\n", p.Schema)
 	kv("name", p.Project.Name)
 	kv("prefix", p.Project.Prefix)
@@ -340,25 +341,6 @@ func projectTOML(p *config.Project) []byte {
 		b.WriteString("\n[tools]\nnvim = true\n")
 	}
 	return []byte(b.String())
-}
-
-// tomlQuote quotes s as a TOML basic string.
-func tomlQuote(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range s {
-		switch {
-		case r == '"' || r == '\\':
-			b.WriteByte('\\')
-			b.WriteRune(r)
-		case r < 0x20 || r == 0x7f:
-			fmt.Fprintf(&b, `\u%04X`, r)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteByte('"')
-	return b.String()
 }
 
 // ejectNames are the defaults the stack builds, in eject order: base
@@ -452,25 +434,7 @@ func prepare(ws, slug string, st *pack.Stack) error {
 	case !errors.Is(err, fs.ErrExist):
 		return err
 	}
-	for _, v := range st.Pack.WorktreeVolumes {
-		rel, ok := strings.CutPrefix(v.Mount, "/app/")
-		if !ok {
-			continue
-		}
-		if !filepath.IsLocal(rel) {
-			return fmt.Errorf("worktree volume mount %q is not below /app", v.Mount)
-		}
-		root, err := os.OpenRoot(filepath.Join(ws, slug))
-		if err != nil {
-			return err
-		}
-		err = root.MkdirAll(rel, 0o755)
-		root.Close()
-		if err != nil {
-			return fmt.Errorf("create %s for its worktree volume: %w", filepath.Join(ws, slug, rel), err)
-		}
-	}
-	return nil
+	return worktree.PrecreateVolumes(filepath.Join(ws, slug), worktree.VolumeDirs(st.Pack))
 }
 
 // writeGenerated writes <ws>/mise.local.toml (0600) with a fresh random
@@ -487,7 +451,7 @@ func writeGenerated(ws string, st *pack.Stack) error {
 	for _, n := range slices.Compact(names) {
 		buf := make([]byte, 16)
 		rand.Read(buf)
-		fmt.Fprintf(&b, "%s = %s\n", n, tomlQuote(hex.EncodeToString(buf)))
+		fmt.Fprintf(&b, "%s = %s\n", n, config.QuoteString(hex.EncodeToString(buf)))
 	}
 	return createFile(filepath.Join(ws, "mise.local.toml"), []byte(b.String()), 0o600)
 }
@@ -533,16 +497,23 @@ func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *works
 	return wt.ID, nil
 }
 
+// unregister drops prefix from the registry and refreshes the machine-wide
+// units a partial render may have written, so the shared Traefik unit
+// stops naming the project's network.
 func unregister(dirs machine.Dirs, prefix string) error {
 	reg, err := machine.Open(dirs.Data)
-	if err == nil {
-		defer reg.Close()
-		if err = reg.RemoveProject(prefix); err == nil {
-			err = reg.Save()
-		}
-	}
 	if err != nil {
 		return fmt.Errorf("unregistering project %s: %w", prefix, err)
+	}
+	defer reg.Close()
+	if err := reg.RemoveProject(prefix); err != nil {
+		return fmt.Errorf("unregistering project %s: %w", prefix, err)
+	}
+	if err := reg.Save(); err != nil {
+		return fmt.Errorf("unregistering project %s: %w", prefix, err)
+	}
+	if err := machine.RefreshProxyUnits(reg.Registry, dirs.Quadlet); err != nil {
+		return fmt.Errorf("unregistered project %s, but rewriting %s failed (railswitch render in another project rewrites it): %w", prefix, filepath.Join(dirs.Quadlet, machine.ProxyUnitName), err)
 	}
 	return nil
 }

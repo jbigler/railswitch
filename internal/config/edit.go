@@ -25,7 +25,7 @@ func SetImageBase(path, value string) error {
 		case value:
 			return d.data, nil
 		case "":
-			return d.insertKey([]string{"image"}, "base", tomlString(value)), nil
+			return d.insertKey([]string{"image"}, "base", QuoteString(value)), nil
 		}
 		return "", fmt.Errorf("%s: [image] base is already %q, not %q: change it by hand", path, p.Image.Base, value)
 	})
@@ -39,7 +39,7 @@ func AppendImageAddon(path, value string) error {
 		if slices.Contains(p.Image.Addons, value) {
 			return "", fmt.Errorf("%s: [image] addons already lists %q", path, value)
 		}
-		elem := tomlString(value)
+		elem := QuoteString(value)
 		s := d.find([]string{"image"}, "addons")
 		if s == nil {
 			return d.insertKey([]string{"image"}, "addons", "["+elem+"]"), nil
@@ -423,8 +423,8 @@ func tokenEnd(data string, p int) (int, error) {
 	return p + 1, nil
 }
 
-// tomlString quotes s as a TOML basic string.
-func tomlString(s string) string {
+// QuoteString quotes s as a TOML basic string.
+func QuoteString(s string) string {
 	var b strings.Builder
 	b.WriteByte('"')
 	for _, r := range s {
@@ -456,13 +456,13 @@ func AddSecret(path, name string, s Secret) error {
 		if len(s.Services) > 0 {
 			elems := make([]string, len(s.Services))
 			for i, id := range s.Services {
-				elems[i] = tomlString(id)
+				elems[i] = QuoteString(id)
 			}
 			b.WriteString("services = [" + strings.Join(elems, ", ") + "]\n")
 		}
 		for _, kv := range [][2]string{{"env", s.Env}, {"scope", s.Scope}, {"git_host", s.GitHost}, {"git_user", s.GitUser}} {
 			if kv[1] != "" {
-				b.WriteString(kv[0] + " = " + tomlString(kv[1]) + "\n")
+				b.WriteString(kv[0] + " = " + QuoteString(kv[1]) + "\n")
 			}
 		}
 		return d.appendTable([]string{"secrets", name}, b.String()), nil

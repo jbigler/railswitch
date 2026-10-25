@@ -194,6 +194,12 @@ func TestNew(t *testing.T) {
 		t.Errorf("base worktree not cloned: %v", err)
 	}
 
+	// Git never lists an empty dir: give each never-tracked one a file.
+	writeFile(t, filepath.Join(ws, "db-dumps", "dump.sql"), "-- dump\n")
+	if err := os.MkdirAll(filepath.Join(ws, ".railswitch"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(ws, ".railswitch", "x"), "x\n")
 	cmd := exec.Command("git", "-C", ws, "status", "--porcelain", "--untracked-files=all")
 	st, err := cmd.Output()
 	if err != nil {
@@ -336,6 +342,119 @@ func TestNewRenderFailureUnregisters(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(ws, "main", "README")); err != nil {
 		t.Errorf("the clone was removed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dirs.Quadlet, machine.ProxyUnitName)); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the Traefik unit render never wrote exists: %v", err)
+	}
+}
+
+// A render that wrote the shared Traefik unit before failing: unregistering
+// rewrites it without the project's network, for the projects still there.
+func TestNewRenderFailureRefreshesProxy(t *testing.T) {
+	dirs := newEnv(t)
+	reg, err := machine.Open(dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.AddProject("other", "/ws/other"); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	only := *reg.Registry
+	both := only
+	both.Projects = append(slices.Clone(only.Projects), machine.ProjectEntry{Prefix: "shop", Workspace: "/ws/shop", Subnet: 1})
+	reg.Close()
+	unit := filepath.Join(dirs.Quadlet, machine.ProxyUnitName)
+	if err := os.MkdirAll(dirs.Quadlet, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, unit, string(machine.ProxyUnits(&both)[machine.ProxyUnitName]))
+
+	ws := filepath.Join(t.TempDir(), "shop")
+	f := &systest.Fake{Passthrough: []string{"git"}} // no podman: render fails
+	if code, _, _ := runWith(t, f, "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop"); code == 0 {
+		t.Fatal("new succeeded without podman")
+	}
+	got := readFile(t, unit)
+	if strings.Contains(got, "shop") {
+		t.Errorf("the Traefik unit still names shop:\n%s", got)
+	}
+	if want := string(machine.ProxyUnits(&only)[machine.ProxyUnitName]); got != want {
+		t.Errorf("Traefik unit =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestGitArg(t *testing.T) {
+	for _, v := range []string{"", "--upload-pack=touch /tmp/x", "-oProxyCommand=x", "-b", "main\nx", "a\rb", "a\x00b"} {
+		if gitArg("--branch", v) == nil {
+			t.Errorf("gitArg(%q) accepted", v)
+		}
+	}
+	for _, v := range []string{"main", "feat/x-1", "file:///tmp/a.git", "git@github.com:a/b.git"} {
+		if err := gitArg("--branch", v); err != nil {
+			t.Errorf("gitArg(%q) = %v", v, err)
+		}
+	}
+}
+
+func TestNewRefusesOptionLikeGitValues(t *testing.T) {
+	newEnv(t)
+	repo := bareRepo(t, "main")
+	for _, args := range [][]string{
+		{"--repo", "--upload-pack=touch /tmp/pwned", "--prefix", "shop", "--branch", "main"},
+		{"--repo", repo, "--prefix", "shop", "--branch", "-main"},
+		{"--repo", repo, "--prefix", "shop", "--branch", "ma\nin"},
+	} {
+		ws := filepath.Join(t.TempDir(), "shop")
+		f := gitHost()
+		code, _, errs := runWith(t, f, append([]string{"new", ws}, args...)...)
+		if code == 0 || !strings.Contains(errs, "not a usable git value") {
+			t.Errorf("new %q: exit %d, stderr %q; want a refusal", args, code, errs)
+		}
+		for _, c := range f.Calls {
+			if slices.Contains(c, "clone") || slices.Contains(c, "ls-remote") {
+				t.Errorf("new %q ran %v", args, c)
+			}
+		}
+	}
+}
+
+func TestInitRefusesOptionLikeGitValues(t *testing.T) {
+	newEnv(t)
+	ws := filepath.Join(t.TempDir(), "shop")
+	mustNew(t, ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
+	editProject(t, ws, `repo = "file://`, `repo = "--upload-pack=x file://`)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
+	f := gitHost()
+	code, _, errs := runWith(t, f, "-C", ws, "init")
+	if code == 0 || !strings.Contains(errs, "not a usable git value") {
+		t.Errorf("init: exit %d, stderr %q; want a refusal", code, errs)
+	}
+	for _, c := range f.Calls {
+		if slices.Contains(c, "clone") {
+			t.Errorf("init ran %v", c)
+		}
+	}
+}
+
+func TestRepoHost(t *testing.T) {
+	for repo, want := range map[string]string{
+		"git@github.com:a/b.git":           "github.com",
+		"github.com:a/b.git":               "github.com",
+		"ssh://git@GitHub.com/a/b.git":     "github.com",
+		"https://github.com/a/b.git":       "github.com",
+		"https://user@github.com:443/a/b":  "github.com",
+		"https://github.com.evil.org/a/b":  "github.com.evil.org",
+		"git@github.com.evil.org:a/b.git":  "github.com.evil.org",
+		"file:///srv/git/github.com:a.git": "",
+		"/srv/git/app.git":                 "",
+		"./github.com:a/b":                 "",
+	} {
+		if got := repoHost(repo); got != want {
+			t.Errorf("repoHost(%q) = %q; want %q", repo, got, want)
+		}
 	}
 }
 

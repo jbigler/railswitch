@@ -5,11 +5,10 @@ version = 1
 service = "rails"
 server = "bin/dev"
 port = 3000
-install = "bundle install && npm ci"            # what deps runs; lockfile-frozen (D35)
 health = "curl -fsS http://localhost:3000/up"   # Rails 7.1+ health route (D34)
 health_start_period = "120s"
 entrypoint = "entrypoints/entrypoint-app.sh"
-deps_entrypoint = "entrypoints/entrypoint-deps.sh"
+deps_entrypoint = "entrypoints/entrypoint-deps.sh" # deps installs the lockfiles, frozen (D35); no install command
 
 [deps]
 frozen_env = { BUNDLE_FROZEN = "true" }         # set on the deps service; `railswitch deps` leaves it out (D35)

@@ -507,3 +507,22 @@ func TestUnitHashLabel(t *testing.T) {
 		}
 	}
 }
+
+// TestDepsExecFromInstall: the pack's [app] install is the deps service's
+// command, run through its entrypoint.
+func TestDepsExecFromInstall(t *testing.T) {
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range cat.Packs {
+		p.App.Install = "mix deps.get --only dev"
+	}
+	ws := testfixture.Workspace(t, fixtureDir)
+	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasLine(t, units, "filial-master-deps.container", "Entrypoint=/usr/local/bin/entrypoint-deps.sh")
+	hasLine(t, units, "filial-master-deps.container", "Exec=mix deps.get --only dev")
+}

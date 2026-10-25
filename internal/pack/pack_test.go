@@ -3,6 +3,7 @@ package pack
 import (
 	"io/fs"
 	"maps"
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
@@ -125,6 +126,7 @@ version = 1
 service = "web"
 server = "run"
 port = 3000
+install = "fetch --frozen"
 [image]
 file = "Containerfile.base"
 tag = "x"
@@ -149,6 +151,17 @@ container = 1
 func TestMinimalCatalogLoads(t *testing.T) {
 	if _, err := Load(minimal()); err != nil {
 		t.Fatalf("Load(minimal): %v", err)
+	}
+}
+
+// TestDepsNeedsInstallOrEntrypoint: a pack whose deps service would run
+// nothing (no [app] install, no deps_entrypoint) is refused.
+func TestDepsNeedsInstallOrEntrypoint(t *testing.T) {
+	fsys := minimal()
+	fsys["packs/p/pack.toml"].Data = []byte(strings.Replace(string(fsys["packs/p/pack.toml"].Data), "install = \"fetch --frozen\"\n", "", 1))
+	_, err := Load(fsys)
+	if err == nil || !strings.Contains(err.Error(), "app.install") || !strings.Contains(err.Error(), "app.deps_entrypoint") {
+		t.Errorf("Load without install or deps_entrypoint: %v", err)
 	}
 }
 
@@ -321,5 +334,23 @@ func TestNameMatchesDirectory(t *testing.T) {
 	fsys["packs/q/Containerfile.base"] = fsys["packs/p/Containerfile.base"]
 	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "packs/q") {
 		t.Errorf("Load with name p in packs/q: %v", err)
+	}
+}
+
+// TestRailsDepsEntrypointExecsArgs: given a command (the pack's install,
+// or another pack reusing it), the deps entrypoint execs it after its setup
+// instead of its own install.
+func TestRailsDepsEntrypointExecsArgs(t *testing.T) {
+	script, err := fs.ReadFile(builtin.FS, "packs/rails/entrypoints/entrypoint-deps.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	body := strings.Replace(string(script), "cd /app", "cd "+dir, 1)
+	cmd := exec.Command("sh", "-c", body, "entrypoint-deps.sh", "sh", "-c", "pwd; echo installed")
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != dir+"\ninstalled\n" {
+		t.Errorf("entrypoint with args: %v\n%s", err, out)
 	}
 }

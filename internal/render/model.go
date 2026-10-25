@@ -88,7 +88,7 @@ type Service struct {
 	Image      ImageSpec
 	Exec       []string // the container's command and arguments ([unit] exec)
 	Entrypoint string   // container path, e.g. "/usr/local/bin/entrypoint-app.sh"
-	Command    string   // the app's server or an option's command
+	Command    string   // the app's server, deps's install or an option's command
 	Networks   []string // "dev", "proxy"
 	Publish    []Port   // host port = Base + worktree ID, on 127.0.0.1
 	Volumes    []Volume
@@ -246,7 +246,7 @@ func (b *builder) services() error {
 		Unit:     unitExtras(pk.Unit, RoleApp, p.Services[appID]),
 	}
 	deps := Service{
-		ID: "deps", Role: RoleDeps, Image: baseImage, Oneshot: true,
+		ID: "deps", Role: RoleDeps, Image: baseImage, Oneshot: true, Command: pk.App.Install,
 		Firewall: []string{"deps"},
 		Worktree: true,
 		Mounts:   []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}}, // no .git: nothing an install needs (D11)

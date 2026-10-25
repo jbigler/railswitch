@@ -256,6 +256,9 @@ func (l *loader) checkPack(dir string, p *Pack) bool {
 	}
 	l.file(file, "app.entrypoint", dir, p.App.Entrypoint)
 	l.file(file, "app.deps_entrypoint", dir, p.App.DepsEntrypoint)
+	if p.App.Install == "" && p.App.DepsEntrypoint == "" {
+		l.add(file, "app.install or app.deps_entrypoint is required: the deps service would install nothing")
+	}
 	l.env(file, "deps.frozen_env", p.Deps.FrozenEnv)
 
 	l.required(file, "image.file", p.Image.File)

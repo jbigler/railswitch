@@ -50,11 +50,11 @@ type App struct {
 	Service           string `toml:"service"` // default app service id; project.toml [stack] app overrides it
 	Server            string `toml:"server"`  // the app's command
 	Port              int    `toml:"port"`    // the port Traefik routes {worktree.host} to
-	Install           string `toml:"install"` // what deps runs; lockfile-frozen (D35)
+	Install           string `toml:"install"` // the deps service's command (Exec=, split into words like server), run through deps_entrypoint; lockfile-frozen (D35)
 	Health            string `toml:"health"`  // app health command (D34); empty = none
 	HealthStartPeriod string `toml:"health_start_period"`
 	Entrypoint        string `toml:"entrypoint"`      // package file mounted as the app's entrypoint
-	DepsEntrypoint    string `toml:"deps_entrypoint"` // package file mounted as the deps service's entrypoint
+	DepsEntrypoint    string `toml:"deps_entrypoint"` // package file mounted as the deps service's entrypoint; it execs install, if any, after its setup
 }
 
 // Deps is the pack's [deps] table.

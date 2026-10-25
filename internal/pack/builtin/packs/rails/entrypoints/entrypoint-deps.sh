@@ -10,8 +10,15 @@
 #
 # Both checks below are offline, so an unchanged worktree starts the app
 # without touching the network.
+#
+# Given a command (a pack's [app] install, rendered as the unit's Exec=), it
+# runs that instead, after the setup.
 set -eu
 cd /app
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
 
 if bundle check >/dev/null 2>&1; then
   echo "deps: gems up to date"

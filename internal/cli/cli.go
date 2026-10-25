@@ -28,10 +28,11 @@ type env struct {
 type command func(ctx context.Context, e *env, args []string) int
 
 var commands = map[string]command{
-	"version": cmdVersion,
-	"lock":    cmdLock,
-	"render":  cmdRender,
-	"env":     cmdEnv,
+	"version":       cmdVersion,
+	"lock":          cmdLock,
+	"render":        cmdRender,
+	"env":           cmdEnv,
+	"containerfile": cmdContainerfile,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.

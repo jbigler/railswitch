@@ -116,6 +116,40 @@ type envRow struct {
 	Source  string  `json:"source"`
 }
 
+// instance loads the workspace and builds the model and the current
+// worktree's instance; code is non-zero when it failed (reported).
+func (e *env) instance(ctx context.Context, cmd string) (w *workspace.Workspace, m *render.Model, in *render.Instance, code int) {
+	w, err := workspace.Load(ctx, e.dir, e.slug)
+	if err != nil {
+		return nil, nil, nil, e.fail(err)
+	}
+	if w.Slug == "" {
+		return nil, nil, nil, e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
+	}
+	host, err := workspace.ReadHost(ctx, e.run)
+	if err != nil {
+		return nil, nil, nil, e.fail(err)
+	}
+	reg, err := machine.Open(w.Dirs.Data)
+	if err != nil {
+		return nil, nil, nil, e.fail(err)
+	}
+	m, err = w.Model(reg.Registry, host)
+	reg.Close()
+	if err != nil {
+		return nil, nil, nil, e.fail(err)
+	}
+	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == w.Slug })
+	if i < 0 {
+		return nil, nil, nil, e.fail(fmt.Errorf("worktree %s is not registered for project %s", w.Slug, m.Prefix))
+	}
+	in, err = m.Instance(m.Inputs.Worktrees[i])
+	if err != nil {
+		return nil, nil, nil, e.fail(err)
+	}
+	return w, m, in, 0
+}
+
 // railswitch env [svc]: the current worktree's effective env, per service.
 func cmdEnv(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("env")
@@ -125,33 +159,9 @@ func cmdEnv(ctx context.Context, e *env, args []string) int {
 	if fs.NArg() > 1 {
 		return e.usageErr("usage: railswitch env [service]")
 	}
-	w, err := workspace.Load(ctx, e.dir, e.slug)
-	if err != nil {
-		return e.fail(err)
-	}
-	if w.Slug == "" {
-		return e.usageErr("env: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>")
-	}
-	host, err := workspace.ReadHost(ctx, e.run)
-	if err != nil {
-		return e.fail(err)
-	}
-	reg, err := machine.Open(w.Dirs.Data)
-	if err != nil {
-		return e.fail(err)
-	}
-	m, err := w.Model(reg.Registry, host)
-	reg.Close()
-	if err != nil {
-		return e.fail(err)
-	}
-	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == w.Slug })
-	if i < 0 {
-		return e.fail(fmt.Errorf("worktree %s is not registered for project %s", w.Slug, m.Prefix))
-	}
-	in, err := m.Instance(m.Inputs.Worktrees[i])
-	if err != nil {
-		return e.fail(err)
+	w, m, in, code := e.instance(ctx, "env")
+	if code != 0 {
+		return code
 	}
 
 	var svcs []string

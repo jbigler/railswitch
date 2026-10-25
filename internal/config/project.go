@@ -104,6 +104,11 @@ func Load(path string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
+	return decode(path, data)
+}
+
+// decode is Load of path's contents data.
+func decode(path string, data []byte) (*Project, error) {
 	var p Project
 	if err := tomlfile.Decode(data, SchemaVersion, &p); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)

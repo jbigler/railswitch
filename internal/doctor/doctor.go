@@ -6,6 +6,7 @@ package doctor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -13,8 +14,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -31,16 +34,16 @@ type Check struct {
 // Host is where doctor reads the host's proc and sys files and looks up
 // binaries; DefaultHost is the real host.
 type Host struct {
-	PortStart string // ip_unprivileged_port_start
-	Quadlet   string // podman's quadlet generator
-	Cgroup    string // cgroup v2's root cgroup.controllers
+	PortStart string   // ip_unprivileged_port_start
+	Quadlet   []string // podman's quadlet generator: the first that exists
+	Cgroup    string   // cgroup v2's root cgroup.controllers
 	LookPath  func(name string) (string, error)
 }
 
 // DefaultHost is this machine.
 var DefaultHost = Host{
 	PortStart: "/proc/sys/net/ipv4/ip_unprivileged_port_start",
-	Quadlet:   "/usr/libexec/podman/quadlet",
+	Quadlet:   podman.QuadletPaths,
 	Cgroup:    "/sys/fs/cgroup/cgroup.controllers",
 	LookPath:  exec.LookPath,
 }
@@ -77,6 +80,17 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	return out
 }
 
+// Workspace is the failed check for a workspace that doesn't load (a bad
+// project.toml, no stack.lock, a bad -w): its descriptor and units go
+// unchecked.
+func Workspace(err error) Check {
+	c := Check{Name: "workspace", Detail: err.Error(), Fix: "fix the problem named in detail, then run railswitch doctor again"}
+	if errors.Is(err, config.ErrNoLock) {
+		c.Fix = "railswitch lock"
+	}
+	return c
+}
+
 func (h Host) podman(ctx context.Context, r sys.Runner) Check {
 	c := Check{Name: "podman >= 5.0", Fix: "install podman 5.0 or newer"}
 	res, err := r.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"version", "--format", "{{.Client.Version}}"}})
@@ -97,7 +111,18 @@ func (h Host) podman(ctx context.Context, r sys.Runner) Check {
 }
 
 func (h Host) quadlet() Check {
-	return exists("quadlet generator", h.Quadlet, "install podman's quadlet generator (podman 5 ships it; some distributions package it as podman-quadlet)")
+	c := Check{Name: "quadlet generator", Fix: "install podman's quadlet generator at " + strings.Join(h.Quadlet, " or ") + " (podman 5 ships it; some distributions package it as podman-quadlet)"}
+	var errs []string
+	for _, p := range h.Quadlet {
+		if _, err := os.Stat(p); err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
+		c.OK, c.Detail = true, p
+		return c
+	}
+	c.Detail = strings.Join(errs, "; ")
+	return c
 }
 
 func (h Host) cgroup() Check {
@@ -158,16 +183,19 @@ func (h Host) onPath(name, fix string) Check {
 // descriptor checks the firewall's OCI hook descriptor, without which podman
 // starts the project's containers unfirewalled.
 func descriptor(ws *workspace.Workspace) Check {
-	path := filepath.Join(ws.Root, filepath.FromSlash(firewall.Dir), "hooks.d", ws.Project.Project.Prefix+"-firewall.json")
-	return exists("firewall descriptor", path, "railswitch render")
+	return exists("firewall descriptor", firewall.DescriptorPath(ws.Root, ws.Project.Project.Prefix), "railswitch render")
 }
 
-// units checks that render would change nothing.
+// units checks that render would change nothing. A stale stack.lock is fixed
+// by railswitch lock, anything else by railswitch render.
 func units(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
 	c := Check{Name: "units current", Fix: "railswitch render"}
 	d, err := ws.Render(ctx, r, true)
 	if err != nil {
 		c.Detail = err.Error()
+		if errors.Is(err, workspace.ErrStaleLock) {
+			c.Fix = "railswitch lock"
+		}
 		return c
 	}
 	var parts []string

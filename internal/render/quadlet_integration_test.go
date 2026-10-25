@@ -12,20 +12,21 @@ import (
 	"strings"
 	"testing"
 	"time"
-)
 
-const defaultQuadlet = "/usr/libexec/podman/quadlet"
+	"github.com/jbigler/railswitch/internal/podman"
+)
 
 // TestQuadletDryRun feeds the rendered Filial units to the real Quadlet
 // generator (`quadlet -dryrun -user`) and checks the generated services.
 // RAILSWITCH_QUADLET names the generator; when it is set (as in CI) a missing
-// binary fails the test, when unset a missing default binary skips it.
+// binary fails the test; when unset, the first of podman.QuadletPaths that
+// exists is used, and the test is skipped when none does.
 func TestQuadletDryRun(t *testing.T) {
 	bin := os.Getenv("RAILSWITCH_QUADLET")
 	if bin == "" {
-		bin = defaultQuadlet
-		if _, err := os.Stat(bin); err != nil {
-			t.Skipf("quadlet generator %s: %v (set RAILSWITCH_QUADLET to require it)", bin, err)
+		var ok bool
+		if bin, ok = podman.FindQuadlet(); !ok {
+			t.Skipf("no quadlet generator at %s (set RAILSWITCH_QUADLET to require it)", strings.Join(podman.QuadletPaths, " or "))
 		}
 	} else if _, err := os.Stat(bin); err != nil {
 		t.Fatalf("RAILSWITCH_QUADLET=%s: %v", bin, err)

@@ -3,6 +3,7 @@ package doctor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -39,7 +41,7 @@ func host(t *testing.T, portStart string, present bool, found ...string) Host {
 	dir := t.TempDir()
 	h := Host{
 		PortStart: filepath.Join(dir, "ip_unprivileged_port_start"),
-		Quadlet:   filepath.Join(dir, "quadlet"),
+		Quadlet:   []string{filepath.Join(dir, "libexec-quadlet"), filepath.Join(dir, "lib-quadlet")},
 		Cgroup:    filepath.Join(dir, "cgroup.controllers"),
 		LookPath: func(name string) (string, error) {
 			if slices.Contains(found, name) {
@@ -52,7 +54,7 @@ func host(t *testing.T, portStart string, present bool, found ...string) Host {
 		t.Fatal(err)
 	}
 	if present {
-		for _, p := range []string{h.Quadlet, h.Cgroup} {
+		for _, p := range []string{h.Quadlet[0], h.Cgroup} {
 			if err := os.WriteFile(p, []byte("cpu memory pids\n"), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -316,5 +318,43 @@ func TestUnitsStale(t *testing.T) {
 	}
 	if c := m["firewall descriptor"]; !c.OK {
 		t.Errorf("firewall descriptor = %+v", c)
+	}
+}
+
+func TestQuadletArchPath(t *testing.T) {
+	h := host(t, "80", false)
+	if c := h.quadlet(); c.OK || !strings.Contains(c.Fix, h.Quadlet[0]) || !strings.Contains(c.Fix, h.Quadlet[1]) {
+		t.Errorf("quadlet check with neither path = %+v, want a failure whose fix names both", c)
+	}
+	if err := os.WriteFile(h.Quadlet[1], nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if c := h.quadlet(); !c.OK || c.Detail != h.Quadlet[1] {
+		t.Errorf("quadlet check with only the Arch path = %+v", c)
+	}
+}
+
+func TestDefaultQuadletPaths(t *testing.T) {
+	want := []string{"/usr/libexec/podman/quadlet", "/usr/lib/podman/quadlet"}
+	if !slices.Equal(DefaultHost.Quadlet, want) {
+		t.Errorf("DefaultHost.Quadlet = %q, want %q", DefaultHost.Quadlet, want)
+	}
+}
+
+func TestUnitsStaleLockFix(t *testing.T) {
+	ws := workspaceAt(t, true)
+	ws.Lock.Options = nil
+	c := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["units current"]
+	if c.OK || c.Fix != "railswitch lock" || !strings.Contains(c.Detail, "stack.lock is out of date") {
+		t.Errorf("units current with a stale lock = %+v", c)
+	}
+}
+
+func TestWorkspaceCheck(t *testing.T) {
+	if c := Workspace(fmt.Errorf("%w: run railswitch lock", config.ErrNoLock)); c.OK || c.Name != "workspace" || c.Fix != "railswitch lock" {
+		t.Errorf("Workspace(no lock) = %+v", c)
+	}
+	if c := Workspace(errors.New("project.toml: bad")); c.OK || c.Fix == "" || c.Detail != "project.toml: bad" {
+		t.Errorf("Workspace(bad project) = %+v", c)
 	}
 }

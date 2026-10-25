@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -536,7 +537,7 @@ func TestPreflightFreshWorkspace(t *testing.T) {
 func TestPreflightNoDescriptor(t *testing.T) {
 	e := setup(t)
 	e.render(t)
-	if err := os.Remove(hookDescriptor(e.ws, "filial")); err != nil {
+	if err := os.Remove(firewall.DescriptorPath(e.ws, "filial")); err != nil {
 		t.Fatal(err)
 	}
 	m, err := e.l.model(ctx)

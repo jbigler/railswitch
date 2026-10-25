@@ -23,25 +23,23 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	if fs.NArg() != 0 {
 		return e.usageErr("doctor takes no arguments")
 	}
-	code := 0
 	var ws *workspace.Workspace
+	var checks []doctor.Check
 	if _, err := workspace.Root(e.dir); err == nil {
-		// A workspace that doesn't load still gets its host checked.
+		// A workspace that doesn't load is a failed check; the host is
+		// still checked.
 		if ws, err = workspace.Load(ctx, e.dir, e.slug); err != nil {
-			fmt.Fprintf(e.stderr, "railswitch: %v; checking the host only\n", err)
-			ws, code = nil, 1
+			ws, checks = nil, []doctor.Check{doctor.Workspace(err)}
 		}
 	}
-	checks := doctor.Run(ctx, e.run, ws)
+	checks = append(checks, doctor.Run(ctx, e.run, ws)...)
+	code := 0
 	for _, c := range checks {
 		if !c.OK {
 			code = 1
 		}
 	}
 	if e.json {
-		if checks == nil {
-			checks = []doctor.Check{}
-		}
 		if err := json.NewEncoder(e.stdout).Encode(checks); err != nil {
 			return e.fail(err)
 		}

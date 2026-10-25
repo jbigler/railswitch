@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -126,5 +127,72 @@ func TestAllowPortsSysctlFails(t *testing.T) {
 	}
 	if calls, _ := sudoCalls(f); len(calls) != 1 {
 		t.Errorf("sudo calls after a failed sysctl = %q, want no tee", calls)
+	}
+}
+
+func TestAllowPortsNoTimeout(t *testing.T) {
+	f := &systest.Fake{}
+	if code, out, errs := runStdin(t, f, "y\n", "allow-ports"); code != 0 {
+		t.Fatalf("allow-ports: exit %d\n%s%s", code, out, errs)
+	}
+	if len(f.Cmds) != 2 {
+		t.Fatalf("calls = %q", f.Calls)
+	}
+	// sudo may prompt for a password on the tty: no deadline.
+	for i, c := range f.Cmds {
+		if c.Timeout != sys.NoTimeout {
+			t.Errorf("%q: Timeout %v, want sys.NoTimeout", f.Calls[i], c.Timeout)
+		}
+	}
+}
+
+// doctorRows runs `railswitch --json doctor` with args before it and decodes
+// the rows.
+func doctorRows(t *testing.T, args ...string) (int, []map[string]any) {
+	t.Helper()
+	code, out, errs := runIn(t, append(args, "--json", "doctor")...)
+	var rows []map[string]any
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatalf("doctor --json: %v\nstdout: %s\nstderr: %s", err, out, errs)
+	}
+	return code, rows
+}
+
+func rowNames(rows []map[string]any) []string {
+	var out []string
+	for _, r := range rows {
+		out = append(out, r["name"].(string))
+	}
+	return out
+}
+
+func TestDoctorOutsideWorkspace(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
+	code, rows := doctorRows(t, "-C", tmp)
+	names := rowNames(rows)
+	if code != 1 || len(names) == 0 || names[0] != "podman >= 5.0" {
+		t.Fatalf("doctor outside a workspace: exit %d, checks %q", code, names)
+	}
+	for _, n := range []string{"workspace", "firewall descriptor", "units current"} {
+		if slices.Contains(names, n) {
+			t.Errorf("doctor outside a workspace ran %q", n)
+		}
+	}
+}
+
+func TestDoctorWorkspaceLoadFails(t *testing.T) {
+	ws, _ := filialWS(t) // no stack.lock
+	code, rows := doctorRows(t, "-C", ws)
+	names := rowNames(rows)
+	if code != 1 || len(rows) == 0 || names[0] != "workspace" {
+		t.Fatalf("doctor in a workspace without a lock: exit %d, checks %q", code, names)
+	}
+	if rows[0]["ok"] != false || rows[0]["fix"] != "railswitch lock" || !strings.Contains(rows[0]["detail"].(string), "railswitch lock") {
+		t.Errorf("workspace row = %v", rows[0])
+	}
+	if !slices.Contains(names, "podman >= 5.0") || slices.Contains(names, "units current") {
+		t.Errorf("checks = %q, want the host checks and no project checks", names)
 	}
 }

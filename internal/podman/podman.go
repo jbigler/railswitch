@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -25,6 +26,20 @@ const (
 
 // Podman runs podman through R.
 type Podman struct{ R sys.Runner }
+
+// QuadletPaths are where distributions install podman's quadlet generator:
+// Fedora, Debian and Ubuntu under libexec, Arch under lib.
+var QuadletPaths = []string{"/usr/libexec/podman/quadlet", "/usr/lib/podman/quadlet"}
+
+// FindQuadlet returns the first of QuadletPaths that exists.
+func FindQuadlet() (string, bool) {
+	for _, p := range QuadletPaths {
+		if _, err := os.Stat(p); err == nil {
+			return p, true
+		}
+	}
+	return "", false
+}
 
 // BuildArgs describes one `podman build`.
 type BuildArgs struct {

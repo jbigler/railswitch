@@ -98,8 +98,20 @@ func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (m
 	if err := enc.Encode(d); err != nil {
 		return nil, err
 	}
-	out[path.Join(Dir, "hooks.d", prefix+"-firewall.json")] = render.File{Data: b.Bytes(), Mode: 0o644}
+	out[descriptorRel(prefix)] = render.File{Data: b.Bytes(), Mode: 0o644}
 	return out, nil
+}
+
+// descriptorRel is project prefix's hook descriptor, as a workspace-relative
+// slash path.
+func descriptorRel(prefix string) string {
+	return path.Join(Dir, "hooks.d", prefix+"-firewall.json")
+}
+
+// DescriptorPath is project prefix's hook descriptor in workspace ws:
+// without it, podman starts the project's containers unfirewalled.
+func DescriptorPath(ws, prefix string) string {
+	return filepath.Join(ws, filepath.FromSlash(descriptorRel(prefix)))
 }
 
 // entries is an allowlist file's entries: comments and blank lines dropped,

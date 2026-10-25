@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -342,5 +344,25 @@ func TestPullOnly(t *testing.T) {
 	wantCalls(t, f, []string{"podman", "pull", "-q", "x@sha256:aa"})
 	if f.Cmds[0].Timeout != 30*time.Minute {
 		t.Fatalf("Timeout = %v", f.Cmds[0].Timeout)
+	}
+}
+
+func TestFindQuadlet(t *testing.T) {
+	dir := t.TempDir()
+	libexec, lib := filepath.Join(dir, "libexec", "quadlet"), filepath.Join(dir, "lib", "quadlet")
+	old := QuadletPaths
+	t.Cleanup(func() { QuadletPaths = old })
+	QuadletPaths = []string{libexec, lib}
+	if p, ok := FindQuadlet(); ok {
+		t.Fatalf("FindQuadlet with neither = %q", p)
+	}
+	if err := os.MkdirAll(filepath.Dir(lib), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(lib, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if p, ok := FindQuadlet(); !ok || p != lib {
+		t.Errorf("FindQuadlet with only the Arch path = %q, %v", p, ok)
 	}
 }

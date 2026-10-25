@@ -197,6 +197,10 @@ func lockEntries(st *pack.Stack) (*config.Lock, error) {
 	return l, nil
 }
 
+// ErrStaleLock is wrapped by CheckLock's (and so Render's) error when
+// stack.lock differs from the resolved stack.
+var ErrStaleLock = errors.New("stack.lock is out of date")
+
 // CheckLock refuses a stack.lock whose packs or options differ from the
 // resolved stack by version or content hash, or that lacks or has an extra
 // one: the hash exists to stop unreviewed package content (HANDOFF §3.11).
@@ -223,7 +227,7 @@ func (w *Workspace) CheckLock() error {
 	cmp(have.Packs, want.Packs)
 	cmp(have.Options, want.Options)
 	if len(stale) > 0 {
-		return fmt.Errorf("stack.lock is out of date for %s: run railswitch lock", strings.Join(stale, ", "))
+		return fmt.Errorf("%w for %s: run railswitch lock", ErrStaleLock, strings.Join(stale, ", "))
 	}
 	return nil
 }

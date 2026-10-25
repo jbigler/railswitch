@@ -48,14 +48,9 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 	return errors.Join(errs...)
 }
 
-// hookDescriptor is the firewall's OCI hook descriptor in workspace ws.
-func hookDescriptor(ws, prefix string) string {
-	return filepath.Join(ws, firewall.Dir, "hooks.d", prefix+"-firewall.json")
-}
-
 // requireDescriptor refuses when the firewall hook descriptor is missing.
 func requireDescriptor(ws, prefix string) error {
-	d := hookDescriptor(ws, prefix)
+	d := firewall.DescriptorPath(ws, prefix)
 	if _, err := os.Stat(d); err != nil {
 		return fmt.Errorf("no firewall hook descriptor %s: containers would start unfirewalled (run railswitch render)", d)
 	}

@@ -427,7 +427,7 @@ func TestTimeouts(t *testing.T) {
 	if err := e.l.Deps(ctx, "feat", []string{"bundle", "add", "x"}); err != nil {
 		t.Fatal(err)
 	}
-	check("deps", "podman --hooks-dir", 30*time.Minute)
+	check("deps", "podman --hooks-dir", sys.NoTimeout)
 }
 
 // envRunner records the --env-file of a podman run while the file exists.

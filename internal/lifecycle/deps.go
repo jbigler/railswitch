@@ -4,18 +4,17 @@ import (
 	"context"
 	"errors"
 	"os"
-	"time"
 
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/sys"
 )
-
-// DepsTimeout bounds `railswitch deps`: an install can be slow.
-const DepsTimeout = 30 * time.Minute
 
 // Deps runs argv in a transient container of worktree slug's deps service
 // (D35): its image, mounts and firewall profile, with its env minus the
 // pack's [deps] frozen_env names, so argv may change the lockfiles. The env
-// goes through a temporary 0600 file, removed afterwards.
+// goes through a temporary 0600 file, removed afterwards. Like exec it has
+// no deadline: it is user-driven, may prompt, and a deadline would put it in
+// a background process group that the terminal stops (SIGTTIN/SIGTTOU).
 func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
 	if len(argv) == 0 {
 		return errors.New("deps: no command")
@@ -51,5 +50,5 @@ func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
 	if err != nil {
 		return err
 	}
-	return l.interactive(ctx, DepsTimeout, args)
+	return l.interactive(ctx, sys.NoTimeout, args)
 }

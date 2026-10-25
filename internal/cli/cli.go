@@ -9,11 +9,16 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 // Version is set at build time with
 // -ldflags "-X github.com/jbigler/railswitch/internal/cli.Version=…".
 var Version = "dev"
+
+func init() { workspace.Version = Version } // stack.lock records it
 
 // env carries the I/O streams and global flags for one invocation.
 type env struct {
@@ -23,17 +28,26 @@ type env struct {
 	dir    string // -C: start dir for workspace discovery
 	slug   string // -w: worktree slug
 	json   bool   // --json: machine-readable output (D40)
+	run    sys.Runner
 }
 
 type command func(ctx context.Context, e *env, args []string) int
 
 var commands = map[string]command{
 	"version": cmdVersion,
+	"lock":    cmdLock,
+	"render":  cmdRender,
+	"env":     cmdEnv,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.
 func Main(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	e := &env{stdin: stdin, stdout: stdout, stderr: stderr}
+	return dispatch(ctx, sys.Exec{}, args, stdin, stdout, stderr)
+}
+
+// dispatch is Main with the Runner every external command goes through.
+func dispatch(ctx context.Context, r sys.Runner, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	e := &env{stdin: stdin, stdout: stdout, stderr: stderr, run: r}
 	fs := flag.NewFlagSet("railswitch", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.StringVar(&e.dir, "C", "", "start `dir` for workspace discovery")

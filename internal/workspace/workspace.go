@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -296,6 +297,7 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 	if err != nil {
 		return nil, err
 	}
+	maps.Copy(p.Units, machine.ProxyUnits(reg.Registry))
 	return render.Apply(p, w.Root, w.Dirs.Quadlet, w.Project.Project.Prefix, check)
 }
 

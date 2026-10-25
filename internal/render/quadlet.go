@@ -17,8 +17,9 @@ import (
 	"github.com/jbigler/railswitch/internal/pack"
 )
 
-// Marker starts the first line of every rendered unit file.
-const Marker = "# railswitch: rendered from "
+// Marker starts the first line of every rendered unit file. It is defined in
+// machine, which renders the shared proxy unit and cannot import render.
+const Marker = machine.Marker
 
 // traefikUnit is the machine-wide proxy (§4).
 const traefikUnit = "railswitch-traefik.service"

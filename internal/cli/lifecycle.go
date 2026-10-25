@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
@@ -130,7 +131,7 @@ func cmdExec(ctx context.Context, e *env, args []string) int {
 		return code
 	}
 	if err := l.Exec(ctx, slug, *fresh, fs.Args()); err != nil {
-		return e.fail(err)
+		return e.failCommand(err)
 	}
 	return 0
 }
@@ -171,7 +172,17 @@ func cmdDeps(ctx context.Context, e *env, args []string) int {
 		return code
 	}
 	if err := l.Deps(ctx, slug, fs.Args()); err != nil {
-		return e.fail(err)
+		return e.failCommand(err)
 	}
 	return 0
+}
+
+// failCommand is fail for exec and deps: the container command's own
+// non-zero exit code becomes railswitch's, with nothing more printed.
+func (e *env) failCommand(err error) int {
+	var x *lifecycle.ExitError
+	if errors.As(err, &x) {
+		return x.Code
+	}
+	return e.fail(err)
 }

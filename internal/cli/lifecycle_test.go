@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -26,5 +27,24 @@ func TestStatusAndExecCLI(t *testing.T) {
 	}
 	if code, _, _ := runWith(t, f, "-C", ws, "-w", "feat", "deps"); code != 2 {
 		t.Fatalf("deps without a command: exit %d", code)
+	}
+}
+
+// TestExecDepsExitCode: exec and deps exit with the container command's
+// exit code, without a railswitch error line.
+func TestExecDepsExitCode(t *testing.T) {
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	mustRun(t, "-C", ws, "render")
+	f := fakeHost()
+	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}"}, sys.Result{Stdout: []byte("true\n")}, nil)
+	exit3 := fmt.Errorf("podman: %w (exit 3)", sys.ErrExit)
+	f.On([]string{"podman", "exec"}, sys.Result{ExitCode: 3}, exit3)
+	f.On([]string{"podman", "--hooks-dir"}, sys.Result{ExitCode: 3}, exit3)
+	for _, args := range [][]string{{"exec", "--", "false"}, {"deps", "--", "false"}} {
+		code, _, errs := runWith(t, f, append([]string{"-C", ws, "-w", "feat"}, args...)...)
+		if code != 3 || errs != "" {
+			t.Errorf("%s: exit %d, stderr %q; want 3 and no stderr", args[0], code, errs)
+		}
 	}
 }

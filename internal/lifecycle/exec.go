@@ -46,9 +46,19 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 	return l.interactive(ctx, sys.NoTimeout, args)
 }
 
+// ExitError is the non-zero exit code of an interactive command (exec,
+// deps); its stderr already went to the user.
+type ExitError struct{ Code int }
+
+func (e *ExitError) Error() string { return "exit status " + strconv.Itoa(e.Code) }
+
 // interactive runs podman args with the caller's stdin, stdout and stderr.
+// A non-zero exit is an *ExitError carrying the command's exit code.
 func (l *L) interactive(ctx context.Context, timeout time.Duration, args []string) error {
-	_, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: args, Stdin: l.In, Stdout: l.Out, Stderr: l.Err, Timeout: timeout})
+	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: args, Stdin: l.In, Stdout: l.Out, Stderr: l.Err, Timeout: timeout})
+	if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
+		return &ExitError{Code: res.ExitCode}
+	}
 	return err
 }
 

@@ -55,51 +55,124 @@ type Manager struct {
 // the worktree name (--name); when empty, Add prompts for it on a terminal
 // and otherwise uses the sanitized branch, suffixed with 4 hex digits of
 // its sha256 when that slug is taken. Nothing is registered unless
-// `git worktree add` succeeded.
-func (m *Manager) Add(ctx context.Context, target, name string) (render.Worktree, error) {
+// `git worktree add` succeeded, and any later failure rolls the whole Add
+// back (see rollback), so a second run can succeed.
+func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktree, err error) {
 	base, err := m.baseDir()
 	if err != nil {
 		return render.Worktree{}, err
 	}
-	branch, err := m.branchFor(ctx, base, target)
+	u := undo{base: base}
+	defer func() {
+		if err != nil {
+			w, err = render.Worktree{}, m.rollback(ctx, u, err)
+		}
+	}()
+	branch, fetched, err := m.branchFor(ctx, base, target)
 	if err != nil {
 		return render.Worktree{}, err
+	}
+	if fetched {
+		u.branch = branch
 	}
 	slug, err := m.slugFor(branch, name)
 	if err != nil {
 		return render.Worktree{}, err
 	}
 	dir := filepath.Join(m.WS, slug)
-	if err := m.gitWorktreeAdd(ctx, base, dir, branch); err != nil {
+	home := filepath.Join(m.WS, ".railswitch", "home", slug)
+	if _, err := os.Lstat(home); errors.Is(err, fs.ErrNotExist) {
+		u.home = home // a kept home of an earlier worktree of this name is user data
+	}
+	created, err := m.gitWorktreeAdd(ctx, base, dir, branch)
+	if err != nil {
 		return render.Worktree{}, err
+	}
+	u.dir = dir
+	if created {
+		u.branch = branch
 	}
 	e, err := m.register(slug)
 	if err != nil {
-		// Leave no checkout behind that the registry doesn't know of.
-		if _, rerr := m.git(ctx, base, "worktree", "remove", "--force", dir); rerr != nil {
-			return render.Worktree{}, fmt.Errorf("%w; removing the new worktree %s failed too: %v", err, dir, rerr)
-		}
 		return render.Worktree{}, err
 	}
-	w := render.Worktree{Slug: slug, ID: e.ID, Dir: dir, Branch: branch}
+	u.slug = slug
 	for _, p := range m.WorktreeVolumes {
 		if !filepath.IsLocal(p) {
-			return w, fmt.Errorf("worktree volume mount %q is not below /app", p)
+			return render.Worktree{}, fmt.Errorf("worktree volume mount %q is not below /app", p)
 		}
 		root, err := os.OpenRoot(dir)
 		if err != nil {
-			return w, err
+			return render.Worktree{}, err
 		}
 		err = root.MkdirAll(p, 0o755)
 		root.Close()
 		if err != nil {
-			return w, fmt.Errorf("create %s for its worktree volume: %w", filepath.Join(dir, p), err)
+			return render.Worktree{}, fmt.Errorf("create %s for its worktree volume: %w", filepath.Join(dir, p), err)
 		}
 	}
 	if err := m.seed(base, dir); err != nil {
-		return w, err
+		return render.Worktree{}, err
 	}
-	return w, m.Render(ctx)
+	u.rendered = true
+	if err := m.Render(ctx); err != nil {
+		return render.Worktree{}, err
+	}
+	return render.Worktree{Slug: slug, ID: e.ID, Dir: dir, Branch: branch}, nil
+}
+
+// undo is what a failed Add has done so far.
+type undo struct {
+	base     string
+	branch   string // the branch Add created (or fetched), to delete
+	dir      string // the checkout Add created
+	home     string // the slug's home dir, absent before Add
+	slug     string // registered by Add
+	rendered bool   // Render ran
+}
+
+// rollback undoes a failed Add in reverse order: the registry entry, the
+// slug's env dir and (new) home dir, the checkout, the branch Add created;
+// then, when Render ran, it renders again, which deletes the slug's units
+// and env files (D28). It returns cause joined with every rollback error.
+// It stops at a failed unregister: a registered worktree whose checkout is
+// gone would block every later change (the partial-view abort).
+func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
+	ctx = context.WithoutCancel(ctx) // an interrupted Add still rolls back (each call keeps its timeout)
+	errs := []error{cause}
+	fail := func(what string, err error) {
+		errs = append(errs, fmt.Errorf("rolling back: %s: %w", what, err))
+	}
+	if u.slug != "" {
+		if err := m.unregister(u.slug); err != nil {
+			fail("unregister "+u.slug, err)
+			return errors.Join(errs...)
+		}
+		if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", "env", u.slug)); err != nil {
+			fail("remove its env dir", err)
+		}
+	}
+	if u.home != "" && u.rendered { // only Render creates it
+		if err := os.RemoveAll(u.home); err != nil {
+			fail("remove its home dir", err)
+		}
+	}
+	if u.dir != "" {
+		if _, err := m.gitT(ctx, gitLong, u.base, "worktree", "remove", "--force", u.dir); err != nil {
+			fail("git worktree remove "+u.dir, err)
+		}
+	}
+	if u.branch != "" {
+		if _, err := m.git(ctx, u.base, "branch", "-D", u.branch); err != nil {
+			fail("delete branch "+u.branch, err)
+		}
+	}
+	if u.rendered {
+		if err := m.Render(ctx); err != nil {
+			fail("re-render without "+u.slug+" (run railswitch render)", err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // baseDir is the base worktree, <WS>/<Sanitize(Base)> (D22).
@@ -120,34 +193,37 @@ func (m *Manager) baseSlug() (string, error) {
 }
 
 // branchFor is target's branch: a PR number's head branch, else target.
-func (m *Manager) branchFor(ctx context.Context, base, target string) (string, error) {
-	branch := target
+// fetched: a PR head that was neither local nor on origin was fetched
+// into a new local branch.
+func (m *Manager) branchFor(ctx context.Context, base, target string) (branch string, fetched bool, err error) {
+	branch = target
 	if isPR(target) {
 		res, err := m.R.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"pr", "view", target, "--json", "headRefName", "-q", ".headRefName"}, Dir: base})
 		if err != nil {
-			return "", fmt.Errorf("PR %s: %w", target, err)
+			return "", false, fmt.Errorf("PR %s: %w", target, err)
 		}
 		branch = strings.TrimSpace(string(res.Stdout))
 	}
 	if branch == "" || strings.HasPrefix(branch, "-") {
-		return "", fmt.Errorf("%q is not a branch name", branch)
+		return "", false, fmt.Errorf("%q is not a branch name", branch)
 	}
 	if _, err := m.git(ctx, base, "check-ref-format", "--branch", branch); err != nil {
-		return "", fmt.Errorf("%q is not a branch name: %w", branch, err)
+		return "", false, fmt.Errorf("%q is not a branch name: %w", branch, err)
 	}
-	if isPR(target) {
-		local, err := m.hasRef(ctx, base, "refs/heads/"+branch)
-		if err != nil {
-			return "", err
-		}
-		if !local {
-			// The PR's head, from a fork too.
-			if _, err := m.gitT(ctx, gitLong, base, "fetch", "origin", "refs/pull/"+target+"/head:refs/heads/"+branch); err != nil {
-				return "", fmt.Errorf("fetch PR %s: %w", target, err)
-			}
+	if !isPR(target) {
+		return branch, false, nil
+	}
+	for _, ref := range []string{"refs/heads/" + branch, "refs/remotes/origin/" + branch} {
+		ok, err := m.hasRef(ctx, base, ref)
+		if err != nil || ok {
+			return branch, false, err // gitWorktreeAdd tracks origin/<branch>
 		}
 	}
-	return branch, nil
+	// A fork's PR: its head, fetched.
+	if _, err := m.gitT(ctx, gitLong, base, "fetch", "origin", "refs/pull/"+target+"/head:refs/heads/"+branch); err != nil {
+		return "", false, fmt.Errorf("fetch PR %s: %w", target, err)
+	}
+	return branch, true, nil
 }
 
 func isPR(target string) bool {
@@ -194,17 +270,17 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 
 // gitWorktreeAdd checks branch out at dir: an existing local branch, a
 // new tracking branch for origin/<branch>, else a new branch at the base
-// worktree's HEAD.
-func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) error {
+// worktree's HEAD. created: it created the local branch.
+func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) (created bool, err error) {
 	args := []string{"worktree", "add", dir, branch}
 	local, err := m.hasRef(ctx, base, "refs/heads/"+branch)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !local {
 		remote, err := m.hasRef(ctx, base, "refs/remotes/origin/"+branch)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if remote {
 			args = []string{"worktree", "add", "--track", "-b", branch, dir, "origin/" + branch}
@@ -213,9 +289,9 @@ func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) 
 		}
 	}
 	if _, err := m.gitT(ctx, gitLong, base, args...); err != nil {
-		return fmt.Errorf("git worktree add %s: %w", branch, err)
+		return false, fmt.Errorf("git worktree add %s: %w", branch, err)
 	}
-	return nil
+	return !local, nil
 }
 
 // register adds slug to the registry.
@@ -248,8 +324,9 @@ func (m *Manager) seed(base, dir string) error {
 			fmt.Fprintf(m.Out, "warning: seed file %s skipped: not a path inside the worktree\n", p)
 			continue
 		}
-		if _, err := root.Lstat(p); !errors.Is(err, fs.ErrNotExist) {
-			continue // present (or unreadable) in the new worktree: keep it
+		_, lerr := root.Lstat(p)
+		if lerr == nil {
+			continue // present in the new worktree: keep it
 		}
 		data, err := safefile.Read(filepath.Join(base, p), safefile.Limit)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -258,6 +335,9 @@ func (m *Manager) seed(base, dir string) error {
 		if err != nil {
 			fmt.Fprintf(m.Out, "warning: seed file %s skipped: %v\n", p, err)
 			continue
+		}
+		if !errors.Is(lerr, fs.ErrNotExist) {
+			return fmt.Errorf("seed file %s: %w", p, lerr) // e.g. a parent is a file in this branch
 		}
 		if d := filepath.Dir(p); d != "." {
 			if err := root.MkdirAll(d, 0o755); err != nil {

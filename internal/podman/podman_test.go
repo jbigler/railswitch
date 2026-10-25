@@ -221,6 +221,24 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+func TestStopLoaded(t *testing.T) {
+	f := &systest.Fake{}
+	r, err := exitErr(5, "Failed to stop a.service: Unit a.service not loaded.")
+	f.On([]string{"systemctl", "--user", "stop", "a.service"}, r, err)
+	s := Systemd{R: f}
+	if err := s.StopLoaded(ctx, "a.service", "b.service"); err != nil {
+		t.Fatalf("not loaded: %v", err)
+	}
+	wantCalls(t, f,
+		[]string{"systemctl", "--user", "stop", "a.service"},
+		[]string{"systemctl", "--user", "stop", "b.service"})
+	r, err = exitErr(1, "Job failed.")
+	f.On([]string{"systemctl", "--user", "stop", "b.service"}, r, err)
+	if err := s.StopLoaded(ctx, "b.service"); err == nil {
+		t.Fatal("a failed stop was ignored")
+	}
+}
+
 func TestSystemd(t *testing.T) {
 	f := &systest.Fake{}
 	s := Systemd{R: f}

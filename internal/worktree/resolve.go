@@ -24,15 +24,19 @@ func (m *Manager) git(ctx context.Context, dir string, args ...string) (string, 
 }
 
 func (m *Manager) gitT(ctx context.Context, timeout time.Duration, dir string, args ...string) (string, error) {
-	argv := append([]string{"-C", dir, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"}, args...)
-	res, err := m.R.Run(ctx, sys.Cmd{Name: "git", Args: argv, Timeout: timeout})
+	res, err := m.gitRun(ctx, timeout, dir, args...)
 	return string(res.Stdout), err
+}
+
+// gitRun is the one place a git argv is built.
+func (m *Manager) gitRun(ctx context.Context, timeout time.Duration, dir string, args ...string) (sys.Result, error) {
+	argv := append([]string{"-C", dir, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"}, args...)
+	return m.R.Run(ctx, sys.Cmd{Name: "git", Args: argv, Timeout: timeout})
 }
 
 // hasRef reports whether ref exists in the repo at dir.
 func (m *Manager) hasRef(ctx context.Context, dir, ref string) (bool, error) {
-	argv := []string{"-C", dir, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "show-ref", "--verify", "--quiet", ref}
-	res, err := m.R.Run(ctx, sys.Cmd{Name: "git", Args: argv})
+	res, err := m.gitRun(ctx, 0, dir, "show-ref", "--verify", "--quiet", ref)
 	if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode == 1 {
 		return false, nil
 	}

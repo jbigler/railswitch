@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -248,6 +250,88 @@ func TestAddGitFailsNoRegistry(t *testing.T) {
 	}
 }
 
+// rolledBack fails unless the failed Add of slug left nothing behind: no
+// registry entry, checkout, env dir or home dir.
+func (e *tenv) rolledBack(t *testing.T, slug string) {
+	t.Helper()
+	if got := e.slugs(t); !slices.Equal(got, []string{"master"}) {
+		t.Errorf("registry = %v; want only master", got)
+	}
+	for _, p := range []string{slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug} {
+		if exists(filepath.Join(e.ws, p)) {
+			t.Errorf("%s remains after the failed Add", p)
+		}
+	}
+	if strings.Contains(git(t, e.base, "worktree", "list"), filepath.Join(e.ws, slug)) {
+		t.Errorf("git still lists %s", slug)
+	}
+}
+
+func hasBranch(dir, b string) bool {
+	return exec.Command("git", "-C", dir, "show-ref", "--verify", "--quiet", "refs/heads/"+b).Run() == nil
+}
+
+func TestAddRenderFailsRollsBack(t *testing.T) {
+	e := setup(t)
+	render := e.m.Render
+	fail := true
+	e.m.Render = func(ctx context.Context) error {
+		if err := render(ctx); err != nil {
+			return err
+		}
+		if fail {
+			// As Apply would have: the home dir, besides the env dir.
+			if err := os.MkdirAll(filepath.Join(e.ws, ".railswitch", "home", "feat"), 0o700); err != nil {
+				return err
+			}
+			fail = false
+			return errors.New("render boom")
+		}
+		return nil
+	}
+	_, err := e.m.Add(context.Background(), "feat", "")
+	if err == nil || !strings.Contains(err.Error(), "render boom") {
+		t.Fatalf("Add = %v; want the render error", err)
+	}
+	e.rolledBack(t, "feat")
+	if hasBranch(e.base, "feat") {
+		t.Error("the branch feat that the failed Add created remains")
+	}
+	if e.renders != 2 {
+		t.Errorf("renders = %d; want 2 (the failed one and the rollback's)", e.renders)
+	}
+	if w := e.add(t, "feat", ""); w.Slug != "feat" || w.ID != 2 {
+		t.Errorf("second Add = %+v; want feat, ID 2", w)
+	}
+}
+
+func TestAddSeedFailsRollsBack(t *testing.T) {
+	e := setup(t)
+	// Branch feat has a file sub where the seed file sub/x needs a dir.
+	git(t, e.base, "checkout", "-q", "-b", "feat")
+	writeFile(t, filepath.Join(e.base, "sub"), "file\n")
+	git(t, e.base, "add", "sub")
+	git(t, e.base, "commit", "-q", "-m", "sub")
+	git(t, e.base, "checkout", "-q", "master")
+	writeFile(t, filepath.Join(e.base, "sub", "x"), "seed\n")
+	e.m.SeedFiles = []string{"sub/x"}
+	_, err := e.m.Add(context.Background(), "feat", "")
+	if err == nil || !strings.Contains(err.Error(), "sub/x") {
+		t.Fatalf("Add = %v; want a seed error naming sub/x", err)
+	}
+	e.rolledBack(t, "feat")
+	if !hasBranch(e.base, "feat") {
+		t.Error("the existing branch feat was deleted")
+	}
+	if e.renders != 0 {
+		t.Errorf("renders = %d; want 0: nothing was rendered, so the rollback has nothing to re-render", e.renders)
+	}
+	e.m.SeedFiles = nil
+	if w := e.add(t, "feat", ""); w.Slug != "feat" || w.ID != 2 {
+		t.Errorf("second Add = %+v; want feat, ID 2", w)
+	}
+}
+
 func TestAddNameCollision(t *testing.T) {
 	e := setup(t)
 	e.add(t, "other", "feat")
@@ -281,6 +365,24 @@ func TestAddPR(t *testing.T) {
 	w := e.add(t, "42", "")
 	if w.Slug != "pr-head" || w.Branch != "pr-head" {
 		t.Errorf("Add(42) = %+v; want pr-head", w)
+	}
+}
+
+// TestAddPRSameRepo: a PR head on origin only becomes a tracking branch,
+// not a fetched PR ref without upstream.
+func TestAddPRSameRepo(t *testing.T) {
+	e := setup(t)
+	git(t, e.base, "push", "-q", "origin", "HEAD:refs/heads/pr-head")
+	git(t, e.base, "fetch", "-q", "origin")
+	e.f.On([]string{"gh", "pr", "view", "7", "--json", "headRefName", "-q", ".headRefName"}, sys.Result{Stdout: []byte("pr-head\n")}, nil)
+	w := e.add(t, "7", "")
+	if up := strings.TrimSpace(git(t, w.Dir, "rev-parse", "--abbrev-ref", "pr-head@{upstream}")); up != "origin/pr-head" {
+		t.Errorf("upstream = %q; want origin/pr-head", up)
+	}
+	for _, c := range e.f.Calls {
+		if slices.Contains(c, "fetch") {
+			t.Errorf("fetched: %q", c)
+		}
 	}
 }
 
@@ -374,6 +476,28 @@ func TestRemovePartialViewAborts(t *testing.T) {
 	}
 }
 
+// TestRemoveUnitNotLoaded: a unit systemd doesn't know (never rendered, or a
+// service the stack gained since) is already stopped.
+func TestRemoveUnitNotLoaded(t *testing.T) {
+	e := setup(t)
+	e.add(t, "feat", "")
+	e.f.On([]string{"systemctl", "--user", "stop", "demo-feat-db.service"},
+		sys.Result{ExitCode: 5, Stderr: []byte("Failed to stop demo-feat-db.service: Unit demo-feat-db.service not loaded.\n")},
+		fmt.Errorf("systemctl: %w (exit 5)", sys.ErrExit))
+	if err := e.m.Remove(context.Background(), "feat", false); err != nil {
+		t.Fatalf("Remove with a not-loaded unit: %v", err)
+	}
+	if slices.Contains(e.slugs(t), "feat") {
+		t.Error("feat is still registered")
+	}
+	// Any other stop failure aborts.
+	e.add(t, "other", "")
+	e.f.On([]string{"systemctl", "--user", "stop", "demo-other-db.service"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	if err := e.m.Remove(context.Background(), "other", false); err == nil {
+		t.Error("Remove succeeded though a stop failed")
+	}
+}
+
 func TestRemoveExactNames(t *testing.T) {
 	e := setup(t)
 	e.add(t, "api", "")
@@ -394,7 +518,9 @@ func TestRemoveExactNames(t *testing.T) {
 		}
 	}
 	for _, want := range [][]string{
-		{"systemctl", "--user", "stop", "demo-api-rails.service", "demo-api-db.service", "demo-api-dev-network.service"},
+		{"systemctl", "--user", "stop", "demo-api-rails.service"},
+		{"systemctl", "--user", "stop", "demo-api-db.service"},
+		{"systemctl", "--user", "stop", "demo-api-dev-network.service"},
 		{"podman", "rm", "-f", "--ignore", "demo-api-rails"},
 		{"podman", "rm", "-f", "--ignore", "demo-api-db"},
 		{"podman", "volume", "rm", "-f", "demo-api-db-data"},
@@ -431,7 +557,9 @@ func TestNeverPrune(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(e.ws, "gone")); err != nil {
 		t.Fatal(err)
 	}
-	_ = e.m.Remove(ctx, "gone", true)
+	if err := e.m.Remove(ctx, "gone", true); err == nil || !strings.Contains(err.Error(), "out of view") {
+		t.Errorf("Remove(gone) with its dir missing = %v; want the partial-view refusal", err)
+	}
 	if _, err := e.m.List(ctx); err != nil {
 		t.Errorf("List with a missing worktree dir: %v", err)
 	}

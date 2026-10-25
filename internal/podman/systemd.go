@@ -2,6 +2,7 @@ package podman
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -38,6 +39,22 @@ func (s Systemd) Start(ctx context.Context, units ...string) error {
 // Stop runs `systemctl --user stop <units…>`.
 func (s Systemd) Stop(ctx context.Context, units ...string) error {
 	return s.units(ctx, 0, "stop", units)
+}
+
+// unitNotLoaded is systemctl's exit code for a unit it doesn't know.
+const unitNotLoaded = 5
+
+// StopLoaded runs `systemctl --user stop <unit>` for each unit in turn; a
+// unit systemd doesn't know ("not loaded", exit 5: never rendered, or its
+// file is gone) counts as stopped.
+func (s Systemd) StopLoaded(ctx context.Context, units ...string) error {
+	for _, u := range units {
+		r, err := s.run(ctx, 0, "stop", u)
+		if err != nil && !(errors.Is(err, sys.ErrExit) && r.ExitCode == unitNotLoaded) {
+			return err
+		}
+	}
+	return nil
 }
 
 // Restart runs (Timeout StartTimeout) `systemctl --user restart <units…>`.

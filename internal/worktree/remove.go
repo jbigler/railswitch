@@ -99,7 +99,7 @@ func (m *Manager) teardown(ctx context.Context, slug string) error {
 		if err := sd.DaemonReload(ctx); err != nil {
 			return err
 		}
-		if err := sd.Stop(ctx, names.Units...); err != nil {
+		if err := sd.StopLoaded(ctx, names.Units...); err != nil {
 			return err
 		}
 	}

@@ -11,6 +11,8 @@ func TestExpand(t *testing.T) {
 		{"{worktree.host}/admin", "feat.filial.localhost/admin"},
 		{"/data/rustfs{0..3}", "/data/rustfs{0..3}"},
 		{"http://$${1}/x", "http://$${1}/x"},
+		{"{{{worktree.host}", "{feat.filial.localhost"},
+		{"{worktree.host}:{worktree.host}", "feat.filial.localhost:feat.filial.localhost"},
 		{"{{literal}", "{literal}"},
 	}
 	for _, c := range cases {
@@ -29,12 +31,8 @@ func TestExpandUnknown(t *testing.T) {
 	}
 }
 
-type unsetScope struct{ MapScope }
-
-func (unsetScope) Unset(name string) bool { return name == "env.FOO" }
-
 func TestExpandUnset(t *testing.T) {
-	_, err := Expand("x={env.FOO}", unsetScope{MapScope{}})
+	_, err := Expand("TZ={env.TZ}", MapScope{})
 	if !errors.Is(err, ErrUnset) {
 		t.Fatalf("err = %v; want ErrUnset", err)
 	}

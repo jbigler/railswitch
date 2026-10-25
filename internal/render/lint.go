@@ -53,26 +53,9 @@ type lintUnit struct {
 	role    string // from "# role: <role>" on line 2
 }
 
-// markerScope is the last parenthesised group of the marker line.
-var markerScope = regexp.MustCompile(`\(([^()]*)\)[^()]*$`)
-
 func parseUnit(name string, data []byte) *lintUnit {
 	u := &lintUnit{name: name, lines: strings.Split(string(data), "\n")}
-	if len(u.lines) > 0 && strings.HasPrefix(u.lines[0], Marker) {
-		if m := markerScope.FindStringSubmatch(u.lines[0]); m != nil {
-			if m[1] == "machine" {
-				u.machine = true
-			} else {
-				for part := range strings.SplitSeq(m[1], ", ") {
-					if v, ok := strings.CutPrefix(part, "prefix "); ok {
-						u.prefix = v
-					} else if v, ok := strings.CutPrefix(part, "worktree "); ok {
-						u.slug = v
-					}
-				}
-			}
-		}
-	}
+	u.prefix, u.slug, u.machine, _ = parseMarker(u.lines[0])
 	if len(u.lines) > 1 {
 		u.role, _ = strings.CutPrefix(u.lines[1], "# role: ")
 	}

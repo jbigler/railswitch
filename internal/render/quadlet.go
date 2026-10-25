@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -80,6 +81,33 @@ func markerLine(m *Model, slug string) string {
 		where += ", worktree " + slug
 	}
 	return Marker + filepath.Join(m.Inputs.Workspace, "project.toml") + " (" + where + "). Edit project.toml, not this file."
+}
+
+// markerScope is the last parenthesised group of the marker line.
+var markerScope = regexp.MustCompile(`\(([^()]*)\)[^()]*$`)
+
+// parseMarker reads a unit's line 1. ok: it is a railswitch marker; machine:
+// a machine-wide unit; else the unit's project prefix and worktree slug (""
+// for a project-wide unit).
+func parseMarker(line string) (prefix, slug string, machine, ok bool) {
+	if !strings.HasPrefix(line, Marker) {
+		return "", "", false, false
+	}
+	m := markerScope.FindStringSubmatch(line)
+	if m == nil {
+		return "", "", false, false
+	}
+	if m[1] == "machine" {
+		return "", "", true, true
+	}
+	for part := range strings.SplitSeq(m[1], ", ") {
+		if v, ok := strings.CutPrefix(part, "prefix "); ok {
+			prefix = v
+		} else if v, ok := strings.CutPrefix(part, "worktree "); ok {
+			slug = v
+		}
+	}
+	return prefix, slug, false, true
 }
 
 func proxyNetwork(m *Model) *unit {

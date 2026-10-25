@@ -46,6 +46,9 @@ func TestSimpleArgv(t *testing.T) {
 				t.Fatal(err)
 			}
 			wantCalls(t, f, tc.want)
+			if tc.name == "VolumeImport" && f.Cmds[0].Timeout != 10*time.Minute {
+				t.Fatalf("import Timeout = %v", f.Cmds[0].Timeout)
+			}
 		})
 	}
 }
@@ -88,6 +91,9 @@ func TestPull(t *testing.T) {
 	wantCalls(t, f,
 		[]string{"podman", "pull", "-q", "docker.io/x:1"},
 		[]string{"podman", "image", "inspect", "--format", "{{.Digest}}", "docker.io/x:1"})
+	if f.Cmds[0].Timeout != 30*time.Minute {
+		t.Fatalf("pull Timeout = %v", f.Cmds[0].Timeout)
+	}
 }
 
 func TestBuild(t *testing.T) {
@@ -110,7 +116,7 @@ func TestRemoversTolerateMissing(t *testing.T) {
 	f := &systest.Fake{}
 	r, e := exitErr(1, "Error: no such volume api")
 	f.On([]string{"podman", "volume", "rm"}, r, e)
-	r, e = exitErr(1, `Error: unable to find network with name or ID api: network not found: unknown network`)
+	r, e = exitErr(1, "Error: unable to find network with name or ID api: network not found")
 	f.On([]string{"podman", "network", "rm"}, r, e)
 	p := Podman{R: f}
 	if err := p.RemoveVolume(ctx, "api"); err != nil {
@@ -200,14 +206,14 @@ func TestHealth(t *testing.T) {
 	if err != nil || h != "healthy" {
 		t.Fatalf("got %q %v", h, err)
 	}
-	wantCalls(t, f, []string{"podman", "container", "inspect", "--format", "{{.State.Health.Status}}", "api-db"})
+	wantCalls(t, f, []string{"podman", "container", "inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{end}}", "api-db"})
 	r, e := exitErr(125, "Error: no such container api-db")
 	f.On([]string{"podman", "container", "inspect"}, r, e)
 	h, err = Podman{R: f}.Health(ctx, "api-db")
 	if err != nil || h != "" {
 		t.Fatalf("missing: got %q %v", h, err)
 	}
-	f.On([]string{"podman", "container", "inspect"}, sys.Result{Stdout: []byte("<no value>\n")}, nil)
+	f.On([]string{"podman", "container", "inspect"}, sys.Result{Stdout: []byte("\n")}, nil)
 	h, err = Podman{R: f}.Health(ctx, "api-db")
 	if err != nil || h != "" {
 		t.Fatalf("no healthcheck: got %q %v", h, err)
@@ -240,6 +246,9 @@ func TestSystemd(t *testing.T) {
 		[]string{"systemctl", "--user", "reset-failed", "a.service", "b.service"})
 	if f.Cmds[1].Timeout != 10*time.Minute {
 		t.Fatalf("start Timeout = %v", f.Cmds[1].Timeout)
+	}
+	if f.Cmds[3].Timeout != 10*time.Minute {
+		t.Fatalf("restart Timeout = %v", f.Cmds[3].Timeout)
 	}
 }
 

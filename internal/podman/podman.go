@@ -12,8 +12,12 @@ import (
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
-// BuildTimeout bounds one image build.
-const BuildTimeout = 30 * time.Minute
+// BuildTimeout bounds one image build; PullTimeout one pull.
+const (
+	BuildTimeout  = 30 * time.Minute
+	PullTimeout   = 30 * time.Minute
+	ImportTimeout = 10 * time.Minute
+)
 
 // Podman runs podman through R.
 type Podman struct{ R sys.Runner }
@@ -64,7 +68,7 @@ func (p Podman) ImageExists(ctx context.Context, ref string) (bool, error) {
 
 // Pull runs `podman pull -q <ref>` and returns the pulled image's digest.
 func (p Podman) Pull(ctx context.Context, ref string) (string, error) {
-	if _, err := p.run(ctx, 0, "pull", "-q", ref); err != nil {
+	if _, err := p.run(ctx, PullTimeout, "pull", "-q", ref); err != nil {
 		return "", err
 	}
 	return p.out(ctx, "image", "inspect", "--format", "{{.Digest}}", ref)
@@ -106,7 +110,7 @@ func (p Podman) VolumeCreate(ctx context.Context, name string) error {
 
 // VolumeImport runs `podman volume import <name> <tarball>`.
 func (p Podman) VolumeImport(ctx context.Context, name, tarball string) error {
-	_, err := p.run(ctx, 0, "volume", "import", name, tarball)
+	_, err := p.run(ctx, ImportTimeout, "volume", "import", name, tarball)
 	return err
 }
 
@@ -128,7 +132,7 @@ func (p Podman) RemoveVolume(ctx context.Context, name string) error {
 // RemoveNetwork runs `podman network rm -f <name>`; a missing network is not an error.
 func (p Podman) RemoveNetwork(ctx context.Context, name string) error {
 	r, err := p.run(ctx, 0, "network", "rm", "-f", name)
-	if err != nil && isMissing(r, err, "unknown network", "network not found") {
+	if err != nil && isMissing(r, err, "network not found") {
 		return nil
 	}
 	return err
@@ -172,9 +176,7 @@ func (p Podman) ImageDigest(ctx context.Context, ref string) (string, error) {
 // Health returns `{{.State.Health.Status}}`, or "" for a missing container
 // or one without a healthcheck.
 func (p Podman) Health(ctx context.Context, name string) (string, error) {
-	s, err := p.inspectContainer(ctx, "{{.State.Health.Status}}", name)
-	if s == "<no value>" {
-		s = ""
-	}
-	return s, err
+	// .State.Health is nil without a healthcheck; guard it so the
+	// template prints "" instead of failing.
+	return p.inspectContainer(ctx, "{{if .State.Health}}{{.State.Health.Status}}{{end}}", name)
 }

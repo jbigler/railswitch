@@ -40,9 +40,9 @@ func (s Systemd) Stop(ctx context.Context, units ...string) error {
 	return s.units(ctx, 0, "stop", units)
 }
 
-// Restart runs `systemctl --user restart <units…>`.
+// Restart runs (Timeout StartTimeout) `systemctl --user restart <units…>`.
 func (s Systemd) Restart(ctx context.Context, units ...string) error {
-	return s.units(ctx, 0, "restart", units)
+	return s.units(ctx, StartTimeout, "restart", units)
 }
 
 // ResetFailed runs `systemctl --user reset-failed <units…>`.

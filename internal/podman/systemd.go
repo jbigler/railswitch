@@ -9,13 +9,23 @@ import (
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
-// StartTimeout bounds `systemctl --user start` (it waits for image pulls
-// and healthy dependencies): at least the deps oneshot's TimeoutStartSec
-// (900 s) plus the app's own (180 s by default).
+// StartTimeout is the default bound of `systemctl --user start`/`restart`
+// (they wait for image pulls and healthy dependencies) when Systemd.Timeout
+// is unset; up derives its own from the units it starts.
 const StartTimeout = 20 * time.Minute
 
 // Systemd runs `systemctl --user` through R.
-type Systemd struct{ R sys.Runner }
+type Systemd struct {
+	R       sys.Runner
+	Timeout time.Duration // start and restart deadline; 0 = StartTimeout
+}
+
+func (s Systemd) startTimeout() time.Duration {
+	if s.Timeout > 0 {
+		return s.Timeout
+	}
+	return StartTimeout
+}
 
 func (s Systemd) run(ctx context.Context, timeout time.Duration, args ...string) (sys.Result, error) {
 	return s.R.Run(ctx, sys.Cmd{Name: "systemctl", Args: append([]string{"--user"}, args...), Timeout: timeout})
@@ -34,7 +44,7 @@ func (s Systemd) DaemonReload(ctx context.Context) error {
 
 // Start runs `systemctl --user start <units…>`.
 func (s Systemd) Start(ctx context.Context, units ...string) error {
-	return s.units(ctx, StartTimeout, "start", units)
+	return s.units(ctx, s.startTimeout(), "start", units)
 }
 
 // Stop runs `systemctl --user stop <units…>`.
@@ -58,9 +68,9 @@ func (s Systemd) StopLoaded(ctx context.Context, units ...string) error {
 	return nil
 }
 
-// Restart runs (Timeout StartTimeout) `systemctl --user restart <units…>`.
+// Restart runs (Timeout as Start) `systemctl --user restart <units…>`.
 func (s Systemd) Restart(ctx context.Context, units ...string) error {
-	return s.units(ctx, StartTimeout, "restart", units)
+	return s.units(ctx, s.startTimeout(), "restart", units)
 }
 
 // ResetFailed runs `systemctl --user reset-failed <units…>`.

@@ -17,7 +17,6 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
-	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -1020,29 +1019,49 @@ func TestUpBuildsTagsOfRecordedDigests(t *testing.T) {
 	}
 }
 
-// TestStartTimeoutCoversUnits: systemctl start of the app waits for the
-// deps oneshot and then the app's own start, so its deadline is at least
-// the sum of their TimeoutStartSec.
-func TestStartTimeoutCoversUnits(t *testing.T) {
+// TestStartTimeoutFromUnits: systemctl start/restart of a worktree's units
+// waits up to the sum of their TimeoutStartSec (systemd's 90 s default when
+// unset) plus a margin, so a long health start period is covered.
+func TestStartTimeoutFromUnits(t *testing.T) {
 	e := setup(t)
-	e.render(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.labels(t, "filial-feat-db")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
 	total := 0
-	for _, svc := range []string{"deps", "rails"} {
-		data, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-"+svc+".container"))
+	entries, err := os.ReadDir(e.l.WS.Dirs.Quadlet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, en := range entries {
+		if !strings.HasPrefix(en.Name(), "filial-feat-") || !strings.HasSuffix(en.Name(), ".container") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, en.Name()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		n := 90
 		for _, line := range strings.Split(string(data), "\n") {
 			if v, ok := strings.CutPrefix(line, "TimeoutStartSec="); ok {
-				n, err := strconv.Atoi(v)
-				if err != nil {
+				if n, err = strconv.Atoi(v); err != nil {
 					t.Fatal(err)
 				}
-				total += n
 			}
 		}
+		total += n
 	}
-	if want := time.Duration(total) * time.Second; total < 900 || podman.StartTimeout < want {
-		t.Errorf("StartTimeout = %v; want at least %v (deps + app TimeoutStartSec)", podman.StartTimeout, want)
+	want := time.Duration(total)*time.Second + 2*time.Minute
+	if want < 20*time.Minute {
+		t.Fatalf("fixture total %v is too small to tell", want)
+	}
+	for i, c := range e.f.Calls {
+		if j := joined(c); strings.HasPrefix(j, "systemctl --user start") || strings.HasPrefix(j, "systemctl --user restart") {
+			if got := e.f.Cmds[i].Timeout; got != want {
+				t.Errorf("%s: Timeout = %v; want %v", j, got, want)
+			}
+		}
 	}
 }

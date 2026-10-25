@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -148,6 +150,9 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	if err != nil {
 		return err
 	}
+	if sd.Timeout, err = l.startTimeout(names.Containers); err != nil {
+		return err
+	}
 	// What systemd has loaded, read before any reload: a unit file changed
 	// by an earlier render (railswitch render, wt add, a failed up) is
 	// not loaded yet or loaded stale (NeedDaemonReload). Whether a running
@@ -215,6 +220,36 @@ func (l *L) staleContainer(ctx context.Context, ctr, unitFile, key string) (bool
 		return false, err
 	}
 	return have != unithash.Read(data, key), nil
+}
+
+// defaultStartSec is systemd's DefaultTimeoutStartSec, for a unit that
+// sets no TimeoutStartSec.
+const defaultStartSec = 90
+
+// startTimeout bounds starting containers' units: the sum of their
+// TimeoutStartSec (starting the app waits for deps and the data services,
+// a chain at worst) plus two minutes, never below podman.StartTimeout.
+func (l *L) startTimeout(containers []string) (time.Duration, error) {
+	total := 0
+	for _, c := range containers {
+		data, err := os.ReadFile(filepath.Join(l.WS.Dirs.Quadlet, c+".container"))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return 0, err
+		}
+		n := defaultStartSec
+		for line := range strings.Lines(string(data)) {
+			if v, ok := strings.CutPrefix(strings.TrimRight(line, "\n"), "TimeoutStartSec="); ok {
+				if n, err = strconv.Atoi(v); err != nil {
+					return 0, fmt.Errorf("%s.container: TimeoutStartSec=%q: %w", c, v, err)
+				}
+			}
+		}
+		total += n
+	}
+	return max(time.Duration(total)*time.Second+2*time.Minute, podman.StartTimeout), nil
 }
 
 func unitOf(m *render.Model, slug, svc string) string {

@@ -73,10 +73,10 @@ Each pair's diff is a single hunk (the whole file), so the annotations below go 
 | `db@.container` | `filial-<slug>-db.container` | **intended change (D3, D6)** |
 | `redis@.container` | `filial-<slug>-cache.container` | **intended change (D3: slot id `cache`)** |
 | `rustfs@.container` | `filial-<slug>-storage.container` | **intended change (D3: slot id `storage`)** |
-| `rustfs-init@.container` | none | **intended change (D18)**: the seed is imported by `podman volume import` in `up`. That is Stage 2 (Task 18) **gap → Stage 2** |
+| `rustfs-init@.container` | none | **intended change (D18)**: the seed is imported by `podman volume import` in `up` (Stage 2, Task 18) |
 | `playwright@.container` | `filial-<slug>-browser.container` | **intended change (D3: slot id `browser`)** |
 | `nvim@.container` | `filial-<slug>-nvim.container` | **intended change (D23)** |
-| `traefik.container` | none | **gap → Stage 2**: Task 15 renders the machine-wide `railswitch-traefik.container` (D21). Units already `Wants=railswitch-traefik.service` |
+| `traefik.container` | `railswitch-traefik.container` (machine-wide) | **intended change (D21)**: one Traefik for every project, rendered from the machine registry (Stage 2, Task 15); not part of this project's goldens |
 | `dozzle.container` | none | **gap → Stage 3**: `railswitch-dozzle` at `logs.localhost` (roadmap Stage 3) |
 
 ## Applies to every pair
@@ -91,8 +91,9 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `-Requires=/After=@@P@@-net-network@%i.service` | **intended change (D27)** | Dropped because `Network=` now names the `.network` unit, so Quadlet adds `Requires=`/`After=filial-feat-dev-network.service` itself. Shown by the dry-run: `filial-feat-rails.service` has `Requires=filial-feat-dev-network.service` / `After=filial-feat-dev-network.service`. |
 | `-[Service] EnvironmentFile=@@ROOT@@/.unit-env/%i.env` (and `%i.share.env`) | **intended change (D8)** | It only existed so systemd could expand `${VAR}` in the unit. Rendered units have no `${VAR}`, so nothing reads it. |
 | `-Annotation=@@P@@.firewall.mode=${FIREWALL_MODE}` / `+…=log` | **intended change (D8)** | Same value as the old default (`FIREWALL_MODE:-log` in `units-env.sh`), written in. |
-| `-GlobalArgs=--hooks-dir=@@ROOT@@/.firewall/hooks.d` / `+…/.railswitch/firewall/hooks.d` | **intended change (D19)** + **gap → Stage 2** | Path moves under `.railswitch/`. The hook descriptor, `hook.sh` and `firewall.sh` are not written by Stage 1 render (the rendered workspace has only `.railswitch/assets` and `.railswitch/env`); Task 16 writes them. |
+| `-GlobalArgs=--hooks-dir=@@ROOT@@/.firewall/hooks.d` / `+…/.railswitch/firewall/hooks.d` | **intended change (D19)** | Path moves under `.railswitch/`. Render writes the hook descriptor, `hook.sh` and `firewall.sh` there (Stage 2, Task 16). |
 | `+NoNewPrivileges=true`, `+Memory=…`, `+PidsLimit=…` | **intended change (D34)** | New hardening and limits on every container. |
+| `+Label=filial.unit-hash=<12 hex>` (first line of `[Container]`) | **intended change** (final-review fix I3) | The first 12 hex of the sha256 of the unit without this line. `up` restarts a running container whose label differs from its rendered unit's, so a stale container is caught even after another daemon-reload cleared `NeedDaemonReload`. Traefik carries `railswitch.unit-hash`. Label only, no runtime effect on the app. |
 | `+Notify=healthy` on every unit with a `HealthCmd=` | **intended change**: app unit **D34**; data units (db, cache, storage) plan Task 9 ("Data services: health keys from the option, plus `Notify=healthy`"; no D#) | The old rails@ comment says its `Requires=` on db/redis/rustfs is a health gate *because* of `Notify=healthy`, but no old unit set it: the gate was `--sdnotify=conmon` (started, not healthy). Now real; the dry-run shows `--sdnotify=healthy`. |
 | `-NetworkAlias=x` + `-Network=@@P@@-%i-dev` / `+Network=filial-feat-dev.network:alias=x` | **intended change (D27)** | Same alias scope for single-network containers; per-network alias for two-network containers, as the old rails@ already did. |
 | `-Entrypoint=entrypoint-x.sh` / `+Entrypoint=/usr/local/bin/entrypoint-x.sh` | **same behaviour** | Same file (mounted at `/usr/local/bin/`), absolute instead of found on `PATH`. |
@@ -158,7 +159,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 ```diff
 --- testdata/legacy/quadlet/rails@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-rails.container
-@@ -1,62 +1,58 @@
+@@ -1,62 +1,60 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: app
 +
@@ -186,6 +187,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 -Network=@@P@@-%i-dev:alias=rails
 -Network=@@P@@-proxy.network
 -
++Label=filial.unit-hash=0367fe9591f2
 +Image=localhost/filial/base:ruby3.3.6-node22.11.0-ba118cc2
 +ContainerName=filial-feat-rails
 +Network=filial-feat-dev.network:alias=rails
@@ -215,7 +217,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 +AddHost=s3.feat.filial.localhost:10.214.3.2
 +AddHost=s3-ui.feat.filial.localhost:10.214.3.2
 +AddHost=vnc.feat.filial.localhost:10.214.3.2
-+PublishPort=127.0.0.1:33002:38698
++PublishPort=127.0.0.1:33002:33002
 +PublishPort=127.0.0.1:13002:3000
 +Volume=/WORKSPACES/filial/feat:/app:z
 +Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:ro,z
@@ -223,6 +225,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 +Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 +Volume=filial_npm_cache:/home/appuser/.npm:U
 +Volume=filial-feat-node-modules:/app/node_modules:U
++Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN
 +DropCapability=all
 +NoNewPrivileges=true
 +Memory=4g
@@ -275,7 +278,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `-Network=@@P@@-proxy.network` / `+Network=filial-proxy.network` | **same behaviour** | Same network. |
 | `-EnvironmentFile=…/.container-config/.env`, `…/.unit-env/%i.env`, `…/%i.share.env` / `+EnvironmentFile=…/.railswitch/env/feat/rails.env` | **intended change (D10, D26, D42)** | One file. See [Env contents](#env-contents) for the variables that went away. |
 | `-PodmanArgs=--add-host ${WORKTREE_HOST}:… ${S3_HOST} ${RUSTFS_UI_HOST} ${TS_HOST_ENTRY}` / `+AddHost=` for `feat`, `s3.feat`, `s3-ui.feat`, `vnc.feat` `.filial.localhost` → `10.214.3.2` | **intended change (D5, D8)**; `TS_HOST_ENTRY` **intended change (D26)** | Same Traefik-routed hosts mapped to Traefik's `.2`, now as native `AddHost=`, plus `vnc.`. The share entry returns with the share redesign (Stage 3). |
-| `-PublishPort=127.0.0.1:${RUBY_DEBUG_PORT}:38698`, `${APP_PORT}:3000` / `+127.0.0.1:33002:38698`, `13002:3000` | **intended change (D8)** | Same loopback publishes, with pinned bases 33000+ID and 13000+ID written in. |
+| `-PublishPort=127.0.0.1:${RUBY_DEBUG_PORT}:38698`, `${APP_PORT}:3000` / `+127.0.0.1:33002:33002`, `13002:3000` | **intended change (D8, Task 13F)** | Same loopback publishes, with pinned bases 33000+ID and 13000+ID written in. The rails pack's debug port has `same_port = true`: rdbg listens on `RUBY_DEBUG_PORT` (33000+ID) inside the container too, so the port it reports is the one published. |
 | `-Volume=@@ROOT@@/%i:/app:z`, `${MAIN_WORKTREE_PATH}/.git…` / `+Volume=/WORKSPACES/filial/feat:/app:z`, `/WORKSPACES/filial/master/.git…:ro,z` | **intended change (D8, D22)** | Same mounts, with the base worktree `master/` written in. |
 | `-Volume=${GEM_VOLUME}:/usr/local/bundle` / `+Volume=filial_gems_ruby3.3.6:/usr/local/bundle` | **intended change (D8)** | Same shared gem volume, keyed by ruby version (pack `[[caches]]`). |
 | `-Volume=@@P@@-%i-node-modules…:U`, `@@P@@_npm_cache…:U` / `+` same | **same behaviour** | Same volumes and `:U`. |
@@ -284,14 +287,14 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `+Label=traefik.docker.network=filial_proxy` | **intended change (D21)** | The old project-local Traefik set `--providers.docker.network=@@P@@_proxy` globally. The machine-wide Traefik serves several projects' proxy networks, so each two-network container names its own. |
 | `-…routers.@@P@@-%i-app.rule=Host(`${WORKTREE_HOST}`)` / `+…filial-feat-app.rule=Host(`feat.filial.localhost`)`, `+…routers.filial-feat-app.service=filial-feat-app` | **intended change (D5, D8)** | Same router; hostname written in. The explicit `.service=` label names the service Traefik already inferred (single service), so routing is unchanged. |
 | `+HealthCmd=curl -fsS http://localhost:3000/up`, `HealthInterval/Retries/StartPeriod`, `Notify=healthy` | **intended change (D34)** | App health. The dry-run shows `--health-cmd` and `--sdnotify=healthy`; `TimeoutStartSec=180` > start period 120s. |
-| Twilio secret: no `Secret=` line, though the fixture declares `[secrets.twilio_auth_token] services = ["rails"]` | **gap → Stage 2** | `Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN` is rendered by Task 16A (D33). Legacy had no secret delivery at all (env passthrough). |
+| `+Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN` | **intended change (D33)** | The fixture's `[secrets.twilio_auth_token] services = ["rails"]`, delivered by podman as an env var (Task 16A). Legacy had no secret delivery at all (env passthrough). |
 
 ## deps@.container → filial-feat-deps.container
 
 ```diff
 --- testdata/legacy/quadlet/deps@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-deps.container
-@@ -1,33 +1,33 @@
+@@ -1,33 +1,34 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: deps
 +
@@ -305,6 +308,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 -Image=${RAILS_IMAGE}
 -ContainerName=@@P@@-%i-deps
 -Network=@@P@@-%i-dev
++Label=filial.unit-hash=351a507dc52f
 +Image=localhost/filial/base:ruby3.3.6-node22.11.0-ba118cc2
 +ContainerName=filial-feat-deps
 +Network=filial-feat-dev.network:alias=deps
@@ -354,18 +358,19 @@ These line groups repeat in every hunk below and are not re-annotated there.
 |---|---|---|
 | `-Image=${RAILS_IMAGE}` / `+Image=localhost/filial/base:…` | **intended change (D9, D31)** | Same image as rails. |
 | `-Network=@@P@@-%i-dev` / `+Network=filial-feat-dev.network:alias=deps` | **intended change (D27)** | Same network; `.network` reference gives the dependency. The alias is new, and harmless (nothing resolves `deps`). |
-| `-Environment=PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` / `+EnvironmentFile=…/env/feat/deps.env` | **intended change (D11, D35)** + **gap → Stage 4** | `deps.env` holds only the pack layer, `BINDING=0.0.0.0`, `RAILS_ENV=development`, and `BUNDLE_FROZEN=true` (D35, new: frozen installs). `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is gone: without it, `npm ci` downloads a Chromium the browser container already provides. Fix: Filial sets `[services.deps.env]`, or the playwright option gives it to deps (the design mock-up does). **Open question 2.** |
+| `-Environment=PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` / `+EnvironmentFile=…/env/feat/deps.env` | **intended change (D11, D35)** + **gap → Stage 4** | `deps.env` holds only the pack layer, `BINDING=0.0.0.0`, `RAILS_ENV=development`, `RUBY_DEBUG_HOST=0.0.0.0`, and `BUNDLE_FROZEN=true` (D35, new: frozen installs). `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is gone: without it, `npm ci` downloads a Chromium the browser container already provides. Fix: Filial sets `[services.deps.env]`, or the playwright option gives it to deps (the design mock-up does). **Open question 2.** |
 | Volumes: `/app`, `entrypoint-deps.sh`, gems, `node-modules`, `npm_cache` | **same behaviour** | Same five mounts. `entrypoint-deps.sh` now comes from the rails pack assets. |
 | `+DropCapability=all` | **intended change (D34)** |  |
 | `Annotation=…firewall=deps`, `networks=filial-feat-dev` | **same behaviour** | Same profile and networks. The `allow.deps = ["github.com"]` list lands in the descriptor (Stage 2, Task 16). |
 | `LogDriver=passthrough`, `Type=oneshot`, `TimeoutStartSec=900` | **same behaviour** | Unchanged; still no `RemainAfterExit`, so each rails start reruns deps. |
+| No `Exec=` after `Entrypoint=` | **same behaviour** | A pack's `[app] install` becomes the deps unit's `Exec=`, which the deps entrypoint runs after its setup. The rails pack sets none: its `entrypoint-deps.sh` does the lockfile-frozen install itself, as the legacy unit did. |
 
 ## db@.container → filial-feat-db.container
 
 ```diff
 --- testdata/legacy/quadlet/db@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-db.container
-@@ -1,69 +1,36 @@
+@@ -1,69 +1,37 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: data
 +
@@ -385,6 +390,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 -Environment=TZ=Asia/Bangkok
 -Environment=PGTZ=Asia/Bangkok
 -
++Label=filial.unit-hash=3e72bc09ca96
 +Image=docker.io/library/postgres:17
 +ContainerName=filial-feat-db
 +Network=filial-feat-dev.network:alias=db
@@ -475,7 +481,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 ```diff
 --- testdata/legacy/quadlet/redis@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-cache.container
-@@ -1,27 +1,30 @@
+@@ -1,27 +1,31 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: data
 +
@@ -486,6 +492,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 +Description=filial cache of worktree feat
  
  [Container]
++Label=filial.unit-hash=c0c3e332d3b7
  Image=docker.io/library/redis:8-alpine
 -ContainerName=@@P@@-%i-redis
 -Network=@@P@@-%i-dev
@@ -533,7 +540,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 ```diff
 --- testdata/legacy/quadlet/rustfs@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-storage.container
-@@ -1,53 +1,52 @@
+@@ -1,53 +1,53 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: data
 +
@@ -548,6 +555,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 +After=railswitch-traefik.service
  
  [Container]
++Label=filial.unit-hash=8a2d620cb4ef
  Image=docker.io/rustfs/rustfs:1.0.0-alpha.83
 -ContainerName=@@P@@-%i-rustfs
 -Network=@@P@@-%i-dev:alias=rustfs
@@ -627,7 +635,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 
 | Lines in the hunk | Verdict | Why |
 |---|---|---|
-| `-Requires/After=…rustfs-init@%i.service` | **intended change (D18)** + **gap → Stage 2** | No init container. `up` imports `db-dumps/rustfs_data.tar.gz` (rustfs option `seed`) into `filial-feat-rustfs-data` when it creates the volume (Task 18). Old: the tarball was extracted when `/data/rustfs0` was missing. New: imported once at volume creation. Equivalent for a fresh volume. |
+| `-Requires/After=…rustfs-init@%i.service` | **intended change (D18)** | No init container. `up` imports `db-dumps/rustfs_data.tar.gz` (rustfs option `seed`) into `filial-feat-rustfs-data` when it creates the volume (Task 18). Old: the tarball was extracted when `/data/rustfs0` was missing. New: imported once at volume creation. Equivalent for a fresh volume. |
 | `-ContainerName=…-rustfs`, `alias=rustfs` / `+…-storage`, `alias=storage` | **intended change (D3)** | Clients follow: `S3_ENDPOINT=http://storage:9000` in rails.env. Legacy rails got `RUSTFS_ENDPOINT=http://${S3_HOST}` (via Traefik); see [Env contents](#env-contents). |
 | `-Environment=RUSTFS_*` (8 lines) / `+EnvironmentFile=…/env/feat/storage.env` | **intended change (D10, D17)** | Same 8 `RUSTFS_*` values in `storage.env`, except `RUSTFS_SECRET_KEY`: it is the generated `S3_SECRET_KEY` (D17) instead of the hard-coded `rustfsadmin`. |
 | `+AddHost=…` (4 lines) | **intended change (D5)** | New: every proxy-network container gets the Traefik host entries. Harmless for storage. |
@@ -641,7 +649,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 ```diff
 --- testdata/legacy/quadlet/playwright@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-browser.container
-@@ -1,42 +1,42 @@
+@@ -1,42 +1,43 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: tool
 +
@@ -666,6 +674,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 -PublishPort=127.0.0.1:${PLAYWRIGHT_HOST_PORT}:8888
 -PodmanArgs=--add-host ${WORKTREE_HOST}:${PODMAN_TRAEFIK_IP} --add-host ${S3_HOST}:${PODMAN_TRAEFIK_IP} --add-host ${RUSTFS_UI_HOST}:${PODMAN_TRAEFIK_IP}
 -
++Label=filial.unit-hash=54588bf5adb0
 +Image=localhost/filial/playwright:1.54.0-8ed7a43c
 +ContainerName=filial-feat-browser
 +Network=filial-feat-dev.network:alias=browser
@@ -732,7 +741,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 ```diff
 --- testdata/legacy/quadlet/nvim@.container (comments stripped)
 +++ internal/render/testdata/golden/filial/filial-feat-nvim.container
-@@ -1,53 +1,41 @@
+@@ -1,53 +1,43 @@
 +# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
 +# role: tool
 +
@@ -747,6 +756,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 -ContainerName=@@P@@-%i-nvim
 -Network=@@P@@-%i-dev
 -NetworkAlias=nvim
++Label=filial.unit-hash=6be063e54a09
 +Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-d2ae020d
 +ContainerName=filial-feat-nvim
 +Network=filial-feat-dev.network:alias=nvim
@@ -794,6 +804,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 +Volume=filial_npm_cache:/home/appuser/.npm:U
 +Volume=filial_nvim_config:/home/appuser/.config/nvim:U
 +Volume=filial_nvim_share:/home/appuser/.local/share/nvim:U
++Secret=filial_github_token,type=mount,target=/run/secrets/github_token,uid=1000,gid=1000,mode=0400
 +DropCapability=all
 +NoNewPrivileges=true
 +Memory=2g
@@ -821,10 +832,10 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `-Image=${NVIM_IMAGE}` / `+Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-d2ae020d` | **intended change (D9, D23, D31)** | Built on the base image. |
 | `-EnvironmentFile=…/.container-config/.env`, `…/.unit-env/%i.env`, `-Environment=SSH_AUTH_SOCK=…`, `-Environment=RUSTFS_ENDPOINT=http://rustfs:9000` / `+EnvironmentFile=…/env/feat/nvim.env` | **intended change (D10, D33, D42)** | `nvim.env` has the app env (DB, `REDIS_URL`, `S3_ENDPOINT=http://storage:9000`, `PLAYWRIGHT_HOST`, worktree vars). `SSH_AUTH_SOCK` is gone (D33); `RUSTFS_ENDPOINT` is now `S3_ENDPOINT` (D3/option `gives`). |
 | `-PublishPort=127.0.0.1:${NVIM_PORT}:7777` / `+127.0.0.1:17002:7777` | **intended change (D8)** | 17000+ID. |
-| `-Volume=@@ROOT@@/.home/%i:/home/appuser:z` / `+Volume=…/.railswitch/home/feat:/home/appuser:z` | **intended change (D30)** + **gap → Stage 2** | Per-worktree home moves under `.railswitch/`. Nothing in Stages 0–1 creates `.railswitch/home/<slug>/`: render writes only `assets/` and `env/`. A bind mount of a missing source makes `podman run` fail. Something in Stage 2 (`wt add`/`up`) must create it. **Open question 4.** |
+| `-Volume=@@ROOT@@/.home/%i:/home/appuser:z` / `+Volume=…/.railswitch/home/feat:/home/appuser:z` | **intended change (D30)** | Per-worktree home moves under `.railswitch/`. Render creates `.railswitch/home/<slug>/` (0700) for every worktree when a service mounts it (Task 13F); orphan removal never deletes one. |
 | `-Volume=${MAIN_WORKTREE_PATH}/.git…:z` / `+Volume=/WORKSPACES/filial/master/.git…:z` | **same behaviour** | Same mount, read-write as before. |
 | `-Volume=${NVIM_CONFIG_MOUNT}` / `+Volume=filial_nvim_config:/home/appuser/.config/nvim:U` | **intended change (D33)** | No host nvim config; a named volume instead. |
-| `-Volume=${SSH_PATH}…`, `${SSH_AGENT_SOCK}…`, `${GITIGNORE_PATH}…`, `${GITCONFIG_PATH}…` | **intended change (D33)** | Nothing of the host identity reaches a container. A GitHub token becomes a declared secret (Task 16A adds `[secrets.github_token]` for nvim). |
+| `-Volume=${SSH_PATH}…`, `${SSH_AGENT_SOCK}…`, `${GITIGNORE_PATH}…`, `${GITCONFIG_PATH}…` / `+Secret=filial_github_token,type=mount,target=/run/secrets/github_token,uid=1000,gid=1000,mode=0400` | **intended change (D33)** | Nothing of the host identity reaches a container. A GitHub token is the fixture's declared `[secrets.github_token]`, mounted read-only for the tool user (Task 16A). |
 | `-Volume=/usr/bin/kitten…`, `-Volume=%h/.local/state/kitty:/kitty-sock:z` | **gap → Stage 4** | Machine-local terminal integration. The plan (Task 4) defers it to Stage 4. |
 | `-Volume=@@P@@_npm_global…:U` | **gap → Stage 4** | As for rails: **open question 1**. |
 | gems, `node-modules`, `npm_cache`, `nvim_share`, entrypoint | **same behaviour** | Same volumes (gems/npm from the pack caches). |
@@ -838,18 +849,18 @@ Removed: **intended change (D18)**. See the storage `Requires=` row. The seed im
 
 ## traefik.container, dozzle.container → (none)
 
-- `traefik.container` is a **gap → Stage 2**. Task 15 renders one machine-wide `railswitch-traefik.container` with `Network=filial-proxy.network:ip=10.214.<n>.2` per project (D21), instead of one Traefik per project. App, storage and browser units already `Wants=railswitch-traefik.service`, and carry `traefik.docker.network`.
+- `traefik.container` is an **intended change (D21)**. Render writes one machine-wide `railswitch-traefik.container` with `Network=filial-proxy.network:ip=10.214.<n>.2` per project (Stage 2, Task 15), instead of one Traefik per project. App, storage and browser units `Wants=railswitch-traefik.service`, and carry `traefik.docker.network`.
 - `dozzle.container` is a **gap → Stage 3** (`railswitch-dozzle` at `logs.localhost`).
 
 ## Env contents
 
-The units no longer hold env; it moved to the per-service env files (D10). Compared with the old `.container-config/.env` + `.unit-env/<slug>.env`, rails.env has `APP_PORT`, `BINDING`, `DATABASE_URL`, `HEADLESS_SYSTEM_TESTS` (from the fixture's `[services.rails.env]`), `PG*`, `PLAYWRIGHT_HOST`, `RAILS_ENV`, `REDIS_URL`, `RUBY_DEBUG_PORT`, `S3_*`, `TZ`, `WORKTREE_*`.
+The units no longer hold env; it moved to the per-service env files (D10). Compared with the old `.container-config/.env` + `.unit-env/<slug>.env`, rails.env has `APP_PORT`, `BINDING`, `DATABASE_URL`, `HEADLESS_SYSTEM_TESTS` (from the fixture's `[services.rails.env]`), `PG*`, `PLAYWRIGHT_HOST`, `RAILS_ENV`, `REDIS_URL`, `RUBY_DEBUG_HOST`, `RUBY_DEBUG_PORT`, `S3_*`, `TZ`, `WORKTREE_*`.
 
 These variables are gone. Each is **intended (D42)**: Filial preferences, not generic defaults. They come back via Filial's own `[env]`/`[services.<id>.env]`, a **gap → Stage 4**:
 - `DEV_HOSTS`, `DOMAIN`, `WORKTREE_NAME`;
 - `GIT_EDITOR`, `EDITOR`, `TERM`, `SHELL`, `COLORTERM`, `KITTY_WINDOW_ID`;
 - `TAILWINDCSS_DEBUG`, `LAUNCHY_DRY_RUN`, `BROWSER`;
-- `RUBY_DEBUG_HOST`, `RUBY_DEBUG_IRB_CONSOLE`;
+- `RUBY_DEBUG_IRB_CONSOLE`;
 - `SKIP_TEST_DATABASE_TRUNCATE`, `DOCKER`;
 - `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD`;
 - `RUSTFS_ENDPOINT`, `S3_HOST`, `RUSTFS_UI_HOST` (`TRAEFIK_IP`/`PODMAN_TRAEFIK_IP` are obsolete: the playwright entrypoint reads the `AddHost=` entry).
@@ -859,12 +870,9 @@ Others are intended for different reasons:
 - **D8:** the image/version/path vars that only existed for `${VAR}` expansion;
 - **D17:** `PGPASSWORD=password` (now generated).
 
-Without `RUBY_DEBUG_HOST=0.0.0.0`, rdbg is not reachable through the published port; see open question 3.
+`RUBY_DEBUG_HOST=0.0.0.0` is not gone: the rails pack's `[env]` gives it (Task 13F) to the rails, worker, nvim and deps env files, so rdbg is reachable through the published port.
 
 ## Open questions
 
 1. **`npm_global` and `playwright_browsers` volumes** (rails, nvim): add them as rails pack `[[caches]]`, or drop them for good (D42)?
 2. **`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for deps:** should the playwright option give it to deps when the browser slot is on (as the design mock-up does), or should Filial set `[services.deps.env]` (Stage 4)?
-3. **`RUBY_DEBUG_HOST` and the debug port:** resolved (Task 13F): the rails pack's `[[ports]] debug` has `same_port = true`, so it publishes `127.0.0.1:<33000+ID>:<33000+ID>` and `RUBY_DEBUG_PORT` is right on both sides, and the rails pack `[env]` gives `RUBY_DEBUG_HOST=0.0.0.0` (rails, worker, nvim and deps env files); the diffs above predate this.
-4. **Per-worktree home** `.railswitch/home/<slug>/` (nvim): resolved (Task 13F): render Apply creates it (0700) for every worktree when a service mounts it, check mode reports it as added without creating it, and orphan removal never deletes one.
-5. **Firewall hooks dir** `.railswitch/firewall/hooks.d` is referenced by every unit but written only in Stage 2 (Task 16). Until then, a Stage 1 render cannot start containers. This is expected, since Stage 1 only renders.

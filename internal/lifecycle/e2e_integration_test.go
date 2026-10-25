@@ -21,7 +21,22 @@ import (
 // cleanupReserve is the part of the test deadline kept back for cleanup: the
 // steps run under a context that expires this long before `go test` would
 // kill the binary, and cleanup runs on a fresh context within it.
-const cleanupReserve = 5 * time.Minute
+const cleanupReserve = cleanupCommands*cleanupTimeout + time.Minute
+
+// cleanupTimeout bounds one cleanup command; cleanupCommands is the most
+// that run (the second worktree's down and wt rm, the base's down).
+const (
+	cleanupTimeout  = 2 * time.Minute
+	cleanupCommands = 3
+)
+
+// TestE2ECleanupReserve: the reserve holds every cleanup command at its
+// worst case, plus a minute for the test's own work.
+func TestE2ECleanupReserve(t *testing.T) {
+	if want := cleanupCommands*cleanupTimeout + time.Minute; cleanupReserve < want {
+		t.Errorf("cleanupReserve = %v; want at least %v", cleanupReserve, want)
+	}
+}
 
 // TestE2E is the Stage 2 acceptance run (docs/stage2-acceptance.md, steps
 // 3-8) against real podman and systemd: a fresh Rails app is set up, started,
@@ -69,7 +84,7 @@ func TestE2E(t *testing.T) {
 	// cleanup runs a teardown command on its own context: the steps' context
 	// may have expired.
 	cleanup := func(t *testing.T, args ...string) {
-		if out, errOut, err := railswitch(context.Background(), bin, 2*time.Minute, args...); err != nil {
+		if out, errOut, err := railswitch(context.Background(), bin, cleanupTimeout, args...); err != nil {
 			t.Logf("cleanup: railswitch %s: %v\n%s%s", strings.Join(args, " "), err, out, errOut)
 		}
 	}

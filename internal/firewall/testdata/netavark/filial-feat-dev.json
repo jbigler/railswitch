@@ -1,0 +1,22 @@
+{
+     "name": "filial-feat-dev",
+     "id": "5c4f9a0de3b7e1c2a8f6d4b2e0c9a7f5d3b1e9c7a5f3d1b9e7c5a3f1d9b7e5c3",
+     "driver": "bridge",
+     "network_interface": "podman7",
+     "created": "2026-10-25T09:12:44.123456789+07:00",
+     "subnets": [
+          {
+               "subnet": "10.89.7.0/24",
+               "gateway": "10.89.7.1"
+          }
+     ],
+     "ipv6_enabled": false,
+     "internal": false,
+     "dns_enabled": true,
+     "options": {
+          "mtu": "1400"
+     },
+     "ipam_options": {
+          "driver": "host-local"
+     }
+}

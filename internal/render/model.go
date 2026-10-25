@@ -38,7 +38,9 @@ type Worktree struct {
 }
 
 // Host is what render reads from the host. GitName/GitEmail: host `git config
-// --global user.name/user.email`, read by workspace.Render.
+// --global user.name/user.email`, read by workspace.Render. NetworkDir:
+// netavark's network config dir (<podman GraphRoot>/networks), set by
+// workspace.Render for the firewall hook descriptor.
 type Host struct {
 	CPUs                                int
 	Home, NetworkDir, GitName, GitEmail string

@@ -12,17 +12,34 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
 const filialFixture = "../../testdata/fixtures/filial"
 
-// runIn runs railswitch with a fake runner (no host git config).
+// graphRoot is podman's graph root as the fake runner reports it.
+const graphRoot = "/home/u/.local/share/containers/storage"
+
+// fakeHost is a fake runner for this host: no host git config, podman's
+// graph root at graphRoot.
+func fakeHost() *systest.Fake {
+	f := &systest.Fake{}
+	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte(graphRoot + "\n")}, nil)
+	return f
+}
+
+// runIn runs railswitch with a fakeHost runner.
 func runIn(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
+	return runWith(t, fakeHost(), args...)
+}
+
+func runWith(t *testing.T, f *systest.Fake, args ...string) (int, string, string) {
+	t.Helper()
 	var out, errb bytes.Buffer
-	code := dispatch(context.Background(), &systest.Fake{}, args, strings.NewReader(""), &out, &errb)
+	code := dispatch(context.Background(), f, args, strings.NewReader(""), &out, &errb)
 	return code, out.String(), errb.String()
 }
 

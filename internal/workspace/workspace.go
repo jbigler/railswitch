@@ -18,9 +18,11 @@ import (
 
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -274,14 +276,18 @@ func samePath(a, b string) bool {
 }
 
 // Render checks stack.lock (CheckLock), opens the registry, builds the
-// Model, merges every source into one render.Plan and Applies it; with check
-// it writes nothing. It is the only path that writes units.
+// Model, merges every source into one render.Plan (the units and files of
+// the Model, the firewall's files, the machine's proxy units) and Applies
+// it; with check it writes nothing. It is the only path that writes units.
 func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*render.Diff, error) {
 	if err := w.CheckLock(); err != nil {
 		return nil, err
 	}
 	host, err := ReadHost(ctx, r)
 	if err != nil {
+		return nil, err
+	}
+	if host.NetworkDir, err = NetworkDir(ctx, r); err != nil {
 		return nil, err
 	}
 	reg, err := machine.Open(w.Dirs.Data)
@@ -297,8 +303,27 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 	if err != nil {
 		return nil, err
 	}
+	prefix := w.Project.Project.Prefix
+	fw, err := firewall.Files(prefix, w.Root, host.NetworkDir, w.Stack, w.Project.Firewall)
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(p.Files, fw)
 	maps.Copy(p.Units, machine.ProxyUnits(reg.Registry))
-	return render.Apply(p, w.Root, w.Dirs.Quadlet, w.Project.Project.Prefix, check)
+	return render.Apply(p, w.Root, w.Dirs.Quadlet, prefix, check)
+}
+
+// NetworkDir is rootless podman's netavark network config dir,
+// <GraphRoot>/networks, where the firewall hook reads each network's subnets.
+func NetworkDir(ctx context.Context, r sys.Runner) (string, error) {
+	g, err := podman.Podman{R: r}.GraphRoot(ctx)
+	if err != nil {
+		return "", fmt.Errorf("podman info (the firewall hook needs the graph root): %w", err)
+	}
+	if g == "" {
+		return "", errors.New("podman info reported no graph root (the firewall hook reads <graph root>/networks)")
+	}
+	return filepath.Join(g, "networks"), nil
 }
 
 // ReadHost reads what render needs from the host: CPU count, $HOME and the

@@ -1610,6 +1610,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
 - [ ] **Step 1: Generate a fresh app without host Ruby:**
 
   ```bash
+  mkdir -p /tmp/rs-demo
   podman run --rm -v /tmp/rs-demo:/w:Z -w /w docker.io/library/ruby:3.4 \
     sh -c 'gem install rails && rails new demo -d postgresql && cd demo && git config --global user.email t@t && git config --global user.name t && git add -A && git commit -qm init'
   ```

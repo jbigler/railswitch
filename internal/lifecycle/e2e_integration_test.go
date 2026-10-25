@@ -18,6 +18,11 @@ import (
 	"github.com/jbigler/railswitch/internal/naming"
 )
 
+// cleanupReserve is the part of the test deadline kept back for cleanup: the
+// steps run under a context that expires this long before `go test` would
+// kill the binary, and cleanup runs on a fresh context within it.
+const cleanupReserve = 5 * time.Minute
+
 // TestE2E is the Stage 2 acceptance run (docs/stage2-acceptance.md, steps
 // 3-8) against real podman and systemd: a fresh Rails app is set up, started,
 // queried, given a second worktree, and that worktree is torn down again.
@@ -37,6 +42,11 @@ func TestE2E(t *testing.T) {
 		prefix = "demo"
 	}
 	ctx := context.Background()
+	if d, ok := t.Deadline(); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, d.Add(-cleanupReserve))
+		t.Cleanup(cancel)
+	}
 	bin := buildBinary(t)
 
 	// The workspace is not a t.TempDir: files the containers write there are
@@ -50,26 +60,29 @@ func TestE2E(t *testing.T) {
 
 	rs := func(t *testing.T, timeout time.Duration, args ...string) string {
 		t.Helper()
-		out, err := railswitch(ctx, bin, timeout, args...)
+		out, errOut, err := railswitch(ctx, bin, timeout, args...)
 		if err != nil {
-			t.Fatalf("railswitch %s: %v\n%s", strings.Join(args, " "), err, out)
+			t.Fatalf("railswitch %s: %v\nstdout:\n%s\nstderr:\n%s", strings.Join(args, " "), err, out, errOut)
 		}
 		return out
 	}
+	// cleanup runs a teardown command on its own context: the steps' context
+	// may have expired.
+	cleanup := func(t *testing.T, args ...string) {
+		if out, errOut, err := railswitch(context.Background(), bin, 2*time.Minute, args...); err != nil {
+			t.Logf("cleanup: railswitch %s: %v\n%s%s", strings.Join(args, " "), err, out, errOut)
+		}
+	}
 
 	// Step 3: new + up of the base worktree.
-	rs(t, 10*time.Minute, "new", ws, "--repo", repo, "--prefix", prefix)
+	rs(t, 5*time.Minute, "new", ws, "--repo", repo, "--prefix", prefix)
 	wts := worktrees(t, rs(t, time.Minute, "-C", ws, "--json", "wt", "ls"))
 	if len(wts) != 1 {
 		t.Fatalf("after new: want 1 worktree, got %+v", wts)
 	}
 	base := wts[0]
-	t.Cleanup(func() {
-		if out, err := railswitch(context.Background(), bin, 10*time.Minute, "-C", ws, "-w", base.Slug, "down", "--yes"); err != nil {
-			t.Logf("cleanup: down %s: %v\n%s", base.Slug, err, out)
-		}
-	})
-	rs(t, 20*time.Minute, "-C", ws, "-w", base.Slug, "up")
+	t.Cleanup(func() { cleanup(t, "-C", ws, "-w", base.Slug, "down", "--yes") })
+	rs(t, 10*time.Minute, "-C", ws, "-w", base.Slug, "up")
 
 	// Step 4: the app answers through Traefik.
 	if code := httpStatus(ctx, t, "http://"+base.Slug+"."+prefix+".localhost/"); code != "200" {
@@ -77,14 +90,14 @@ func TestE2E(t *testing.T) {
 	}
 
 	// Step 5: the app reaches its database.
-	out := rs(t, 5*time.Minute, "-C", ws, "-w", base.Slug, "exec", "--",
+	out := rs(t, 2*time.Minute, "-C", ws, "-w", base.Slug, "exec", "--",
 		"bin/rails", "runner", `puts ActiveRecord::Base.connection.select_value("select 1")`)
 	if strings.TrimSpace(lastLine(out)) != "1" {
 		t.Fatalf("step 5: rails runner printed %q, want 1", out)
 	}
 
 	// Step 6: rails runs with profile none in log mode; nothing is unfirewalled.
-	out = rs(t, 3*time.Minute, "-C", ws, "-w", base.Slug, "fw", "show")
+	out = rs(t, 2*time.Minute, "-C", ws, "-w", base.Slug, "fw", "show")
 	railsC := naming.Container(prefix, base.Slug, "rails")
 	if !strings.Contains(out, railsC+"  profiles=none mode=log") {
 		t.Errorf("step 6: fw show does not list %s with profiles=none mode=log:\n%s", railsC, out)
@@ -95,7 +108,15 @@ func TestE2E(t *testing.T) {
 
 	// Step 7: a second worktree comes up on its own ports and host name.
 	const slug = "feat-x"
-	rs(t, 5*time.Minute, "-C", ws, "wt", "add", slug)
+	rs(t, 2*time.Minute, "-C", ws, "wt", "add", slug)
+	featDone := false
+	t.Cleanup(func() {
+		if featDone {
+			return
+		}
+		cleanup(t, "-C", ws, "-w", slug, "down", "--yes")
+		cleanup(t, "-C", ws, "wt", "rm", "--force", slug)
+	})
 	var feat worktree
 	for _, w := range worktrees(t, rs(t, time.Minute, "-C", ws, "--json", "wt", "ls")) {
 		if w.Slug == slug {
@@ -106,7 +127,7 @@ func TestE2E(t *testing.T) {
 		t.Fatalf("step 7: %s missing from wt ls", slug)
 	}
 	t.Logf("%s has ID %d (2 on a machine with no other worktree: ports 55434/33002)", slug, feat.ID)
-	rs(t, 20*time.Minute, "-C", ws, "-w", slug, "up")
+	rs(t, 5*time.Minute, "-C", ws, "-w", slug, "up")
 	if code := httpStatus(ctx, t, "http://"+slug+"."+prefix+".localhost/"); code != "200" {
 		t.Fatalf("step 7: GET %s.%s.localhost: status %s, want 200", slug, prefix, code)
 	}
@@ -115,22 +136,29 @@ func TestE2E(t *testing.T) {
 	wantPort(ctx, t, naming.Container(prefix, slug, "rails"), debug, debug)
 
 	// Step 8: down + wt rm leave nothing of feat-x; the base keeps running.
-	rs(t, 10*time.Minute, "-C", ws, "-w", slug, "down", "--yes")
-	rs(t, 5*time.Minute, "-C", ws, "wt", "rm", slug)
 	gone := prefix + "-" + slug + "-"
+	hasGone := func(n string) bool { return strings.HasPrefix(n, gone) }
+	if !slices.ContainsFunc(lines(podman(ctx, t, "volume", "ls", "--format", "{{.Name}}")), hasGone) {
+		t.Fatalf("step 8: no %s* volume exists before down; the teardown check would prove nothing", gone)
+	}
+	rs(t, 3*time.Minute, "-C", ws, "-w", slug, "down", "--yes")
+	rs(t, 2*time.Minute, "-C", ws, "wt", "rm", slug)
+	featDone = true
 	for _, names := range [][]string{
-		lines(t, podman(ctx, t, "ps", "-a", "--format", "{{.Names}}")),
-		lines(t, podman(ctx, t, "volume", "ls", "--format", "{{.Name}}")),
+		lines(podman(ctx, t, "ps", "-a", "--format", "{{.Names}}")),
+		lines(podman(ctx, t, "volume", "ls", "--format", "{{.Name}}")),
 	} {
 		for _, n := range names {
-			if strings.HasPrefix(n, gone) {
+			if hasGone(n) {
 				t.Errorf("step 8: %s still exists", n)
 			}
 		}
 	}
-	running := lines(t, podman(ctx, t, "ps", "--format", "{{.Names}}"))
-	if !slices.Contains(running, railsC) {
-		t.Errorf("step 8: %s is not running; running: %v", railsC, running)
+	running := lines(podman(ctx, t, "ps", "--format", "{{.Names}}"))
+	for _, svc := range []string{"rails", "db", "cache"} {
+		if c := naming.Container(prefix, base.Slug, svc); !slices.Contains(running, c) {
+			t.Errorf("step 8: %s is not running; running: %v", c, running)
+		}
 	}
 }
 
@@ -159,25 +187,29 @@ func buildBinary(t *testing.T) string {
 	return bin
 }
 
-func railswitch(ctx context.Context, bin string, timeout time.Duration, args ...string) (string, error) {
+// railswitch runs bin with args, bounded by timeout and ctx, and returns its
+// stdout and stderr separately.
+func railswitch(ctx context.Context, bin string, timeout time.Duration, args ...string) (string, string, error) {
+	return run(ctx, timeout, bin, args...)
+}
+
+func run(ctx context.Context, timeout time.Duration, name string, args ...string) (string, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	var buf bytes.Buffer
-	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Stdout, cmd.Stderr = &buf, &buf
+	var out, errOut bytes.Buffer
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
-	return buf.String(), err
+	return out.String(), errOut.String(), err
 }
 
 func podman(ctx context.Context, t *testing.T, args ...string) string {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "podman", args...).Output()
+	out, errOut, err := run(ctx, 30*time.Second, "podman", args...)
 	if err != nil {
-		t.Fatalf("podman %s: %v", strings.Join(args, " "), err)
+		t.Fatalf("podman %s: %v\n%s", strings.Join(args, " "), err, errOut)
 	}
-	return string(out)
+	return out
 }
 
 // wantPort checks that container publishes ctr on 127.0.0.1:host.
@@ -185,7 +217,7 @@ func wantPort(ctx context.Context, t *testing.T, container string, ctr, host int
 	t.Helper()
 	out := podman(ctx, t, "port", container, strconv.Itoa(ctr)+"/tcp")
 	want := "127.0.0.1:" + strconv.Itoa(host)
-	if !slices.Contains(lines(t, out), want) {
+	if !slices.Contains(lines(out), want) {
 		t.Errorf("podman port %s %d: got %q, want %s", container, ctr, out, want)
 	}
 }
@@ -194,17 +226,14 @@ func wantPort(ctx context.Context, t *testing.T, container string, ctr, host int
 // *.localhost name to the loopback address itself.
 func httpStatus(ctx context.Context, t *testing.T, url string) string {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "curl", "-sS", "--max-time", "30", "-o", "/dev/null", "-w", "%{http_code}", url).Output()
+	out, errOut, err := run(ctx, time.Minute, "curl", "-sS", "--max-time", "30", "-o", "/dev/null", "-w", "%{http_code}", url)
 	if err != nil {
-		t.Fatalf("curl %s: %v (%s)", url, err, out)
+		t.Fatalf("curl %s: %v (status %q)\n%s", url, err, out, errOut)
 	}
-	return string(out)
+	return out
 }
 
-func lines(t *testing.T, s string) []string {
-	t.Helper()
+func lines(s string) []string {
 	var out []string
 	for _, l := range strings.Split(s, "\n") {
 		if l = strings.TrimSpace(l); l != "" {

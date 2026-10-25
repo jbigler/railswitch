@@ -256,14 +256,23 @@ func qualified(ref string) bool {
 	return ok && tag != ""
 }
 
-// hash8 is the first 8 hex of the sha256 of a Containerfile and its sorted
-// build args (D9).
-func hash8(data []byte, args map[string]string) string {
+// hash8 is the first 8 hex of the sha256 of a Containerfile, its sorted
+// build args (D9) and the digests stack.lock records for its FROM refs
+// (D36), so a new base digest gives a new tag.
+func hash8(data []byte, args map[string]string, from []string, lock *config.Lock) string {
 	h := sha256.New()
 	h.Write(data)
 	for _, k := range sortedKeys(args) {
 		h.Write([]byte{0})
 		io.WriteString(h, k+"="+args[k])
+	}
+	if lock != nil {
+		for _, r := range from {
+			if d := lock.BaseDigest(r); d != "" {
+				h.Write([]byte{1})
+				io.WriteString(h, r+"@"+d)
+			}
+		}
 	}
 	return hex.EncodeToString(h.Sum(nil))[:8]
 }
@@ -293,7 +302,7 @@ func (m *Model) imageValues(in *Instance) error {
 		if err != nil {
 			return "", err
 		}
-		tag := fmt.Sprintf("localhost/%s/%s:%s-%s", m.Prefix, repo, version, hash8(cf.data, args))
+		tag := fmt.Sprintf("localhost/%s/%s:%s-%s", m.Prefix, repo, version, hash8(cf.data, args, from, m.Inputs.Lock))
 		in.Builds = append(in.Builds, BuildStep{Name: name, File: cf.path, Context: ctx, Args: args, Tag: tag, From: from})
 		return tag, nil
 	}

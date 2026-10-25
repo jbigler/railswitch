@@ -121,8 +121,18 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		}
 	}
 
-	if _, err := l.pinBases(ctx, in, false); err != nil {
+	_, wrote, err := l.pinBases(ctx, in, false)
+	if err != nil {
 		return err
+	}
+	if wrote { // a new FROM digest gives new build tags (D36)
+		if d, err = l.WS.Render(ctx, l.R, false); err != nil {
+			return err
+		}
+		ch.add(d)
+		if m, in, err = l.load(ctx, slug); err != nil {
+			return err
+		}
 	}
 	if err := l.build(ctx, in.Builds, func(int) bool { return false }); err != nil {
 		return err
@@ -239,19 +249,19 @@ func repo(ref string) string {
 // ref is pulled by tag and the new digest recorded. A ref already pinned by
 // digest (repo@sha256:…) is its own pin: it is pulled as is when missing,
 // never re-tagged, and nothing is recorded for it. It returns the refs
-// whose recorded digest changed.
-func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) ([]string, error) {
+// whose recorded digest changed, and whether it wrote stack.lock (the
+// build tags then change: re-render and reload).
+func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) (changed []string, wrote bool, err error) {
 	p, lock := l.podman(), l.WS.Lock
-	var changed []string
 	for _, ref := range fromRefs(in.Builds) {
 		if strings.Contains(ref, "@") {
 			ok, err := p.ImageExists(ctx, ref)
 			if err != nil {
-				return nil, err
+				return nil, wrote, err
 			}
 			if !ok {
 				if err := p.PullOnly(ctx, ref); err != nil {
-					return nil, err
+					return nil, wrote, err
 				}
 			}
 			continue
@@ -260,18 +270,19 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) ([]s
 		if old == "" || repull {
 			dg, err := p.Pull(ctx, ref)
 			if err != nil {
-				return nil, err
+				return nil, wrote, err
 			}
 			if dg == "" {
-				return nil, fmt.Errorf("podman reported no digest for %s", ref)
+				return nil, wrote, fmt.Errorf("podman reported no digest for %s", ref)
 			}
 			if dg == old {
 				continue
 			}
 			lock.SetBaseDigest(ref, dg)
 			if err := lock.Write(l.lockPath()); err != nil {
-				return nil, err
+				return nil, wrote, err
 			}
+			wrote = true
 			switch {
 			case old != "":
 				fmt.Fprintf(l.Out, "%s: %s → %s\n", ref, old, dg)
@@ -283,20 +294,20 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) ([]s
 		}
 		local, err := p.ImageDigest(ctx, ref)
 		if err != nil {
-			return nil, err
+			return nil, wrote, err
 		}
 		if local == old {
 			continue
 		}
 		pinned := repo(ref) + "@" + old
 		if err := p.PullOnly(ctx, pinned); err != nil {
-			return nil, err
+			return nil, wrote, err
 		}
 		if err := p.Tag(ctx, pinned, ref); err != nil {
-			return nil, err
+			return nil, wrote, err
 		}
 	}
-	return changed, nil
+	return changed, wrote, nil
 }
 
 // build runs each step, in order, whose tag is missing or for which force

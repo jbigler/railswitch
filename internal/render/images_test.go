@@ -261,3 +261,41 @@ func TestBadPin(t *testing.T) {
 		t.Errorf("error = %v; want an invalid pin error", err)
 	}
 }
+
+// TestTagsIncludeFromDigests (D36): a step's tag covers the digests
+// stack.lock records for its FROM refs, so a new base digest re-tags the
+// base and every step built on it.
+func TestTagsIncludeFromDigests(t *testing.T) {
+	ws := fixtureWS(t)
+	const ruby = "docker.io/library/ruby:3.3.6-slim"
+	const debian = "docker.io/library/debian:trixie-slim"
+	tags := func(digests map[string]string) map[string]string {
+		in := fixtureInputs(t, ws, nil)
+		in.Lock = &config.Lock{}
+		for ref, dg := range digests {
+			in.Lock.SetBaseDigest(ref, dg)
+		}
+		out := map[string]string{}
+		for _, b := range mustInstance(t, mustBuild(t, in), "master").Builds {
+			out[b.Name] = b.Tag
+		}
+		return out
+	}
+	none := tags(nil)
+	aa := tags(map[string]string{ruby: "sha256:" + strings.Repeat("a", 64)})
+	bb := tags(map[string]string{ruby: "sha256:" + strings.Repeat("b", 64)})
+	for name := range none {
+		changes := name != "playwright"
+		for what, pair := range map[string][2]map[string]string{"recorded": {none, aa}, "changed": {aa, bb}} {
+			if got := pair[0][name] != pair[1][name]; got != changes {
+				t.Errorf("%s ruby digest: %s tag changed = %v; want %v (%s → %s)", what, name, got, changes, pair[0][name], pair[1][name])
+			}
+		}
+	}
+	deb := tags(map[string]string{ruby: "sha256:" + strings.Repeat("a", 64), debian: "sha256:" + strings.Repeat("c", 64)})
+	for name := range aa {
+		if changes := name == "nvim"; (aa[name] != deb[name]) != changes {
+			t.Errorf("debian digest: %s tag changed = %v; want %v", name, aa[name] != deb[name], changes)
+		}
+	}
+}

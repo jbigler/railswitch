@@ -911,9 +911,9 @@ func TestPinBasesDigestRef(t *testing.T) {
 	e.missing("podman", "image", "exists", ref)
 	for _, repull := range []bool{false, true} {
 		e.reset()
-		changed, err := e.l.pinBases(ctx, in, repull)
-		if err != nil || len(changed) != 0 {
-			t.Fatalf("pinBases(repull=%v) = %v, %v", repull, changed, err)
+		changed, wrote, err := e.l.pinBases(ctx, in, repull)
+		if err != nil || len(changed) != 0 || wrote {
+			t.Fatalf("pinBases(repull=%v) = %v, %v, %v", repull, changed, wrote, err)
 		}
 		calls := e.calls()
 		if got := count(calls, "podman pull -q "+ref); got != 1 {
@@ -928,10 +928,33 @@ func TestPinBasesDigestRef(t *testing.T) {
 	}
 	e.reset()
 	e.f.On([]string{"podman", "image", "exists", ref}, sys.Result{}, nil)
-	if _, err := e.l.pinBases(ctx, in, false); err != nil {
+	if _, _, err := e.l.pinBases(ctx, in, false); err != nil {
 		t.Fatal(err)
 	}
 	if n := count(e.calls(), "podman pull"); n != 0 {
 		t.Errorf("pulled a present digest ref:\n%s", dump(e.calls()))
+	}
+}
+
+// TestUpBuildsTagsOfRecordedDigests: the first up records the FROM digests,
+// which are part of the build tags (D36): it builds the tags the units run.
+func TestUpBuildsTagsOfRecordedDigests(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "image", "exists")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	unit, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-rails.container"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	built := false
+	for _, b := range builds(e.calls()) {
+		if strings.Contains(string(unit), "Image="+argAfter(b, "-t")+"\n") {
+			built = true
+		}
+	}
+	if !built {
+		t.Fatalf("no build of the rails unit's image; builds %q\nunit:\n%s", builds(e.calls()), unit)
 	}
 }

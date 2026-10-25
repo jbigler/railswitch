@@ -1,0 +1,47 @@
+schema = 1
+
+from = "rails-postgres-redis-rustfs@1"      # template it came from (optional)
+
+[project]
+name        = "Filial Rails"
+prefix      = "filial"                     # unique on this machine; names objects and hosts
+repo        = "git@github.com:[ORG]/[REPO].git"
+base_branch = "master"
+
+[stack]
+pack = "rails@1"
+app  = "rails"                             # the service with role app
+
+[options]                                  # one per slot; "none" turns a slot off
+database = "postgres@1"
+cache    = "redis@1"
+storage  = "rustfs@1"
+jobs     = "none"
+mail     = "none"
+browser  = "playwright@1"
+
+[versions]                                 # pins for options' images;
+postgres = "16"                            # runtimes (ruby, node) come from the app's files
+redis    = "8"
+rustfs   = "1.0.0-alpha.83"
+
+# Only what differs from the pack and options:
+[env]
+TZ = "Asia/Bangkok"
+
+[services.rails.env]
+HEADLESS_SYSTEM_TESTS = "0"
+
+[worktrees.postgres-trial.versions]        # per-worktree override
+postgres = "17"
+
+[secrets.twilio_auth_token]                # values live in podman secrets
+services = ["rails"]
+env      = "TWILIO_AUTH_TOKEN"
+
+[[links]]                                  # Worktree links (see 3.10)
+label = "Admin"
+url   = "{worktree.host}/admin"
+
+[image]
+base = "containerfiles/Containerfile.base"

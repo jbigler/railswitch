@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/jbigler/railswitch/internal/tomlfile"
 )
+
+// LockSchemaVersion is the stack.lock schema this railswitch reads and
+// writes (D39). It moves independently of project.toml's SchemaVersion.
+const LockSchemaVersion = 1
 
 // ErrNoLock is returned by ReadLock when stack.lock does not exist.
 var ErrNoLock = errors.New("no stack.lock")
@@ -42,9 +47,8 @@ type LockImage struct {
 	Digest string `toml:"digest"`
 }
 
-// ReadLock reads stack.lock. The schema is checked on its own first, so a file
-// from a newer railswitch is refused as such (D39); then the file is decoded
-// strictly. A missing file is ErrNoLock.
+// ReadLock reads stack.lock strictly. A newer schema is refused as such, and
+// a missing or older one is an error too (D39). A missing file is ErrNoLock.
 func ReadLock(path string) (*Lock, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -53,26 +57,12 @@ func ReadLock(path string) (*Lock, error) {
 	if err != nil {
 		return nil, err
 	}
-	var head struct {
-		Schema int `toml:"schema"`
-	}
-	if _, err := toml.Decode(string(data), &head); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if head.Schema > SchemaVersion {
-		return nil, fmt.Errorf("%s: %w", path, newerSchema(head.Schema))
-	}
 	var l Lock
-	md, err := toml.Decode(string(data), &l)
-	if err != nil {
+	if err := tomlfile.Decode(data, LockSchemaVersion, &l); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	if und := md.Undecoded(); len(und) > 0 {
-		errs := make([]error, len(und))
-		for i, k := range und {
-			errs[i] = fmt.Errorf("%s: unknown key %s", path, k)
-		}
-		return nil, errors.Join(errs...)
+	if l.Schema != LockSchemaVersion {
+		return nil, fmt.Errorf("%s: schema: %d is not %d; a railswitch-written stack.lock always has `schema = %d`", path, l.Schema, LockSchemaVersion, LockSchemaVersion)
 	}
 	// Digest lookups binary-search; a hand-edited file may be out of order.
 	byRef := func(a, b LockImage) int { return strings.Compare(a.Ref, b.Ref) }
@@ -81,32 +71,17 @@ func ReadLock(path string) (*Lock, error) {
 	return &l, nil
 }
 
-// Write writes the lock with its header through a temp file and a rename.
-// Map keys and image entries are sorted, so the same lock always gives the
-// same bytes.
+// Write stamps the lock with LockSchemaVersion and replaces path atomically
+// with it, under its header. Map keys and image entries are sorted, so the
+// same lock always gives the same bytes.
 func (l *Lock) Write(path string) error {
+	l.Schema = LockSchemaVersion
 	var buf bytes.Buffer
 	buf.WriteString(lockHeader)
 	if err := toml.NewEncoder(&buf).Encode(l); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name()) // no-op after the rename
-	if err := tmp.Chmod(0o644); err != nil {
-		tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(buf.Bytes()); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return tomlfile.WriteAtomic(path, buf.Bytes(), 0o644)
 }
 
 // Digest returns the recorded digest of a pulled service image, or "".

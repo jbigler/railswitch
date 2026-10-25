@@ -62,7 +62,7 @@ func TestLockWriteDeterministic(t *testing.T) {
 }
 
 func TestLockDigests(t *testing.T) {
-	l := &Lock{Schema: SchemaVersion}
+	l := &Lock{Schema: LockSchemaVersion}
 	if d := l.Digest("docker.io/library/postgres:16"); d != "" {
 		t.Errorf("Digest(unknown) = %q", d)
 	}
@@ -116,6 +116,16 @@ func TestReadLockNewerSchema(t *testing.T) {
 	}
 	if _, err := ReadLock(path); err == nil || !strings.Contains(err.Error(), "newer railswitch") {
 		t.Errorf("ReadLock = %v; want newer railswitch", err)
+	}
+}
+
+func TestReadLockMissingSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stack.lock")
+	if err := os.WriteFile(path, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadLock(path); err == nil || !strings.Contains(err.Error(), "schema") {
+		t.Errorf("ReadLock(empty file) = %v; want a schema error", err)
 	}
 }
 

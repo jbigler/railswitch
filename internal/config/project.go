@@ -9,10 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/BurntSushi/toml"
-
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/placeholder"
+	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
 // SchemaVersion is the project.toml schema this railswitch reads (D39).
@@ -105,32 +104,11 @@ func Load(path string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	var head struct {
-		Schema int `toml:"schema"`
-	}
-	if _, err := toml.Decode(string(data), &head); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if head.Schema > SchemaVersion {
-		return nil, fmt.Errorf("%s: %w", path, newerSchema(head.Schema))
-	}
 	var p Project
-	md, err := toml.Decode(string(data), &p)
-	if err != nil {
+	if err := tomlfile.Decode(data, SchemaVersion, &p); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if und := md.Undecoded(); len(und) > 0 {
-		errs := make([]error, len(und))
-		for i, k := range und {
-			errs[i] = fmt.Errorf("%s: unknown key %s", path, k)
-		}
-		return nil, errors.Join(errs...)
 	}
 	return &p, nil
-}
-
-func newerSchema(n int) error {
-	return fmt.Errorf("schema: %d was written by a newer railswitch (this one reads schema = %d)", n, SchemaVersion)
 }
 
 // Validate checks every field and returns all problems at once
@@ -142,7 +120,7 @@ func (p *Project) Validate() error {
 	case p.Schema == 0:
 		v.add("schema", "missing; add `schema = %d` at the top", SchemaVersion)
 	case p.Schema > SchemaVersion:
-		v.errs = append(v.errs, newerSchema(p.Schema))
+		v.errs = append(v.errs, &tomlfile.NewerSchemaError{Schema: p.Schema, Max: SchemaVersion})
 	case p.Schema != SchemaVersion:
 		v.add("schema", "%d is not %d", p.Schema, SchemaVersion)
 	}

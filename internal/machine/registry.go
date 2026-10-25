@@ -12,6 +12,8 @@ import (
 	"syscall"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
 // SchemaVersion is the registry.toml schema this railswitch reads (D39).
@@ -88,61 +90,33 @@ func Open(dataDir string) (*Locked, error) {
 	return l, nil
 }
 
-// readRegistry checks the schema on its own first, so a newer file is refused
-// as such even when it changes a known key's type, then decodes strictly.
+// readRegistry decodes registry.toml strictly. A newer schema is refused as
+// such; a missing or older one is an error too, since an empty registry
+// would hand out subnets and IDs that live networks still use (D39).
 func readRegistry(path string) (*Registry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var head struct {
-		Schema int `toml:"schema"`
-	}
-	if _, err := toml.Decode(string(data), &head); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if head.Schema > SchemaVersion {
-		return nil, fmt.Errorf("%s: schema: %d was written by a newer railswitch (this one reads schema = %d)", path, head.Schema, SchemaVersion)
-	}
 	var r Registry
-	md, err := toml.Decode(string(data), &r)
-	if err != nil {
+	if err := tomlfile.Decode(data, SchemaVersion, &r); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	if und := md.Undecoded(); len(und) > 0 {
-		errs := make([]error, len(und))
-		for i, k := range und {
-			errs[i] = fmt.Errorf("%s: unknown key %s", path, k)
-		}
-		return nil, errors.Join(errs...)
+	if r.Schema != SchemaVersion {
+		return nil, fmt.Errorf("%s: schema: %d is not %d; a railswitch-written registry.toml always has `schema = %d`", path, r.Schema, SchemaVersion, SchemaVersion)
 	}
 	return &r, nil
 }
 
-// Save writes registry.toml through a temp file and a rename, so a crash
-// leaves either the old or the new file.
+// Save stamps the registry with SchemaVersion and replaces registry.toml
+// atomically.
 func (l *Locked) Save() error {
+	l.Schema = SchemaVersion
 	var buf bytes.Buffer
 	if err := toml.NewEncoder(&buf).Encode(l.Registry); err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(l.path), ".registry.toml.*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name()) // no-op after the rename
-	if _, err := tmp.Write(buf.Bytes()); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), l.path)
+	return tomlfile.WriteAtomic(l.path, buf.Bytes(), 0o600)
 }
 
 // Close releases the lock. Unsaved changes are dropped.

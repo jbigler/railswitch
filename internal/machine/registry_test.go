@@ -179,7 +179,7 @@ func TestSaveRoundTrip(t *testing.T) {
 
 func TestOpenNewerSchema(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "registry.toml"), []byte("schema = 2\nprojects = \"changed type\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "registry.toml"), []byte("schema = 2\nproject = \"changed type\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	l, err := Open(dir)
@@ -197,6 +197,22 @@ func TestOpenNewerSchema(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Open after a failed Open blocked")
+	}
+}
+
+func TestOpenMissingSchema(t *testing.T) {
+	for name, src := range map[string]string{"empty": "", "no schema": "[[project]]\nprefix = \"a\"\nsubnet = 0\n"} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "registry.toml"), []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		l, err := Open(dir)
+		if err == nil {
+			l.Close()
+			t.Errorf("%s: Open accepted a registry.toml without schema = 1", name)
+		} else if !strings.Contains(err.Error(), "schema") {
+			t.Errorf("%s: Open = %v; want a schema error", name, err)
+		}
 	}
 }
 

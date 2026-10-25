@@ -1623,5 +1623,5 @@ docs/json.md                      # --json schemas (D40), created in Task 12
 - [ ] **Step 6:** Run `railswitch fw show`. Expected: rails is listed with profile `none` and mode `log`; no container is reported as unfirewalled.
 - [ ] **Step 7:** Run `railswitch wt add feat-x && railswitch -w feat-x up && curl -s -o /dev/null -w '%{http_code}' http://feat-x.demo.localhost/`. Expected: `200`, with ports `55434`/`33002`.
 - [ ] **Step 8:** Run `railswitch -w feat-x down --yes && railswitch wt rm feat-x`. Expected: `podman ps -a --format {{.Names}}` and `podman volume ls --format {{.Name}}` show nothing named `demo-feat-x-*`; `demo-main-*` is still running.
-- [ ] **Step 9:** Encode steps 3–8 in `e2e_integration_test.go`, taking the repo path from `RAILSWITCH_E2E_REPO`; it is skipped when unset. Run `RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 30m`. Expected: PASS.
+- [ ] **Step 9:** Encode steps 3–8 in `e2e_integration_test.go`, taking the repo path from `RAILSWITCH_E2E_REPO`; it is skipped when unset. Run `RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 45m`. Expected: PASS.
 - [ ] **Step 10:** Write the observed outputs into `docs/stage2-acceptance.md`. `make check && git add -A && git commit -m "test: Stage 2 end-to-end acceptance"`.

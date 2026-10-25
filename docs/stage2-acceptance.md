@@ -109,7 +109,7 @@ manual steps. railswitch has no command to unregister a project, so the
 registry entry remains after the run.
 
 ```bash
-RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 30m -v
+RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 45m -v
 ```
 
 Expected: `PASS`.

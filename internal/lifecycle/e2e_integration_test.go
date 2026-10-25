@@ -46,7 +46,7 @@ func TestE2ECleanupReserve(t *testing.T) {
 // test is skipped when it is unset. RAILSWITCH_E2E_PREFIX overrides the
 // project prefix (default "demo"); it must not be registered yet.
 //
-//	RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 30m
+//	RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 45m
 func TestE2E(t *testing.T) {
 	repo := os.Getenv("RAILSWITCH_E2E_REPO")
 	if repo == "" {

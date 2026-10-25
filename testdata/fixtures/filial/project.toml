@@ -42,6 +42,9 @@ postgres = "17"
 services = ["rails"]
 env      = "TWILIO_AUTH_TOKEN"
 
+[secrets.github_token]
+services = ["nvim"]
+
 [tools]
 nvim = true
 

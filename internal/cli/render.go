@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
-	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/placeholder"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -126,16 +125,7 @@ func (e *env) instance(ctx context.Context, cmd string) (w *workspace.Workspace,
 	if w.Slug == "" {
 		return nil, nil, nil, e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
 	}
-	host, err := workspace.ReadHost(ctx, e.run)
-	if err != nil {
-		return nil, nil, nil, e.fail(err)
-	}
-	reg, err := machine.Open(w.Dirs.Data)
-	if err != nil {
-		return nil, nil, nil, e.fail(err)
-	}
-	m, err = w.Model(reg.Registry, host)
-	reg.Close()
+	m, err = e.model(ctx, w)
 	if err != nil {
 		return nil, nil, nil, e.fail(err)
 	}

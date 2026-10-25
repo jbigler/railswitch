@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -263,5 +264,44 @@ func TestSystemdShow(t *testing.T) {
 	want := map[string]string{"ActiveState": "active", "SubState": "running", "ExecMainStatus": "0"}
 	if !reflect.DeepEqual(m, want) {
 		t.Fatalf("got %v", m)
+	}
+}
+
+func TestSecrets(t *testing.T) {
+	f := &systest.Fake{}
+	p := Podman{R: f}
+	f.On([]string{"podman", "secret", "exists"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	ok, err := p.SecretExists(ctx, "api_tok")
+	if ok || err != nil {
+		t.Fatalf("exists: got %v %v", ok, err)
+	}
+	if err := p.SecretCreate(ctx, "api_tok", strings.NewReader("s3cret"), false, Driver{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SecretCreate(ctx, "api_tok", strings.NewReader("s3cret"), true,
+		Driver{Name: "pass", Opts: map[string]string{"root": "/x", "key": "ABC"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SecretRemove(ctx, "api_tok"); err != nil {
+		t.Fatal(err)
+	}
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("file\n")}, nil)
+	if d, err := p.SecretDriver(ctx, "api_tok"); d != "file" || err != nil {
+		t.Fatalf("driver: got %q %v", d, err)
+	}
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt}}"}, sys.Result{Stdout: []byte("2026-10-25 09:08:07.123 +0000 UTC\n")}, nil)
+	c, err := p.SecretCreated(ctx, "api_tok")
+	if err != nil || !c.Equal(time.Date(2026, 10, 25, 9, 8, 7, 123e6, time.UTC)) {
+		t.Fatalf("created: got %v %v", c, err)
+	}
+	wantCalls(t, f,
+		[]string{"podman", "secret", "exists", "api_tok"},
+		[]string{"podman", "secret", "create", "api_tok", "-"},
+		[]string{"podman", "secret", "create", "--replace", "--driver=pass", "--driver-opts=key=ABC,root=/x", "api_tok", "-"},
+		[]string{"podman", "secret", "rm", "api_tok"},
+		[]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}", "api_tok"},
+		[]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt}}", "api_tok"})
+	if string(f.Stdins[1]) != "s3cret" || string(f.Stdins[2]) != "s3cret" {
+		t.Fatalf("stdins = %q", f.Stdins)
 	}
 }

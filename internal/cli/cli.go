@@ -34,6 +34,7 @@ var commands = map[string]command{
 	"env":           cmdEnv,
 	"containerfile": cmdContainerfile,
 	"fw":            cmdFw,
+	"secret":        cmdSecret,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.

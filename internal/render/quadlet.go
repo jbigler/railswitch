@@ -238,6 +238,7 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		}
 		u.add(c, "Volume", v)
 	}
+	u.add(c, "Secret", in.SecretSpecs(s.ID)...)
 
 	ux := s.Unit
 	if ux.ShmSize != "" {

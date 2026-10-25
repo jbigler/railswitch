@@ -182,3 +182,30 @@ func TestEditSkipsStrings(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestAddSecretKeepsComments(t *testing.T) {
+	commented := commented + "\n[image]  # the chain\nbase = \"containerfiles/Containerfile.base\"\n"
+	path := writeProject(t, commented)
+	if err := AddSecret(path, "x", Secret{Services: []string{"rails"}}); err != nil {
+		t.Fatal(err)
+	}
+	got := readString(t, path)
+	if want := commented + "\n[secrets.x]\nservices = [\"rails\"]\n"; got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+	if err := AddSecret(path, "x", Secret{Services: []string{"rails"}}); err == nil || !strings.Contains(err.Error(), "already") {
+		t.Fatalf("second add: got %v", err)
+	}
+	if readString(t, path) != got {
+		t.Fatal("refused add changed the file")
+	}
+	if err := AddSecret(path, "y", Secret{Services: []string{"rails", "worker"}, Env: "Y_KEY", Scope: "machine"}); err != nil {
+		t.Fatal(err)
+	}
+	if want := got + "\n[secrets.y]\nservices = [\"rails\", \"worker\"]\nenv = \"Y_KEY\"\nscope = \"machine\"\n"; readString(t, path) != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", readString(t, path), want)
+	}
+	if err := AddSecret(path, "Bad", Secret{Services: []string{"rails"}}); err == nil {
+		t.Fatal("invalid name: want error")
+	}
+}

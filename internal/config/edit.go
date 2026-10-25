@@ -441,3 +441,30 @@ func tomlString(s string) string {
 	b.WriteByte('"')
 	return b.String()
 }
+
+// AddSecret appends a [secrets.<name>] table holding s's non-empty fields at
+// the end of path. A secret name already declared is an error.
+func AddSecret(path, name string, s Secret) error {
+	return editFile(path, func(*doc) error { return nil }, func(p *Project, d *doc) (string, error) {
+		if _, ok := p.Secrets[name]; ok {
+			return "", fmt.Errorf("%s: secret %s is already declared", path, name)
+		}
+		if !secretNameRe.MatchString(name) {
+			return "", fmt.Errorf("secret name %q must match %s", name, secretNameRe)
+		}
+		var b strings.Builder
+		if len(s.Services) > 0 {
+			elems := make([]string, len(s.Services))
+			for i, id := range s.Services {
+				elems[i] = tomlString(id)
+			}
+			b.WriteString("services = [" + strings.Join(elems, ", ") + "]\n")
+		}
+		for _, kv := range [][2]string{{"env", s.Env}, {"scope", s.Scope}, {"git_host", s.GitHost}, {"git_user", s.GitUser}} {
+			if kv[1] != "" {
+				b.WriteString(kv[0] + " = " + tomlString(kv[1]) + "\n")
+			}
+		}
+		return d.appendTable([]string{"secrets", name}, b.String()), nil
+	})
+}

@@ -656,18 +656,50 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		}
 	}
 	for _, name := range sortedKeys(p.Secrets) {
-		v["secret."+name] = secretName(m.Prefix, name, p.Secrets[name])
+		v["secret."+name] = SecretName(m.Prefix, name, p.Secrets[name])
 	}
 	m.envValues(in)
 	return in, nil
 }
 
-// secretName is the podman secret holding a project secret (D33).
-func secretName(prefix, name string, s config.Secret) string {
+// SecretName is the podman secret holding project secret name (D33).
+func SecretName(prefix, name string, s config.Secret) string {
 	if s.Scope == "machine" {
 		return "railswitch_" + name
 	}
 	return naming.Shared(prefix, name)
+}
+
+// SecretSpecs are the podman --secret specs (Quadlet Secret= values) of
+// every project secret service svc receives, in name order: an env var when
+// the secret sets env, else the file /run/secrets/<name> (D33).
+func (in *Instance) SecretSpecs(svc string) []string {
+	p := in.m.Inputs.Project
+	var specs []string
+	for _, name := range sortedKeys(p.Secrets) {
+		sec := p.Secrets[name]
+		if !slices.Contains(sec.Services, svc) {
+			continue
+		}
+		spec := in.Values["secret."+name]
+		if sec.Env != "" {
+			spec += ",type=env,target=" + sec.Env
+		} else {
+			spec += ",type=mount,target=/run/secrets/" + name + ",uid=1000,gid=1000,mode=0400"
+		}
+		specs = append(specs, spec)
+	}
+	return specs
+}
+
+// SecretArgs are service svc's secrets as podman run flags, for a transient
+// container (exec) that must see what the service's unit gets.
+func (in *Instance) SecretArgs(svc string) []string {
+	var args []string
+	for _, s := range in.SecretSpecs(svc) {
+		args = append(args, "--secret", s)
+	}
+	return args
 }
 
 // Scope is the placeholder scope of service svc's fields: Values plus

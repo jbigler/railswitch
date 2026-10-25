@@ -433,3 +433,48 @@ func TestAppDependencies(t *testing.T) {
 	hasLine(t, units, "filial-master-db.container", "Notify=healthy")
 	noLinePrefix(t, units, "filial-master-db.container", "UserNS=")
 }
+
+const ghMount = "Secret=filial_github_token,type=mount,target=/run/secrets/github_token,uid=1000,gid=1000,mode=0400"
+
+func TestUnitSecretLines(t *testing.T) {
+	_, units := renderUnits(t, fixtureDir, nil)
+	hasLine(t, units, "filial-master-nvim.container", ghMount)
+	for _, l := range unitLines(t, units, "filial-master-rails.container") {
+		if strings.HasPrefix(l, "Secret=filial_github_token") {
+			t.Errorf("rails: unexpected %q", l)
+		}
+	}
+	golden := readGolden(t, "filial", "filial-master-nvim.container")
+	if !strings.Contains(golden, "\n"+ghMount+"\n") {
+		t.Errorf("golden filial-master-nvim.container lacks %q", ghMount)
+	}
+	_, units = renderUnits(t, fixtureDir, func(p *config.Project) {
+		s := p.Secrets["github_token"]
+		s.Env = "GH_TOKEN"
+		p.Secrets["github_token"] = s
+	})
+	hasLine(t, units, "filial-master-nvim.container", "Secret=filial_github_token,type=env,target=GH_TOKEN")
+}
+
+func TestEnvSecretForApp(t *testing.T) {
+	_, units := renderUnits(t, fixtureDir, nil)
+	const line = "Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN"
+	hasLine(t, units, "filial-master-rails.container", line)
+	for _, f := range []string{"filial-master-deps.container", "filial-master-nvim.container"} {
+		noLinePrefix(t, units, f, "Secret=filial_twilio_auth_token")
+	}
+	_, in := filial(t, nil)
+	want := []string{"--secret", "filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN"}
+	if got := in.SecretArgs("rails"); !slices.Equal(got, want) {
+		t.Errorf("SecretArgs(rails) = %q, want %q", got, want)
+	}
+}
+
+func readGolden(t *testing.T, dir, file string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", "golden", dir, file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}

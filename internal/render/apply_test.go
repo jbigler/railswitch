@@ -291,7 +291,7 @@ func TestApplyCreatesHome(t *testing.T) {
 
 func TestApplyNoHomeWithoutNvim(t *testing.T) {
 	ws := fixtureWS(t)
-	p, err := mustBuild(t, fixtureInputs(t, ws, func(p *config.Project) { p.Tools.Nvim = false })).Plan()
+	p, err := mustBuild(t, fixtureInputs(t, ws, func(p *config.Project) { p.Tools.Nvim = false; delete(p.Secrets, "github_token") })).Plan()
 	if err != nil {
 		t.Fatal(err)
 	}

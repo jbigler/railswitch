@@ -5,6 +5,9 @@ package podman
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -179,4 +182,67 @@ func (p Podman) Health(ctx context.Context, name string) (string, error) {
 	// .State.Health is nil without a healthcheck; guard it so the
 	// template prints "" instead of failing.
 	return p.inspectContainer(ctx, "{{if .State.Health}}{{.State.Health.Status}}{{end}}", name)
+}
+
+// Driver is a podman secret driver with its options (D37). The zero value
+// is podman's default driver (file).
+type Driver struct {
+	Name string
+	Opts map[string]string
+}
+
+// SecretExists runs `podman secret exists <name>` (exit 1 = false).
+func (p Podman) SecretExists(ctx context.Context, name string) (bool, error) {
+	return p.exists(ctx, "secret", "exists", name)
+}
+
+// SecretCreate runs `podman secret create [--replace] [--driver=<name>
+// --driver-opts=<k=v,…>] <name> -`. The value travels on stdin only (D33).
+// podman's --replace fails on a missing secret, so the caller passes
+// replace = SecretExists(name).
+func (p Podman) SecretCreate(ctx context.Context, name string, value io.Reader, replace bool, d Driver) error {
+	args := []string{"secret", "create"}
+	if replace {
+		args = append(args, "--replace")
+	}
+	if d.Name != "" {
+		args = append(args, "--driver="+d.Name)
+		if len(d.Opts) > 0 {
+			opts := make([]string, 0, len(d.Opts))
+			for _, k := range slices.Sorted(maps.Keys(d.Opts)) {
+				opts = append(opts, k+"="+d.Opts[k])
+			}
+			args = append(args, "--driver-opts="+strings.Join(opts, ","))
+		}
+	}
+	args = append(args, name, "-")
+	_, err := p.R.Run(ctx, sys.Cmd{Name: "podman", Args: args, Stdin: value})
+	return err
+}
+
+// SecretDriver returns the driver secret name is stored with.
+func (p Podman) SecretDriver(ctx context.Context, name string) (string, error) {
+	return p.out(ctx, "secret", "inspect", "--format", "{{.Spec.Driver.Name}}", name)
+}
+
+// SecretRemove runs `podman secret rm <name>`.
+func (p Podman) SecretRemove(ctx context.Context, name string) error {
+	_, err := p.run(ctx, 0, "secret", "rm", name)
+	return err
+}
+
+// secretTimeLayout is how a Go template prints a time.Time (time.Time.String).
+const secretTimeLayout = "2006-01-02 15:04:05.999999999 -0700 MST"
+
+// SecretCreated returns when secret name was created.
+func (p Podman) SecretCreated(ctx context.Context, name string) (time.Time, error) {
+	s, err := p.out(ctx, "secret", "inspect", "--format", "{{.CreatedAt}}", name)
+	if err != nil {
+		return time.Time{}, err
+	}
+	t, err := time.Parse(secretTimeLayout, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("secret %s: created at %q: %w", name, s, err)
+	}
+	return t, nil
 }

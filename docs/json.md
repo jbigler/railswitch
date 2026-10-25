@@ -56,3 +56,28 @@ suggested addon that is missing from `[image] addons`.
 | `steps[].tag` | string | The image tag it builds: `localhost/<prefix>/<repo>:<version>-<hash8>` (D9). |
 | `steps[].from` | array of strings | The file's `FROM` images with build args expanded, without `${BASE_IMAGE}`, `scratch` and stage names (D36). Empty for an addon that only builds on the previous step. |
 | `warnings` | array of strings | Non-fatal findings; empty when there are none. |
+
+## `secret ls`
+
+The project's declared secrets (`project.toml [secrets]`), sorted by name.
+It is an array with one object per secret. It never holds a value: railswitch
+does not read a secret's value back from podman.
+
+```json
+[
+  {"name": "github_token", "scope": "project", "podman_secret": "filial_github_token", "delivery": "file", "driver": "file", "set": false, "created": null, "services": ["nvim"], "driver_differs": false},
+  {"name": "twilio_auth_token", "scope": "project", "podman_secret": "filial_twilio_auth_token", "delivery": "env TWILIO_AUTH_TOKEN", "driver": "file", "set": true, "created": "2026-10-25T09:08:07Z", "services": ["rails"], "driver_differs": false}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The secret's name in `[secrets]`. |
+| `scope` | string | `project` (podman secret `<prefix>_<name>`) or `machine` (`railswitch_<name>`, shared by every project). |
+| `podman_secret` | string | The podman secret's name. |
+| `delivery` | string | `file` (mounted at `/run/secrets/<name>`) or `env <VAR>`. |
+| `driver` | string | The podman secret driver the value is stored with; when not set, the driver `config.toml` configures (`file` by default). |
+| `set` | boolean | Whether the podman secret exists. |
+| `created` | string or `null` | When the podman secret was created (RFC 3339); `null` when not set. |
+| `services` | array of strings | The service ids that receive it. |
+| `driver_differs` | boolean | The value is stored with another driver than `config.toml` configures; `railswitch secret set <name>` re-creates it under the configured one. |

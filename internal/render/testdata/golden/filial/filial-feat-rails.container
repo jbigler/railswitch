@@ -27,6 +27,7 @@ Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-app.sh
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
 Volume=filial-feat-node-modules:/app/node_modules:U
+Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN
 DropCapability=all
 NoNewPrivileges=true
 Memory=4g

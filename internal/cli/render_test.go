@@ -229,7 +229,7 @@ func TestEnvMasksProjectGenerated(t *testing.T) {
 }
 
 // TestRenderThroughSymlink: a workspace reached through a symlink is the
-// registered one.
+// registered one, and renders the same bytes as through its real path.
 func TestRenderThroughSymlink(t *testing.T) {
 	ws, _ := filialWS(t)
 	link := filepath.Join(t.TempDir(), "ws-link")
@@ -237,7 +237,14 @@ func TestRenderThroughSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	mustRun(t, "-C", link, "lock")
+	mustRun(t, "-C", ws, "render")
+	if out := mustRun(t, "-C", link, "render", "--check"); out != "" {
+		t.Errorf("render --check via the symlink after a render via the real path:\n%s", out)
+	}
 	mustRun(t, "-C", link, "render")
+	if out := mustRun(t, "-C", ws, "render", "--check"); out != "" {
+		t.Errorf("render --check via the real path after a render via the symlink:\n%s", out)
+	}
 }
 
 func appendFile(t *testing.T, path, data string) {

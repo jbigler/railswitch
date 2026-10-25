@@ -226,7 +226,8 @@ func (w *Workspace) CheckLock() error {
 }
 
 // Model builds the project's render model from the registry: the project's
-// subnet and every registered worktree of it.
+// subnet and every registered worktree of it. It sets w.Root to the
+// registered workspace path, which Root may reach through a symlink.
 func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Model, error) {
 	prefix := w.Project.Project.Prefix
 	pe, ok := reg.Project(prefix)
@@ -236,6 +237,9 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 	if !samePath(pe.Workspace, w.Root) {
 		return nil, fmt.Errorf("project prefix %s is registered for workspace %s, not %s", prefix, pe.Workspace, w.Root)
 	}
+	// Reached through another path (a symlink): every rendered path, marker
+	// and Apply target uses the registered one, so renders agree byte for byte.
+	w.Root = filepath.Clean(pe.Workspace)
 	var wts []render.Worktree
 	for _, e := range reg.WorktreesOf(prefix) {
 		dir := filepath.Join(w.Root, e.Slug)

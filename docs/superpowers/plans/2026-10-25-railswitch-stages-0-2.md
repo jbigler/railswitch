@@ -14,7 +14,7 @@
 
 **Spec:**
 - `handoff/HANDOFF.md`;
-- the decisions D1–D26 in `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md` (binding: cite them by number);
+- the decisions D1–D43 in `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md` (binding: cite them by number);
 - the mock-up values in `docs/reference/design-data.md`;
 - the old tool: `https://github.com/jbigler/rails-dev-podman` at commit `fd7336b` (`AGENTS.md` and `.container-config/`).
 
@@ -25,12 +25,12 @@
   - config dir `~/.config/railswitch/`;
   - data dir `~/.local/share/railswitch/`;
   - Quadlet output `~/.config/containers/systemd/`.
-- **Calling commands:** argv only, never a shell; every call has a `context` with a timeout; all calls go through `sys.Runner`.
+- **Calling commands:** argv only, never a shell; every call has a timeout (`sys.Cmd.Timeout`, default 30 s) or is an explicit interactive/follow call (`sys.NoTimeout`: `logs -f`, `exec`); all calls go through `sys.Runner`.
 - **No podman Go bindings.**
 - **Secrets (D33):** a secret value only ever travels on stdin: never on argv, in a file railswitch writes, an env file, a log or a job output. No host SSH agent, `~/.ssh` or host gitconfig is mounted into any container.
-- **Dependencies:** stdlib, `github.com/BurntSushi/toml`, and `golang.org/x/term` (no-echo prompt for `secret set`).
-- **Container hardening (D34):** every rendered container has `NoNewPrivileges=true`, `Memory=` and `PidsLimit=`. App, deps, worker and tool containers also get `DropCapability=all`.
-- **Schema versions (D39):** `project.toml`, `stack.lock` and `registry.toml` carry `schema = 1`. A file with a higher schema is refused ("written by a newer railswitch"), never misread.
+- **Dependencies:** stdlib and `github.com/BurntSushi/toml`. The no-echo prompt for `secret set` uses stdlib `syscall` `TCGETS`/`TCSETS` ioctls on linux (clear `ECHO`, restore afterwards).
+- **Container hardening (D34):** every rendered container has `NoNewPrivileges=true`, `Memory=` and `PidsLimit=`. App, deps, worker and tool containers also get `DropCapability=all`, except the browser (it keeps `AddCapability=NET_ADMIN`/`NET_RAW` and gets no `DropCapability`).
+- **Schema versions (D39):** `project.toml`, `stack.lock`, `registry.toml` and the machine `config.toml` carry `schema = 1`. A file with a higher schema is refused ("written by a newer railswitch"), never misread.
 - **Machine-readable output (D40):** every read command (`env`, `status`, `wt ls`, `secret ls`, `containerfile list`, `doctor`) accepts the global `--json` flag and prints one JSON document with stable field names, documented in `docs/json.md`.
 - **Unit tests** need no podman, systemd, gh or network. `git` and `bash` are allowed.
 - **Integration tests** carry `//go:build integration`.
@@ -81,12 +81,13 @@ internal/sys/runner.go            # Runner, Cmd, Result, Exec (os/exec impl)
 internal/sys/systest/fake.go      # Fake runner for tests
 internal/safefile/safefile.go     # hostile-file reads
 internal/naming/naming.go         # Sanitize, object/unit names (D6, D7)
-internal/config/{project,lock,secrets,hsts}.go
+internal/placeholder/placeholder.go # placeholder grammar shared by config and pack (Task 3)
+internal/config/{project,lock,generated,hsts,edit}.go
 internal/pack/{ref,format,load,hash,expand,resolve}.go
 internal/pack/builtin/            # embedded: packs/rails, options/{postgres,redis,rustfs,playwright,sidekiq}, tools/nvim
 internal/version/{chain,parsers}.go
-internal/machine/{dirs,registry,proxy}.go
-internal/render/{model,env,quadlet,lint,apply}.go + testdata/
+internal/machine/{dirs,registry,proxy,config}.go
+internal/render/{model,env,images,quadlet,lint,diff,apply}.go + testdata/
 internal/podman/{podman,systemd}.go
 internal/firewall/{descriptor.go, assets/{hook.sh,firewall.sh}}
 internal/worktree/{add,remove,resolve}.go
@@ -94,7 +95,9 @@ internal/workspace/workspace.go   # workspace discovery + the single Render path
 internal/lifecycle/{up,stop,down,status,logs,exec,build,preflight}.go
 internal/doctor/doctor.go
 testdata/legacy/quadlet/          # old units at fd7336b, for the equivalence review only
-testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree files
+testdata/fixtures/filial/         # project.toml, mise.local.toml, db-dumps/, master/ and feat/ worktree files
+testdata/fixtures/minimal/        # rails with database/cache/browser none, no tools (Task 9)
+docs/json.md                      # --json schemas (D40), created in Task 12
 ```
 
 ---
@@ -130,9 +133,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - [ ] **Step 6: Write the Makefile and workflows.**
   - `make check` runs `test -z "$(gofmt -l .)"`, `go vet ./...`, `staticcheck ./...` and `go test ./...`.
   - `make build` runs `CGO_ENABLED=0 go build -trimpath -ldflags "-X github.com/jbigler/railswitch/internal/cli.Version=$(VERSION)" -o railswitch ./cmd/railswitch`.
-  - `ci.yml`, on push and pull request:
-    - job `check`: `make check` on `ubuntu-latest` (Go version from `go.mod`);
-    - job `quadlet` in container `quay.io/podman/stable`: `go test -tags integration ./internal/render/ -run Quadlet` (the Task 13 test; it passes with no tests before then).
+  - `ci.yml`, on push and pull request: job `check`: `make check` on `ubuntu-latest` (Go version from `go.mod`). This is its only job here; Task 13 adds the `quadlet` job.
   - `release.yml`, on tags `v*`:
     - `make build` for `linux/amd64` and `linux/arm64` with `VERSION=${tag}`;
     - `sha256sum` into `SHA256SUMS`;
@@ -163,12 +164,14 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
       Stdin   io.Reader
       Stdout  io.Writer       // nil = captured into Result
       Stderr  io.Writer
-      Timeout time.Duration   // 0 = DefaultTimeout (30s)
+      Timeout time.Duration   // 0 = DefaultTimeout (30s); NoTimeout = no deadline (interactive/follow calls only)
   }
   type Result struct { Stdout, Stderr []byte; ExitCode int }
   type Runner interface { Run(ctx context.Context, c Cmd) (Result, error) }
   type Exec struct{}         // real implementation
   var ErrExit = errors.New("non-zero exit")   // wrapped together with the exit code and stderr tail
+  const DefaultTimeout = 30 * time.Second
+  const NoTimeout time.Duration = -1          // logs -f and exec; the call ends only with its ctx
   // systest:
   type Fake struct {
       Passthrough []string    // binary names run for real (e.g. "git")
@@ -181,6 +184,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `TestExecArgvLiteral`: running `printf %s 'a;b $(x)'` gives stdout `a;b $(x)` exactly.
   - `TestExecExitCode`: `false` gives `errors.Is(err, ErrExit)` and `ExitCode == 1`.
   - `TestExecTimeout`: `sleep 5` with a 100 ms timeout returns within 1 s and `errors.Is(err, context.DeadlineExceeded)`.
+  - `TestDeadlineFor` (in-package, on the unexported `func deadlineFor(c Cmd) (time.Duration, bool)`): `Timeout 0` → `30s, true`; `Timeout 5s` → `5s, true`; `Timeout NoTimeout` → `0, false` (no deadline is set; only the caller's ctx can end the call).
+  - `TestExecNoTimeoutCancel`: `sleep 5` with `Timeout: NoTimeout` and a parent ctx cancelled after 100 ms returns within 1 s with `errors.Is(err, context.Canceled)`.
   - `TestFakeRecordsAndScripts`: the most specific `On` wins, and `Calls` records the argv.
   - `TestFakePassthrough`: `git --version` runs for real when `"git"` is in `Passthrough`.
 - [ ] **Step 2:** Run `go test ./internal/sys/...`. Expected: FAIL.
@@ -220,8 +225,9 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 **Files:**
 - Create:
   - `internal/naming/naming.go` and `naming_test.go`
+  - `internal/placeholder/placeholder.go` and `placeholder_test.go`
   - `internal/config/project.go`, `hsts.go`, `project_test.go`
-  - `testdata/fixtures/filial/project.toml`
+  - `testdata/fixtures/filial/project.toml`: `schema = 1`, then the HANDOFF §3.2 example with its `[secrets] names = […]` line replaced by `[secrets.twilio_auth_token]` (`services = ["rails"]`, `env = "TWILIO_AUTH_TOKEN"`), then `[image]` with `base = "containerfiles/Containerfile.base"`. Task 8 extends it.
 
 **Interfaces:**
 - Produces (naming):
@@ -236,6 +242,14 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   func Shared(prefix, what string) string        // "filial_npm_cache"
   func DevNetwork(prefix, slug string) string    // "filial-feat-dev"
   func ProxyNetwork(prefix string) string        // "filial_proxy"
+  ```
+
+- Produces (placeholder; a leaf package that imports nothing of railswitch, so `config` and `pack` both use it):
+
+  ```go
+  var Pattern = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_.]*\}`) // "{{" is a literal "{" and never starts a placeholder
+  func Names(s string) []string                 // placeholder names in s, in order, without braces; skips "{{" escapes
+  var LinkNames = map[string]bool{"worktree.host": true, "worktree.slug": true, "branch": true} // the names a [[links]] url may use (HANDOFF §3.10)
   ```
 
 - Produces (config): the types below, plus:
@@ -299,9 +313,11 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - 50 × `"ab-"` → at most 40 chars, no trailing `-`;
   - `"!!!"` → `ErrEmptyName`.
 
-  `ValidService`: `app`, `dev`, `page`, `new` are rejected with a message containing `HSTS`; `rails` and `db` pass. `Container("api","x","db")` is not a prefix of `Container("api","x-v2","db")` when compared as exact strings (a documentation test for gotcha 11).
+  `ValidService`: `app`, `dev`, `page`, `new` are rejected with a message containing `HSTS`; `rails` and `db` pass.
+
+  `placeholder.Names`: `"{worktree.host}/x/{branch}"` → `["worktree.host","branch"]`; `"{{literal}"` → `[]`; `"/data/rustfs{0..3}"` → `[]`.
 - [ ] **Step 2: Write the config tests.**
-  - `TestLoadFilial`: loads the §3.2 example, with its `[secrets] names = […]` line replaced by `[secrets.twilio_auth_token]` (`services = ["rails"]`, `env = "TWILIO_AUTH_TOKEN"`). Asserts `Options["cache"] == "redis@1"`, `Worktrees["postgres-trial"].Versions["postgres"] == "17"`, and `Secrets["twilio_auth_token"].Env == "TWILIO_AUTH_TOKEN"`.
+  - `TestLoadFilial`: loads `testdata/fixtures/filial/project.toml`. Asserts `Schema == 1`, `Options["cache"] == "redis@1"`, `Worktrees["postgres-trial"].Versions["postgres"] == "17"`, `Secrets["twilio_auth_token"].Env == "TWILIO_AUTH_TOKEN"`, and `Image.Base == "containerfiles/Containerfile.base"`; `Validate` returns nil.
   - `TestUnknownKey`: `[optins]` gives an error containing `optins`.
   - `TestValidate` (table-driven), each row expecting an error naming the field:
     - prefix `"Filial"`, `"fi-l"`, `"f"`;
@@ -310,7 +326,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - `[stack] app = "app"`;
     - secret name `db-pass`;
     - an `[env]` value with `\n`;
-    - an unknown link placeholder `{worktree.hots}`;
+    - an unknown link placeholder `{worktree.hots}` (link urls are checked with `placeholder.Names` against `placeholder.LinkNames`);
     - `[worktrees."Bad Slug"]`;
     - firewall mode `strict`;
     - `[image] addons = ["Dockerfile"]` and `["../x/Containerfile.y"]` (each must be `containerfiles/Containerfile.<name>`);
@@ -366,6 +382,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   [image]                    # the base image (D31); app, deps and worker run it
   file = "Containerfile.base"
   tag = "ruby{ruby}-node{node}"
+  os = "debian"
   args = { RUBY_VERSION = "{ruby}", NODE_VERSION = "{node}" }
   [runtimes.ruby]
   from = [".ruby-version", ".tool-versions:ruby", "Gemfile", "Gemfile.lock"]
@@ -463,7 +480,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   [[volumes]]
   name = "db-data-pg{postgres.major}"
   mount = "/var/lib/postgresql/data"
-  [[mounts]]
+  [[mounts]]              # a relative source is a package asset (Task 8 writes it to .railswitch/assets/postgres/…)
   source = "initdb/restore-dump.sh"
   target = "/docker-entrypoint-initdb.d/restore-dump.sh"
   options = "ro,z"
@@ -482,9 +499,11 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   ```
 
   Fields the other options need:
-  - playwright: `firewall = "self"`, `[unit] add_capability = ["NET_ADMIN","NET_RAW"]`, `run_init = true`, `shm_size = "1g"`;
+  - playwright: `firewall = "self"`, `[unit] add_capability = ["NET_ADMIN","NET_RAW"]`, `run_init = true`, `shm_size = "1g"`, `entrypoint = "entrypoints/entrypoint-playwright.sh"`, `[[mounts]] source = "init-firewall-playwright.sh"`, and a **standalone build** (D31 "playwright stays standalone"): `[image] build = "Containerfile.playwright"`, `tag = "{playwright}"`, `args = { PLAYWRIGHT_VERSION = "{playwright}" }`. A standalone build is not on the base chain: no `BASE_IMAGE`, and it is ejected like a tool (`containerfiles/Containerfile.playwright`, found by filename);
   - rustfs: `[[volumes]] seed = "rustfs_data.tar.gz"` (D18);
-  - sidekiq: `slot = "jobs"`, `image = "app"`, `command = "bundle exec sidekiq"`, `needs = ["cache"]`, `works_with = ["rails","hanami"]`.
+  - sidekiq: `slot = "jobs"`, `[image] use = "app"` (runs the app's base image), `command = "bundle exec sidekiq"`, `needs = ["cache"]`, `works_with = ["rails","hanami"]`.
+
+  An option's `[image]` table has exactly one of `pull` (a registry ref template), `use = "app"`, or `build` (+ `tag`, `args`); any other combination is a `Load` error.
 
   `tool.toml` for nvim: `[image] file = "Containerfile.nvim"` (built on the base, D31), plus from `fd7336b` `nvim@.container`: port 17000 → 7777, `firewall = ["agent","deps"]`, `success_exit_status = 1`, and these mounts only: the worktree at `/app`, the base worktree's `.git`, the per-worktree home, the shared cache volumes, and `<prefix>_nvim_config`/`<prefix>_nvim_share`. Not ported (D33): `~/.ssh`, the SSH agent socket, `SSH_AUTH_SOCK`, the host gitconfig and gitignore. Also not ported: the kitty socket and `/usr/bin/kitten` (machine-local mounts, Stage 4).
 
@@ -500,7 +519,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - `app.health` is set;
     - `deps.frozen_env["BUNDLE_FROZEN"] == "true"`.
   - `TestPlaywrightOptionEnv`: the playwright option's env has no `HEADLESS_SYSTEM_TESTS`. It keeps only what it defines itself: `PLAYWRIGHT_HOST = "ws://{service}:8888/connect"` in `[gives]` and `CHROME_START_URL = "http://{worktree.host}"` in `[env]`.
-  - `TestBuiltinFromQualified` (D36): every `FROM` in every built-in Containerfile, other than `${BASE_IMAGE}`, `scratch` and stage names, starts with a registry host (`docker.io/`, `ghcr.io/`, `quay.io/`).
+  - `TestBuiltinFromQualified` (D36): every `FROM` in every built-in Containerfile, other than `${BASE_IMAGE}`, `scratch` and stage names, starts with a registry host (`docker.io/`, `ghcr.io/`, `quay.io/`, `mcr.microsoft.com/`).
+  - `TestOptionImageKinds`: an option `[image]` with both `pull` and `use` is a `Load` error; the playwright option has `Image.Build == "Containerfile.playwright"`; sidekiq has `Image.Use == "app"`.
 - [ ] **Step 2:** Run `go test ./internal/pack/`. Expected: FAIL.
 - [ ] **Step 3: Implement the loader and hash.**
 - [ ] **Step 4: Write the rails assets.** They are proved working in Task 21, not here.
@@ -513,6 +533,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     `pack.toml [image]` gets `os = "debian"`. Every `FROM` is fully qualified (D36). Port the generic parts of `fd7336b` `.container-config/Dockerfile` `base` stage; drop the Filial-specific packages and every Claude Code install.
   - `options/postgres/Containerfile.pg-client`: `ARG BASE_IMAGE`, `FROM ${BASE_IMAGE}`, `USER root`, `apt-get install -y --no-install-recommends libpq-dev postgresql-client`, `USER appuser`.
   - `tools/nvim/Containerfile.nvim`: `ARG BASE_IMAGE`, a build stage porting `fd7336b`'s `build-nvim` (Neovim from source on `docker.io/library/debian:trixie-slim`), then `FROM ${BASE_IMAGE}` with the built Neovim copied in. No agent software (D30).
+  - `options/playwright/Containerfile.playwright` (standalone, D31): `ARG PLAYWRIGHT_VERSION`, `FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble` (it ships the browsers), then `USER root`, the packages `init-firewall-playwright.sh` needs (`nftables`, `iproute2`), as in `fd7336b`'s playwright image. No `COPY`/`ADD` from the build context: its entrypoint and firewall script are bind-mounted package assets (Task 8).
   - `entrypoint-deps.sh`: port `fd7336b` `entrypoint-deps.sh`, lockfile-frozen (D35):
     - `bundle check || bundle install`. With `BUNDLE_FROZEN=true` from the service env, bundler refuses to change `Gemfile.lock`;
     - keep the `node_modules/.deps-stamp` check, and install with `npm ci`. If `package-lock.json` is missing, exit 1 with `no package-lock.json: run railswitch deps -- npm install`;
@@ -528,9 +549,10 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - Create: `internal/pack/expand.go`, `internal/pack/expand_test.go`
 
 **Interfaces:**
+- Consumes: `placeholder.Pattern` (Task 3); `Expand` finds placeholders only through it, so the grammar lives in one place.
 - Produces:
   - `type Scope interface{ Lookup(name string) (string, bool) }`
-  - `func Expand(s string, sc Scope) (string, error)`: placeholders match `\{[A-Za-z_][A-Za-z0-9_.]*\}`, and `{{` is a literal `{`. An unknown name returns `*UnknownPlaceholderError{Name}`. `ErrUnset` is returned for an `env.X` name the scope knows is unset.
+  - `func Expand(s string, sc Scope) (string, error)`: placeholders are `placeholder.Pattern` matches (`\{[A-Za-z_][A-Za-z0-9_.]*\}`), and `{{` is a literal `{`. An unknown name returns `*UnknownPlaceholderError{Name}`. `ErrUnset` is returned for an `env.X` name the scope knows is unset.
   - `func Major(v string) string`: the leading digits before the first `.` or `-`.
   - `type MapScope map[string]string`
 
@@ -555,8 +577,9 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - Consumes: `safefile.Read`
 - Produces:
   - `type Resolved struct{ Value, Source string; Warnings []string }`. `Source` is `"<file>"`, `"<file>:<key>"` or `"fallback"`.
-  - `func Resolve(dir string, from []string, fallback string) Resolved`
-  - `var ValidValue = regexp.MustCompile(`^[0-9][0-9A-Za-z._-]{0,39}$`)`
+  - `func Resolve(dir string, from []string, fallback string, valid *regexp.Regexp) Resolved`: a source value that doesn't match `valid` is skipped with a warning containing `invalid`.
+  - `var ValidVersion = regexp.MustCompile(`^[0-9][0-9A-Za-z._-]{0,39}$`)`: runtimes and pins.
+  - `var ValidDBName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,62}$`)`: `[db_name]` (D16).
 
 - [ ] **Step 1: Write failing tests**, one per parser, with fixtures in `testdata/`:
 
@@ -578,6 +601,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `.ruby-version` = `3.3.6; rm -rf ~` is skipped with a warning containing `invalid`;
   - a 2 MiB `.nvmrc` is skipped;
   - when every source is skipped, the result is `Value == fallback` and `Source == "fallback"`.
+  - `TestDBNameValidator`: `config/database.yml` with `development: database: filial_dev` and `ValidDBName` gives `filial_dev`; with `ValidVersion` it is skipped as `invalid`; `database: "x; drop"` with `ValidDBName` is skipped as `invalid`.
 - [ ] **Step 2:** Run `go test ./internal/version/`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
   - Choose the parser by base filename; the `:key` suffix is optional.
@@ -592,7 +616,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - Create:
   - `internal/machine/dirs.go`, `registry.go`, `registry_test.go`
   - `internal/config/lock.go`, `lock_test.go`
-  - `internal/config/secrets.go`, `secrets_test.go`
+  - `internal/config/generated.go`, `generated_test.go` (the D17 generated values; not called secrets)
 
 **Interfaces:**
 - Produces (machine):
@@ -630,6 +654,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   func ReadLock(path string) (*Lock, error)       // a missing file is ErrNoLock
   func (l *Lock) Write(path string) error         // header "# Written by railswitch. Do not edit; review updates in the dashboard."
   func (l *Lock) Digest(ref string) string
+  func (l *Lock) SetDigest(ref, digest string)     // adds or replaces the [[image]] entry for ref; entries kept sorted by ref
   func (l *Lock) BaseDigest(ref string) string
   func (l *Lock) SetBaseDigest(ref, digest string)
   func ReadGenerated(path string) (map[string]string, error) // [env] string values of the workspace-root mise.local.toml (D17)
@@ -640,13 +665,14 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - IDs are machine-wide: projects `a` and `b` alternating get 1, 2, 3;
     - after removing ID 2, the next ID is 4 (max+1, never reused while higher IDs exist);
     - a second `AddProject("a")` gives `ErrPrefixTaken`;
-    - subnets 0, 1, 2; after removing project 1, the next project gets 1;
+    - three projects get subnets 0, 1, 2;
     - `TestOpenBlocks`: a second `Open` from a goroutine blocks until the first `Close` (assert ordering with channels);
     - `Subnet(3) == "10.214.3.0/24"`, `TraefikIP(3) == "10.214.3.2"`, `IPRange(3) == "10.214.3.128/25"`.
   - Lock:
     - write/read round trip;
     - two `Write`s of the same lock are byte-identical;
-    - `Digest` on an unknown ref returns `""`.
+    - `Digest` on an unknown ref returns `""`;
+    - `SetDigest("docker.io/library/postgres:16", "sha256:aa")` then `Write`/`ReadLock` gives `Digest(…) == "sha256:aa"`; a second `SetDigest` with `"sha256:bb"` replaces it (one entry).
   - Generated:
     - reads `[env] DB_PASSWORD = "x"`;
     - ignores non-string values;
@@ -657,23 +683,24 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - [ ] **Step 2:** Run it. Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4:** Run it. Expected: PASS.
-- [ ] **Step 5:** `make check && git commit -am "feat: machine registry, stack.lock, secrets"`.
+- [ ] **Step 5:** `make check && git commit -am "feat: machine registry, stack.lock, generated values"`.
 
 ### Task 8: Resolve the stack and build the render model with env layers
 
 **Files:**
 - Create:
   - `internal/pack/resolve.go`, `resolve_test.go`
-  - `internal/render/model.go`, `env.go`, `model_test.go`
-  - `testdata/fixtures/filial/`:
-    - `project.toml`: `schema = 1` plus the §3.2 example, with its `[secrets] names = […]` line replaced by `[secrets.twilio_auth_token]` (`services = ["rails"]`, `env = "TWILIO_AUTH_TOKEN"`). Also `[tools] nvim = true`, `[worktrees.feat.versions] postgres = "17"`, `[firewall] allow.deps = ["github.com"]`, and `[image] base = "containerfiles/Containerfile.base"`, `addons = ["containerfiles/Containerfile.pg-client"]`;
-    - `mise.local.toml`: `DB_PASSWORD = "s3cret"`, `S3_SECRET_KEY = "s3cret-s3"`;
-    - `worktrees/master/` and `worktrees/feat/`, each with `.ruby-version` (`3.3.6`), `.nvmrc` (`22.11.0`), `Gemfile.lock` (`playwright-ruby-client (1.54.0)`), and `config/database.yml` (`development: database: filial_development`).
+  - `internal/render/model.go`, `env.go`, `images.go`, `model_test.go`, `images_test.go`
+  - `testdata/fixtures/filial/mise.local.toml`: `[env]` then `DB_PASSWORD = "s3cret"` and `S3_SECRET_KEY = "s3cret-s3"`;
+  - `testdata/fixtures/filial/db-dumps/rustfs_data.tar.gz` (a valid empty tar.gz; Task 18's `volume import` reads it);
+  - `testdata/fixtures/filial/master/` and `testdata/fixtures/filial/feat/` (D22 layout: `<workspace>/<slug>/`), each with `.ruby-version` (`3.3.6`), `.nvmrc` (`22.11.0`), `Gemfile.lock` (`playwright-ruby-client (1.54.0)`), and `config/database.yml` (`development: database: filial_dev`).
+- Modify:
+  - `testdata/fixtures/filial/project.toml` (from Task 3): add `[tools] nvim = true`, `[worktrees.feat.versions] postgres = "17"`, `[firewall] allow.deps = ["github.com"]`, and `addons = ["containerfiles/Containerfile.pg-client"]` under `[image]`. (The §3.2 example already has `browser = "playwright@1"` and `[env] TZ = "Asia/Bangkok"`.)
 
-    The fixture has no `containerfiles/`. The test helper that copies the fixture to a temp workspace writes the built-in defaults' bytes there (`Containerfile.base`, `.pg-client`, `.nvim`), so the fixture can't drift from the built-ins.
+    The fixture has no `containerfiles/`. The test helper that copies the fixture to a temp workspace writes the built-in defaults' bytes there (`Containerfile.base`, `.pg-client`, `.nvim`, `.playwright`), so the fixture can't drift from the built-ins. The copy includes `db-dumps/` (mode 0700), as `new`/`init` create it (Task 20).
 
 **Interfaces:**
-- Consumes: `config.Project`, `pack.Catalog`, `pack.Expand`, `version.Resolve`, `config.Lock`, `machine.ProjectEntry`/`WorktreeEntry`
+- Consumes: `config.Project`, `pack.Catalog`, `pack.Expand`, `version.Resolve` with `version.ValidVersion` (runtimes, pins) and `version.ValidDBName` (`[db_name]`), `config.Lock`, `machine.ProjectEntry`/`WorktreeEntry`
 - Produces:
 
   ```go
@@ -707,10 +734,17 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
       Prefix   string
       Services []Service // ordered: app, deps, worker, data (slot order), tools
       Inputs   Inputs
+      Warnings []string  // non-fatal findings, e.g. a suggested option addon missing from [image] addons
+      Assets   []Asset   // every package asset a service mounts; Task 11's Plan writes them
+  }
+  type Asset struct {
+      Rel  string      // workspace-relative: ".railswitch/assets/<package>/<path>", e.g. ".railswitch/assets/postgres/initdb/restore-dump.sh"
+      Data []byte      // the embedded package file's bytes
+      Mode fs.FileMode // 0755 for scripts (*.sh), else 0644
   }
   type Service struct {
       ID, Role   string   // app|deps|worker|data|tool
-      Image      ImageSpec // one of: Pull{Ref template}; Base (the worktree's base image); Build{File, Args} on the base (D31)
+      Image      ImageSpec // one of: Pull{Ref template}; Base (the worktree's base image); Build{File, Args} on the base (D31); Standalone{File, Tag, Args} (an option's own build, not on the chain: playwright)
       Exec       []string
       Entrypoint string
       Command    string
@@ -732,21 +766,26 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
       Worktree Worktree
       Values   map[string]string   // every placeholder name → its concrete value for this worktree
       Env      map[string][]EnvVar // svc → effective process env, highest layer per name, provenance kept
-      Builds   []BuildStep         // in build order: the base chain, then tool and agent images
+      Builds   []BuildStep         // in build order: the base chain, then tool images, then standalone option images
   }
   type BuildStep struct {
-      Name    string            // "base", "addon pg-client", "nvim"
+      Name    string            // "base", "addon pg-client", "nvim", "playwright"
       File    string            // absolute path, always under <ws>/containerfiles/
       Context string            // always <ws>/containerfiles
-      Args    map[string]string // includes BASE_IMAGE for every step after the first
+      Args    map[string]string // includes BASE_IMAGE for every chain/tool step after the first; never for a standalone step
       Tag     string            // D9
       From    []string          // FROM refs of this file (ARGs expanded), excluding ${BASE_IMAGE}, scratch and stage names (D36)
   }
   func (m *Model) Instance(wt Worktree) (*Instance, error)
+  type Names struct{ Units, Containers, Volumes, Networks []string }
+  func (m *Model) NamesFor(slug string) (Names, error) // exact names of one registered slug's objects; an unregistered slug is an error
+  // Units: every "<prefix>-<slug>-<svc>.service" and "<prefix>-<slug>-dev-network.service";
+  // Containers: "<prefix>-<slug>-<svc>"; Volumes: per-worktree volumes only ("<prefix>-<slug>-<name>", never "<prefix>_…");
+  // Networks: "<prefix>-<slug>-dev". Used by wt rm (Task 17), stop/down (Task 18) and secret set (Task 16A).
   ```
 
 - Rules:
-  - **Services:** the app service (`[stack] app`, default the pack's `app.service`, role app, command `app.server`, the base image); `deps` (role deps, oneshot, the base image, `deps_entrypoint`, plus the pack's `[deps] frozen_env` at the pack layer); one service per chosen option (role `data` for database/cache/storage, `worker` for jobs unless the image is in-process, `tool` for mail/browser; an option with `image = "app"` runs the base image); tool `nvim` only when `[tools] nvim = true`.
+  - **Services:** the app service (`[stack] app`, default the pack's `app.service`, role app, command `app.server`, the base image); `deps` (role deps, oneshot, the base image, `deps_entrypoint`, plus the pack's `[deps] frozen_env` at the pack layer); one service per chosen option (role `data` for database/cache/storage, `worker` for jobs unless the image is in-process, `tool` for mail/browser; an option whose `Image.Use == "app"` (`[image] use = "app"`) runs the base image); tool `nvim` only when `[tools] nvim = true`.
   - **Dependencies:** the app Requires deps and every data service, and Wants every tool (D23).
   - **Networks:** app and routed services join `dev` and `proxy`; the rest join `dev` only.
   - **Env layers** apply per HANDOFF §3.7, with D10/D11 deciding which services get which layers:
@@ -758,13 +797,19 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - the worktree layer (`WORKTREE_ID`, `WORKTREE_SLUG`, `WORKTREE_HOST`, the port env of ports the service publishes) goes to app, worker and tools, plus each service's own ports;
     - generated values are referenced only through `{generated.X}` inside values.
   - **Instance values:** `Values` holds every name a unit field can use:
-    - `worktree.slug`, `worktree.host`, `traefik.ip`;
+    - `worktree.slug`, `worktree.host`, `traefik.ip`, `branch`;
+    - `project.prefix`;
     - `image.<svc>`;
     - each pin or runtime and its `.major`;
     - each port env name;
+    - `dumps`: `<ws>/db-dumps`;
+    - `db`: the `[db_name]` chain result (`version.Resolve` with `ValidDBName`, fallback expanded with `project.prefix`);
+    - `env.<NAME>`: the value of `NAME` from env layers 1–3 (pack `[env]`, option, project `[env]`); a name absent there is unset (`ErrUnset`);
     - `secret.<name>`: the podman secret name (`<prefix>_<name>` or `railswitch_<name>`, D33).
 
     `generated.*` is never in `Values`; it is resolved only into `Env`.
+  - **Per-service scope:** expanding a service's fields and env adds, on top of `Values`: `service` (that option's service id; for `[gives]`, the giving option's service id) and `scheme` (the pack's `db_scheme[<option name>]`, e.g. `postgres://`). An env var whose value expands to `ErrUnset` is omitted from that service's env, with no error (e.g. `PGTZ = "{env.TZ}"` with no `TZ` set). Any other unknown name is an `UnknownPlaceholderError`.
+  - **Package assets (D12/D13):** a relative `[[mounts]] source`, an `entrypoint` or a `deps_entrypoint` names a file in its package (`rails`, `postgres`, `playwright`, `nvim`, …). Each used asset becomes one `Model.Assets` entry at `.railswitch/assets/<package>/<path>`. The service mounts it read-only: a `[[mounts]]` asset at its `target`; an entrypoint at `/usr/local/bin/<basename>`, with `Entrypoint=/usr/local/bin/<basename>`. When `<ws>/entrypoints/<basename>` exists, the mount source is that file instead (D13: the project's own entrypoint wins), and no asset is written for it.
   - **Secret env collisions:** a secret delivered as env (`env = "X"`) to a service that also gets `X` from layers 1–5 is an error naming the secret, the service and `X`. The precedence between podman's `--env-file` and a `type=env` secret is not something to rely on.
   - **Secrets with `git_host` (D33):** the services named in that secret's `services` get git wiring through `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` env, so nothing is written into the repo's `.git/config`, which the host shares:
     - `credential.https://<git_host>.helper` = `!f() { test "$1" = get && printf 'username=<git_user>\npassword=%s\n' "$(cat /run/secrets/<name>)"; }; f`. With `env` delivery, it prints `"$<ENV>"` instead of reading the file;
@@ -777,11 +822,12 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - each step after the first gets `BASE_IMAGE=<previous step's tag>`;
     - `image.base` is the last step's tag; app, deps and worker run it;
     - each enabled tool is a further step on `image.base`, built from `containerfiles/Containerfile.<tool>` (`Containerfile.nvim`);
-    - a missing file in the chain or for an enabled tool is an error naming it and `railswitch containerfile eject <name>`;
+    - **standalone builds (D31: playwright stays standalone):** an option with `[image] build = "Containerfile.<name>"` is built from `containerfiles/Containerfile.<name>` (`Containerfile.playwright`), after the chain and tools, with its own `[image] args` (`PLAYWRIGHT_VERSION = "{playwright}"`) and no `BASE_IMAGE`. Its tag is `localhost/<prefix>/<name>:<expanded [image] tag>-<hash8>` (`localhost/filial/playwright:1.54.0-<hash8>`; hash8 = first 8 hex of the sha256 of the Containerfile and its sorted args, D9); `image.<svc>` is that tag. Its `From` refs are pinned like every other step's (D36);
+    - a missing file in the chain, for an enabled tool or for a chosen standalone option is an error naming it and `railswitch containerfile eject <name>`;
     - a chosen option whose `[app_addon]` file isn't in `[image] addons` is a warning, not an error (`Model.Warnings []string`): `postgres@1 suggests addon pg-client, which is not in [image] addons (railswitch containerfile eject pg-client), ignore this if your base already covers it`.
 
     Per-worktree `[worktrees.<slug>.versions]` overrides `[versions]`, which overrides the option's pin default.
-  - **Containerfile contract**, checked on every step after the first and on every addon, tool and agent file (in `internal/render/images.go`). Each failure is an error naming the file:
+  - **Containerfile contract**, checked on every step after the first and on every addon and tool file (in `internal/render/images.go`). A standalone step gets only the `USER` and fully-qualified-`FROM` checks. Each failure is an error naming the file:
     - `ARG BASE_IMAGE` comes before the first `FROM`, and the last `FROM` is exactly `FROM ${BASE_IMAGE}`. Helper stages before it are allowed;
     - if the file has a `USER` line, the last one is `USER appuser`, `USER 1000` or `USER 1000:1000` (keep-id maps the host user to 1000);
     - for every step, the first included: every other `FROM` is fully qualified (`<registry>/<repo>:<tag>` or `…@sha256:…`), after expanding `${ARG}`s from the step's args and `ARG` defaults. `scratch` and stage names are allowed. Short names resolve differently per host's `registries.conf` and can't be pinned (D36);
@@ -791,7 +837,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `TestResolveErrors`: `browser = "nope@1"` gives an error listing `playwright@1`; `jobs = "sidekiq@1"` with `cache = "none"` gives `sidekiq needs cache`.
   - `TestFixedServiceIDs`: the Filial fixture yields services `rails`, `deps`, `db`, `cache`, `storage`, `browser`, `nvim`, and app env `REDIS_URL == "redis://cache:6379/1"`.
   - `TestLayerPrecedence`: `[env] TZ = "Asia/Bangkok"` plus `[services.rails.env] TZ = "UTC"` gives an effective rails TZ of `UTC` with `Layer == LayerService`; the db service TZ is `Asia/Bangkok`.
-  - `TestDatabaseURL`: the effective app `DATABASE_URL` is `postgres://postgres:s3cret@db/filial_development` (fixture database.yml has `filial_development`).
+  - `TestDatabaseURL`: the effective app `DATABASE_URL` is `postgres://postgres:s3cret@db/filial_dev` (fixture database.yml has `filial_dev`, not the `filial_development` fallback, so the chain is proven live).
+  - `TestEnvScope` (placeholder scope): the db service has `PGTZ=Asia/Bangkok` from `{env.TZ}`; with `[env] TZ` removed, `Build`/`Instance` give no error and db has no `PGTZ`; the playwright `[gives]` `PLAYWRIGHT_HOST` is `ws://browser:8888/connect`; postgres' `/db-dumps` mount source is `<ws>/db-dumps`.
   - `TestDepsGetsNoSecrets`: no deps EnvVar value contains the secret value, and no deps EnvVar is named `DATABASE_URL`.
   - `TestMissingSecret` (Review Focus 3): with `DB_PASSWORD` absent from `mise.local.toml`, `Build` or `Instance` errors with a message containing `DB_PASSWORD` and `mise.local.toml`.
   - `TestValuesHaveNoSecrets`: no `Instance.Values` value contains the secret.
@@ -800,18 +847,20 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `TestSecretGitWiring` (D33): `[secrets.github_token] services = ["nvim"]`, `git_host = "github.com"`:
     - nvim's env has `GIT_CONFIG_COUNT=2` with a `credential.https://github.com.helper` that reads `/run/secrets/github_token`, and `url.https://github.com/.insteadOf=git@github.com:`;
     - nvim's env has `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME`, `GIT_COMMITTER_EMAIL` from `Host`;
-    - `rails`, `deps` and `db` get none of these;
-    - no env file and no `Values` entry contains a secret value. railswitch never reads podman secret values, so the test asserts no code path can.
+    - `rails`, `deps` and `db` get none of these.
+  - `TestNoGitTokenEnv`: with `[secrets.github_token] services = ["nvim"]`, nvim's `Instance.Env` has no `GH_TOKEN` or `GITHUB_TOKEN`, and its git credential helper reads `/run/secrets/github_token`.
   - `TestSecretEnvCollision`: `[secrets.tz] services = ["rails"]`, `env = "TZ"` with `[env] TZ = "Asia/Bangkok"` gives an error naming `tz`, `rails` and `TZ`.
   - `TestPortsFromID`: ID 7 gives `DB_PORT=55439`, `RUBY_DEBUG_PORT=33007`, `NVIM_PORT=17007`, `PLAYWRIGHT_HOST_PORT=18895`, `APP_PORT=13007`, `S3_PORT=19007`.
   - `TestImageChain` (D31):
-    - with `[image] addons = ["containerfiles/Containerfile.pg-client", "containerfiles/Containerfile.vips"]`, master's `Builds` names are `base`, `addon pg-client`, `addon vips`, `nvim`, in that order, and every `File` is under the workspace's `containerfiles/`;
-    - each step's `Args["BASE_IMAGE"]` equals the previous step's `Tag`;
+    - with `[image] addons = ["containerfiles/Containerfile.pg-client", "containerfiles/Containerfile.vips"]`, master's `Builds` names are `base`, `addon pg-client`, `addon vips`, `nvim`, `playwright`, in that order, and every `File` is under the workspace's `containerfiles/`;
+    - each chain/tool step's `Args["BASE_IMAGE"]` equals the previous chain step's `Tag` (nvim's equals `image.base`); the `playwright` step has no `BASE_IMAGE`, `Args["PLAYWRIGHT_VERSION"] == "1.54.0"`, `Tag` starting with `localhost/filial/playwright:1.54.0-`, `From == ["mcr.microsoft.com/playwright:v1.54.0-noble"]`, and `Values["image.browser"]` equals that tag;
     - `rails` and `deps` use `Values["image.base"]`, which equals the `addon vips` tag and starts with `localhost/filial/base:ruby3.3.6-node22.11.0-`;
     - `nvim`'s tag starts with `localhost/filial/nvim:ruby3.3.6-node22.11.0-`;
     - changing one byte of `containerfiles/Containerfile.vips` changes the `addon vips` and `nvim` tags only;
-    - changing one byte of `containerfiles/Containerfile.base` changes every tag.
-  - `TestImageChainMissingFile`: deleting `containerfiles/Containerfile.nvim` gives an error containing `railswitch containerfile eject nvim`; with `[tools] nvim = false` there is no error.
+    - changing one byte of `containerfiles/Containerfile.base` changes every chain and tool tag, and not the `playwright` tag.
+  - `TestImageChainMissingFile`: deleting `containerfiles/Containerfile.nvim` gives an error containing `railswitch containerfile eject nvim`; with `[tools] nvim = false` there is no error. Deleting `containerfiles/Containerfile.playwright` gives an error containing `railswitch containerfile eject playwright`; with `browser = "none"` there is no error.
+  - `TestAssets` (D12/D13): `Model.Assets` has `.railswitch/assets/rails/entrypoints/entrypoint-app.sh` (0755, the embedded bytes) and `.railswitch/assets/postgres/initdb/restore-dump.sh`; with `<ws>/entrypoints/entrypoint-app.sh` present, the rails entrypoint mount source is that file and no `rails/entrypoints/entrypoint-app.sh` asset is listed.
+  - `TestNamesFor`: for `feat`, `Units` contains `filial-feat-rails.service` and `filial-feat-dev-network.service`; `Containers` contains `filial-feat-db`; `Volumes` is exactly the feat per-worktree volumes (`filial-feat-db-data-pg17`, `filial-feat-node-modules`, …) and none starts with `filial_`; `Networks == ["filial-feat-dev"]`. `NamesFor("gone")` is an error.
   - `TestOptionAddonWarning`: postgres chosen with `addons = []` gives no error, and one warning containing `pg-client` and `eject`.
   - `TestFromQualified`:
     - a base file with `FROM ruby:3.3-slim` gives an error naming the file and `fully qualified`;
@@ -825,19 +874,23 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 ### Task 9: Quadlet writer with golden tests
 
 **Files:**
-- Create: `internal/render/quadlet.go`, `internal/render/quadlet_test.go`, `internal/render/testdata/golden/filial/*`, `internal/render/testdata/golden/minimal/*` (rails with database `none`, cache `none`, browser `none`, no tools)
+- Create:
+  - `internal/render/quadlet.go`, `internal/render/quadlet_test.go`, `internal/render/testdata/golden/filial/*`, `internal/render/testdata/golden/minimal/*`
+  - `testdata/fixtures/minimal/`: `project.toml` (`schema = 1`, `[project] name = "minimal"`, `prefix = "mini"`, `[stack] pack = "rails@1"`, `[options] database = "none"`, `cache = "none"`, `browser = "none"`, no `[tools]`, `[image] base = "containerfiles/Containerfile.base"`) and `master/` with `.ruby-version` (`3.3.6`) and `.nvmrc` (`22.11.0`). The Task 8 fixture helper copies it the same way (writing `containerfiles/Containerfile.base` from the built-in).
 
 **Interfaces:**
 - Consumes: `Model`
 - Produces:
   - `func Quadlet(m *Model) (map[string][]byte, error)`: keyed by filename, for every worktree in `m.Inputs.Worktrees`. It returns `<prefix>-proxy.network`, plus for each worktree `<prefix>-<slug>-dev.network` and one `<prefix>-<slug>-<svc>.container` per service.
-  - `const Marker = "# railswitch: rendered from "`. The first line of every file is `Marker + <workspace>/project.toml (prefix <prefix>, worktree <slug>). Edit project.toml, not this file.` `<prefix>-proxy.network` omits `, worktree <slug>`.
+  - `const Marker = "# railswitch: rendered from "`. The first line of every file is `Marker + <workspace>/project.toml (prefix <prefix>, worktree <slug>). Edit project.toml, not this file.` `<prefix>-proxy.network` omits `, worktree <slug>`. The second line of every `.container` is `# role: <role>` (`app`, `deps`, `worker`, `data` or `tool`); Task 10's `deps-remain` lint reads it.
 
 - Emission rules (each is a HANDOFF §7 gotcha, and Task 10 lints every one):
   - **Network dependencies (D27):** `Network=` always names the `.network` unit (`<prefix>-<slug>-dev.network`, `<prefix>-proxy.network`), so Quadlet adds the `Requires=`/`After=` itself.
   - **Aliases:** scoped on the dev network only: `Network=<prefix>-<slug>-dev.network:alias=<svc>`.
   - **Proxy network:** `NetworkName=<prefix>_proxy`, with `Subnet`, `Gateway` and `IPRange` from `machine`. Dev network: `NetworkName=<prefix>-<slug>-dev`, `Options=mtu=1400`.
   - **Env files:** every container has `EnvironmentFile=<ws>/.railswitch/env/<slug>/<svc>.env` in `[Container]`. There is nothing under `[Service]` for systemd to expand (D8).
+  - **Images:** `Image=` is `Values["image.<svc>"]`: a pulled ref (with `@digest` when locked), the base chain's tag, a tool's tag, or a standalone build's tag (the browser: `Image=localhost/filial/playwright:1.54.0-<hash8>`).
+  - **Package assets (Task 8 `Model.Assets`):** each asset mount is `Volume=<ws>/.railswitch/assets/<package>/<path>:<target>:ro,z` (or `<ws>/entrypoints/<basename>` when the project supplies it, D13); an entrypoint asset adds `Entrypoint=/usr/local/bin/<basename>`.
   - **Data services:** health keys from the option, plus `Notify=healthy`.
   - **App:** `Requires=`/`After=` on the deps and data units; `Wants=` on the tool units and `railswitch-traefik.service`.
   - **deps:** `Type=oneshot`, `TimeoutStartSec=900`, `LogDriver=passthrough`, never `RemainAfterExit`.
@@ -872,7 +925,9 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - **Escaping:** user-supplied strings (commands, exec args, link text) get `%` → `%%` and `$` → `$$`. Values with spaces are double-quoted.
 
 - [ ] **Step 1: Write failing tests.**
-  - `TestGolden`: for each fixture dir, compare every file with `testdata/golden/<fixture>/<file>`. `go test ./internal/render -update` rewrites the goldens. Review the first goldens by hand against `fd7336b` units before committing them.
+  - `TestGolden`: for each fixture dir (`testdata/fixtures/filial`, `testdata/fixtures/minimal`), compare every file with `testdata/golden/<fixture>/<file>`. `go test ./internal/render -update` rewrites the goldens. Review the first goldens by hand against `fd7336b` units before committing them.
+  - `TestRoleLine`: line 2 of `filial-master-deps.container` is `# role: deps`, of `filial-master-rails.container` `# role: app`, of `filial-master-db.container` `# role: data`.
+  - `TestAssetMounts`: `filial-master-db.container` has `Volume=<ws>/.railswitch/assets/postgres/initdb/restore-dump.sh:/docker-entrypoint-initdb.d/restore-dump.sh:ro,z`; `filial-master-rails.container` has `Entrypoint=/usr/local/bin/entrypoint-app.sh` and `Volume=<ws>/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z`; `filial-master-browser.container` has `Image=localhost/filial/playwright:1.54.0-` followed by 8 hex digits.
   - `TestDepsNotRemainAfterExit`.
   - `TestNoNonLoopbackPublish`.
   - `TestPercentEscaped` (Review Focus 5): a test catalog (`fstest.MapFS`) whose pack server is `echo 100%` gives `Exec=… 100%%`.
@@ -896,7 +951,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 ### Task 10: Render-time lints
 
 **Files:**
-- Create: `internal/render/lint.go`, `internal/render/lint_test.go`, `internal/render/testdata/lint/*.container` (one bad unit per rule)
+- Create: `internal/render/lint.go`, `internal/render/lint_test.go`, `internal/render/testdata/lint/*.container` (one bad unit per rule, plus `machine-ok.container`)
+- Modify: `internal/render/quadlet.go` (`Quadlet` runs `Lint` on its own output)
 
 **Interfaces:**
 - Produces:
@@ -914,10 +970,10 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   | `network-dependency` | `Network=X` where X is not a `.network` unit and no `Requires=` and `After=` name X's network service |
   | `loopback-publish` | `PublishPort=` not starting with `127.0.0.1:` |
   | `firewall-networks` | the `<prefix>.firewall.networks` annotation set ≠ the set of `Network=` names (after `.network` → `NetworkName` mapping); also fails when a `GlobalArgs=--hooks-dir` exists without the profile annotation, or vice versa |
-  | `shared-underscore` | a `Volume=` source that is neither `<prefix>-<slug>-…` (prefix and slug from the marker), `<prefix>_…`, nor an absolute path |
-  | `deps-remain` | `RemainAfterExit=` in a unit whose marker says role deps (writer adds `# role: deps`) |
+  | `shared-underscore` | a `Volume=` source that is none of: `<prefix>-<slug>-…` (prefix and slug from the marker), `<prefix>_…`, an absolute path, or a path starting with a systemd specifier (`%t/`, `%h/`). A unit whose marker says `(machine)` has no prefix/slug, so only the absolute/specifier forms (and `railswitch_…`) are accepted |
+  | `deps-remain` | `RemainAfterExit=` in a unit whose second line is `# role: deps` (Task 9 writes that line in every `.container`) |
 
-- [ ] **Step 1: Write the seven failing tests**, plus `TestGoldensLintClean` (`Lint` on both golden sets returns nothing).
+- [ ] **Step 1: Write the seven failing tests**, plus `TestLintMachineMarker` (`machine-ok.container`: marker `(machine)`, `Volume=%t/podman/podman.sock:/var/run/docker.sock:ro`, gives no finding; the same unit with `Volume=foo:/x` gives `shared-underscore`) and `TestGoldensLintClean` (`Lint` on both golden sets returns nothing).
 - [ ] **Step 2:** Run it. Expected: FAIL.
 - [ ] **Step 3: Implement** a line-oriented INI scanner that understands `\` continuations.
 - [ ] **Step 4:** Run it. Expected: PASS.
@@ -926,7 +982,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 ### Task 11: Apply (write, orphan removal, check mode)
 
 **Files:**
-- Create: `internal/render/apply.go`, `internal/render/apply_test.go`
+- Create: `internal/render/apply.go`, `internal/render/diff.go`, `internal/render/apply_test.go`, `internal/render/diff_test.go`
 
 **Interfaces:**
 - Produces:
@@ -934,11 +990,11 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   ```go
   type Plan struct {
       Units map[string][]byte            // → Dirs.Quadlet
-      Files map[string]File              // workspace-relative path → content+mode (env files, firewall assets)
+      Files map[string]File              // workspace-relative path → content+mode (env files, package assets, firewall assets)
   }
   type File struct{ Data []byte; Mode fs.FileMode }
   type Diff struct{ Added, Changed, Removed []string; Text string } // Text = unified diff
-  func (m *Model) Plan() (*Plan, error)   // units and every worktree's env files
+  func (m *Model) Plan() (*Plan, error)   // units, every worktree's env files, and every Model.Assets entry at its Rel path with its Mode
   func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error)
   ```
 
@@ -949,6 +1005,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - a marker file for prefix `billing` is untouched;
   - a hand-written `filial-x.container` without a marker is untouched;
   - env files are mode 0600 and their dirs 0700;
+  - `Plan()` of the filial model has `Files[".railswitch/assets/rails/entrypoints/entrypoint-app.sh"]` with mode 0755 and the embedded bytes, and `Files[".railswitch/assets/postgres/initdb/restore-dump.sh"]`;
+  - `diff_test.go`: the LCS differ gives `-a\n+b\n` for `a`→`b` and nothing for equal inputs;
   - `check=true` writes nothing and returns `Diff.Text` containing `+Image=`;
   - a write failure midway (read-only quadlet dir) leaves no `*.tmp` files and returns an error (Review Focus 4).
 - [ ] **Step 2:** Run it. Expected: FAIL.
@@ -962,13 +1020,19 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - Create:
   - `internal/workspace/workspace.go`, `workspace_test.go`: find the workspace by walking up from `-C`/cwd to the dir with `project.toml`; resolve the worktree from `-w` or cwd. `internal/cli`, `lifecycle`, `worktree` and `doctor` all use it. It never imports them, so there is no cycle.
   - `internal/cli/render.go`, `internal/cli/render_test.go`
+  - `docs/json.md` (D40): the `env --json` schema; every later `--json` command adds its section
 
 **Interfaces:**
 - Consumes: Tasks 3–11
 - Produces:
-  - `railswitch lock`: resolves the stack and writes `stack.lock` (built-ins: `source = "built in (railswitch <Version>)"`, `sha256 = ContentHash`), keeping existing image digests.
+  - `railswitch lock`: calls `workspace.Lock(ctx, root)`. It resolves the stack and writes `stack.lock` (built-ins: `source = "built in (railswitch <Version>)"`, `sha256 = ContentHash`), keeping existing image digests.
   - `railswitch render [--check]`: `config.Load` → `Validate` → `ReadLock`. A lock entry that differs from the resolved stack exits 1 with `stack.lock is out of date for <ref>: run railswitch lock`. Then `Build` → `Plan` → `Apply`. `--check` exits 1 when the Diff is non-empty and prints `Diff.Text`.
-  - `railswitch env [svc]`: prints the effective env of the current worktree as `NAME=value  # <layer>: <source>`, with secrets shown as `••••••••`. With `--json`: `[{"service":…,"name":…,"value":…,"layer":…,"source":…}]`, masked the same way.
+  - `railswitch env [svc]`: prints the effective env of the current worktree, one line per variable:
+    - `NAME=value  # <layer>: <source>`;
+    - a value that contains a generated (D17) value prints `NAME=••••••••  # <layer>: <source>` (generated values aren't secrets, but they are never echoed);
+    - a podman-secret env delivery prints `NAME  # secret: podman secret <podman name>`, with no `=` and no value (railswitch never has it).
+
+    With `--json`: `[{"service":…,"name":…,"value":…,"layer":…,"source":…}]`; a masked value is `"••••••••"` and a secret has `"value": null`, `"layer": "secret"`, `"source": "podman secret <podman name>"`.
   - Package `workspace`, reused by every later command:
 
     ```go
@@ -981,7 +1045,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
         Dirs    machine.Dirs
         Slug    string // current worktree, "" at the root
     }
-    func Load(ctx context.Context, startDir, slug string) (*Workspace, error)
+    func Load(ctx context.Context, startDir, slug string) (*Workspace, error) // needs stack.lock (ErrNoLock otherwise)
+    func Lock(ctx context.Context, root string) error // Load + Validate project.toml at root, Resolve the stack, write <root>/stack.lock; needs no existing lock (used by `lock` and `new`)
     func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Model, error)
     func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*render.Diff, error)
     // Render: opens the registry, builds the Model, merges every source into one render.Plan, and Applies it.
@@ -989,12 +1054,14 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     // It is the only path that writes units: cli render, lifecycle Up, worktree Add/Remove and new all call it.
     ```
 
-- [ ] **Step 1: Write failing tests**, using a temp workspace built from `testdata/fixtures/filial` with `XDG_DATA_HOME` and `XDG_CONFIG_HOME` pointing into the temp dir:
+- [ ] **Step 1: Write failing tests**, using a temp workspace built from `testdata/fixtures/filial` (the Task 8 fixture helper) with `XDG_DATA_HOME` and `XDG_CONFIG_HOME` pointing into the temp dir. The test helper then opens the temp registry (`machine.Open`) and runs `AddProject("filial", ws)`, `AddWorktree("filial", "master")`, `AddWorktree("filial", "feat")`, `Save`, `Close`, because nothing before Tasks 17/20 registers worktrees:
   - `lock` then `render` exits 0, and the quadlet dir has `filial-master-rails.container` and `filial-feat-rails.container`;
   - `render --check` right after exits 0;
   - editing `[env]` makes `render --check` exit 1 with a diff;
   - deleting `stack.lock` makes `render` exit 1 mentioning `railswitch lock`;
-  - `env rails` output has `DATABASE_URL=••••••••` (the value contains a generated password), `TZ=Asia/Bangkok  # project`, and, with the fixture's twilio secret, `TWILIO_AUTH_TOKEN  # secret: podman secret filial_twilio_auth_token`, with no value shown.
+  - `env rails` output has `DATABASE_URL=••••••••` (the value contains a generated password), `TZ=Asia/Bangkok  # project`, and, with the fixture's twilio secret, the line `TWILIO_AUTH_TOKEN  # secret: podman secret filial_twilio_auth_token` (no `=`);
+  - `--json env rails` parses; the `TWILIO_AUTH_TOKEN` entry has `"value": null`, and the `DATABASE_URL` entry has `"value": "••••••••"`;
+  - `workspace.Lock` on a temp root whose `project.toml` is valid and that has no `stack.lock` writes one.
 - [ ] **Step 2:** Run it. Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4:** Run it. Expected: PASS.
@@ -1004,9 +1071,10 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 
 **Files:**
 - Create: `internal/config/edit.go`, `internal/config/edit_test.go`, `internal/cli/containerfile.go`, `internal/cli/containerfile_test.go`
+- Modify: `docs/json.md` (`containerfile list --json`)
 
 **Interfaces:**
-- Consumes: `workspace.Load`, `render.Instance.Builds`, the Task 8 Containerfile contract check, `pack.ContentHash`
+- Consumes: `workspace.Load`, `pack.Catalog.Resolve` (for `Eject`), `render.Instance.Builds`, the Task 8 Containerfile contract check, `pack.ContentHash`
 - Produces:
 
   ```go
@@ -1016,20 +1084,21 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   func SetImageBase(path, value string) error    // adds [image] and/or base; same value = no-op; a different existing value = error naming it
   func AppendImageAddon(path, value string) error // adds [image] and/or addons; appends, order kept; an existing entry = error
 
-  // cli/containerfile.go, also called by railswitch new (Task 20)
-  func eject(ws *workspace.Workspace, name string, force bool) error
+  // cli/containerfile.go; Eject is also called by railswitch new (Task 20), before any stack.lock exists, so it takes no Workspace.
+  // root = workspace root; st = the stack resolved from the in-memory Project (Catalog.Resolve).
+  func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error
   ```
 
   CLI (D32):
   - `railswitch containerfile list`: one line per `Builds` step of the current worktree: name, file, tag. Then the warnings from `Model.Warnings`. With `--json`: `{"steps":[{"name","file","tag","from"}],"warnings":[…]}`.
-  - `railswitch containerfile show <name> [--default]`: prints the workspace file. With `--default`, or when no workspace file exists, it prints the built-in default instead. `<name>` is `base` (the pack's), an option addon (`pg-client`), or a tool (`nvim`).
+  - `railswitch containerfile show <name> [--default]`: prints the workspace file. With `--default`, or when no workspace file exists, it prints the built-in default instead. `<name>` is `base` (the pack's), an option addon (`pg-client`), a tool (`nvim`), or an option's standalone build (`playwright`).
   - `railswitch containerfile eject <name> [--force]` writes `containerfiles/Containerfile.<name>`:
     - the header `# Ejected from <package ref> Containerfile.<name> (sha256 <hex of the default>) by railswitch <Version>. Edit freely: railswitch builds this file.`, then the default's bytes;
-    - for `base`, it then calls `SetImageBase`; for an option addon, `AppendImageAddon`; for a tool, nothing (tools are found by filename);
+    - for `base`, it then calls `SetImageBase`; for an option addon, `AppendImageAddon`; for a tool or a standalone option build (`playwright`, D31), nothing (both are found by filename);
     - an option addon whose `os` differs from the pack's `[image] os` is refused, naming both;
     - an existing file is refused unless `--force`.
   - `railswitch containerfile new <name>`:
-    - `<name>` must match `^[a-z][a-z0-9-]{0,30}$` and not name a built-in (`base`, an option addon, a tool);
+    - `<name>` must match `^[a-z][a-z0-9-]{0,30}$` and not name a built-in (`base`, an option addon, a tool, a standalone option build);
     - writes `containerfiles/Containerfile.<name>`:
 
       ```dockerfile
@@ -1056,12 +1125,14 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - a second `eject base` exits 1, and `--force` restores the default.
   - `TestEjectOptionAddon`: `eject pg-client` writes the file and appends it to `[image] addons`, and the `TestOptionAddonWarning` warning disappears. With a test pack declaring `os = "alpine"`, it exits 1 naming `alpine` and `debian`.
   - `TestEjectTool`: `eject nvim` writes `containerfiles/Containerfile.nvim` and leaves `project.toml` unchanged.
+  - `TestEjectStandalone`: `eject playwright` writes `containerfiles/Containerfile.playwright` (header + the playwright option's default bytes, whose `FROM` is `mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble`) and leaves `project.toml` unchanged; `list` then shows a `playwright` step with tag `localhost/filial/playwright:1.54.0-<hash8>`.
+  - `TestEjectNoWorkspace`: `Eject(root, cat, st, "base", false)` on a root with a `project.toml` that has no `[image]` and no `stack.lock` succeeds and sets `[image] base`.
   - `TestNewAddon`:
     - the skeleton passes the Task 8 contract check;
     - `list` shows it after `addon pg-client`;
-    - `new base`, `new nvim` and `new Bad_Name` exit 2.
+    - `new base`, `new nvim`, `new playwright` and `new Bad_Name` exit 2.
   - `TestShowDefault`: after editing `containerfiles/Containerfile.base`, `show base` prints the edited file and `show base --default` prints the built-in.
-  - `TestBuiltinContainerfilesSelfContained`: no built-in `Containerfile.*` (base, addons, tools) has a `COPY` or `ADD` that reads the build context (only `COPY --from=` is allowed). An ejected default must build unchanged with `containerfiles/` as its context.
+  - `TestBuiltinContainerfilesSelfContained`: no built-in `Containerfile.*` (base, addons, tools, standalone option builds) has a `COPY` or `ADD` that reads the build context (only `COPY --from=` is allowed). An ejected default must build unchanged with `containerfiles/` as its context.
 - [ ] **Step 2:** Run `go test ./internal/config/ ./internal/cli/`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4:** Run it. Expected: PASS.
@@ -1074,9 +1145,11 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `internal/render/quadlet_integration_test.go` (`//go:build integration`)
   - `testdata/legacy/quadlet/*` (copied from `fd7336b` `.container-config/quadlet/`)
   - `docs/stage1-equivalence.md`
+- Modify: `.github/workflows/ci.yml` (adds the `quadlet` job, D41)
 
-- [ ] **Step 1: Write the integration test.** Render the Filial fixture into a temp dir. Run `/usr/libexec/podman/quadlet -dryrun -user` with `QUADLET_UNIT_DIRS=<dir>`. Expect exit 0. In the generated `filial-feat-rails.service`, expect `--hooks-dir=`, no `--health-cmd`, and `Requires=` naming `filial-feat-dev-network.service` (proves D27).
-- [ ] **Step 2:** Run `go test -tags integration ./internal/render/ -run Quadlet`. Expected: PASS. (It needs podman ≥ 5 on the host.)
+- [ ] **Step 1: Write the integration test** `TestQuadletDryRun`. Render the Filial fixture into a temp dir. Run `/usr/libexec/podman/quadlet -dryrun -user` with `QUADLET_UNIT_DIRS=<dir>`. Expect exit 0. In the generated `filial-feat-rails.service`, expect `--hooks-dir=`, `--health-cmd` (the app's `HealthCmd=curl -fsS http://localhost:3000/up`, D34), `--sdnotify=healthy`, and `Requires=` naming `filial-feat-dev-network.service` (proves D27). In `filial-feat-deps.service`, expect no `--health-cmd`.
+- [ ] **Step 2:** Run `go test -tags integration ./internal/render/ -run TestQuadletDryRun`. Expected: PASS. (It needs podman ≥ 5 on the host.)
+- [ ] **Step 2a: Add the CI job.** In `ci.yml`, job `quadlet` (alongside `check`): `runs-on: ubuntu-latest`, `container: quay.io/podman/stable`, steps `actions/checkout`, `actions/setup-go` (Go version from `go.mod`; the image has no Go), then `go test -tags integration ./internal/render/ -run TestQuadletDryRun`.
 - [ ] **Step 3: Write `docs/stage1-equivalence.md`.** Generate it with `diff -ru testdata/legacy/quadlet <rendered>`, then annotate every hunk as *same behaviour*, *intended change (cite D#)* or *gap → Stage N*. Expected intended changes:
   - `rustfs-init@` gone (D18);
   - one unit per worktree and service instead of `@` templates, with values written in (D8);
@@ -1116,6 +1189,8 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   func (p Podman) RemoveNetwork(ctx, name) error                // podman network rm -f <name>; "unknown network" = nil
   func (p Podman) Running(ctx, name) (bool, error)              // podman container inspect --format {{.State.Running}} <name>; missing = false
   func (p Podman) GraphRoot(ctx) (string, error)                // podman info --format {{.Store.GraphRoot}}
+  func (p Podman) ImageDigest(ctx, ref) (string, error)         // podman image inspect --format {{.Digest}} <ref>; missing image = "", nil
+  func (p Podman) Health(ctx, name) (string, error)             // podman container inspect --format {{.State.Health.Status}} <name>; missing container or no healthcheck = "", nil
   type Systemd struct{ R sys.Runner }
   func (s Systemd) DaemonReload(ctx) error                      // systemctl --user daemon-reload
   func (s Systemd) Start/Stop/Restart(ctx, units ...string) error // systemctl --user start|stop|restart <units…>  (Timeout 10m for start)
@@ -1123,7 +1198,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   func (s Systemd) ResetFailed(ctx, units ...string) error
   ```
 
-- [ ] **Step 1: Write failing tests** (Fake): every function's argv equals the commented argv. `TestNoFilters` calls every remover with `"api"` and asserts that no recorded argv contains `--filter` and that each argv's last element is exactly `"api"` (Review Focus 2). `ImageExists` maps exit 1 to `false, nil`.
+- [ ] **Step 1: Write failing tests** (Fake): every function's argv equals the commented argv. `TestNoFilters` calls every remover with `"api"` and asserts that no recorded argv contains `--filter` and that each argv's last element is exactly `"api"` (Review Focus 2). `ImageExists` maps exit 1 to `false, nil`. `ImageDigest` returns the trimmed stdout (`sha256:aa`), and `"", nil` when inspect fails with `no such image`. `Health` returns `healthy` from stdout, and `"", nil` for a missing container.
 - [ ] **Step 2:** Run it. Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4:** Run it. Expected: PASS.
@@ -1191,14 +1266,20 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 ### Task 16A: Secrets: `secret add|set|ls|rm` and delivery (D33)
 
 **Files:**
-- Create: `internal/cli/secret.go`, `internal/cli/secret_test.go`
+- Create:
+  - `internal/cli/secret.go`, `internal/cli/secret_test.go`
+  - `internal/cli/noecho_linux.go` (the no-echo prompt: `syscall` `TCGETS`/`TCSETS` ioctls)
+  - `internal/machine/config.go`, `internal/machine/config_test.go`
+  - `internal/lifecycle/preflight.go`, `internal/lifecycle/preflight_test.go` (`CheckSecrets`; Task 18 adds the rest of `Preflight` to this file)
 - Modify:
   - `internal/podman/podman.go` + test;
   - `internal/render/quadlet.go` + goldens (`Secret=` lines);
-  - `internal/lifecycle/preflight.go` (Task 18 calls it).
+  - `internal/config/edit.go` + `edit_test.go` (`AddSecret`);
+  - `testdata/fixtures/filial/project.toml`: add `[secrets.github_token]` with `services = ["nvim"]`;
+  - `docs/json.md` (`secret ls --json`).
 
 **Interfaces:**
-- Consumes: `config.Secret`, `Values["secret.<name>"]`, `sys.Runner`
+- Consumes: `config.Secret`, `Values["secret.<name>"]`, `sys.Runner`, `render.Model.NamesFor` (Task 8), `podman.Podman.Running`, `podman.Systemd.Restart`
 - Produces:
 
   ```go
@@ -1208,21 +1289,40 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   func (p Podman) SecretDriver(ctx, name) (string, error)        // podman secret inspect --format {{.Spec.Driver.Name}} <name>
   func (p Podman) SecretRemove(ctx, name) error                          // podman secret rm <name>
   func (p Podman) SecretCreated(ctx, name) (time.Time, error)            // podman secret inspect --format {{.CreatedAt}} <name>
+
+  // config/edit.go: line-level append of one [secrets.<name>] table (services, env, scope as given; empty fields omitted);
+  // every other byte kept; temp + rename after Load + Validate; an existing name is an error.
+  func AddSecret(path, name string, s Secret) error
+
+  // machine/config.go
+  type Config struct {
+      Schema  int           `toml:"schema"`  // 1 (D39); a higher value is refused ("written by a newer railswitch")
+      Secrets SecretsConfig `toml:"secrets"`
+  }
+  type SecretsConfig struct {
+      Driver     string            `toml:"driver"`      // "" = podman's default (file)
+      DriverOpts map[string]string `toml:"driver_opts"`
+  }
+  func LoadConfig(d Dirs) (*Config, error) // <d.Config>/config.toml; strict decode; a missing file = zero Config, no error
+
+  // lifecycle/preflight.go
+  func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string) error
+  // for each secret a service of this worktree receives: SecretExists; missing → "secret <name> is not set: railswitch secret set <name>"
   ```
 
   - **Units:** each service in a secret's `services` gets one line. File delivery (default): `Secret=<podman name>,type=mount,target=/run/secrets/<name>,uid=1000,gid=1000,mode=0400`. With `env` set: `Secret=<podman name>,type=env,target=<ENV>`, e.g. `Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN` in `filial-<slug>-rails.container`. The transient `exec` container (Task 18) gets the same as `--secret` flags. So `railswitch exec -- bin/rails console` sees the same env as the running app.
   - **Preflight (`up`, `exec`):** for each secret a service of this worktree receives, `SecretExists`. If it's missing, refuse with `secret <name> is not set: railswitch secret set <name>`.
   - **`railswitch secret set <name> [--restart]`:**
     - `<name>` must be declared in `[secrets]`;
-    - the value is read from stdin; on a TTY, prompt `Value for <name>:` with no echo (`term.ReadPassword`);
+    - the value is read from stdin; on a TTY, prompt `Value for <name>:` with no echo (stdlib `syscall` `TCGETS`/`TCSETS` ioctls on stdin's fd: clear `ECHO`, read one line, restore the saved termios, also on error);
     - one trailing newline is stripped; an empty value or a value with an inner newline is refused;
     - then `SecretCreate(name, value, replace = SecretExists(name))`. podman's `--replace` fails on a missing secret ([#29612](https://github.com/podman-container-tools/podman/issues/29612)), hence the check;
     - podman's `--replace` changes only newly created containers, so `set` then lists the running containers that receive the secret (exact names via `NamesFor`, `Running`) and says they keep the old value until restarted. With `--restart`, it restarts them.
-  - **`railswitch secret add <name> --service <id>… [--env <VAR>] [--machine]`:** declares `[secrets.<name>]` in `project.toml` (a line-level edit like Task 12A's, keeping comments; refuses an existing name), then runs `set`. `railswitch secret add twilio_auth_token --service rails --service worker --env TWILIO_AUTH_TOKEN` is the whole workflow for an app key.
+  - **`railswitch secret add <name> --service <id>… [--env <VAR>] [--machine]`:** declares `[secrets.<name>]` in `project.toml` via `config.AddSecret` (keeping comments; refuses an existing name), then runs `set`. `railswitch secret add twilio_auth_token --service rails --service worker --env TWILIO_AUTH_TOKEN` is the whole workflow for an app key.
   - **`railswitch secret ls`:** one line per declared secret: name, scope, podman secret name, delivery (`file` or `env VAR`), driver, `set <created>` or `not set`, receiving services. Never a value. A secret stored with a driver other than the configured one is flagged `driver differs: railswitch secret set <name> to move it`. With `--json`, the same fields.
   - **`railswitch secret rm <name>`:** `SecretRemove`. The `project.toml` declaration stays until the user deletes it, and `up` then refuses with the `secret set` hint.
   - **`railswitch new`** (Task 20) writes `[secrets.github_token]` with `services = ["nvim"]` and `git_host = "github.com"` when the repo URL's host is `github.com` and nvim is enabled (`--tool nvim`). It then prints `railswitch secret set github_token` as the next step.
-  - **Secret driver (D37):** machine-wide, in `~/.config/railswitch/config.toml` (`internal/machine/config.go`: `func LoadConfig(d Dirs) (*Config, error)`):
+  - **Secret driver (D37):** machine-wide, in `~/.config/railswitch/config.toml` (`machine.LoadConfig`, above):
 
     ```toml
     schema = 1
@@ -1251,12 +1351,14 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - `filial-master-rails.container` has `Secret=filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN`;
     - `filial-master-deps.container` and `filial-master-nvim.container` have no line for it;
     - the transient `exec` argv has `--secret filial_twilio_auth_token,type=env,target=TWILIO_AUTH_TOKEN`.
-  - `TestSecretAdd`: `secret add twilio_auth_token --service rails --env TWILIO_AUTH_TOKEN` with stdin `AC123\n`:
+  - `TestSecretAdd` (on a fixture copy with `[secrets.twilio_auth_token]` removed): `secret add twilio_auth_token --service rails --env TWILIO_AUTH_TOKEN` with stdin `AC123\n`:
     - `project.toml` gains the `[secrets.twilio_auth_token]` table, with other lines byte-identical;
     - the Fake records `podman secret create filial_twilio_auth_token -` with stdin `AC123`;
     - a second `add` with the same name exits 1;
     - `--service nope` exits 2, naming the known services.
-  - `TestPreflightMissingSecret`: the error contains `railswitch secret set github_token`.
+  - `TestPreflightMissingSecret` (`lifecycle.CheckSecrets`, Fake `secret exists filial_github_token` exit 1): the error contains `railswitch secret set github_token`.
+  - `TestAddSecretKeepsComments` (`config.AddSecret`): a commented `project.toml` gains `[secrets.x]\nservices = ["rails"]` at the end; every other line is byte-identical; adding `x` again is an error.
+  - `TestLoadConfig`: a missing `config.toml` gives a zero `Config` and no error; `driver = "pass"` with `driver_opts` parses; `schema = 2` gives an error containing `newer railswitch`; an unknown key is an error.
 - [ ] **Step 2:** Run `go test ./internal/podman/ ./internal/cli/ ./internal/render/ ./internal/lifecycle/`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4:** Run it. Expected: PASS.
@@ -1266,10 +1368,10 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 
 **Files:**
 - Create: `internal/worktree/add.go`, `remove.go`, `resolve.go`, `worktree_test.go`
-- Modify: `internal/cli/` (`wt` group)
+- Modify: `internal/cli/` (`wt` group; wires `Manager.Render`, `Manager.Names` and `Manager.WorktreeVolumes`), `docs/json.md` (`wt ls --json`)
 
 **Interfaces:**
-- Consumes: `sys.Runner` (git real, gh/podman/systemctl faked in tests), `machine.Open`, `naming.Sanitize`, `render.Model` (the exact unit/container/volume names of one slug), `podman.Podman`, `podman.Systemd`
+- Consumes: `sys.Runner` (git real, gh/podman/systemctl faked in tests), `machine.Open`, `naming.Sanitize`, `render.Model.NamesFor` (Task 8, via `Manager.Names`), `safefile.Read`, `podman.Podman`, `podman.Systemd`
 - Produces:
 
   ```go
@@ -1281,36 +1383,39 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
       In  io.Reader
       Out io.Writer
       TTY bool
+      Render          func(ctx context.Context) error                // wired to workspace.Render by the CLI
+      Names           func(slug string) (render.Names, error)        // wired by the CLI: build the Model, then Model.NamesFor(slug)
+      WorktreeVolumes []string                                       // mounts of the pack's [[worktree_volumes]] relative to /app (e.g. "node_modules"), wired by the CLI from the Stack
   }
+  type Row struct{ Slug string; ID int; Branch, Dir string; Dirty bool }
   func (m *Manager) Add(ctx, target string, name string) (render.Worktree, error)
   // target = branch | PR number (gh pr view <n> --json headRefName -q .headRefName) | new branch from base HEAD.
   // Steps:
   //   1. name: --name, else a prompt `Worktree name [<default>]:` when TTY, else Sanitize(branch) with "-<4 hex of sha256(branch)>" when taken;
   //   2. git -C <base> worktree add <ws>/<slug> <branch> (or -b);
   //   3. only then machine.Open(Data) → AddWorktree → Save → Close;
-  //   4. pre-create <slug>/node_modules if the pack has that worktree volume;
-  //   5. copy Meta.SeedFiles from base when present and absent in the new worktree;
+  //   4. pre-create <ws>/<slug>/<p> for each p in m.WorktreeVolumes (so the worktree volume mounts over a dir the user owns);
+  //   5. for each Meta.SeedFiles path present in base and absent in the new worktree: safefile.Read(<base>/<path>, safefile.Limit);
+  //      a refused/oversized file is skipped with a warning on Out naming it; otherwise write it at mode 0600;
   //   6. m.Render(ctx).
-  func (m *Manager) Remove(ctx, target string, force bool, names render.Names) error
+  func (m *Manager) Remove(ctx, target string, force bool) error
   // Resolve target: absolute path → branch checked out in a worktree → exact worktree name.
   // Refused: target hits two worktrees; the base worktree; a dirty worktree (git status --porcelain) unless force.
   // Abort before any change if any registered worktree dir of this project is missing (partial view).
-  // Then:
+  // Then, with names, err := m.Names(slug):
   //   1. Systemd.Stop(names.Units...);
   //   2. RemoveContainer / RemoveVolume (per-worktree volumes only) / RemoveNetwork, by exact name;
   //   3. rm -rf .railswitch/env/<slug>;
   //   4. machine.Open(Data) → RemoveWorktree → Save → Close;
   //   5. git -C <base> worktree remove --force <path>;
   //   6. m.Render(ctx): deletes the slug's unit files (D28); then Systemd.DaemonReload.
-  // Manager also has a field `Render func(ctx context.Context) error`, wired to workspace.Render by the CLI.
-  // In render/model.go:
-  //   type Names struct{ Units, Containers, Volumes, Networks []string }
-  //   func (m *Model) NamesFor(slug string) Names   // exact names of one slug's objects
-  func (m *Manager) List(ctx) ([]Row, error)                          // slug, id, branch, dir, dirty; `wt ls --json` prints the rows
+  func (m *Manager) List(ctx) ([]Row, error)                          // `wt ls`; `wt ls --json` prints the rows as [{"slug","id","branch","dir","dirty"}]
   ```
 
 - [ ] **Step 1: Write failing tests.** Use real git: a temp bare remote plus the base clone. Fake the rest.
   - `TestAddAllocatesAfterGit`: Add `feat` gives ID 2 (the base is 1), and the registry has the entry.
+  - `TestAddSeedFiles`: with `seed_files = [".env", "config/master.key"]`, `.env` is copied at mode 0600; a `config/master.key` that is a symlink in base is not copied, and `Out` has a warning naming it.
+  - `TestAddPrecreatesWorktreeVolumes`: with `WorktreeVolumes = ["node_modules"]`, `<ws>/feat/node_modules` exists after Add.
   - `TestAddGitFailsNoRegistry` (Review Focus 4): Add a branch already checked out in base fails, the registry is unchanged, and no env dir exists.
   - `TestAddNameCollision`: a second worktree for branch `feat` gets slug `feat-<4hex>`.
   - `TestRemovePrecedence`: a path beats a branch, which beats a name.
@@ -1320,6 +1425,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `TestRemovePartialViewAborts`: rename another worktree's dir; Remove errors and no podman/git calls were made.
   - `TestRemoveExactNames` (Review Focus 2): worktrees `api` and `api-v2`; Remove `api`; every Fake argv names only `…-api-…` objects; `.railswitch/env/api-v2` still exists.
   - `TestNeverPrune`: no recorded argv contains `prune`.
+  - `TestListJSON`: `wt ls --json` parses into `[{"slug","id","branch","dir","dirty"}]` with the base at ID 1.
 - [ ] **Step 2:** Run it. Expected: FAIL.
 - [ ] **Step 3: Implement.** Every git call passes `-c core.fsmonitor=false -c core.hooksPath=/dev/null`.
 - [ ] **Step 4:** Run it. Expected: PASS.
@@ -1328,50 +1434,54 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 ### Task 18: Lifecycle: `up`, `stop`, `down`, `restart`, `status`, `logs`, `exec`, `build`
 
 **Files:**
-- Create: `internal/lifecycle/{up,stop,down,status,logs,exec,build,preflight}.go`, `internal/lifecycle/lifecycle_test.go`
-- Modify: `internal/cli/` (commands)
+- Create: `internal/lifecycle/{up,stop,down,status,logs,exec,build,deps}.go`, `internal/lifecycle/lifecycle_test.go`
+- Modify:
+  - `internal/lifecycle/preflight.go` + `preflight_test.go` (created in Task 16A with `CheckSecrets`; this task adds `Preflight`);
+  - `internal/cli/` (commands);
+  - `docs/json.md` (`status --json`).
 
 **Interfaces:**
-- Consumes: Tasks 8–17
-- Produces (`type L struct{ R sys.Runner; WS *workspace.Workspace; Out, Err io.Writer; In io.Reader; TTY bool }`). Each step:
+- Consumes: Tasks 8–17; in particular `render.Model.NamesFor` (returns `(Names, error)`), `lifecycle.CheckSecrets` (Task 16A), `config.Lock.SetDigest`/`SetBaseDigest` (Task 7), `podman.Podman.ImageDigest`/`Health` (Task 14), `sys.NoTimeout` (Task 1)
+- Produces (`type L struct{ R sys.Runner; WS *workspace.Workspace; Out, Err io.Writer; In io.Reader; TTY bool }`; `func (l *L) Preflight(ctx context.Context, m *render.Model, slug string) error` in `preflight.go`). Each step:
   - **`Up(ctx, slug)`**, in this order, stopping at the first error:
     1. `WS.Render(ctx, R, false)`, which includes the lock check;
     2. `Preflight`:
        - every absolute bind-mount source exists, naming the missing path;
        - `hooks.d/<prefix>-firewall.json` exists, else refuse: `containers would start unfirewalled`;
        - the worktree dir exists;
-       - every secret this worktree's services receive exists (Task 16A);
-    3. for each pulled image with no lock digest: `Pull`, record the digest, `Lock.Write`, then render again so the units carry `ref@digest`;
+       - every secret this worktree's services receive exists (`CheckSecrets`, Task 16A);
+    3. for each pulled image with no lock digest: `Pull`, `Lock.SetDigest(ref, digest)`, `Lock.Write`, then render again so the units carry `ref@digest`;
     4. **pinned base images (D36):** for each distinct ref in the `From` of every `Instance.Builds` step:
        - with no `Lock.BaseDigest(ref)`: `Pull(ref)`, then `SetBaseDigest` and `Lock.Write`;
-       - with a recorded digest, when `ref` is missing locally or its local digest differs: `podman pull <repo>@<digest>`, then `Tag(<repo>@<digest>, ref)`.
+       - with a recorded digest, when `ref` is missing locally (`ImageDigest` returns `""`) or `ImageDigest(ref)` differs from it: `podman pull <repo>@<digest>`, then `Tag(<repo>@<digest>, ref)`.
 
-       Then, for each `Instance.Builds` step in order where `!ImageExists(step.Tag)`: `Build` (`--pull=never`, so the build uses exactly the pinned FROM images). Steps run strictly in order, so every image exists before anything built on it;
+       Then, for each `Instance.Builds` step in order (base chain, tools, then standalone builds such as `playwright`) where `!ImageExists(step.Tag)`: `Build` (`--pull=never`, so the build uses exactly the pinned FROM images). Steps run strictly in order, so every image exists before anything built on it;
     5. for each option volume with a `seed` where `!VolumeExists`: `VolumeCreate`, then `VolumeImport` if `<ws>/db-dumps/<seed>` exists;
     6. if the Diff has unit changes: `DaemonReload`, and `Restart railswitch-traefik.service` if its unit changed;
     7. `Start <prefix>-<slug>-<app>.service`.
-  - **`Stop(ctx, slug)`:** stops every unit of the slug (`Model.NamesFor(slug).Units`).
+  - **`Stop(ctx, slug)`:** stops every unit of the slug (`names, err := Model.NamesFor(slug)`, then `Stop(names.Units...)`).
   - **`Restart(ctx, slug)`:** Stop, then Up.
   - **`Down(ctx, slug, yes bool)`:**
     - it prompts `Delete <N> volumes of <slug>? [y/N]`, defaulting to No, unless `yes`; a non-TTY without `--yes` refuses;
     - it then runs Stop, `RemoveContainer` for each container, and `RemoveVolume` for the per-worktree volumes;
     - shared `_` volumes and images are never touched.
-  - **`Status(ctx, slug)`:** a table of `SERVICE ROLE UNIT-STATE HEALTH`, from `Show ActiveState,SubState`, plus `podman container inspect --format {{.State.Health.Status}}` for services with health (the app included, D34). With `--json`, the same fields.
+  - **`Status(ctx, slug)`:** a table of `SERVICE ROLE UNIT-STATE HEALTH`, from `Show ActiveState,SubState`, plus `Podman.Health(<container>)` for services with health (the app included, D34). With `--json`, the same fields.
   - **`Logs(ctx, slug, svc, follow bool)`:**
     - oneshot/deps: `journalctl --user -u <unit> [-f] --no-pager`;
     - otherwise: `podman logs [-f] <container>`;
-    - streamed to `Out`, with `Timeout` 0 when following (no deadline).
+    - streamed to `Out`; when following, `Timeout: sys.NoTimeout` (ends with the ctx, e.g. Ctrl-C); otherwise the default.
   - **`Exec(ctx, slug, fresh bool, argv []string)`:**
     - if not `fresh` and the app container is `Running`: `podman exec [-t] -i -w /app <ctr> argv…`;
     - else a transient `podman --hooks-dir <…> run --rm -i [-t] --label traefik.enable=false --annotation <same firewall annotations> --network <dev> --env-file <app.env> -v …(app mounts) -w /app <IMAGE> argv…`, built from the same `Service` model (not by parsing units);
-    - `-t` only when `TTY`;
+    - `-t` only when `TTY`; both forms run with `Timeout: sys.NoTimeout` (an interactive `bin/rails console` has no deadline);
     - refuses without the hook descriptor.
   - **`Build(ctx, slug, force, pull bool)`:** builds every built image of the slug; `force` rebuilds existing tags. `pull` (`railswitch build --pull`, D36):
     - re-pulls every FROM ref by tag, records the new digests in `stack.lock`, and prints `<ref>: <old> → <new>` for each that changed;
     - rebuilds every step from the first one whose FROM digest changed. That's the only way an upstream base image update enters a build.
   - **`Deps(ctx, slug, argv)`** (`railswitch deps -- <cmd>`, D35): a transient container built from the deps service model:
     - the base image, the deps mounts, firewall profile `deps`, `-w /app`;
-    - env from `Instance.Env["deps"]` minus the pack's `[deps] frozen_env` names, passed via a temporary 0600 env file that is removed afterwards.
+    - env from `Instance.Env["deps"]` minus the pack's `[deps] frozen_env` names, passed via a temporary 0600 env file that is removed afterwards;
+    - `Timeout: 30 * time.Minute` (an install can be slow; 30 s would kill it).
 
     This is how lockfiles change: `railswitch deps -- bundle add rack-attack`, `railswitch deps -- npm install left-pad`.
 
@@ -1379,9 +1489,9 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
   - `TestUpOrder`: the recorded argv sequence is:
     1. render;
     2. `podman pull` → `podman image inspect` (service images);
-    3. `podman pull` + `podman image inspect` for each base FROM ref (`docker.io/library/node:22.11.0-slim`, `docker.io/library/ruby:3.3.6-slim`);
-    4. for each of base, `addon pg-client`, nvim: `podman image exists` then `podman build --pull=never` (each argv after the first contains `--build-arg BASE_IMAGE=` with the previous step's tag);
-    5. `podman volume exists` → `podman volume create` → `podman volume import`;
+    3. `podman pull` + `podman image inspect` for each base FROM ref (`docker.io/library/node:22.11.0-slim`, `docker.io/library/ruby:3.3.6-slim`, `docker.io/library/debian:trixie-slim` (nvim's build stage), `mcr.microsoft.com/playwright:v1.54.0-noble` (the standalone playwright build));
+    4. for each of base, `addon pg-client`, nvim, playwright: `podman image exists` then `podman build --pull=never` (each chain/tool argv after the first contains `--build-arg BASE_IMAGE=` with the previous chain step's tag; the playwright argv has `-f <ws>/containerfiles/Containerfile.playwright`, `-t localhost/filial/playwright:1.54.0-<hash8>`, `--build-arg PLAYWRIGHT_VERSION=1.54.0` and no `BASE_IMAGE`);
+    5. `podman volume exists` → `podman volume create` → `podman volume import filial-feat-<rustfs volume> <ws>/db-dumps/rustfs_data.tar.gz` (the Task 8 fixture ships that file);
     6. `systemctl --user daemon-reload` → `systemctl --user start filial-feat-rails.service`.
   - `TestUpRecordsDigest`: after Up, `stack.lock` has the digest and `filial-feat-db.container` has `Image=…@sha256:…`.
   - `TestUpPinsBaseImages`:
@@ -1389,14 +1499,17 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - a second Up, with that image missing (Fake: `image exists` exit 1), runs `podman pull docker.io/library/ruby@sha256:…` then `podman tag docker.io/library/ruby@sha256:… docker.io/library/ruby:3.3.6-slim`;
     - every `podman build` argv has `--pull=never`.
   - `TestBuildPull`: `Build(pull=true)` with a changed digest prints `docker.io/library/ruby:3.3.6-slim: sha256:aaa → sha256:bbb` and rebuilds base and every later step.
+  - `TestTimeouts`: the Fake records each `sys.Cmd`; `logs -f` and both `exec` forms have `Timeout == sys.NoTimeout`; `deps -- bundle add x` has `Timeout == 30*time.Minute`; `logs` without `-f` has `Timeout == 0`.
+  - `TestUpLocalDigestDiffers`: with a recorded base digest `sha256:aa` and `ImageDigest` returning `sha256:zz`, Up runs `podman pull docker.io/library/ruby@sha256:aa` then `podman tag`.
   - `TestDepsUnfrozen`:
     - `deps -- bundle add x` runs with argv containing `--annotation filial.firewall=deps` and `-w /app`, and its env file has no `BUNDLE_FROZEN`;
     - `filial-master-deps.container`'s env file has `BUNDLE_FROZEN=true`;
     - the temporary env file is gone afterwards.
-  - `TestStatusJSON`: `--json` output parses into `[{"service","role","state","health"}]`.
+  - `TestStatusJSON`: `--json` output parses into `[{"service","role","state","health"}]`; the Fake records `podman container inspect --format {{.State.Health.Status}} filial-feat-rails`.
   - `TestUpSecondRunNoPull`: a second Up makes no pull and no daemon-reload.
   - `TestUpBuildFailsNoStart` (Review Focus 4): `podman build` fails, so there is no `systemctl start` and a re-run retries the build.
   - `TestPreflightMissingBind`: the error names the path.
+  - `TestPreflightFreshWorkspace`: with the fixture's `db-dumps/` and the rendered `.railswitch/assets/`, Preflight passes (every bind source exists).
   - `TestPreflightNoDescriptor`: the error contains `unfirewalled`.
   - `TestDownDefaultsNo`: input `\n` means no remove calls.
   - `TestDownExactNames`: with slugs `api` and `api-v2`, only `api` objects are removed (Review Focus 2).
@@ -1414,7 +1527,7 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 
 **Files:**
 - Create: `internal/doctor/doctor.go`, `internal/doctor/doctor_test.go`
-- Modify: `internal/cli/`
+- Modify: `internal/cli/`, `docs/json.md` (`doctor --json`)
 
 **Interfaces:**
 - Produces:
@@ -1444,23 +1557,23 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
 - Create: `internal/cli/new.go`, `internal/cli/new_test.go`
 
 **Interfaces:**
-- Consumes: `config`, `pack.Catalog`, `machine.Locked`, `worktree`, Task 12 `lock`/`render`
+- Consumes: `config`, `pack.Catalog` (+ `Catalog.Resolve` on the in-memory `Project`), `machine.Locked`, `worktree`, `cli.Eject` (Task 12A: `Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error`), `workspace.Lock(ctx, root)` (Task 12), `workspace.Render`
 - Produces:
   - Usage: `railswitch new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]… [--tool nvim]`.
-  - `railswitch init` (D38), run in a cloned workspace repo (it has `project.toml` but isn't registered on this machine): clone `[project] repo` into the base dir, write `mise.local.toml` with fresh `generated` values, register the prefix and base worktree, and render. Then print `railswitch secret set <name>` for each declared secret that isn't set. Refuse if the prefix is registered.
+  - `railswitch init` (D38), run in a cloned workspace repo (it has `project.toml` but isn't registered on this machine): clone `[project] repo` (branch `[project] base_branch`) into the base dir, create `<ws>/db-dumps/` (0700), write `mise.local.toml` with fresh `generated` values, register the prefix and base worktree, and render. Then print `railswitch secret set <name>` for each declared secret that isn't set. Refuse if the prefix is registered.
   - Steps:
     1. refuse if `<dir>/project.toml` exists or the prefix is registered;
-    2. `git clone --branch <base> <repo> <dir>/<sanitize(base)>`. Then make the workspace its own git repo (D38): `git init <dir>` and write `<dir>/.gitignore` as an allowlist, `/*`, `!/.gitignore`, `!/project.toml`, `!/stack.lock`, `!/containerfiles/`, `!/entrypoints/`, `!/packs/`, `!/options/` (the last two for Stage 5 local packs). Worktrees, `.railswitch/`, `mise.local.toml` and `db-dumps/` are therefore never tracked. There's no commit; the user commits;
+    2. resolve `<base>`: `--branch`, else the remote's HEAD branch from `git ls-remote --symref <repo> HEAD` (the line `ref: refs/heads/<base>\tHEAD`); a repo with no symref HEAD is an error asking for `--branch`. `<base>` is recorded as `[project] base_branch`. Then `git clone --branch <base> <repo> <dir>/<sanitize(base)>`. Then make the workspace its own git repo (D38): `git init <dir>` and write `<dir>/.gitignore` as an allowlist, `/*`, `!/.gitignore`, `!/project.toml`, `!/stack.lock`, `!/containerfiles/`, `!/entrypoints/`, `!/packs/`, `!/options/` (the last two for Stage 5 local packs). Create `<dir>/db-dumps/` (0700; postgres mounts it, and `up` preflight needs every bind source). Worktrees, `.railswitch/`, `mise.local.toml` and `db-dumps/` are therefore never tracked. There's no commit; the user commits;
     3. write `project.toml`:
-       - pack defaults overlaid by `--option`;
+       - `[project]` `name`, `prefix`, `repo`, `base_branch = "<base>"`; pack defaults overlaid by `--option`;
        - `[versions]` from the options' pin defaults;
        - `schema = 1`, and `[tools] nvim = true` with `--tool nvim`;
        - when the repo URL's host is `github.com` and nvim is enabled, `[secrets.github_token]` with `services = ["nvim"]`, `git_host = "github.com"`. The last line `new` prints is then `next: railswitch secret set github_token` (D33);
-    4. eject every default the stack builds (Task 12A `eject`): `base`, each chosen option's `[app_addon]`, and each enabled tool. After this, every Containerfile the project builds is a file in `containerfiles/` that the user can edit;
+    4. resolve the stack from the in-memory `Project` (`Catalog.Resolve`), then `Eject(dir, cat, st, name, false)` for every default the stack builds: `base` first (it sets `[image] base`, which `Validate` requires), then each chosen option's `[app_addon]`, each enabled tool, and each chosen option's standalone build (`playwright` when `browser = "playwright@1"`; written to `containerfiles/Containerfile.playwright`). After this, every Containerfile the project builds is a file in `containerfiles/` that the user can edit;
     5. write `mise.local.toml` (0600) with `[env] <NAME> = "<32 hex from crypto/rand>"` for each chosen option's `generated` names (D17);
-    6. `lock`;
+    6. `workspace.Lock(ctx, dir)` (no `stack.lock` exists yet, so not `workspace.Load`);
     7. `Reg.AddProject` and `Reg.AddWorktree(base)`;
-    8. `workspace.Render`.
+    8. `workspace.Load` then `Render`.
   - If a step fails after the clone, the error lists what exists and the command to remove it. It does not auto-delete the user's clone (HANDOFF §9 transactional create is open).
 - [ ] **Step 1: Write failing tests.**
   - With a local bare repo as `--repo`, `new` writes `project.toml` that `config.Load` + `Validate` accept, with `schema = 1`.
@@ -1469,15 +1582,18 @@ testdata/fixtures/filial/         # project.toml, mise.local.toml, fake worktree
     - `containerfiles/` holds `Containerfile.base` and `Containerfile.pg-client`, each starting with the `# Ejected from` header;
     - `project.toml` has `[image] base = "containerfiles/Containerfile.base"` and `addons = ["containerfiles/Containerfile.pg-client"]`, no `[tools]`, no `[secrets]`, and `browser = "none"`.
   - With `--tool nvim` and a `github.com` repo URL: `containerfiles/Containerfile.nvim` exists, and `[secrets.github_token]` is declared.
+  - With `--option browser=playwright@1`: `containerfiles/Containerfile.playwright` exists with the `# Ejected from` header, and `project.toml`'s `[image]` is unchanged by it.
   - `railswitch containerfile list` in the new workspace prints no warnings.
-  - `git -C <dir> status --porcelain --untracked-files=all` lists only `.gitignore`, `project.toml`, `stack.lock` and files under `containerfiles/`. Never `mise.local.toml`, `.railswitch/` or `main/`.
+  - `<dir>/db-dumps/` exists with mode 0700.
+  - `git -C <dir> status --porcelain --untracked-files=all` lists only `.gitignore`, `project.toml`, `stack.lock` and files under `containerfiles/`. Never `mise.local.toml`, `.railswitch/`, `db-dumps/` or `main/`.
+  - `TestNewDefaultBranch`: with no `--branch` and a bare repo whose HEAD is `refs/heads/trunk`, the base dir is `<dir>/trunk/` and `project.toml` has `base_branch = "trunk"`.
   - `project.toml` does not contain the password value.
   - The registry has the prefix and base ID.
   - A second `new` with the same prefix fails with `prefix "x" is already used by <workspace>`.
   - `TestInitJoin` (D38): `railswitch init`, in a directory holding only the tracked files of a `new` workspace and pointed at a fresh `XDG_DATA_HOME`:
     - clones `[project] repo` into the base dir;
     - writes `mise.local.toml` with fresh `generated` values;
-    - registers the prefix and base worktree, and renders;
+    - registers the prefix and base worktree, creates `db-dumps/` (0700), and renders;
     - prints `railswitch secret set <name>` for each declared secret that isn't set.
 
     It refuses when the prefix is already registered.

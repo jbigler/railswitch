@@ -81,3 +81,23 @@ does not read a secret's value back from podman.
 | `created` | string or `null` | When the podman secret was created (RFC 3339); `null` when not set. |
 | `services` | array of strings | The service ids that receive it. |
 | `driver_differs` | boolean | The value is stored with another driver than `config.toml` configures; `railswitch secret set <name>` re-creates it under the configured one. |
+
+## `wt ls`
+
+The project's registered worktrees, by ID; the base worktree is first (ID 1
+on a machine with one project). It is an array with one object per worktree.
+
+```json
+[
+  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/master", "dirty": false},
+  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/feat", "dirty": true}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `slug` | string | The worktree's name: its directory under the workspace and the `<slug>` in its object names. |
+| `id` | number | Its machine-wide ID; its host ports are derived from it. |
+| `branch` | string | The branch checked out in it; `""` when detached, or when its directory is missing or not a git worktree. |
+| `dir` | string | Its directory, `<workspace>/<slug>`. |
+| `dirty` | boolean | `git status --porcelain` lists changes or untracked files. `false` when its directory is missing or not a git worktree. |

@@ -39,6 +39,7 @@ fallback = "{project.prefix}_development"
 [env]                      # only what Rails itself reads; app-specific names go in the project's [env]
 RAILS_ENV = "development"
 BINDING = "0.0.0.0"
+RUBY_DEBUG_HOST = "0.0.0.0"  # the debug port is published, so the debug gem listens on every container address
 
 [db_scheme]
 postgres = "postgres://"
@@ -64,7 +65,7 @@ chown = true
 name = "debug"
 env = "RUBY_DEBUG_PORT"
 base = 33000
-container = 38698
+same_port = true          # the container port is the host port, so RUBY_DEBUG_PORT is right inside the container too
 
 [[ports]]
 name = "app"

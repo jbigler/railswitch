@@ -397,7 +397,7 @@ func (b *builder) toolService(t *pack.Tool) (Service, error) {
 		}
 	}
 	if t.Home {
-		s.Mounts = append(s.Mounts, Mount{Source: "{worktree.home}", Target: "/home/appuser", Options: "z"})
+		s.Mounts = append(s.Mounts, Mount{Source: homeSource, Target: "/home/appuser", Options: "z"})
 	}
 	if t.Caches {
 		for _, v := range pk.Caches {
@@ -584,7 +584,7 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		"worktree.id":    strconv.Itoa(wt.ID),
 		"worktree.host":  wt.Slug + "." + m.Prefix + ".localhost",
 		"worktree.dir":   wt.Dir,
-		"worktree.home":  filepath.Join(m.Inputs.Workspace, ".railswitch", "home", wt.Slug), // D30's per-worktree home
+		"worktree.home":  filepath.Join(m.Inputs.Workspace, filepath.FromSlash(homeDir), wt.Slug), // D30's per-worktree home
 		"base.git":       filepath.Join(m.baseDir, ".git"),
 		"traefik.ip":     machine.TraefikIP(m.Inputs.Machine.Subnet),
 		"branch":         wt.Branch,

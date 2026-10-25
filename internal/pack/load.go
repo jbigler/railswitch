@@ -189,7 +189,10 @@ func (l *loader) ports(file, owner string, ports []Port) {
 		if p.Base < 1024 || p.Base > 65535 {
 			l.add(file, "%s.base %d is not a port above 1023", f, p.Base)
 		}
-		if p.Container < 1 || p.Container > 65535 {
+		switch {
+		case p.SamePort && p.Container != 0:
+			l.add(file, "%s: same_port and container are exclusive (same_port: the container port is the host port)", f)
+		case !p.SamePort && (p.Container < 1 || p.Container > 65535):
 			l.add(file, "%s.container %d is not a port", f, p.Container)
 		}
 		// Host port = base + worktree ID, so a base belongs to one package

@@ -89,12 +89,15 @@ type Volume struct {
 }
 
 // Port is a published port: host port Base + worktree ID, container port
-// Container, its host port given to services as env Env.
+// Container, its host port given to services as env Env. With SamePort the
+// container port is the host port too (Container is unset), for a server
+// that reads its port from Env inside the container.
 type Port struct {
 	Name      string `toml:"name"`
 	Env       string `toml:"env"`
 	Base      int    `toml:"base"`
 	Container int    `toml:"container"`
+	SamePort  bool   `toml:"same_port"`
 }
 
 // Link is a suggested worktree link (HANDOFF §3.10).

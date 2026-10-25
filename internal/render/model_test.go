@@ -247,9 +247,20 @@ func TestDepsGetsNoSecrets(t *testing.T) {
 		}
 	}
 	// D11: the pack layer and [services.deps.env] only.
-	want := []string{"BINDING", "BUNDLE_FROZEN", "RAILS_ENV"}
+	want := []string{"BINDING", "BUNDLE_FROZEN", "RAILS_ENV", "RUBY_DEBUG_HOST"}
 	if !slices.Equal(names, want) {
 		t.Errorf("deps env = %v; want %v", names, want)
+	}
+}
+
+// The debug gem listens on RUBY_DEBUG_HOST:RUBY_DEBUG_PORT inside the
+// container; the rails pack publishes that port, so it gives the bind address.
+func TestDebugHost(t *testing.T) {
+	_, in := filial(t, nil)
+	for _, svc := range []string{"rails", "nvim"} {
+		if e, _ := envVar(in, svc, "RUBY_DEBUG_HOST"); e.Value != "0.0.0.0" || e.Layer != LayerPack {
+			t.Errorf("%s RUBY_DEBUG_HOST = %+v; want 0.0.0.0 at LayerPack", svc, e)
+		}
 	}
 }
 

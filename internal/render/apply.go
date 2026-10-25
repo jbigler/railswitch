@@ -19,6 +19,10 @@ import (
 type Plan struct {
 	Units map[string][]byte // unit filename → content, written to the Quadlet dir at mode 0644
 	Files map[string]File   // workspace-relative slash path → content and mode (env files, package assets)
+	// Homes are the per-worktree home dirs (D30) a unit bind-mounts,
+	// workspace-relative slash paths. Apply creates a missing one 0700 and
+	// never removes one: they hold user data.
+	Homes []string
 }
 
 // File is one workspace file of a Plan.
@@ -36,7 +40,10 @@ type Diff struct {
 
 const (
 	unitMode = fs.FileMode(0o644)
-	envDir   = ".railswitch/env" // D10: <envDir>/<slug>/<svc>.env, 0600 in 0700 dirs
+	envDir   = ".railswitch/env"  // D10: <envDir>/<slug>/<svc>.env, 0600 in 0700 dirs
+	homeDir  = ".railswitch/home" // D30: <homeDir>/<slug>, a tool's per-worktree home, 0700
+	// homeSource is the mount source of a per-worktree home.
+	homeSource = "{worktree.home}"
 )
 
 // Plan renders the project: its units, every worktree's per-service env file
@@ -47,6 +54,10 @@ func (m *Model) Plan() (*Plan, error) {
 		return nil, err
 	}
 	files := map[string]File{}
+	var homes []string
+	mountsHome := slices.ContainsFunc(m.Services, func(s Service) bool {
+		return slices.ContainsFunc(s.Mounts, func(mt Mount) bool { return mt.Source == homeSource })
+	})
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)
 		if err != nil {
@@ -55,11 +66,14 @@ func (m *Model) Plan() (*Plan, error) {
 		for _, s := range m.Services {
 			files[path.Join(envDir, wt.Slug, s.ID+".env")] = File{Data: envFile(in.Env[s.ID]), Mode: 0o600}
 		}
+		if mountsHome {
+			homes = append(homes, path.Join(homeDir, wt.Slug))
+		}
 	}
 	for _, a := range m.Assets {
 		files[a.Rel] = File{Data: a.Data, Mode: a.Mode}
 	}
-	return &Plan{Units: units, Files: files}, nil
+	return &Plan{Units: units, Files: files, Homes: homes}, nil
 }
 
 // envFile is a podman env file: NAME=value per line, the value verbatim
@@ -82,9 +96,11 @@ type target struct {
 	mode       fs.FileMode
 }
 
-// Apply makes the disk match p: p.Files under ws, p.Units in quadletDir,
-// then it removes every unit in quadletDir whose marker names prefix but which
-// p does not render (D28), and every env dir or env file p does not render.
+// Apply makes the disk match p: p.Files under ws, each missing p.Homes dir
+// (0700; an existing one is left as it is and none is ever removed), p.Units
+// in quadletDir, then it removes every unit in quadletDir whose marker names
+// prefix but which p does not render (D28), and every env dir or env file p
+// does not render.
 // Unchanged files are left alone. Each file is replaced atomically, so a
 // failure leaves every file old or new, never half-written, and running again
 // finishes the job. With check, nothing is written: the Diff says what would
@@ -133,6 +149,20 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 	if err != nil {
 		return nil, err
 	}
+	var homes []string // the ones to create
+	for _, rel := range p.Homes {
+		fi, err := os.Stat(filepath.Join(ws, filepath.FromSlash(rel)))
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			homes = append(homes, rel)
+			d.Added = append(d.Added, rel)
+			text.WriteString("--- /dev/null\n+++ b/" + rel + "/\n(new directory, mode 0700)\n")
+		case err != nil:
+			return nil, err
+		case !fi.IsDir():
+			return nil, fmt.Errorf("%s: not a directory (the per-worktree home a unit mounts)", filepath.Join(ws, filepath.FromSlash(rel)))
+		}
+	}
 	for _, o := range slices.Concat(units, envs) {
 		d.Removed = append(d.Removed, o.name)
 		text.WriteString("--- a/" + o.name + "\n+++ /dev/null\n")
@@ -156,6 +186,15 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 			if err := ensureDir(dir, true); err != nil {
 				return nil, err
 			}
+		}
+	}
+	for _, rel := range homes {
+		dir := filepath.Join(ws, filepath.FromSlash(rel))
+		if err := ensureDir(filepath.Dir(dir), false); err != nil {
+			return nil, err
+		}
+		if err := os.Mkdir(dir, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+			return nil, err
 		}
 	}
 	for _, t := range writes {

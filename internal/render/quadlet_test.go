@@ -183,6 +183,8 @@ func TestNoNonLoopbackPublish(t *testing.T) {
 		t.Fatal("no PublishPort rendered")
 	}
 	hasLine(t, units, "filial-feat-db.container", "PublishPort=127.0.0.1:55434:5432")
+	// The debug port is the same on both sides, so RUBY_DEBUG_PORT is right in the container too.
+	hasLine(t, units, "filial-feat-rails.container", "PublishPort=127.0.0.1:33002:33002")
 }
 
 // serverUnits renders the filial fixture with the rails pack's server

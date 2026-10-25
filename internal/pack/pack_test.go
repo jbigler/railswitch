@@ -161,6 +161,24 @@ func TestUnknownFieldInPackToml(t *testing.T) {
 	}
 }
 
+func TestPortSamePort(t *testing.T) {
+	fsys := minimal()
+	opt := fsys["options/o/option.toml"]
+	opt.Data = []byte(strings.Replace(string(opt.Data), "container = 1\n", "same_port = true\n", 1))
+	cat, err := Load(fsys)
+	if err != nil {
+		t.Fatalf("Load with same_port: %v", err)
+	}
+	if p := cat.Options[Ref{"o", 1}].Ports[0]; !p.SamePort || p.Container != 0 {
+		t.Errorf("port = %+v; want SamePort and no container", p)
+	}
+
+	opt.Data = append(opt.Data, []byte("container = 5\n")...)
+	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "same_port") {
+		t.Errorf("Load with same_port and container: %v", err)
+	}
+}
+
 func TestPortBasesUnique(t *testing.T) {
 	fsys := minimal()
 	fsys["options/q/option.toml"] = &fstest.MapFile{Data: []byte(`name = "q"
@@ -183,8 +201,9 @@ container = 5432
 
 func TestRailsPackGeneric(t *testing.T) {
 	p := builtins(t).Packs[Ref{"rails", 1}]
-	if got := slices.Sorted(maps.Keys(p.Env)); !slices.Equal(got, []string{"BINDING", "RAILS_ENV"}) {
-		t.Errorf("rails [env] keys = %v, want exactly BINDING, RAILS_ENV", got)
+	// RUBY_DEBUG_HOST: the debug gem (in Rails' default Gemfile) listens on the published debug port.
+	if got := slices.Sorted(maps.Keys(p.Env)); !slices.Equal(got, []string{"BINDING", "RAILS_ENV", "RUBY_DEBUG_HOST"}) {
+		t.Errorf("rails [env] keys = %v, want exactly BINDING, RAILS_ENV, RUBY_DEBUG_HOST", got)
 	}
 	if p.Defaults["browser"] != "none" {
 		t.Errorf("defaults.browser = %q, want none", p.Defaults["browser"])

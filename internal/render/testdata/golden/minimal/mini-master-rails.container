@@ -16,7 +16,7 @@ UserNS=keep-id:uid=1000,gid=1000
 User=1000:1000
 EnvironmentFile=/WORKSPACES/minimal/.railswitch/env/master/rails.env
 AddHost=master.mini.localhost:10.214.3.2
-PublishPort=127.0.0.1:33001:38698
+PublishPort=127.0.0.1:33001:33001
 PublishPort=127.0.0.1:13001:3000
 Volume=/WORKSPACES/minimal/master:/app:z
 Volume=/WORKSPACES/minimal/master/.git:/WORKSPACES/minimal/master/.git:ro,z

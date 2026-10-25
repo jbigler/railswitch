@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
 )
 
@@ -36,11 +37,12 @@ func mustApply(t *testing.T, p *Plan, ws, qdir string, check bool) *Diff {
 	return d
 }
 
-// planNames is every unit filename and workspace-relative file path of p,
-// sorted.
+// planNames is every unit filename, workspace-relative file path and home dir
+// of p, sorted.
 func planNames(p *Plan) []string {
 	names := slices.Collect(maps.Keys(p.Units))
 	names = slices.AppendSeq(names, maps.Keys(p.Files))
+	names = append(names, p.Homes...)
 	slices.Sort(names)
 	return names
 }
@@ -253,6 +255,9 @@ func TestApplyCheckWritesNothing(t *testing.T) {
 	if want := planNames(p); !slices.Equal(d.Added, want) || !slices.Equal(d.Removed, []string{"filial-gone-rails.container"}) {
 		t.Errorf("Added = %v, Removed = %v", d.Added, d.Removed)
 	}
+	if !slices.Contains(d.Added, ".railswitch/home/feat") {
+		t.Errorf("Added = %v; want the home dir .railswitch/home/feat", d.Added)
+	}
 	if strings.Contains(d.Text, "s3cret") {
 		t.Error("Text shows an env file's contents")
 	}
@@ -265,6 +270,53 @@ func TestApplyCheckWritesNothing(t *testing.T) {
 	}
 	if fileExists(t, filepath.Join(ws, ".railswitch")) {
 		t.Error("check mode created .railswitch")
+	}
+}
+
+// D30: a service with the tool home flag (nvim) bind-mounts
+// .railswitch/home/<slug>; Apply creates it, private.
+func TestApplyCreatesHome(t *testing.T) {
+	p, ws, qdir := filialPlan(t)
+	mustApply(t, p, ws, qdir, false)
+	for _, slug := range []string{"master", "feat"} {
+		fi, err := os.Stat(filepath.Join(ws, ".railswitch", "home", slug))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !fi.IsDir() || fi.Mode().Perm() != 0o700 {
+			t.Errorf("home %s: mode %v; want a 0700 dir", slug, fi.Mode())
+		}
+	}
+}
+
+func TestApplyNoHomeWithoutNvim(t *testing.T) {
+	ws := fixtureWS(t)
+	p, err := mustBuild(t, fixtureInputs(t, ws, func(p *config.Project) { p.Tools.Nvim = false })).Plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := mustApply(t, p, ws, t.TempDir(), false)
+	if fileExists(t, filepath.Join(ws, ".railswitch", "home")) {
+		t.Error("Apply created .railswitch/home with nvim off")
+	}
+	for _, n := range d.Added {
+		if strings.HasPrefix(n, ".railswitch/home") {
+			t.Errorf("Added has %s with nvim off", n)
+		}
+	}
+}
+
+// A home dir holds user data: a worktree gone from the plan keeps it.
+func TestApplyKeepsOrphanHome(t *testing.T) {
+	p, ws, qdir := filialPlan(t)
+	kept := filepath.Join(ws, ".railswitch", "home", "gone", ".bash_history")
+	writeFile(t, kept, "ls\n")
+	d := mustApply(t, p, ws, qdir, false)
+	if !fileExists(t, kept) {
+		t.Error("Apply removed an orphan worktree's home")
+	}
+	if len(d.Removed) != 0 {
+		t.Errorf("Removed = %v; want none", d.Removed)
 	}
 }
 

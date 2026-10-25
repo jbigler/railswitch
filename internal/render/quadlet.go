@@ -213,7 +213,11 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		}
 	}
 	for _, p := range s.Publish {
-		u.add(c, "PublishPort", "127.0.0.1:"+in.Values[p.Env]+":"+strconv.Itoa(p.Container))
+		host, ctr := in.Values[p.Env], strconv.Itoa(p.Container)
+		if p.SamePort {
+			ctr = host
+		}
+		u.add(c, "PublishPort", "127.0.0.1:"+host+":"+ctr)
 	}
 	for _, mt := range s.Mounts {
 		v := x(mt.Source) + ":" + x(mt.Target)

@@ -37,6 +37,12 @@ type tenv struct {
 	out *bytes.Buffer
 }
 
+// units makes every unit-state query report stdout; unit, if given,
+// narrows it to that unit.
+func (e *tenv) units(stdout string, unit ...string) {
+	e.f.On(append([]string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState"}, unit...), sys.Result{Stdout: []byte(stdout)}, nil)
+}
+
 // missing makes calls with argv prefix exit 1 ("does not exist").
 func (e *tenv) missing(prefix ...string) {
 	e.f.On(prefix, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
@@ -299,7 +305,7 @@ func TestUpLocalDigestDiffers(t *testing.T) {
 
 func TestUpSecondRunNoPull(t *testing.T) {
 	e := setup(t)
-	e.f.On([]string{"systemctl", "--user", "show", "-p", "LoadState"}, sys.Result{Stdout: []byte("loaded\n")}, nil)
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n")
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
@@ -705,12 +711,12 @@ func TestUpReloadsUnloadedUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.reset()
-	e.f.On([]string{"systemctl", "--user", "show", "-p", "LoadState"}, sys.Result{Stdout: []byte("not-found\n")}, nil)
+	e.units("LoadState=not-found\nNeedDaemonReload=no\nActiveState=inactive\n")
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
 	wantInOrder(t, e.calls(),
-		"systemctl --user show -p LoadState --value filial-feat-rails.service",
+		"systemctl --user show -p LoadState,NeedDaemonReload,ActiveState filial-feat-rails.service",
 		"systemctl --user daemon-reload",
 		"systemctl --user start filial-feat-rails.service")
 	if n := count(e.calls(), "podman pull"); n != 0 {
@@ -849,4 +855,47 @@ func TestUpImportCancelledRemovesVolume(t *testing.T) {
 	if !r.removed {
 		t.Fatalf("unseeded volume not removed after cancellation:\n%s", dump(e.calls()))
 	}
+}
+
+const loadedClean = "LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n"
+
+// upTwice runs Up once (units, digests on disk), then resets the calls.
+func upTwice(t *testing.T, e *tenv) {
+	t.Helper()
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	e.reset()
+}
+
+func TestUpStaleLoadedUnitRestarted(t *testing.T) {
+	e := setup(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.units("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=active\n", "filial-feat-db.service")
+	e.units("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=inactive\n", "filial-feat-redis.service")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user daemon-reload",
+		"systemctl --user restart filial-feat-db.service",
+		"systemctl --user start filial-feat-rails.service")
+	if n := count(e.calls(), "systemctl --user restart filial-feat-redis") + count(e.calls(), "systemctl --user restart railswitch-traefik"); n != 0 {
+		t.Fatalf("restarted an inactive unit or traefik:\n%s", dump(e.calls()))
+	}
+}
+
+func TestUpTraefikStaleRestarted(t *testing.T) {
+	e := setup(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.units("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=active\n", "railswitch-traefik.service")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user daemon-reload",
+		"systemctl --user restart railswitch-traefik.service",
+		"systemctl --user start filial-feat-rails.service")
 }

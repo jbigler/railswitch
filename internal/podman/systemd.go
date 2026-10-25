@@ -82,8 +82,18 @@ func (s Systemd) Show(ctx context.Context, unit string, props ...string) (map[st
 	return m, nil
 }
 
-// LoadState is unit's systemd LoadState, e.g. "loaded" or "not-found".
-func (s Systemd) LoadState(ctx context.Context, unit string) (string, error) {
-	r, err := s.run(ctx, 0, "show", "-p", "LoadState", "--value", unit)
-	return strings.TrimSpace(string(r.Stdout)), err
+// UnitState is what systemd knows of a unit.
+type UnitState struct {
+	Load       string // LoadState: "loaded", "not-found", …
+	NeedReload bool   // NeedDaemonReload: its file changed since the last daemon-reload
+	Active     string // ActiveState: "active", "inactive", "failed", …
+}
+
+// UnitState reads unit's LoadState, NeedDaemonReload and ActiveState.
+func (s Systemd) UnitState(ctx context.Context, unit string) (UnitState, error) {
+	m, err := s.Show(ctx, unit, "LoadState", "NeedDaemonReload", "ActiveState")
+	if err != nil {
+		return UnitState{}, err
+	}
+	return UnitState{Load: m["LoadState"], NeedReload: m["NeedDaemonReload"] == "yes", Active: m["ActiveState"]}, nil
 }

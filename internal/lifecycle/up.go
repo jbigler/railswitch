@@ -132,10 +132,29 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 
 	sd := l.systemd()
-	reload := ch.units
-	if !reload {
-		if reload, err = l.anyUnloaded(ctx, m, slug); err != nil {
+	names, err := m.NamesFor(slug)
+	if err != nil {
+		return err
+	}
+	// What systemd has loaded, read before any reload: a unit file changed
+	// by an earlier render (railswitch render, wt add, a failed up) is
+	// not loaded yet or loaded stale (NeedDaemonReload).
+	reload, restartTraefik := ch.units, ch.traefik
+	var restart []string // active units of this worktree running a stale unit
+	for _, u := range append(names.Units, traefikService) {
+		st, err := sd.UnitState(ctx, u)
+		if err != nil {
 			return err
+		}
+		if st.Load != "loaded" || st.NeedReload {
+			reload = true
+		}
+		switch {
+		case !st.NeedReload:
+		case u == traefikService:
+			restartTraefik = true
+		case st.Active == "active":
+			restart = append(restart, u)
 		}
 	}
 	if reload {
@@ -143,33 +162,17 @@ func (l *L) Up(ctx context.Context, slug string) error {
 			return err
 		}
 	}
-	if ch.traefik {
+	if restartTraefik {
 		if err := sd.Restart(ctx, traefikService); err != nil {
 			return err
 		}
 	}
+	if len(restart) > 0 {
+		if err := sd.Restart(ctx, restart...); err != nil {
+			return err
+		}
+	}
 	return sd.Start(ctx, unitOf(m, slug, m.Services[0].ID))
-}
-
-// anyUnloaded reports whether a unit Up starts (every service of the
-// worktree, its dev network and Traefik) is not loaded by systemd: a unit
-// written by an earlier render (wt add, render, a failed up) that no
-// daemon-reload has generated yet.
-func (l *L) anyUnloaded(ctx context.Context, m *render.Model, slug string) (bool, error) {
-	names, err := m.NamesFor(slug)
-	if err != nil {
-		return false, err
-	}
-	for _, u := range append(names.Units, traefikService) {
-		st, err := l.systemd().LoadState(ctx, u)
-		if err != nil {
-			return false, err
-		}
-		if st != "loaded" {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func unitOf(m *render.Model, slug, svc string) string {

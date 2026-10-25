@@ -324,14 +324,14 @@ func TestSecrets(t *testing.T) {
 	}
 }
 
-func TestLoadState(t *testing.T) {
+func TestUnitState(t *testing.T) {
 	f := &systest.Fake{}
-	f.On([]string{"systemctl", "--user", "show"}, sys.Result{Stdout: []byte("not-found\n")}, nil)
-	st, err := Systemd{R: f}.LoadState(ctx, "a.service")
-	if err != nil || st != "not-found" {
-		t.Fatalf("got %q %v", st, err)
+	f.On([]string{"systemctl", "--user", "show"}, sys.Result{Stdout: []byte("LoadState=loaded\nNeedDaemonReload=yes\nActiveState=active\n")}, nil)
+	st, err := Systemd{R: f}.UnitState(ctx, "a.service")
+	if err != nil || st != (UnitState{Load: "loaded", NeedReload: true, Active: "active"}) {
+		t.Fatalf("got %+v %v", st, err)
 	}
-	wantCalls(t, f, []string{"systemctl", "--user", "show", "-p", "LoadState", "--value", "a.service"})
+	wantCalls(t, f, []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState", "a.service"})
 }
 
 func TestPullOnly(t *testing.T) {

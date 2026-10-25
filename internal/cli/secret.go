@@ -73,6 +73,9 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	if _, ok := w.Project.Secrets[name]; ok {
+		return e.fail(fmt.Errorf("secret %s is already declared in project.toml; set its value with railswitch secret set %s", name, name))
+	}
 	m, err := e.model(ctx, w)
 	if err != nil {
 		return e.fail(err)
@@ -86,12 +89,24 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 			return e.usageErr("secret add: no service %s (services: %s)", id, strings.Join(ids, ", "))
 		}
 	}
-	if _, ok := w.Project.Secrets[name]; ok {
-		return e.fail(fmt.Errorf("secret %s is already declared in project.toml; set its value with railswitch secret set %s", name, name))
-	}
 	sec := config.Secret{Services: services, Env: *envVar}
 	if *mach {
 		sec.Scope = "machine"
+	}
+	// Build the model again with the declaration added, so render's checks
+	// (an env var collision, D33) refuse it before anything is written.
+	cand := *w.Project
+	cand.Secrets = maps.Clone(w.Project.Secrets)
+	if cand.Secrets == nil {
+		cand.Secrets = map[string]config.Secret{}
+	}
+	cand.Secrets[name] = sec
+	if err := cand.Validate(); err != nil {
+		return e.fail(err)
+	}
+	w.Project = &cand
+	if m, err = e.model(ctx, w); err != nil {
+		return e.fail(err)
 	}
 	value, err := e.readSecretValue(ctx, name)
 	if err != nil {
@@ -165,7 +180,7 @@ func (e *env) readSecretValue(ctx context.Context, name string) ([]byte, error) 
 	var value []byte
 	if f, ok := e.stdin.(*os.File); ok && isTerminal(f) {
 		fmt.Fprintf(e.stderr, "Value for %s: ", name)
-		v, err := readNoEcho(f)
+		v, err := readNoEcho(ctx, f)
 		fmt.Fprintln(e.stderr)
 		if err != nil {
 			return nil, err
@@ -209,9 +224,26 @@ func (e *env) storeSecret(ctx context.Context, w *workspace.Workspace, m *render
 	if err != nil {
 		return e.fail(err)
 	}
-	// podman's --replace fails on a missing secret (#29612).
 	d := podman.Driver{Name: cfg.Secrets.Driver, Opts: cfg.Secrets.DriverOpts}
-	if err := p.SecretCreate(ctx, pname, bytes.NewReader(value), exists, d); err != nil {
+	// podman's --replace fails on a missing secret (#29612). A value stored
+	// under another driver is removed first, so its old copy is gone; podman
+	// secret rm does not check for containers using it, and running ones
+	// keep the copy they got at creation.
+	replace := exists
+	if exists {
+		stored, err := p.SecretDriver(ctx, pname)
+		if err != nil {
+			return e.fail(err)
+		}
+		if stored != configuredDriver(cfg) {
+			if err := p.SecretRemove(ctx, pname); err != nil {
+				return e.fail(fmt.Errorf("secret %s: removing the %s copy: %w", name, stored, err))
+			}
+			fmt.Fprintf(e.stdout, "removed podman secret %s stored with driver %s\n", pname, stored)
+			replace = false
+		}
+	}
+	if err := p.SecretCreate(ctx, pname, bytes.NewReader(value), replace, d); err != nil {
 		return e.fail(fmt.Errorf("secret %s: %w", name, err))
 	}
 	fmt.Fprintf(e.stdout, "secret %s stored in podman secret %s\n", name, pname)
@@ -237,6 +269,14 @@ func (e *env) storeSecret(ctx context.Context, w *workspace.Workspace, m *render
 	}
 	fmt.Fprintf(e.stdout, "restarted %s\n", strings.Join(running, ", "))
 	return 0
+}
+
+// configuredDriver is config.toml's secret driver; podman's default is file.
+func configuredDriver(cfg *machine.Config) string {
+	if cfg.Secrets.Driver == "" {
+		return "file"
+	}
+	return cfg.Secrets.Driver
 }
 
 // runningReceivers are the running containers, in every registered
@@ -295,10 +335,7 @@ func secretLs(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	configured := cfg.Secrets.Driver
-	if configured == "" {
-		configured = "file"
-	}
+	configured := configuredDriver(cfg)
 	p := podman.Podman{R: e.run}
 	rows := []secretRow{}
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {

@@ -289,9 +289,9 @@ func TestSecrets(t *testing.T) {
 	if d, err := p.SecretDriver(ctx, "api_tok"); d != "file" || err != nil {
 		t.Fatalf("driver: got %q %v", d, err)
 	}
-	f.On([]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt}}"}, sys.Result{Stdout: []byte("2026-10-25 09:08:07.123 +0000 UTC\n")}, nil)
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt.Unix}}"}, sys.Result{Stdout: []byte("1792919287\n")}, nil)
 	c, err := p.SecretCreated(ctx, "api_tok")
-	if err != nil || !c.Equal(time.Date(2026, 10, 25, 9, 8, 7, 123e6, time.UTC)) {
+	if err != nil || !c.Equal(time.Unix(1792919287, 0)) {
 		t.Fatalf("created: got %v %v", c, err)
 	}
 	wantCalls(t, f,
@@ -300,7 +300,7 @@ func TestSecrets(t *testing.T) {
 		[]string{"podman", "secret", "create", "--replace", "--driver=pass", "--driver-opts=key=ABC,root=/x", "api_tok", "-"},
 		[]string{"podman", "secret", "rm", "api_tok"},
 		[]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}", "api_tok"},
-		[]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt}}", "api_tok"})
+		[]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt.Unix}}", "api_tok"})
 	if string(f.Stdins[1]) != "s3cret" || string(f.Stdins[2]) != "s3cret" {
 		t.Fatalf("stdins = %q", f.Stdins)
 	}

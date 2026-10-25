@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -231,18 +232,16 @@ func (p Podman) SecretRemove(ctx context.Context, name string) error {
 	return err
 }
 
-// secretTimeLayout is how a Go template prints a time.Time (time.Time.String).
-const secretTimeLayout = "2006-01-02 15:04:05.999999999 -0700 MST"
-
-// SecretCreated returns when secret name was created.
+// SecretCreated returns when secret name was created
+// (`{{.CreatedAt.Unix}}`: CreatedAt is a time.Time).
 func (p Podman) SecretCreated(ctx context.Context, name string) (time.Time, error) {
-	s, err := p.out(ctx, "secret", "inspect", "--format", "{{.CreatedAt}}", name)
+	s, err := p.out(ctx, "secret", "inspect", "--format", "{{.CreatedAt.Unix}}", name)
 	if err != nil {
 		return time.Time{}, err
 	}
-	t, err := time.Parse(secretTimeLayout, s)
+	sec, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("secret %s: created at %q: %w", name, s, err)
 	}
-	return t, nil
+	return time.Unix(sec, 0), nil
 }

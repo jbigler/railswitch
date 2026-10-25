@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jbigler/railswitch/internal/tomlfile"
 )
@@ -41,5 +42,29 @@ func LoadConfig(d Dirs) (*Config, error) {
 	if err := tomlfile.Decode(data, ConfigSchema, &c); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+	if c.Schema != ConfigSchema {
+		return nil, fmt.Errorf("%s: schema: %d is not %d; config.toml starts with `schema = %d`", path, c.Schema, ConfigSchema, ConfigSchema)
+	}
+	for _, k := range pathOpts {
+		v, ok := c.Secrets.DriverOpts[k]
+		if !ok {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(v, "~/"); ok {
+			home := os.Getenv("HOME")
+			if !filepath.IsAbs(home) {
+				return nil, fmt.Errorf("%s: secrets.driver_opts.%s: %q starts with ~/ but HOME is not an absolute path", path, k, v)
+			}
+			v = filepath.Join(home, rest)
+		}
+		if !filepath.IsAbs(v) {
+			return nil, fmt.Errorf("%s: secrets.driver_opts.%s: %q is not an absolute path (or ~/…)", path, k, v)
+		}
+		c.Secrets.DriverOpts[k] = v
+	}
 	return &c, nil
 }
+
+// pathOpts are the driver_opts that hold a path: a leading ~/ is the
+// user's home, and the result must be absolute.
+var pathOpts = []string{"root", "gpghomedir"}

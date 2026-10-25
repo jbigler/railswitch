@@ -37,7 +37,7 @@ func lockedWS(t *testing.T) (string, machine.Dirs) {
 
 // created scripts every `podman secret inspect --format {{.CreatedAt}}`.
 func created(f *systest.Fake) {
-	f.On([]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt}}"}, sys.Result{Stdout: []byte("2026-10-25 09:08:07.5 +0000 UTC\n")}, nil)
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.CreatedAt.Unix}}"}, sys.Result{Stdout: []byte("1792919287\n")}, nil)
 }
 
 func runStdin(t *testing.T, f *systest.Fake, stdin string, args ...string) (int, string, string) {
@@ -95,12 +95,13 @@ func TestSecretSetStdin(t *testing.T) {
 func TestSecretSetReplace(t *testing.T) {
 	ws, _ := lockedWS(t)
 	f := fakeHost()
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("file\n")}, nil)
 	code, out, errs := runStdin(t, f, "tok123\n", "-C", ws, "secret", "set", "github_token")
 	if code != 0 {
 		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
 	calls, _ := secretCalls(f)
-	if len(calls) != 2 || !slices.Equal(calls[1], []string{"podman", "secret", "create", "--replace", "filial_github_token", "-"}) {
+	if len(calls) != 3 || !slices.Equal(calls[2], []string{"podman", "secret", "create", "--replace", "filial_github_token", "-"}) {
 		t.Fatalf("calls = %q", calls)
 	}
 }
@@ -307,5 +308,52 @@ func TestSecretAdd(t *testing.T) {
 	code, out, errs = runStdin(t, fakeHost(), "x\n", "-C", ws, "secret", "add", "other", "--service", "nope")
 	if code != 2 || !strings.Contains(errs, "nope") || !strings.Contains(errs, "rails, deps, db") {
 		t.Fatalf("--service nope: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+}
+
+func TestSecretAddEnvCollision(t *testing.T) {
+	ws, _ := lockedWS(t)
+	path := filepath.Join(ws, "project.toml")
+	before := readFile(t, path)
+	f := fakeHost()
+	code, out, errs := runStdin(t, f, "v\n", "-C", ws, "secret", "add", "dburl", "--service", "rails", "--env", "DATABASE_URL")
+	if code != 1 || !strings.Contains(errs, "dburl") || !strings.Contains(errs, "rails") || !strings.Contains(errs, "DATABASE_URL") {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	if readFile(t, path) != before {
+		t.Error("project.toml changed")
+	}
+	if calls, _ := secretCalls(f); len(calls) != 0 {
+		t.Errorf("podman secret calls: %q", calls)
+	}
+}
+
+func TestSecretSetDriverMove(t *testing.T) {
+	ws, dirs := lockedWS(t)
+	writeConfig(t, dirs.Config, passConfig)
+	f := fakeHost()
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("file\n")}, nil)
+	if code, out, errs := runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token"); code != 0 {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	calls, _ := secretCalls(f)
+	want := [][]string{
+		{"podman", "secret", "exists", "filial_github_token"},
+		{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}", "filial_github_token"},
+		{"podman", "secret", "rm", "filial_github_token"},
+		{"podman", "secret", "create", "--driver=pass", "--driver-opts=key=ABC,root=/x", "filial_github_token", "-"},
+	}
+	if !slices.EqualFunc(calls, want, slices.Equal) {
+		t.Fatalf("calls = %q", calls)
+	}
+	// Same driver: --replace.
+	f = fakeHost()
+	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("pass\n")}, nil)
+	if code, _, errs := runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token"); code != 0 {
+		t.Fatal(errs)
+	}
+	calls, _ = secretCalls(f)
+	if last := calls[len(calls)-1]; !slices.Contains(last, "--replace") || slices.ContainsFunc(calls, func(c []string) bool { return c[2] == "rm" }) {
+		t.Fatalf("calls = %q", calls)
 	}
 }

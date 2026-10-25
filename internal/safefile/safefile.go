@@ -1,5 +1,6 @@
 // Package safefile reads files from untrusted locations (worktrees):
-// regular files only, never through a symlink, never blocking, bounded size.
+// regular files only, never blocking, bounded size. A symlink as the final
+// path component is refused; symlinks in parent directories are followed.
 package safefile
 
 import (

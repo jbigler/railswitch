@@ -125,7 +125,7 @@ func proxyNetwork(m *Model) *unit {
 	u.add("Network", "Subnet", machine.Subnet(n))
 	u.add("Network", "Gateway", machine.Gateway(n))
 	u.add("Network", "IPRange", machine.IPRange(n))
-	u.add("Network", "Options", "mtu=1400", "isolate=true")
+	u.add("Network", "Options", "mtu=1400", "isolate=strict")
 	return u
 }
 
@@ -133,7 +133,7 @@ func devNetwork(m *Model, slug string) *unit {
 	u := &unit{Header: []string{markerLine(m, slug)}}
 	u.add("Unit", "Description", "Dev network of "+m.Prefix+" worktree "+slug)
 	u.add("Network", "NetworkName", naming.DevNetwork(m.Prefix, slug))
-	u.add("Network", "Options", "mtu=1400", "isolate=true")
+	u.add("Network", "Options", "mtu=1400", "isolate=strict")
 	return u
 }
 

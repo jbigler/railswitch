@@ -18,8 +18,11 @@ var hostClientClause = buildHostClientClause()
 //     ClientIP(`10.214.<n>.2/32`) per n in 0..255, the machine network
 //     included.
 //
-// Neither admits another project's container: with isolate=true it reaches
-// Traefik only from its own subnet, from a host part of 3 or more.
+// Neither admits another container, provided every railswitch network is
+// isolate=strict and Traefik is the only .2 on any network that can reach it:
+// strict blocks traffic to and from every other bridge network, so a
+// container reaches Traefik only over its own railswitch network, from its
+// subnet with a host part of 3 or more.
 // Traefik v3's ClientIP takes exactly one argument, hence the || chain.
 func HostClientClause() string { return hostClientClause }
 

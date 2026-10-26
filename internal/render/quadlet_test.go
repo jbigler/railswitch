@@ -645,12 +645,13 @@ func TestRouterClientIP(t *testing.T) {
 	}
 }
 
-// TestNetworkIsolate: every network unit pins isolate=true, so a container
-// reaches another project only through Traefik (D50).
+// TestNetworkIsolate: every network unit pins isolate=strict, so a container
+// reaches another project, or any other bridge network, only through Traefik
+// (D50).
 func TestNetworkIsolate(t *testing.T) {
 	for file, body := range goldenFiles(t, "filial", ".network") {
-		if !strings.Contains(body, "\nOptions=isolate=true\n") {
-			t.Errorf("%s lacks Options=isolate=true:\n%s", file, body)
+		if !strings.Contains(body, "\nOptions=isolate=strict\n") {
+			t.Errorf("%s lacks Options=isolate=strict:\n%s", file, body)
 		}
 	}
 }

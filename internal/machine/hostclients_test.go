@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// TestHostClientClause pins the clause term by term. That it is static
+// (registering a project never changes app labels) is structural: it takes no
+// registry and is computed once.
 func TestHostClientClause(t *testing.T) {
 	got := HostClientClause()
 	terms := strings.Split(got, " || ")
@@ -24,14 +27,5 @@ func TestHostClientClause(t *testing.T) {
 		if want := "ClientIP(`" + TraefikIP(n) + "/32`)"; term != want {
 			t.Errorf("term %d = %q; want %q", n+1, term, want)
 		}
-	}
-
-	// Static: registering a project never changes app labels.
-	r := newRegistry(t, "a")
-	if _, err := r.AddProject("b", "/ws/b", nil); err != nil {
-		t.Fatal(err)
-	}
-	if again := HostClientClause(); again != got {
-		t.Errorf("HostClientClause changed after registering projects:\n%s\nwant\n%s", again, got)
 	}
 }

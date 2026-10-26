@@ -3,20 +3,34 @@
 This is the run procedure for the Stage 3 acceptance. Run it on a real host,
 not in a sandbox. The reference host is CachyOS/Arch.
 
+## Prerequisites
+
+- podman ≥ 5 with netavark ≥ 1.7.0: every railswitch network is
+  `isolate=strict` (D50), a value netavark added in 1.7.0 (podman ≥ 4.6).
+  Check with `podman info --format '{{.Host.NetworkBackendInfo.Version}}'`.
+
 ## Existing networks after upgrading
 
 Networks railswitch created before Stage 3 keep their old options:
-`isolate=true` (D50) only takes effect when podman creates the network again.
-For every project created before Stage 3:
+`isolate=strict` (D50) only takes effect when podman creates the network
+again. For every project created before Stage 3:
 
-1. `railswitch down` in every worktree of the project;
-2. `podman network rm <prefix>_proxy <prefix>-<slug>-dev …` (every worktree's
-   dev network, by exact name; `railswitch wt ls` lists the slugs);
-3. `railswitch up` in every worktree. The network units create the networks
-   again, now with `isolate=true`.
+1. `railswitch down` in every worktree of the project. This stops each
+   worktree's `<prefix>-<slug>-dev-network.service`.
+2. `podman network disconnect <prefix>_proxy railswitch-traefik`: Traefik
+   stays attached through `down`, and `podman network rm` refuses a network
+   in use (`-f` would remove the Traefik container).
+3. `systemctl --user stop <prefix>-proxy-network.service <prefix>-<slug>-dev-network.service …`
+   (every worktree's dev network service). Quadlet network services are
+   oneshot with `RemainAfterExit=yes`, and `down` leaves the proxy network's
+   running, so without this `up` would never create the network again.
+4. `podman network rm <prefix>_proxy <prefix>-<slug>-dev …` (every worktree's
+   dev network, by exact name; `railswitch wt ls` lists the slugs).
+5. `railswitch up` in every worktree. The network units create the networks
+   again, now with `isolate=strict`.
 
 Check with `podman network inspect <prefix>_proxy --format '{{.Options}}'`:
-it shows `isolate:true`.
+it shows `isolate:strict`.
 
 ## Host source address (confirmation, optional)
 

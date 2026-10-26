@@ -12,7 +12,7 @@
 - Traefik's network attachments;
 - tailnet serves.
 
-Sharing is a new env layer (7) plus `tailscale serve` on each worktree's own HTTPS port. Isolation between projects has two parts: every railswitch network is `isolate=true`, and a Traefik router rule accepts a request only from the project's own subnet or from the host.
+Sharing is a new env layer (7) plus `tailscale serve` on each worktree's own HTTPS port. Isolation between projects has two parts: every railswitch network is `isolate=strict`, and a Traefik router rule accepts a request only from the project's own subnet or from the host.
 
 **Tech Stack:** Go (stdlib + `github.com/BurntSushi/toml`), rootless podman 5+, Quadlet, systemd user units, Traefik v3.7, Dozzle `docker.io/amir20/dozzle:v11.3.5`, the `tailscale` CLI 1.104+.
 
@@ -44,7 +44,7 @@ Every Global Constraint of `docs/superpowers/plans/2026-10-25-railswitch-stages-
   - every Traefik router a project renders matches only clients in that project's subnet or the host clause `machine.HostClientClause()`;
   - the host clause is static and pinned in `internal/machine/hostclients.go` from a measurement on a real host (Task 2);
   - the `logs.localhost` router (Dozzle) and the `traefik.localhost` router (Traefik API, `api@internal`) match only the host clause; Traefik no longer publishes `127.0.0.1:8080` or runs `--api.insecure`;
-  - every railswitch network (proxy, dev, machine) has `Options=isolate=true`, so a container reaches another project only through Traefik.
+  - every railswitch network (proxy, dev, machine) has `Options=isolate=strict` (controller ruling, Task 2 fix round 1; `true` would let non-isolated bridges reach Traefik), so a container reaches another project, or any other bridge network, only through Traefik.
 - **Sharing:**
   - tailnet port = the worktree's loopback host port (app `13000+ID`, storage `19000+ID`);
   - commands are `tailscale serve --bg --https=<port> http://127.0.0.1:<port>` and `tailscale serve --https=<port> off`;
@@ -130,8 +130,8 @@ docs/json.md, docs/stage3-acceptance.md
 **Files:**
 - Create:
   - `internal/machine/hostclients.go` (+ test);
-  - `docs/stage3-acceptance.md` (procedure; this task writes its "Host source address" section, and notes that existing networks keep their old options until recreated: `railswitch down` every worktree, `podman network rm` the project's networks, `up`).
-- Modify: `internal/render/quadlet.go` (+ goldens): router rules; `Options=isolate=true` on every proxy and dev network unit.
+  - `docs/stage3-acceptance.md` (procedure; this task writes its "Host source address" section, and notes that existing networks keep their old options until recreated: `railswitch down` every worktree, `podman network disconnect <prefix>_proxy railswitch-traefik`, `systemctl --user stop` the project's network services, `podman network rm` the project's networks, `up`).
+- Modify: `internal/render/quadlet.go` (+ goldens): router rules; `Options=isolate=strict` on every proxy and dev network unit.
 
 **Interfaces:**
 - Produces:
@@ -146,7 +146,7 @@ docs/json.md, docs/stage3-acceptance.md
   Host(`<h>`) && (ClientIP(`10.214.<n>.0/24`) || <HostClientClause()>)
   ```
   Traefik v3's `ClientIP` takes exactly one argument, so alternatives are joined with `||`.
-- Network option: every railswitch network unit (`<prefix>-proxy.network`, `<prefix>-<slug>-dev.network`, and `railswitch-machine.network` in Task 3) carries `Options=isolate=true` next to `Options=mtu=1400`. On podman 5 / netavark, bridges otherwise forward to each other; podman 6 defaults to `strict`, so railswitch pins it.
+- Network option: every railswitch network unit (`<prefix>-proxy.network`, `<prefix>-<slug>-dev.network`, and `railswitch-machine.network` in Task 3) carries `Options=isolate=strict` next to `Options=mtu=1400`. On podman 5 / netavark 1.x, bridges otherwise forward to each other, and `isolate=true` blocks only traffic between isolated networks, so a non-isolated bridge could still reach Traefik. `strict` (netavark ≥ 1.7.0) blocks traffic to and from every other bridge; podman 6 / netavark 2 defaults to it, and railswitch pins it.
 
 **Steps:**
 - [ ] **Step 1: Measure on the user's host (user action, already requested; the sandbox has no podman).** Write the procedure into `docs/stage3-acceptance.md`. With a project up:
@@ -167,11 +167,11 @@ docs/json.md, docs/stage3-acceptance.md
   | (b) the receiving container's own address on the network (F2: rootlessport's child dials from inside the container's netns) | ``ClientIP(`10.214.0.2/32`) \|\| ClientIP(`10.214.1.2/32`) \|\| … \|\| ClientIP(`10.214.255.2/32`)``, generated for every n in 0..255 | ``Host(`h`) && (ClientIP(`<project subnet>`) \|\| ClientIP(`10.214.<n>.2/32`) for every n in 0..255)`` |
   | (c) anything else | — | stop: the controller decides with the user before coding |
 
-  Both are safe: with `isolate=true`, another project's container can only reach Traefik from its own subnet with host part ≥ 3, which neither clause admits ((a) excludes all of 10.214.0.0/16; (b) admits only `.2`). Record the chosen row and the measurement in D50.
+  Both are safe: with `isolate=strict`, another project's container can only reach Traefik from its own subnet with host part ≥ 3, which neither clause admits ((a) excludes all of 10.214.0.0/16; (b) admits only `.2`). Record the chosen row and the measurement in D50.
 - [ ] **Step 3: Write failing tests.**
   - `TestHostClientClause`: equals the pinned row exactly. For (b): 256 `ClientIP` terms, the first `10.214.0.2/32`, the last `10.214.255.2/32`. Registering a project doesn't change it.
   - `TestRouterClientIP`: every `traefik.http.routers.*.rule` label in the filial goldens equals ``Host(`<h>`) && (ClientIP(`10.214.3.0/24`) || <HostClientClause()>)``.
-  - `TestNetworkIsolate`: every `.network` unit in the filial goldens has `Options=isolate=true`.
+  - `TestNetworkIsolate`: every `.network` unit in the filial goldens has `Options=isolate=strict`.
   - The live cross-project checks (host 200, own container 200, other project refused) are in Task 9's `TestE2ETwoProjects`.
 - [ ] **Step 4:** `go test ./internal/machine/ ./internal/render/`. Expected: FAIL, then implement, then PASS. `RAILSWITCH_QUADLET=$HOME/.local/bin/quadlet go test -tags integration ./internal/render/ -run TestQuadletDryRun` PASS.
 - [ ] **Step 5:** `make check && git commit -m "feat(render): routers accept only the project's subnet and the host; isolated networks"`
@@ -190,7 +190,7 @@ docs/json.md, docs/stage3-acceptance.md
 
 **Interfaces:**
 - Produces:
-  - `machine.ProxyUnits(r)` also returns `railswitch-machine.network` (`NetworkName=railswitch_machine`, Subnet 10.214.255.0/24, Gateway .1, IPRange `10.214.255.128/25`, `Options=mtu=1400`, `Options=isolate=true`) and `railswitch-dozzle.container`;
+  - `machine.ProxyUnits(r)` also returns `railswitch-machine.network` (`NetworkName=railswitch_machine`, Subnet 10.214.255.0/24, Gateway .1, IPRange `10.214.255.128/25`, `Options=mtu=1400`, `Options=isolate=strict`) and `railswitch-dozzle.container`;
   - Traefik gets `Network=railswitch-machine.network:ip=10.214.255.2`;
   - functions:
 
@@ -379,7 +379,7 @@ It works when the workspace directory is gone: names come from the registry and 
 - **machine:** Traefik and Dozzle state from `systemctl show`, and Traefik's attached networks (`Podman.Networks`) against the registry. A missing attachment is flagged `not attached: railswitch up`;
 - **reach:** one row per network with its members, from the models (e.g. `demo-main-dev: rails, deps, db, cache`; `demo_proxy: Traefik, rails, worker`), plus the fixed lines:
   - "Traefik reaches every project network";
-  - "a project's containers reach another project only through Traefik, which refuses them (D50); networks are `isolate=true`, and the Traefik API and Dozzle answer only host clients".
+  - "a project's containers reach another project only through Traefik, which refuses them (D50); networks are `isolate=strict`, and the Traefik API and Dozzle answer only host clients".
 
 - [ ] **Step 1: Write failing tests**
   - `TestMachineTwoProjects`: two fixture projects (filial and the minimal fixture, prefix `mini`). Their IDs, ports, subnets, router names and hosts are pairwise disjoint (the roadmap's Stage 3 unit test).
@@ -441,7 +441,7 @@ Errors print nothing (completion never writes to stderr).
   - `logs.localhost` is 200 from the host and not 200 from A's rails container;
   - `railswitch machine --json` shows disjoint IDs, ports, subnets and hosts;
   - A's rails container gets 404 for `-H "Host: <B host>" http://<A traefik ip>/`;
-  - A's rails container gets a connection failure (curl exit 7 or 28, `--max-time 5`) for B's rails container IP, for B's Traefik IP `10.214.<b>.2` and for Dozzle `10.214.255.3:8080` (`isolate=true`, Task 2);
+  - A's rails container gets a connection failure (curl exit 7 or 28, `--max-time 5`) for B's rails container IP, for B's Traefik IP `10.214.<b>.2` and for Dozzle `10.214.255.3:8080` (`isolate=strict`, Task 2);
   - after `share` on A's base worktree (only when `tailscale status` works; skip that part otherwise), `tailscale serve status --json` holds A's ports and nothing else changed.
 
   Cleanup: `project rm --yes` both, then check that no object of either prefix remains (`podman ps -a`, `podman volume ls`, `podman network ls`, unit files), and that `railswitch-traefik` is still running after the first `project rm`.

@@ -49,9 +49,9 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		return err
 	}
 	if !yes {
-		what := fmt.Sprintf("stops %d worktrees of %s and deletes their containers, volumes, units and networks", len(wts), prefix)
+		what := fmt.Sprintf("stops %d worktrees of %s and deletes their containers, per-worktree volumes, units and networks", len(wts), prefix)
 		if purge {
-			what += ", the shared " + prefix + "_… volumes and " + filepath.Join(pe.Workspace, ".railswitch")
+			what += ", the shared " + prefix + "_… volumes and, if the workspace still loads as " + prefix + ", " + filepath.Join(pe.Workspace, ".railswitch")
 		}
 		if !tty {
 			return fmt.Errorf("project rm %s: pass --yes (no terminal to confirm on)", what)
@@ -100,6 +100,18 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 			if base, ok := strings.CutSuffix(filepath.Base(u.Path), ".container"); ok {
 				if err := sd.StopLoaded(ctx, base+".service"); err != nil {
 					return err
+				}
+			}
+		}
+		// Stopping a Quadlet unit removes its container; then its
+		// per-worktree volumes, exact names from the units.
+		p := podman.Podman{R: r}
+		for _, u := range units {
+			for _, v := range u.VolumeNames {
+				if strings.HasPrefix(v, prefix+"-") {
+					if err := p.RemoveVolume(ctx, v); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -162,6 +174,16 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 	if err := sd.DaemonReload(ctx); err != nil {
 		return err
 	}
+	// A Quadlet network service stays active (RemainAfterExit) with its file
+	// gone, so a re-registered prefix would never recreate the network. Only
+	// after the reload: until then Traefik's unit Requires= the proxy one.
+	for _, u := range units {
+		if base, ok := strings.CutSuffix(filepath.Base(u.Path), ".network"); ok {
+			if err := sd.StopLoaded(ctx, base+"-network.service"); err != nil {
+				return err
+			}
+		}
+	}
 
 	// 8. --purge: the shared volumes and the workspace's generated files.
 	if purge {
@@ -177,7 +199,9 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 			}
 		}
 		gen := filepath.Join(pe.Workspace, ".railswitch")
-		if fi, err := os.Lstat(gen); err == nil && fi.IsDir() {
+		if !loaded {
+			fmt.Fprintf(out, "kept %s: the workspace does not load as project %s\n", gen, prefix)
+		} else if fi, err := os.Lstat(gen); err == nil && fi.IsDir() {
 			if err := os.RemoveAll(gen); err != nil {
 				return err
 			}
@@ -187,10 +211,14 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 	return nil
 }
 
-// unserveBases turns off, for a worktree with ID id of project pe whose
-// workspace doesn't load, each tailnet port base+id (every recorded port
-// base) that is served to its own loopback port, as Share set it up. IDs
-// are unique machine-wide, so such a port is this worktree's.
+// shareBases are the pinned bases of the ports share serves: app and
+// storage.
+var shareBases = []int{13000, 19000}
+
+// unserveBases turns off, for a shared worktree with ID id of project pe
+// whose workspace doesn't load, each share port base+id (a pinned share
+// base pe records) that is served to its own loopback port, as Share set it
+// up. IDs are unique machine-wide, so such a port is this worktree's.
 func unserveBases(ctx context.Context, r sys.Runner, pe machine.ProjectEntry, id int) error {
 	ts := tailscale.T{R: r}
 	served, err := ts.Served(ctx)
@@ -199,7 +227,9 @@ func unserveBases(ctx context.Context, r sys.Runner, pe machine.ProjectEntry, id
 	}
 	var ports []int
 	for _, b := range pe.Ports {
-		ports = append(ports, b+id)
+		if slices.Contains(shareBases, b) && !slices.Contains(ports, b+id) {
+			ports = append(ports, b+id)
+		}
 	}
 	slices.Sort(ports)
 	for _, port := range ports {

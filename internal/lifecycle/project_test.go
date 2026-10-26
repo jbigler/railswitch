@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -108,6 +109,7 @@ func unitNames(t *testing.T, dir, prefix string) []string {
 // api2 object.
 func TestProjectRemoveExactNames(t *testing.T) {
 	dirs, _, f := projects(t, "api", "api2")
+	traefikRunning(f, "api_proxy api2_proxy railswitch_machine ")
 	before := unitNames(t, dirs.Quadlet, "api2")
 	if len(before) == 0 || len(unitNames(t, dirs.Quadlet, "api")) == 0 {
 		t.Fatal("fixture rendered no units")
@@ -124,10 +126,14 @@ func TestProjectRemoveExactNames(t *testing.T) {
 			continue
 		}
 		j := joined(c)
-		if !(strings.HasPrefix(j, "podman container inspect ") && c[len(c)-1] == traefikContainer) && j != "systemctl --user daemon-reload" {
+		if !(strings.HasPrefix(j, "podman container inspect ") && c[len(c)-1] == traefikContainer) && j != "systemctl --user daemon-reload" && j != "podman network ls --format json" {
 			t.Errorf("unexpected call: %q", c)
 		}
 	}
+	if n := count(nonGit(f), "podman network disconnect"); n != 1 {
+		t.Errorf("%d disconnects:\n%s", n, dump(nonGit(f)))
+	}
+	find(t, nonGit(f), "podman network disconnect api_proxy railswitch-traefik")
 	if after := unitNames(t, dirs.Quadlet, "api2"); !slices.Equal(after, before) {
 		t.Errorf("api2 units %v, want %v", after, before)
 	}
@@ -162,8 +168,13 @@ func TestProjectRemoveOrder(t *testing.T) {
 		"podman network disconnect api_proxy railswitch-traefik",
 		"podman network rm api-master-dev",
 		"podman network rm api_proxy",
-		"systemctl --user daemon-reload")
+		"systemctl --user daemon-reload",
+		"systemctl --user stop api-proxy-network.service")
+	wantInOrder(t, calls, "systemctl --user daemon-reload", "systemctl --user stop api-master-dev-network.service")
 	for _, c := range calls {
+		if j := joined(c); strings.Contains(j, "railswitch-traefik.service") || strings.HasPrefix(j, "systemctl --user restart") {
+			t.Errorf("touches Traefik's unit: %q", c)
+		}
 		if j := joined(c); strings.HasPrefix(j, "podman network rm") && slices.Contains(c, "-f") {
 			t.Errorf("forced network removal: %q", c)
 		}
@@ -201,15 +212,26 @@ func TestProjectRemoveMissingWorkspace(t *testing.T) {
 	if err := os.RemoveAll(wss["api"]); err != nil {
 		t.Fatal(err)
 	}
-	if err := ProjectRemove(ctx, f, dirs, &bytes.Buffer{}, strings.NewReader(""), false, "api", true, false); err != nil {
+	shared(t, dirs, "api")
+	// ID 1's share ports, and its db port served to itself by hand.
+	serving(f, 13001, 19001, 55433)
+	if err := ProjectRemove(ctx, f, dirs, &bytes.Buffer{}, strings.NewReader(""), false, "api", true, true); err != nil {
 		t.Fatal(err)
 	}
 	calls := nonGit(f)
 	wantInOrder(t, calls,
+		"tailscale serve --https=13001 off",
+		"tailscale serve --https=19001 off",
 		"systemctl --user stop api-master-rails.service",
+		"podman volume rm -f api-master-node-modules",
 		"podman network rm api-master-dev",
 		"podman network rm api_proxy",
-		"systemctl --user daemon-reload")
+		"systemctl --user daemon-reload",
+		"systemctl --user stop api-master-dev-network.service",
+		"systemctl --user stop api-proxy-network.service")
+	if n := count(calls, "tailscale serve --https="); n != 2 {
+		t.Errorf("%d serve offs; only the share ports:\n%s", n, dump(calls))
+	}
 	for _, c := range calls {
 		if strings.Contains(joined(c), "api2") {
 			t.Errorf("names api2: %q", c)
@@ -253,5 +275,72 @@ func TestProjectRemovePurgeKeepsRepo(t *testing.T) {
 		if slices.ContainsFunc(c, func(a string) bool { return strings.HasPrefix(a, "--filter") }) || (c[0] == "git" && slices.Contains(c, "worktree")) {
 			t.Errorf("filters or removes a worktree: %q", c)
 		}
+	}
+}
+
+// shared records worktree master of prefix as shared.
+func shared(t *testing.T, dirs machine.Dirs, prefix string) {
+	t.Helper()
+	reg, err := machine.Open(dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reg.Close()
+	if err := reg.SetShare(prefix, "master", &machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// serving scripts tailscale serving each port to its own loopback port.
+func serving(f *systest.Fake, ports ...int) {
+	var tcp, web []string
+	for _, p := range ports {
+		ps := strconv.Itoa(p)
+		tcp = append(tcp, `"`+ps+`": {"HTTPS": true}`)
+		web = append(web, `"box.tail1234.ts.net:`+ps+`": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:`+ps+`"}}}`)
+	}
+	f.On([]string{"tailscale", "serve", "status", "--json"}, sys.Result{Stdout: []byte(`{"TCP": {` + strings.Join(tcp, ",") + `}, "Web": {` + strings.Join(web, ",") + `}}`)}, nil)
+}
+
+// TestProjectRemoveSharedLoaded: a shared worktree's own share ports are
+// turned off (DropShare) before it is stopped; a port it doesn't share stays.
+func TestProjectRemoveSharedLoaded(t *testing.T) {
+	dirs, _, f := projects(t, "api")
+	shared(t, dirs, "api")
+	serving(f, 13001, 19001, 55433)
+	if err := ProjectRemove(ctx, f, dirs, &bytes.Buffer{}, strings.NewReader(""), false, "api", true, false); err != nil {
+		t.Fatal(err)
+	}
+	calls := nonGit(f)
+	wantInOrder(t, calls, "tailscale serve --https=13001 off", "tailscale serve --https=19001 off", "systemctl --user stop api-master-rails.service")
+	if n := count(calls, "tailscale serve --https="); n != 2 {
+		t.Errorf("%d serve offs:\n%s", n, dump(calls))
+	}
+}
+
+// TestProjectRemovePurgeOtherPrefix: a workspace that now loads as another
+// prefix keeps its .railswitch/.
+func TestProjectRemovePurgeOtherPrefix(t *testing.T) {
+	dirs, wss, f := projects(t, "api")
+	toml := filepath.Join(wss["api"], "project.toml")
+	data, err := os.ReadFile(toml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(toml, bytes.Replace(data, []byte(`prefix      = "api"`), []byte(`prefix      = "api3"`), 1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	if err := ProjectRemove(ctx, f, dirs, out, strings.NewReader(""), false, "api", true, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(wss["api"], ".railswitch")); err != nil {
+		t.Errorf(".railswitch removed: %v", err)
+	}
+	if !strings.Contains(out.String(), "kept ") {
+		t.Errorf("output %q", out.String())
 	}
 }

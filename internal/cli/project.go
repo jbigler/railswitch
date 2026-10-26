@@ -27,9 +27,11 @@ func cmdProject(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	tty := false
-	if f, ok := e.stdin.(*os.File); ok && isTerminal(f) {
-		tty = true
+	tty := false // both ends a terminal, as lifecycle: no prompt into a pipe
+	if in, ok := e.stdin.(*os.File); ok && isTerminal(in) {
+		if out, ok := e.stdout.(*os.File); ok && isTerminal(out) {
+			tty = true
+		}
 	}
 	if err := lifecycle.ProjectRemove(ctx, e.run, dirs, e.stdout, e.stdin, tty, prefix, *yes, *purge); err != nil {
 		return e.fail(err)

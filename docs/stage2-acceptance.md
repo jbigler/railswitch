@@ -154,7 +154,7 @@ Expected: `PASS`.
 
 ### 2026-10-26, run on the user's host (CachyOS)
 
-Steps 1–8 run by hand: the base worktree (`demo`, `main`), then `feat-x` added, brought up, taken down and removed. Step 9 (the automated e2e test) is not yet run.
+Steps 1–8 run by hand: the base worktree (`demo`, `main`), then `feat-x` added, brought up, taken down and removed. Step 9 passed on a later run (below).
 
 Problems found and fixed on the way:
 
@@ -167,3 +167,7 @@ After these fixes, the user reported that steps 1–8 passed: `main` and `feat-x
 ### 2026-10-26, automated e2e run (prefix `e2e1`)
 
 `RAILSWITCH_E2E_PREFIX=e2e1` failed at step 4: `curl http://main.e2e1.localhost/` returned 404 right after `up` returned. The 404 came from Traefik with no router for the host: its docker provider adds a container's routers only after the container is healthy and the podman event reaches it, and this run also restarted Traefik for the new project's proxy network. Fixed by `up` waiting for the route: it polls Traefik's API for the app's router and prints `<url> ready` once it exists. Step 4 stays strict (no retry).
+
+### 2026-10-26, automated e2e run after the fix
+
+After `0257c48`, the e2e test (`go test -tags integration ./internal/lifecycle/ -run E2E -timeout 45m`, new prefix) passed in 92.7 s on the user's host. Stage 2 acceptance is complete.

@@ -127,7 +127,8 @@ Filial is an ordinary project. It is created with `railswitch new` from its repo
 
 - Must settle first, as pack-contract fields every pack can set:
   - the dev server's bind address. Phoenix's generated `config/dev.exs` binds `127.0.0.1` (from the generator's defaults; verify), so the pack needs a way to tell the app to bind `0.0.0.0`, e.g. an env the app reads;
-  - HMR/websocket ports and their routing;
+  - HMR/websocket ports and their routing, including a project-level route that needs no new pack: `project.toml` adds a route to a service's port (e.g. `vite.<slug>.<prefix>.localhost` → the app's 3036 for `vite_rails` hot reload; asset requests already go through Rails);
+  - JavaScript package managers in the rails pack's deps install, chosen by lockfile: `package-lock.json` → `npm ci`, `bun.lock`/`bun.lockb` → `bun install --frozen-lockfile`, `yarn.lock` → `yarn install --immutable`, `pnpm-lock.yaml` → `pnpm install --frozen-lockfile` (yarn and pnpm through corepack). A missing tool fails naming the fix. Bun comes from a built-in ejectable `bun` addon whose version chain reads `.bun-version` and `package.json` `packageManager`. Today a bun, yarn or pnpm app fails in deps ("no package-lock.json"); `rails new -j bun` hits it;
   - which browser protocol each pack's test driver uses;
   - how a pack documents app-side changes it needs. For Phoenix's generated dev Repo config: drop the hard-coded `hostname`/`username`/`password` so that Postgrex falls back to the `PG*` env the postgres option gives (D29).
 - Build:
@@ -154,7 +155,8 @@ Filial is an ordinary project. It is created with `railswitch new` from its repo
   2. Settings (staged slot changes with data-impact labels; Secrets: one row per declared secret with its services and delivery, set/unset and its date, never the value, plus "Add a secret". Value fields run `railswitch secret add|set` with the value on stdin, so it never reaches argv or a job log);
   3. New project (repo detection: `Gemfile: pg` etc.). The boards' "Adopt this workspace" banner, the "Adopt a workspace…" switcher entry, and the short-name settings on the Machine and Settings boards are dropped;
   4. Library, including a "New pack" form: the `pack.toml` fields (server, port, install, runtimes and version files, env, caches, registries, health) plus pasted Containerfiles. It runs `railswitch pack new`, then writes the files;
-  5. Install review.
+  5. Images (advanced; the Images board): the build chain from `containerfile list --json`, versions and pins, and the project's own Containerfiles. Each one opens in an editor on the file the project actually builds (`containerfiles/Containerfile.<name>`), with a diff against the built-in default it was ejected from and "Reset to default" (`containerfile eject <name> --force`). Saving requires the "I've read this file" acknowledgement (every `RUN` line runs on this machine during the build, outside the firewall). New files come from paste, upload or a template. The UI only calls the CLI, so this needs `railswitch containerfile write <name>`: content on stdin, the D31/D36 contract checks before anything is written, an atomic write, then the new image tags reported. The board's "Add an option" dialog maps to `containerfile new` plus `project.toml` edits;
+  6. Install review.
 - Test (secret form, with the command runner faked):
   - a POST without the dashboard token or with a foreign Origin is answered 403, and no command runs;
   - a valid POST runs `railswitch secret set <name>` (or `add` with its flags), and the value is exactly the child's stdin;

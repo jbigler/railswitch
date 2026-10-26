@@ -16,14 +16,14 @@ import (
 const tcpListen = "0A"
 
 // Listening returns the TCP ports in the LISTEN state in <procRoot>/net/tcp
-// and <procRoot>/net/tcp6, on any local address. A missing file (no IPv6)
-// lists none.
+// and <procRoot>/net/tcp6, on any local address. A missing tcp6 (IPv6
+// disabled) lists none; a missing tcp is an error.
 func Listening(procRoot string) (map[int]bool, error) {
 	ports := map[int]bool{}
 	for _, name := range []string{"tcp", "tcp6"} {
 		path := filepath.Join(procRoot, "net", name)
 		data, err := os.ReadFile(path)
-		if errors.Is(err, fs.ErrNotExist) {
+		if name == "tcp6" && errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {

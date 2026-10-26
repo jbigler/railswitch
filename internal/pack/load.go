@@ -30,7 +30,7 @@ func LoadBuiltins() (*Catalog, error) { return Load(builtin.FS) }
 // Every problem found is returned at once (errors.Join), each naming its file.
 func Load(fsys fs.FS) (*Catalog, error) {
 	c := &Catalog{Packs: map[Ref]*Pack{}, Options: map[Ref]*Option{}, Tools: map[string]*Tool{}}
-	l := &loader{fsys: fsys, bases: map[int]string{}}
+	l := &loader{fsys: fsys, bases: map[int]string{}, names: map[string]string{}}
 
 	for _, dir := range l.dirs("packs") {
 		var p Pack
@@ -76,7 +76,8 @@ var envNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 type loader struct {
 	fsys  fs.FS
 	errs  []error
-	bases map[int]string // port base → "<kind> <name>" that declares it
+	bases map[int]string    // port base → "<kind> <name>" that declares it
+	names map[string]string // port name → "<kind> <name>" that declares it
 }
 
 func (l *loader) add(file, format string, args ...any) {
@@ -201,6 +202,13 @@ func (l *loader) ports(file, owner string, ports []Port) {
 			l.add(file, "%s.base %d is already used by %s", f, p.Base, prev)
 		} else {
 			l.bases[p.Base] = owner
+		}
+		// The registry records bases by port name, so a name belongs to one
+		// package name too.
+		if prev, ok := l.names[p.Name]; ok && prev != owner {
+			l.add(file, "%s.name %q is already used by %s", f, p.Name, prev)
+		} else {
+			l.names[p.Name] = owner
 		}
 	}
 }

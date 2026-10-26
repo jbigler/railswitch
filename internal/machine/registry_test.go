@@ -218,10 +218,8 @@ func TestSetPortsConflict(t *testing.T) {
 	if err == nil {
 		t.Fatal("SetPorts(b, x=13050) succeeded within 99 of a's 13000")
 	}
-	for _, s := range []string{"a", "b", "13000", "13050"} {
-		if !strings.Contains(err.Error(), s) {
-			t.Errorf("error %q does not name %s", err, s)
-		}
+	if want := "project b: port x base 13050 is less than 100 from project a's port app base 13000, so their base+ID ranges overlap"; err.Error() != want {
+		t.Errorf("error = %q; want %q", err, want)
 	}
 	if pe, _ := r.Project("b"); pe.Ports != nil {
 		t.Errorf("b ports = %v after a refused SetPorts", pe.Ports)
@@ -240,10 +238,8 @@ func TestSetPortsOwnSpacing(t *testing.T) {
 	if err == nil {
 		t.Fatal("SetPorts with two own bases 50 apart succeeded")
 	}
-	for _, s := range []string{"a", "app", "x", "13000", "13050"} {
-		if !strings.Contains(err.Error(), s) {
-			t.Errorf("error %q does not name %s", err, s)
-		}
+	if want := "project a: port app base 13000 and port x base 13050 are less than 100 apart, so their base+ID ranges overlap"; err.Error() != want {
+		t.Errorf("error = %q; want %q", err, want)
 	}
 }
 

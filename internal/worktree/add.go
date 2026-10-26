@@ -49,6 +49,11 @@ type Manager struct {
 	// Names are a registered worktree's exact object names
 	// (render.Model.NamesFor).
 	Names func(slug string) (render.Names, error)
+	// Ports are the project's port bases (render.Model.PortBases), built
+	// from reg, the registry register holds locked: register records them
+	// before choosing an ID, so the ID's ports are checked even when no
+	// render recorded them yet.
+	Ports func(reg *machine.Registry) (map[string]int, error)
 	// WorktreeVolumes are the mounts of the pack's [[worktree_volumes]]
 	// relative to /app, e.g. "node_modules".
 	WorktreeVolumes []string
@@ -373,8 +378,8 @@ func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) 
 	return !local, nil
 }
 
-// register adds slug to the registry on an ID none of whose ports another
-// program listens on.
+// register records the project's port bases and adds slug to the registry
+// on an ID none of whose ports another program listens on.
 func (m *Manager) register(slug string) (machine.WorktreeEntry, error) {
 	busy, err := machine.Listening(m.Proc)
 	if err != nil {
@@ -385,6 +390,13 @@ func (m *Manager) register(slug string) (machine.WorktreeEntry, error) {
 		return machine.WorktreeEntry{}, err
 	}
 	defer reg.Close()
+	ports, err := m.Ports(reg.Registry)
+	if err != nil {
+		return machine.WorktreeEntry{}, err
+	}
+	if err := reg.SetPorts(m.Pfx, ports); err != nil {
+		return machine.WorktreeEntry{}, err
+	}
 	e, err := reg.AddWorktree(m.Pfx, slug, busy)
 	if err != nil {
 		return machine.WorktreeEntry{}, err

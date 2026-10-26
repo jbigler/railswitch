@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"text/tabwriter"
 
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
 	"github.com/jbigler/railswitch/internal/worktree"
@@ -64,6 +65,14 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 				return render.Names{}, err
 			}
 			return m.NamesFor(slug)
+		},
+		Ports: func(reg *machine.Registry) (map[string]int, error) {
+			// The bases only: the host values change no port.
+			m, err := w.Model(reg, render.Host{})
+			if err != nil {
+				return nil, err
+			}
+			return m.PortBases(), nil
 		},
 		WorktreeVolumes: worktree.VolumeDirs(w.Stack.Pack),
 	}, nil

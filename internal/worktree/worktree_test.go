@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -84,6 +85,8 @@ func setup(t *testing.T) *tenv {
 	}
 	reg.Close()
 
+	proc := t.TempDir() // no listening ports
+	writeFile(t, filepath.Join(proc, "net", "tcp"), "  sl  local_address rem_address   st\n")
 	e := &tenv{f: &systest.Fake{Passthrough: []string{"git"}}, out: &bytes.Buffer{}, ws: ws, base: base}
 	e.m = &Manager{
 		R:    e.f,
@@ -91,7 +94,7 @@ func setup(t *testing.T) *tenv {
 		Pfx:  prefix,
 		Data: data,
 		Base: "master",
-		Proc: t.TempDir(), // no listening ports
+		Proc: proc,
 		In:   strings.NewReader(""),
 		Out:  e.out,
 		// Like workspace.Render: an env dir for every registered worktree.
@@ -104,6 +107,7 @@ func setup(t *testing.T) *tenv {
 			}
 			return nil
 		},
+		Ports: func(*machine.Registry) (map[string]int, error) { return map[string]int{"app": 13000}, nil },
 		Names: fakeNames,
 	}
 	return e
@@ -132,6 +136,17 @@ func (e *tenv) registered(t *testing.T) []machine.WorktreeEntry {
 	}
 	defer reg.Close()
 	return reg.WorktreesOf(prefix)
+}
+
+func (e *tenv) project(t *testing.T) machine.ProjectEntry {
+	t.Helper()
+	reg, err := machine.Open(e.m.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reg.Close()
+	pe, _ := reg.Project(prefix)
+	return pe
 }
 
 func (e *tenv) slugs(t *testing.T) []string {
@@ -190,24 +205,47 @@ func TestAddAllocatesAfterGit(t *testing.T) {
 }
 
 // TestAddSkipsListeningPort: an ID whose port another program listens on
-// (here 127.0.0.1:13002) is never handed out.
+// (here 127.0.0.1:13002) is never handed out, even when no render recorded
+// the project's bases yet (a registry from before they were recorded): Add
+// records them first.
 func TestAddSkipsListeningPort(t *testing.T) {
+	e := setup(t)
+	if pe := e.project(t); pe.Ports != nil {
+		t.Fatalf("setup recorded ports %v", pe.Ports)
+	}
+	writeFile(t, filepath.Join(e.m.Proc, "net", "tcp"),
+		"  sl  local_address rem_address   st\n   0: 0100007F:32CA 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 4242 1\n")
+	if w := e.add(t, "feat", ""); w.ID != 3 {
+		t.Errorf("ID = %d; want 3 (13002 is in use)", w.ID)
+	}
+	if pe := e.project(t); !maps.Equal(pe.Ports, map[string]int{"app": 13000}) {
+		t.Errorf("registered ports = %v; want app 13000", pe.Ports)
+	}
+}
+
+// TestAddPortsConflict: bases too close to another project's refuse the
+// worktree.
+func TestAddPortsConflict(t *testing.T) {
 	e := setup(t)
 	reg, err := machine.Open(e.m.Data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := reg.SetPorts(prefix, map[string]int{"app": 13000}); err != nil {
+	if _, err := reg.AddProject("other", "/ws/other", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.SetPorts("other", map[string]int{"web": 13050}); err != nil {
 		t.Fatal(err)
 	}
 	if err := reg.Save(); err != nil {
 		t.Fatal(err)
 	}
 	reg.Close()
-	writeFile(t, filepath.Join(e.m.Proc, "net", "tcp"),
-		"  sl  local_address rem_address   st\n   0: 0100007F:32CA 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 4242 1\n")
-	if w := e.add(t, "feat", ""); w.ID != 3 {
-		t.Errorf("ID = %d; want 3 (13002 is in use)", w.ID)
+	if _, err := e.m.Add(context.Background(), "feat", ""); err == nil || !strings.Contains(err.Error(), "project other's port web base 13050") {
+		t.Errorf("Add = %v; want a port base conflict with other", err)
+	}
+	if slices.Contains(e.slugs(t), "feat") {
+		t.Error("feat registered despite the conflict")
 	}
 }
 

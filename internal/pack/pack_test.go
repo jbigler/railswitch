@@ -231,6 +231,28 @@ container = 5432
 	}
 }
 
+// TestPortNamesUnique: two packages declaring one port name (with
+// different bases) make Load fail: the registry keys bases by name.
+func TestPortNamesUnique(t *testing.T) {
+	fsys := minimal()
+	fsys["options/q/option.toml"] = &fstest.MapFile{Data: []byte(`name = "q"
+version = 1
+slot = "database"
+service = "db"
+[image]
+pull = "docker.io/library/postgres:16"
+[[ports]]
+name = "o"
+env = "Q_PORT"
+base = 56432
+container = 5432
+`)}
+	_, err := Load(fsys)
+	if err == nil || !strings.Contains(err.Error(), `name "o" is already used by option o`) {
+		t.Errorf("Load with a duplicate port name: %v", err)
+	}
+}
+
 func TestRailsPackGeneric(t *testing.T) {
 	p := builtins(t).Packs[Ref{"rails", 1}]
 	// RUBY_DEBUG_HOST: the debug gem (in Rails' default Gemfile) listens on the published debug port.

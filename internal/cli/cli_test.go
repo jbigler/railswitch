@@ -10,11 +10,14 @@ import (
 	"testing"
 )
 
-// TestMain points procRoot at an empty dir: no test sees the host's
-// listening ports unless it sets some with listening.
+// TestMain points procRoot at a dir whose net/tcp lists no socket: no test
+// sees the host's listening ports unless it sets some with listening.
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "railswitch-proc")
 	if err != nil {
+		panic(err)
+	}
+	if err := writeProcTCP(dir); err != nil {
 		panic(err)
 	}
 	procRoot = dir
@@ -23,19 +26,25 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// listening makes ports listening TCP sockets (127.0.0.1) for this test.
-func listening(t *testing.T, ports ...int) {
-	t.Helper()
-	dir := t.TempDir()
+// writeProcTCP writes <dir>/net/tcp with ports as listening TCP sockets on
+// 127.0.0.1.
+func writeProcTCP(dir string, ports ...int) error {
 	var b strings.Builder
 	b.WriteString("  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n")
 	for i, p := range ports {
 		fmt.Fprintf(&b, "%4d: 0100007F:%04X 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 %d 1\n", i, p, 40000+i)
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "net"), 0o755); err != nil {
-		t.Fatal(err)
+		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "net", "tcp"), []byte(b.String()), 0o644); err != nil {
+	return os.WriteFile(filepath.Join(dir, "net", "tcp"), []byte(b.String()), 0o644)
+}
+
+// listening makes ports listening TCP sockets (127.0.0.1) for this test.
+func listening(t *testing.T, ports ...int) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := writeProcTCP(dir, ports...); err != nil {
 		t.Fatal(err)
 	}
 	old := procRoot

@@ -9,6 +9,22 @@ not in a sandbox. The reference host is CachyOS/Arch.
   `isolate=strict` (D50), a value netavark added in 1.7.0 (podman ≥ 4.6).
   Check with `podman info --format '{{.Host.NetworkBackendInfo.Version}}'`.
 
+## From a clean machine
+
+For a host where no railswitch project exists (nothing in `railswitch machine`,
+no `~/.config/containers/systemd/*.container` with a railswitch marker), skip
+"Upgrading from Stage 2" and do this:
+
+1. Build and install from the `stage-3` branch:
+   `git switch stage-3 && git pull && make build && install -m755 railswitch ~/.local/bin/`.
+2. `systemctl --user enable --now podman.socket` (Traefik and Dozzle read it).
+3. `railswitch doctor`: every host check OK. If `unprivileged port 80`
+   fails, run `railswitch allow-ports`, then `doctor` again. `machine subnet
+   free` must pass (no other podman network on 10.214.255.0/24).
+4. A fresh app at `/tmp/rs-demo/demo`, as in docs/stage2-acceptance.md
+   Step 1 (no host Ruby needed).
+5. Run "Two projects at once" below.
+
 ## Upgrading from Stage 2
 
 The first `railswitch up` after upgrading changes these, on its own:

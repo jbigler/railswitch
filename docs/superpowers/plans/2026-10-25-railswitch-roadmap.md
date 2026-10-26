@@ -92,7 +92,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 1 Engine and lint | detailed | The Filial fixture renders units that behave like `.container-config/quadlet/*`. **The user reviews `docs/stage1-equivalence.md`** |
 | 2 Lifecycle CLI | detailed | A fresh Rails project runs end to end on one machine: `railswitch project new` → `up` → app at `http://master.<prefix>.localhost` → `wt add` → `down` → `wt rm` |
 | 3 Machine layer | detailed (`2026-10-26-railswitch-stage-3.md`) | Two projects run at once without collisions |
-| 4 Run the Filial stack | later | The Filial repo runs end to end from a fresh `new`, using only generic features and its own settings. **v1 acceptance** |
+| 4 Run the Filial stack | detailed (`2026-10-26-railswitch-stage-4.md`) | The Filial repo runs end to end from a fresh `new`, using only generic features and its own settings. **v1 acceptance** |
 | 5 Local packs | later | A Phoenix app runs end to end from a pack the user wrote (`local:phoenix@1`), with no framework knowledge added to core |
 | 6 UI | later | Dashboard (switcher, palette, links), Settings, New project, Library, Install review; the UI only calls the CLI |
 | 7 Library and trust | later | Library repos, signing and signers, update review |

@@ -414,7 +414,10 @@ func remoteHead(ctx context.Context, r sys.Runner, repo string) (string, error) 
 			return b, nil
 		}
 	}
-	return "", fmt.Errorf("%s has no HEAD branch: pass --branch <base>", repo)
+	if strings.TrimSpace(string(res.Stdout)) == "" {
+		return "", fmt.Errorf("%s has no commits yet: commit there first, or pass --branch <base>", repo)
+	}
+	return "", fmt.Errorf("%s has a detached HEAD, so it names no branch: pass --branch <base>", repo)
 }
 
 // clone checks branch base of repo out into dir.

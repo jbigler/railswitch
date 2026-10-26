@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -274,6 +275,33 @@ func TestNewPlaywright(t *testing.T) {
 	}
 	if p.Image.Base != "containerfiles/Containerfile.base" || !slices.Equal(p.Image.Addons, []string{"containerfiles/Containerfile.pg-client"}) {
 		t.Errorf("[image] = %+v; the standalone playwright build must not join the chain", p.Image)
+	}
+}
+
+// A repo with no commits and one with a detached HEAD name no branch; the
+// error says which, so the fix is clear.
+func TestRemoteHeadNoBranch(t *testing.T) {
+	git := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	unborn := t.TempDir()
+	git(unborn, "init", "-q", "-b", "main")
+	detached := t.TempDir()
+	git(detached, "init", "-q", "-b", "main")
+	git(detached, "commit", "-q", "--allow-empty", "-m", "x")
+	git(detached, "checkout", "-q", "--detach")
+	for _, tc := range []struct{ repo, want string }{
+		{unborn, "has no commits yet"},
+		{detached, "has a detached HEAD"},
+	} {
+		_, err := remoteHead(context.Background(), sys.Exec{}, tc.repo)
+		if err == nil || !strings.Contains(err.Error(), tc.want) || !strings.Contains(err.Error(), "--branch") {
+			t.Errorf("%s: err = %v, want %q and --branch", tc.repo, err, tc.want)
+		}
 	}
 }
 

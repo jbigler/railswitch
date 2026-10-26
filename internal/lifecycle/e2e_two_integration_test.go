@@ -116,7 +116,9 @@ func TestE2ETwoProjects(t *testing.T) {
 	for _, p := range projects {
 		p.ws = filepath.Join(parent, "rs-"+p.prefix)
 		t.Logf("workspace %s", p.ws)
-		rs(t, 5*time.Minute, "project", "new", p.ws, "--repo", repo, "--prefix", p.prefix)
+		// Storage is "none" by default in the rails pack; the s3. checks
+		// (D49) need the rustfs option.
+		rs(t, 5*time.Minute, "project", "new", p.ws, "--repo", repo, "--prefix", p.prefix, "--option", "storage=rustfs@1")
 		t.Cleanup(func() {
 			if p.removed {
 				return

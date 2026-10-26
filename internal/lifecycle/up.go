@@ -37,6 +37,12 @@ type L struct {
 	Out, Err io.Writer
 	In       io.Reader
 	TTY      bool
+
+	// TraefikAPI is the base URL of Traefik's API ("": the shared
+	// proxy's); RoutePoll and RouteTimeout pace up's wait for the app's
+	// route (zero: 500ms, 30s).
+	TraefikAPI              string
+	RoutePoll, RouteTimeout time.Duration
 }
 
 func (l *L) podman() podman.Podman   { return podman.Podman{R: l.R} }
@@ -95,8 +101,9 @@ func (c *changes) add(d *render.Diff) {
 }
 
 // Up renders, checks, pulls, builds and seeds what worktree slug needs, then
-// starts its app unit. It stops at the first error; nothing is started
-// after a failure, and running it again resumes.
+// starts its app unit and waits for Traefik to route the app. It stops at
+// the first error; nothing is started after a failure, and running it
+// again resumes.
 func (l *L) Up(ctx context.Context, slug string) error {
 	if err := l.checkProxySubnet(ctx); err != nil {
 		return err
@@ -215,7 +222,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		proxyNet := strings.TrimSuffix(naming.ProxyNetworkUnit(m.Prefix), ".network") + "-network.service"
 		return l.startFailure(ctx, sd, slug, append(slices.Clone(names.Units), proxyNet, traefikService), err)
 	}
-	return nil
+	return l.waitRoute(ctx, m, in, slug)
 }
 
 // startFailure turns a failed `systemctl start` into an error naming the

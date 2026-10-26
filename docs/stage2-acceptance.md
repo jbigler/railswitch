@@ -48,7 +48,17 @@ railswitch new ~/workspace/rs-demo --repo /tmp/rs-demo/demo --prefix demo
 cd ~/workspace/rs-demo/main && railswitch up
 ```
 
-Expected: both exit 0. `up` waits for the app's `/up` health check (D34).
+Expected: both exit 0. `up` waits for the app's `/up` health check (D34),
+then for Traefik to report the app's router (`demo-main-app@docker` on its
+API, `127.0.0.1:8080`), and ends with:
+
+```
+http://main.demo.localhost/ ready
+```
+
+If Traefik has no route after 30 s, `up` still exits 0 but warns, listing
+Traefik's `demo-` routers; if Traefik's API doesn't answer, the warning
+points at `systemctl --user status railswitch-traefik.service`.
 
 ### 4. The app answers
 
@@ -153,3 +163,7 @@ Problems found and fixed on the way:
 3. The old Traefik must be stopped first; it holds `127.0.0.1:80` (Prerequisites). The old tool's host dashboard (`<prefix>-dashboard.service`, `wt.localhost:7700`) keeps running until disabled; it doesn't conflict with railswitch.
 
 After these fixes, the user reported that steps 1–8 passed: `main` and `feat-x` both served, and `feat-x` teardown left `demo-main-*` running. The command outputs were not recorded here.
+
+### 2026-10-26, automated e2e run (prefix `e2e1`)
+
+`RAILSWITCH_E2E_PREFIX=e2e1` failed at step 4: `curl http://main.e2e1.localhost/` returned 404 right after `up` returned. The 404 came from Traefik with no router for the host: its docker provider adds a container's routers only after the container is healthy and the podman event reaches it, and this run also restarted Traefik for the new project's proxy network. Fixed by `up` waiting for the route: it polls Traefik's API for the app's router and prints `<url> ready` once it exists. Step 4 stays strict (no retry).

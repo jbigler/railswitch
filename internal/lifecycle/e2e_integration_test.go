@@ -97,11 +97,15 @@ func TestE2E(t *testing.T) {
 	}
 	base := wts[0]
 	t.Cleanup(func() { cleanup(t, "-C", ws, "-w", base.Slug, "down", "--yes") })
-	rs(t, 10*time.Minute, "-C", ws, "-w", base.Slug, "up")
+	url := "http://" + base.Slug + "." + prefix + ".localhost/"
+	if out := rs(t, 10*time.Minute, "-C", ws, "-w", base.Slug, "up"); lastLine(out) != url+" ready" {
+		t.Fatalf("step 3: up did not report the route ready; output:\n%s", out)
+	}
 
-	// Step 4: the app answers through Traefik.
-	if code := httpStatus(ctx, t, "http://"+base.Slug+"."+prefix+".localhost/"); code != "200" {
-		t.Fatalf("step 4: GET %s.%s.localhost: status %s, want 200", base.Slug, prefix, code)
+	// Step 4: the app answers through Traefik. No retry: up returns ready
+	// only once Traefik routes the host.
+	if code := httpStatus(ctx, t, url); code != "200" {
+		t.Fatalf("step 4: GET %s: status %s, want 200", url, code)
 	}
 
 	// Step 5: the app reaches its database.

@@ -100,7 +100,12 @@ func setup(t *testing.T, slugs ...string) *tenv {
 	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte("/g\n")}, nil)
 	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
 	out := &bytes.Buffer{}
-	return &tenv{ws: ws, f: f, out: out, l: &L{R: f, WS: w, Out: out, Err: &bytes.Buffer{}, In: strings.NewReader("")}}
+	var routers []string
+	for _, s := range slugs {
+		routers = append(routers, "filial-"+s+"-app@docker")
+	}
+	_, api := newFakeTraefik(t, routers...)
+	return &tenv{ws: ws, f: f, out: out, l: &L{R: f, WS: w, Out: out, Err: &bytes.Buffer{}, In: strings.NewReader(""), TraefikAPI: api}}
 }
 
 func (e *tenv) render(t *testing.T) {

@@ -207,9 +207,15 @@ func TestE2ETwoProjects(t *testing.T) {
 			t.Errorf("%s GET %s via %s: status %q (curl exit %d), want 200", p.rails, p.host, p.traefikIP, code, exit)
 		}
 		// D49: its rails container reaches its own s3. host by name, through
-		// Traefik (the AddHost of the s3. host), as the app's presigned URLs do.
-		if code, exit := ctrStatus(ctx, t, p.rails, "", "http://"+p.s3Host+"/"); code == "000" || code == "404" {
-			t.Errorf("%s GET http://%s/: status %q (curl exit %d), want an answer from storage", p.rails, p.s3Host, code, exit)
+		// Traefik (the AddHost of the s3. host), as the app's presigned URLs
+		// do. Not with curl: curl resolves every *.localhost name to
+		// 127.0.0.1 itself and never reads /etc/hosts. The app's HTTP client
+		// (Ruby's, through getaddrinfo) does, so the probe is Ruby.
+		if addr := ctrResolve(ctx, t, p.rails, p.s3Host); addr != p.traefikIP {
+			t.Errorf("%s resolves %s to %q, want its Traefik %s", p.rails, p.s3Host, addr, p.traefikIP)
+		}
+		if code := ctrRubyStatus(ctx, t, p.rails, "http://"+p.s3Host+"/"); code == "000" || code == "404" {
+			t.Errorf("%s GET http://%s/ (Ruby Net::HTTP): status %q, want an answer from storage", p.rails, p.s3Host, code)
 		}
 	}
 	// logs.localhost and traefik.localhost: the host only (host clause).
@@ -355,6 +361,32 @@ func ctrStatus(ctx context.Context, t *testing.T, container, host, url string) (
 	}
 	t.Fatalf("podman %s: %v\n%s", strings.Join(append(args, url), " "), err, errOut)
 	return "", 0
+}
+
+// ctrResolve is the first address `getent hosts name` gives inside container,
+// i.e. what /etc/hosts and DNS give the app ("" when unresolved).
+func ctrResolve(ctx context.Context, t *testing.T, container, name string) string {
+	t.Helper()
+	out, _, err := run(ctx, 30*time.Second, "podman", "exec", container, "getent", "hosts", name)
+	if err != nil {
+		return ""
+	}
+	if f := strings.Fields(out); len(f) > 0 {
+		return f[0]
+	}
+	return ""
+}
+
+// ctrRubyStatus GETs url from inside container with Ruby's Net::HTTP, the
+// app's own resolver path: the HTTP status, or "000" when it can't connect.
+func ctrRubyStatus(ctx context.Context, t *testing.T, container, url string) string {
+	t.Helper()
+	const script = `require "net/http"; begin; print Net::HTTP.get_response(URI(ARGV[0])).code; rescue SystemCallError, SocketError, Net::OpenTimeout; print "000"; end`
+	out, errOut, err := run(ctx, 30*time.Second, "podman", "exec", container, "ruby", "-e", script, url)
+	if err != nil {
+		t.Fatalf("podman exec %s ruby GET %s: %v\n%s", container, url, err, errOut)
+	}
+	return strings.TrimSpace(out)
 }
 
 // hostStatus GETs url from the host with Host: host.

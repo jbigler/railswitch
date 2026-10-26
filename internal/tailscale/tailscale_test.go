@@ -117,6 +117,25 @@ func TestServedEmpty(t *testing.T) {
 	}
 }
 
+// TestServedForegroundKeepsBackground: a foreground session on a port the
+// background config serves never hides railswitch's background entry.
+func TestServedForegroundKeepsBackground(t *testing.T) {
+	const st = `{
+  "TCP": {"13002": {"HTTPS": true}},
+  "Web": {"box.tail1234.ts.net:13002": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:13002"}}}},
+  "Foreground": {"abc": {"TCP": {"13002": {"HTTPS": true}}, "Web": {"box.tail1234.ts.net:13002": {"Handlers": {"/": {"Text": "hi"}}}}}}
+}`
+	f := &systest.Fake{}
+	f.On([]string{"tailscale", "serve", "status", "--json"}, sys.Result{Stdout: []byte(st)}, nil)
+	got, err := T{R: f}.Served(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[13002] != Target(13002) {
+		t.Errorf("Served[13002] = %q; want the background entry %q", got[13002], Target(13002))
+	}
+}
+
 func TestServeArgv(t *testing.T) {
 	f := &systest.Fake{}
 	ts := T{R: f}

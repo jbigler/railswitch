@@ -24,9 +24,14 @@ const tsStatus = `{"BackendState": "Running", "Self": {"DNSName": "box.tail1234.
 type tsRunner struct {
 	*systest.Fake
 	served map[int]string // HTTPS port → proxy target
+	later  map[int]string // merged into served at the first systemctl call (something else serves a port while Up runs)
 }
 
 func (r *tsRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
+	if c.Name == "systemctl" && r.later != nil {
+		maps.Copy(r.served, r.later)
+		r.later = nil
+	}
 	res, err := r.Fake.Run(ctx, c)
 	if err != nil || c.Name != "tailscale" || len(c.Args) < 2 || c.Args[0] != "serve" {
 		return res, err
@@ -360,4 +365,114 @@ func TestShareKeepsDepsRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	check("unshare")
+}
+
+// setShareWith records slug as shared with the recorded tailnet ports.
+func (e *tenv) setShareWith(t *testing.T, slug string, ports ...int) {
+	t.Helper()
+	reg, err := machine.Open(e.l.WS.Dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reg.Close()
+	if err := reg.SetShare("filial", slug, &machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7", Ports: ports}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestTeardownTurnsOffRecordedPorts (final I1): a recorded share port that
+// left the model while shared (14002) is still turned off by unshare, down
+// and wt rm (DropShare); a port served elsewhere stays on.
+func TestTeardownTurnsOffRecordedPorts(t *testing.T) {
+	for name, run := range map[string]func(e *tenv) error{
+		"unshare": func(e *tenv) error { return e.l.Unshare(ctx, "feat") },
+		"down":    func(e *tenv) error { return e.l.Down(ctx, "feat", true) },
+		"wt rm":   func(e *tenv) error { return e.l.DropShare(ctx, "feat") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := setup(t)
+			e.setShareWith(t, "feat", 13002, 14002, 15002)
+			e.tailscale(t, map[int]string{
+				13002: "http://127.0.0.1:13002",
+				19002: "http://127.0.0.1:19002",
+				14002: "http://127.0.0.1:14002",
+				15002: "http://127.0.0.1:4000",
+			})
+			if err := run(e); err != nil {
+				t.Fatal(err)
+			}
+			want := []string{"tailscale serve --https=13002 off", "tailscale serve --https=14002 off", "tailscale serve --https=19002 off"}
+			if got := e.serveCalls(); !slices.Equal(got, want) {
+				t.Errorf("serve calls = %q; want %q", got, want)
+			}
+			if s := e.share(t, "feat"); s != nil {
+				t.Errorf("registry share = %+v; want none", s)
+			}
+		})
+	}
+}
+
+// TestReshareMergesRecordedPorts (final I1): a re-share keeps the ports an
+// earlier share recorded.
+func TestReshareMergesRecordedPorts(t *testing.T) {
+	e := setup(t)
+	e.setShareWith(t, "feat", 14002)
+	e.tailscale(t, map[int]string{14002: "http://127.0.0.1:14002"})
+	if err := e.l.Share(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if s := e.share(t, "feat"); s == nil || !slices.Equal(s.Ports, []int{13002, 14002, 19002}) {
+		t.Errorf("registry share = %+v; want ports [13002 14002 19002]", s)
+	}
+}
+
+// TestShareRechecksAfterUp (final M3): a port taken by something else while
+// Up ran is refused, never overwritten, and the share is rolled back.
+func TestShareRechecksAfterUp(t *testing.T) {
+	e := setup(t)
+	e.tailscale(t, nil)
+	e.l.R.(*tsRunner).later = map[int]string{19002: "http://127.0.0.1:4000"}
+	err := e.l.Share(ctx, "feat")
+	if err == nil || !strings.Contains(err.Error(), "19002") || !strings.Contains(err.Error(), "http://127.0.0.1:4000") {
+		t.Fatalf("Share error = %v; want it to name 19002 and its target", err)
+	}
+	for _, c := range e.serveCalls() {
+		if strings.Contains(c, "--bg") {
+			t.Errorf("serve call %q after the port was taken", c)
+		}
+	}
+	if s := e.share(t, "feat"); s != nil {
+		t.Errorf("registry share = %+v; want none", s)
+	}
+}
+
+// TestTeardownServeStatusFails (final M4): when `tailscale serve status`
+// fails, down and wt rm warn, keep the share record and carry on.
+func TestTeardownServeStatusFails(t *testing.T) {
+	for name, run := range map[string]func(e *tenv) error{
+		"down":  func(e *tenv) error { return e.l.Down(ctx, "feat", true) },
+		"wt rm": func(e *tenv) error { return e.l.DropShare(ctx, "feat") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := setup(t)
+			e.setShareWith(t, "feat", 13002)
+			e.tailscale(t, nil)
+			e.f.On([]string{"tailscale", "serve", "status"}, sys.Result{ExitCode: 1}, fmt.Errorf("tailscale: %w (exit 1)", sys.ErrExit))
+			if err := run(e); err != nil {
+				t.Fatalf("%s failed: %v", name, err)
+			}
+			if s := e.share(t, "feat"); s == nil {
+				t.Error("the share record was cleared though its ports may still be served")
+			}
+			if w := e.errOut(); !strings.Contains(w, "warning") || !strings.Contains(w, "unshare") {
+				t.Errorf("stderr %q lacks a warning naming unshare", w)
+			}
+			if name == "down" {
+				wantInOrder(t, e.f.Calls, "systemctl --user stop")
+			}
+		})
+	}
 }

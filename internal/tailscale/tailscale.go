@@ -99,7 +99,8 @@ func (h handler) String() string {
 // Served maps every tailnet port the serve config holds to what it serves:
 // the proxy target of a port whose only handler is a proxy at "/", else a
 // description ("tcp <addr>", "/: <target>, /docs: path /srv"…). Ports of
-// foreground sessions are included.
+// foreground sessions are included, unless the background config serves
+// the same port: that entry is the one `serve … off` acts on.
 func (t T) Served(ctx context.Context) (map[int]string, error) {
 	out, err := t.run(ctx, "serve", "status", "--json")
 	if err != nil {
@@ -143,7 +144,8 @@ func (sc *serveConfig) collect(served map[int]string) error {
 		served[port] = strings.Join(parts, ", ")
 	}
 	// railswitch writes only the background config, and `serve … off` edits
-	// only that one: a foreground session's port is never railswitch's.
+	// only that one: a foreground session's port is never railswitch's, and
+	// it never hides the background entry of the same port.
 	for _, f := range sc.Foreground {
 		if f == nil {
 			continue
@@ -153,7 +155,9 @@ func (sc *serveConfig) collect(served map[int]string) error {
 			return err
 		}
 		for port, desc := range fg {
-			served[port] = "foreground session: " + desc
+			if _, ok := served[port]; !ok {
+				served[port] = "foreground session: " + desc
+			}
 		}
 	}
 	return nil

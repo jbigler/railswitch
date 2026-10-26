@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -318,6 +319,46 @@ func TestProjectRemoveSharedLoaded(t *testing.T) {
 	wantInOrder(t, calls, "tailscale serve --https=13001 off", "tailscale serve --https=19001 off", "systemctl --user stop api-master-rails.service")
 	if n := count(calls, "tailscale serve --https="); n != 2 {
 		t.Errorf("%d serve offs:\n%s", n, dump(calls))
+	}
+}
+
+// TestProjectRemoveSharedRecordedPort (final I1): a recorded share port the
+// model no longer has (14001) is turned off too.
+func TestProjectRemoveSharedRecordedPort(t *testing.T) {
+	dirs, _, f := projects(t, "api")
+	shared(t, dirs, "api", 13001, 14001)
+	serving(f, 13001, 14001, 19001)
+	if err := ProjectRemove(ctx, f, dirs, &bytes.Buffer{}, strings.NewReader(""), false, "api", true, false); err != nil {
+		t.Fatal(err)
+	}
+	calls := nonGit(f)
+	wantInOrder(t, calls, "tailscale serve --https=13001 off", "tailscale serve --https=14001 off", "tailscale serve --https=19001 off", "systemctl --user stop api-master-rails.service")
+}
+
+// TestProjectRemoveServeStatusFails (final M4): with tailscaled down,
+// project rm of a shared project warns and carries on, loaded or not.
+func TestProjectRemoveServeStatusFails(t *testing.T) {
+	for _, loaded := range []bool{true, false} {
+		t.Run(fmt.Sprint("loaded=", loaded), func(t *testing.T) {
+			dirs, wss, f := projects(t, "api")
+			if !loaded {
+				if err := os.RemoveAll(wss["api"]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			shared(t, dirs, "api", 13001)
+			f.On([]string{"tailscale", "serve", "status"}, sys.Result{ExitCode: 1}, fmt.Errorf("tailscale: %w (exit 1)", sys.ErrExit))
+			out := &bytes.Buffer{}
+			if err := ProjectRemove(ctx, f, dirs, out, strings.NewReader(""), false, "api", true, false); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), "warning: worktree master is shared") {
+				t.Errorf("output %q lacks the warning", out.String())
+			}
+			if n := count(nonGit(f), "systemctl --user stop"); n == 0 {
+				t.Errorf("stopped nothing:\n%s", dump(nonGit(f)))
+			}
+		})
 	}
 }
 

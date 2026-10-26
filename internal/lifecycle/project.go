@@ -64,7 +64,7 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		}
 	}
 
-	l := &L{R: r, WS: &workspace.Workspace{Dirs: dirs}, Out: out, Err: io.Discard, In: in, TTY: tty}
+	l := &L{R: r, WS: &workspace.Workspace{Dirs: dirs}, Out: out, Err: out, In: in, TTY: tty}
 	loaded := false
 	if w, err := workspace.Load(ctx, pe.Workspace, ""); err == nil && filepath.Clean(w.Root) == filepath.Clean(pe.Workspace) && w.Project.Project.Prefix == prefix {
 		l.WS, loaded = w, true
@@ -214,7 +214,8 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 // unserveRecorded turns off each tailnet port share recorded for worktree
 // wt of a project whose workspace doesn't load, where the serve config
 // still serves it to its own loopback port, as Share set it up. An entry
-// from before the ports were recorded turns nothing off.
+// from before the ports were recorded turns nothing off. A failed serve
+// status is a warning: the teardown continues.
 func unserveRecorded(ctx context.Context, r sys.Runner, out io.Writer, wt machine.WorktreeEntry) error {
 	if len(wt.Share.Ports) == 0 {
 		fmt.Fprintf(out, "worktree %s was shared, but its tailnet ports were not recorded: check `tailscale serve status` and turn its ports off with `tailscale serve --https=<port> off`\n", wt.Slug)
@@ -223,14 +224,8 @@ func unserveRecorded(ctx context.Context, r sys.Runner, out io.Writer, wt machin
 	ts := tailscale.T{R: r}
 	served, err := ts.Served(ctx)
 	if err != nil {
-		return err
+		fmt.Fprintf(out, "warning: worktree %s is shared, but %v: its tailnet ports %v may still be served; turn each off with `tailscale serve --https=<port> off`\n", wt.Slug, err, wt.Share.Ports)
+		return nil
 	}
-	for _, port := range wt.Share.Ports {
-		if t, ok := served[port]; ok && t == tailscale.Target(port) {
-			if err := ts.ServeOff(ctx, port); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return turnOffOwn(ctx, ts, served, wt.Share.Ports)
 }

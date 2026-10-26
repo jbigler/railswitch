@@ -114,6 +114,13 @@ func readRegistry(path string) (*Registry, error) {
 	return &r, nil
 }
 
+// Read reads <dataDir>/registry.toml without taking the lock or creating
+// anything: for read-only callers such as shell completion. Save replaces
+// the file atomically, so Read sees one whole version of it.
+func Read(dataDir string) (*Registry, error) {
+	return readRegistry(filepath.Join(dataDir, "registry.toml"))
+}
+
 // Save stamps the registry with SchemaVersion and replaces registry.toml
 // atomically.
 func (l *Locked) Save() error {

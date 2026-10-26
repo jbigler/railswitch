@@ -53,6 +53,7 @@ var commands = map[string]command{
 	"deps":          cmdDeps,
 	"doctor":        cmdDoctor,
 	"allow-ports":   cmdAllowPorts,
+	"completion":    cmdCompletion,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.
@@ -62,6 +63,9 @@ func Main(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io
 
 // dispatch is Main with the Runner every external command goes through.
 func dispatch(ctx context.Context, r sys.Runner, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "__complete" { // hidden: shell completion
+		return printCompletions(ctx, stdout, args[1:])
+	}
 	e := &env{stdin: stdin, stdout: stdout, stderr: stderr, run: r}
 	fs := flag.NewFlagSet("railswitch", flag.ContinueOnError)
 	fs.SetOutput(stderr)

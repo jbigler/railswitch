@@ -212,7 +212,7 @@ func TestE2ETwoProjects(t *testing.T) {
 		// 127.0.0.1 itself and never reads /etc/hosts. The app's HTTP client
 		// (Ruby's, through getaddrinfo) does, so the probe is Ruby.
 		if addr := ctrResolve(ctx, t, p.rails, p.s3Host); addr != p.traefikIP {
-			t.Errorf("%s resolves %s to %q, want its Traefik %s", p.rails, p.s3Host, addr, p.traefikIP)
+			t.Errorf("%s resolves %s to %q (getaddrinfo), want only its Traefik %s", p.rails, p.s3Host, addr, p.traefikIP)
 		}
 		if code := ctrRubyStatus(ctx, t, p.rails, "http://"+p.s3Host+"/"); code == "000" || code == "404" {
 			t.Errorf("%s GET http://%s/ (Ruby Net::HTTP): status %q, want an answer from storage", p.rails, p.s3Host, code)
@@ -363,18 +363,25 @@ func ctrStatus(ctx context.Context, t *testing.T, container, host, url string) (
 	return "", 0
 }
 
-// ctrResolve is the first address `getent hosts name` gives inside container,
-// i.e. what /etc/hosts and DNS give the app ("" when unresolved).
+// ctrResolve is every distinct address getaddrinfo gives for name inside
+// container (`getent ahosts`, the call Ruby and other clients make), joined
+// with "," ("" when unresolved). Not `getent hosts`: that asks for IPv6
+// first, which /etc/hosts' IPv4-only AddHost entry doesn't answer, so it
+// falls through to DNS, where the host's resolver synthesizes ::1 for every
+// *.localhost name. getaddrinfo takes the /etc/hosts match and stops.
 func ctrResolve(ctx context.Context, t *testing.T, container, name string) string {
 	t.Helper()
-	out, _, err := run(ctx, 30*time.Second, "podman", "exec", container, "getent", "hosts", name)
+	out, _, err := run(ctx, 30*time.Second, "podman", "exec", container, "getent", "ahosts", name)
 	if err != nil {
 		return ""
 	}
-	if f := strings.Fields(out); len(f) > 0 {
-		return f[0]
+	var addrs []string
+	for line := range strings.Lines(out) {
+		if f := strings.Fields(line); len(f) > 0 && !slices.Contains(addrs, f[0]) {
+			addrs = append(addrs, f[0])
+		}
 	}
-	return ""
+	return strings.Join(addrs, ",")
 }
 
 // ctrRubyStatus GETs url from inside container with Ruby's Net::HTTP, the

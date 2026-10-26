@@ -153,3 +153,67 @@ failed `machine config` check. `doctor` exits 1 when any check fails.
 | `ok` | boolean | The check passed. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a stale or missing `stack.lock`); `""` for a passed check. |
+
+## `machine`
+
+The whole machine, from anywhere (no workspace needed): every registered
+project, its worktrees and routes, the machine-wide units, and which
+containers can reach which. It reads `registry.toml` without locking or
+creating it; with none, no project is listed. The ports, routes and reach
+rows of a project come from its workspace's model. A project whose
+workspace doesn't load (moved, no `project.toml`, no `stack.lock`, …) is
+still listed from the registry, with its port bases as last recorded and a
+`note`; it has no routes and no reach rows. It is one object.
+
+```json
+{
+  "projects": [
+    {"prefix": "filial", "workspace": "/home/u/src/filial", "subnet": "10.214.0.0/24", "traefik_ip": "10.214.0.2", "note": "",
+     "worktrees": [{"slug": "master", "id": 1, "ports": {"app": 13001, "db": 55433, "debug": 33001}, "shared_url": "https://box.tail1234.ts.net:13001/"}]}
+  ],
+  "routes": [
+    {"host": "master.filial.localhost", "project": "filial", "worktree": "master", "service": "rails", "router": "filial-master-app"},
+    {"host": "s3.master.filial.localhost", "project": "filial", "worktree": "master", "service": "storage", "router": "filial-master-s3"}
+  ],
+  "machine": {
+    "traefik": {"unit": "railswitch-traefik.service", "state": "active/running"},
+    "dozzle": {"unit": "railswitch-dozzle.service", "state": "active/running"},
+    "traefik_networks": [
+      {"network": "railswitch_machine", "project": "", "attached": true},
+      {"network": "filial_proxy", "project": "filial", "attached": false}
+    ]
+  },
+  "reach": {
+    "networks": [
+      {"network": "railswitch_machine", "members": ["Traefik", "Dozzle"]},
+      {"network": "filial_proxy", "members": ["Traefik", "rails", "storage"]},
+      {"network": "filial-master-dev", "members": ["rails", "deps", "db", "cache", "storage"]}
+    ],
+    "notes": ["Traefik reaches every project network", "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"]
+  }
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `projects` | array | One object per registered project, sorted by `prefix`. |
+| `projects[].prefix` | string | The project's prefix. |
+| `projects[].workspace` | string | Its registered workspace directory. |
+| `projects[].subnet` | string | Its proxy network's subnet, `10.214.<n>.0/24`. |
+| `projects[].traefik_ip` | string | Traefik's address on that network, `10.214.<n>.2`. |
+| `projects[].note` | string | Why its workspace or model didn't load, or why a worktree's routes didn't resolve; `""` when all did. |
+| `projects[].worktrees` | array | Its registered worktrees, by ID. |
+| `…worktrees[].slug` | string | The worktree's slug. |
+| `…worktrees[].id` | number | Its machine-wide ID. |
+| `…worktrees[].ports` | object | Port name → its loopback host port (base + ID), for every `[[ports]]` of the project's pack, options and tools. |
+| `…worktrees[].shared_url` | string | While shared on the tailnet (`railswitch share`): the first shared port's URL, `https://<tailnet host>:<port>/` (the app's). `""` when not shared. |
+| `routes` | array | One object per Traefik route of every worktree, sorted by `host`. |
+| `routes[].host` | string | The host name the route answers, e.g. `s3.master.filial.localhost`. |
+| `routes[].project` | string | Its project's prefix. |
+| `routes[].worktree` | string | Its worktree's slug. |
+| `routes[].service` | string | The service it routes to. |
+| `routes[].router` | string | Traefik's router name, `<prefix>-<slug>-<route name>`. |
+| `machine.traefik`, `machine.dozzle` | object | The machine-wide unit's `unit` name and its systemd `state`, `<ActiveState>/<SubState>` as in `status`. |
+| `machine.traefik_networks` | array | The networks Traefik must be on: the machine network `railswitch_machine` (`project` `""`), then each registered project's proxy network. `attached` is whether the running Traefik container is on it; `false` for each when Traefik isn't running. The text output flags a missing one `not attached: railswitch up`. |
+| `reach.networks` | array | One object per network with its members: `railswitch_machine` (Traefik and Dozzle), then for each project its proxy network (Traefik and the services on it) and each worktree's dev network (`<prefix>-<slug>-dev`: every service of that worktree). Members are service ids, plus `Traefik` and `Dozzle`. |
+| `reach.notes` | array of strings | Fixed lines on what the networks don't show: Traefik reaches every project network; a project's containers reach another project only through Traefik, whose routers refuse them (D50); every railswitch network is `isolate=strict`; the Traefik API (`traefik.localhost`) and Dozzle (`logs.localhost`) answer only host clients. |

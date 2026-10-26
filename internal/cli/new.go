@@ -397,7 +397,11 @@ func remoteHead(ctx context.Context, r sys.Runner, repo string) (string, error) 
 	if err := gitArg("--repo", repo); err != nil {
 		return "", err
 	}
-	res, err := r.Run(ctx, sys.Cmd{Name: "git", Args: []string{"ls-remote", "--symref", repo, "HEAD"}, Env: sys.GitBatchEnv(os.Environ()), Timeout: gitRemoteTimeout})
+	env, err := sys.GitNetEnv(ctx, r, os.Environ())
+	if err != nil {
+		return "", err
+	}
+	res, err := r.Run(ctx, sys.Cmd{Name: "git", Args: []string{"ls-remote", "--symref", repo, "HEAD"}, Env: env, Timeout: gitRemoteTimeout})
 	if err != nil {
 		return "", fmt.Errorf("git ls-remote %s: %w", repo, err)
 	}
@@ -415,7 +419,11 @@ func remoteHead(ctx context.Context, r sys.Runner, repo string) (string, error) 
 
 // clone checks branch base of repo out into dir.
 func clone(ctx context.Context, r sys.Runner, repo, base, dir string) error {
-	_, err := r.Run(ctx, sys.Cmd{Name: "git", Args: []string{"clone", "--branch", base, repo, dir}, Env: sys.GitBatchEnv(os.Environ()), Timeout: gitCloneTimeout})
+	env, err := sys.GitNetEnv(ctx, r, os.Environ())
+	if err != nil {
+		return err
+	}
+	_, err = r.Run(ctx, sys.Cmd{Name: "git", Args: []string{"clone", "--branch", base, repo, dir}, Env: env, Timeout: gitCloneTimeout})
 	if err != nil {
 		return fmt.Errorf("git clone --branch %s %s: %w", base, repo, err)
 	}

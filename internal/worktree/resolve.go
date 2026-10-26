@@ -39,11 +39,16 @@ func (m *Manager) gitCmd(timeout time.Duration, dir string, args ...string) sys.
 }
 
 // fetch fetches refspec from origin into the repo at dir, unable to prompt
-// (sys.GitBatchEnv).
+// and with the ssh the user chose, never one from the repo's config
+// (sys.GitNetEnv).
 func (m *Manager) fetch(ctx context.Context, dir, refspec string) error {
+	env, err := sys.GitNetEnv(ctx, m.R, os.Environ())
+	if err != nil {
+		return err
+	}
 	c := m.gitCmd(gitLong, dir, "fetch", "origin", refspec)
-	c.Env = sys.GitBatchEnv(os.Environ())
-	_, err := m.R.Run(ctx, c)
+	c.Env = env
+	_, err = m.R.Run(ctx, c)
 	return err
 }
 

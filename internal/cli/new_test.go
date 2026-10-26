@@ -526,30 +526,42 @@ func TestInitJoin(t *testing.T) {
 }
 
 // TestNewGitNonInteractive: git calls that may touch the network (ls-remote,
-// clone) cannot prompt: GIT_TERMINAL_PROMPT=0 and ssh in batch mode.
+// clone) cannot prompt: GIT_TERMINAL_PROMPT=0, and ssh in batch mode unless
+// the user's git config names an ssh, which is then kept.
 func TestNewGitNonInteractive(t *testing.T) {
-	newEnv(t)
-	t.Setenv("GIT_SSH_COMMAND", "")
-	os.Unsetenv("GIT_SSH_COMMAND")
-	repo := bareRepo(t, "main")
-	f := gitHost()
-	ws := filepath.Join(t.TempDir(), "shop")
-	if code, _, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
-		t.Fatalf("new: exit %d: %s", code, errs)
-	}
-	seen := 0
-	for i, c := range f.Calls {
-		if !slices.Contains(c, "clone") && !slices.Contains(c, "ls-remote") {
-			continue
+	for _, tc := range []struct{ config, want string }{
+		{"", "GIT_SSH_COMMAND=ssh -o BatchMode=yes"},
+		{"[core]\n\tsshCommand = ssh -i /keys/work\n", "GIT_SSH_COMMAND=ssh -i /keys/work"},
+	} {
+		newEnv(t)
+		t.Setenv("GIT_SSH_COMMAND", "")
+		os.Unsetenv("GIT_SSH_COMMAND")
+		global := filepath.Join(t.TempDir(), "gitconfig")
+		if err := os.WriteFile(global, []byte(tc.config), 0o600); err != nil {
+			t.Fatal(err)
 		}
-		seen++
-		env := f.Cmds[i].Env
-		if !slices.Contains(env, "GIT_TERMINAL_PROMPT=0") || !slices.Contains(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
-			t.Errorf("%v env lacks the batch settings: %q", c, env)
+		t.Setenv("GIT_CONFIG_GLOBAL", global)
+		t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+		repo := bareRepo(t, "main")
+		f := gitHost()
+		ws := filepath.Join(t.TempDir(), "shop")
+		if code, _, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
+			t.Fatalf("new: exit %d: %s", code, errs)
 		}
-	}
-	if seen == 0 {
-		t.Fatal("no clone or ls-remote call")
+		seen := 0
+		for i, c := range f.Calls {
+			if !slices.Contains(c, "clone") && !slices.Contains(c, "ls-remote") {
+				continue
+			}
+			seen++
+			env := f.Cmds[i].Env
+			if !slices.Contains(env, "GIT_TERMINAL_PROMPT=0") || !slices.Contains(env, tc.want) {
+				t.Errorf("config %q: %v env lacks GIT_TERMINAL_PROMPT=0 or %s: %q", tc.config, c, tc.want, env)
+			}
+		}
+		if seen == 0 {
+			t.Fatal("no clone or ls-remote call")
+		}
 	}
 }
 

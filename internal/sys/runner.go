@@ -146,26 +146,53 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// GitBatchEnv is environ for a git call that may touch the network, made
+// GitNetEnv is environ for a git call that may touch the network, made
 // non-interactive: a timed call runs in its own process group, where a
 // credential, passphrase or host-key prompt would stop git silently until
-// the deadline. GIT_TERMINAL_PROMPT=0, and ssh in batch mode unless the
-// user's environment already chooses an ssh (GIT_SSH_COMMAND or GIT_SSH).
-func GitBatchEnv(environ []string) []string {
+// the deadline. It sets GIT_TERMINAL_PROMPT=0 and chooses the ssh git runs:
+//   - GIT_SSH_COMMAND or GIT_SSH already in environ: the user's, unchanged;
+//   - core.sshCommand in the user's global or system git config: that
+//     command, as GIT_SSH_COMMAND (the user's key or agent wrapper keeps
+//     working);
+//   - otherwise `ssh -o BatchMode=yes`.
+//
+// The repo's own config is never read for it, and GIT_SSH_COMMAND overrides
+// it: containers can write the base repo's .git/config, and a
+// core.sshCommand set there would run on the host.
+func GitNetEnv(ctx context.Context, r Runner, environ []string) ([]string, error) {
+	// -C /: outside any repo, so only global and system config count.
+	res, err := r.Run(ctx, Cmd{Name: "git", Args: []string{"-C", "/", "config", "--get", "core.sshCommand"}})
+	switch {
+	case err == nil:
+	case errors.Is(err, ErrExit) && res.ExitCode == 1: // not set
+	default:
+		return nil, fmt.Errorf("git config --get core.sshCommand: %w", err)
+	}
+	return gitBatchEnv(environ, strings.TrimSpace(string(res.Stdout))), nil
+}
+
+// gitBatchEnv is environ with GIT_TERMINAL_PROMPT=0 and, unless environ
+// names an ssh, GIT_SSH_COMMAND set to userSSH, or to
+// `ssh -o BatchMode=yes` when userSSH is "".
+func gitBatchEnv(environ []string, userSSH string) []string {
 	env := make([]string, 0, len(environ)+2)
-	userSSH := false
+	chosen := false
 	for _, kv := range environ {
 		k, _, _ := strings.Cut(kv, "=")
 		switch k {
 		case "GIT_TERMINAL_PROMPT":
 			continue
 		case "GIT_SSH_COMMAND", "GIT_SSH":
-			userSSH = true
+			chosen = true
 		}
 		env = append(env, kv)
 	}
 	env = append(env, "GIT_TERMINAL_PROMPT=0")
-	if !userSSH {
+	switch {
+	case chosen:
+	case userSSH != "":
+		env = append(env, "GIT_SSH_COMMAND="+userSSH)
+	default:
 		env = append(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes")
 	}
 	return env

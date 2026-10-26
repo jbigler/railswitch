@@ -3,6 +3,7 @@ package sys
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -126,12 +127,12 @@ func TestExecStderrTailWithCallerStderr(t *testing.T) {
 
 func TestGitBatchEnv(t *testing.T) {
 	has := func(env []string, kv string) bool { return slices.Contains(env, kv) }
-	env := GitBatchEnv([]string{"HOME=/h"})
+	env := gitBatchEnv([]string{"HOME=/h"}, "")
 	if !has(env, "HOME=/h") || !has(env, "GIT_TERMINAL_PROMPT=0") || !has(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
 		t.Errorf("plain env = %q", env)
 	}
 	for _, user := range []string{"GIT_SSH_COMMAND=my-ssh", "GIT_SSH=/usr/bin/my-ssh"} {
-		env := GitBatchEnv([]string{user, "GIT_TERMINAL_PROMPT=1"})
+		env := gitBatchEnv([]string{user, "GIT_TERMINAL_PROMPT=1"}, "ssh -i k")
 		if !has(env, user) || !has(env, "GIT_TERMINAL_PROMPT=0") || has(env, "GIT_TERMINAL_PROMPT=1") {
 			t.Errorf("env with %s = %q", user, env)
 		}
@@ -141,4 +142,61 @@ func TestGitBatchEnv(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The user's core.sshCommand (global or system config) is kept, pinned as
+// GIT_SSH_COMMAND so a repo-level value cannot replace it.
+func TestGitNetEnvKeepsUserSSHCommand(t *testing.T) {
+	const sshCmd = "ssh -i ~/.ssh/work"
+	f := &fakeRunner{out: map[string]Result{
+		"git -C / config --get core.sshCommand": {Stdout: []byte(sshCmd + "\n")},
+	}}
+	env, err := GitNetEnv(context.Background(), f, []string{"HOME=/h"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(env, "GIT_SSH_COMMAND="+sshCmd) || slices.Contains(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
+		t.Errorf("env = %q, want GIT_SSH_COMMAND=%s and no batch-mode ssh", env, sshCmd)
+	}
+	if !slices.Contains(env, "GIT_TERMINAL_PROMPT=0") {
+		t.Errorf("env = %q, want GIT_TERMINAL_PROMPT=0", env)
+	}
+	if len(f.calls) != 1 {
+		t.Fatalf("calls = %+v", f.calls)
+	}
+}
+
+// With no core.sshCommand (git config exits 1) ssh runs in batch mode.
+func TestGitNetEnvNoUserSSHCommand(t *testing.T) {
+	const k = "git -C / config --get core.sshCommand"
+	f := &fakeRunner{out: map[string]Result{k: {ExitCode: 1}}, errs: map[string]error{k: fmt.Errorf("git: %w (exit 1)", ErrExit)}}
+	env, err := GitNetEnv(context.Background(), f, []string{"HOME=/h"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(env, "GIT_SSH_COMMAND=ssh -o BatchMode=yes") {
+		t.Errorf("env = %q, want batch-mode ssh", env)
+	}
+}
+
+// Any other failure reading git config is an error, not a guess.
+func TestGitNetEnvConfigFails(t *testing.T) {
+	const k = "git -C / config --get core.sshCommand"
+	f := &fakeRunner{out: map[string]Result{k: {ExitCode: 3}}, errs: map[string]error{k: fmt.Errorf("git: %w (exit 3)", ErrExit)}}
+	if _, err := GitNetEnv(context.Background(), f, nil); err == nil {
+		t.Fatal("want an error")
+	}
+}
+
+// fakeRunner answers by space-joined argv (name included) and records calls.
+type fakeRunner struct {
+	out   map[string]Result
+	errs  map[string]error
+	calls []Cmd
+}
+
+func (f *fakeRunner) Run(_ context.Context, c Cmd) (Result, error) {
+	f.calls = append(f.calls, c)
+	k := strings.Join(append([]string{c.Name}, c.Args...), " ")
+	return f.out[k], f.errs[k]
 }

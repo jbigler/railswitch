@@ -302,7 +302,10 @@ func (b *builder) services() error {
 	for i := range b.m.Services {
 		s := &b.m.Services[i]
 		s.Networks = []string{"dev"}
-		if s.Role == RoleApp || len(s.Routes) > 0 {
+		// D49: app, workers and tools reach Traefik-routed hosts (S3)
+		// through the proxy network; routed services sit there for Traefik.
+		switch {
+		case s.Role == RoleApp, s.Role == RoleWorker, s.Role == RoleTool, len(s.Routes) > 0:
 			s.Networks = append(s.Networks, "proxy")
 		}
 	}

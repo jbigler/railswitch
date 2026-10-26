@@ -20,7 +20,7 @@ retries = 5
 start_period = "15s"
 
 [gives]
-S3_ENDPOINT = "http://{service}:9000"
+S3_ENDPOINT = "http://s3.{worktree.host}"
 S3_ACCESS_KEY = "rustfsadmin"
 S3_SECRET_KEY = "{generated.S3_SECRET_KEY}"
 

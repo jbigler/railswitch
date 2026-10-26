@@ -641,7 +641,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | Lines in the hunk | Verdict | Why |
 |---|---|---|
 | `-Requires/After=…rustfs-init@%i.service` | **intended change (D18)** | No init container. `up` imports `db-dumps/rustfs_data.tar.gz` (rustfs option `seed`) into `filial-feat-rustfs-data` when it creates the volume (Task 18). Old: the tarball was extracted when `/data/rustfs0` was missing. New: imported once at volume creation. Equivalent for a fresh volume. |
-| `-ContainerName=…-rustfs`, `alias=rustfs` / `+…-storage`, `alias=storage` | **intended change (D3)** | Clients follow: `S3_ENDPOINT=http://storage:9000` in rails.env. Legacy rails got `RUSTFS_ENDPOINT=http://${S3_HOST}` (via Traefik); see [Env contents](#env-contents). |
+| `-ContainerName=…-rustfs`, `alias=rustfs` / `+…-storage`, `alias=storage` | **intended change (D3)** | Clients follow, through Traefik like legacy (D49): `S3_ENDPOINT=http://s3.feat.filial.localhost` in rails.env (was `RUSTFS_ENDPOINT=http://${S3_HOST}`); see [Env contents](#env-contents). |
 | `-Environment=RUSTFS_*` (8 lines) / `+EnvironmentFile=…/env/feat/storage.env` | **intended change (D10, D17)** | Same 8 `RUSTFS_*` values in `storage.env`, except `RUSTFS_SECRET_KEY`: it is the generated `S3_SECRET_KEY` (D17) instead of the hard-coded `rustfsadmin`. |
 | `+AddHost=…` (4 lines) | **intended change (D5)** | New: every proxy-network container gets the Traefik host entries. Harmless for storage. |
 | `-PublishPort=127.0.0.1:${S3_PORT}:9000` / `+127.0.0.1:19002:9000` | **intended change (D8)** | 19000+ID (pinned "Storage (share)"). |
@@ -835,7 +835,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | Lines in the hunk | Verdict | Why |
 |---|---|---|
 | `-Image=${NVIM_IMAGE}` / `+Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-d2ae020d` | **intended change (D9, D23, D31)** | Built on the base image. |
-| `-EnvironmentFile=…/.container-config/.env`, `…/.unit-env/%i.env`, `-Environment=SSH_AUTH_SOCK=…`, `-Environment=RUSTFS_ENDPOINT=http://rustfs:9000` / `+EnvironmentFile=…/env/feat/nvim.env` | **intended change (D10, D33, D42)** | `nvim.env` has the app env (DB, `REDIS_URL`, `S3_ENDPOINT=http://storage:9000`, `PLAYWRIGHT_HOST`, worktree vars). `SSH_AUTH_SOCK` is gone (D33); `RUSTFS_ENDPOINT` is now `S3_ENDPOINT` (D3/option `gives`). |
+| `-EnvironmentFile=…/.container-config/.env`, `…/.unit-env/%i.env`, `-Environment=SSH_AUTH_SOCK=…`, `-Environment=RUSTFS_ENDPOINT=http://rustfs:9000` / `+EnvironmentFile=…/env/feat/nvim.env` | **intended change (D10, D33, D42)** | `nvim.env` has the app env (DB, `REDIS_URL`, `S3_ENDPOINT=http://s3.feat.filial.localhost` through Traefik (D49), `PLAYWRIGHT_HOST`, worktree vars). `SSH_AUTH_SOCK` is gone (D33); `RUSTFS_ENDPOINT` is now `S3_ENDPOINT` (D3/option `gives`). |
 | `-PublishPort=127.0.0.1:${NVIM_PORT}:7777` / `+127.0.0.1:17002:7777` | **intended change (D8)** | 17000+ID. |
 | `-Volume=@@ROOT@@/.home/%i:/home/appuser:z` / `+Volume=…/.railswitch/home/feat:/home/appuser:z` | **intended change (D30)** | Per-worktree home moves under `.railswitch/`. Render creates `.railswitch/home/<slug>/` (0700) for every worktree when a service mounts it (Task 13F); orphan removal never deletes one. |
 | `-Volume=${MAIN_WORKTREE_PATH}/.git…:z` / `+Volume=/WORKSPACES/filial/master/.git…:z` | **same behaviour** | Same mount, read-write as before. |

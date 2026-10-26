@@ -5,13 +5,18 @@
 Description=filial nvim of worktree feat
 
 [Container]
-Label=filial.unit-hash=cd0c0bfd909d
+Label=filial.unit-hash=d669e62242ef
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-96f4c4f3
 ContainerName=filial-feat-nvim
 Network=filial-feat-dev.network:alias=nvim
+Network=filial-proxy.network
 UserNS=keep-id:uid=1000,gid=1000
 User=1000:1000
 EnvironmentFile=/WORKSPACES/filial/.railswitch/env/feat/nvim.env
+AddHost=feat.filial.localhost:10.214.3.2
+AddHost=s3.feat.filial.localhost:10.214.3.2
+AddHost=s3-ui.feat.filial.localhost:10.214.3.2
+AddHost=vnc.feat.filial.localhost:10.214.3.2
 PublishPort=127.0.0.1:17002:7777
 Volume=/WORKSPACES/filial/feat:/app:z
 Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
@@ -30,7 +35,7 @@ Memory=2g
 PidsLimit=4096
 GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
 Annotation=filial.firewall=agent,deps
-Annotation=filial.firewall.networks=filial-feat-dev
+Annotation=filial.firewall.networks=filial-feat-dev,filial_proxy
 Annotation=filial.firewall.mode=log
 PodmanArgs=--cpus=2 --tty --interactive
 LogDriver=k8s-file

@@ -558,3 +558,16 @@ func TestDepsExecFromInstall(t *testing.T) {
 	hasLine(t, units, "filial-master-deps.container", "Entrypoint=/usr/local/bin/entrypoint-deps.sh")
 	hasLine(t, units, "filial-master-deps.container", "Exec=mix deps.get --only dev")
 }
+
+func TestWorkerOnProxy(t *testing.T) {
+	_, units := renderUnits(t, fixtureDir, func(p *config.Project) { p.Options["jobs"] = "sidekiq@1" })
+	const w = "filial-master-worker.container"
+	for _, l := range []string{
+		"Network=filial-master-dev.network:alias=worker",
+		"Network=filial-proxy.network",
+		"AddHost=s3.master.filial.localhost:10.214.3.2",
+	} {
+		hasLine(t, units, w, l)
+	}
+	noLinePrefix(t, units, w, "Label=traefik")
+}

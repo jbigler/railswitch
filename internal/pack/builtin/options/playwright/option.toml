@@ -13,6 +13,10 @@ args = { PLAYWRIGHT_VERSION = "{playwright}" }
 
 [gives]
 PLAYWRIGHT_HOST = "ws://{service}:8888/connect"
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"   # npm installs via `railswitch exec`: the browser has Chrome
+
+[deps_env]                    # D44: npm installs in deps skip the browser download too
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
 
 [env]
 CHROME_START_URL = "http://{worktree.host}"

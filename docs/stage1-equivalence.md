@@ -358,7 +358,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 |---|---|---|
 | `-Image=${RAILS_IMAGE}` / `+Image=localhost/filial/base:…` | **intended change (D9, D31)** | Same image as rails. |
 | `-Network=@@P@@-%i-dev` / `+Network=filial-feat-dev.network:alias=deps` | **intended change (D27)** | Same network; `.network` reference gives the dependency. The alias is new, and harmless (nothing resolves `deps`). |
-| `-Environment=PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` / `+EnvironmentFile=…/env/feat/deps.env` | **intended change (D11, D35)** + **gap → Stage 4** | `deps.env` holds only the pack layer, `BINDING=0.0.0.0`, `RAILS_ENV=development`, `RUBY_DEBUG_HOST=0.0.0.0`, and `BUNDLE_FROZEN=true` (D35, new: frozen installs). `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is gone: without it, `npm ci` downloads a Chromium the browser container already provides. Fix: Filial sets `[services.deps.env]`, or the playwright option gives it to deps (the design mock-up does). **Open question 2.** |
+| `-Environment=PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` / `+EnvironmentFile=…/env/feat/deps.env` | **intended change (D11, D35, D44)** | `deps.env` holds only the pack layer, `BINDING=0.0.0.0`, `RAILS_ENV=development`, `RUBY_DEBUG_HOST=0.0.0.0`, and `BUNDLE_FROZEN=true` (D35, new: frozen installs). With `browser = "playwright@1"`, `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` comes from the option's `[deps_env]` (D44), also under `railswitch deps`. **Open question 2, resolved.** |
 | Volumes: `/app`, `entrypoint-deps.sh`, gems, `node-modules`, `npm_cache` | **same behaviour** | Same five mounts. `entrypoint-deps.sh` now comes from the rails pack assets. |
 | `+DropCapability=all` | **intended change (D34)** |  |
 | `Annotation=…firewall=deps`, `networks=filial-feat-dev` | **same behaviour** | Same profile and networks. The `allow.deps = ["github.com"]` list lands in the descriptor (Stage 2, Task 16). |
@@ -862,7 +862,6 @@ These variables are gone. Each is **intended (D42)**: Filial preferences, not ge
 - `TAILWINDCSS_DEBUG`, `LAUNCHY_DRY_RUN`, `BROWSER`;
 - `RUBY_DEBUG_IRB_CONSOLE`;
 - `SKIP_TEST_DATABASE_TRUNCATE`, `DOCKER`;
-- `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD`;
 - `RUSTFS_ENDPOINT`, `S3_HOST`, `RUSTFS_UI_HOST` (`TRAEFIK_IP`/`PODMAN_TRAEFIK_IP` are obsolete: the playwright entrypoint reads the `AddHost=` entry).
 
 Others are intended for different reasons:
@@ -870,9 +869,11 @@ Others are intended for different reasons:
 - **D8:** the image/version/path vars that only existed for `${VAR}` expansion;
 - **D17:** `PGPASSWORD=password` (now generated).
 
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` is not gone: the playwright option gives it to rails, worker, nvim and deps (D44).
+
 `RUBY_DEBUG_HOST=0.0.0.0` is not gone: the rails pack's `[env]` gives it (Task 13F) to the rails, worker, nvim and deps env files, so rdbg is reachable through the published port.
 
 ## Open questions
 
 1. **`npm_global` and `playwright_browsers` volumes** (rails, nvim): add them as rails pack `[[caches]]`, or drop them for good (D42)?
-2. **`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for deps:** should the playwright option give it to deps when the browser slot is on (as the design mock-up does), or should Filial set `[services.deps.env]` (Stage 4)?
+2. **Resolved (D44, commit `feat(pack): options can give env to deps; playwright skips its browser download`):** the playwright option gives it to deps via the new `[deps_env]`, and to the app via `[gives]`. Was: **`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for deps:** should the playwright option give it to deps when the browser slot is on (as the design mock-up does), or should Filial set `[services.deps.env]` (Stage 4)?

@@ -191,8 +191,9 @@ type Option struct {
 	Command    string   `toml:"command"`    // the service's command (an option running the app image)
 	Firewall   Profiles `toml:"firewall"`   // empty = the role's default profile
 
-	Gives   map[string]string `toml:"gives"` // layer 2, to app, worker and tools; never to its own service
-	Env     map[string]string `toml:"env"`   // its own service's env
+	Gives   map[string]string `toml:"gives"`    // layer 2, to app, worker and tools; never to its own service
+	DepsEnv map[string]string `toml:"deps_env"` // to the deps service (D44): what its installs need
+	Env     map[string]string `toml:"env"`      // its own service's env
 	Volumes []Volume          `toml:"volumes"`
 	Mounts  []Mount           `toml:"mounts"`
 	Ports   []Port            `toml:"ports"`

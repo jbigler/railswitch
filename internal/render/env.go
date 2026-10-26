@@ -77,6 +77,7 @@ func optionSource(o *pack.Option) string {
 //   - options' [gives]: app, worker and tool packages, never the giver itself
 //     and never a role-tool option (the browser): least privilege, it needs
 //     no data-service credentials;
+//   - options' [deps_env]: deps (D44);
 //   - an option's or tool's own [env]: its own service;
 //   - project [env]: every service but deps;
 //   - [services.<id>.env]: that service;
@@ -111,6 +112,13 @@ func (b *builder) envSpecs() {
 					continue
 				}
 				add(LayerOption, optionSource(ch.Option)+" [gives]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.Gives)
+			}
+		}
+		if s.Role == RoleDeps {
+			for _, slot := range config.Slots {
+				if ch := st.Options[slot]; ch != nil {
+					add(LayerOption, optionSource(ch.Option)+" [deps_env]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.DepsEnv)
+				}
 			}
 		}
 		if o := b.opts[s.ID]; o != nil {

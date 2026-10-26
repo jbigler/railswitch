@@ -246,10 +246,29 @@ func TestDepsGetsNoSecrets(t *testing.T) {
 			t.Errorf("deps has DATABASE_URL")
 		}
 	}
-	// D11: the pack layer and [services.deps.env] only.
-	want := []string{"BINDING", "BUNDLE_FROZEN", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
+	// D11, D44: the pack layer, options' [deps_env] and [services.deps.env] only.
+	want := []string{"BINDING", "BUNDLE_FROZEN", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
 	if !slices.Equal(names, want) {
 		t.Errorf("deps env = %v; want %v", names, want)
+	}
+}
+
+// D44: an option's [deps_env] reaches the deps service, so the playwright
+// option keeps npm installs from downloading a browser it already has; its
+// [gives] does the same for installs run in the app container.
+func TestOptionDepsEnv(t *testing.T) {
+	_, in := filial(t, nil)
+	if e, _ := envVar(in, "deps", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"); e.Value != "1" || e.Layer != LayerOption || e.Source != "option playwright@1 [deps_env]" {
+		t.Errorf("deps PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = %+v", e)
+	}
+	if e, _ := envVar(in, "rails", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"); e.Value != "1" || e.Source != "option playwright@1 [gives]" {
+		t.Errorf("rails PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = %+v", e)
+	}
+	_, in = filial(t, func(p *config.Project) { p.Options["browser"] = "none" })
+	for _, svc := range []string{"deps", "rails"} {
+		if e, ok := envVar(in, svc, "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD"); ok {
+			t.Errorf("browser = none: %s has %+v", svc, e)
+		}
 	}
 }
 

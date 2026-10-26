@@ -346,6 +346,7 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 	l.health(file, o.Health)
 	l.file(file, "entrypoint", dir, o.Entrypoint)
 	l.env(file, "gives", o.Gives)
+	l.env(file, "deps_env", o.DepsEnv)
 	l.env(file, "env", o.Env)
 	l.volumes(file, "volumes", o.Volumes, true)
 	for i, m := range o.Mounts {

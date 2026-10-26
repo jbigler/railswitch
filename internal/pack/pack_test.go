@@ -174,6 +174,25 @@ func TestUnknownFieldInPackToml(t *testing.T) {
 	}
 }
 
+// D44: an option's [deps_env] decodes and its names are checked like [gives].
+func TestOptionDepsEnv(t *testing.T) {
+	fsys := minimal()
+	opt := fsys["options/o/option.toml"]
+	base := string(opt.Data)
+	opt.Data = []byte(base + "[deps_env]\nSKIP = \"1\"\n")
+	cat, err := Load(fsys)
+	if err != nil {
+		t.Fatalf("Load with deps_env: %v", err)
+	}
+	if got := cat.Options[Ref{"o", 1}].DepsEnv; !maps.Equal(got, map[string]string{"SKIP": "1"}) {
+		t.Errorf("deps_env = %v", got)
+	}
+	opt.Data = []byte(base + "[deps_env]\n\"bad-name\" = \"1\"\n")
+	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "deps_env") {
+		t.Errorf("Load with bad deps_env name: %v", err)
+	}
+}
+
 func TestPortSamePort(t *testing.T) {
 	fsys := minimal()
 	opt := fsys["options/o/option.toml"]
@@ -231,13 +250,17 @@ func TestRailsPackGeneric(t *testing.T) {
 
 func TestPlaywrightOptionEnv(t *testing.T) {
 	o := builtins(t).Options[Ref{"playwright", 1}]
-	for _, m := range []map[string]string{o.Env, o.Gives} {
+	for _, m := range []map[string]string{o.Env, o.Gives, o.DepsEnv} {
 		if _, ok := m["HEADLESS_SYSTEM_TESTS"]; ok {
 			t.Errorf("playwright defines HEADLESS_SYSTEM_TESTS")
 		}
 	}
-	if !maps.Equal(o.Gives, map[string]string{"PLAYWRIGHT_HOST": "ws://{service}:8888/connect"}) {
+	skip := map[string]string{"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"} // D44: the browser has Chrome
+	if !maps.Equal(o.Gives, map[string]string{"PLAYWRIGHT_HOST": "ws://{service}:8888/connect", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"}) {
 		t.Errorf("playwright gives = %v", o.Gives)
+	}
+	if !maps.Equal(o.DepsEnv, skip) {
+		t.Errorf("playwright deps_env = %v", o.DepsEnv)
 	}
 	if !maps.Equal(o.Env, map[string]string{"CHROME_START_URL": "http://{worktree.host}"}) {
 		t.Errorf("playwright env = %v", o.Env)

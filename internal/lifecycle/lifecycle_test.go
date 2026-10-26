@@ -471,7 +471,7 @@ func TestDepsUnfrozen(t *testing.T) {
 	if argAfter(c, "-w") != "/app" || !slices.Equal(c[len(c)-3:], []string{"bundle", "add", "x"}) {
 		t.Errorf("argv %q", c)
 	}
-	if r.data == "" || strings.Contains(r.data, "BUNDLE_FROZEN") || !strings.Contains(r.data, "RAILS_ENV=development\n") {
+	if r.data == "" || strings.Contains(r.data, "BUNDLE_FROZEN") || !strings.Contains(r.data, "RAILS_ENV=development\n") || !strings.Contains(r.data, "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1\n") {
 		t.Errorf("deps env file:\n%s", r.data)
 	}
 	if _, err := os.Stat(r.path); !errors.Is(err, os.ErrNotExist) {

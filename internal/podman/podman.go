@@ -309,3 +309,22 @@ func (p Podman) SecretCreated(ctx context.Context, name string) (time.Time, erro
 func (p Podman) Label(ctx context.Context, name, key string) (string, error) {
 	return p.inspectContainer(ctx, `{{index .Config.Labels "`+key+`"}}`, name)
 }
+
+// NetworkConnect runs `podman network connect --ip <ip> <network> <container>`.
+func (p Podman) NetworkConnect(ctx context.Context, network, container, ip string) error {
+	_, err := p.run(ctx, 0, "network", "connect", "--ip", ip, network, container)
+	return err
+}
+
+// NetworkDisconnect runs `podman network disconnect <network> <container>`.
+func (p Podman) NetworkDisconnect(ctx context.Context, network, container string) error {
+	_, err := p.run(ctx, 0, "network", "disconnect", network, container)
+	return err
+}
+
+// Networks names the networks container is attached to, none for a missing
+// container.
+func (p Podman) Networks(ctx context.Context, container string) ([]string, error) {
+	s, err := p.inspectContainer(ctx, `{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}`, container)
+	return strings.Fields(s), err
+}

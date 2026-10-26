@@ -5,6 +5,7 @@ package render
 import (
 	"bytes"
 	"context"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/podman"
 )
 
@@ -32,6 +34,7 @@ func TestQuadletDryRun(t *testing.T) {
 		t.Fatalf("RAILSWITCH_QUADLET=%s: %v", bin, err)
 	}
 	_, units := renderUnits(t, fixtureDir, nil)
+	maps.Copy(units, machine.ProxyUnits(&machine.Registry{Schema: machine.SchemaVersion, Projects: []machine.ProjectEntry{{Prefix: "filial", Subnet: 3}}}))
 	dir := t.TempDir()
 	for name, data := range units {
 		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
@@ -64,6 +67,22 @@ func TestQuadletDryRun(t *testing.T) {
 	requires := regexp.MustCompile(`(?m)^Requires=.*\bfilial-feat-dev-network\.service\b`)
 	if !requires.MatchString(services["filial-feat-rails.service"]) {
 		t.Errorf("filial-feat-rails.service has no Requires= naming filial-feat-dev-network.service:\n%s", services["filial-feat-rails.service"])
+	}
+
+	// Traefik's network dependencies come from Quadlet (D27), and Dozzle
+	// generates.
+	traefik := services["railswitch-traefik.service"]
+	for _, net := range []string{"filial-proxy-network.service", "railswitch-machine-network.service"} {
+		if !regexp.MustCompile(`(?m)^Requires=.*\b` + regexp.QuoteMeta(net) + `\b`).MatchString(traefik) {
+			t.Errorf("railswitch-traefik.service has no Requires= naming %s:\n%s", net, traefik)
+		}
+	}
+	if tr := execStart(t, services, "railswitch-traefik.service"); !strings.Contains(tr, "--network railswitch_machine:ip=10.214.255.2") {
+		t.Errorf("railswitch-traefik.service ExecStart lacks the machine network:\n%s", tr)
+	}
+	execStart(t, services, "railswitch-dozzle.service")
+	if _, ok := services["railswitch-machine-network.service"]; !ok {
+		t.Errorf("no railswitch-machine-network.service; got %v", keys(services))
 	}
 
 	if deps := execStart(t, services, "filial-feat-deps.service"); strings.Contains(deps, "--health-cmd") {

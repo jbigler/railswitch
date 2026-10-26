@@ -4,11 +4,11 @@
 [Unit]
 Description=mini rails of worktree master
 Requires=mini-master-deps.service
-Wants=railswitch-traefik.service
-After=mini-master-deps.service railswitch-traefik.service
+Wants=railswitch-traefik.service railswitch-dozzle.service
+After=mini-master-deps.service railswitch-traefik.service railswitch-dozzle.service
 
 [Container]
-Label=mini.unit-hash=fb18a830571e
+Label=mini.unit-hash=8f1d0084c850
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-bb30b09f
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails

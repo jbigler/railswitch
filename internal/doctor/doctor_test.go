@@ -135,7 +135,7 @@ func names(cs []Check) []string {
 
 var hostChecks = []string{
 	"podman >= 5.0", "quadlet generator", "podman.socket active", "unprivileged port 80",
-	"nft", "nsenter", "getent", "jq", "curl",
+	"nft", "nsenter", "getent", "jq", "curl", "machine subnet free",
 }
 
 func TestAllOK(t *testing.T) {
@@ -172,7 +172,7 @@ func TestAllFail(t *testing.T) {
 	f.On(podmanVersion, sys.Result{Stdout: []byte("4.9.3\n")}, nil)
 	f.On(socketActive, sys.Result{ExitCode: 3, Stdout: []byte("inactive\n")}, errors.New("systemctl: non-zero exit (exit 3)"))
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{ExitCode: 2}, errors.New("gpg: non-zero exit (exit 2)"))
-	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]}]`)}, nil)
+	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
 	h := host(t, "1024", false)
 
 	got := h.Run(context.Background(), f, ws)
@@ -378,5 +378,18 @@ func TestProxySubnet(t *testing.T) {
 	f.On(networkLs, sys.Result{ExitCode: 125}, errors.New("podman: non-zero exit (exit 125)"))
 	if c := proxySubnet(context.Background(), f, ws); c.OK || !strings.Contains(c.Detail, "exit 125") {
 		t.Errorf("ls fails: %+v", c)
+	}
+}
+
+func TestMachineSubnet(t *testing.T) {
+	f := fakeHost()
+	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"railswitch_machine","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
+	if c := machineSubnet(context.Background(), f); !c.OK || c.Name != "machine subnet free" {
+		t.Errorf("own network: %+v", c)
+	}
+	f = fakeHost()
+	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
+	if c := machineSubnet(context.Background(), f); c.OK || !strings.Contains(c.Detail, "other") || !strings.Contains(c.Detail, "10.214.255.0/24") {
+		t.Errorf("taken: %+v", c)
 	}
 }

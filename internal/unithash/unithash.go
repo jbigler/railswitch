@@ -36,12 +36,30 @@ const section = "[Container]\n"
 // of its [Container] section; the hash is of the unit without that line plus
 // the inputs the container is also created from (its env file).
 func Stamp(unit []byte, key string, inputs ...[]byte) []byte {
+	return stamp(unit, key, unit, inputs)
+}
+
+// StampExcept is Stamp with a hash that ignores every line of unit (without
+// its line break) for which skip reports true: a change to those lines alone
+// keeps the label value.
+func StampExcept(unit []byte, key string, skip func(line string) bool, inputs ...[]byte) []byte {
+	kept := make([]byte, 0, len(unit))
+	for line := range bytes.Lines(unit) {
+		if !skip(string(bytes.TrimSuffix(line, []byte("\n")))) {
+			kept = append(kept, line...)
+		}
+	}
+	return stamp(unit, key, kept, inputs)
+}
+
+// stamp inserts the label of Sum(hashed, inputs…) into unit.
+func stamp(unit []byte, key string, hashed []byte, inputs [][]byte) []byte {
 	i := bytes.Index(unit, []byte("\n"+section))
 	if i < 0 {
 		return unit
 	}
 	i += 1 + len(section)
-	label := "Label=" + key + "=" + Sum(unit, inputs...) + "\n"
+	label := "Label=" + key + "=" + Sum(hashed, inputs...) + "\n"
 	out := make([]byte, 0, len(unit)+len(label))
 	out = append(out, unit[:i]...)
 	out = append(out, label...)

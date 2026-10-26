@@ -38,9 +38,10 @@ type L struct {
 	In       io.Reader
 	TTY      bool
 
-	// TraefikAPI is the base URL of Traefik's API ("": the shared
-	// proxy's); RoutePoll and RouteTimeout pace up's wait for the app's
-	// route (zero: 500ms, 30s).
+	// TraefikAPI is the base URL of Traefik's API, asked with Host
+	// traefik.localhost ("": the shared proxy's, 127.0.0.1:80); RoutePoll
+	// and RouteTimeout pace up's wait for the app's route (zero: 500ms,
+	// 30s).
 	TraefikAPI              string
 	RoutePoll, RouteTimeout time.Duration
 }
@@ -87,16 +88,13 @@ func (l *L) load(ctx context.Context, slug string) (*render.Model, *render.Insta
 func (l *L) lockPath() string { return filepath.Join(l.WS.Root, "stack.lock") }
 
 // changes accumulates the unit changes of every render of one Up.
-type changes struct{ units, traefik bool }
+type changes struct{ units bool }
 
 func (c *changes) add(d *render.Diff) {
 	for _, n := range slices.Concat(d.Added, d.Changed, d.Removed) {
 		if !strings.Contains(n, "/") { // units are bare filenames, workspace files relative paths
 			c.units = true
 		}
-	}
-	if slices.Contains(d.Added, traefikUnit) || slices.Contains(d.Changed, traefikUnit) {
-		c.traefik = true
 	}
 }
 
@@ -168,8 +166,11 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	// by an earlier render (railswitch render, wt add, a failed up) is
 	// not loaded yet or loaded stale (NeedDaemonReload). Whether a running
 	// container is stale is told by its unit-hash label (unithash), not by
-	// NeedDaemonReload, which any other daemon-reload clears.
-	reload, restartTraefik := ch.units, ch.traefik
+	// NeedDaemonReload, which any other daemon-reload clears. Traefik's
+	// label ignores its Network= lines: a project added or removed is
+	// joined or left live (AttachTraefik), never by a restart.
+	reload := ch.units
+	var restartTraefik bool
 	var restart []string // active units of this worktree running an older unit
 	key := unithash.Key(m.Prefix)
 	for _, u := range append(names.Units, traefikService) {
@@ -216,11 +217,19 @@ func (l *L) Up(ctx context.Context, slug string) error {
 			return err
 		}
 	}
+	// The app also needs the project's proxy network and Traefik. The
+	// network is started first so a running Traefik can join it live.
+	proxyNet := strings.TrimSuffix(naming.ProxyNetworkUnit(m.Prefix), ".network") + "-network.service"
+	failed := append(slices.Clone(names.Units), proxyNet, traefikService)
+	if err := sd.Start(ctx, proxyNet); err != nil {
+		return l.startFailure(ctx, sd, slug, failed, err)
+	}
+	if err := l.AttachTraefik(ctx); err != nil {
+		return err
+	}
 	app := unitOf(m, slug, m.Services[0].ID)
 	if err := sd.Start(ctx, app); err != nil {
-		// The app also needs the project's proxy network and Traefik.
-		proxyNet := strings.TrimSuffix(naming.ProxyNetworkUnit(m.Prefix), ".network") + "-network.service"
-		return l.startFailure(ctx, sd, slug, append(slices.Clone(names.Units), proxyNet, traefikService), err)
+		return l.startFailure(ctx, sd, slug, failed, err)
 	}
 	return l.waitRoute(ctx, m, in, slug)
 }

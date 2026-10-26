@@ -1,0 +1,12 @@
+# railswitch: rendered from railswitch (machine). Edit the railswitch registry, not this file.
+
+[Unit]
+Description=railswitch machine network
+
+[Network]
+NetworkName=railswitch_machine
+Subnet=10.214.255.0/24
+Gateway=10.214.255.1
+IPRange=10.214.255.128/25
+Options=mtu=1400
+Options=isolate=strict

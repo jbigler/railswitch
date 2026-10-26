@@ -52,7 +52,8 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 	return errors.Join(errs...)
 }
 
-// checkProxySubnet runs before up renders. While the project's proxy
+// checkProxySubnet runs before up renders. It refuses while another network
+// uses the machine network's subnet (checkMachineSubnet). While the project's proxy
 // network does not exist yet and another podman network overlaps the
 // registered subnet (netavark refuses it, and the network unit fails),
 // it moves the project to the lowest free subnet, which the render then
@@ -62,6 +63,9 @@ func (l *L) checkProxySubnet(ctx context.Context) error {
 	nets, err := l.podman().NetworkSubnets(ctx)
 	if err != nil {
 		return fmt.Errorf("listing podman networks: %w", err)
+	}
+	if err := checkMachineSubnet(nets); err != nil {
+		return err
 	}
 	prefix := l.WS.Project.Project.Prefix
 	own := naming.ProxyNetwork(prefix)
@@ -107,6 +111,16 @@ func (l *L) checkProxySubnet(ctx context.Context) error {
 		return err
 	}
 	fmt.Fprintf(l.Out, "proxy subnet %s is used by podman network %s; project %s moved to %s\n", registered, strings.Join(users, ", "), prefix, machine.Subnet(moved))
+	return nil
+}
+
+// checkMachineSubnet refuses while another podman network than the
+// machine network uses its reserved 10.214.255.0/24: the machine network
+// unit would fail, and Traefik and Dozzle with it.
+func checkMachineSubnet(nets map[string][]netip.Prefix) error {
+	if users := machine.SubnetUsers(nets, machine.MachineNetwork, machine.MachineSubnet); len(users) > 0 {
+		return fmt.Errorf("the machine network subnet %s is used by podman network %s: railswitch does not start Traefik and Dozzle on it; remove or move that network", machine.Subnet(machine.MachineSubnet), strings.Join(users, ", "))
+	}
 	return nil
 }
 

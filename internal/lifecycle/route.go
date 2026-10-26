@@ -13,9 +13,14 @@ import (
 	"github.com/jbigler/railswitch/internal/render"
 )
 
-// traefikAPI is the shared proxy's API, published by its unit
-// (machine.ProxyUnit: --api.insecure, 127.0.0.1:8080).
-const traefikAPI = "http://127.0.0.1:8080"
+// traefikAPI is the shared proxy's API: its railswitch-api router serves
+// it on the web entrypoint (127.0.0.1:80) for Host traefik.localhost
+// (machine.ProxyUnits). The Host header is sent explicitly, so no name
+// resolution is needed.
+const (
+	traefikAPI     = "http://127.0.0.1"
+	traefikAPIHost = "traefik.localhost"
+)
 
 // waitRoute waits until Traefik routes the app's first route, then prints
 // its URL as ready. Traefik's docker provider adds a container's routers
@@ -101,5 +106,6 @@ func traefikGet(ctx context.Context, client *http.Client, url string) (*http.Res
 	if err != nil {
 		return nil, err
 	}
+	req.Host = traefikAPIHost
 	return client.Do(req)
 }

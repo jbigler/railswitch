@@ -43,6 +43,8 @@ func TestSimpleArgv(t *testing.T) {
 		{"RemoveContainer", func(p Podman) error { return p.RemoveContainer(ctx, "api") }, []string{"podman", "rm", "-f", "--ignore", "api"}},
 		{"RemoveVolume", func(p Podman) error { return p.RemoveVolume(ctx, "api") }, []string{"podman", "volume", "rm", "-f", "api"}},
 		{"RemoveNetwork", func(p Podman) error { return p.RemoveNetwork(ctx, "api") }, []string{"podman", "network", "rm", "-f", "api"}},
+		{"NetworkConnect", func(p Podman) error { return p.NetworkConnect(ctx, "api_proxy", "railswitch-traefik", "10.214.3.2") }, []string{"podman", "network", "connect", "--ip", "10.214.3.2", "api_proxy", "railswitch-traefik"}},
+		{"NetworkDisconnect", func(p Podman) error { return p.NetworkDisconnect(ctx, "api_proxy", "railswitch-traefik") }, []string{"podman", "network", "disconnect", "api_proxy", "railswitch-traefik"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := &systest.Fake{}
@@ -419,5 +421,20 @@ func TestNetworkSubnets(t *testing.T) {
 	f.On([]string{"podman", "network", "ls"}, r, e)
 	if _, err := (Podman{R: f}).NetworkSubnets(ctx); err == nil {
 		t.Fatal("failed ls: want error")
+	}
+}
+
+func TestPodmanNetworks(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"podman", "container", "inspect"}, sys.Result{Stdout: []byte("a_proxy railswitch_machine \n")}, nil)
+	got, err := Podman{R: f}.Networks(ctx, "railswitch-traefik")
+	if err != nil || !slices.Equal(got, []string{"a_proxy", "railswitch_machine"}) {
+		t.Fatalf("got %q %v", got, err)
+	}
+	wantCalls(t, f, []string{"podman", "container", "inspect", "--format", `{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}`, "railswitch-traefik"})
+	r, e := exitErr(125, "Error: no such container railswitch-traefik")
+	f.On([]string{"podman", "container", "inspect"}, r, e)
+	if got, err := (Podman{R: f}).Networks(ctx, "railswitch-traefik"); len(got) != 0 || err != nil {
+		t.Fatalf("missing: got %q %v", got, err)
 	}
 }

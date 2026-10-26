@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/machine"
@@ -23,33 +24,6 @@ func twoProjects() *machine.Registry {
 	}}
 }
 
-func TestProxyUnitsGolden(t *testing.T) {
-	units := machine.ProxyUnits(twoProjects())
-	if len(units) != 1 {
-		t.Fatalf("units = %v, want only %s", len(units), machine.ProxyUnitName)
-	}
-	got, ok := units[machine.ProxyUnitName]
-	if !ok {
-		t.Fatalf("no %s in %v", machine.ProxyUnitName, units)
-	}
-	golden := filepath.Join("testdata", "golden", machine.ProxyUnitName)
-	if *update {
-		if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(golden, got, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(golden)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != string(want) {
-		t.Errorf("%s differs from its golden (go test ./internal/machine -run TestProxyUnitsGolden -update):\n--- got\n%s\n--- want\n%s", machine.ProxyUnitName, got, want)
-	}
-}
-
 func TestProxyUnitsNoProjects(t *testing.T) {
 	if units := machine.ProxyUnits(&machine.Registry{Schema: machine.SchemaVersion}); len(units) != 0 {
 		t.Fatalf("zero projects rendered %v", units)
@@ -63,12 +37,17 @@ func TestProxyUnitsLintClean(t *testing.T) {
 }
 
 // TestProxyUnitHashLabel: Traefik's unit carries railswitch.unit-hash, the
-// hash of the unit with that label line excluded.
+// hash of the unit with that label line and its Network= lines excluded.
 func TestProxyUnitHashLabel(t *testing.T) {
 	data := machine.ProxyUnits(twoProjects())[machine.ProxyUnitName]
 	key := unithash.Key("railswitch")
 	h := unithash.Read(data, key)
-	rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1)
+	var rest []byte
+	for line := range bytes.Lines(bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1)) {
+		if !bytes.HasPrefix(line, []byte("Network=")) {
+			rest = append(rest, line...)
+		}
+	}
 	if h == "" || unithash.Sum(rest) != h {
 		t.Errorf("unit-hash %q; want %q", h, unithash.Sum(rest))
 	}
@@ -127,5 +106,104 @@ func TestRefreshProxyUnits(t *testing.T) {
 	}
 	if got := read(); got != "[Container]\n" {
 		t.Errorf("user file = %q", got)
+	}
+}
+
+// TestProxyUnitsMachine: the machine-wide units are Traefik, the machine
+// network and Dozzle; Traefik joins every project's proxy network and the
+// machine network, publishes only :80 and routes its API by host.
+func TestProxyUnitsMachine(t *testing.T) {
+	units := machine.ProxyUnits(twoProjects())
+	names := []string{machine.ProxyUnitName, machine.MachineNetworkUnitName, machine.DozzleUnitName}
+	if len(units) != len(names) {
+		t.Fatalf("units = %d, want %v", len(units), names)
+	}
+	for _, name := range names {
+		got, ok := units[name]
+		if !ok {
+			t.Fatalf("no %s", name)
+		}
+		golden := filepath.Join("testdata", "golden", name)
+		if *update {
+			if err := os.WriteFile(golden, got, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		want, err := os.ReadFile(golden)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != string(want) {
+			t.Errorf("%s differs from its golden (-update):\n--- got\n%s\n--- want\n%s", name, got, want)
+		}
+	}
+	if fs := render.Lint(map[string][]byte{machine.DozzleUnitName: units[machine.DozzleUnitName]}); len(fs) != 0 {
+		t.Errorf("dozzle lint: %+v", fs)
+	}
+	tr := string(units[machine.ProxyUnitName])
+	if n := strings.Count(tr, "\nNetwork="); n != 3 {
+		t.Errorf("traefik has %d Network= lines, want 3:\n%s", n, tr)
+	}
+	for _, bad := range []string{"Requires=", "After=", "--api.insecure", "127.0.0.1:8080"} {
+		if strings.Contains(tr, bad) {
+			t.Errorf("traefik unit has %q:\n%s", bad, tr)
+		}
+	}
+	for _, want := range []string{
+		"Network=railswitch-machine.network:ip=10.214.255.2\n",
+		"Label=traefik.enable=true\n",
+		"Label=\"traefik.http.routers.railswitch-api.rule=Host(`traefik.localhost`) && (" + machine.HostClientClause() + ")\"\n",
+		"Label=traefik.http.routers.railswitch-api.service=api@internal\n",
+	} {
+		if !strings.Contains(tr, want) {
+			t.Errorf("traefik unit lacks %q", want)
+		}
+	}
+	dz := string(units[machine.DozzleUnitName])
+	if want := "Label=\"traefik.http.routers.railswitch-logs.rule=Host(`logs.localhost`) && (" + machine.HostClientClause() + ")\"\n"; !strings.Contains(dz, want) {
+		t.Errorf("dozzle unit lacks %q:\n%s", want, dz)
+	}
+}
+
+// TestRefreshProxyUnitsMachine: every machine-wide unit is refreshed, and
+// all go with the last project.
+func TestRefreshProxyUnitsMachine(t *testing.T) {
+	dir := t.TempDir()
+	one := &machine.Registry{Schema: machine.SchemaVersion, Projects: twoProjects().Projects[:1]}
+	for name, data := range machine.ProxyUnits(twoProjects()) {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := machine.RefreshProxyUnits(one, dir); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range machine.ProxyUnits(one) {
+		got, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil || string(got) != string(want) {
+			t.Errorf("%s = %q, %v; want %q", name, got, err, want)
+		}
+	}
+	if err := machine.RefreshProxyUnits(&machine.Registry{Schema: machine.SchemaVersion}, dir); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{machine.ProxyUnitName, machine.MachineNetworkUnitName, machine.DozzleUnitName} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("%s with no project left: %v; want removed", name, err)
+		}
+	}
+}
+
+// TestTraefikHashIgnoresNetworks: adding a project changes Traefik's unit
+// (a Network= line) but not its unit-hash, so Traefik isn't restarted.
+func TestTraefikHashIgnoresNetworks(t *testing.T) {
+	key := unithash.Key("railswitch")
+	both := machine.ProxyUnits(twoProjects())[machine.ProxyUnitName]
+	one := machine.ProxyUnits(&machine.Registry{Schema: machine.SchemaVersion, Projects: twoProjects().Projects[:1]})[machine.ProxyUnitName]
+	if bytes.Equal(both, one) {
+		t.Fatal("units equal")
+	}
+	if a, b := unithash.Read(both, key), unithash.Read(one, key); a == "" || a != b {
+		t.Errorf("unit-hash %q with two projects, %q with one", a, b)
 	}
 }

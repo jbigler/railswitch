@@ -25,6 +25,10 @@ func newFakeTraefik(t *testing.T, routers ...string) (*fakeTraefik, string) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ft.mu.Lock()
 		defer ft.mu.Unlock()
+		if r.Host != "traefik.localhost" { // Traefik routes its API by host
+			http.NotFound(w, r)
+			return
+		}
 		if r.URL.Path == "/api/http/routers" {
 			var all []map[string]string
 			for _, n := range ft.routers {

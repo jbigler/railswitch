@@ -69,6 +69,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
+	out = append(out, machineSubnet(ctx, r))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws))
 	}
@@ -242,6 +243,25 @@ func proxySubnet(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Che
 	}
 	subnet := machine.Subnet(pe.Subnet)
 	if users := machine.SubnetUsers(nets, own, pe.Subnet); len(users) > 0 {
+		c.Detail = subnet + " overlaps podman network " + strings.Join(users, ", ")
+		return c
+	}
+	c.OK, c.Detail = true, subnet+" overlaps no other podman network"
+	return c
+}
+
+// machineSubnet checks that no other podman network than the machine
+// network uses its reserved subnet: up refuses to start Traefik and Dozzle
+// on it.
+func machineSubnet(ctx context.Context, r sys.Runner) Check {
+	subnet := machine.Subnet(machine.MachineSubnet)
+	c := Check{Name: "machine subnet free", Fix: "remove or move the podman network named in detail: " + subnet + " is reserved for " + machine.MachineNetwork}
+	nets, err := podman.Podman{R: r}.NetworkSubnets(ctx)
+	if err != nil {
+		c.Detail, c.Fix = err.Error(), "fix podman network ls --format json"
+		return c
+	}
+	if users := machine.SubnetUsers(nets, machine.MachineNetwork, machine.MachineSubnet); len(users) > 0 {
 		c.Detail = subnet + " overlaps podman network " + strings.Join(users, ", ")
 		return c
 	}

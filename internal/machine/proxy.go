@@ -19,12 +19,21 @@ import (
 // rather than in render because render imports machine; render.Marker is it.
 const Marker = "# railswitch: rendered from "
 
-// ProxyUnitName is the shared Traefik unit's file name.
-const ProxyUnitName = "railswitch-traefik.container"
+// The machine-wide units' file names, and the machine network's name.
+const (
+	ProxyUnitName          = "railswitch-traefik.container"
+	MachineNetworkUnitName = "railswitch-machine.network"
+	DozzleUnitName         = "railswitch-dozzle.container"
+	MachineNetwork         = "railswitch_machine"
+)
+
+// machineUnitNames are every unit ProxyUnits renders.
+var machineUnitNames = []string{ProxyUnitName, MachineNetworkUnitName, DozzleUnitName}
 
 // traefikFlags are Traefik's static configuration (fd7336b) minus
 // --providers.docker.network: each routed container carries its own
-// traefik.docker.network label.
+// traefik.docker.network label. The API is served only through the
+// railswitch-api router (traefik.localhost), never --api.insecure.
 var traefikFlags = []string{
 	"--providers.docker=true",
 	"--providers.docker.exposedByDefault=false",
@@ -36,14 +45,28 @@ var traefikFlags = []string{
 	"--entryPoints.web.http.encodedcharacters.allowencodedpercent=true",
 	"--entryPoints.web.http.encodedcharacters.allowencodedquestionmark=true",
 	"--entryPoints.web.http.encodedcharacters.allowencodedhash=true",
-	"--api.insecure=true",
+	"--api=true",
 	"--log.level=INFO",
 	"--accesslog=false",
 }
 
+// machineMarker is line 1 of every machine-wide unit.
+const machineMarker = Marker + "railswitch (machine). Edit the railswitch registry, not this file."
+
+// hostRule is the rule of a machine router serving host h to the host only
+// (D50), double-quoted for Label=: it holds spaces, no quote or backslash.
+func hostRule(router, h string) string {
+	return `"traefik.http.routers.` + router + ".rule=Host(`" + h + "`) && (" + HostClientClause() + `)"`
+}
+
+// isNetworkLine reports a Network= line: Traefik's unit-hash ignores them,
+// so adding or removing a project doesn't restart it (it joins live).
+func isNetworkLine(l string) bool { return strings.HasPrefix(l, "Network=") }
+
 // ProxyUnits renders the machine-wide units, keyed by filename: the shared
 // Traefik container, joined to every registered project's proxy network at
-// its fixed address (D21). With no project registered it renders nothing.
+// its fixed address (D21) and to the machine network; the machine network;
+// and Dozzle on it. With no project registered it renders nothing.
 // Prefixes and subnets come from the registry and hold no % or $.
 func ProxyUnits(r *Registry) map[string][]byte {
 	if len(r.Projects) == 0 {
@@ -51,32 +74,29 @@ func ProxyUnits(r *Registry) map[string][]byte {
 	}
 	ps := slices.Clone(r.Projects)
 	slices.SortFunc(ps, func(a, b ProjectEntry) int { return cmp.Compare(a.Subnet, b.Subnet) })
+	lines := func(s ...string) []byte { return []byte(strings.Join(s, "\n") + "\n") }
 
-	var b strings.Builder
-	line := func(s ...string) {
-		for _, l := range s {
-			b.WriteString(l + "\n")
-		}
-	}
-	line(Marker+"railswitch (machine). Edit the railswitch registry, not this file.",
+	// The networks' Requires=/After= come from Quadlet itself (D27).
+	traefik := []string{machineMarker,
 		"",
 		"[Unit]",
-		"Description=railswitch Traefik")
-	for _, p := range ps {
-		svc := strings.TrimSuffix(naming.ProxyNetworkUnit(p.Prefix), ".network") + "-network.service"
-		line("Requires="+svc, "After="+svc)
-	}
-	line("", "[Container]",
+		"Description=railswitch Traefik",
+		"",
+		"[Container]",
 		"Image=docker.io/traefik:v3.7",
-		"ContainerName=railswitch-traefik")
+		"ContainerName=railswitch-traefik",
+		"Network=" + MachineNetworkUnitName + ":ip=" + TraefikIP(MachineSubnet)}
 	for _, p := range ps {
-		line("Network=" + naming.ProxyNetworkUnit(p.Prefix) + ":ip=" + TraefikIP(p.Subnet))
+		traefik = append(traefik, "Network="+naming.ProxyNetworkUnit(p.Prefix)+":ip="+TraefikIP(p.Subnet))
 	}
-	line("PublishPort=127.0.0.1:80:80",
-		"PublishPort=127.0.0.1:8080:8080",
+	traefik = append(traefik,
+		"PublishPort=127.0.0.1:80:80",
 		"Volume=%t/podman/podman.sock:/var/run/docker.sock:ro",
 		"LogDriver=k8s-file",
 		"LogOpt=max-size=20m",
+		"Label=traefik.enable=true",
+		"Label="+hostRule("railswitch-api", "traefik.localhost"),
+		"Label=traefik.http.routers.railswitch-api.service=api@internal",
 		"Exec="+strings.Join(traefikFlags, " \\\n  "),
 		"NoNewPrivileges=true",
 		"Memory=512m",
@@ -84,7 +104,52 @@ func ProxyUnits(r *Registry) map[string][]byte {
 		"",
 		"[Service]",
 		"Restart=on-failure")
-	return map[string][]byte{ProxyUnitName: unithash.Stamp([]byte(b.String()), unithash.Key("railswitch"))}
+
+	network := lines(machineMarker,
+		"",
+		"[Unit]",
+		"Description=railswitch machine network",
+		"",
+		"[Network]",
+		"NetworkName="+MachineNetwork,
+		"Subnet="+Subnet(MachineSubnet),
+		"Gateway="+Gateway(MachineSubnet),
+		"IPRange="+IPRange(MachineSubnet),
+		"Options=mtu=1400",
+		"Options=isolate=strict")
+
+	dozzle := lines(machineMarker,
+		"",
+		"[Unit]",
+		"Description=railswitch Dozzle",
+		"",
+		"[Container]",
+		"Image=docker.io/amir20/dozzle:v11.3.5",
+		"ContainerName=railswitch-dozzle",
+		"Network="+MachineNetworkUnitName+":ip="+addr(MachineSubnet, ".3"),
+		"Volume=%t/podman/podman.sock:/var/run/docker.sock:ro",
+		"LogDriver=k8s-file",
+		"LogOpt=max-size=20m",
+		"Label=traefik.enable=true",
+		"Label=traefik.docker.network="+MachineNetwork,
+		"Label="+hostRule("railswitch-logs", "logs.localhost"),
+		"Label=traefik.http.routers.railswitch-logs.entrypoints=web",
+		"Label=traefik.http.routers.railswitch-logs.service=railswitch-logs",
+		"Label=traefik.http.services.railswitch-logs.loadbalancer.server.port=8080",
+		"DropCapability=all",
+		"NoNewPrivileges=true",
+		"Memory=256m",
+		"PidsLimit=256",
+		"",
+		"[Service]",
+		"Restart=on-failure")
+
+	key := unithash.Key("railswitch")
+	return map[string][]byte{
+		ProxyUnitName:          unithash.StampExcept(lines(traefik...), key, isNetworkLine),
+		MachineNetworkUnitName: network,
+		DozzleUnitName:         dozzle,
+	}
 }
 
 // RefreshProxyUnits brings the machine-wide units already in quadletDir in
@@ -94,7 +159,7 @@ func ProxyUnits(r *Registry) map[string][]byte {
 // unit not on disk is left absent; the next render writes it.
 func RefreshProxyUnits(r *Registry, quadletDir string) error {
 	want := ProxyUnits(r)
-	for _, name := range []string{ProxyUnitName} {
+	for _, name := range machineUnitNames {
 		path := filepath.Join(quadletDir, name)
 		old, err := os.ReadFile(path)
 		if errors.Is(err, fs.ErrNotExist) {

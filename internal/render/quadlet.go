@@ -25,6 +25,9 @@ const Marker = machine.Marker
 // traefikUnit is the machine-wide proxy (§4).
 const traefikUnit = "railswitch-traefik.service"
 
+// dozzleUnit is the machine-wide log viewer, at logs.localhost.
+const dozzleUnit = "railswitch-dozzle.service"
+
 // Quadlet renders the project's Quadlet files, keyed by filename: the proxy
 // network, and for every worktree its dev network and one .container per
 // service. Every value railswitch did not write itself as a literal key is
@@ -182,6 +185,9 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 	}
 	if s.Role == RoleApp || len(s.Routes) > 0 {
 		wants = append(wants, traefikUnit)
+	}
+	if s.Role == RoleApp {
+		wants = append(wants, dozzleUnit)
 	}
 	if len(requires) > 0 {
 		u.add("Unit", "Requires", strings.Join(requires, " "))

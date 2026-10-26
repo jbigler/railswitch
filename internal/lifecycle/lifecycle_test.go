@@ -217,9 +217,12 @@ func TestUpOrder(t *testing.T) {
 		"podman volume exists filial-feat-rustfs-data", "podman volume create filial-feat-rustfs-data",
 		"podman volume import filial-feat-rustfs-data "+ws+"/db-dumps/rustfs_data.tar.gz",
 		"systemctl --user daemon-reload",
-		"systemctl --user restart railswitch-traefik.service",
+		"systemctl --user start filial-proxy-network.service",
 		"systemctl --user start filial-feat-rails.service",
 	)
+	if n := count(calls, "systemctl --user restart"); n != 0 {
+		t.Errorf("restarted:\n%s", dump(calls))
+	}
 	b := builds(calls)
 	if len(b) != 4 {
 		t.Fatalf("builds:\n%s", dump(b))
@@ -1135,7 +1138,7 @@ func TestUpMovesClashingSubnet(t *testing.T) {
 			t.Errorf("filial-proxy.network lacks %s:\n%s", w, net)
 		}
 	}
-	if tr := readUnit(t, e.l.WS.Dirs.Quadlet, "railswitch-traefik.container"); !strings.Contains(tr, "10.214.1.2") || strings.Contains(tr, "10.214.0.2") {
+	if tr := readUnit(t, e.l.WS.Dirs.Quadlet, "railswitch-traefik.container"); !strings.Contains(tr, "ip=10.214.1.2\n") || strings.Contains(tr, "ip=10.214.0.2\n") {
 		t.Errorf("traefik unit keeps the old IP:\n%s", tr)
 	}
 }

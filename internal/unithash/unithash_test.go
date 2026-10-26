@@ -31,3 +31,16 @@ func TestStamp(t *testing.T) {
 		t.Error("a changed unit has the same hash")
 	}
 }
+
+func TestStampExcept(t *testing.T) {
+	skip := func(l string) bool { return strings.HasPrefix(l, "Network=") }
+	a := StampExcept([]byte("[Unit]\n\n[Container]\nNetwork=a\nImage=x\n"), "k", skip)
+	b := StampExcept([]byte("[Unit]\n\n[Container]\nNetwork=b\nNetwork=c\nImage=x\n"), "k", skip)
+	c := StampExcept([]byte("[Unit]\n\n[Container]\nNetwork=a\nImage=y\n"), "k", skip)
+	if Read(a, "k") == "" || Read(a, "k") != Read(b, "k") {
+		t.Errorf("skipped lines changed the hash: %q %q", Read(a, "k"), Read(b, "k"))
+	}
+	if Read(a, "k") == Read(c, "k") {
+		t.Error("a kept line did not change the hash")
+	}
+}

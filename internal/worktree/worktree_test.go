@@ -76,7 +76,7 @@ func setup(t *testing.T) *tenv {
 	if _, err := reg.AddProject(prefix, ws, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reg.AddWorktree(prefix, "master"); err != nil {
+	if _, err := reg.AddWorktree(prefix, "master", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := reg.Save(); err != nil {
@@ -91,6 +91,7 @@ func setup(t *testing.T) *tenv {
 		Pfx:  prefix,
 		Data: data,
 		Base: "master",
+		Proc: t.TempDir(), // no listening ports
 		In:   strings.NewReader(""),
 		Out:  e.out,
 		// Like workspace.Render: an env dir for every registered worktree.
@@ -185,6 +186,28 @@ func TestAddAllocatesAfterGit(t *testing.T) {
 		if c[0] == "git" && !slices.Contains(c, "core.fsmonitor=false") || c[0] == "git" && !slices.Contains(c, "core.hooksPath=/dev/null") {
 			t.Errorf("git call without the safety config: %q", c)
 		}
+	}
+}
+
+// TestAddSkipsListeningPort: an ID whose port another program listens on
+// (here 127.0.0.1:13002) is never handed out.
+func TestAddSkipsListeningPort(t *testing.T) {
+	e := setup(t)
+	reg, err := machine.Open(e.m.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.SetPorts(prefix, map[string]int{"app": 13000}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reg.Close()
+	writeFile(t, filepath.Join(e.m.Proc, "net", "tcp"),
+		"  sl  local_address rem_address   st\n   0: 0100007F:32CA 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 4242 1\n")
+	if w := e.add(t, "feat", ""); w.ID != 3 {
+		t.Errorf("ID = %d; want 3 (13002 is in use)", w.ID)
 	}
 }
 

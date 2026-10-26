@@ -508,6 +508,18 @@ func (m *Model) serviceIDs() []string {
 	return ids
 }
 
+// PortBases is every published port's base by port name: the [[ports]] of
+// the pack, options and tools the project uses.
+func (m *Model) PortBases() map[string]int {
+	bases := map[string]int{}
+	for _, s := range m.Services {
+		for _, p := range s.Publish {
+			bases[p.Name] = p.Base
+		}
+	}
+	return bases
+}
+
 // checkRefs refuses a [services.<id>] or a secret's services entry that
 // names no service of this stack.
 func (b *builder) checkRefs() error {

@@ -81,7 +81,7 @@ func setup(t *testing.T, slugs ...string) *tenv {
 		t.Fatal(err)
 	}
 	for _, s := range slugs {
-		if _, err := reg.AddWorktree("filial", s); err != nil {
+		if _, err := reg.AddWorktree("filial", s, nil); err != nil {
 			t.Fatal(err)
 		}
 	}

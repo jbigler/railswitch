@@ -600,3 +600,20 @@ func TestNewNetworkLsFails(t *testing.T) {
 		t.Error("shop registered despite the failed podman network ls")
 	}
 }
+
+// TestNewSetsPortsBeforeWorktree: the project's port bases are recorded
+// before its base worktree gets an ID, so another program's dev server on
+// 127.0.0.1:13001 makes the base worktree ID 2.
+func TestNewSetsPortsBeforeWorktree(t *testing.T) {
+	dirs := newEnv(t)
+	listening(t, 13001)
+	ws := filepath.Join(t.TempDir(), "shop")
+	mustNew(t, ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main")
+	reg := registry(t, dirs)
+	if wts := reg.WorktreesOf("shop"); len(wts) != 1 || wts[0].ID != 2 {
+		t.Errorf("registry worktrees = %+v; want main ID 2", wts)
+	}
+	if pe, _ := reg.Project("shop"); pe.Ports["app"] != 13000 {
+		t.Errorf("shop ports = %v; want app 13000", pe.Ports)
+	}
+}

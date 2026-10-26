@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -21,7 +22,9 @@ import (
 // SchemaVersion is the registry.toml schema this railswitch reads (D39).
 const SchemaVersion = 1
 
-const maxSubnet = 255 // 10.214.<n>.0/24, n in 0..255
+// MachineSubnet is the reserved 10.214.255.0/24 of the machine network
+// railswitch_machine; projects get 10.214.<n>.0/24 with n in 0..254.
+const MachineSubnet = 255
 
 var (
 	ErrPrefixTaken = errors.New("project prefix is already registered")
@@ -30,9 +33,10 @@ var (
 
 // ProjectEntry is one registered project.
 type ProjectEntry struct {
-	Prefix    string `toml:"prefix"`
-	Workspace string `toml:"workspace"`
-	Subnet    int    `toml:"subnet"` // n in 10.214.n.0/24
+	Prefix    string         `toml:"prefix"`
+	Workspace string         `toml:"workspace"`
+	Subnet    int            `toml:"subnet"` // n in 10.214.n.0/24
+	Ports     map[string]int `toml:"ports"`  // port name → base: every [[ports]] base of its pack, options and tools
 }
 
 // WorktreeEntry is one registered worktree. ID is unique machine-wide; ports
@@ -169,7 +173,7 @@ func (r *Registry) freeSubnet(prefix string, taken []netip.Prefix) (int, error) 
 			used[p.Subnet] = true
 		}
 	}
-	for n := 0; n <= maxSubnet; n++ {
+	for n := range MachineSubnet {
 		if !used[n] && !Overlaps(SubnetPrefix(n), taken) {
 			return n, nil
 		}
@@ -210,9 +214,49 @@ func SubnetUsers(nets map[string][]netip.Prefix, own string, n int) []string {
 // storage 19000+ID).
 const MaxWorktreeID = 99
 
+// SetPorts records prefix's port bases (port name → base). Two different
+// bases on the machine must be more than MaxWorktreeID apart, or their
+// base+ID ranges overlap: a base within MaxWorktreeID of another project's
+// different base, or two of prefix's own, is refused and nothing changes.
+func (r *Registry) SetPorts(prefix string, ports map[string]int) error {
+	i := slices.IndexFunc(r.Projects, func(p ProjectEntry) bool { return p.Prefix == prefix })
+	if i < 0 {
+		return fmt.Errorf("project %s: %w", prefix, fs.ErrNotExist)
+	}
+	names := slices.Sorted(maps.Keys(ports))
+	for j, a := range names {
+		for _, b := range names[j+1:] {
+			if tooClose(ports[a], ports[b]) {
+				return fmt.Errorf("project %s: port %s base %d and port %s base %d are less than %d apart, so their base+ID ranges overlap", prefix, a, ports[a], b, ports[b], MaxWorktreeID+1)
+			}
+		}
+	}
+	for _, p := range r.Projects {
+		if p.Prefix == prefix {
+			continue
+		}
+		for _, a := range names {
+			for _, b := range slices.Sorted(maps.Keys(p.Ports)) {
+				if tooClose(ports[a], p.Ports[b]) {
+					return fmt.Errorf("project %s: port %s base %d is less than %d from project %s's port %s base %d, so their base+ID ranges overlap", prefix, a, ports[a], MaxWorktreeID+1, p.Prefix, b, p.Ports[b])
+				}
+			}
+		}
+	}
+	r.Projects[i].Ports = maps.Clone(ports)
+	return nil
+}
+
+// tooClose reports whether a and b are different bases whose base+ID
+// ranges (ID 1..MaxWorktreeID) overlap.
+func tooClose(a, b int) bool {
+	return a != b && max(a-b, b-a) <= MaxWorktreeID
+}
+
 // AddWorktree registers slug under a registered project on the lowest free
-// ID in 1..MaxWorktreeID, machine-wide.
-func (r *Registry) AddWorktree(prefix, slug string) (WorktreeEntry, error) {
+// ID in 1..MaxWorktreeID, machine-wide, for which no base+ID of any base
+// recorded on the machine is in busy (ports in use, see Listening).
+func (r *Registry) AddWorktree(prefix, slug string, busy map[int]bool) (WorktreeEntry, error) {
 	if _, ok := r.Project(prefix); !ok {
 		return WorktreeEntry{}, fmt.Errorf("project %s is not registered", prefix)
 	}
@@ -223,12 +267,31 @@ func (r *Registry) AddWorktree(prefix, slug string) (WorktreeEntry, error) {
 		}
 		used[w.ID] = true
 	}
+	var bases []int
+	for _, p := range r.Projects {
+		for _, b := range p.Ports {
+			bases = append(bases, b)
+		}
+	}
+	slices.Sort(bases)
+	bases = slices.Compact(bases)
+	blocked := 0 // the first port in use that kept a free ID from being handed out
 	for id := 1; id <= MaxWorktreeID; id++ {
-		if !used[id] {
+		if used[id] {
+			continue
+		}
+		i := slices.IndexFunc(bases, func(b int) bool { return busy[b+id] })
+		if i < 0 {
 			e := WorktreeEntry{Prefix: prefix, Slug: slug, ID: id}
 			r.Worktrees = append(r.Worktrees, e)
 			return e, nil
 		}
+		if blocked == 0 {
+			blocked = bases[i] + id
+		}
+	}
+	if blocked != 0 {
+		return WorktreeEntry{}, fmt.Errorf("%s/%s: no free worktree ID: every free ID has a port another program listens on (the first: port %d); stop it or remove a worktree with railswitch wt rm", prefix, slug, blocked)
 	}
 	return WorktreeEntry{}, fmt.Errorf("%s/%s: at most %d worktrees per machine; remove one with railswitch wt rm", prefix, slug, MaxWorktreeID)
 }

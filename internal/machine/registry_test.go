@@ -27,7 +27,7 @@ func newRegistry(t *testing.T, prefixes ...string) *Registry {
 
 func addWT(t *testing.T, r *Registry, prefix, slug string) WorktreeEntry {
 	t.Helper()
-	w, err := r.AddWorktree(prefix, slug)
+	w, err := r.AddWorktree(prefix, slug, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestWorktreeIDCeiling(t *testing.T) {
 	for i := 1; i <= 99; i++ {
 		addWT(t, r, "a", fmt.Sprintf("w%d", i))
 	}
-	_, err := r.AddWorktree("a", "w100")
+	_, err := r.AddWorktree("a", "w100", nil)
 	if err == nil || !strings.Contains(err.Error(), "at most 99 worktrees per machine; remove one with railswitch wt rm") {
 		t.Fatalf("100th AddWorktree = %v", err)
 	}
@@ -96,7 +96,7 @@ func TestRemoveWorktreeUnknown(t *testing.T) {
 func TestSlugTaken(t *testing.T) {
 	r := newRegistry(t, "a", "b")
 	addWT(t, r, "a", "master")
-	if _, err := r.AddWorktree("a", "master"); !errors.Is(err, ErrSlugTaken) {
+	if _, err := r.AddWorktree("a", "master", nil); !errors.Is(err, ErrSlugTaken) {
 		t.Errorf("second AddWorktree(a, master) = %v; want ErrSlugTaken", err)
 	}
 	addWT(t, r, "b", "master") // same slug, other project: fine
@@ -104,7 +104,7 @@ func TestSlugTaken(t *testing.T) {
 
 func TestAddWorktreeUnknownProject(t *testing.T) {
 	r := newRegistry(t)
-	if _, err := r.AddWorktree("nope", "master"); err == nil {
+	if _, err := r.AddWorktree("nope", "master", nil); err == nil {
 		t.Error("AddWorktree on an unregistered project succeeded")
 	}
 }
@@ -157,6 +157,96 @@ func TestSubnetPoolExhausted(t *testing.T) {
 	}
 }
 
+// TestMachineSubnetReserved: 10.214.255.0/24 belongs to the machine network
+// and is never handed to a project.
+func TestMachineSubnetReserved(t *testing.T) {
+	r := &Registry{Schema: SchemaVersion}
+	for n := range MachineSubnet {
+		r.Projects = append(r.Projects, ProjectEntry{Prefix: fmt.Sprintf("p%d", n), Subnet: n})
+	}
+	if e, err := r.AddProject("last", "/ws", nil); err == nil {
+		t.Errorf("AddProject with 0..254 used = %+v; want an error (255 is the machine's)", e)
+	}
+	r = &Registry{Schema: SchemaVersion}
+	e, err := r.AddProject("b", "/ws/b", []netip.Prefix{netip.MustParsePrefix("10.214.255.0/24")})
+	if err != nil || e.Subnet != 0 {
+		t.Errorf("AddProject with 10.214.255.0/24 taken = %+v, %v; want subnet 0", e, err)
+	}
+}
+
+func TestAddWorktreeSkipsBusy(t *testing.T) {
+	for _, c := range []struct {
+		busy map[int]bool
+		want int
+	}{
+		{map[int]bool{13001: true}, 2},
+		{map[int]bool{13001: true, 19002: true}, 3},
+	} {
+		r := newRegistry(t, "a")
+		if err := r.SetPorts("a", map[string]int{"app": 13000, "s3": 19000}); err != nil {
+			t.Fatal(err)
+		}
+		w, err := r.AddWorktree("a", "master", c.busy)
+		if err != nil || w.ID != c.want {
+			t.Errorf("busy %v: AddWorktree = %+v, %v; want ID %d", c.busy, w, err, c.want)
+		}
+	}
+}
+
+// TestAddWorktreeAllBusy: no free ID names the first blocking port.
+func TestAddWorktreeAllBusy(t *testing.T) {
+	r := newRegistry(t, "a")
+	if err := r.SetPorts("a", map[string]int{"app": 13000}); err != nil {
+		t.Fatal(err)
+	}
+	busy := map[int]bool{}
+	for id := 1; id <= MaxWorktreeID; id++ {
+		busy[13000+id] = true
+	}
+	_, err := r.AddWorktree("a", "master", busy)
+	if err == nil || !strings.Contains(err.Error(), "port 13001") {
+		t.Errorf("AddWorktree = %v; want an error naming port 13001", err)
+	}
+}
+
+func TestSetPortsConflict(t *testing.T) {
+	r := newRegistry(t, "a", "b")
+	if err := r.SetPorts("a", map[string]int{"app": 13000}); err != nil {
+		t.Fatal(err)
+	}
+	err := r.SetPorts("b", map[string]int{"x": 13050})
+	if err == nil {
+		t.Fatal("SetPorts(b, x=13050) succeeded within 99 of a's 13000")
+	}
+	for _, s := range []string{"a", "b", "13000", "13050"} {
+		if !strings.Contains(err.Error(), s) {
+			t.Errorf("error %q does not name %s", err, s)
+		}
+	}
+	if pe, _ := r.Project("b"); pe.Ports != nil {
+		t.Errorf("b ports = %v after a refused SetPorts", pe.Ports)
+	}
+	if err := r.SetPorts("b", map[string]int{"app": 13000}); err != nil {
+		t.Errorf("SetPorts(b, app=13000), the same base as a: %v", err)
+	}
+	if pe, _ := r.Project("b"); pe.Ports["app"] != 13000 {
+		t.Errorf("b ports = %v", pe.Ports)
+	}
+}
+
+func TestSetPortsOwnSpacing(t *testing.T) {
+	r := newRegistry(t, "a")
+	err := r.SetPorts("a", map[string]int{"app": 13000, "x": 13050})
+	if err == nil {
+		t.Fatal("SetPorts with two own bases 50 apart succeeded")
+	}
+	for _, s := range []string{"a", "app", "x", "13000", "13050"} {
+		if !strings.Contains(err.Error(), s) {
+			t.Errorf("error %q does not name %s", err, s)
+		}
+	}
+}
+
 func TestAddresses(t *testing.T) {
 	for got, want := range map[string]string{
 		Subnet(3):    "10.214.3.0/24",
@@ -197,7 +287,7 @@ func TestSaveRoundTrip(t *testing.T) {
 	if _, err := l.AddProject("filial", "/home/u/filial", nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.AddWorktree("filial", "master"); err != nil {
+	if _, err := l.AddWorktree("filial", "master", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := l.Save(); err != nil {

@@ -35,7 +35,10 @@ type Manager struct {
 	// registry change (Open → change → Save → Close), never across Render:
 	// Render opens it too, and flock is per open file description, so
 	// holding it would deadlock.
-	Data      string
+	Data string
+	// Proc is the procfs root ("/proc") of the host's listening TCP ports
+	// (machine.Listening): an ID with a port in use is never handed out.
+	Proc      string
 	Base      string   // [project] base_branch; the base worktree is <WS>/<Sanitize(Base)> (D22)
 	SeedFiles []string // [project] seed_files, relative to a worktree
 	In        io.Reader
@@ -370,14 +373,19 @@ func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) 
 	return !local, nil
 }
 
-// register adds slug to the registry.
+// register adds slug to the registry on an ID none of whose ports another
+// program listens on.
 func (m *Manager) register(slug string) (machine.WorktreeEntry, error) {
+	busy, err := machine.Listening(m.Proc)
+	if err != nil {
+		return machine.WorktreeEntry{}, fmt.Errorf("listing listening ports to pick a free worktree ID: %w", err)
+	}
 	reg, err := machine.Open(m.Data)
 	if err != nil {
 		return machine.WorktreeEntry{}, err
 	}
 	defer reg.Close()
-	e, err := reg.AddWorktree(m.Pfx, slug)
+	e, err := reg.AddWorktree(m.Pfx, slug, busy)
 	if err != nil {
 		return machine.WorktreeEntry{}, err
 	}

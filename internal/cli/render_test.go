@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,7 +68,7 @@ func filialWS(t *testing.T) (ws string, dirs machine.Dirs) {
 		t.Fatal(err)
 	}
 	for _, slug := range []string{"master", "feat"} {
-		if _, err := reg.AddWorktree("filial", slug); err != nil {
+		if _, err := reg.AddWorktree("filial", slug, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -117,6 +118,48 @@ func TestLockRenderCheck(t *testing.T) {
 	}
 	if strings.Contains(out, "Europe/Paris") || strings.Contains(out, "s3cret") {
 		t.Errorf("check diff shows a private env file's contents:\n%s", out)
+	}
+}
+
+// TestRenderCheckNoRegistryWrite: port bases that differ from the
+// registered ones are a change render --check reports, without writing
+// registry.toml; render records them.
+func TestRenderCheckNoRegistryWrite(t *testing.T) {
+	ws, dirs := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	mustRun(t, "-C", ws, "render")
+	reg, err := machine.Open(dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := reg.Project("filial")
+	if want.Ports["app"] != 13000 || want.Ports["db"] != 55432 {
+		t.Fatalf("render recorded ports %v", want.Ports)
+	}
+	if err := reg.SetPorts("filial", map[string]int{"app": 13000}); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reg.Close()
+	path := filepath.Join(dirs.Data, "registry.toml")
+	before := readFile(t, path)
+
+	code, out, errs := runIn(t, "-C", ws, "render", "--check")
+	if code != 1 || !strings.Contains(out, "registry.toml") || !strings.Contains(out, "+ports filial") {
+		t.Errorf("render --check: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	if after := readFile(t, path); after != before {
+		t.Errorf("render --check wrote registry.toml:\n%s\nwas:\n%s", after, before)
+	}
+
+	mustRun(t, "-C", ws, "render")
+	if got, _ := registry(t, dirs).Project("filial"); !maps.Equal(got.Ports, want.Ports) {
+		t.Errorf("ports after render = %v; want %v", got.Ports, want.Ports)
+	}
+	if out := mustRun(t, "-C", ws, "render", "--check"); out != "" {
+		t.Errorf("render --check after render printed %q", out)
 	}
 }
 

@@ -83,7 +83,7 @@ func workspaceAt(t *testing.T, render bool) *workspace.Workspace {
 	if _, err := reg.AddProject("filial", root, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reg.AddWorktree("filial", "master"); err != nil {
+	if _, err := reg.AddWorktree("filial", "master", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := reg.Save(); err != nil {

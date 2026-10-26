@@ -167,6 +167,16 @@ func TestFixedServiceIDs(t *testing.T) {
 	}
 }
 
+// TestPortBases: every [[ports]] base of the pack, options and tools, by
+// port name.
+func TestPortBases(t *testing.T) {
+	m, _ := filial(t, nil)
+	want := map[string]int{"app": 13000, "debug": 33000, "nvim": 17000, "playwright": 18888, "s3": 19000, "db": 55432}
+	if got := m.PortBases(); !maps.Equal(got, want) {
+		t.Errorf("PortBases = %v; want %v", got, want)
+	}
+}
+
 func TestLayerPrecedence(t *testing.T) {
 	_, in := filial(t, func(p *config.Project) {
 		p.Services["rails"].Env["TZ"] = "UTC"

@@ -25,6 +25,10 @@ type env struct {
 	run    sys.Runner
 }
 
+// procRoot is the procfs root machine.Listening reads the host's listening
+// TCP ports from; tests point it elsewhere.
+var procRoot = "/proc"
+
 type command func(ctx context.Context, e *env, args []string) int
 
 var commands = map[string]command{

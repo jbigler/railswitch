@@ -280,9 +280,11 @@ func samePath(a, b string) bool {
 }
 
 // Render checks stack.lock (CheckLock), opens the registry, builds the
-// Model, merges every source into one render.Plan (the units and files of
-// the Model, the firewall's files, the machine's proxy units) and Applies
-// it; with check it writes nothing. It is the only path that writes units.
+// Model, records the Model's port bases in the registry when they differ
+// (SetPorts), merges every source into one render.Plan (the units and files
+// of the Model, the firewall's files, the machine's proxy units) and Applies
+// it; with check it writes nothing, and differing port bases are a change
+// in the Diff. It is the only path that writes units.
 func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*render.Diff, error) {
 	if err := w.CheckLock(); err != nil {
 		return nil, err
@@ -303,18 +305,44 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 	if err != nil {
 		return nil, err
 	}
+	prefix := w.Project.Project.Prefix
+	pe, _ := reg.Project(prefix) // Model found it
+	bases := m.PortBases()
+	portsChanged := !maps.Equal(pe.Ports, bases)
+	if portsChanged && !check {
+		if err := reg.SetPorts(prefix, bases); err != nil {
+			return nil, err
+		}
+		if err := reg.Save(); err != nil {
+			return nil, err
+		}
+	}
 	p, err := m.Plan()
 	if err != nil {
 		return nil, err
 	}
-	prefix := w.Project.Project.Prefix
 	fw, err := firewall.Files(prefix, w.Root, host.NetworkDir, w.Stack, w.Project.Firewall)
 	if err != nil {
 		return nil, err
 	}
 	maps.Copy(p.Files, fw)
 	maps.Copy(p.Units, machine.ProxyUnits(reg.Registry))
-	return render.Apply(p, w.Root, w.Dirs.Quadlet, prefix, check)
+	d, err := render.Apply(p, w.Root, w.Dirs.Quadlet, prefix, check)
+	if err != nil || !portsChanged || !check {
+		return d, err
+	}
+	d.Changed = append(d.Changed, "registry.toml")
+	d.Text += "--- a/registry.toml\n+++ b/registry.toml\n-ports " + prefix + portList(pe.Ports) + "\n+ports " + prefix + portList(bases) + "\n"
+	return d, nil
+}
+
+// portList is " name=base" for each port, sorted by name.
+func portList(ports map[string]int) string {
+	var b strings.Builder
+	for _, name := range sortedKeys(ports) {
+		fmt.Fprintf(&b, " %s=%d", name, ports[name])
+	}
+	return b.String()
 }
 
 // NetworkDir is rootless podman's netavark network config dir,

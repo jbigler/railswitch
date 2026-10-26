@@ -475,10 +475,11 @@ func createFile(path string, data []byte, perm fs.FileMode) error {
 	return errors.Join(err, f.Close())
 }
 
-// registerAndRender registers w's project and its base worktree slug, then
-// renders. The project's subnet skips every subnet an existing podman
-// network uses. A failed render unregisters the project again: the shared
-// Traefik unit names every registered project's network.
+// registerAndRender registers w's project, its port bases and its base
+// worktree slug, then renders. The project's subnet skips every subnet an
+// existing podman network uses; the worktree's ID skips every ID with a
+// port another program listens on. A failed render unregisters the project
+// again: the shared Traefik unit names every registered project's network.
 func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *workspace.Workspace, slug string) (int, error) {
 	prefix := w.Project.Project.Prefix
 	nets, err := podman.Podman{R: e.run}.NetworkSubnets(ctx)
@@ -489,6 +490,10 @@ func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *works
 	for _, subnets := range nets {
 		taken = append(taken, subnets...)
 	}
+	busy, err := machine.Listening(procRoot)
+	if err != nil {
+		return 0, fmt.Errorf("listing listening ports to pick a free worktree ID: %w", err)
+	}
 	reg, err := machine.Open(dirs.Data)
 	if err != nil {
 		return 0, err
@@ -498,9 +503,17 @@ func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *works
 		return 0, prefixTaken(prefix, pe.Workspace)
 	}
 	_, err = reg.AddProject(prefix, w.Root, taken)
+	var m *render.Model
+	if err == nil {
+		// The bases only: the host values change no port.
+		m, err = w.Model(reg.Registry, render.Host{})
+	}
+	if err == nil {
+		err = reg.SetPorts(prefix, m.PortBases())
+	}
 	var wt machine.WorktreeEntry
 	if err == nil {
-		wt, err = reg.AddWorktree(prefix, slug)
+		wt, err = reg.AddWorktree(prefix, slug, busy)
 	}
 	if err == nil {
 		err = reg.Save()

@@ -9,11 +9,46 @@ not in a sandbox. The reference host is CachyOS/Arch.
   `isolate=strict` (D50), a value netavark added in 1.7.0 (podman ≥ 4.6).
   Check with `podman info --format '{{.Host.NetworkBackendInfo.Version}}'`.
 
-## Existing networks after upgrading
+## Upgrading from Stage 2
+
+The first `railswitch up` after upgrading changes these, on its own:
+
+- **Traefik's unit.** It no longer publishes `127.0.0.1:8080` or runs
+  `--api.insecure`. The dashboard is at http://traefik.localhost/ and the
+  log view (Dozzle, new) at http://logs.localhost/, both from the host only
+  (D50). Traefik's unit-hash label is stale, so this `up` restarts Traefik
+  once: every project's routes drop for a few seconds.
+- **The machine network** `railswitch_machine` (10.214.255.0/24) and
+  Dozzle are created; `up` refuses to start when another podman network
+  uses that subnet (`railswitch doctor`: `machine subnet free`).
+- **Each worktree's units** gain the router rules and network options of
+  Stage 3 on that worktree's own `up`; other worktrees keep their old
+  units until then.
+
+Then, by hand:
+
+1. **Packs changed:** if `up` or `render` says `stack.lock` is stale, run
+   `railswitch lock` first.
+2. **Ejected Containerfiles** stay as they are. Only if you want the new
+   default, run `railswitch containerfile eject <name> --force` (it
+   replaces your file).
+3. **Recreate the networks** (below): `up` prints a WARNING, and
+   `railswitch doctor` fails `networks isolated`, while a network lacks
+   `isolate=strict`.
+
+### Recreating networks
 
 Networks railswitch created before Stage 3 keep their old options:
 `isolate=strict` (D50) only takes effect when podman creates the network
-again. For every project created before Stage 3:
+again (Quadlet runs `podman network create --ignore`). Until then, other
+projects' containers reach these networks directly.
+
+Recreating stops Traefik. Quadlet derives `Requires=` and `After=` from
+each `Network=<x>.network` line, so the generated Traefik service requires
+every project's proxy network service: stopping one stops Traefik, and
+**every project's routes drop** until Traefik starts again (steps 5–6).
+
+For every project created before Stage 3:
 
 1. `railswitch down` in every worktree of the project. This stops each
    worktree's `<prefix>-<slug>-dev-network.service`.
@@ -24,13 +59,20 @@ again. For every project created before Stage 3:
    (every worktree's dev network service). Quadlet network services are
    oneshot with `RemainAfterExit=yes`, and `down` leaves the proxy network's
    running, so without this `up` would never create the network again.
+   **This stops `railswitch-traefik.service` too** (see above).
 4. `podman network rm <prefix>_proxy <prefix>-<slug>-dev …` (every worktree's
    dev network, by exact name; `railswitch wt ls` lists the slugs).
 5. `railswitch up` in every worktree. The network units create the networks
    again, now with `isolate=strict`.
+6. Last, make sure Traefik runs again: the first `up` of step 5 starts it
+   (every app unit has `Wants=railswitch-traefik.service`); without one,
+   run `systemctl --user start railswitch-traefik.service`. Its unit lists
+   every project's network, so every other project's routes come back with
+   it; `railswitch machine` shows `Traefik reaches every project network`.
 
-Check with `podman network inspect <prefix>_proxy --format '{{.Options}}'`:
-it shows `isolate:strict`.
+Check with `railswitch doctor` (`networks isolated` passes) or
+`podman network inspect <prefix>_proxy --format '{{.Options}}'`: it shows
+`isolate:strict`.
 
 ## Host source address (confirmation, optional)
 

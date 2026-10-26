@@ -50,7 +50,8 @@ cd ~/workspace/rs-demo/main && railswitch up
 
 Expected: both exit 0. `up` waits for the app's `/up` health check (D34),
 then for Traefik to report the app's router (`demo-main-app@docker` on its
-API, `127.0.0.1:8080`), and ends with:
+API; Stage 3 moved it from `127.0.0.1:8080` to http://traefik.localhost/,
+see docs/stage3-acceptance.md, "Upgrading from Stage 2"), and ends with:
 
 ```
 http://main.demo.localhost/ ready

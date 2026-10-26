@@ -1,7 +1,7 @@
 # AGENTS.md — railswitch
 
 Go CLI (`railswitch`, module `github.com/jbigler/railswitch`) that runs Rails dev environments on rootless podman via Quadlet.
-Spec: `handoff/HANDOFF.md`; decisions D1–D43: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
+Spec: `handoff/HANDOFF.md`; decisions D1–D53: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
 
 ## Commands
 - `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...`, `go test ./...`.
@@ -20,7 +20,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D43: `docs/superpowers/plans/2026-10-
 - Ports publish only on `127.0.0.1:<host>:<ctr>`.
 - Remove objects by exact name, never `--filter`/regex. Never `git worktree prune`.
 - Files inside a worktree are read only via `safefile.Read` (regular files, ≤ 1 MiB).
-- Pinned: subnet pool `10.214.0.0/16`, one `/24` per project (skipping /24s any existing podman network uses), gateway `.1`, Traefik `.2`, dynamic `10.214.<n>.128/25`; dev network MTU 1400; ports DB 55432+ID, Ruby debug 33000+ID, Neovim 17000+ID, Playwright 18888+ID, App share 13000+ID, Storage share 19000+ID; worktree slug ≤ 40 chars; `LogOpt=max-size=20m`.
+- Pinned: subnet pool `10.214.0.0/16`, one `/24` per project (skipping /24s any existing podman network uses), gateway `.1`, Traefik `.2`, dynamic `10.214.<n>.128/25`; `10.214.255.0/24` reserved for the machine network `railswitch_machine` (gateway `.1`, Traefik `.2`, Dozzle `.3`), never a project's; every railswitch network (proxy, dev, machine) `isolate=strict`; dev network MTU 1400; ports DB 55432+ID, Ruby debug 33000+ID, Neovim 17000+ID, Playwright 18888+ID, App share 13000+ID, Storage share 19000+ID; two different port bases on one machine ≥ 100 (`MaxWorktreeID + 1`) apart; worktree slug ≤ 40 chars; `LogOpt=max-size=20m`.
 - railswitch's own CI lives in `.github/workflows/`; railswitch never generates or touches a project's CI (D41).
 
 ## Package map
@@ -32,6 +32,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D43: `docs/superpowers/plans/2026-10-
 - `internal/machine` — dirs, registry, proxy, machine config.
 - `internal/render` — model, env, images, quadlet, lint, diff, apply.
 - `internal/unithash` — the `<prefix>.unit-hash` label that tells `up` a container runs an older unit.
+- `internal/tailscale` — the tailscale CLI for `share`/`unshare` (`serve --bg`, `serve … off`, never `reset`).
 - `internal/podman`, `internal/firewall`, `internal/worktree`, `internal/workspace`, `internal/lifecycle`, `internal/doctor`.
 
 ## Rules

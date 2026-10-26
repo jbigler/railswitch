@@ -42,7 +42,11 @@ func (l *L) Share(ctx context.Context, slug string) error {
 			return fmt.Errorf("tailnet port %d (%s %s) is already served to %s, not by railswitch; railswitch never overwrites it", p.Port, p.Service, p.Name, t)
 		}
 	}
-	if err := l.setShare(slug, &machine.ShareEntry{Host: host, IP: ip.String()}); err != nil {
+	var on []int
+	for _, p := range ports {
+		on = append(on, p.Port)
+	}
+	if err := l.setShare(slug, &machine.ShareEntry{Host: host, IP: ip.String(), Ports: on}); err != nil {
 		return err
 	}
 	err = func() error {

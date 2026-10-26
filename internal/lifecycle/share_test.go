@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -147,7 +148,7 @@ func TestShareArgv(t *testing.T) {
 	}
 	noReset(t, e.tsCalls())
 	wantInOrder(t, e.calls(), "systemctl --user start filial-feat-rails.service", "tailscale serve --bg --https=13002")
-	if s := e.share(t, "feat"); s == nil || *s != (machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}) {
+	if s := e.share(t, "feat"); s == nil || !reflect.DeepEqual(*s, machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7", Ports: []int{13002, 19002}}) {
 		t.Errorf("registry share = %+v", s)
 	}
 	if s := e.share(t, "master"); s != nil {

@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -497,7 +498,7 @@ func TestShareRoundTrip(t *testing.T) {
 	if err := l.SetShare("filial", "nope", &ShareEntry{Host: "h", IP: "100.64.0.7"}); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("SetShare of an unregistered slug = %v; want fs.ErrNotExist", err)
 	}
-	if err := l.SetShare("filial", "feat", &ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}); err != nil {
+	if err := l.SetShare("filial", "feat", &ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7", Ports: []int{13002, 19002}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := l.Save(); err != nil {
@@ -516,7 +517,7 @@ func TestShareRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	w := r.WorktreesOf("filial")
-	if w[0].Share != nil || w[1].Share == nil || *w[1].Share != (ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}) {
+	if w[0].Share != nil || w[1].Share == nil || !reflect.DeepEqual(*w[1].Share, ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7", Ports: []int{13002, 19002}}) {
 		t.Errorf("shares = %+v, %+v", w[0].Share, w[1].Share)
 	}
 	if err := r.SetShare("filial", "feat", nil); err != nil || r.WorktreesOf("filial")[1].Share != nil {

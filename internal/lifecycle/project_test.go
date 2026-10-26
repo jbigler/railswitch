@@ -212,8 +212,8 @@ func TestProjectRemoveMissingWorkspace(t *testing.T) {
 	if err := os.RemoveAll(wss["api"]); err != nil {
 		t.Fatal(err)
 	}
-	shared(t, dirs, "api")
-	// ID 1's share ports, and its db port served to itself by hand.
+	shared(t, dirs, "api", 13001, 19001)
+	// The recorded ports, and its db port served to itself by hand.
 	serving(f, 13001, 19001, 55433)
 	if err := ProjectRemove(ctx, f, dirs, &bytes.Buffer{}, strings.NewReader(""), false, "api", true, true); err != nil {
 		t.Fatal(err)
@@ -278,15 +278,15 @@ func TestProjectRemovePurgeKeepsRepo(t *testing.T) {
 	}
 }
 
-// shared records worktree master of prefix as shared.
-func shared(t *testing.T, dirs machine.Dirs, prefix string) {
+// shared records worktree master of prefix as shared on ports.
+func shared(t *testing.T, dirs machine.Dirs, prefix string, ports ...int) {
 	t.Helper()
 	reg, err := machine.Open(dirs.Data)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer reg.Close()
-	if err := reg.SetShare(prefix, "master", &machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}); err != nil {
+	if err := reg.SetShare(prefix, "master", &machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7", Ports: ports}); err != nil {
 		t.Fatal(err)
 	}
 	if err := reg.Save(); err != nil {
@@ -309,7 +309,7 @@ func serving(f *systest.Fake, ports ...int) {
 // turned off (DropShare) before it is stopped; a port it doesn't share stays.
 func TestProjectRemoveSharedLoaded(t *testing.T) {
 	dirs, _, f := projects(t, "api")
-	shared(t, dirs, "api")
+	shared(t, dirs, "api", 13001, 19001)
 	serving(f, 13001, 19001, 55433)
 	if err := ProjectRemove(ctx, f, dirs, &bytes.Buffer{}, strings.NewReader(""), false, "api", true, false); err != nil {
 		t.Fatal(err)
@@ -341,6 +341,27 @@ func TestProjectRemovePurgeOtherPrefix(t *testing.T) {
 		t.Errorf(".railswitch removed: %v", err)
 	}
 	if !strings.Contains(out.String(), "kept ") {
+		t.Errorf("output %q", out.String())
+	}
+}
+
+// TestProjectRemoveSharedUnrecorded: a share entry from before the ports
+// were recorded, with no workspace, turns nothing off and says how to check.
+func TestProjectRemoveSharedUnrecorded(t *testing.T) {
+	dirs, wss, f := projects(t, "api")
+	if err := os.RemoveAll(wss["api"]); err != nil {
+		t.Fatal(err)
+	}
+	shared(t, dirs, "api")
+	serving(f, 13001, 19001)
+	out := &bytes.Buffer{}
+	if err := ProjectRemove(ctx, f, dirs, out, strings.NewReader(""), false, "api", true, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(nonGit(f), "tailscale"); n != 0 {
+		t.Errorf("ran tailscale:\n%s", dump(nonGit(f)))
+	}
+	if !strings.Contains(out.String(), "tailscale serve status") {
 		t.Errorf("output %q", out.String())
 	}
 }

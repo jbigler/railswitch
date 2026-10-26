@@ -53,6 +53,10 @@ type WorktreeEntry struct {
 type ShareEntry struct {
 	Host string `toml:"host" json:"host"` // e.g. "box.tail1234.ts.net"
 	IP   string `toml:"ip" json:"ip"`     // e.g. "100.64.0.7"
+	// Ports are the tailnet HTTPS ports share turned on, so a teardown
+	// without the workspace turns off exactly those. Empty in an entry
+	// written before they were recorded.
+	Ports []int `toml:"ports,omitempty" json:"-"`
 }
 
 // Registry is registry.toml in the data dir.

@@ -80,7 +80,7 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		if loaded {
 			err = l.DropShare(ctx, wt.Slug)
 		} else {
-			err = unserveBases(ctx, r, pe, wt.ID)
+			err = unserveRecorded(ctx, r, out, wt)
 		}
 		if err != nil {
 			return fmt.Errorf("unsharing %s: %w", wt.Slug, err)
@@ -211,28 +211,21 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 	return nil
 }
 
-// shareBases are the pinned bases of the ports share serves: app and
-// storage.
-var shareBases = []int{13000, 19000}
-
-// unserveBases turns off, for a shared worktree with ID id of project pe
-// whose workspace doesn't load, each share port base+id (a pinned share
-// base pe records) that is served to its own loopback port, as Share set it
-// up. IDs are unique machine-wide, so such a port is this worktree's.
-func unserveBases(ctx context.Context, r sys.Runner, pe machine.ProjectEntry, id int) error {
+// unserveRecorded turns off each tailnet port share recorded for worktree
+// wt of a project whose workspace doesn't load, where the serve config
+// still serves it to its own loopback port, as Share set it up. An entry
+// from before the ports were recorded turns nothing off.
+func unserveRecorded(ctx context.Context, r sys.Runner, out io.Writer, wt machine.WorktreeEntry) error {
+	if len(wt.Share.Ports) == 0 {
+		fmt.Fprintf(out, "worktree %s was shared, but its tailnet ports were not recorded: check `tailscale serve status` and turn its ports off with `tailscale serve --https=<port> off`\n", wt.Slug)
+		return nil
+	}
 	ts := tailscale.T{R: r}
 	served, err := ts.Served(ctx)
 	if err != nil {
 		return err
 	}
-	var ports []int
-	for _, b := range pe.Ports {
-		if slices.Contains(shareBases, b) && !slices.Contains(ports, b+id) {
-			ports = append(ports, b+id)
-		}
-	}
-	slices.Sort(ports)
-	for _, port := range ports {
+	for _, port := range wt.Share.Ports {
 		if t, ok := served[port]; ok && t == tailscale.Target(port) {
 			if err := ts.ServeOff(ctx, port); err != nil {
 				return err

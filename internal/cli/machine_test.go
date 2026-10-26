@@ -173,7 +173,9 @@ func TestMachineTwoProjects(t *testing.T) {
 	if fd := members["filial-feat-dev"]; !slices.Contains(fd, "db") || slices.Contains(fd, "Traefik") {
 		t.Errorf("reach filial-feat-dev: %v", fd)
 	}
-	if !slices.Equal(r.Reach.Notes, []string{reachesAll, reachRefused}) {
+	// The isolation note (Notes[1]) is TestMachineIsolation's: this fake
+	// inspects no network.
+	if len(r.Reach.Notes) != 2 || r.Reach.Notes[0] != reachesAll {
 		t.Errorf("reach notes %q", r.Reach.Notes)
 	}
 }
@@ -330,5 +332,11 @@ func TestMachineIsolation(t *testing.T) {
 	code, out, errs := runWith(t, f, "machine")
 	if code != 0 || !strings.Contains(out, "networks are isolate=strict") {
 		t.Errorf("machine: exit %d\n%s%s", code, out, errs)
+	}
+
+	// No railswitch network exists (nothing up yet): no isolate=strict claim.
+	f = machineHost()
+	if r := machineJSON(t, f); r.Reach.Notes[1] != reachNoNetworks {
+		t.Errorf("note %q with no networks; want %q", r.Reach.Notes[1], reachNoNetworks)
 	}
 }

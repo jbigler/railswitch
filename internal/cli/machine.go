@@ -85,10 +85,12 @@ type reachNetwork struct {
 
 // reachesAll is the reach note when Traefik is on every network it must be
 // on; reachRefused the note on cross-project traffic when every railswitch
-// network that exists is isolate=strict (reachNote).
+// network that exists is isolate=strict, reachNoNetworks when none exists
+// (reachNote).
 const (
-	reachesAll   = "Traefik reaches every project network"
-	reachRefused = "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"
+	reachesAll      = "Traefik reaches every project network"
+	reachRefused    = "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"
+	reachNoNetworks = "no railswitch network exists yet: railswitch up creates them isolate=strict (D50)"
 )
 
 // traefikReach is the reach note on Traefik: reachesAll when it is on every
@@ -112,16 +114,23 @@ func traefikReach(nets []traefikNetwork) string {
 	return "Traefik reaches " + reaches + "; " + strings.Join(off, ", ") + " not attached: railswitch up"
 }
 
-// reachNote is reachRefused when every railswitch network of iso has
-// isolate=strict, else the networks that don't and how to fix them.
+// reachNote is reachNoNetworks when no railswitch network of iso exists,
+// reachRefused when every one that exists has isolate=strict, else the
+// networks that don't and how to fix them.
 func reachNote(nets []string, iso map[string]bool) string {
 	var not []string
+	exist := false
 	for _, n := range nets {
-		if ok, exists := iso[n]; exists && !ok {
+		ok, exists := iso[n]
+		exist = exist || exists
+		if exists && !ok {
 			not = append(not, n)
 		}
 	}
-	if len(not) == 0 {
+	switch {
+	case !exist:
+		return reachNoNetworks
+	case len(not) == 0:
 		return reachRefused
 	}
 	return "networks not isolate=strict (created before Stage 3): " + strings.Join(not, ", ") + "; other projects' containers reach them directly, not only through Traefik; " + machine.RecreateNetworks

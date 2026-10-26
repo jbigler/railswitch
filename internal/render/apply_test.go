@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -188,6 +189,28 @@ func TestApplyOrphanUnitsPrefixExtends(t *testing.T) {
 		if strings.HasPrefix(n, "filial2-") {
 			t.Errorf("Removed = %v", d.Removed)
 		}
+	}
+}
+
+func TestMarkedUnits(t *testing.T) {
+	qdir := t.TempDir()
+	writeFile(t, filepath.Join(qdir, "api-m-rails.container"), Marker+"/w/api/project.toml (prefix api, worktree m). Edit project.toml, not this file.\n[Container]\nContainerName=api-m-rails\nVolume=api_gems:/usr/local/bundle\nVolume=/w/api/m:/app:z\nVolume=api-m-nm:/app/node_modules:U\n")
+	writeFile(t, filepath.Join(qdir, "api_proxy.network"), Marker+"/w/api/project.toml (prefix api). Edit project.toml, not this file.\n[Network]\nNetworkName=api_proxy\n")
+	writeFile(t, filepath.Join(qdir, "api2-m-rails.container"), markedUnit("api2", "m"))
+	writeFile(t, filepath.Join(qdir, "api-x.container"), "[Container]\nContainerName=api-x\n")
+	got, err := MarkedUnits(qdir, "api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []MarkedUnit{
+		{Path: filepath.Join(qdir, "api-m-rails.container"), ContainerNames: []string{"api-m-rails"}, VolumeNames: []string{"api_gems", "api-m-nm"}},
+		{Path: filepath.Join(qdir, "api_proxy.network"), NetworkNames: []string{"api_proxy"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v\nwant %+v", got, want)
+	}
+	if got, err := MarkedUnits(filepath.Join(qdir, "none"), "api"); got != nil || err != nil {
+		t.Fatalf("missing dir: %v %v", got, err)
 	}
 }
 

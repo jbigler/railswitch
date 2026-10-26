@@ -165,6 +165,24 @@ func (p Podman) RemoveNetwork(ctx context.Context, name string) error {
 	return err
 }
 
+// NetworkRemove runs `podman network rm <name>`, without -f: a network a
+// container still uses is refused, not torn out of it. A missing network is
+// not an error.
+func (p Podman) NetworkRemove(ctx context.Context, name string) error {
+	r, err := p.run(ctx, 0, "network", "rm", name)
+	if err != nil && isMissing(r, err, "network not found") {
+		return nil
+	}
+	return err
+}
+
+// VolumeRemove runs `podman volume rm <name>`, without -f: a volume a
+// container still uses is refused.
+func (p Podman) VolumeRemove(ctx context.Context, name string) error {
+	_, err := p.run(ctx, 0, "volume", "rm", name)
+	return err
+}
+
 // NetworkSubnets maps every podman network's name to its subnets, from
 // `podman network ls --format json` (a []types.Network: "name",
 // "subnets":[{"subnet":"10.88.0.0/16",…}]). Empty output means no networks.

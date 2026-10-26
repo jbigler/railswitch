@@ -49,6 +49,7 @@ var completionFlags = map[string][]string{
 	"down":                {"--yes"},
 	"exec":                {"--fresh"},
 	"logs":                {"-f"},
+	"project rm":          {"--purge", "--yes"},
 	"new":                 {"--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
 	"render":              {"--check"},
 	"secret add":          {"--env=", "--machine", "--service="},

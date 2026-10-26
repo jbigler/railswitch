@@ -314,6 +314,62 @@ func firstLine(path string) (string, error) {
 	return strings.TrimSuffix(string(line), "\n"), nil
 }
 
+// MarkedUnit is a unit file in the Quadlet dir whose marker names a project,
+// with the object names it declares.
+type MarkedUnit struct {
+	Path           string
+	ContainerNames []string // ContainerName= values
+	VolumeNames    []string // the named volumes of Volume=<name>:… (host paths excluded)
+	NetworkNames   []string // NetworkName= values
+}
+
+// MarkedUnits are the regular files in dir, sorted by name, whose marker
+// names exactly prefix (project-wide or worktree units; never machine-wide
+// ones, never the user's unmarked files). A missing dir has none.
+func MarkedUnits(dir, prefix string) ([]MarkedUnit, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []MarkedUnit
+	for _, e := range entries {
+		if !e.Type().IsRegular() {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		first, _, _ := strings.Cut(string(data), "\n")
+		if pfx, _, machine, ok := parseMarker(first); !ok || machine || pfx != prefix {
+			continue
+		}
+		u := MarkedUnit{Path: path}
+		for line := range strings.Lines(string(data)) {
+			k, v, ok := strings.Cut(strings.TrimRight(line, "\n"), "=")
+			if !ok {
+				continue
+			}
+			switch k {
+			case "ContainerName":
+				u.ContainerNames = append(u.ContainerNames, v)
+			case "NetworkName":
+				u.NetworkNames = append(u.NetworkNames, v)
+			case "Volume":
+				if name, _, ok := strings.Cut(v, ":"); ok && name != "" && !strings.HasPrefix(name, "/") {
+					u.VolumeNames = append(u.VolumeNames, name)
+				}
+			}
+		}
+		out = append(out, u)
+	}
+	return out, nil
+}
+
 // orphanEnv are the entries under <ws>/.railswitch/env that p does not
 // render: the env dir of a slug no longer registered, or a file in a live env
 // dir that no service writes any more. Neither's contents are shown.

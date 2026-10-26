@@ -43,6 +43,8 @@ func TestSimpleArgv(t *testing.T) {
 		{"RemoveContainer", func(p Podman) error { return p.RemoveContainer(ctx, "api") }, []string{"podman", "rm", "-f", "--ignore", "api"}},
 		{"RemoveVolume", func(p Podman) error { return p.RemoveVolume(ctx, "api") }, []string{"podman", "volume", "rm", "-f", "api"}},
 		{"RemoveNetwork", func(p Podman) error { return p.RemoveNetwork(ctx, "api") }, []string{"podman", "network", "rm", "-f", "api"}},
+		{"NetworkRemove", func(p Podman) error { return p.NetworkRemove(ctx, "api_proxy") }, []string{"podman", "network", "rm", "api_proxy"}},
+		{"VolumeRemove", func(p Podman) error { return p.VolumeRemove(ctx, "api_gems") }, []string{"podman", "volume", "rm", "api_gems"}},
 		{"NetworkConnect", func(p Podman) error { return p.NetworkConnect(ctx, "api_proxy", "railswitch-traefik", "10.214.3.2") }, []string{"podman", "network", "connect", "--ip", "10.214.3.2", "api_proxy", "railswitch-traefik"}},
 		{"NetworkDisconnect", func(p Podman) error { return p.NetworkDisconnect(ctx, "api_proxy", "railswitch-traefik") }, []string{"podman", "network", "disconnect", "api_proxy", "railswitch-traefik"}},
 	} {

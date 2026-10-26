@@ -215,8 +215,8 @@ container = 5432
 func TestRailsPackGeneric(t *testing.T) {
 	p := builtins(t).Packs[Ref{"rails", 1}]
 	// RUBY_DEBUG_HOST: the debug gem (in Rails' default Gemfile) listens on the published debug port.
-	if got := slices.Sorted(maps.Keys(p.Env)); !slices.Equal(got, []string{"BINDING", "RAILS_ENV", "RUBY_DEBUG_HOST"}) {
-		t.Errorf("rails [env] keys = %v, want exactly BINDING, RAILS_ENV, RUBY_DEBUG_HOST", got)
+	if got := slices.Sorted(maps.Keys(p.Env)); !slices.Equal(got, []string{"BINDING", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}) {
+		t.Errorf("rails [env] keys = %v, want exactly BINDING, RAILS_DEVELOPMENT_HOSTS, RAILS_ENV, RUBY_DEBUG_HOST", got)
 	}
 	if p.Defaults["browser"] != "none" {
 		t.Errorf("defaults.browser = %q, want none", p.Defaults["browser"])

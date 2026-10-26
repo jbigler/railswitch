@@ -247,7 +247,7 @@ func TestDepsGetsNoSecrets(t *testing.T) {
 		}
 	}
 	// D11: the pack layer and [services.deps.env] only.
-	want := []string{"BINDING", "BUNDLE_FROZEN", "RAILS_ENV", "RUBY_DEBUG_HOST"}
+	want := []string{"BINDING", "BUNDLE_FROZEN", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
 	if !slices.Equal(names, want) {
 		t.Errorf("deps env = %v; want %v", names, want)
 	}
@@ -261,6 +261,17 @@ func TestDebugHost(t *testing.T) {
 		if e, _ := envVar(in, svc, "RUBY_DEBUG_HOST"); e.Value != "0.0.0.0" || e.Layer != LayerPack {
 			t.Errorf("%s RUBY_DEBUG_HOST = %+v; want 0.0.0.0 at LayerPack", svc, e)
 		}
+	}
+}
+
+// Rails' development host check allows `.localhost` with ONE subdomain
+// label (ActionDispatch::HostAuthorization SUBDOMAIN_REGEX), so it blocks
+// the D5 hostname <slug>.<prefix>.localhost with a 403 unless the pack adds
+// it through RAILS_DEVELOPMENT_HOSTS (read by Rails >= 7.0 in development).
+func TestRailsDevelopmentHosts(t *testing.T) {
+	_, in := filial(t, nil)
+	if e, _ := envVar(in, "rails", "RAILS_DEVELOPMENT_HOSTS"); e.Value != "master.filial.localhost" || e.Layer != LayerPack {
+		t.Errorf("rails RAILS_DEVELOPMENT_HOSTS = %+v; want master.filial.localhost at LayerPack", e)
 	}
 }
 

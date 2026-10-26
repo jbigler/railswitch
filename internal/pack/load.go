@@ -204,8 +204,10 @@ func (l *loader) ports(file, owner string, ports []Port) {
 			l.bases[p.Base] = owner
 		}
 		// The registry records bases by port name, so a name belongs to one
-		// package name too.
-		if prev, ok := l.names[p.Name]; ok && prev != owner {
+		// package name too, and occurs once in its file.
+		if j := slices.IndexFunc(ports[:i], func(q Port) bool { return q.Name == p.Name }); j >= 0 {
+			l.add(file, "%s.name %q is already used by ports[%d]", f, p.Name, j)
+		} else if prev, ok := l.names[p.Name]; ok && prev != owner {
 			l.add(file, "%s.name %q is already used by %s", f, p.Name, prev)
 		} else {
 			l.names[p.Name] = owner

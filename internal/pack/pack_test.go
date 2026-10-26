@@ -253,6 +253,33 @@ container = 5432
 	}
 }
 
+// TestPortNamesUniqueInPackage (final M2): one package declaring a port
+// name twice makes Load fail: PortBases would keep only the last base.
+func TestPortNamesUniqueInPackage(t *testing.T) {
+	fsys := minimal()
+	fsys["options/q/option.toml"] = &fstest.MapFile{Data: []byte(`name = "q"
+version = 1
+slot = "database"
+service = "db"
+[image]
+pull = "docker.io/library/postgres:16"
+[[ports]]
+name = "q"
+env = "Q_PORT"
+base = 56432
+container = 5432
+[[ports]]
+name = "q"
+env = "Q2_PORT"
+base = 57432
+container = 5433
+`)}
+	_, err := Load(fsys)
+	if err == nil || !strings.Contains(err.Error(), `ports[1].name "q" is already used by ports[0]`) {
+		t.Errorf("Load with a port name twice in one package: %v", err)
+	}
+}
+
 func TestRailsPackGeneric(t *testing.T) {
 	p := builtins(t).Packs[Ref{"rails", 1}]
 	// RUBY_DEBUG_HOST: the debug gem (in Rails' default Gemfile) listens on the published debug port.

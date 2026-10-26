@@ -116,7 +116,7 @@ func TestE2ETwoProjects(t *testing.T) {
 	for _, p := range projects {
 		p.ws = filepath.Join(parent, "rs-"+p.prefix)
 		t.Logf("workspace %s", p.ws)
-		rs(t, 5*time.Minute, "new", p.ws, "--repo", repo, "--prefix", p.prefix)
+		rs(t, 5*time.Minute, "project", "new", p.ws, "--repo", repo, "--prefix", p.prefix)
 		t.Cleanup(func() {
 			if p.removed {
 				return

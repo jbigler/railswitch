@@ -32,7 +32,7 @@ var completionFiles = map[string]string{
 var completionSubs = map[string][]string{
 	"containerfile": {"eject", "list", "new", "show"},
 	"fw":            {"allow", "show"},
-	"project":       {"rm"},
+	"project":       {"init", "ls", "new", "rm"},
 	"secret":        {"add", "ls", "rm", "set"},
 	"wt":            {"add", "ls", "rm"},
 }
@@ -50,7 +50,7 @@ var completionFlags = map[string][]string{
 	"exec":                {"--fresh"},
 	"logs":                {"-f"},
 	"project rm":          {"--purge", "--yes"},
-	"new":                 {"--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
+	"project new":         {"--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
 	"render":              {"--check"},
 	"secret add":          {"--env=", "--machine", "--service="},
 	"secret set":          {"--restart"},

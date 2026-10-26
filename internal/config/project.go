@@ -41,7 +41,7 @@ type Project struct {
 
 // ImageConfig is the workspace's base image chain (D31).
 type ImageConfig struct {
-	Base   string   `toml:"base"`   // required: "containerfiles/Containerfile.<name>"; railswitch new ejects the pack's default here (D31)
+	Base   string   `toml:"base"`   // required: "containerfiles/Containerfile.<name>"; railswitch project new ejects the pack's default here (D31)
 	Addons []string `toml:"addons"` // "containerfiles/Containerfile.<name>", applied in this order on top of base
 }
 

@@ -144,7 +144,7 @@ RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a \
 The prefixes are `$RAILSWITCH_E2E_PREFIX` and `${RAILSWITCH_E2E_PREFIX}b`;
 both must match `^[a-z][a-z0-9]{1,15}$` (so at most 14 characters for the
 base), else the test fails at once. The test builds railswitch from source,
-runs `new` and `up` for both base worktrees in a fresh temp workspace, and
+runs `project new` and `up` for both base worktrees in a fresh temp workspace, and
 checks:
 
 1. From the host: each app host is 200; each `s3.` host answers (not 000 or

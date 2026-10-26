@@ -90,7 +90,7 @@ func TestE2E(t *testing.T) {
 	}
 
 	// Step 3: new + up of the base worktree.
-	rs(t, 5*time.Minute, "new", ws, "--repo", repo, "--prefix", prefix)
+	rs(t, 5*time.Minute, "project", "new", ws, "--repo", repo, "--prefix", prefix)
 	wts := worktrees(t, rs(t, time.Minute, "-C", ws, "--json", "wt", "ls"))
 	if len(wts) != 1 {
 		t.Fatalf("after new: want 1 worktree, got %+v", wts)

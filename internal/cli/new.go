@@ -28,7 +28,7 @@ import (
 	"github.com/jbigler/railswitch/internal/worktree"
 )
 
-const newUsage = "usage: railswitch new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim]"
+const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim]"
 
 const (
 	gitCloneTimeout  = 10 * time.Minute // checks out the app's tree
@@ -47,11 +47,11 @@ const workspaceGitignore = `/*
 !/options/
 `
 
-// railswitch new: clone the app repo into a new workspace (its own git
+// railswitch project new: clone the app repo into a new workspace (its own git
 // repo, D38), write project.toml, eject every default Containerfile the
 // stack builds, generate the local passwords, lock, register and render.
 func cmdNew(ctx context.Context, e *env, args []string) int {
-	fset := e.flags("new")
+	fset := e.flags("project new")
 	repo := fset.String("repo", "", "the app's git `url`")
 	prefix := fset.String("prefix", "", "the project `prefix`: unique on this machine, names every object")
 	name := fset.String("name", "", "the project `name` (default: the dir's name)")
@@ -83,7 +83,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	switch _, err := os.Lstat(filepath.Join(ws, "project.toml")); {
 	case err == nil:
-		return e.fail(fmt.Errorf("%s already exists: run railswitch init there to join that project", filepath.Join(ws, "project.toml")))
+		return e.fail(fmt.Errorf("%s already exists: run railswitch project init there to join that project", filepath.Join(ws, "project.toml")))
 	case !errors.Is(err, fs.ErrNotExist):
 		return e.fail(err)
 	}
@@ -127,7 +127,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	secrets, id, err := e.createWorkspace(ctx, dirs, ws, slug, p, cat, st)
 	if err != nil {
-		return e.failLeft("new", err, ws, before)
+		return e.failLeft("project new", err, ws, before)
 	}
 	fmt.Fprintf(e.stdout, "created workspace %s: project %s, base worktree %s (ID %d)\n", ws, *prefix, slug, id)
 	fmt.Fprintf(e.stdout, "the workspace is a git repo: commit project.toml, stack.lock and containerfiles/ (git -C %s add -A && git -C %s commit)\n", shellQuote(ws), shellQuote(ws))
@@ -177,14 +177,14 @@ func (e *env) createWorkspace(ctx context.Context, dirs machine.Dirs, ws, slug s
 	return secrets, id, err
 }
 
-// railswitch init: join a project from a clone of its workspace repo (D38).
+// railswitch project init: join a project from a clone of its workspace repo (D38).
 func cmdInit(ctx context.Context, e *env, args []string) int {
-	fset := e.flags("init")
+	fset := e.flags("project init")
 	if code, ok := parse(fset, args); !ok {
 		return code
 	}
 	if fset.NArg() != 0 {
-		return e.usageErr("init takes no arguments")
+		return e.usageErr("project init takes no arguments")
 	}
 	root, err := workspace.Root(e.dir)
 	if err != nil {
@@ -229,7 +229,7 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 		id, err = e.registerAndRender(ctx, w.Dirs, w, slug)
 	}
 	if err != nil {
-		return e.failLeft("init", err, root, before)
+		return e.failLeft("project init", err, root, before)
 	}
 	fmt.Fprintf(e.stdout, "joined project %s in %s: base worktree %s (ID %d)\n", pm.Prefix, w.Root, slug, id)
 

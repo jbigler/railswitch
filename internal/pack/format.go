@@ -40,7 +40,7 @@ type Pack struct {
 	WorktreeVolumes []Volume `toml:"worktree_volumes"` // per worktree: <prefix>-<slug>-<name>
 	Ports           []Port   `toml:"ports"`            // published by the app service
 
-	Defaults map[string]string `toml:"defaults"` // slot → option ref or "none", for railswitch new
+	Defaults map[string]string `toml:"defaults"` // slot → option ref or "none", for railswitch project new
 	Tasks    map[string]string `toml:"tasks"`    // task name → command run in the app image
 	Links    []Link            `toml:"links"`    // suggested worktree links (HANDOFF §3.10)
 	Unit     Unit              `toml:"unit"`     // extras for the app unit
@@ -68,7 +68,7 @@ type Deps struct {
 }
 
 // PackImage is the pack's default base image (D31). File is ejected to
-// containerfiles/ by railswitch new; railswitch never builds it directly.
+// containerfiles/ by railswitch project new; railswitch never builds it directly.
 type PackImage struct {
 	File string            `toml:"file"` // e.g. "Containerfile.base"
 	Tag  string            `toml:"tag"`  // tag version part, e.g. "ruby{ruby}-node{node}" (D9)

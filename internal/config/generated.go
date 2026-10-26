@@ -10,7 +10,7 @@ import (
 )
 
 // ReadGenerated returns the string values of [env] in the workspace-root
-// mise.local.toml, where railswitch new writes the generated service values
+// mise.local.toml, where railswitch project new writes the generated service values
 // (D17). Other tables and non-string values are ignored. A missing file gives
 // an empty map: render reports each missing name.
 func ReadGenerated(path string) (map[string]string, error) {

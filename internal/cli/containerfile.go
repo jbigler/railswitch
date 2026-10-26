@@ -114,7 +114,7 @@ func lookup(cat *pack.Catalog, st *pack.Stack, name string) (builtin, error) {
 // package and sha256, and for base sets [image] base, for an option addon
 // appends it to [image] addons (tools and standalone builds are found by
 // filename). An existing file is refused unless force. It needs no
-// stack.lock: railswitch new ejects before it locks.
+// stack.lock: railswitch project new ejects before it locks.
 func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error {
 	b, err := lookup(cat, st, name)
 	if err != nil {

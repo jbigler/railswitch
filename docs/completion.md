@@ -28,7 +28,7 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 
 ## What completes
 
-- Commands, subcommands (`wt add|rm|ls`, …) and each command's flags. Flags come from a table in `internal/cli/completion.go`; a test fails when a command defines a flag the table lacks.
+- Commands, subcommands (`wt add|rm|ls`, `project new|init|rm|ls`, …) and each command's flags. Flags come from a table in `internal/cli/completion.go`; a test fails when a command defines a flag the table lacks.
 - After `-w`, and for `wt rm`, `share` and `unshare`: the current workspace's registered worktree slugs.
 - `logs` and `fw show|allow`: the workspace's service ids.
 - `secret set|rm`: the secrets `project.toml` declares.

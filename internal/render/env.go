@@ -299,7 +299,7 @@ func (m *Model) expandEnv(in *Instance) error {
 	}
 	file := filepath.Join(m.Inputs.Workspace, "mise.local.toml")
 	missing := func(name string) error {
-		return fmt.Errorf("%s is not set (or empty) in %s (railswitch new generates it; restore it under [env])", name, file)
+		return fmt.Errorf("%s is not set (or empty) in %s (railswitch project new generates it; restore it under [env])", name, file)
 	}
 	var errs []error
 	for _, slot := range config.Slots {

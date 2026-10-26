@@ -13,7 +13,7 @@ not in a sandbox. The reference host is CachyOS/Arch.
 - No project with prefix `demo` registered yet, and ideally no other worktree
   on the machine (see the note on ports in Step 7).
 - The old stack's podman networks (rails-dev-podman's `filial_proxy` on
-  `10.214.0.0/24`) may stay: `new` gives the project a `/24` no podman network
+  `10.214.0.0/24`) may stay: `project new` gives the project a `/24` no podman network
   uses, and `up` moves a project whose `demo_proxy` does not exist yet off a
   `/24` another network took since.
 
@@ -44,7 +44,7 @@ privileged), run `railswitch allow-ports` first, then re-run `doctor`.
 ### 3. New project, base worktree up
 
 ```bash
-railswitch new ~/workspace/rs-demo --repo /tmp/rs-demo/demo --prefix demo
+railswitch project new ~/workspace/rs-demo --repo /tmp/rs-demo/demo --prefix demo
 cd ~/workspace/rs-demo/main && railswitch up
 ```
 

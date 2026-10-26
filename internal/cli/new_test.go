@@ -69,10 +69,10 @@ func gitHost() *systest.Fake {
 	return f
 }
 
-// mustNew runs railswitch new and fails the test on a non-zero exit.
+// mustNew runs railswitch project new and fails the test on a non-zero exit.
 func mustNew(t *testing.T, args ...string) string {
 	t.Helper()
-	code, out, errs := runWith(t, gitHost(), append([]string{"new"}, args...)...)
+	code, out, errs := runWith(t, gitHost(), append([]string{"project", "new"}, args...)...)
 	if code != 0 {
 		t.Fatalf("new %v: exit %d\nstdout: %s\nstderr: %s", args, code, out, errs)
 	}
@@ -294,7 +294,7 @@ func TestNewNoRemoteHead(t *testing.T) {
 	repo := bareRepo(t, "main")
 	gitIn(t, strings.TrimPrefix(repo, "file://"), "symbolic-ref", "HEAD", "refs/heads/gone")
 	ws := filepath.Join(t.TempDir(), "shop")
-	code, _, errs := runWith(t, gitHost(), "new", ws, "--repo", repo, "--prefix", "shop")
+	code, _, errs := runWith(t, gitHost(), "project", "new", ws, "--repo", repo, "--prefix", "shop")
 	if code == 0 || !strings.Contains(errs, "--branch") {
 		t.Errorf("exit %d, stderr %q; want an error asking for --branch", code, errs)
 	}
@@ -309,7 +309,7 @@ func TestNewPrefixTaken(t *testing.T) {
 	first := filepath.Join(t.TempDir(), "one")
 	mustNew(t, first, "--repo", repo, "--prefix", "x1")
 	second := filepath.Join(t.TempDir(), "two")
-	code, _, errs := runWith(t, gitHost(), "new", second, "--repo", repo, "--prefix", "x1")
+	code, _, errs := runWith(t, gitHost(), "project", "new", second, "--repo", repo, "--prefix", "x1")
 	if want := `prefix "x1" is already used by ` + first; code == 0 || !strings.Contains(errs, want) {
 		t.Errorf("exit %d, stderr %q; want %q", code, errs, want)
 	}
@@ -322,7 +322,7 @@ func TestNewRefusesExistingProject(t *testing.T) {
 	newEnv(t)
 	ws := t.TempDir()
 	writeFile(t, filepath.Join(ws, "project.toml"), "schema = 1\n")
-	code, _, errs := runWith(t, gitHost(), "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
+	code, _, errs := runWith(t, gitHost(), "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
 	if code == 0 || !strings.Contains(errs, "project.toml") {
 		t.Errorf("exit %d, stderr %q; want a refusal naming project.toml", code, errs)
 	}
@@ -332,7 +332,7 @@ func TestNewRenderFailureUnregisters(t *testing.T) {
 	dirs := newEnv(t)
 	ws := filepath.Join(t.TempDir(), "shop")
 	f := &systest.Fake{Passthrough: []string{"git"}} // no podman: render fails
-	code, _, errs := runWith(t, f, "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
+	code, _, errs := runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
 	if code == 0 {
 		t.Fatal("new succeeded without podman")
 	}
@@ -376,7 +376,7 @@ func TestNewRenderFailureRefreshesProxy(t *testing.T) {
 
 	ws := filepath.Join(t.TempDir(), "shop")
 	f := &systest.Fake{Passthrough: []string{"git"}} // no podman: render fails
-	if code, _, _ := runWith(t, f, "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop"); code == 0 {
+	if code, _, _ := runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop"); code == 0 {
 		t.Fatal("new succeeded without podman")
 	}
 	got := readFile(t, unit)
@@ -411,7 +411,7 @@ func TestNewRefusesOptionLikeGitValues(t *testing.T) {
 	} {
 		ws := filepath.Join(t.TempDir(), "shop")
 		f := gitHost()
-		code, _, errs := runWith(t, f, append([]string{"new", ws}, args...)...)
+		code, _, errs := runWith(t, f, append([]string{"project", "new", ws}, args...)...)
 		if code == 0 || !strings.Contains(errs, "not a usable git value") {
 			t.Errorf("new %q: exit %d, stderr %q; want a refusal", args, code, errs)
 		}
@@ -430,7 +430,7 @@ func TestInitRefusesOptionLikeGitValues(t *testing.T) {
 	editProject(t, ws, `repo = "file://`, `repo = "--upload-pack=x file://`)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(t.TempDir(), "data"))
 	f := gitHost()
-	code, _, errs := runWith(t, f, "-C", ws, "init")
+	code, _, errs := runWith(t, f, "-C", ws, "project", "init")
 	if code == 0 || !strings.Contains(errs, "not a usable git value") {
 		t.Errorf("init: exit %d, stderr %q; want a refusal", code, errs)
 	}
@@ -490,7 +490,7 @@ func TestInitJoin(t *testing.T) {
 
 	f := gitHost()
 	unset(f, "shop_github_token")
-	code, out, errs := runWith(t, f, "-C", join, "init")
+	code, out, errs := runWith(t, f, "-C", join, "project", "init")
 	if code != 0 {
 		t.Fatalf("init: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
@@ -519,7 +519,7 @@ func TestInitJoin(t *testing.T) {
 		t.Errorf("init does not list the unset secret:\n%s", out)
 	}
 
-	code, _, errs = runWith(t, gitHost(), "-C", join, "init")
+	code, _, errs = runWith(t, gitHost(), "-C", join, "project", "init")
 	if want := `prefix "shop" is already used by ` + join; code == 0 || !strings.Contains(errs, want) {
 		t.Errorf("second init: exit %d, stderr %q; want %q", code, errs, want)
 	}
@@ -545,7 +545,7 @@ func TestNewGitNonInteractive(t *testing.T) {
 		repo := bareRepo(t, "main")
 		f := gitHost()
 		ws := filepath.Join(t.TempDir(), "shop")
-		if code, _, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
+		if code, _, errs := runWith(t, f, "project", "new", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
 			t.Fatalf("new: exit %d: %s", code, errs)
 		}
 		seen := 0
@@ -574,7 +574,7 @@ func TestNewSkipsPodmanSubnets(t *testing.T) {
 	f := gitHost()
 	f.On([]string{"podman", "network", "ls", "--format", "json"},
 		sys.Result{Stdout: []byte(`[{"name":"filial_proxy","subnets":[{"subnet":"10.214.0.0/24","gateway":"10.214.0.1"}]}]`)}, nil)
-	if code, out, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"); code != 0 {
+	if code, out, errs := runWith(t, f, "project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"); code != 0 {
 		t.Fatalf("new: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
 	if pe, _ := registry(t, dirs).Project("shop"); pe.Subnet != 1 {
@@ -592,7 +592,7 @@ func TestNewNetworkLsFails(t *testing.T) {
 	f := gitHost()
 	f.On([]string{"podman", "network", "ls"}, sys.Result{ExitCode: 125, Stderr: []byte("Error: boom\n")},
 		fmt.Errorf("podman: %w (exit 125): Error: boom", sys.ErrExit))
-	code, _, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main")
+	code, _, errs := runWith(t, f, "project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main")
 	if code == 0 || !strings.Contains(errs, "boom") {
 		t.Fatalf("new: exit %d, stderr %q; want failure naming the podman error", code, errs)
 	}

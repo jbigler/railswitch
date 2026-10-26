@@ -275,7 +275,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
       Image     ImageConfig                 `toml:"image"`
   }
   type ImageConfig struct {
-      Base   string   `toml:"base"`   // required: "containerfiles/Containerfile.<name>"; railswitch new ejects the pack's default here (D31)
+      Base   string   `toml:"base"`   // required: "containerfiles/Containerfile.<name>"; railswitch project new ejects the pack's default here (D31)
       Addons []string `toml:"addons"` // "containerfiles/Containerfile.<name>", applied in this order on top of base
   }
   type Secret struct {
@@ -1084,7 +1084,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
   func SetImageBase(path, value string) error    // adds [image] and/or base; same value = no-op; a different existing value = error naming it
   func AppendImageAddon(path, value string) error // adds [image] and/or addons; appends, order kept; an existing entry = error
 
-  // cli/containerfile.go; Eject is also called by railswitch new (Task 20), before any stack.lock exists, so it takes no Workspace.
+  // cli/containerfile.go; Eject is also called by railswitch project new (Task 20), before any stack.lock exists, so it takes no Workspace.
   // root = workspace root; st = the stack resolved from the in-memory Project (Catalog.Resolve).
   func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error
   ```
@@ -1321,7 +1321,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
   - **`railswitch secret add <name> --service <id>… [--env <VAR>] [--machine]`:** declares `[secrets.<name>]` in `project.toml` via `config.AddSecret` (keeping comments; refuses an existing name), then runs `set`. `railswitch secret add twilio_auth_token --service rails --service worker --env TWILIO_AUTH_TOKEN` is the whole workflow for an app key.
   - **`railswitch secret ls`:** one line per declared secret: name, scope, podman secret name, delivery (`file` or `env VAR`), driver, `set <created>` or `not set`, receiving services. Never a value. A secret stored with a driver other than the configured one is flagged `driver differs: railswitch secret set <name> to move it`. With `--json`, the same fields.
   - **`railswitch secret rm <name>`:** `SecretRemove`. The `project.toml` declaration stays until the user deletes it, and `up` then refuses with the `secret set` hint.
-  - **`railswitch new`** (Task 20) writes `[secrets.github_token]` with `services = ["nvim"]` and `git_host = "github.com"` when the repo URL's host is `github.com` and nvim is enabled (`--tool nvim`). It then prints `railswitch secret set github_token` as the next step.
+  - **`railswitch project new`** (Task 20) writes `[secrets.github_token]` with `services = ["nvim"]` and `git_host = "github.com"` when the repo URL's host is `github.com` and nvim is enabled (`--tool nvim`). It then prints `railswitch secret set github_token` as the next step.
   - **Secret driver (D37):** machine-wide, in `~/.config/railswitch/config.toml` (`machine.LoadConfig`, above):
 
     ```toml
@@ -1551,7 +1551,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
 - [ ] **Step 4:** Run it. Expected: PASS.
 - [ ] **Step 5:** `make check && git commit -am "feat(doctor): host checks and allow-ports"`.
 
-### Task 20: `railswitch new` and `railswitch init`
+### Task 20: `railswitch project new` and `railswitch project init`
 
 **Files:**
 - Create: `internal/cli/new.go`, `internal/cli/new_test.go`
@@ -1559,8 +1559,8 @@ docs/json.md                      # --json schemas (D40), created in Task 12
 **Interfaces:**
 - Consumes: `config`, `pack.Catalog` (+ `Catalog.Resolve` on the in-memory `Project`), `machine.Locked`, `worktree`, `cli.Eject` (Task 12A: `Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error`), `workspace.Lock(ctx, root)` (Task 12), `workspace.Render`
 - Produces:
-  - Usage: `railswitch new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]… [--tool nvim]`.
-  - `railswitch init` (D38), run in a cloned workspace repo (it has `project.toml` but isn't registered on this machine): clone `[project] repo` (branch `[project] base_branch`) into the base dir, create `<ws>/db-dumps/` (0700), write `mise.local.toml` with fresh `generated` values, register the prefix and base worktree, and render. Then print `railswitch secret set <name>` for each declared secret that isn't set. Refuse if the prefix is registered.
+  - Usage: `railswitch project new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]… [--tool nvim]`.
+  - `railswitch project init` (D38), run in a cloned workspace repo (it has `project.toml` but isn't registered on this machine): clone `[project] repo` (branch `[project] base_branch`) into the base dir, create `<ws>/db-dumps/` (0700), write `mise.local.toml` with fresh `generated` values, register the prefix and base worktree, and render. Then print `railswitch secret set <name>` for each declared secret that isn't set. Refuse if the prefix is registered.
   - Steps:
     1. refuse if `<dir>/project.toml` exists or the prefix is registered;
     2. resolve `<base>`: `--branch`, else the remote's HEAD branch from `git ls-remote --symref <repo> HEAD` (the line `ref: refs/heads/<base>\tHEAD`); a repo with no symref HEAD is an error asking for `--branch`. `<base>` is recorded as `[project] base_branch`. Then `git clone --branch <base> <repo> <dir>/<sanitize(base)>`. Then make the workspace its own git repo (D38): `git init <dir>` and write `<dir>/.gitignore` as an allowlist, `/*`, `!/.gitignore`, `!/project.toml`, `!/stack.lock`, `!/containerfiles/`, `!/entrypoints/`, `!/packs/`, `!/options/` (the last two for Stage 5 local packs). Create `<dir>/db-dumps/` (0700; postgres mounts it, and `up` preflight needs every bind source). Worktrees, `.railswitch/`, `mise.local.toml` and `db-dumps/` are therefore never tracked. There's no commit; the user commits;
@@ -1590,7 +1590,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
   - `project.toml` does not contain the password value.
   - The registry has the prefix and base ID.
   - A second `new` with the same prefix fails with `prefix "x" is already used by <workspace>`.
-  - `TestInitJoin` (D38): `railswitch init`, in a directory holding only the tracked files of a `new` workspace and pointed at a fresh `XDG_DATA_HOME`:
+  - `TestInitJoin` (D38): `railswitch project init`, in a directory holding only the tracked files of a `new` workspace and pointed at a fresh `XDG_DATA_HOME`:
     - clones `[project] repo` into the base dir;
     - writes `mise.local.toml` with fresh `generated` values;
     - registers the prefix and base worktree, creates `db-dumps/` (0700), and renders;
@@ -1617,7 +1617,7 @@ docs/json.md                      # --json schemas (D40), created in Task 12
 
   Expected: `/tmp/rs-demo/demo/.git` exists.
 - [ ] **Step 2:** Run `railswitch doctor`. Expected: every check OK (run `railswitch allow-ports` first if port 80 fails).
-- [ ] **Step 3:** Run `railswitch new ~/workspace/rs-demo --repo /tmp/rs-demo/demo --prefix demo`, then `cd ~/workspace/rs-demo/main && railswitch up`. Expected: exit 0.
+- [ ] **Step 3:** Run `railswitch project new ~/workspace/rs-demo --repo /tmp/rs-demo/demo --prefix demo`, then `cd ~/workspace/rs-demo/main && railswitch up`. Expected: exit 0.
 - [ ] **Step 4:** Run `curl -sS -o /dev/null -w '%{http_code}' http://main.demo.localhost/`. Expected: `200`. `up` already waited for the `/up` health check (D34). If Rails host authorization or binding blocks it, the fix belongs in the rails pack (`BINDING`), or in the project's `[env]` for an app-specific setting. Never in core.
 - [ ] **Step 5:** Run `railswitch exec -- bin/rails runner 'puts ActiveRecord::Base.connection.select_value("select 1")'`. Expected: `1`.
 - [ ] **Step 6:** Run `railswitch fw show`. Expected: rails is listed with profile `none` and mode `log`; no container is reported as unfirewalled.

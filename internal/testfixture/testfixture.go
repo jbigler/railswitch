@@ -14,7 +14,7 @@ import (
 
 // Workspace copies the fixture dir to a temp workspace named after it and
 // writes the built-in default Containerfiles into its containerfiles/, as
-// railswitch new ejects them, so the fixture can't drift from the built-ins.
+// railswitch project new ejects them, so the fixture can't drift from the built-ins.
 func Workspace(t testing.TB, dir string) string {
 	t.Helper()
 	ws := filepath.Join(t.TempDir(), filepath.Base(dir))

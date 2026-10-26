@@ -239,7 +239,7 @@ func proxySubnet(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Che
 	pe, ok := reg.Project(prefix)
 	reg.Close()
 	if !ok {
-		c.Detail, c.Fix = "project "+prefix+" is not registered", "railswitch init"
+		c.Detail, c.Fix = "project "+prefix+" is not registered", "railswitch project init"
 		return c
 	}
 	subnet := machine.Subnet(pe.Subnet)

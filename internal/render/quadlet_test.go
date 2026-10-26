@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/testfixture"
@@ -256,6 +257,25 @@ func TestQuadletLintGate(t *testing.T) {
 	}
 }
 
+// A container's env file is part of what it was created from: changing
+// [env] must change the unit-hash label, or `up` keeps the old container
+// (its unit file is unchanged; only the env file it names is).
+func TestUnitHashCoversEnv(t *testing.T) {
+	ws := fixtureWS(t)
+	label := func(tz string) string {
+		m := mustBuild(t, fixtureInputs(t, ws, func(p *config.Project) { p.Env["TZ"] = tz }))
+		units, err := Quadlet(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return unithash.Read(units["filial-master-rails.container"], unithash.Key("filial"))
+	}
+	a, b := label("Asia/Bangkok"), label("Europe/Berlin")
+	if a == "" || a == b {
+		t.Fatalf("rails unit-hash %q for TZ=Asia/Bangkok and %q for TZ=Europe/Berlin; want different", a, b)
+	}
+}
+
 // TestWorkspaceWithSpace: keys Quadlet splits into words are quoted; keys it
 // reads whole are not.
 func TestWorkspaceWithSpace(t *testing.T) {
@@ -489,9 +509,21 @@ func readGolden(t *testing.T, dir, file string) string {
 }
 
 // TestUnitHashLabel: every .container carries <prefix>.unit-hash, the hash
-// of the unit with that label line excluded; networks carry none.
+// of the unit with that label line excluded plus the service's env file;
+// networks carry none.
 func TestUnitHashLabel(t *testing.T) {
-	_, units := renderUnits(t, fixtureDir, nil)
+	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), nil))
+	units, err := Quadlet(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envOf := map[string][]byte{}
+	for _, wt := range m.Inputs.Worktrees {
+		in := mustInstance(t, m, wt.Slug)
+		for _, s := range m.Services {
+			envOf[naming.Container("filial", wt.Slug, s.ID)+".container"] = EnvFile(in.Env[s.ID])
+		}
+	}
 	key := unithash.Key("filial")
 	for file, data := range units {
 		h := unithash.Read(data, key)
@@ -502,8 +534,8 @@ func TestUnitHashLabel(t *testing.T) {
 			continue
 		}
 		rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1)
-		if h == "" || unithash.Sum(rest) != h {
-			t.Errorf("%s: unit-hash %q; want %q", file, h, unithash.Sum(rest))
+		if want := unithash.Sum(rest, envOf[file]); h == "" || h != want {
+			t.Errorf("%s: unit-hash %q; want %q", file, h, want)
 		}
 	}
 }

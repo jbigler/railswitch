@@ -66,7 +66,9 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 			if err := put(name, u); err != nil {
 				return nil, err
 			}
-			out[name] = unithash.Stamp(out[name], unithash.Key(m.Prefix))
+			// The env file is part of what the container is created from, so
+			// an [env] change marks the running container stale too.
+			out[name] = unithash.Stamp(out[name], unithash.Key(m.Prefix), EnvFile(in.Env[s.ID]))
 		}
 	}
 	if fs := Lint(out); len(fs) > 0 {

@@ -378,8 +378,13 @@ func (p Podman) Label(ctx context.Context, name, key string) (string, error) {
 }
 
 // NetworkConnect runs `podman network connect --ip <ip> <network> <container>`.
+// A container already connected (another up got there first) is not an
+// error.
 func (p Podman) NetworkConnect(ctx context.Context, network, container, ip string) error {
-	_, err := p.run(ctx, 0, "network", "connect", "--ip", ip, network, container)
+	r, err := p.run(ctx, 0, "network", "connect", "--ip", ip, network, container)
+	if err != nil && isMissing(r, err, "network is already connected") {
+		return nil
+	}
 	return err
 }
 

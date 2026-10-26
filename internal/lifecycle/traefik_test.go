@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -137,5 +138,38 @@ func TestUpRefusesMachineSubnetTaken(t *testing.T) {
 	}
 	if n := count(e.calls(), "systemctl --user start"); n != 0 {
 		t.Errorf("started:\n%s", dump(e.calls()))
+	}
+}
+
+// TestAttachTraefikAlreadyConnected (final M5): another `up` connecting
+// Traefik first is no failure.
+func TestAttachTraefikAlreadyConnected(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := machine.Open(dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pe, err := reg.AddProject("a", "/ws/a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reg.Close()
+	f := &systest.Fake{}
+	traefikRunning(f, "railswitch_machine ")
+	f.On([]string{"podman", "network", "ls", "--format", "json"}, sys.Result{Stdout: []byte(`[{"name":"a_proxy","subnets":[{"subnet":"` + machine.Subnet(pe.Subnet) + `"}]}]`)}, nil)
+	const stderr = "Error: network is already connected"
+	f.On([]string{"podman", "network", "connect"}, sys.Result{ExitCode: 125, Stderr: []byte(stderr)}, fmt.Errorf("podman: %w (exit 125): %s", sys.ErrExit, stderr))
+	l := &L{R: f, WS: &workspace.Workspace{Dirs: dirs}, Out: &bytes.Buffer{}, Err: &bytes.Buffer{}}
+	if err := l.AttachTraefik(ctx); err != nil {
+		t.Fatalf("AttachTraefik: %v", err)
 	}
 }

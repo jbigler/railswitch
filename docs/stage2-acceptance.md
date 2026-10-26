@@ -142,9 +142,9 @@ Expected: `PASS`.
 
 ## Run log
 
-### 2026-10-26, partial run on the user's host (CachyOS)
+### 2026-10-26, run on the user's host (CachyOS)
 
-Steps 1–7 for the base worktree only (`demo`, `main`). Steps 7–9 for `feat-x` and the e2e test are not yet run.
+Steps 1–8 run by hand: the base worktree (`demo`, `main`), then `feat-x` added, brought up, taken down and removed. Step 9 (the automated e2e test) is not yet run.
 
 Problems found and fixed on the way:
 
@@ -152,4 +152,4 @@ Problems found and fixed on the way:
 2. `curl http://main.demo.localhost/` returned 403, from Rails' development host check, which allows one subdomain label under `.localhost`. Fixed in `f6719f3`: the rails pack sets `RAILS_DEVELOPMENT_HOSTS={worktree.host}`. `b2d2ec9` makes an env change restart the container.
 3. The old Traefik must be stopped first; it holds `127.0.0.1:80` (Prerequisites). The old tool's host dashboard (`<prefix>-dashboard.service`, `wt.localhost:7700`) keeps running until disabled; it doesn't conflict with railswitch.
 
-After these fixes, the user reported that `up` and the app at `http://main.demo.localhost/` work. The command outputs were not recorded here.
+After these fixes, the user reported that steps 1–8 passed: `main` and `feat-x` both served, and `feat-x` teardown left `demo-main-*` running. The command outputs were not recorded here.

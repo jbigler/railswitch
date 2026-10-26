@@ -26,11 +26,13 @@ const (
 	DozzleUnitName         = "railswitch-dozzle.container"
 	MachineNetwork         = "railswitch_machine"
 
-	// ProxyContainer is Traefik's container; ProxyService and DozzleService
-	// are the services Quadlet generates from the machine's .container units.
-	ProxyContainer = "railswitch-traefik"
-	ProxyService   = "railswitch-traefik.service"
-	DozzleService  = "railswitch-dozzle.service"
+	// ProxyContainer and DozzleContainer are Traefik's and Dozzle's
+	// containers; ProxyService and DozzleService are the services Quadlet
+	// generates from the machine's .container units.
+	ProxyContainer  = "railswitch-traefik"
+	DozzleContainer = "railswitch-dozzle"
+	ProxyService    = "railswitch-traefik.service"
+	DozzleService   = "railswitch-dozzle.service"
 )
 
 // machineUnitNames are every unit ProxyUnits renders.
@@ -131,9 +133,13 @@ func ProxyUnits(r *Registry) map[string][]byte {
 		"",
 		"[Container]",
 		"Image=docker.io/amir20/dozzle:v11.3.5",
-		"ContainerName=railswitch-dozzle",
+		"ContainerName="+DozzleContainer,
 		"Network="+MachineNetworkUnitName+":ip="+addr(MachineSubnet, ".3"),
 		"Volume=%t/podman/podman.sock:/var/run/docker.sock:ro",
+		// The socket's :ro doesn't stop API writes over it: Dozzle's own
+		// settings are the guard, pinned rather than left to its defaults.
+		"Environment=DOZZLE_ENABLE_ACTIONS=false",
+		"Environment=DOZZLE_ENABLE_SHELL=false",
 		"LogDriver=k8s-file",
 		"LogOpt=max-size=20m",
 		"Label=traefik.enable=true",
@@ -154,7 +160,7 @@ func ProxyUnits(r *Registry) map[string][]byte {
 	return map[string][]byte{
 		ProxyUnitName:          unithash.StampExcept(lines(traefik...), key, isNetworkLine),
 		MachineNetworkUnitName: network,
-		DozzleUnitName:         dozzle,
+		DozzleUnitName:         unithash.Stamp(dozzle, key),
 	}
 }
 

@@ -28,6 +28,9 @@ const (
 	traefikUnit      = machine.ProxyUnitName
 	traefikService   = machine.ProxyService
 	traefikContainer = machine.ProxyContainer
+	dozzleUnit       = machine.DozzleUnitName
+	dozzleService    = machine.DozzleService
+	dozzleContainer  = machine.DozzleContainer
 )
 
 // L runs lifecycle commands for one workspace.
@@ -171,10 +174,10 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	// label ignores its Network= lines: a project added or removed is
 	// joined or left live (AttachTraefik), never by a restart.
 	reload := ch.units
-	var restartTraefik bool
+	var restartTraefik, restartDozzle bool
 	var restart []string // active units of this worktree running an older unit
 	key := unithash.Key(m.Prefix)
-	for _, u := range append(names.Units, traefikService) {
+	for _, u := range append(names.Units, traefikService, dozzleService) {
 		st, err := sd.UnitState(ctx, u)
 		if err != nil {
 			return err
@@ -193,6 +196,12 @@ func (l *L) Up(ctx context.Context, slug string) error {
 				return err
 			}
 			restartTraefik = restartTraefik || stale
+		case u == dozzleService:
+			stale, err := l.staleContainer(ctx, dozzleContainer, dozzleUnit, unithash.Key("railswitch"))
+			if err != nil {
+				return err
+			}
+			restartDozzle = stale
 		case slices.Contains(names.Containers, ctr):
 			stale, err := l.staleContainer(ctx, ctr, ctr+".container", key)
 			if err != nil {
@@ -210,6 +219,11 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 	if restartTraefik {
 		if err := sd.Restart(ctx, traefikService); err != nil {
+			return err
+		}
+	}
+	if restartDozzle {
+		if err := sd.Restart(ctx, dozzleService); err != nil {
 			return err
 		}
 	}

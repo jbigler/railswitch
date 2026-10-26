@@ -207,3 +207,20 @@ func TestTraefikHashIgnoresNetworks(t *testing.T) {
 		t.Errorf("unit-hash %q with two projects, %q with one", a, b)
 	}
 }
+
+// TestDozzleUnitHashReadOnly (final M6): Dozzle's unit carries a unit-hash
+// label, so up restarts it when its unit changes, and pins actions and
+// shell off.
+func TestDozzleUnitHashReadOnly(t *testing.T) {
+	data := machine.ProxyUnits(twoProjects())[machine.DozzleUnitName]
+	key := unithash.Key("railswitch")
+	h := unithash.Read(data, key)
+	if rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1); h == "" || unithash.Sum(rest) != h {
+		t.Errorf("dozzle unit-hash %q; want %q", h, unithash.Sum(rest))
+	}
+	for _, want := range []string{"\nEnvironment=DOZZLE_ENABLE_ACTIONS=false\n", "\nEnvironment=DOZZLE_ENABLE_SHELL=false\n"} {
+		if !bytes.Contains(data, []byte(want)) {
+			t.Errorf("dozzle unit lacks %q:\n%s", want[1:], data)
+		}
+	}
+}

@@ -927,7 +927,7 @@ func (e *tenv) labels(t *testing.T, stale ...string) {
 			t.Fatal(err)
 		}
 		key := unithash.Key("filial")
-		if ctr == "railswitch-traefik" {
+		if strings.HasPrefix(ctr, "railswitch-") {
 			key = unithash.Key("railswitch")
 		}
 		h := unithash.Read(data, key)
@@ -1243,5 +1243,23 @@ func TestUpIsolatedNoWarning(t *testing.T) {
 	}
 	if w := e.errOut(); strings.Contains(w, "WARNING") {
 		t.Errorf("stderr %q", w)
+	}
+}
+
+// TestUpDozzleStaleLabelRestarted (final M6): Dozzle running an older unit
+// is restarted, like Traefik.
+func TestUpDozzleStaleLabelRestarted(t *testing.T) {
+	e := setup(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.labels(t, "railswitch-dozzle")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user restart railswitch-dozzle.service",
+		"systemctl --user start filial-feat-rails.service")
+	if n := count(e.calls(), "systemctl --user restart filial-") + count(e.calls(), "systemctl --user restart railswitch-traefik"); n != 0 {
+		t.Fatalf("restarted a current unit:\n%s", dump(e.calls()))
 	}
 }

@@ -1,17 +1,22 @@
-// Package pack reads stack packs, options and tools (D12): their file
-// format, the built-in catalog and the content hash that locks them (D14).
+// Package pack reads stack packs, options, tools and agent packages (D12):
+// their file format, the catalog and the content hash that locks them (D14).
 package pack
 
 import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/jbigler/railswitch/internal/config"
 )
 
-// Ref names one version of a pack or option: "<name>@<version>".
+// Ref names one version of a package: "<name>@<version>", or for a
+// workspace-local agent package "local:<name>@<version>" (Local).
 type Ref struct {
 	Name    string
 	Version int
+	Local   bool
 }
 
 // refRe is the ref grammar: a lowercase name, "@", a positive version with no
@@ -22,8 +27,12 @@ var refRe = regexp.MustCompile(`^([a-z][a-z0-9-]*)@([1-9][0-9]{0,8})$`)
 // nameRe is the grammar of a package name on its own (tools, directories).
 var nameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
-// ParseRef parses "name@N".
+// ParseRef parses "name@N". A "local:" ref is refused: only agents take one
+// until Stage 5 (D43); see ParseAgentRef.
 func ParseRef(s string) (Ref, error) {
+	if strings.HasPrefix(s, config.LocalPrefix) {
+		return Ref{}, fmt.Errorf("%q: local: refs are supported for agents only until Stage 5 (D43)", s)
+	}
 	m := refRe.FindStringSubmatch(s)
 	if m == nil {
 		return Ref{}, fmt.Errorf("%q is not a ref name@N, e.g. \"postgres@1\"", s)
@@ -32,5 +41,22 @@ func ParseRef(s string) (Ref, error) {
 	return Ref{Name: m[1], Version: v}, nil
 }
 
-// String returns "name@N".
-func (r Ref) String() string { return fmt.Sprintf("%s@%d", r.Name, r.Version) }
+// ParseAgentRef parses "name@N" or "local:name@N".
+func ParseAgentRef(s string) (Ref, error) {
+	rest, local := strings.CutPrefix(s, config.LocalPrefix)
+	m := refRe.FindStringSubmatch(rest)
+	if m == nil {
+		return Ref{}, fmt.Errorf("%q is not a ref name@N or local:name@N, e.g. \"claude@1\"", s)
+	}
+	v, _ := strconv.Atoi(m[2])
+	return Ref{Name: m[1], Version: v, Local: local}, nil
+}
+
+// String returns "name@N", or "local:name@N" for a local ref.
+func (r Ref) String() string {
+	s := fmt.Sprintf("%s@%d", r.Name, r.Version)
+	if r.Local {
+		return config.LocalPrefix + s
+	}
+	return s
+}

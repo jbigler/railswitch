@@ -188,7 +188,7 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(root)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -377,7 +377,7 @@ func containerfileNew(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(root)
 	if err != nil {
 		return e.fail(err)
 	}

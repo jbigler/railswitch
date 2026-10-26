@@ -36,7 +36,8 @@ const (
 )
 
 // workspaceGitignore is the workspace repo's allowlist (D38): worktrees,
-// .railswitch/, mise.local.toml and db-dumps/ are never tracked.
+// .railswitch/, mise.local.toml and db-dumps/ are never tracked; local agent
+// packages under agents/ are.
 const workspaceGitignore = `/*
 !/.gitignore
 !/project.toml
@@ -45,6 +46,7 @@ const workspaceGitignore = `/*
 !/entrypoints/
 !/packs/
 !/options/
+!/agents/
 `
 
 // railswitch project new: clone the app repo into a new workspace (its own git
@@ -88,7 +90,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(ws)
 	if err != nil {
 		return e.fail(err)
 	}

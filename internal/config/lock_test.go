@@ -138,3 +138,18 @@ func TestReadLockUnknownKey(t *testing.T) {
 		t.Errorf("ReadLock = %v; want an error naming imgae", err)
 	}
 }
+
+func TestLockAgentsRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stack.lock")
+	l := &Lock{Agents: map[string]LockEntry{"local:probe@1": {Version: "1", Source: "local", SHA256: "ab"}}}
+	if err := l.Write(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadLock(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Agents["local:probe@1"] != l.Agents["local:probe@1"] {
+		t.Errorf("Agents = %+v", got.Agents)
+	}
+}

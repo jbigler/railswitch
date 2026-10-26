@@ -73,7 +73,7 @@ func TestResolveErrors(t *testing.T) {
 
 func TestResolveWorksWith(t *testing.T) {
 	cat := builtins(t)
-	cat.Options[Ref{"sidekiq", 1}].WorksWith = []string{"hanami"}
+	cat.Options[Ref{Name: "sidekiq", Version: 1}].WorksWith = []string{"hanami"}
 	_, err := cat.Resolve(resolveProject(map[string]string{"cache": "redis@1", "jobs": "sidekiq@1"}, false))
 	if err == nil || !strings.Contains(err.Error(), "does not work with pack rails") {
 		t.Fatalf("Resolve = %v; want a works_with error", err)

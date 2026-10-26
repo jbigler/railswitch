@@ -23,11 +23,11 @@ func builtins(t *testing.T) *Catalog {
 
 func TestLoadBuiltins(t *testing.T) {
 	cat := builtins(t)
-	if cat.Packs[Ref{"rails", 1}] == nil {
+	if cat.Packs[Ref{Name: "rails", Version: 1}] == nil {
 		t.Errorf("no pack rails@1; have %v", slices.Collect(maps.Keys(cat.Packs)))
 	}
 	for _, name := range []string{"postgres", "redis", "rustfs", "playwright", "sidekiq"} {
-		if cat.Options[Ref{name, 1}] == nil {
+		if cat.Options[Ref{Name: name, Version: 1}] == nil {
 			t.Errorf("no option %s@1", name)
 		}
 	}
@@ -35,10 +35,10 @@ func TestLoadBuiltins(t *testing.T) {
 		t.Errorf("no tool nvim")
 	}
 	// Every package carries its own directory.
-	if _, err := fs.Stat(cat.Packs[Ref{"rails", 1}].Files, "Containerfile.base"); err != nil {
+	if _, err := fs.Stat(cat.Packs[Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"); err != nil {
 		t.Errorf("rails Files: %v", err)
 	}
-	if _, err := fs.Stat(cat.Options[Ref{"postgres", 1}].Files, "initdb/restore-dump.sh"); err != nil {
+	if _, err := fs.Stat(cat.Options[Ref{Name: "postgres", Version: 1}].Files, "initdb/restore-dump.sh"); err != nil {
 		t.Errorf("postgres Files: %v", err)
 	}
 	if _, err := fs.Stat(cat.Tools["nvim"].Files, "Containerfile.nvim"); err != nil {
@@ -62,7 +62,7 @@ func TestLoadBuiltins(t *testing.T) {
 
 func TestParseRef(t *testing.T) {
 	r, err := ParseRef("rails@1")
-	if err != nil || r != (Ref{"rails", 1}) || r.String() != "rails@1" {
+	if err != nil || r != (Ref{Name: "rails", Version: 1}) || r.String() != "rails@1" {
 		t.Errorf(`ParseRef("rails@1") = %v, %v`, r, err)
 	}
 	for _, bad := range []string{"rails", "rails@x", "@1", "rails@0", "rails@01", "Rails@1", "rails@1@2", ""} {
@@ -184,7 +184,7 @@ func TestOptionDepsEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load with deps_env: %v", err)
 	}
-	if got := cat.Options[Ref{"o", 1}].DepsEnv; !maps.Equal(got, map[string]string{"SKIP": "1"}) {
+	if got := cat.Options[Ref{Name: "o", Version: 1}].DepsEnv; !maps.Equal(got, map[string]string{"SKIP": "1"}) {
 		t.Errorf("deps_env = %v", got)
 	}
 	opt.Data = []byte(base + "[deps_env]\n\"bad-name\" = \"1\"\n")
@@ -201,7 +201,7 @@ func TestPortSamePort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load with same_port: %v", err)
 	}
-	if p := cat.Options[Ref{"o", 1}].Ports[0]; !p.SamePort || p.Container != 0 {
+	if p := cat.Options[Ref{Name: "o", Version: 1}].Ports[0]; !p.SamePort || p.Container != 0 {
 		t.Errorf("port = %+v; want SamePort and no container", p)
 	}
 
@@ -281,7 +281,7 @@ container = 5433
 }
 
 func TestRailsPackGeneric(t *testing.T) {
-	p := builtins(t).Packs[Ref{"rails", 1}]
+	p := builtins(t).Packs[Ref{Name: "rails", Version: 1}]
 	// RUBY_DEBUG_HOST: the debug gem (in Rails' default Gemfile) listens on the published debug port.
 	if got := slices.Sorted(maps.Keys(p.Env)); !slices.Equal(got, []string{"BINDING", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}) {
 		t.Errorf("rails [env] keys = %v, want exactly BINDING, RAILS_DEVELOPMENT_HOSTS, RAILS_ENV, RUBY_DEBUG_HOST", got)
@@ -298,7 +298,7 @@ func TestRailsPackGeneric(t *testing.T) {
 }
 
 func TestPlaywrightOptionEnv(t *testing.T) {
-	o := builtins(t).Options[Ref{"playwright", 1}]
+	o := builtins(t).Options[Ref{Name: "playwright", Version: 1}]
 	for _, m := range []map[string]string{o.Env, o.Gives, o.DepsEnv} {
 		if _, ok := m["HEADLESS_SYSTEM_TESTS"]; ok {
 			t.Errorf("playwright defines HEADLESS_SYSTEM_TESTS")
@@ -366,13 +366,13 @@ func TestBuiltinFromQualified(t *testing.T) {
 
 func TestOptionImageKinds(t *testing.T) {
 	cat := builtins(t)
-	if got := cat.Options[Ref{"playwright", 1}].Image.Build; got != "Containerfile.playwright" {
+	if got := cat.Options[Ref{Name: "playwright", Version: 1}].Image.Build; got != "Containerfile.playwright" {
 		t.Errorf("playwright Image.Build = %q", got)
 	}
-	if got := cat.Options[Ref{"sidekiq", 1}].Image.Use; got != "app" {
+	if got := cat.Options[Ref{Name: "sidekiq", Version: 1}].Image.Use; got != "app" {
 		t.Errorf("sidekiq Image.Use = %q", got)
 	}
-	if got := cat.Options[Ref{"postgres", 1}].Image.Pull; got != "docker.io/library/postgres:{postgres}" {
+	if got := cat.Options[Ref{Name: "postgres", Version: 1}].Image.Pull; got != "docker.io/library/postgres:{postgres}" {
 		t.Errorf("postgres Image.Pull = %q", got)
 	}
 

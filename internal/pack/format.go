@@ -276,3 +276,38 @@ type Tool struct {
 type ToolImage struct {
 	File string `toml:"file"` // e.g. "Containerfile.nvim"
 }
+
+// Agent is an agent package (D54): agent.toml plus its directory. Built-in
+// ones live under agents/ in railswitch; a workspace's own under
+// <workspace>/agents/<name>/, referred to as "local:<name>@N".
+type Agent struct {
+	Name    string `toml:"name"`
+	Version int    `toml:"version"`
+	Run     string `toml:"run"` // default run mode: "on-demand" (or "") or "service"
+	// Default marks the agent railswitch project new adds unless --agent is
+	// given; at most one built-in sets it.
+	Default bool `toml:"default"`
+
+	Image      AgentImage        `toml:"image"`
+	Entrypoint string            `toml:"entrypoint"` // package file mounted as the entrypoint
+	Allow      []string          `toml:"allow"`      // firewall hosts the agent needs
+	Shared     []Volume          `toml:"shared"`     // volumes shared by every worktree: <prefix>_<name>
+	Mounts     []Mount           `toml:"mounts"`
+	Env        map[string]string `toml:"env"`
+	Secrets    []AgentSecret     `toml:"secrets"`
+	Unit       Unit              `toml:"unit"`
+
+	Files fs.FS `toml:"-"` // the package's directory
+}
+
+// AgentImage is an agent package's Containerfile, built on the agent base image.
+type AgentImage struct {
+	File string `toml:"file"` // e.g. "Containerfile.<pkg>"
+}
+
+// AgentSecret is a secret the agent needs; railswitch project new declares
+// it as [secrets.<agent>_<name>].
+type AgentSecret struct {
+	Name string `toml:"name"`
+	Env  string `toml:"env"`
+}

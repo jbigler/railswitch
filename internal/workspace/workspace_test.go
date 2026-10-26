@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -191,5 +192,84 @@ func TestBranchOf(t *testing.T) {
 		if got := branchOf(filepath.Join(tmp, dir)); got != want {
 			t.Errorf("branchOf(%s) = %q, want %q", dir, got, want)
 		}
+	}
+}
+
+// addProbeAgent gives root a local agent package probe@1 and a project
+// that uses it as agent "probe".
+func addProbeAgent(t *testing.T, root string) {
+	t.Helper()
+	dir := filepath.Join(root, "agents", "probe")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"agent.toml":          "name = \"probe\"\nversion = 1\n[image]\nfile = \"Containerfile.probe\"\n",
+		"Containerfile.probe": "FROM base\n",
+	}
+	for name, data := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := os.OpenFile(filepath.Join(root, "project.toml"), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("\n[agents.probe]\nuse = \"local:probe@1\"\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLockAgents(t *testing.T) {
+	builtin := &pack.Agent{Name: "a", Version: 1, Files: fstest.MapFS{"agent.toml": {Data: []byte("a")}}}
+	local := &pack.Agent{Name: "probe", Version: 1, Files: fstest.MapFS{"agent.toml": {Data: []byte("p")}}}
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := &pack.Stack{Pack: cat.Packs[pack.Ref{Name: "rails", Version: 1}], Agents: []*pack.ChosenAgent{
+		{Name: "a", Agent: builtin, Ref: pack.Ref{Name: "a", Version: 1}},
+		{Name: "b", Agent: builtin, Ref: pack.Ref{Name: "a", Version: 1}},
+		{Name: "probe", Agent: local, Ref: pack.Ref{Name: "probe", Version: 1, Local: true}},
+	}}
+	l, err := lockEntries(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := l.Agents["a@1"]; e.Version != "1" || e.Source != "built in (railswitch dev)" || len(e.SHA256) != 64 {
+		t.Errorf(`agent."a@1" = %+v`, e)
+	}
+	if e := l.Agents["local:probe@1"]; e.Version != "1" || e.Source != "local" || len(e.SHA256) != 64 {
+		t.Errorf(`agent."local:probe@1" = %+v`, e)
+	}
+	if len(l.Agents) != 2 {
+		t.Errorf("Agents = %v", l.Agents)
+	}
+
+	root := projectRoot(t)
+	addProbeAgent(t, root)
+	ctx := context.Background()
+	if err := Lock(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.CheckLock(); err != nil {
+		t.Fatalf("CheckLock after lock: %v", err)
+	}
+	toml := filepath.Join(root, "agents", "probe", "agent.toml")
+	if err := os.WriteFile(toml, []byte("name = \"probe\"\nversion = 1\nallow = [\"x.example\"]\n[image]\nfile = \"Containerfile.probe\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if w, err = Load(ctx, root, ""); err != nil {
+		t.Fatal(err)
+	}
+	err = w.CheckLock()
+	if !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "for local:probe@1:") {
+		t.Errorf("CheckLock after edit: %v", err)
 	}
 }

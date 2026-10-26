@@ -176,3 +176,65 @@ func TestValidateJoinsAll(t *testing.T) {
 		t.Fatalf("Validate = %v; want both problems", err)
 	}
 }
+
+func TestAgentConfigValidate(t *testing.T) {
+	good := []Agent{
+		{Use: "claude@1"},
+		{Use: "local:probe@1"},
+		{Use: "claude@1", Run: "on-demand"},
+		{Use: "claude@1", Run: "service", Env: map[string]string{"X": "1"}, Allow: []string{"api.example.com"}},
+	}
+	for i, a := range good {
+		p := loadFilial(t)
+		p.Agents = map[string]Agent{"probe": a}
+		if err := p.Validate(); err != nil {
+			t.Errorf("good[%d] %+v: %v", i, a, err)
+		}
+	}
+	ok := Agent{Use: "claude@1"}
+	cases := []struct {
+		name  string
+		agent string
+		a     Agent
+		want  []string
+	}{
+		{"upper", "Bad", ok, []string{"agents.Bad"}},
+		{"ls", "ls", ok, []string{"agents.ls", "reserved"}},
+		{"base", "base", ok, []string{"agents.base", "reserved"}},
+		{"underscore", "a_b", ok, []string{"agents.a_b"}},
+		{"long", strings.Repeat("a", 26), ok, []string{"agents." + strings.Repeat("a", 26)}},
+		{"run", "x", Agent{Use: "claude@1", Run: "always"}, []string{"agents.x.run", "always"}},
+		{"env", "x", Agent{Use: "claude@1", Env: map[string]string{"1X": "v"}}, []string{"agents.x.env.1X"}},
+		{"allow", "x", Agent{Use: "claude@1", Allow: []string{"a b"}}, []string{"agents.x.allow[0]", "a b"}},
+		{"local zero", "x", Agent{Use: "local:x@0"}, []string{"agents.x.use", "local:x@0"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := loadFilial(t)
+			p.Agents = map[string]Agent{c.agent: c.a}
+			err := p.Validate()
+			if err == nil {
+				t.Fatal("Validate = nil; want error")
+			}
+			for _, w := range c.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("Validate = %q; want it to contain %q", err, w)
+				}
+			}
+		})
+	}
+}
+
+func TestStackLocalRefused(t *testing.T) {
+	p := loadFilial(t)
+	p.Options["database"] = "local:pg@1"
+	err := p.Validate()
+	if err == nil || !strings.Contains(err.Error(), "options.database") || !strings.Contains(err.Error(), "agents only until Stage 5") {
+		t.Fatalf("Validate = %v", err)
+	}
+	p = loadFilial(t)
+	p.Stack.Pack = "local:rails@1"
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "stack.pack") || !strings.Contains(err.Error(), "agents only until Stage 5") {
+		t.Fatalf("Validate = %v", err)
+	}
+}

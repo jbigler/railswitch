@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path"
 	"regexp"
 	"slices"
@@ -20,16 +21,46 @@ type Catalog struct {
 	Packs   map[Ref]*Pack
 	Options map[Ref]*Option
 	Tools   map[string]*Tool
+	Agents  map[Ref]*Agent // built-in and workspace-local (Ref.Local) agent packages
 }
 
 // LoadBuiltins loads the packages embedded in railswitch.
 func LoadBuiltins() (*Catalog, error) { return Load(builtin.FS) }
 
-// Load reads packs/<name>/pack.toml, options/<name>/option.toml and
-// tools/<name>/tool.toml from fsys. A missing top-level directory is empty.
+// LoadCatalog is a workspace's catalog: the built-ins plus the agent
+// packages under root/agents/. Every place that resolves a workspace's
+// stack loads it through here.
+func LoadCatalog(root string) (*Catalog, error) {
+	c, err := LoadBuiltins()
+	if err != nil {
+		return nil, err
+	}
+	if err := LoadLocalAgents(c, root); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// LoadLocalAgents adds root/agents/<name>/agent.toml to c as
+// Ref{Local: true}. A root without agents/ adds nothing.
+func LoadLocalAgents(c *Catalog, root string) error {
+	if c.Agents == nil {
+		c.Agents = map[Ref]*Agent{}
+	}
+	l := &loader{fsys: os.DirFS(root), bases: map[int]string{}, names: map[string]string{}}
+	l.agents(c, true)
+	if err := errors.Join(l.errs...); err != nil {
+		return fmt.Errorf("%s: %w", root, err)
+	}
+	return nil
+}
+
+// Load reads packs/<name>/pack.toml, options/<name>/option.toml,
+// tools/<name>/tool.toml and agents/<name>/agent.toml from fsys. A missing
+// top-level directory is empty.
 // Every problem found is returned at once (errors.Join), each naming its file.
 func Load(fsys fs.FS) (*Catalog, error) {
-	c := &Catalog{Packs: map[Ref]*Pack{}, Options: map[Ref]*Option{}, Tools: map[string]*Tool{}}
+	c := &Catalog{Packs: map[Ref]*Pack{}, Options: map[Ref]*Option{}, Tools: map[string]*Tool{}, Agents: map[Ref]*Agent{}}
 	l := &loader{fsys: fsys, bases: map[int]string{}, names: map[string]string{}}
 
 	for _, dir := range l.dirs("packs") {
@@ -39,7 +70,7 @@ func Load(fsys fs.FS) (*Catalog, error) {
 		}
 		p.Files = l.sub(dir)
 		if l.checkPack(dir, &p) {
-			c.Packs[Ref{p.Name, p.Version}] = &p
+			c.Packs[Ref{Name: p.Name, Version: p.Version}] = &p
 		}
 	}
 	for _, dir := range l.dirs("options") {
@@ -49,7 +80,7 @@ func Load(fsys fs.FS) (*Catalog, error) {
 		}
 		o.Files = l.sub(dir)
 		if l.checkOption(dir, &o) {
-			c.Options[Ref{o.Name, o.Version}] = &o
+			c.Options[Ref{Name: o.Name, Version: o.Version}] = &o
 		}
 	}
 	for _, dir := range l.dirs("tools") {
@@ -65,10 +96,45 @@ func Load(fsys fs.FS) (*Catalog, error) {
 			c.Tools[t.Name] = &t
 		}
 	}
+	l.agents(c, false)
+	var defaults []string
+	for r, a := range c.Agents {
+		if a.Default {
+			defaults = append(defaults, r.String())
+		}
+	}
+	if len(defaults) > 1 {
+		slices.Sort(defaults)
+		l.errs = append(l.errs, fmt.Errorf("agents: %s all set default = true; at most one may", strings.Join(defaults, ", ")))
+	}
 	if err := errors.Join(l.errs...); err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// DefaultAgent is the built-in agent package that sets default = true.
+func (c *Catalog) DefaultAgent() (Ref, bool) {
+	for r, a := range c.Agents {
+		if a.Default && !r.Local {
+			return r, true
+		}
+	}
+	return Ref{}, false
+}
+
+// agents loads agents/<name>/agent.toml into c, keyed with Local set to local.
+func (l *loader) agents(c *Catalog, local bool) {
+	for _, dir := range l.dirs("agents") {
+		var a Agent
+		if !l.decode(dir, "agent.toml", &a) {
+			continue
+		}
+		a.Files = l.sub(dir)
+		if l.checkAgent(dir, &a) {
+			c.Agents[Ref{Name: a.Name, Version: a.Version, Local: local}] = &a
+		}
+	}
 }
 
 var envNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -361,16 +427,7 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 	l.env(file, "env", o.Env)
 	l.env(file, "share.gives", o.Share.Gives)
 	l.volumes(file, "volumes", o.Volumes, true)
-	for i, m := range o.Mounts {
-		f := fmt.Sprintf("mounts[%d]", i)
-		l.required(file, f+".source", m.Source)
-		if !strings.HasPrefix(m.Target, "/") {
-			l.add(file, "%s.target %q is not an absolute container path", f, m.Target)
-		}
-		if m.Source != "" && !strings.HasPrefix(m.Source, "/") && !strings.HasPrefix(m.Source, "{") {
-			l.file(file, f+".source", dir, m.Source)
-		}
-	}
+	l.mounts(file, dir, o.Mounts)
 	l.ports(file, "option "+o.Name, o.Ports)
 	for i, r := range o.Routes {
 		f := fmt.Sprintf("routes[%d]", i)
@@ -386,6 +443,55 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		}
 	}
 	l.links(file, o.Links)
+	return ok && len(l.errs) == n
+}
+
+func (l *loader) mounts(file, dir string, ms []Mount) {
+	for i, m := range ms {
+		f := fmt.Sprintf("mounts[%d]", i)
+		l.required(file, f+".source", m.Source)
+		if !strings.HasPrefix(m.Target, "/") {
+			l.add(file, "%s.target %q is not an absolute container path", f, m.Target)
+		}
+		if m.Source != "" && !strings.HasPrefix(m.Source, "/") && !strings.HasPrefix(m.Source, "{") {
+			l.file(file, f+".source", dir, m.Source)
+		}
+	}
+}
+
+var (
+	hostRe       = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
+	secretNameRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}$`)
+)
+
+func (l *loader) checkAgent(dir string, a *Agent) bool {
+	file := path.Join(dir, "agent.toml")
+	n := len(l.errs)
+	ok := l.head(file, dir, a.Name, a.Version, true)
+	switch a.Run {
+	case "", "on-demand", "service":
+	default:
+		l.add(file, "run %q must be \"on-demand\" or \"service\"", a.Run)
+	}
+	l.required(file, "image.file", a.Image.File)
+	l.file(file, "image.file", dir, a.Image.File)
+	l.file(file, "entrypoint", dir, a.Entrypoint)
+	for i, h := range a.Allow {
+		if !hostRe.MatchString(h) {
+			l.add(file, "allow[%d]: %q is not a host name", i, h)
+		}
+	}
+	l.volumes(file, "shared", a.Shared, false)
+	l.mounts(file, dir, a.Mounts)
+	l.env(file, "env", a.Env)
+	for i, s := range a.Secrets {
+		if !secretNameRe.MatchString(s.Name) {
+			l.add(file, "secrets[%d].name %q must match %s", i, s.Name, secretNameRe)
+		}
+		if !envNameRe.MatchString(s.Env) {
+			l.add(file, "secrets[%d].env %q is not an env var name", i, s.Env)
+		}
+	}
 	return ok && len(l.errs) == n
 }
 

@@ -37,12 +37,21 @@ type Project struct {
 	Tools     Tools                       `toml:"tools"`
 	Firewall  Firewall                    `toml:"firewall"`
 	Image     ImageConfig                 `toml:"image"`
+	Agents    map[string]Agent            `toml:"agents"` // agent name → its package and settings
 }
 
 // ImageConfig is the workspace's base image chain (D31).
 type ImageConfig struct {
 	Base   string   `toml:"base"`   // required: "containerfiles/Containerfile.<name>"; railswitch project new ejects the pack's default here (D31)
 	Addons []string `toml:"addons"` // "containerfiles/Containerfile.<name>", applied in this order on top of base
+}
+
+// Agent is one [agents.<name>] table.
+type Agent struct {
+	Use   string            `toml:"use"`   // "claude@1" or "local:<name>@N"
+	Run   string            `toml:"run"`   // "", "on-demand", "service"
+	Env   map[string]string `toml:"env"`   // added to the agent's env
+	Allow []string          `toml:"allow"` // extra firewall hosts for this agent
 }
 
 // Secret declares one user-provided secret (D33).
@@ -100,7 +109,16 @@ var (
 	memoryRe        = regexp.MustCompile(`^[0-9]+[kmg]$`)
 	containerfileRe = regexp.MustCompile(`^containerfiles/Containerfile\.[a-z][a-z0-9-]*$`)
 	bareKeyRe       = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	agentNameRe     = regexp.MustCompile(`^[a-z][a-z0-9-]{0,24}$`) // agent-<name> fits naming's service id
+	hostRe          = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
 )
+
+// LocalPrefix marks a workspace-local package ref, "local:<name>@N" (agents only).
+const LocalPrefix = "local:"
+
+// reservedAgents are names an agent cannot take: they are subcommands or
+// image names of `railswitch agent`.
+var reservedAgents = []string{"ls", "base"}
 
 // Load decodes path strictly: a key project.toml does not define is an error
 // naming its dotted path. The schema is read first, on its own, so a file from
@@ -241,6 +259,35 @@ func (p *Project) Validate() error {
 		v.containerfile(fmt.Sprintf("image.addons[%d]", i), a)
 	}
 
+	for _, name := range sortedKeys(p.Agents) {
+		path := "agents." + key(name)
+		switch {
+		case !agentNameRe.MatchString(name):
+			v.add(path, "agent name must match %s", agentNameRe)
+		case slices.Contains(reservedAgents, name):
+			v.add(path, "%q is a reserved agent name", name)
+		}
+		a := p.Agents[name]
+		if r, ok := strings.CutPrefix(a.Use, LocalPrefix); ok {
+			if !refRe.MatchString(r) {
+				v.add(path+".use", "%q is not a ref name@N or local:name@N, e.g. \"claude@1\"", a.Use)
+			}
+		} else {
+			v.ref(path+".use", a.Use)
+		}
+		switch a.Run {
+		case "", "on-demand", "service":
+		default:
+			v.add(path+".run", "%q must be \"on-demand\" or \"service\"", a.Run)
+		}
+		v.env(path+".env", a.Env)
+		for i, h := range a.Allow {
+			if !hostRe.MatchString(h) {
+				v.add(fmt.Sprintf("%s.allow[%d]", path, i), "%q is not a host name", h)
+			}
+		}
+	}
+
 	return errors.Join(v.errs...)
 }
 
@@ -251,6 +298,10 @@ func (v *validator) add(path, format string, args ...any) {
 }
 
 func (v *validator) ref(path, ref string) {
+	if strings.HasPrefix(ref, LocalPrefix) {
+		v.add(path, "%q: local: refs are supported for agents only until Stage 5 (D43)", ref)
+		return
+	}
 	if !refRe.MatchString(ref) {
 		v.add(path, "%q is not a ref name@N, e.g. \"postgres@1\"", ref)
 	}

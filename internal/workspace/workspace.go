@@ -89,7 +89,7 @@ func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(root)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func Lock(_ context.Context, root string) error {
 	if err != nil {
 		return err
 	}
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(root)
 	if err != nil {
 		return err
 	}
@@ -169,30 +169,46 @@ func Lock(_ context.Context, root string) error {
 	if err != nil {
 		return err
 	}
-	l.Packs, l.Options = want.Packs, want.Options
+	l.Packs, l.Options, l.Agents = want.Packs, want.Options, want.Agents
 	return l.Write(path)
 }
 
-// lockEntries is the lock's pack and option entries for st.
+// lockEntries is the lock's pack, option and agent entries for st. An
+// agent's key is its ref string ("local:probe@1" for a local package).
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
-	src := "built in (railswitch " + buildinfo.Version + ")"
-	entry := func(version int, files fs.FS) (config.LockEntry, error) {
+	builtinSrc := "built in (railswitch " + buildinfo.Version + ")"
+	entry := func(version int, files fs.FS, src string) (config.LockEntry, error) {
 		sum, err := pack.ContentHash(files)
 		return config.LockEntry{Version: strconv.Itoa(version), Source: src, SHA256: sum}, err
 	}
-	l := &config.Lock{Packs: map[string]config.LockEntry{}, Options: map[string]config.LockEntry{}}
-	e, err := entry(st.Pack.Version, st.Pack.Files)
+	l := &config.Lock{Packs: map[string]config.LockEntry{}, Options: map[string]config.LockEntry{}, Agents: map[string]config.LockEntry{}}
+	e, err := entry(st.Pack.Version, st.Pack.Files, builtinSrc)
 	if err != nil {
 		return nil, fmt.Errorf("pack %s: %w", st.Pack.Name, err)
 	}
 	l.Packs[st.Pack.Name] = e
 	for _, ch := range st.Options {
 		o := ch.Option
-		e, err := entry(o.Version, o.Files)
+		e, err := entry(o.Version, o.Files, builtinSrc)
 		if err != nil {
 			return nil, fmt.Errorf("option %s: %w", o.Name, err)
 		}
 		l.Options[o.Name] = e
+	}
+	for _, a := range st.Agents {
+		key := a.Ref.String()
+		if _, ok := l.Agents[key]; ok {
+			continue
+		}
+		src := builtinSrc
+		if a.Ref.Local {
+			src = "local"
+		}
+		e, err := entry(a.Agent.Version, a.Agent.Files, src)
+		if err != nil {
+			return nil, fmt.Errorf("agent %s: %w", key, err)
+		}
+		l.Agents[key] = e
 	}
 	return l, nil
 }
@@ -201,9 +217,9 @@ func lockEntries(st *pack.Stack) (*config.Lock, error) {
 // stack.lock differs from the resolved stack.
 var ErrStaleLock = errors.New("stack.lock is out of date")
 
-// CheckLock refuses a stack.lock whose packs or options differ from the
-// resolved stack by version or content hash, or that lacks or has an extra
-// one: the hash exists to stop unreviewed package content (HANDOFF §3.11).
+// CheckLock refuses a stack.lock whose packs, options or agents differ from
+// the resolved stack by version or content hash, or that lacks or has an
+// extra one: the hash exists to stop unreviewed package content (HANDOFF §3.11).
 func (w *Workspace) CheckLock() error {
 	want, err := lockEntries(w.Stack)
 	if err != nil {
@@ -211,21 +227,25 @@ func (w *Workspace) CheckLock() error {
 	}
 	have := w.Lock
 	var stale []string
-	cmp := func(have, want map[string]config.LockEntry) {
+	// label names an entry in the error: name@version for packs and
+	// options, the key itself for agents (already a ref string).
+	cmp := func(have, want map[string]config.LockEntry, label func(string, config.LockEntry) string) {
 		for _, name := range sortedKeys(want) {
 			h, ok := have[name]
 			if !ok || h.Version != want[name].Version || h.SHA256 != want[name].SHA256 {
-				stale = append(stale, name+"@"+want[name].Version)
+				stale = append(stale, label(name, want[name]))
 			}
 		}
 		for _, name := range sortedKeys(have) {
 			if _, ok := want[name]; !ok {
-				stale = append(stale, name+"@"+have[name].Version)
+				stale = append(stale, label(name, have[name]))
 			}
 		}
 	}
-	cmp(have.Packs, want.Packs)
-	cmp(have.Options, want.Options)
+	versioned := func(name string, e config.LockEntry) string { return name + "@" + e.Version }
+	cmp(have.Packs, want.Packs, versioned)
+	cmp(have.Options, want.Options, versioned)
+	cmp(have.Agents, want.Agents, func(key string, _ config.LockEntry) string { return key })
 	if len(stale) > 0 {
 		return fmt.Errorf("%w for %s: run railswitch lock", ErrStaleLock, strings.Join(stale, ", "))
 	}

@@ -1,3 +1,5 @@
 /.superpowers/
 /railswitch
 /dist/
+/mise.toml
+/mise.local.toml

@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
@@ -595,4 +596,61 @@ func TestUnroutedToolOptionOffProxy(t *testing.T) {
 	const b = "filial-master-browser.container"
 	noLinePrefix(t, units, b, "Network=filial-proxy.network")
 	noLinePrefix(t, units, b, "AddHost=")
+}
+
+// goldenFiles returns every file of golden dir whose name ends in suffix,
+// keyed by name.
+func goldenFiles(t *testing.T, dir, suffix string) map[string]string {
+	t.Helper()
+	entries, err := os.ReadDir(filepath.Join("testdata", "golden", dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]string{}
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), suffix) {
+			out[e.Name()] = readGolden(t, dir, e.Name())
+		}
+	}
+	if len(out) == 0 {
+		t.Fatalf("no %s files in golden %s", suffix, dir)
+	}
+	return out
+}
+
+// TestRouterClientIP: every router of the filial goldens (subnet 3) matches
+// only its host, and only clients in the project's subnet or the host (D50).
+func TestRouterClientIP(t *testing.T) {
+	ruleLabel := regexp.MustCompile(`^Label="traefik\.http\.routers\.[^.]+\.rule=(Host\(` + "`([^`]+)`" + `\).*)"$`)
+	rules := 0
+	for file, body := range goldenFiles(t, "filial", ".container") {
+		for line := range strings.SplitSeq(body, "\n") {
+			if !strings.Contains(line, ".rule=") {
+				continue
+			}
+			m := ruleLabel.FindStringSubmatch(line)
+			if m == nil {
+				t.Errorf("%s: unexpected rule label %q", file, line)
+				continue
+			}
+			rules++
+			want := "Host(`" + m[2] + "`) && (ClientIP(`10.214.3.0/24`) || " + machine.HostClientClause() + ")"
+			if m[1] != want {
+				t.Errorf("%s: rule\n%s\nwant\n%s", file, m[1], want)
+			}
+		}
+	}
+	if rules != 8 {
+		t.Errorf("found %d router rules in filial goldens; want 8", rules)
+	}
+}
+
+// TestNetworkIsolate: every network unit pins isolate=true, so a container
+// reaches another project only through Traefik (D50).
+func TestNetworkIsolate(t *testing.T) {
+	for file, body := range goldenFiles(t, "filial", ".network") {
+		if !strings.Contains(body, "\nOptions=isolate=true\n") {
+			t.Errorf("%s lacks Options=isolate=true:\n%s", file, body)
+		}
+	}
 }

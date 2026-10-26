@@ -125,7 +125,7 @@ func proxyNetwork(m *Model) *unit {
 	u.add("Network", "Subnet", machine.Subnet(n))
 	u.add("Network", "Gateway", machine.Gateway(n))
 	u.add("Network", "IPRange", machine.IPRange(n))
-	u.add("Network", "Options", "mtu=1400")
+	u.add("Network", "Options", "mtu=1400", "isolate=true")
 	return u
 }
 
@@ -133,7 +133,7 @@ func devNetwork(m *Model, slug string) *unit {
 	u := &unit{Header: []string{markerLine(m, slug)}}
 	u.add("Unit", "Description", "Dev network of "+m.Prefix+" worktree "+slug)
 	u.add("Network", "NetworkName", naming.DevNetwork(m.Prefix, slug))
-	u.add("Network", "Options", "mtu=1400")
+	u.add("Network", "Options", "mtu=1400", "isolate=true")
 	return u
 }
 
@@ -256,7 +256,7 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		label("traefik.docker.network=" + naming.ProxyNetwork(prefix))
 		for _, r := range s.Routes {
 			name := prefix + "-" + slug + "-" + r.Name
-			label("traefik.http.routers." + name + ".rule=Host(`" + x(r.Host) + "`)")
+			label("traefik.http.routers." + name + ".rule=" + machine.RouterRule(x(r.Host), m.Inputs.Machine.Subnet))
 			label("traefik.http.routers." + name + ".entrypoints=web")
 			label("traefik.http.routers." + name + ".service=" + name)
 			label("traefik.http.services." + name + ".loadbalancer.server.port=" + strconv.Itoa(r.Port))

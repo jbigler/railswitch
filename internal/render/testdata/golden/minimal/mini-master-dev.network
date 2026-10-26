@@ -6,3 +6,4 @@ Description=Dev network of mini worktree master
 [Network]
 NetworkName=mini-master-dev
 Options=mtu=1400
+Options=isolate=true

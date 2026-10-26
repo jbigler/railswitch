@@ -2,7 +2,12 @@
 
 ## User decisions
 
-**Pending.** Stage 1 is done only when the user accepts this document (plan Task 13, Step 4). Record their decisions on each **gap** and on the [open questions](#open-questions) here.
+**Accepted** by the user on 2026-10-26. Stage 1 is done. Their decisions:
+
+- every row marked *same behaviour* or *intended change* stands as written;
+- the *gaps* stay with the stages named on them;
+- open question 1: the `npm_global` volume is kept for the nvim tool only, one volume per Node version, and `playwright_browsers` is dropped (D45);
+- open question 2: the playwright option gives `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` to deps and the app, because the browser container has its own browser (D44).
 
 ## How this was produced
 

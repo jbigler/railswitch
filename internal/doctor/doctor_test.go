@@ -135,7 +135,7 @@ func names(cs []Check) []string {
 
 var hostChecks = []string{
 	"podman >= 5.0", "quadlet generator", "podman.socket active", "unprivileged port 80",
-	"nft", "nsenter", "getent", "jq", "curl", "machine subnet free",
+	"nft", "nsenter", "getent", "jq", "curl", "machine subnet free", "networks isolated",
 }
 
 func TestAllOK(t *testing.T) {
@@ -173,6 +173,7 @@ func TestAllFail(t *testing.T) {
 	f.On(socketActive, sys.Result{ExitCode: 3, Stdout: []byte("inactive\n")}, errors.New("systemctl: non-zero exit (exit 3)"))
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{ExitCode: 2}, errors.New("gpg: non-zero exit (exit 2)"))
 	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
+	inspect(f, "filial_proxy", `"mtu": "1400"`)
 	h := host(t, "1024", false)
 
 	got := h.Run(context.Background(), f, ws)
@@ -391,5 +392,36 @@ func TestMachineSubnet(t *testing.T) {
 	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
 	if c := machineSubnet(context.Background(), f); c.OK || !strings.Contains(c.Detail, "other") || !strings.Contains(c.Detail, "10.214.255.0/24") {
 		t.Errorf("taken: %+v", c)
+	}
+}
+
+func inspect(f *systest.Fake, name, opts string) {
+	f.On([]string{"podman", "network", "inspect", name}, sys.Result{Stdout: []byte(`[{"name": "` + name + `", "options": {` + opts + `}}]`)}, nil)
+}
+
+// TestNetworksIsolated (final I2): a registered network without
+// isolate=strict fails the check, with the recreate procedure as its fix; a
+// missing one is not inspected further.
+func TestNetworksIsolated(t *testing.T) {
+	ws := workspaceAt(t, false)
+	f := fakeHost()
+	inspect(f, "filial_proxy", `"mtu": "1400"`)
+	inspect(f, "filial-master-dev", `"isolate": "strict", "mtu": "1400"`)
+	f.On([]string{"podman", "network", "inspect", "railswitch_machine"}, sys.Result{ExitCode: 125, Stderr: []byte("Error: network not found")}, fmt.Errorf("podman: %w (exit 125)", sys.ErrExit))
+	c := networksIsolated(context.Background(), f, ws.Dirs)
+	if c.OK || c.Name != "networks isolated" || !strings.Contains(c.Detail, "filial_proxy") || strings.Contains(c.Detail, "filial-master-dev") {
+		t.Errorf("not isolated: %+v", c)
+	}
+	for _, s := range []string{"podman network rm", "railswitch up", "Traefik", "docs/stage3-acceptance.md"} {
+		if !strings.Contains(c.Fix, s) {
+			t.Errorf("fix %q lacks %q", c.Fix, s)
+		}
+	}
+	f = fakeHost()
+	inspect(f, "filial_proxy", `"isolate": "strict"`)
+	inspect(f, "filial-master-dev", `"isolate": "strict"`)
+	inspect(f, "railswitch_machine", `"isolate": "strict"`)
+	if c := networksIsolated(context.Background(), f, ws.Dirs); !c.OK {
+		t.Errorf("all isolated: %+v", c)
 	}
 }

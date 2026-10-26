@@ -524,3 +524,16 @@ func TestShareRoundTrip(t *testing.T) {
 		t.Errorf("SetShare nil: %v, %+v", err, r.WorktreesOf("filial")[1].Share)
 	}
 }
+
+func TestNetworks(t *testing.T) {
+	r := newRegistry(t, "b", "a")
+	addWT(t, r, "a", "main")
+	addWT(t, r, "b", "main")
+	addWT(t, r, "a", "feat")
+	if got, want := r.Networks(""), []string{"railswitch_machine", "a_proxy", "a-feat-dev", "a-main-dev", "b_proxy", "b-main-dev"}; !slices.Equal(got, want) {
+		t.Errorf("Networks(\"\") = %q; want %q", got, want)
+	}
+	if got, want := r.Networks("a"), []string{"a_proxy", "a-feat-dev", "a-main-dev"}; !slices.Equal(got, want) {
+		t.Errorf("Networks(a) = %q; want %q", got, want)
+	}
+}

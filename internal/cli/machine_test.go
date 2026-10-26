@@ -208,7 +208,7 @@ func TestMachineJSON(t *testing.T) {
 	check("machine", m, "dozzle", "traefik", "traefik_networks")
 	check("traefik", m.(map[string]any)["traefik"], "state", "unit")
 	check("traefik network", first(m.(map[string]any)["traefik_networks"]), "attached", "network", "project")
-	check("reach", doc["reach"], "networks", "notes")
+	check("reach", doc["reach"], "isolated", "networks", "notes")
 	check("reach network", first(doc["reach"].(map[string]any)["networks"]), "members", "network")
 }
 
@@ -294,5 +294,41 @@ func TestMachineTraefikStopped(t *testing.T) {
 	}
 	if want := "Traefik reaches no network; railswitch_machine, filial_proxy, mini_proxy not attached: railswitch up"; r.Reach.Notes[0] != want {
 		t.Errorf("note %q", r.Reach.Notes[0])
+	}
+}
+
+// TestMachineIsolation (final I2): reach.isolated has one field per
+// railswitch network that exists, and the note claims isolate=strict only
+// when every one of them has it.
+func TestMachineIsolation(t *testing.T) {
+	twoProjects(t)
+	inspect := func(f *systest.Fake, name, opts string) {
+		f.On([]string{"podman", "network", "inspect", name}, sys.Result{Stdout: []byte(`[{"name": "` + name + `", "options": {` + opts + `}}]`)}, nil)
+	}
+	f := machineHost("railswitch_machine", "filial_proxy", "mini_proxy")
+	inspect(f, "railswitch_machine", `"isolate": "strict"`)
+	inspect(f, "filial_proxy", `"mtu": "1400"`)
+	inspect(f, "filial-master-dev", `"isolate": "strict"`)
+	inspect(f, "mini_proxy", `"isolate": "strict"`)
+	// filial-feat-dev and mini-master-dev don't exist (unscripted: empty).
+	r := machineJSON(t, f)
+	want := map[string]bool{"railswitch_machine": true, "filial_proxy": false, "filial-master-dev": true, "mini_proxy": true}
+	if !maps.Equal(r.Reach.Isolated, want) {
+		t.Errorf("reach.isolated = %v; want %v", r.Reach.Isolated, want)
+	}
+	note := r.Reach.Notes[1]
+	if strings.Contains(note, "networks are isolate=strict") || !strings.Contains(note, "filial_proxy") || strings.Contains(note, "mini_proxy") {
+		t.Errorf("note %q; want it to name only filial_proxy as not isolated", note)
+	}
+
+	f = machineHost("railswitch_machine", "filial_proxy", "mini_proxy")
+	inspect(f, "railswitch_machine", `"isolate": "strict"`)
+	inspect(f, "filial_proxy", `"isolate": "strict"`)
+	if r := machineJSON(t, f); r.Reach.Notes[1] != reachRefused {
+		t.Errorf("note %q; want %q", r.Reach.Notes[1], reachRefused)
+	}
+	code, out, errs := runWith(t, f, "machine")
+	if code != 0 || !strings.Contains(out, "networks are isolate=strict") {
+		t.Errorf("machine: exit %d\n%s%s", code, out, errs)
 	}
 }

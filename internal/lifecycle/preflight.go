@@ -52,6 +52,33 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 	return errors.Join(errs...)
 }
 
+// warnNotIsolated prints a WARNING naming this project's networks that
+// exist without isolate=strict (D50: created before Stage 3, podman never
+// changes them) and how to recreate them. It never refuses: the networks
+// work, only the isolation between projects is missing. A failed check is
+// a warning too.
+func (l *L) warnNotIsolated(ctx context.Context) {
+	reg, err := machine.Read(l.WS.Dirs.Data)
+	if err != nil {
+		return // checkProxySubnet and the render report the registry
+	}
+	nets := reg.Networks(l.WS.Project.Project.Prefix)
+	iso, err := l.podman().Isolation(ctx, nets)
+	if err != nil {
+		fmt.Fprintf(l.Err, "WARNING: could not check that the networks are isolate=strict: %v\n", err)
+		return
+	}
+	var not []string
+	for _, n := range nets {
+		if ok, exists := iso[n]; exists && !ok {
+			not = append(not, n)
+		}
+	}
+	if len(not) > 0 {
+		fmt.Fprintf(l.Err, "WARNING: podman networks %s are not isolate=strict (created before Stage 3): other projects' containers reach them directly; %s\n", strings.Join(not, ", "), machine.RecreateNetworks)
+	}
+}
+
 // checkProxySubnet runs before up renders. It refuses while another network
 // uses the machine network's subnet (checkMachineSubnet). While the project's proxy
 // network does not exist yet and another podman network overlaps the

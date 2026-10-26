@@ -73,8 +73,9 @@ type traefikNetwork struct {
 }
 
 type machineReach struct {
-	Networks []reachNetwork `json:"networks"`
-	Notes    []string       `json:"notes"`
+	Networks []reachNetwork  `json:"networks"`
+	Notes    []string        `json:"notes"`
+	Isolated map[string]bool `json:"isolated"` // network → isolate=strict, for each railswitch network that exists
 }
 
 type reachNetwork struct {
@@ -83,7 +84,8 @@ type reachNetwork struct {
 }
 
 // reachesAll is the reach note when Traefik is on every network it must be
-// on; reachRefused the fixed note on cross-project traffic.
+// on; reachRefused the note on cross-project traffic when every railswitch
+// network that exists is isolate=strict (reachNote).
 const (
 	reachesAll   = "Traefik reaches every project network"
 	reachRefused = "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"
@@ -108,6 +110,21 @@ func traefikReach(nets []traefikNetwork) string {
 		reaches = strings.Join(on, ", ")
 	}
 	return "Traefik reaches " + reaches + "; " + strings.Join(off, ", ") + " not attached: railswitch up"
+}
+
+// reachNote is reachRefused when every railswitch network of iso has
+// isolate=strict, else the networks that don't and how to fix them.
+func reachNote(nets []string, iso map[string]bool) string {
+	var not []string
+	for _, n := range nets {
+		if ok, exists := iso[n]; exists && !ok {
+			not = append(not, n)
+		}
+	}
+	if len(not) == 0 {
+		return reachRefused
+	}
+	return "networks not isolate=strict (created before Stage 3): " + strings.Join(not, ", ") + "; other projects' containers reach them directly, not only through Traefik; " + machine.RecreateNetworks
 }
 
 // railswitch machine: every registered project with its worktrees, ports
@@ -185,7 +202,11 @@ func (e *env) machineReport(ctx context.Context) (*machineReport, error) {
 		r.Projects = append(r.Projects, p)
 	}
 	slices.SortFunc(r.Routes, func(a, b machineRoute) int { return cmp.Compare(a.Host, b.Host) })
-	r.Reach.Notes = []string{traefikReach(r.Machine.TraefikNetworks), reachRefused}
+	nets := reg.Networks("")
+	if r.Reach.Isolated, err = pm.Isolation(ctx, nets); err != nil {
+		return nil, err
+	}
+	r.Reach.Notes = []string{traefikReach(r.Machine.TraefikNetworks), reachNote(nets, r.Reach.Isolated)}
 
 	sd := podman.Systemd{R: e.run}
 	for _, u := range []struct {

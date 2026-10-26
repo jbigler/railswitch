@@ -1212,3 +1212,36 @@ func readUnit(t *testing.T, dir, name string) string {
 	}
 	return string(b)
 }
+
+// TestUpWarnsNotIsolated (final I2): up warns, without refusing, about this
+// project's networks that lack isolate=strict and names the procedure;
+// another project's network is not this up's business.
+func TestUpWarnsNotIsolated(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"podman", "network", "inspect", "filial_proxy"}, sys.Result{Stdout: []byte(`[{"name": "filial_proxy", "options": {"mtu": "1400"}}]`)}, nil)
+	e.f.On([]string{"podman", "network", "inspect", "filial-feat-dev"}, sys.Result{Stdout: []byte(`[{"name": "filial-feat-dev", "options": {"isolate": "strict"}}]`)}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	w := e.errOut()
+	if !strings.Contains(w, "WARNING") || !strings.Contains(w, "filial_proxy") || strings.Contains(w, "filial-feat-dev") || !strings.Contains(w, "podman network rm") {
+		t.Errorf("stderr %q; want a WARNING naming filial_proxy and the recreate procedure", w)
+	}
+	for _, c := range e.f.Calls {
+		if joined(c) == "podman network inspect railswitch_machine" {
+			t.Error("up inspected the machine network; only this project's are warned about")
+		}
+	}
+}
+
+// TestUpIsolatedNoWarning: all isolated (or not created yet): no warning.
+func TestUpIsolatedNoWarning(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"podman", "network", "inspect", "filial_proxy"}, sys.Result{Stdout: []byte(`[{"name": "filial_proxy", "options": {"isolate": "strict"}}]`)}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if w := e.errOut(); strings.Contains(w, "WARNING") {
+		t.Errorf("stderr %q", w)
+	}
+}

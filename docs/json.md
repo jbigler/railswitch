@@ -127,7 +127,10 @@ tools). It is an array with one object per service.
 ## `doctor`
 
 The host checks (among them whether another podman network uses the
-machine network's reserved 10.214.255.0/24: `machine subnet free`) and,
+machine network's reserved 10.214.255.0/24: `machine subnet free`; and
+whether every railswitch network of the registry that exists is
+`isolate=strict`: `networks isolated`, whose fix is the recreate procedure
+of docs/stage3-acceptance.md, "Upgrading from Stage 2") and,
 inside a workspace, the project's checks: its firewall
 hook descriptor, whether `render` would change any of its files or the
 units of any of its worktrees, and whether another podman network overlaps
@@ -149,7 +152,7 @@ failed `machine config` check. `doctor` exits 1 when any check fails.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `firewall descriptor`, `units current`, `proxy subnet`, `cgroup v2`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `cgroup v2`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a stale or missing `stack.lock`); `""` for a passed check. |
@@ -189,7 +192,8 @@ still listed from the registry, with its port bases as last recorded and a
       {"network": "filial_proxy", "members": ["Traefik", "rails", "storage"]},
       {"network": "filial-master-dev", "members": ["rails", "deps", "db", "cache", "storage"]}
     ],
-    "notes": ["Traefik reaches every project network", "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"]
+    "notes": ["Traefik reaches every project network", "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"],
+    "isolated": {"railswitch_machine": true, "filial_proxy": true, "filial-master-dev": true}
   }
 }
 ```
@@ -216,4 +220,5 @@ still listed from the registry, with its port bases as last recorded and a
 | `machine.traefik`, `machine.dozzle` | object | The machine-wide unit's `unit` name and its systemd `state`, `<ActiveState>/<SubState>` as in `status`. |
 | `machine.traefik_networks` | array | The networks Traefik must be on: the machine network `railswitch_machine` (`project` `""`), then each registered project's proxy network. `attached` is whether the running Traefik container is on it; `false` for each when Traefik isn't running. The text output flags a missing one `not attached: railswitch up`. |
 | `reach.networks` | array | One object per network with its members: `railswitch_machine` (Traefik and Dozzle), then for each project its proxy network (Traefik and the services on it) and each worktree's dev network (`<prefix>-<slug>-dev`: every service of that worktree). Members are service ids, plus `Traefik` and `Dozzle`. `Traefik` is a member only of a network it is attached to (`machine.traefik_networks`); the text output marks the others `(Traefik not attached: railswitch up)`. |
-| `reach.notes` | array of strings | Two lines on what the networks don't show. First, Traefik's reach: `Traefik reaches every project network` when every network of `machine.traefik_networks` is attached, else `Traefik reaches <attached networks, or "no network">; <the others> not attached: railswitch up`. Second, fixed: a project's containers reach another project only through Traefik, whose routers refuse them (D50); every railswitch network is `isolate=strict`; the Traefik API (`traefik.localhost`) and Dozzle (`logs.localhost`) answer only host clients. |
+| `reach.notes` | array of strings | Two lines on what the networks don't show. First, Traefik's reach: `Traefik reaches every project network` when every network of `machine.traefik_networks` is attached, else `Traefik reaches <attached networks, or "no network">; <the others> not attached: railswitch up`. Second, isolation: when every network of `reach.isolated` is `true`, `a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients`; else `networks not isolate=strict (created before Stage 3): <networks>; other projects' containers reach them directly, not only through Traefik; recreate them (…)` with the procedure of docs/stage3-acceptance.md, "Upgrading from Stage 2". |
+| `reach.isolated` | object | One field per railswitch network that exists (`railswitch_machine`, each registered project's proxy network, each registered worktree's dev network), named after the network: `true` when `podman network inspect` shows `isolate=strict` (D50), `false` for a network created before Stage 3 with other options. A network that doesn't exist yet has no field. |

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -438,5 +439,54 @@ func TestPodmanNetworks(t *testing.T) {
 	f.On([]string{"podman", "container", "inspect"}, r, e)
 	if got, err := (Podman{R: f}).Networks(ctx, "railswitch-traefik"); len(got) != 0 || err != nil {
 		t.Fatalf("missing: got %q %v", got, err)
+	}
+}
+
+func TestNetworkOptions(t *testing.T) {
+	f := &systest.Fake{}
+	// Shape of `podman network inspect`: []types.Network, "options" omitted
+	// when empty.
+	f.On([]string{"podman", "network", "inspect", "a_proxy"}, sys.Result{Stdout: []byte(`[{"name": "a_proxy", "driver": "bridge", "options": {"isolate": "strict", "mtu": "1400"}}]`)}, nil)
+	f.On([]string{"podman", "network", "inspect", "old_proxy"}, sys.Result{Stdout: []byte(`[{"name": "old_proxy", "driver": "bridge"}]`)}, nil)
+	r, e := exitErr(125, "Error: unable to find network with name or ID gone: network not found")
+	f.On([]string{"podman", "network", "inspect", "gone"}, r, e)
+	p := Podman{R: f}
+	got, err := p.NetworkOptions(ctx, "a_proxy")
+	if err != nil || !maps.Equal(got, map[string]string{"isolate": "strict", "mtu": "1400"}) {
+		t.Fatalf("a_proxy: %v %v", got, err)
+	}
+	wantCalls(t, f, []string{"podman", "network", "inspect", "a_proxy"})
+	if got, err := p.NetworkOptions(ctx, "old_proxy"); err != nil || got == nil || len(got) != 0 {
+		t.Fatalf("no options: %v (nil %t) %v; want an empty non-nil map", got, got == nil, err)
+	}
+	if got, err := p.NetworkOptions(ctx, "gone"); err != nil || got != nil {
+		t.Fatalf("missing: %v %v; want nil, nil", got, err)
+	}
+	r, e = exitErr(125, "Error: boom")
+	f.On([]string{"podman", "network", "inspect", "a_proxy"}, r, e)
+	if _, err := p.NetworkOptions(ctx, "a_proxy"); err == nil {
+		t.Fatal("failed inspect: want error")
+	}
+}
+
+func TestNetworkOptionsExactName(t *testing.T) {
+	f := &systest.Fake{}
+	// inspect also matches an ID prefix: another network's entry is not
+	// name's.
+	f.On([]string{"podman", "network", "inspect", "ab"}, sys.Result{Stdout: []byte(`[{"name": "abcdef_net", "id": "ab12", "options": {"isolate": "strict"}}]`)}, nil)
+	if got, err := (Podman{R: f}).NetworkOptions(ctx, "ab"); err != nil || got != nil {
+		t.Fatalf("got %v %v; want nil, nil", got, err)
+	}
+}
+
+func TestIsolation(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"podman", "network", "inspect", "a_proxy"}, sys.Result{Stdout: []byte(`[{"name": "a_proxy", "options": {"isolate": "strict"}}]`)}, nil)
+	f.On([]string{"podman", "network", "inspect", "b_proxy"}, sys.Result{Stdout: []byte(`[{"name": "b_proxy", "options": {"isolate": "true"}}]`)}, nil)
+	r, e := exitErr(125, "Error: network not found")
+	f.On([]string{"podman", "network", "inspect", "gone"}, r, e)
+	got, err := Podman{R: f}.Isolation(ctx, []string{"a_proxy", "b_proxy", "gone"})
+	if err != nil || !maps.Equal(got, map[string]bool{"a_proxy": true, "b_proxy": false}) {
+		t.Fatalf("got %v %v", got, err)
 	}
 }

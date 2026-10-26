@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,7 +70,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, machineSubnet(ctx, r))
+	out = append(out, machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws))
 	}
@@ -266,6 +267,55 @@ func machineSubnet(ctx context.Context, r sys.Runner) Check {
 		return c
 	}
 	c.OK, c.Detail = true, subnet+" overlaps no other podman network"
+	return c
+}
+
+// networksIsolatedIn is networksIsolated on ws's machine dirs (the default
+// ones outside a workspace).
+func (h Host) networksIsolatedIn(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
+	if ws != nil {
+		return networksIsolated(ctx, r, ws.Dirs)
+	}
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return Check{Name: "networks isolated", Detail: err.Error(), Fix: "set HOME (or XDG_DATA_HOME) to an absolute path"}
+	}
+	return networksIsolated(ctx, r, dirs)
+}
+
+// networksIsolated checks that every railswitch network of the registry
+// that exists (each project's proxy network, each worktree's dev network,
+// the machine network) has isolate=strict (D50). One created before Stage
+// 3 keeps its old options, and other projects' containers reach it
+// directly.
+func networksIsolated(ctx context.Context, r sys.Runner, dirs machine.Dirs) Check {
+	c := Check{Name: "networks isolated", Fix: machine.RecreateNetworks}
+	reg, err := machine.Read(dirs.Data)
+	if errors.Is(err, fs.ErrNotExist) {
+		c.OK, c.Detail = true, "no project is registered"
+		return c
+	}
+	if err != nil {
+		c.Detail, c.Fix = err.Error(), "fix the registry named in detail"
+		return c
+	}
+	nets := reg.Networks("")
+	iso, err := podman.Podman{R: r}.Isolation(ctx, nets)
+	if err != nil {
+		c.Detail, c.Fix = err.Error(), "fix podman network inspect"
+		return c
+	}
+	var not []string
+	for _, n := range nets {
+		if ok, exists := iso[n]; exists && !ok {
+			not = append(not, n)
+		}
+	}
+	if len(not) > 0 {
+		c.Detail = "not isolate=strict: " + strings.Join(not, ", ")
+		return c
+	}
+	c.OK, c.Detail = true, strconv.Itoa(len(iso))+" railswitch networks exist, each isolate=strict"
 	return c
 }
 

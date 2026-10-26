@@ -218,6 +218,55 @@ func (p Podman) NetworkSubnets(ctx context.Context) (map[string][]netip.Prefix, 
 	return nets, nil
 }
 
+// NetworkOptions is network name's options, from `podman network inspect
+// <name>` (a []types.Network: "name", "options"). Only the entry with
+// exactly that name counts (inspect also matches an ID prefix). A missing
+// network is nil, nil; an existing one a non-nil map.
+func (p Podman) NetworkOptions(ctx context.Context, name string) (map[string]string, error) {
+	r, err := p.run(ctx, 0, "network", "inspect", name)
+	if err != nil {
+		if isMissing(r, err, "network not found") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var ns []struct {
+		Name    string            `json:"name"`
+		Options map[string]string `json:"options"`
+	}
+	if out := strings.TrimSpace(string(r.Stdout)); out != "" {
+		if err := json.Unmarshal([]byte(out), &ns); err != nil {
+			return nil, fmt.Errorf("podman network inspect %s: %w", name, err)
+		}
+	}
+	for _, n := range ns {
+		if n.Name == name {
+			if n.Options == nil {
+				return map[string]string{}, nil
+			}
+			return n.Options, nil
+		}
+	}
+	return nil, nil
+}
+
+// Isolation maps each network of names that exists to whether it has
+// isolate=strict (D50). Networks created before Stage 3 keep their old
+// options: podman creates a network once and never changes it.
+func (p Podman) Isolation(ctx context.Context, names []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	for _, n := range names {
+		opts, err := p.NetworkOptions(ctx, n)
+		if err != nil {
+			return nil, err
+		}
+		if opts != nil {
+			out[n] = opts["isolate"] == "strict"
+		}
+	}
+	return out, nil
+}
+
 // inspectContainer returns the formatted field, or "" for a missing container.
 func (p Podman) inspectContainer(ctx context.Context, format, name string) (string, error) {
 	r, err := p.run(ctx, 0, "container", "inspect", "--format", format, name)

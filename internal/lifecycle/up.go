@@ -106,6 +106,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	if err := l.checkProxySubnet(ctx); err != nil {
 		return err
 	}
+	l.warnNotIsolated(ctx)
 	var ch changes
 	d, err := l.WS.Render(ctx, l.R, false)
 	if err != nil {

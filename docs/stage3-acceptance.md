@@ -69,3 +69,53 @@ Record here:
 | host curl's `RemoteAddr` | |
 | rails container's `RemoteAddr` | |
 | Outcome | (a) outside 10.214.0.0/16 / (b) whoami's own address / (c) other |
+
+## Two projects at once (`TestE2ETwoProjects`)
+
+Prerequisites as in docs/stage2-acceptance.md (podman, a systemd user
+session, `curl`, a generated app at `/tmp/rs-demo/demo`, `railswitch doctor`
+all OK). No project with prefix `s3a` or `s3ab` may be registered. With
+`tailscale status` working the share check runs too; otherwise the test logs
+that it skipped it.
+
+```sh
+RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a \
+  go test -tags integration ./internal/lifecycle/ -run E2ETwoProjects -timeout 60m -v
+```
+
+The prefixes are `$RAILSWITCH_E2E_PREFIX` and `${RAILSWITCH_E2E_PREFIX}b`;
+both must match `^[a-z][a-z0-9]{1,15}$` (so at most 14 characters for the
+base), else the test fails at once. The test builds railswitch from source,
+runs `new` and `up` for both base worktrees in a fresh temp workspace, and
+checks:
+
+1. From the host: each app host is 200; each `s3.` host answers (not 000 or
+   404); `traefik.localhost/api/rawdata` and `logs.localhost` are 200.
+2. Each project's rails container gets 200 for its own host through its own
+   Traefik IP (`10.214.<n>.2`, Host header).
+3. A's rails container through A's Traefik IP: `traefik.localhost` and
+   `logs.localhost` are not 200; B's host is 404.
+4. A's rails container cannot connect (curl exit 7 or 28, `--max-time 5`)
+   to B's rails container (`:3000`), B's Traefik IP or Dozzle
+   `10.214.255.3:8080` (`isolate=strict`).
+5. `railswitch machine --json`: IDs, ports, subnets, Traefik IPs and route
+   hosts are disjoint between the projects.
+6. Only with `tailscale status` working: `share` of A's base worktree adds
+   only A's ports to `tailscale serve status --json`, each to its own
+   `http://127.0.0.1:<port>`, and changes nothing else; `unshare` restores
+   the previous serve config.
+7. `project rm s3a --yes --purge`: nothing named `s3a-…`/`s3a_…` remains
+   (containers, volumes, networks, unit files); every `s3ab` object is still
+   there, `railswitch-traefik` runs and B's app is still 200. Then
+   `project rm s3ab --yes --purge`: none of either project's objects (exact
+   names recorded before) remains.
+
+`--purge` is used so the shared `<prefix>_…` volumes go too; without it they
+stay by design. If the test fails mid-way, its cleanup runs
+`project rm <prefix> --yes --purge` for each project not yet removed.
+
+### Run log
+
+NOT YET RUN. The run is a user action on the host; record the date, host,
+podman/netavark versions, whether the share part ran, and the `go test`
+output here.

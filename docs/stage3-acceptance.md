@@ -175,7 +175,7 @@ stay by design. If the test fails mid-way, its cleanup runs
 
 ### Run log
 
-**2026-10-27, PASS** on the user's CachyOS host (rootless, user jbigler):
+**2026-10-26, PASS** on the user's CachyOS host (rootless, user jbigler):
 podman 6.1.4, netavark 2.1.0, branch `stage-3` at `793627d`. The share part
 ran: `tailscale status` succeeded, so `share`/`unshare` of `s3a`'s base
 worktree was checked against the live serve config.

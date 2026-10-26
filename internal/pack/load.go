@@ -281,6 +281,7 @@ func (l *loader) checkPack(dir string, p *Pack) bool {
 		l.required(file, "runtimes."+name+".fallback", p.Runtimes[name].Fallback)
 	}
 	l.env(file, "env", p.Env)
+	l.env(file, "share.env", p.Share.Env)
 	l.volumes(file, "caches", p.Caches, false)
 	l.volumes(file, "worktree_volumes", p.WorktreeVolumes, false)
 	l.ports(file, "pack "+p.Name, p.Ports)
@@ -356,6 +357,7 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 	l.env(file, "gives", o.Gives)
 	l.env(file, "deps_env", o.DepsEnv)
 	l.env(file, "env", o.Env)
+	l.env(file, "share.gives", o.Share.Gives)
 	l.volumes(file, "volumes", o.Volumes, true)
 	for i, m := range o.Mounts {
 		f := fmt.Sprintf("mounts[%d]", i)

@@ -217,6 +217,9 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		for _, h := range hosts {
 			u.add(c, "AddHost", h+":"+in.Values["traefik.ip"])
 		}
+		if sh := in.Worktree.Share; sh != nil { // the tailnet URLs layer 7 gives resolve to the host (D46)
+			u.add(c, "AddHost", sh.Host+":"+sh.IP)
+		}
 	}
 	for _, p := range s.Publish {
 		host, ctr := in.Values[p.Env], strconv.Itoa(p.Container)

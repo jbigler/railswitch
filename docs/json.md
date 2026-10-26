@@ -89,8 +89,8 @@ on a machine with one project). It is an array with one object per worktree.
 
 ```json
 [
-  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/master", "dirty": false},
-  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/feat", "dirty": true}
+  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/master", "dirty": false, "share": null},
+  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/feat", "dirty": true, "share": {"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}}
 ]
 ```
 
@@ -101,6 +101,7 @@ on a machine with one project). It is an array with one object per worktree.
 | `branch` | string | The branch checked out in it; `""` when detached, or when its directory is missing or not a git worktree. |
 | `dir` | string | Its directory, `<workspace>/<slug>`. |
 | `dirty` | boolean | `git status --porcelain` lists changes or untracked files. `false` when its directory is missing or not a git worktree. |
+| `share` | object or null | Set while the worktree is shared on the tailnet (`railswitch share`): `host` is this machine's tailnet DNS name and `ip` its tailnet IPv4 address. Each port with `share = true` is then served at `https://<host>:<port>/`, the port being its loopback host port. `null` when not shared. |
 
 ## `status`
 

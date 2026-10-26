@@ -3,6 +3,7 @@ package machine
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -479,5 +480,46 @@ func TestSubnetUsers(t *testing.T) {
 	}
 	if got := SubnetUsers(nets, "filial_proxy", 0); !slices.Equal(got, []string{"old_proxy", "wide"}) {
 		t.Fatalf("SubnetUsers = %v", got)
+	}
+}
+
+func TestShareRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	l, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.AddProject("filial", "/home/u/filial", nil); err != nil {
+		t.Fatal(err)
+	}
+	addWT(t, l.Registry, "filial", "master")
+	addWT(t, l.Registry, "filial", "feat")
+	if err := l.SetShare("filial", "nope", &ShareEntry{Host: "h", IP: "100.64.0.7"}); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("SetShare of an unregistered slug = %v; want fs.ErrNotExist", err)
+	}
+	if err := l.SetShare("filial", "feat", &ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Save(); err != nil {
+		t.Fatal(err)
+	}
+	l.Close()
+	data, err := os.ReadFile(filepath.Join(dir, "registry.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(data), "[worktree.share]"); n != 1 {
+		t.Errorf("registry.toml has %d share tables; want 1 (an unshared worktree has none):\n%s", n, data)
+	}
+	r, err := Read(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := r.WorktreesOf("filial")
+	if w[0].Share != nil || w[1].Share == nil || *w[1].Share != (ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}) {
+		t.Errorf("shares = %+v, %+v", w[0].Share, w[1].Share)
+	}
+	if err := r.SetShare("filial", "feat", nil); err != nil || r.WorktreesOf("filial")[1].Share != nil {
+		t.Errorf("SetShare nil: %v, %+v", err, r.WorktreesOf("filial")[1].Share)
 	}
 }

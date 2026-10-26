@@ -13,11 +13,12 @@ import (
 )
 
 // Remove tears down the worktree target names (see resolve) and removes
-// it: its units are stopped, its containers, per-worktree volumes and dev
-// network removed by exact name, its env dir, registry entry and checkout
-// deleted, and the project re-rendered (D28). The base worktree is
-// refused, and so is a dirty one unless force. force also deletes the
-// worktree's home dir (.railswitch/home/<slug>), which is kept otherwise.
+// it: its tailnet share is turned off (Unshare), its units are stopped, its
+// containers, per-worktree volumes and dev network removed by exact name,
+// its env dir, registry entry and checkout deleted, and the project
+// re-rendered (D28). The base worktree is refused, and so is a dirty one
+// unless force. force also deletes the worktree's home dir
+// (.railswitch/home/<slug>), which is kept otherwise.
 // Nothing changes when a registered worktree's directory is missing.
 func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	entries, err := m.registered()
@@ -53,6 +54,9 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	}
 
 	if w.ID != 0 {
+		if err := m.Unshare(ctx, w.Slug); err != nil {
+			return err
+		}
 		if err := m.teardown(ctx, w.Slug); err != nil {
 			return err
 		}

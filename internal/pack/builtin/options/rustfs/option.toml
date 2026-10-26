@@ -24,6 +24,9 @@ S3_ENDPOINT = "http://s3.{worktree.host}"
 S3_ACCESS_KEY = "rustfsadmin"
 S3_SECRET_KEY = "{generated.S3_SECRET_KEY}"
 
+[share]                       # layer 7: only while the worktree is shared on the tailnet (D46)
+gives = { S3_ENDPOINT = "{share.url.s3}" }
+
 [env]
 RUSTFS_VOLUMES = "/data/rustfs{0..3}"
 RUSTFS_ACCESS_KEY = "rustfsadmin"
@@ -39,11 +42,12 @@ name = "rustfs-data"
 mount = "/data"
 seed = "rustfs_data.tar.gz"   # D18: imported from <workspace>/db-dumps/ when the volume is created
 
-[[ports]]                     # for tailnet share (D26)
+[[ports]]                     # for tailnet share (D46)
 name = "s3"
 env = "S3_PORT"
 base = 19000
 container = 9000
+share = true                  # served on tailnet HTTPS port 19000+ID by railswitch share
 
 [[routes]]                    # S3 API
 name = "s3"

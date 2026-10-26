@@ -43,6 +43,9 @@ RUBY_DEBUG_HOST = "0.0.0.0"  # the debug port is published, so the debug gem lis
 # it answers 403 for <slug>.<prefix>.localhost unless the host is added here.
 RAILS_DEVELOPMENT_HOSTS = "{worktree.host}"
 
+[share]                    # layer 7: only while the worktree is shared on the tailnet (D46)
+env = { RAILS_DEVELOPMENT_HOSTS = "{worktree.host},{share.host}" }
+
 [db_scheme]
 postgres = "postgres://"
 mysql = "mysql2://"
@@ -74,6 +77,7 @@ name = "app"
 env = "APP_PORT"
 base = 13000
 container = 3000
+share = true               # served on tailnet HTTPS port 13000+ID by railswitch share (D46)
 
 [defaults]
 database = "postgres@1"

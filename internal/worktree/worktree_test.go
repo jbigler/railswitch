@@ -109,6 +109,11 @@ func setup(t *testing.T) *tenv {
 		},
 		Ports: func(*machine.Registry) (map[string]int, error) { return map[string]int{"app": 13000}, nil },
 		Names: fakeNames,
+		// Recorded as an "unshare <slug>" call, to order it among the runner's.
+		Unshare: func(_ context.Context, slug string) error {
+			e.f.Calls = append(e.f.Calls, []string{"unshare", slug})
+			return nil
+		},
 	}
 	return e
 }
@@ -662,6 +667,11 @@ func TestRemoveExactNames(t *testing.T) {
 		if !slices.ContainsFunc(calls, func(c []string) bool { return slices.Equal(c, want) }) {
 			t.Errorf("no call %q in %q", want, calls)
 		}
+	}
+	unshare := slices.IndexFunc(calls, func(c []string) bool { return slices.Equal(c, []string{"unshare", "api"}) })
+	stop := slices.IndexFunc(calls, func(c []string) bool { return c[0] == "systemctl" && slices.Contains(c, "stop") })
+	if unshare < 0 || unshare > stop {
+		t.Errorf("the Unshare hook did not run before the units stopped: %q", calls)
 	}
 	if last := calls[len(calls)-1]; !slices.Equal(last, []string{"systemctl", "--user", "daemon-reload"}) {
 		t.Errorf("last call = %q; want daemon-reload", last)

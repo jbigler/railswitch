@@ -84,8 +84,9 @@ func (m *Manager) gitWorktrees(ctx context.Context, base string) ([]gitWorktree,
 // worktree is one of the project's worktrees.
 type worktree struct {
 	Slug, Dir, Branch string
-	ID                int  // 0 when not registered
-	Git               bool // listed by git
+	ID                int                 // 0 when not registered
+	Git               bool                // listed by git
+	Share             *machine.ShareEntry // the registry's: set while shared on the tailnet
 }
 
 // registered returns the project's registry entries.
@@ -123,7 +124,7 @@ func (m *Manager) worktrees(ctx context.Context, base string, entries []machine.
 	ws := realPath(m.WS)
 	var wts []worktree
 	for _, e := range entries {
-		wts = append(wts, worktree{Slug: e.Slug, ID: e.ID, Dir: filepath.Join(m.WS, e.Slug)})
+		wts = append(wts, worktree{Slug: e.Slug, ID: e.ID, Dir: filepath.Join(m.WS, e.Slug), Share: e.Share})
 	}
 	for _, g := range gits {
 		rel, err := filepath.Rel(ws, realPath(g.Dir))
@@ -201,11 +202,12 @@ func (m *Manager) dirty(ctx context.Context, dir string) (bool, error) {
 
 // Row is one line of `wt ls`.
 type Row struct {
-	Slug   string `json:"slug"`
-	ID     int    `json:"id"`
-	Branch string `json:"branch"` // "" when detached or not a git worktree
-	Dir    string `json:"dir"`
-	Dirty  bool   `json:"dirty"`
+	Slug   string              `json:"slug"`
+	ID     int                 `json:"id"`
+	Branch string              `json:"branch"` // "" when detached or not a git worktree
+	Dir    string              `json:"dir"`
+	Dirty  bool                `json:"dirty"`
+	Share  *machine.ShareEntry `json:"share"` // null unless shared on the tailnet
 }
 
 // List is the project's registered worktrees, by ID.
@@ -227,7 +229,7 @@ func (m *Manager) List(ctx context.Context) ([]Row, error) {
 		if w.ID == 0 {
 			continue
 		}
-		r := Row{Slug: w.Slug, ID: w.ID, Branch: w.Branch, Dir: w.Dir}
+		r := Row{Slug: w.Slug, ID: w.ID, Branch: w.Branch, Dir: w.Dir, Share: w.Share}
 		if _, err := os.Lstat(w.Dir); err != nil {
 			r.Branch = "" // git still lists a worktree whose directory is gone
 		} else if w.Git {

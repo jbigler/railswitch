@@ -32,6 +32,9 @@ type Pack struct {
 
 	Env      map[string]string `toml:"env"`       // layer 1 (HANDOFF §3.7): only what the framework itself reads (D42)
 	DBScheme map[string]string `toml:"db_scheme"` // database option name → URL scheme, the {scheme} placeholder
+	// Share is the pack's [share] table: env layer 7, used only while a
+	// worktree is shared on the tailnet (D46).
+	Share PackShare `toml:"share"`
 
 	Caches          []Volume `toml:"caches"`           // shared across worktrees: <prefix>_<name>
 	WorktreeVolumes []Volume `toml:"worktree_volumes"` // per worktree: <prefix>-<slug>-<name>
@@ -91,13 +94,28 @@ type Volume struct {
 // Port is a published port: host port Base + worktree ID, container port
 // Container, its host port given to services as env Env. With SamePort the
 // container port is the host port too (Container is unset), for a server
-// that reads its port from Env inside the container.
+// that reads its port from Env inside the container. Share serves it on the
+// tailnet HTTPS port of the same number while the worktree is shared (D46).
 type Port struct {
 	Name      string `toml:"name"`
 	Env       string `toml:"env"`
 	Base      int    `toml:"base"`
 	Container int    `toml:"container"`
 	SamePort  bool   `toml:"same_port"`
+	Share     bool   `toml:"share"`
+}
+
+// PackShare is a pack's [share] table. Env overrides the pack's [env] for
+// the same services while shared; it may use {share.host} and
+// {share.url.<port name>}.
+type PackShare struct {
+	Env map[string]string `toml:"env"`
+}
+
+// OptionShare is an option's [share] table. Gives overrides the option's
+// [gives] for the same services while shared.
+type OptionShare struct {
+	Gives map[string]string `toml:"gives"`
 }
 
 // Link is a suggested worktree link (HANDOFF §3.10).
@@ -194,6 +212,7 @@ type Option struct {
 	Gives   map[string]string `toml:"gives"`    // layer 2, to app, worker and tools; never to its own service
 	DepsEnv map[string]string `toml:"deps_env"` // to the deps service (D44): what its installs need
 	Env     map[string]string `toml:"env"`      // its own service's env
+	Share   OptionShare       `toml:"share"`    // layer 7 (D46): [share] gives, while shared
 	Volumes []Volume          `toml:"volumes"`
 	Mounts  []Mount           `toml:"mounts"`
 	Ports   []Port            `toml:"ports"`

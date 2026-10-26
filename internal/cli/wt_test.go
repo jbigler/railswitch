@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -44,7 +45,8 @@ func gitWS(t *testing.T) (string, machine.Dirs) {
 }
 
 func TestListJSON(t *testing.T) {
-	ws, _ := gitWS(t)
+	ws, dirs := gitWS(t)
+	shareSlug(t, dirs, "feat")
 	f := fakeHost()
 	f.Passthrough = []string{"git"}
 	code, out, errs := runWith(t, f, "-C", ws, "--json", "wt", "ls")
@@ -56,20 +58,21 @@ func TestListJSON(t *testing.T) {
 		t.Fatalf("%v\n%s", err, out)
 	}
 	want := []map[string]any{
-		{"slug": "master", "id": float64(1), "branch": "master", "dir": filepath.Join(ws, "master"), "dirty": false},
-		{"slug": "feat", "id": float64(2), "branch": "feat", "dir": filepath.Join(ws, "feat"), "dirty": false},
+		{"slug": "master", "id": float64(1), "branch": "master", "dir": filepath.Join(ws, "master"), "dirty": false, "share": nil},
+		{"slug": "feat", "id": float64(2), "branch": "feat", "dir": filepath.Join(ws, "feat"), "dirty": false,
+			"share": map[string]any{"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}},
 	}
 	if len(rows) != len(want) {
 		t.Fatalf("rows = %v; want %v", rows, want)
 	}
 	for i := range want {
 		for k, v := range want[i] {
-			if rows[i][k] != v {
+			if !reflect.DeepEqual(rows[i][k], v) {
 				t.Errorf("row %d %s = %v; want %v", i, k, rows[i][k], v)
 			}
 		}
 		if len(rows[i]) != len(want[i]) {
-			t.Errorf("row %d has fields %v; want exactly slug, id, branch, dir, dirty", i, rows[i])
+			t.Errorf("row %d has fields %v; want exactly slug, id, branch, dir, dirty, share", i, rows[i])
 		}
 	}
 }

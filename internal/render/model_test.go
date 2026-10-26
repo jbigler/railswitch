@@ -888,3 +888,89 @@ func TestS3EndpointThroughTraefik(t *testing.T) {
 		t.Errorf("rails S3_ENDPOINT = %q (set: %v)", e.Value, ok)
 	}
 }
+
+// testShare is a tailnet share of the master worktree.
+var testShare = &machine.ShareEntry{Host: "box.tail1234.ts.net", IP: "100.64.0.7"}
+
+// sharedModel is the Filial model with master (ID 1) shared.
+func sharedModel(t *testing.T, mutate func(*config.Project)) *Model {
+	t.Helper()
+	in := fixtureInputs(t, fixtureWS(t), mutate)
+	in.Worktrees[0].Share = testShare
+	return mustBuild(t, in)
+}
+
+func TestShareEnvLayer(t *testing.T) {
+	m := sharedModel(t, nil)
+	in := mustInstance(t, m, "master")
+	for name, want := range map[string]string{
+		"RAILS_DEVELOPMENT_HOSTS": "master.filial.localhost,box.tail1234.ts.net",
+		"S3_ENDPOINT":             "https://box.tail1234.ts.net:19001",
+	} {
+		if e, ok := envVar(in, "rails", name); !ok || e.Value != want || e.Layer != LayerShare || e.Layer.String() != "share" {
+			t.Errorf("shared rails %s = %+v (set: %v); want %q at layer share", name, e, ok, want)
+		}
+	}
+	if e, _ := envVar(in, "deps", "RAILS_DEVELOPMENT_HOSTS"); e.Layer != LayerShare {
+		t.Errorf("shared deps RAILS_DEVELOPMENT_HOSTS = %+v; want the pack's [share] env, as deps gets the pack's [env]", e)
+	}
+	if _, ok := envVar(in, "storage", "S3_ENDPOINT"); ok {
+		t.Error("the storage service gets its own [share] gives")
+	}
+	units, err := Quadlet(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasLine(t, units, "filial-master-rails.container", "AddHost=box.tail1234.ts.net:100.64.0.7")
+	noLinePrefix(t, units, "filial-feat-rails.container", "AddHost=box.")
+	if e, _ := envVar(mustInstance(t, m, "feat"), "rails", "S3_ENDPOINT"); e.Value != "http://s3.feat.filial.localhost" {
+		t.Errorf("unshared feat S3_ENDPOINT = %q", e.Value)
+	}
+
+	m, in = filial(t, nil)
+	for name, want := range map[string]EnvVar{
+		"RAILS_DEVELOPMENT_HOSTS": {Value: "master.filial.localhost", Layer: LayerPack},
+		"S3_ENDPOINT":             {Value: "http://s3.master.filial.localhost", Layer: LayerOption},
+	} {
+		if e, _ := envVar(in, "rails", name); e.Value != want.Value || e.Layer != want.Layer {
+			t.Errorf("unshared rails %s = %+v; want %q at layer %s", name, e, want.Value, want.Layer)
+		}
+	}
+	if _, ok := in.Values["share.host"]; ok {
+		t.Error("an unshared worktree has share.host")
+	}
+	units, err = Quadlet(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noLinePrefix(t, units, "filial-master-rails.container", "AddHost=box.")
+}
+
+// TestProjectShareEnv: project.toml [share] env is layer 7 too, above the
+// pack's, and reaches every service but deps, like project [env].
+func TestProjectShareEnv(t *testing.T) {
+	m := sharedModel(t, func(p *config.Project) {
+		p.Share.Env = map[string]string{"RAILS_DEVELOPMENT_HOSTS": "{share.host}", "APP_URL": "{share.url.app}"}
+	})
+	in := mustInstance(t, m, "master")
+	if e, _ := envVar(in, "rails", "RAILS_DEVELOPMENT_HOSTS"); e.Value != "box.tail1234.ts.net" || e.Layer != LayerShare {
+		t.Errorf("rails RAILS_DEVELOPMENT_HOSTS = %+v; want the project's [share] env", e)
+	}
+	if e, _ := envVar(in, "storage", "APP_URL"); e.Value != "https://box.tail1234.ts.net:13001" {
+		t.Errorf("storage APP_URL = %+v", e)
+	}
+	if _, ok := envVar(in, "deps", "APP_URL"); ok {
+		t.Error("deps gets the project's [share] env")
+	}
+	if _, ok := envVar(mustInstance(t, m, "feat"), "rails", "APP_URL"); ok {
+		t.Error("an unshared worktree gets [share] env")
+	}
+}
+
+func TestSharePorts(t *testing.T) {
+	m, _ := filial(t, nil)
+	want := []SharePort{{Service: "rails", Name: "app", Port: 13002}, {Service: "storage", Name: "s3", Port: 19002}}
+	if got := m.SharePorts(2); !slices.Equal(got, want) {
+		t.Errorf("SharePorts(2) = %+v; want %+v", got, want)
+	}
+}

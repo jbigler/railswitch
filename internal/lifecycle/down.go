@@ -9,7 +9,8 @@ import (
 
 // Down stops worktree slug and removes its containers and per-worktree
 // volumes, by exact name, after a confirmation that defaults to No (yes
-// skips it; without a terminal it refuses). Shared "<prefix>_…" volumes and
+// skips it; without a terminal it refuses). A shared worktree's tailnet
+// ports are turned off first (DropShare). Shared "<prefix>_…" volumes and
 // images are never touched.
 func (l *L) Down(ctx context.Context, slug string, yes bool) error {
 	m, err := l.model(ctx)
@@ -29,6 +30,11 @@ func (l *L) Down(ctx context.Context, slug string, yes bool) error {
 		if a := strings.ToLower(strings.TrimSpace(line)); a != "y" && a != "yes" {
 			fmt.Fprintln(l.Out, "aborted")
 			return nil
+		}
+	}
+	if shared(m, slug) {
+		if err := l.DropShare(ctx, slug); err != nil {
+			return err
 		}
 	}
 	if err := l.systemd().StopLoaded(ctx, names.Units...); err != nil {

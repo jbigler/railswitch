@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"text/tabwriter"
 
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -73,6 +74,10 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 				return nil, err
 			}
 			return m.PortBases(), nil
+		},
+		Unshare: func(ctx context.Context, slug string) error {
+			l := &lifecycle.L{R: e.run, WS: w, Out: e.stdout, Err: e.stderr, In: e.stdin}
+			return l.DropShare(ctx, slug)
 		},
 		WorktreeVolumes: worktree.VolumeDirs(w.Stack.Pack),
 	}, nil

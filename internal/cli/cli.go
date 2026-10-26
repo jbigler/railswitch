@@ -47,6 +47,8 @@ var commands = map[string]command{
 	"down":          cmdDown,
 	"restart":       cmdRestart,
 	"status":        cmdStatus,
+	"share":         cmdShare,
+	"unshare":       cmdUnshare,
 	"logs":          cmdLogs,
 	"exec":          cmdExec,
 	"build":         cmdBuild,

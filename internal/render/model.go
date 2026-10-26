@@ -30,11 +30,13 @@ const (
 	RoleTool   = "tool"
 )
 
-// Worktree is one registered worktree: <workspace>/<slug>/ (D22).
+// Worktree is one registered worktree: <workspace>/<slug>/ (D22). Share is
+// set while it is shared on the tailnet (D46).
 type Worktree struct {
 	Slug        string
 	ID          int // machine-wide; ports are derived from it
 	Dir, Branch string
+	Share       *machine.ShareEntry
 }
 
 // Host is what render reads from the host. GitName/GitEmail: host `git config
@@ -104,6 +106,9 @@ type Service struct {
 	Worktree bool
 	Unit     UnitExtras
 	EnvSpec  []EnvVar // unexpanded templates with layer provenance, lowest layer first
+	// ShareEnv is env layer 7 (D46), applied over EnvSpec only in a shared
+	// worktree's Instance: an unshared one never meets a {share.*} placeholder.
+	ShareEnv []EnvVar
 
 	scheme string // the {scheme} of this option service (pack db_scheme[<option>]); "" = none
 }
@@ -523,6 +528,27 @@ func (m *Model) PortBases() map[string]int {
 	return bases
 }
 
+// SharePort is a port served on the tailnet while its worktree is shared
+// (D46): tailnet HTTPS port Port serves loopback port Port.
+type SharePort struct {
+	Service, Name string // the publishing service and the port's name
+	Port          int    // base + worktree ID
+}
+
+// SharePorts are worktree id's ports with share = true, in model order (the
+// app's first).
+func (m *Model) SharePorts(id int) []SharePort {
+	var out []SharePort
+	for _, s := range m.Services {
+		for _, p := range s.Publish {
+			if p.Share {
+				out = append(out, SharePort{Service: s.ID, Name: p.Name, Port: p.Base + id})
+			}
+		}
+	}
+	return out
+}
+
 // checkRefs refuses a [services.<id>] or a secret's services entry that
 // names no service of this stack.
 func (b *builder) checkRefs() error {
@@ -668,6 +694,12 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 	for _, s := range m.Services {
 		for _, port := range s.Publish {
 			v[port.Env] = strconv.Itoa(port.Base + wt.ID)
+		}
+	}
+	if sh := wt.Share; sh != nil {
+		v["share.host"] = sh.Host
+		for _, sp := range m.SharePorts(wt.ID) {
+			v["share.url."+sp.Name] = "https://" + sh.Host + ":" + strconv.Itoa(sp.Port)
 		}
 	}
 	for _, name := range sortedKeys(p.Secrets) {

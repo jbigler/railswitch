@@ -572,6 +572,15 @@ func TestWorkerOnProxy(t *testing.T) {
 	noLinePrefix(t, units, w, "Label=traefik")
 }
 
+func TestShareAddHostWorker(t *testing.T) {
+	units, err := Quadlet(sharedModel(t, func(p *config.Project) { p.Options["jobs"] = "sidekiq@1" }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasLine(t, units, "filial-master-worker.container", "AddHost=box.tail1234.ts.net:100.64.0.7")
+	noLinePrefix(t, units, "filial-master-db.container", "AddHost=")
+}
+
 func TestUnroutedToolOptionOffProxy(t *testing.T) {
 	cat, err := pack.LoadBuiltins()
 	if err != nil {

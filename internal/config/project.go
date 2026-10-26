@@ -29,6 +29,7 @@ type Project struct {
 	Options   map[string]string           `toml:"options"` // slot → ref, or "none"
 	Versions  map[string]string           `toml:"versions"`
 	Env       map[string]string           `toml:"env"`
+	Share     Share                       `toml:"share"` // layer 7 (D46), while a worktree is shared on the tailnet
 	Services  map[string]ServiceOverride  `toml:"services"`
 	Worktrees map[string]WorktreeOverride `toml:"worktrees"`
 	Secrets   map[string]Secret           `toml:"secrets"` // key = secret name; values live in podman secrets (D33)
@@ -79,6 +80,12 @@ type Link struct{ Label, URL string }
 
 // Tools are the opt-in developer tools.
 type Tools struct{ Nvim bool } // opt-in; default false
+
+// Share is the [share] table: Env overrides every layer of the services the
+// project's [env] reaches, while a worktree is shared on the tailnet (D46).
+type Share struct {
+	Env map[string]string `toml:"env"`
+}
 
 // Firewall is the [firewall] table.
 type Firewall struct {
@@ -158,6 +165,7 @@ func (p *Project) Validate() error {
 
 	v.oneLines("versions", p.Versions)
 	v.env("env", p.Env)
+	v.env("share.env", p.Share.Env)
 
 	for _, id := range sortedKeys(p.Services) {
 		path := "services." + key(id)

@@ -40,11 +40,19 @@ type ProjectEntry struct {
 }
 
 // WorktreeEntry is one registered worktree. ID is unique machine-wide; ports
-// are derived from it.
+// are derived from it. Share is set while it is shared on the tailnet.
 type WorktreeEntry struct {
-	Prefix string `toml:"prefix"`
-	Slug   string `toml:"slug"`
-	ID     int    `toml:"id"`
+	Prefix string      `toml:"prefix"`
+	Slug   string      `toml:"slug"`
+	ID     int         `toml:"id"`
+	Share  *ShareEntry `toml:"share,omitempty"`
+}
+
+// ShareEntry is a worktree's tailnet share (D46): this machine's tailnet
+// host name and IPv4 address when it was shared.
+type ShareEntry struct {
+	Host string `toml:"host" json:"host"` // e.g. "box.tail1234.ts.net"
+	IP   string `toml:"ip" json:"ip"`     // e.g. "100.64.0.7"
 }
 
 // Registry is registry.toml in the data dir.
@@ -301,6 +309,17 @@ func (r *Registry) AddWorktree(prefix, slug string, busy map[int]bool) (Worktree
 		return WorktreeEntry{}, fmt.Errorf("%s/%s: no free worktree ID: every free ID has a port another program listens on (the first: port %d); stop it or remove a worktree with railswitch wt rm", prefix, slug, blocked)
 	}
 	return WorktreeEntry{}, fmt.Errorf("%s/%s: at most %d worktrees per machine; remove one with railswitch wt rm", prefix, slug, MaxWorktreeID)
+}
+
+// SetShare sets (or, with nil, clears) the exact (prefix, slug) entry's
+// Share. An absent entry is an error wrapping fs.ErrNotExist.
+func (r *Registry) SetShare(prefix, slug string, s *ShareEntry) error {
+	i := slices.IndexFunc(r.Worktrees, func(w WorktreeEntry) bool { return w.Prefix == prefix && w.Slug == slug })
+	if i < 0 {
+		return fmt.Errorf("worktree %s/%s: %w", prefix, slug, fs.ErrNotExist)
+	}
+	r.Worktrees[i].Share = s
+	return nil
 }
 
 // RemoveWorktree drops the exact (prefix, slug) entry. An absent entry is an

@@ -250,7 +250,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 	var wts []render.Worktree
 	for _, e := range reg.WorktreesOf(prefix) {
 		dir := filepath.Join(w.Root, e.Slug)
-		wts = append(wts, render.Worktree{Slug: e.Slug, ID: e.ID, Dir: dir, Branch: branchOf(dir)})
+		wts = append(wts, render.Worktree{Slug: e.Slug, ID: e.ID, Dir: dir, Branch: branchOf(dir), Share: e.Share})
 	}
 	gen, err := config.ReadGenerated(filepath.Join(w.Root, "mise.local.toml"))
 	if err != nil {

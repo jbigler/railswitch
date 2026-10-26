@@ -54,6 +54,10 @@ type Manager struct {
 	// before choosing an ID, so the ID's ports are checked even when no
 	// render recorded them yet.
 	Ports func(reg *machine.Registry) (map[string]int, error)
+	// Unshare turns off a registered worktree's tailnet share, if any,
+	// without a render or restart (lifecycle.L.DropShare): Remove runs it
+	// before the worktree's units stop.
+	Unshare func(ctx context.Context, slug string) error
 	// WorktreeVolumes are the mounts of the pack's [[worktree_volumes]]
 	// relative to /app, e.g. "node_modules".
 	WorktreeVolumes []string

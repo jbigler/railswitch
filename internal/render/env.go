@@ -23,12 +23,13 @@ const (
 	LayerService                   // project.toml [services.<id>.env]
 	LayerWorktree                  // WORKTREE_*, published port numbers
 	LayerSecret                    // git wiring for secrets with git_host (D33)
+	LayerShare                     // [share] env/gives, only while the worktree is shared (D46)
 )
 
-var layerNames = [...]string{LayerPack: "pack", LayerOption: "option", LayerProject: "project", LayerService: "service", LayerWorktree: "worktree", LayerSecret: "secret"}
+var layerNames = [...]string{LayerPack: "pack", LayerOption: "option", LayerProject: "project", LayerService: "service", LayerWorktree: "worktree", LayerSecret: "secret", LayerShare: "share"}
 
 func (l Layer) String() string {
-	if l >= LayerPack && l <= LayerSecret {
+	if l >= LayerPack && l <= LayerShare {
 		return layerNames[l]
 	}
 	return "layer(" + strconv.Itoa(int(l)) + ")"
@@ -85,6 +86,10 @@ func optionSource(o *pack.Option) string {
 //     (tool options included: the browser's entrypoint needs WORKTREE_HOST),
 //     plus every service's own published ports (deps publishes none);
 //   - secret: git wiring for the services of a secret with git_host.
+//
+// Layer 7 goes to ShareEnv, never EnvSpec: the pack's [share] env and the
+// options' [share] gives reach the services their [env] and [gives] reach,
+// then project [share] env the services project [env] reaches (D46).
 func (b *builder) envSpecs() {
 	p, st := b.in.Project, b.in.Stack
 	pk := st.Pack
@@ -94,6 +99,11 @@ func (b *builder) envSpecs() {
 		add := func(layer Layer, src, svc, scheme string, vars map[string]string) {
 			for _, k := range sortedKeys(vars) {
 				s.EnvSpec = append(s.EnvSpec, EnvVar{Name: k, Value: vars[k], Layer: layer, Source: src, svc: svc, scheme: scheme})
+			}
+		}
+		share := func(src, svc, scheme string, vars map[string]string) {
+			for _, k := range sortedKeys(vars) {
+				s.ShareEnv = append(s.ShareEnv, EnvVar{Name: k, Value: vars[k], Layer: LayerShare, Source: src, svc: svc, scheme: scheme})
 			}
 		}
 		consumer := s.Role == RoleApp || s.Role == RoleWorker || b.tools[s.ID] != nil
@@ -142,6 +152,20 @@ func (b *builder) envSpecs() {
 			}
 		}
 		b.gitWiring(s)
+
+		if consumer || s.Role == RoleDeps {
+			share(packSrc+" [share] env", s.ID, s.scheme, pk.Share.Env)
+		}
+		if consumer {
+			for _, slot := range config.Slots {
+				if ch := st.Options[slot]; ch != nil && ch.Service != s.ID {
+					share(optionSource(ch.Option)+" [share] gives", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.Share.Gives)
+				}
+			}
+		}
+		if s.Role != RoleDeps {
+			share("project.toml [share] env", s.ID, s.scheme, p.Share.Env)
+		}
 	}
 }
 
@@ -201,7 +225,7 @@ var (
 )
 
 // checkSecrets refuses a secret delivered as env X to a service that also
-// gets X from layers 1–5: which of podman's --env-file and a type=env secret
+// gets X from layers 1–5 or 7: which of podman's --env-file and a type=env secret
 // wins is not something to rely on. It also refuses a git_host or git_user
 // the credential helper could not carry verbatim.
 func (b *builder) checkSecrets() error {
@@ -220,8 +244,8 @@ func (b *builder) checkSecrets() error {
 		}
 		for _, id := range sec.Services {
 			s := b.m.service(id)
-			for _, e := range s.EnvSpec {
-				if e.Name == sec.Env && e.Layer <= LayerWorktree {
+			for _, e := range slices.Concat(s.EnvSpec, s.ShareEnv) {
+				if e.Name == sec.Env && (e.Layer <= LayerWorktree || e.Layer == LayerShare) {
 					errs = append(errs, fmt.Errorf("secrets.%s: delivered to %s as env %s, but %s already gets %s from %s; rename one of them",
 						name, id, sec.Env, id, sec.Env, e.Source))
 					break
@@ -299,6 +323,11 @@ func (m *Model) expandEnv(in *Instance) error {
 		eff := map[string]EnvVar{}
 		for _, e := range s.EnvSpec { // lowest layer first: the last one wins
 			eff[e.Name] = e
+		}
+		if in.Worktree.Share != nil { // layer 7 (D46)
+			for _, e := range s.ShareEnv {
+				eff[e.Name] = e
+			}
 		}
 		var out []EnvVar
 		for _, name := range sortedKeys(eff) {

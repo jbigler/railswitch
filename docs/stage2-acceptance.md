@@ -142,4 +142,14 @@ Expected: `PASS`.
 
 ## Run log
 
-NOT YET RUN — run on a host with podman and record outputs here.
+### 2026-10-26, partial run on the user's host (CachyOS)
+
+Steps 1–7 for the base worktree only (`demo`, `main`). Steps 7–9 for `feat-x` and the e2e test are not yet run.
+
+Problems found and fixed on the way:
+
+1. `up` failed with systemd's "A dependency job for demo-main-rails.service failed". `demo-proxy-network.service` had failed: the old tool's `filial_proxy` network held `10.214.0.0/24`. Fixed in `cd9ecf7`: new projects skip subnets of existing podman networks, and `up` moves a project whose proxy network isn't created yet. `f74f979` makes a failed start name the failed units and print their journal.
+2. `curl http://main.demo.localhost/` returned 403, from Rails' development host check, which allows one subdomain label under `.localhost`. Fixed in `f6719f3`: the rails pack sets `RAILS_DEVELOPMENT_HOSTS={worktree.host}`. `b2d2ec9` makes an env change restart the container.
+3. The old Traefik must be stopped first; it holds `127.0.0.1:80` (Prerequisites). The old tool's host dashboard (`<prefix>-dashboard.service`, `wt.localhost:7700`) keeps running until disabled; it doesn't conflict with railswitch.
+
+After these fixes, the user reported that `up` and the app at `http://main.demo.localhost/` work. The command outputs were not recorded here.

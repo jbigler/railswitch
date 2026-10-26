@@ -884,7 +884,7 @@ func TestUnknownPlaceholder(t *testing.T) {
 
 func TestS3EndpointThroughTraefik(t *testing.T) {
 	_, in := filial(t, nil)
-	if e, _ := envVar(in, "rails", "S3_ENDPOINT"); e.Value != "http://s3.master.filial.localhost" {
-		t.Errorf("rails S3_ENDPOINT = %q", e.Value)
+	if e, ok := envVar(in, "rails", "S3_ENDPOINT"); !ok || e.Value != "http://s3.master.filial.localhost" {
+		t.Errorf("rails S3_ENDPOINT = %q (set: %v)", e.Value, ok)
 	}
 }

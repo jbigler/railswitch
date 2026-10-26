@@ -571,3 +571,19 @@ func TestWorkerOnProxy(t *testing.T) {
 	}
 	noLinePrefix(t, units, w, "Label=traefik")
 }
+
+func TestUnroutedToolOptionOffProxy(t *testing.T) {
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat.Options[pack.Ref{Name: "playwright", Version: 1}].Routes = nil
+	ws := testfixture.Workspace(t, fixtureDir)
+	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
+	if err != nil {
+		t.Fatalf("Quadlet: %v", err)
+	}
+	const b = "filial-master-browser.container"
+	noLinePrefix(t, units, b, "Network=filial-proxy.network")
+	noLinePrefix(t, units, b, "AddHost=")
+}

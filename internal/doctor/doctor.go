@@ -1,7 +1,8 @@
 // Package doctor checks that the host can run railswitch: podman and its
 // quadlet generator, the podman socket, unprivileged port 80, the tools the
-// firewall hook needs, the workspace's firewall descriptor and units, cgroup
-// v2 and, with the pass secret driver (D37), pass, gpg and the GPG key.
+// firewall hook needs, the workspace's firewall descriptor, units and proxy
+// subnet, cgroup v2 and, with the pass secret driver (D37), pass, gpg and
+// the GPG key.
 package doctor
 
 import (
@@ -17,6 +18,7 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -68,7 +70,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
 	if ws != nil {
-		out = append(out, descriptor(ws), units(ctx, r, ws))
+		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws))
 	}
 	out = append(out, h.cgroup())
 	out = append(out, h.secrets(ctx, r, ws)...)
@@ -212,6 +214,38 @@ func units(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
 		return c
 	}
 	c.Detail = "render would change: " + strings.Join(parts, "; ")
+	return c
+}
+
+// proxySubnet checks that no other podman network overlaps the project's
+// registered subnet: netavark refuses to create the proxy network on it,
+// and its unit fails.
+func proxySubnet(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
+	prefix := ws.Project.Project.Prefix
+	own := naming.ProxyNetwork(prefix)
+	c := Check{Name: "proxy subnet", Fix: "railswitch up moves the project to a free subnet while podman network " + own + " does not exist yet (else run railswitch down in every worktree and podman network rm " + own + " first)"}
+	nets, err := podman.Podman{R: r}.NetworkSubnets(ctx)
+	if err != nil {
+		c.Detail, c.Fix = err.Error(), "fix podman network ls --format json"
+		return c
+	}
+	reg, err := machine.Open(ws.Dirs.Data)
+	if err != nil {
+		c.Detail, c.Fix = err.Error(), "fix the registry named in detail"
+		return c
+	}
+	pe, ok := reg.Project(prefix)
+	reg.Close()
+	if !ok {
+		c.Detail, c.Fix = "project "+prefix+" is not registered", "railswitch init"
+		return c
+	}
+	subnet := machine.Subnet(pe.Subnet)
+	if users := machine.SubnetUsers(nets, own, pe.Subnet); len(users) > 0 {
+		c.Detail = subnet + " overlaps podman network " + strings.Join(users, ", ")
+		return c
+	}
+	c.OK, c.Detail = true, subnet+" overlaps no other podman network"
 	return c
 }
 

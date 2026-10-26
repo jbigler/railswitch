@@ -63,7 +63,7 @@ func filialWS(t *testing.T) (ws string, dirs machine.Dirs) {
 		t.Fatal(err)
 	}
 	defer reg.Close()
-	if _, err := reg.AddProject("filial", ws); err != nil {
+	if _, err := reg.AddProject("filial", ws, nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, slug := range []string{"master", "feat"} {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 )
 
@@ -356,7 +358,7 @@ func TestNewRenderFailureRefreshesProxy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reg.AddProject("other", "/ws/other"); err != nil {
+	if _, err := reg.AddProject("other", "/ws/other", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := reg.Save(); err != nil {
@@ -548,5 +550,41 @@ func TestNewGitNonInteractive(t *testing.T) {
 	}
 	if seen == 0 {
 		t.Fatal("no clone or ls-remote call")
+	}
+}
+
+// TestNewSkipsPodmanSubnets: a /24 another podman network uses (the old
+// stack's filial_proxy) is never handed out.
+func TestNewSkipsPodmanSubnets(t *testing.T) {
+	dirs := newEnv(t)
+	repo := bareRepo(t, "main")
+	ws := filepath.Join(t.TempDir(), "shop")
+	f := gitHost()
+	f.On([]string{"podman", "network", "ls", "--format", "json"},
+		sys.Result{Stdout: []byte(`[{"name":"filial_proxy","subnets":[{"subnet":"10.214.0.0/24","gateway":"10.214.0.1"}]}]`)}, nil)
+	if code, out, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"); code != 0 {
+		t.Fatalf("new: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	if pe, _ := registry(t, dirs).Project("shop"); pe.Subnet != 1 {
+		t.Errorf("shop subnet = %d; want 1", pe.Subnet)
+	}
+	if net := readFile(t, filepath.Join(dirs.Quadlet, "shop-proxy.network")); !strings.Contains(net, "Subnet=10.214.1.0/24") {
+		t.Errorf("shop-proxy.network:\n%s", net)
+	}
+}
+
+func TestNewNetworkLsFails(t *testing.T) {
+	dirs := newEnv(t)
+	repo := bareRepo(t, "main")
+	ws := filepath.Join(t.TempDir(), "shop")
+	f := gitHost()
+	f.On([]string{"podman", "network", "ls"}, sys.Result{ExitCode: 125, Stderr: []byte("Error: boom\n")},
+		fmt.Errorf("podman: %w (exit 125): Error: boom", sys.ErrExit))
+	code, _, errs := runWith(t, f, "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main")
+	if code == 0 || !strings.Contains(errs, "boom") {
+		t.Fatalf("new: exit %d, stderr %q; want failure naming the podman error", code, errs)
+	}
+	if _, ok := registry(t, dirs).Project("shop"); ok {
+		t.Error("shop registered despite the failed podman network ls")
 	}
 }

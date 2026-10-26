@@ -24,6 +24,7 @@ const graphRoot = "/home/u/.local/share/containers/storage"
 var (
 	podmanVersion = []string{"podman", "version", "--format", "{{.Client.Version}}"}
 	socketActive  = []string{"systemctl", "--user", "is-active", "podman.socket"}
+	networkLs     = []string{"podman", "network", "ls", "--format", "json"}
 )
 
 // fakeHost answers podman info (render's graph root) and nothing else.
@@ -79,7 +80,7 @@ func workspaceAt(t *testing.T, render bool) *workspace.Workspace {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reg.AddProject("filial", root); err != nil {
+	if _, err := reg.AddProject("filial", root, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reg.AddWorktree("filial", "master"); err != nil {
@@ -147,7 +148,7 @@ func TestAllOK(t *testing.T) {
 	h := host(t, "80", true, "nft", "nsenter", "getent", "jq", "curl", "pass", "gpg")
 
 	got := h.Run(context.Background(), f, ws)
-	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "cgroup v2", "pass", "gpg", "gpg secret key")
+	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "proxy subnet", "cgroup v2", "pass", "gpg", "gpg secret key")
 	if !slices.Equal(names(got), want) {
 		t.Fatalf("checks = %q\nwant %q", names(got), want)
 	}
@@ -171,10 +172,11 @@ func TestAllFail(t *testing.T) {
 	f.On(podmanVersion, sys.Result{Stdout: []byte("4.9.3\n")}, nil)
 	f.On(socketActive, sys.Result{ExitCode: 3, Stdout: []byte("inactive\n")}, errors.New("systemctl: non-zero exit (exit 3)"))
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{ExitCode: 2}, errors.New("gpg: non-zero exit (exit 2)"))
+	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]}]`)}, nil)
 	h := host(t, "1024", false)
 
 	got := h.Run(context.Background(), f, ws)
-	if len(got) != len(hostChecks)+6 {
+	if len(got) != len(hostChecks)+7 {
 		t.Fatalf("checks = %q", names(got))
 	}
 	for _, c := range got {
@@ -356,5 +358,25 @@ func TestWorkspaceCheck(t *testing.T) {
 	}
 	if c := Workspace(errors.New("project.toml: bad")); c.OK || c.Fix == "" || c.Detail != "project.toml: bad" {
 		t.Errorf("Workspace(bad project) = %+v", c)
+	}
+}
+
+func TestProxySubnet(t *testing.T) {
+	ws := workspaceAt(t, true)
+	f := fakeHost()
+	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"filial_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"podman","subnets":[{"subnet":"10.88.0.0/16"}]}]`)}, nil)
+	if c := proxySubnet(context.Background(), f, ws); !c.OK || !strings.Contains(c.Detail, "10.214.0.0/24") {
+		t.Errorf("no clash: %+v", c)
+	}
+	f = fakeHost()
+	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]}]`)}, nil)
+	c := proxySubnet(context.Background(), f, ws)
+	if c.OK || !strings.Contains(c.Detail, "10.214.0.0/24") || !strings.Contains(c.Detail, "old_proxy") || !strings.Contains(c.Fix, "railswitch up") || !strings.Contains(c.Fix, "filial_proxy") {
+		t.Errorf("clash: %+v", c)
+	}
+	f = fakeHost()
+	f.On(networkLs, sys.Result{ExitCode: 125}, errors.New("podman: non-zero exit (exit 125)"))
+	if c := proxySubnet(context.Background(), f, ws); c.OK || !strings.Contains(c.Detail, "exit 125") {
+		t.Errorf("ls fails: %+v", c)
 	}
 }

@@ -175,7 +175,7 @@ func TestDoctorOutsideWorkspace(t *testing.T) {
 	if code != 1 || len(names) == 0 || names[0] != "podman >= 5.0" {
 		t.Fatalf("doctor outside a workspace: exit %d, checks %q", code, names)
 	}
-	for _, n := range []string{"workspace", "firewall descriptor", "units current"} {
+	for _, n := range []string{"workspace", "firewall descriptor", "units current", "proxy subnet"} {
 		if slices.Contains(names, n) {
 			t.Errorf("doctor outside a workspace ran %q", n)
 		}

@@ -4,10 +4,12 @@ package podman
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
+	"net/netip"
 	"os"
 	"slices"
 	"strconv"
@@ -161,6 +163,41 @@ func (p Podman) RemoveNetwork(ctx context.Context, name string) error {
 		return nil
 	}
 	return err
+}
+
+// NetworkSubnets maps every podman network's name to its subnets, from
+// `podman network ls --format json` (a []types.Network: "name",
+// "subnets":[{"subnet":"10.88.0.0/16",…}]). Empty output means no networks.
+func (p Podman) NetworkSubnets(ctx context.Context) (map[string][]netip.Prefix, error) {
+	out, err := p.out(ctx, "network", "ls", "--format", "json")
+	if err != nil {
+		return nil, err
+	}
+	nets := map[string][]netip.Prefix{}
+	if out == "" {
+		return nets, nil
+	}
+	var ls []struct {
+		Name    string `json:"name"`
+		Subnets []struct {
+			Subnet string `json:"subnet"`
+		} `json:"subnets"`
+	}
+	if err := json.Unmarshal([]byte(out), &ls); err != nil {
+		return nil, fmt.Errorf("podman network ls: %w", err)
+	}
+	for _, n := range ls {
+		var subnets []netip.Prefix
+		for _, s := range n.Subnets {
+			pfx, err := netip.ParsePrefix(s.Subnet)
+			if err != nil {
+				return nil, fmt.Errorf("podman network %s: %w", n.Name, err)
+			}
+			subnets = append(subnets, pfx)
+		}
+		nets[n.Name] = subnets
+	}
+	return nets, nil
 }
 
 // inspectContainer returns the formatted field, or "" for a missing container.

@@ -3,8 +3,10 @@ package machine
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,7 +18,7 @@ func newRegistry(t *testing.T, prefixes ...string) *Registry {
 	t.Helper()
 	r := &Registry{Schema: SchemaVersion}
 	for _, p := range prefixes {
-		if _, err := r.AddProject(p, "/ws/"+p); err != nil {
+		if _, err := r.AddProject(p, "/ws/"+p, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -109,7 +111,7 @@ func TestAddWorktreeUnknownProject(t *testing.T) {
 
 func TestPrefixTaken(t *testing.T) {
 	r := newRegistry(t, "a")
-	if _, err := r.AddProject("a", "/elsewhere"); !errors.Is(err, ErrPrefixTaken) {
+	if _, err := r.AddProject("a", "/elsewhere", nil); !errors.Is(err, ErrPrefixTaken) {
 		t.Errorf("second AddProject(a) = %v; want ErrPrefixTaken", err)
 	}
 }
@@ -150,7 +152,7 @@ func TestSubnetPoolExhausted(t *testing.T) {
 	for n := range 256 {
 		r.Projects = append(r.Projects, ProjectEntry{Prefix: fmt.Sprintf("p%d", n), Subnet: n})
 	}
-	if _, err := r.AddProject("last", "/ws"); err == nil {
+	if _, err := r.AddProject("last", "/ws", nil); err == nil {
 		t.Error("AddProject with a full pool succeeded")
 	}
 }
@@ -192,7 +194,7 @@ func TestSaveRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.AddProject("filial", "/home/u/filial"); err != nil {
+	if _, err := l.AddProject("filial", "/home/u/filial", nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := l.AddWorktree("filial", "master"); err != nil {
@@ -326,5 +328,70 @@ func TestDefaultDirs(t *testing.T) {
 	want = Dirs{Config: "/x/cfg/railswitch", Data: "/x/data/railswitch", Quadlet: "/x/cfg/containers/systemd"}
 	if d != want {
 		t.Errorf("DefaultDirs (XDG) = %+v; want %+v", d, want)
+	}
+}
+
+func TestAddProjectSkipsTaken(t *testing.T) {
+	r := newRegistry(t, "a") // a on 0
+	e, err := r.AddProject("b", "/ws/b", []netip.Prefix{netip.MustParsePrefix("10.214.1.0/24"), netip.MustParsePrefix("10.88.0.0/16")})
+	if err != nil || e.Subnet != 2 {
+		t.Fatalf("AddProject(b) = %+v, %v; want subnet 2", e, err)
+	}
+	r = &Registry{Schema: SchemaVersion}
+	e, err = r.AddProject("demo", "/ws/demo", []netip.Prefix{netip.MustParsePrefix("10.214.0.0/24")})
+	if err != nil || e.Subnet != 1 {
+		t.Fatalf("AddProject(demo) = %+v, %v; want subnet 1", e, err)
+	}
+}
+
+func TestAddProjectTakenPool(t *testing.T) {
+	r := &Registry{Schema: SchemaVersion}
+	_, err := r.AddProject("demo", "/ws/demo", []netip.Prefix{netip.MustParsePrefix("10.214.0.0/16")})
+	if err == nil || !strings.Contains(err.Error(), "10.214.0.0/16") || !strings.Contains(err.Error(), "podman network") {
+		t.Fatalf("err = %v; want one naming the taken 10.214.0.0/16", err)
+	}
+	if len(r.Projects) != 0 {
+		t.Fatalf("Projects = %+v", r.Projects)
+	}
+}
+
+func TestMoveSubnet(t *testing.T) {
+	r := newRegistry(t, "demo", "b") // demo 0, b 1
+	old, n, err := r.MoveSubnet("demo", []netip.Prefix{netip.MustParsePrefix("10.214.0.0/24"), netip.MustParsePrefix("10.214.2.0/23")})
+	if err != nil || old != 0 || n != 4 {
+		t.Fatalf("MoveSubnet = %d, %d, %v; want 0, 4", old, n, err)
+	}
+	if e, _ := r.Project("demo"); e.Subnet != 4 {
+		t.Fatalf("demo = %+v", e)
+	}
+	if e, _ := r.Project("b"); e.Subnet != 1 {
+		t.Fatalf("b moved: %+v", e)
+	}
+	if _, _, err := r.MoveSubnet("nope", nil); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("unknown project: %v", err)
+	}
+	if _, _, err := r.MoveSubnet("demo", []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}); err == nil || !strings.Contains(err.Error(), "10.0.0.0/8") {
+		t.Fatalf("full pool: %v", err)
+	}
+	if e, _ := r.Project("demo"); e.Subnet != 4 {
+		t.Fatalf("failed move changed demo: %+v", e)
+	}
+}
+
+func TestSubnetPrefix(t *testing.T) {
+	if got := SubnetPrefix(3); got.String() != Subnet(3) {
+		t.Fatalf("SubnetPrefix(3) = %v", got)
+	}
+}
+
+func TestSubnetUsers(t *testing.T) {
+	nets := map[string][]netip.Prefix{
+		"filial_proxy": {netip.MustParsePrefix("10.214.0.0/24")},
+		"old_proxy":    {netip.MustParsePrefix("10.214.0.0/24")},
+		"wide":         {netip.MustParsePrefix("fd00::/64"), netip.MustParsePrefix("10.0.0.0/8")},
+		"podman":       {netip.MustParsePrefix("10.88.0.0/16")},
+	}
+	if got := SubnetUsers(nets, "filial_proxy", 0); !slices.Equal(got, []string{"old_proxy", "wide"}) {
+		t.Fatalf("SubnetUsers = %v", got)
 	}
 }

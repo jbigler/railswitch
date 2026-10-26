@@ -20,7 +20,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D43: `docs/superpowers/plans/2026-10-
 - Ports publish only on `127.0.0.1:<host>:<ctr>`.
 - Remove objects by exact name, never `--filter`/regex. Never `git worktree prune`.
 - Files inside a worktree are read only via `safefile.Read` (regular files, ≤ 1 MiB).
-- Pinned: subnet pool `10.214.0.0/16`, one `/24` per project, gateway `.1`, Traefik `.2`, dynamic `10.214.<n>.128/25`; dev network MTU 1400; ports DB 55432+ID, Ruby debug 33000+ID, Neovim 17000+ID, Playwright 18888+ID, App share 13000+ID, Storage share 19000+ID; worktree slug ≤ 40 chars; `LogOpt=max-size=20m`.
+- Pinned: subnet pool `10.214.0.0/16`, one `/24` per project (skipping /24s any existing podman network uses), gateway `.1`, Traefik `.2`, dynamic `10.214.<n>.128/25`; dev network MTU 1400; ports DB 55432+ID, Ruby debug 33000+ID, Neovim 17000+ID, Playwright 18888+ID, App share 13000+ID, Storage share 19000+ID; worktree slug ≤ 40 chars; `LogOpt=max-size=20m`.
 - railswitch's own CI lives in `.github/workflows/`; railswitch never generates or touches a project's CI (D41).
 
 ## Package map

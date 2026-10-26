@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/BurntSushi/toml"
@@ -124,23 +126,83 @@ func (l *Locked) Close() error {
 	return l.lock.Close()
 }
 
-// AddProject registers prefix on the lowest free subnet.
-func (r *Registry) AddProject(prefix, workspace string) (ProjectEntry, error) {
+// AddProject registers prefix on the lowest free subnet: one no other
+// project uses and that overlaps none of taken (the subnets of existing
+// podman networks).
+func (r *Registry) AddProject(prefix, workspace string, taken []netip.Prefix) (ProjectEntry, error) {
 	if _, ok := r.Project(prefix); ok {
 		return ProjectEntry{}, fmt.Errorf("%s: %w", prefix, ErrPrefixTaken)
 	}
+	n, err := r.freeSubnet(prefix, taken)
+	if err != nil {
+		return ProjectEntry{}, err
+	}
+	e := ProjectEntry{Prefix: prefix, Workspace: workspace, Subnet: n}
+	r.Projects = append(r.Projects, e)
+	return e, nil
+}
+
+// MoveSubnet moves prefix to the lowest subnet no other project uses that
+// overlaps none of taken, returning the old and new subnet indices (equal
+// when the current subnet is that one). An absent project is an error
+// wrapping fs.ErrNotExist.
+func (r *Registry) MoveSubnet(prefix string, taken []netip.Prefix) (old, moved int, err error) {
+	i := slices.IndexFunc(r.Projects, func(p ProjectEntry) bool { return p.Prefix == prefix })
+	if i < 0 {
+		return 0, 0, fmt.Errorf("project %s: %w", prefix, fs.ErrNotExist)
+	}
+	n, err := r.freeSubnet(prefix, taken)
+	if err != nil {
+		return 0, 0, err
+	}
+	old = r.Projects[i].Subnet
+	r.Projects[i].Subnet = n
+	return old, n, nil
+}
+
+// freeSubnet returns the lowest n whose 10.214.n.0/24 no project but prefix
+// uses and that overlaps none of taken.
+func (r *Registry) freeSubnet(prefix string, taken []netip.Prefix) (int, error) {
 	used := make(map[int]bool, len(r.Projects))
 	for _, p := range r.Projects {
-		used[p.Subnet] = true
-	}
-	for n := 0; n <= maxSubnet; n++ {
-		if !used[n] {
-			e := ProjectEntry{Prefix: prefix, Workspace: workspace, Subnet: n}
-			r.Projects = append(r.Projects, e)
-			return e, nil
+		if p.Prefix != prefix {
+			used[p.Subnet] = true
 		}
 	}
-	return ProjectEntry{}, fmt.Errorf("%s: no free subnet in 10.214.0.0/16", prefix)
+	for n := 0; n <= maxSubnet; n++ {
+		if !used[n] && !Overlaps(SubnetPrefix(n), taken) {
+			return n, nil
+		}
+	}
+	var clash []string
+	pool := netip.MustParsePrefix("10.214.0.0/16")
+	for _, t := range taken {
+		if t.Overlaps(pool) {
+			clash = append(clash, t.String())
+		}
+	}
+	if len(clash) > 0 {
+		return 0, fmt.Errorf("%s: no free subnet in 10.214.0.0/16: %d used by other railswitch projects, the rest overlaps existing podman network subnets %s", prefix, len(used), strings.Join(clash, ", "))
+	}
+	return 0, fmt.Errorf("%s: no free subnet in 10.214.0.0/16", prefix)
+}
+
+// Overlaps reports whether p overlaps any of taken.
+func Overlaps(p netip.Prefix, taken []netip.Prefix) bool {
+	return slices.ContainsFunc(taken, p.Overlaps)
+}
+
+// SubnetUsers names, sorted, the podman networks in nets other than own
+// whose subnets overlap 10.214.n.0/24.
+func SubnetUsers(nets map[string][]netip.Prefix, own string, n int) []string {
+	var users []string
+	for name, subnets := range nets {
+		if name != own && Overlaps(SubnetPrefix(n), subnets) {
+			users = append(users, name)
+		}
+	}
+	slices.Sort(users)
+	return users
 }
 
 // MaxWorktreeID caps worktree IDs so the per-worktree port ranges
@@ -219,6 +281,11 @@ func addr(n int, host string) string { return "10.214." + strconv.Itoa(n) + host
 
 // Subnet is project n's network: 10.214.<n>.0/24.
 func Subnet(n int) string { return addr(n, ".0/24") }
+
+// SubnetPrefix is Subnet(n) as a netip.Prefix.
+func SubnetPrefix(n int) netip.Prefix {
+	return netip.PrefixFrom(netip.AddrFrom4([4]byte{10, 214, byte(n), 0}), 24)
+}
 
 // Gateway is the network's gateway: 10.214.<n>.1.
 func Gateway(n int) string { return addr(n, ".1") }

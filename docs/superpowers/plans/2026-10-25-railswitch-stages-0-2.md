@@ -43,7 +43,7 @@
 
   | What | Value |
   |---|---|
-  | Subnet pool | `10.214.0.0/16`, one `/24` per project |
+  | Subnet pool | `10.214.0.0/16`, one `/24` per project, skipping /24s used by any existing podman network |
   | Gateway | `.1` |
   | Traefik | `.2` |
   | Dynamic range | `10.214.<n>.128/25` |

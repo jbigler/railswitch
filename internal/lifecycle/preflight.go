@@ -7,11 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/jbigler/railswitch/internal/firewall"
+	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
@@ -46,6 +50,64 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// checkProxySubnet runs before up renders. While the project's proxy
+// network does not exist yet and another podman network overlaps the
+// registered subnet (netavark refuses it, and the network unit fails),
+// it moves the project to the lowest free subnet, which the render then
+// writes. An existing proxy network on another subnet than the registered
+// one is refused: units and the live network would disagree.
+func (l *L) checkProxySubnet(ctx context.Context) error {
+	nets, err := l.podman().NetworkSubnets(ctx)
+	if err != nil {
+		return fmt.Errorf("listing podman networks: %w", err)
+	}
+	prefix := l.WS.Project.Project.Prefix
+	own := naming.ProxyNetwork(prefix)
+	reg, err := machine.Open(l.WS.Dirs.Data)
+	if err != nil {
+		return err
+	}
+	defer reg.Close()
+	pe, ok := reg.Project(prefix)
+	if !ok {
+		return nil // the render names the missing registration
+	}
+	registered := machine.SubnetPrefix(pe.Subnet)
+	if subnets, exists := nets[own]; exists {
+		if slices.Contains(subnets, registered) {
+			return nil
+		}
+		have := "no subnet"
+		if len(subnets) > 0 {
+			strs := make([]string, len(subnets))
+			for i, s := range subnets {
+				strs[i] = s.String()
+			}
+			have = strings.Join(strs, ", ")
+		}
+		return fmt.Errorf("podman network %s has %s, but project %s is registered on %s: run railswitch down in every worktree of the project, then podman network rm %s, then railswitch up", own, have, prefix, registered, own)
+	}
+	users := machine.SubnetUsers(nets, own, pe.Subnet)
+	if len(users) == 0 {
+		return nil
+	}
+	var taken []netip.Prefix
+	for name, subnets := range nets {
+		if name != own {
+			taken = append(taken, subnets...)
+		}
+	}
+	_, moved, err := reg.MoveSubnet(prefix, taken)
+	if err != nil {
+		return fmt.Errorf("proxy subnet %s is used by podman network %s: %w", registered, strings.Join(users, ", "), err)
+	}
+	if err := reg.Save(); err != nil {
+		return err
+	}
+	fmt.Fprintf(l.Out, "proxy subnet %s is used by podman network %s; project %s moved to %s\n", registered, strings.Join(users, ", "), prefix, machine.Subnet(moved))
+	return nil
 }
 
 // requireDescriptor refuses when the firewall hook descriptor is missing.

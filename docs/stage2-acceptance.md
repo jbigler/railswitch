@@ -12,6 +12,10 @@ not in a sandbox. The reference host is CachyOS/Arch.
 - A railswitch binary on `PATH`: `make build && install -m755 railswitch ~/.local/bin/`.
 - No project with prefix `demo` registered yet, and ideally no other worktree
   on the machine (see the note on ports in Step 7).
+- The old stack's podman networks (rails-dev-podman's `filial_proxy` on
+  `10.214.0.0/24`) may stay: `new` gives the project a `/24` no podman network
+  uses, and `up` moves a project whose `demo_proxy` does not exist yet off a
+  `/24` another network took since.
 
 ## Steps
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -467,10 +468,19 @@ func createFile(path string, data []byte, perm fs.FileMode) error {
 }
 
 // registerAndRender registers w's project and its base worktree slug, then
-// renders. A failed render unregisters the project again: the shared
+// renders. The project's subnet skips every subnet an existing podman
+// network uses. A failed render unregisters the project again: the shared
 // Traefik unit names every registered project's network.
 func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *workspace.Workspace, slug string) (int, error) {
 	prefix := w.Project.Project.Prefix
+	nets, err := podman.Podman{R: e.run}.NetworkSubnets(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("listing podman networks to pick a free subnet: %w", err)
+	}
+	var taken []netip.Prefix
+	for _, subnets := range nets {
+		taken = append(taken, subnets...)
+	}
 	reg, err := machine.Open(dirs.Data)
 	if err != nil {
 		return 0, err
@@ -479,7 +489,7 @@ func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *works
 		reg.Close()
 		return 0, prefixTaken(prefix, pe.Workspace)
 	}
-	_, err = reg.AddProject(prefix, w.Root)
+	_, err = reg.AddProject(prefix, w.Root, taken)
 	var wt machine.WorktreeEntry
 	if err == nil {
 		wt, err = reg.AddWorktree(prefix, slug)

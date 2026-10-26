@@ -77,7 +77,7 @@ func setup(t *testing.T, slugs ...string) *tenv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reg.AddProject("filial", ws); err != nil {
+	if _, err := reg.AddProject("filial", ws, nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range slugs {
@@ -1091,4 +1091,116 @@ func TestStartTimeoutFromUnits(t *testing.T) {
 			}
 		}
 	}
+}
+
+// networks scripts `podman network ls --format json`.
+func (e *tenv) networks(json string) {
+	e.f.On([]string{"podman", "network", "ls", "--format", "json"}, sys.Result{Stdout: []byte(json)}, nil)
+}
+
+func (e *tenv) subnet(t *testing.T) int {
+	t.Helper()
+	reg, err := machine.Open(e.l.WS.Dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reg.Close()
+	pe, _ := reg.Project("filial")
+	return pe.Subnet
+}
+
+// TestUpMovesClashingSubnet: another tool's network on the project's /24,
+// and no filial_proxy yet: up moves the project before rendering.
+func TestUpMovesClashingSubnet(t *testing.T) {
+	e := setup(t)
+	e.networks(`[{"name":"podman","subnets":[{"subnet":"10.88.0.0/16"}]},{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24","gateway":"10.214.0.1"}]}]`)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if n := e.subnet(t); n != 1 {
+		t.Fatalf("subnet = %d; want 1", n)
+	}
+	if want := "proxy subnet 10.214.0.0/24 is used by podman network old_proxy; project filial moved to 10.214.1.0/24\n"; !strings.Contains(e.out.String(), want) {
+		t.Fatalf("out:\n%s\nwant %q", e.out, want)
+	}
+	wantInOrder(t, e.calls(), "podman network ls --format json", "podman info")
+	net := readUnit(t, e.l.WS.Dirs.Quadlet, "filial-proxy.network")
+	for _, w := range []string{"Subnet=10.214.1.0/24", "Gateway=10.214.1.1", "IPRange=10.214.1.128/25"} {
+		if !strings.Contains(net, w) {
+			t.Errorf("filial-proxy.network lacks %s:\n%s", w, net)
+		}
+	}
+	if tr := readUnit(t, e.l.WS.Dirs.Quadlet, "railswitch-traefik.container"); !strings.Contains(tr, "10.214.1.2") || strings.Contains(tr, "10.214.0.2") {
+		t.Errorf("traefik unit keeps the old IP:\n%s", tr)
+	}
+}
+
+// TestUpSubnetNoClash: no clash, or filial_proxy already exists on the
+// registered subnet: up leaves the registry alone.
+func TestUpSubnetNoClash(t *testing.T) {
+	for _, nets := range []string{
+		``,
+		`[{"name":"podman","subnets":[{"subnet":"10.88.0.0/16"}]}]`,
+		`[{"name":"filial_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]}]`,
+	} {
+		e := setup(t)
+		e.networks(nets)
+		if err := e.l.Up(ctx, "feat"); err != nil {
+			t.Fatalf("%s: %v", nets, err)
+		}
+		if n := e.subnet(t); n != 0 {
+			t.Errorf("%s: subnet = %d; want 0", nets, n)
+		}
+		if strings.Contains(e.out.String(), "proxy subnet") {
+			t.Errorf("%s: out:\n%s", nets, e.out)
+		}
+	}
+}
+
+// TestUpProxyNetworkOtherSubnet: filial_proxy exists on another subnet
+// than the registered one: up refuses before rendering.
+func TestUpProxyNetworkOtherSubnet(t *testing.T) {
+	e := setup(t)
+	e.networks(`[{"name":"filial_proxy","subnets":[{"subnet":"10.214.7.0/24"}]}]`)
+	err := e.l.Up(ctx, "feat")
+	if err == nil {
+		t.Fatal("want error")
+	}
+	for _, w := range []string{"10.214.7.0/24", "10.214.0.0/24", "railswitch down", "podman network rm filial_proxy"} {
+		if !strings.Contains(err.Error(), w) {
+			t.Errorf("error lacks %q: %v", w, err)
+		}
+	}
+	if slices.ContainsFunc(e.calls(), func(c []string) bool { return joined(c) == "podman info --format {{.Store.GraphRoot}}" }) {
+		t.Errorf("rendered after the refusal:\n%s", dump(e.calls()))
+	}
+}
+
+// TestUpStartFailureNamesProxyNetwork: the project's proxy network unit is
+// outside the worktree's units, but its failure is what blocks the start.
+func TestUpStartFailureNamesProxyNetwork(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=inactive\nResult=success\n")}, nil)
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result", "filial-proxy-network.service"}, sys.Result{Stdout: []byte("ActiveState=failed\nResult=exit-code\n")}, nil)
+	err := e.l.Up(ctx, "feat")
+	if err == nil || !strings.Contains(err.Error(), "filial-proxy-network.service (exit-code)") {
+		t.Fatalf("error does not name the failed proxy network unit: %v", err)
+	}
+	e = setup(t)
+	e.f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=inactive\nResult=success\n")}, nil)
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result", "railswitch-traefik.service"}, sys.Result{Stdout: []byte("ActiveState=failed\nResult=exit-code\n")}, nil)
+	if err := e.l.Up(ctx, "feat"); err == nil || !strings.Contains(err.Error(), "railswitch-traefik.service (exit-code)") {
+		t.Fatalf("error does not name the failed traefik unit: %v", err)
+	}
+}
+
+func readUnit(t *testing.T, dir, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

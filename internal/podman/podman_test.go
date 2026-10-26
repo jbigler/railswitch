@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -379,5 +380,44 @@ func TestLabel(t *testing.T) {
 	f.On([]string{"podman", "container", "inspect"}, r, e)
 	if v, err := (Podman{R: f}).Label(ctx, "api-app", "api.unit-hash"); v != "" || err != nil {
 		t.Fatalf("missing: got %q %v", v, err)
+	}
+}
+
+func TestNetworkSubnets(t *testing.T) {
+	f := &systest.Fake{}
+	// Shape of `podman network ls --format json`: []types.Network with
+	// "name" and "subnets":[{"subnet","gateway"}] (podman v6 libnetwork).
+	f.On([]string{"podman", "network", "ls"}, sys.Result{Stdout: []byte(`[
+  {"name": "podman", "id": "2f25", "driver": "bridge", "network_interface": "podman0",
+   "subnets": [{"subnet": "10.88.0.0/16", "gateway": "10.88.0.1"}]},
+  {"name": "filial_proxy", "driver": "bridge",
+   "subnets": [{"subnet": "10.214.0.0/24", "gateway": "10.214.0.1", "lease_range": {"start_ip": "10.214.0.128", "end_ip": "10.214.0.255"}},
+               {"subnet": "fd00:1::/64"}]},
+  {"name": "none_net", "driver": "bridge"}
+]`)}, nil)
+	got, err := Podman{R: f}.NetworkSubnets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]netip.Prefix{
+		"podman":       {netip.MustParsePrefix("10.88.0.0/16")},
+		"filial_proxy": {netip.MustParsePrefix("10.214.0.0/24"), netip.MustParsePrefix("fd00:1::/64")},
+		"none_net":     nil,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v\nwant %v", got, want)
+	}
+	wantCalls(t, f, []string{"podman", "network", "ls", "--format", "json"})
+
+	f = &systest.Fake{}
+	f.On([]string{"podman", "network", "ls"}, sys.Result{Stdout: []byte(`[{"name":"x","subnets":[{"subnet":"bogus"}]}]`)}, nil)
+	if _, err := (Podman{R: f}).NetworkSubnets(ctx); err == nil || !strings.Contains(err.Error(), "bogus") {
+		t.Fatalf("bad subnet: err = %v", err)
+	}
+	f = &systest.Fake{}
+	r, e := exitErr(125, "Error: boom")
+	f.On([]string{"podman", "network", "ls"}, r, e)
+	if _, err := (Podman{R: f}).NetworkSubnets(ctx); err == nil {
+		t.Fatal("failed ls: want error")
 	}
 }

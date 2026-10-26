@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
@@ -97,6 +98,9 @@ func (c *changes) add(d *render.Diff) {
 // starts its app unit. It stops at the first error; nothing is started
 // after a failure, and running it again resumes.
 func (l *L) Up(ctx context.Context, slug string) error {
+	if err := l.checkProxySubnet(ctx); err != nil {
+		return err
+	}
 	var ch changes
 	d, err := l.WS.Render(ctx, l.R, false)
 	if err != nil {
@@ -207,13 +211,16 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 	app := unitOf(m, slug, m.Services[0].ID)
 	if err := sd.Start(ctx, app); err != nil {
-		return l.startFailure(ctx, sd, slug, names.Units, err)
+		// The app also needs the project's proxy network and Traefik.
+		proxyNet := strings.TrimSuffix(naming.ProxyNetworkUnit(m.Prefix), ".network") + "-network.service"
+		return l.startFailure(ctx, sd, slug, append(slices.Clone(names.Units), proxyNet, traefikService), err)
 	}
 	return nil
 }
 
 // startFailure turns a failed `systemctl start` into an error naming the
-// worktree's units that failed, after printing each one's journal to Err.
+// units (the worktree's, the proxy network's, Traefik's) that failed, after
+// printing each one's journal to Err.
 // systemctl itself only says a dependency failed and points at
 // `journalctl -xe`, the system journal, which holds no user units. The
 // unit journal is the only record left: a failed container ran with --rm,

@@ -73,7 +73,7 @@ func setup(t *testing.T) *tenv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reg.AddProject(prefix, ws); err != nil {
+	if _, err := reg.AddProject(prefix, ws, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := reg.AddWorktree(prefix, "master"); err != nil {

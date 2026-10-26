@@ -204,6 +204,11 @@ func TestE2ETwoProjects(t *testing.T) {
 		if code, exit := ctrStatus(ctx, t, p.rails, p.host, "http://"+p.traefikIP+"/"); code != "200" {
 			t.Errorf("%s GET %s via %s: status %q (curl exit %d), want 200", p.rails, p.host, p.traefikIP, code, exit)
 		}
+		// D49: its rails container reaches its own s3. host by name, through
+		// Traefik (the AddHost of the s3. host), as the app's presigned URLs do.
+		if code, exit := ctrStatus(ctx, t, p.rails, "", "http://"+p.s3Host+"/"); code == "000" || code == "404" {
+			t.Errorf("%s GET http://%s/: status %q (curl exit %d), want an answer from storage", p.rails, p.s3Host, code, exit)
+		}
 	}
 	// logs.localhost and traefik.localhost: the host only (host clause).
 	for _, c := range []struct{ host, path string }{{"traefik.localhost", "/api/rawdata"}, {"logs.localhost", "/"}} {

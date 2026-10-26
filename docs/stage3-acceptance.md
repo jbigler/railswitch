@@ -134,7 +134,8 @@ checks:
 1. From the host: each app host is 200; each `s3.` host answers (not 000 or
    404); `traefik.localhost/api/rawdata` and `logs.localhost` are 200.
 2. Each project's rails container gets 200 for its own host through its own
-   Traefik IP (`10.214.<n>.2`, Host header).
+   Traefik IP (`10.214.<n>.2`, Host header), and its own `s3.` host answers
+   by name (not 000 or 404: the `AddHost` to Traefik, D49).
 3. A's rails container through A's Traefik IP: `traefik.localhost` and
    `logs.localhost` are not 200; B's host is 404.
 4. A's rails container cannot connect (curl exit 7 or 28, `--max-time 5`)

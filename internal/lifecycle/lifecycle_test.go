@@ -745,6 +745,33 @@ func TestUpImportFailRemovesVolume(t *testing.T) {
 	}
 }
 
+// A failed start names the units that failed and shows their journal, so
+// the user isn't sent to `journalctl -xe` (the system journal).
+func TestUpStartFailureNamesFailedUnits(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1, Stderr: []byte("A dependency job for filial-feat-rails.service failed.\n")}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=inactive\nResult=success\n")}, nil)
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result", "filial-feat-db.service"}, sys.Result{Stdout: []byte("ActiveState=failed\nResult=exit-code\n")}, nil)
+	e.f.On([]string{"journalctl", "--user", "-u", "filial-feat-db.service"}, sys.Result{Stdout: []byte("initdb: error: could not create directory\n")}, nil)
+	err := e.l.Up(ctx, "feat")
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if !strings.Contains(err.Error(), "filial-feat-db.service (exit-code)") || !strings.Contains(err.Error(), "journalctl --user -u filial-feat-db.service") {
+		t.Fatalf("error does not name the failed unit and its journal: %v", err)
+	}
+	if strings.Contains(err.Error(), "filial-feat-cache.service") {
+		t.Fatalf("error names a unit that did not fail: %v", err)
+	}
+	if !strings.Contains(e.l.Err.(*bytes.Buffer).String(), "initdb: error: could not create directory") {
+		t.Fatalf("journal of the failed unit not shown; stderr:\n%s", e.l.Err)
+	}
+	c := find(t, e.calls(), "journalctl")
+	if joined(c) != "journalctl --user -u filial-feat-db.service -b -n 40 --no-pager -o cat" {
+		t.Fatalf("journalctl argv %q", c)
+	}
+}
+
 // unitValues are the values of key in the [Container] section of a unit,
 // with Quadlet's word quoting stripped.
 func unitValues(unit, key string) []string {

@@ -205,7 +205,36 @@ func (l *L) Up(ctx context.Context, slug string) error {
 			return err
 		}
 	}
-	return sd.Start(ctx, unitOf(m, slug, m.Services[0].ID))
+	app := unitOf(m, slug, m.Services[0].ID)
+	if err := sd.Start(ctx, app); err != nil {
+		return l.startFailure(ctx, sd, slug, names.Units, err)
+	}
+	return nil
+}
+
+// startFailure turns a failed `systemctl start` into an error naming the
+// worktree's units that failed, after printing each one's journal to Err.
+// systemctl itself only says a dependency failed and points at
+// `journalctl -xe`, the system journal, which holds no user units. The
+// unit journal is the only record left: a failed container ran with --rm,
+// so `podman logs` (and `railswitch logs`) has nothing to show.
+func (l *L) startFailure(ctx context.Context, sd podman.Systemd, slug string, units []string, startErr error) error {
+	var failed, hints []string
+	for _, u := range units {
+		st, err := sd.Show(ctx, u, "ActiveState", "Result")
+		if err != nil || (st["ActiveState"] != "failed" && (st["Result"] == "" || st["Result"] == "success")) {
+			continue
+		}
+		failed = append(failed, fmt.Sprintf("%s (%s)", u, st["Result"]))
+		hints = append(hints, "journalctl --user -u "+u)
+		fmt.Fprintf(l.Err, "--- %s: %s/%s, last log lines:\n", u, st["ActiveState"], st["Result"])
+		// Best effort: the report must not hide the start error.
+		_, _ = l.R.Run(ctx, sys.Cmd{Name: "journalctl", Args: []string{"--user", "-u", u, "-b", "-n", "40", "--no-pager", "-o", "cat"}, Stdout: l.Err, Stderr: l.Err})
+	}
+	if len(failed) == 0 {
+		return fmt.Errorf("%w\nno unit of worktree %s reports a failure; see journalctl --user -b -n 100", startErr, slug)
+	}
+	return fmt.Errorf("%w\nfailed: %s\nmore: %s", startErr, strings.Join(failed, ", "), strings.Join(hints, "; "))
 }
 
 // staleContainer reports whether container ctr was created from another

@@ -36,3 +36,5 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - `project rm`: every registered project prefix.
 
 Workspace candidates honour `-C <dir>` on the command line. Outside a workspace, or on any error, completion offers nothing and prints nothing to stderr. It reads the registry without locking or creating it, and never runs podman, git or any other command.
+
+bash and fish pass words to `__complete` as typed: a quoted or `~`-prefixed `-C` path (`-C "my dir"`, `-C ~/app`) finds no workspace, so nothing is offered. zsh unquotes the words first.

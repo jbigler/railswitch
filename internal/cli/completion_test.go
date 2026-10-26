@@ -209,6 +209,32 @@ func TestCompleteSlugs(t *testing.T) {
 	}
 }
 
+// TestCompleteEqualsSplit: bash splits --flag=value at = (COMP_WORDBREAKS),
+// so -w=f arrives as -w, =, f.
+func TestCompleteEqualsSplit(t *testing.T) {
+	ws, _ := lockedWS(t)
+	t.Chdir(ws)
+	if got, want := complete(t, "-w", "=", "f"), []string{"feat"}; !slices.Equal(got, want) {
+		t.Errorf("-w=f: %q; want %q", got, want)
+	}
+	if got, want := complete(t, "-w", "="), []string{"feat", "master"}; !slices.Equal(got, want) {
+		t.Errorf("-w=: %q; want %q", got, want)
+	}
+	if got, want := complete(t, "-w", "=", "feat", "logs", ""), []string{"browser", "cache", "db", "deps", "nvim", "rails", "storage"}; !slices.Equal(got, want) {
+		t.Errorf("-w=feat logs: %q; want %q", got, want)
+	}
+	t.Chdir(t.TempDir())
+	if got, want := complete(t, "-C", "=", ws, ""), slices.Sorted(maps.Keys(commands)); !slices.Equal(got, want) {
+		t.Errorf("-C=ws: %q; want %q", got, want)
+	}
+	if got, want := complete(t, "-C", "=", ws, "-w", ""), []string{"feat", "master"}; !slices.Equal(got, want) {
+		t.Errorf("-C=ws -w: %q; want %q", got, want)
+	}
+	if got, want := complete(t, "-C="+ws, "wt", "rm", ""), []string{"feat", "master"}; !slices.Equal(got, want) {
+		t.Errorf("-C=ws (one word) wt rm: %q; want %q", got, want)
+	}
+}
+
 func TestCompleteWorkspaceNames(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)

@@ -121,8 +121,13 @@ func completions(ctx context.Context, words []string) []string {
 		pending   string // the flag whose value comes next
 		flagsDone bool   // after --
 	)
+	// bash splits at = (COMP_WORDBREAKS): -w=f arrives as -w, =, f. A lone
+	// = after a flag that takes a value separates it from the value.
 	for _, w := range words {
 		if pending != "" {
+			if w == "=" {
+				continue
+			}
 			if path == "" && pending == "C" {
 				dir = w
 			}
@@ -151,6 +156,9 @@ func completions(ctx context.Context, words []string) []string {
 		default:
 			nargs++
 		}
+	}
+	if pending != "" && cur == "=" {
+		cur = ""
 	}
 	var cands []string
 	switch {
@@ -264,11 +272,10 @@ func containerfileCandidates(dir string, withWorkspace bool) []string {
 	if err != nil {
 		return nil
 	}
-	_, _, st, err := projectStack(root)
-	if err != nil {
-		return nil
+	var out []string
+	if _, _, st, err := projectStack(root); err == nil {
+		out = slices.Collect(maps.Keys(stackBuiltins(st)))
 	}
-	out := slices.Collect(maps.Keys(stackBuiltins(st)))
 	if withWorkspace {
 		ents, _ := os.ReadDir(filepath.Join(root, "containerfiles"))
 		for _, ent := range ents {

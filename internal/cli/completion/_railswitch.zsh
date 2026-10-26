@@ -4,7 +4,7 @@
 # railswitch __complete prints the candidates for the last word.
 _railswitch() {
   local -a candidates
-  candidates=("${(@f)$(command railswitch __complete "${(@)words[2,CURRENT-1]}" "${words[CURRENT]}" 2>/dev/null)}")
+  candidates=("${(@f)$(command railswitch __complete "${(@Q)words[2,CURRENT-1]}" "${(Q)words[CURRENT]}" 2>/dev/null)}")
   candidates=(${candidates:#})
   compadd -a candidates
 }

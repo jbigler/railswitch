@@ -18,7 +18,6 @@ import (
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
-	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -83,18 +82,33 @@ type reachNetwork struct {
 	Members []string `json:"members"`
 }
 
-// machineReachNotes are the fixed lines of the reach section: what the
-// networks don't show.
-var machineReachNotes = []string{
-	"Traefik reaches every project network",
-	"a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients",
+// reachesAll is the reach note when Traefik is on every network it must be
+// on; reachRefused the fixed note on cross-project traffic.
+const (
+	reachesAll   = "Traefik reaches every project network"
+	reachRefused = "a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients"
+)
+
+// traefikReach is the reach note on Traefik: reachesAll when it is on every
+// network of nets, else the networks it is on and those it isn't.
+func traefikReach(nets []traefikNetwork) string {
+	var on, off []string
+	for _, n := range nets {
+		if n.Attached {
+			on = append(on, n.Network)
+		} else {
+			off = append(off, n.Network)
+		}
+	}
+	if len(off) == 0 {
+		return reachesAll
+	}
+	reaches := "no network"
+	if len(on) > 0 {
+		reaches = strings.Join(on, ", ")
+	}
+	return "Traefik reaches " + reaches + "; " + strings.Join(off, ", ") + " not attached: railswitch up"
 }
-
-// traefikContainer is machine.ProxyUnits' ContainerName.
-const traefikContainer = "railswitch-traefik"
-
-// serviceOf is the systemd service Quadlet generates for a .container unit.
-func serviceOf(unit string) string { return strings.TrimSuffix(unit, ".container") + ".service" }
 
 // railswitch machine: every registered project with its worktrees, ports
 // and routes; the machine units and Traefik's networks; who reaches whom.
@@ -138,14 +152,21 @@ func (e *env) machineReport(ctx context.Context) (*machineReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &machineReport{Projects: []machineProject{}, Routes: []machineRoute{},
-		Reach: machineReach{Networks: []reachNetwork{{Network: machine.MachineNetwork, Members: []string{"Traefik", "Dozzle"}}}, Notes: machineReachNotes}}
-
+	// A stopped container still lists its configured networks: only a
+	// running Traefik's count.
 	pm := podman.Podman{R: e.run}
-	attached, err := pm.Networks(ctx, traefikContainer)
+	running, err := pm.Running(ctx, machine.ProxyContainer)
 	if err != nil {
 		return nil, err
 	}
+	var attached []string
+	if running {
+		if attached, err = pm.Networks(ctx, machine.ProxyContainer); err != nil {
+			return nil, err
+		}
+	}
+	r := &machineReport{Projects: []machineProject{}, Routes: []machineRoute{},
+		Reach: machineReach{Networks: []reachNetwork{{Network: machine.MachineNetwork, Members: withTraefik(attached, machine.MachineNetwork, "Dozzle")}}}}
 	r.Machine.TraefikNetworks = []traefikNetwork{{Network: machine.MachineNetwork, Attached: slices.Contains(attached, machine.MachineNetwork)}}
 
 	ps := slices.Clone(reg.Projects)
@@ -158,18 +179,19 @@ func (e *env) machineReport(ctx context.Context) (*machineReport, error) {
 		if err != nil {
 			p.Note = err.Error()
 		}
-		if err := r.addProject(&p, reg.WorktreesOf(pe.Prefix), pe, m); err != nil {
+		if err := r.addProject(&p, reg.WorktreesOf(pe.Prefix), pe, m, attached); err != nil {
 			return nil, err
 		}
 		r.Projects = append(r.Projects, p)
 	}
 	slices.SortFunc(r.Routes, func(a, b machineRoute) int { return cmp.Compare(a.Host, b.Host) })
+	r.Reach.Notes = []string{traefikReach(r.Machine.TraefikNetworks), reachRefused}
 
 	sd := podman.Systemd{R: e.run}
 	for _, u := range []struct {
 		dst  *unitState
 		unit string
-	}{{&r.Machine.Traefik, serviceOf(machine.ProxyUnitName)}, {&r.Machine.Dozzle, serviceOf(machine.DozzleUnitName)}} {
+	}{{&r.Machine.Traefik, machine.ProxyService}, {&r.Machine.Dozzle, machine.DozzleService}} {
 		props, err := sd.Show(ctx, u.unit, "ActiveState", "SubState")
 		if err != nil {
 			return nil, err
@@ -200,8 +222,9 @@ func projectModel(ctx context.Context, reg *machine.Registry, pe machine.Project
 
 // addProject fills p's worktrees from the registry and, with the model m
 // (nil when it didn't load), r's routes and reach rows. Ports come from
-// m, else from the registry's recorded bases.
-func (r *machineReport) addProject(p *machineProject, wts []machine.WorktreeEntry, pe machine.ProjectEntry, m *render.Model) error {
+// m, else from the registry's recorded bases. attached are the networks
+// Traefik is on.
+func (r *machineReport) addProject(p *machineProject, wts []machine.WorktreeEntry, pe machine.ProjectEntry, m *render.Model, attached []string) error {
 	bases := pe.Ports
 	if m != nil {
 		bases = m.PortBases()
@@ -211,7 +234,8 @@ func (r *machineReport) addProject(p *machineProject, wts []machine.WorktreeEntr
 				proxy = append(proxy, s.ID)
 			}
 		}
-		r.Reach.Networks = append(r.Reach.Networks, reachNetwork{Network: naming.ProxyNetwork(pe.Prefix), Members: append([]string{"Traefik"}, proxy...)})
+		net := naming.ProxyNetwork(pe.Prefix)
+		r.Reach.Networks = append(r.Reach.Networks, reachNetwork{Network: net, Members: withTraefik(attached, net, proxy...)})
 	}
 	for _, wt := range wts {
 		w := machineWorktree{Slug: wt.Slug, ID: wt.ID, Ports: map[string]int{}}
@@ -247,26 +271,32 @@ func (r *machineReport) addProject(p *machineProject, wts []machine.WorktreeEntr
 	return nil
 }
 
-// addRoutes adds worktree wt's routes; an instance that doesn't resolve
-// goes into p's note instead.
+// withTraefik is members, after Traefik when it is attached to net.
+func withTraefik(attached []string, net string, members ...string) []string {
+	if slices.Contains(attached, net) {
+		return append([]string{"Traefik"}, members...)
+	}
+	return members
+}
+
+// addRoutes adds worktree wt's routes, as render labels them; an instance
+// or route that doesn't resolve goes into p's note instead.
 func (r *machineReport) addRoutes(m *render.Model, wt machine.WorktreeEntry, p *machineProject) error {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w render.Worktree) bool { return w.Slug == wt.Slug })
 	if i < 0 {
 		return fmt.Errorf("worktree %s missing from project %s's model", wt.Slug, m.Prefix)
 	}
 	in, err := m.Instance(m.Inputs.Worktrees[i])
+	var routes []render.RenderedRoute
+	if err == nil {
+		routes, err = render.Routes(in)
+	}
 	if err != nil {
 		p.Note = strings.TrimPrefix(p.Note+"; ", "; ") + "routes of " + wt.Slug + " not resolved: " + err.Error()
 		return nil
 	}
-	for _, s := range m.Services {
-		for _, rt := range s.Routes {
-			h, err := pack.Expand(rt.Host, in.Scope(s.ID))
-			if err != nil {
-				return fmt.Errorf("%s %s: route %s: %w", m.Prefix, s.ID, rt.Name, err)
-			}
-			r.Routes = append(r.Routes, machineRoute{Host: h, Project: m.Prefix, Worktree: wt.Slug, Service: s.ID, Router: m.Prefix + "-" + wt.Slug + "-" + rt.Name})
-		}
+	for _, rt := range routes {
+		r.Routes = append(r.Routes, machineRoute{Host: rt.Host, Project: m.Prefix, Worktree: wt.Slug, Service: rt.Service, Router: rt.Router})
 	}
 	return nil
 }
@@ -312,7 +342,11 @@ func (r *machineReport) print(w io.Writer) error {
 	}
 	fmt.Fprintln(w, "\nREACH")
 	for _, n := range r.Reach.Networks {
-		fmt.Fprintf(w, "%s: %s\n", n.Network, strings.Join(n.Members, ", "))
+		mark := ""
+		if slices.ContainsFunc(r.Machine.TraefikNetworks, func(t traefikNetwork) bool { return t.Network == n.Network && !t.Attached }) {
+			mark = " (Traefik not attached: railswitch up)"
+		}
+		fmt.Fprintf(w, "%s: %s%s\n", n.Network, strings.Join(n.Members, ", "), mark)
 	}
 	for _, l := range r.Reach.Notes {
 		fmt.Fprintln(w, l)

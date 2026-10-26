@@ -26,8 +26,8 @@ import (
 // traefikUnit is the shared proxy's unit file and service.
 const (
 	traefikUnit      = machine.ProxyUnitName
-	traefikService   = "railswitch-traefik.service"
-	traefikContainer = "railswitch-traefik"
+	traefikService   = machine.ProxyService
+	traefikContainer = machine.ProxyContainer
 )
 
 // L runs lifecycle commands for one workspace.

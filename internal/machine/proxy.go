@@ -25,6 +25,12 @@ const (
 	MachineNetworkUnitName = "railswitch-machine.network"
 	DozzleUnitName         = "railswitch-dozzle.container"
 	MachineNetwork         = "railswitch_machine"
+
+	// ProxyContainer is Traefik's container; ProxyService and DozzleService
+	// are the services Quadlet generates from the machine's .container units.
+	ProxyContainer = "railswitch-traefik"
+	ProxyService   = "railswitch-traefik.service"
+	DozzleService  = "railswitch-dozzle.service"
 )
 
 // machineUnitNames are every unit ProxyUnits renders.
@@ -84,7 +90,7 @@ func ProxyUnits(r *Registry) map[string][]byte {
 		"",
 		"[Container]",
 		"Image=docker.io/traefik:v3.7",
-		"ContainerName=railswitch-traefik",
+		"ContainerName=" + ProxyContainer,
 		"Network=" + MachineNetworkUnitName + ":ip=" + TraefikIP(MachineSubnet)}
 	for _, p := range ps {
 		traefik = append(traefik, "Network="+naming.ProxyNetworkUnit(p.Prefix)+":ip="+TraefikIP(p.Subnet))

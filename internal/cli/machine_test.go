@@ -46,9 +46,10 @@ func twoProjects(t *testing.T) (filial, mini string, dirs machine.Dirs) {
 }
 
 // machineHost is fakeHost with both machine units active and Traefik
-// attached to networks.
+// running, attached to networks.
 func machineHost(networks ...string) *systest.Fake {
 	f := fakeHost()
+	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "railswitch-traefik"}, sys.Result{Stdout: []byte("true\n")}, nil)
 	f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,SubState"}, sys.Result{Stdout: []byte("ActiveState=active\nSubState=running\n")}, nil)
 	f.On([]string{"podman", "container", "inspect", "--format", `{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}`, "railswitch-traefik"},
 		sys.Result{Stdout: []byte(strings.Join(networks, " ") + " \n")}, nil)
@@ -172,7 +173,7 @@ func TestMachineTwoProjects(t *testing.T) {
 	if fd := members["filial-feat-dev"]; !slices.Contains(fd, "db") || slices.Contains(fd, "Traefik") {
 		t.Errorf("reach filial-feat-dev: %v", fd)
 	}
-	if !slices.Equal(r.Reach.Notes, machineReachNotes) {
+	if !slices.Equal(r.Reach.Notes, []string{reachesAll, reachRefused}) {
 		t.Errorf("reach notes %q", r.Reach.Notes)
 	}
 }
@@ -235,18 +236,33 @@ func TestMachineFlagsDetached(t *testing.T) {
 	if l := line("filial_proxy"); strings.Contains(l, "not attached") {
 		t.Errorf("filial_proxy: %q", l)
 	}
-	for _, want := range []string{"Traefik reaches every project network", "filial_proxy: Traefik, rails", "railswitch_machine: Traefik, Dozzle"} {
+	for _, want := range []string{
+		"Traefik reaches railswitch_machine, filial_proxy; mini_proxy not attached: railswitch up\n",
+		"filial_proxy: Traefik, rails",
+		"railswitch_machine: Traefik, Dozzle\n",
+		"mini_proxy: rails (Traefik not attached: railswitch up)\n",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}
 	}
-
-	if err := os.Remove(filepath.Join(mini, "project.toml")); err != nil {
-		t.Fatal(err)
+	if strings.Contains(out, reachesAll) {
+		t.Errorf("claims %q with mini_proxy detached:\n%s", reachesAll, out)
 	}
 	r := machineJSON(t, machineHost("railswitch_machine", "filial_proxy"))
+	for _, n := range r.Reach.Networks {
+		if n.Network == "mini_proxy" && !slices.Equal(n.Members, []string{"rails"}) {
+			t.Errorf("mini_proxy members %v", n.Members)
+		}
+	}
+
+	// A project.toml above the removed one must not be loaded in its place.
+	if err := os.Rename(filepath.Join(mini, "project.toml"), filepath.Join(filepath.Dir(mini), "project.toml")); err != nil {
+		t.Fatal(err)
+	}
+	r = machineJSON(t, machineHost("railswitch_machine", "filial_proxy"))
 	p := r.Projects[1]
-	if p.Prefix != "mini" || p.Note == "" || len(p.Worktrees) != 1 || p.Worktrees[0].Slug != "master" || p.Subnet == "" {
+	if p.Prefix != "mini" || p.Note != "workspace not loaded: no project.toml in "+mini || len(p.Worktrees) != 1 || p.Worktrees[0].Slug != "master" || p.Subnet == "" {
 		t.Errorf("unloadable mini: %+v", p)
 	}
 	for _, n := range r.Reach.Networks {
@@ -256,5 +272,27 @@ func TestMachineFlagsDetached(t *testing.T) {
 	}
 	if attached := r.Machine.TraefikNetworks; !slices.ContainsFunc(attached, func(n traefikNetwork) bool { return n.Network == "mini_proxy" && !n.Attached }) {
 		t.Errorf("traefik networks %+v", attached)
+	}
+}
+
+// TestMachineTraefikStopped: a stopped Traefik container's configured
+// networks don't count as attached.
+func TestMachineTraefikStopped(t *testing.T) {
+	twoProjects(t)
+	f := machineHost("railswitch_machine", "filial_proxy", "mini_proxy")
+	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "railswitch-traefik"}, sys.Result{Stdout: []byte("false\n")}, nil)
+	r := machineJSON(t, f)
+	for _, n := range r.Machine.TraefikNetworks {
+		if n.Attached {
+			t.Errorf("%s attached with Traefik stopped", n.Network)
+		}
+	}
+	for _, n := range r.Reach.Networks {
+		if slices.Contains(n.Members, "Traefik") {
+			t.Errorf("reach %s: %v", n.Network, n.Members)
+		}
+	}
+	if want := "Traefik reaches no network; railswitch_machine, filial_proxy, mini_proxy not attached: railswitch up"; r.Reach.Notes[0] != want {
+		t.Errorf("note %q", r.Reach.Notes[0])
 	}
 }

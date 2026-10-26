@@ -23,10 +23,10 @@ import (
 const Marker = machine.Marker
 
 // traefikUnit is the machine-wide proxy (§4).
-const traefikUnit = "railswitch-traefik.service"
+const traefikUnit = machine.ProxyService
 
 // dozzleUnit is the machine-wide log viewer, at logs.localhost.
-const dozzleUnit = "railswitch-dozzle.service"
+const dozzleUnit = machine.DozzleService
 
 // Quadlet renders the project's Quadlet files, keyed by filename: the proxy
 // network, and for every worktree its dev network and one .container per
@@ -55,13 +55,13 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 		if err := put(naming.DevNetworkUnit(m.Prefix, wt.Slug), devNetwork(m, wt.Slug)); err != nil {
 			return nil, err
 		}
-		hosts, err := routedHosts(in)
+		routes, err := Routes(in)
 		if err != nil {
 			return nil, fmt.Errorf("worktree %s: %w", wt.Slug, err)
 		}
 		for i := range m.Services {
 			s := &m.Services[i]
-			u, err := containerUnit(in, s, hosts)
+			u, err := containerUnit(in, s, routes)
 			if err != nil {
 				return nil, fmt.Errorf("worktree %s: service %s: %w", wt.Slug, s.ID, err)
 			}
@@ -140,24 +140,42 @@ func devNetwork(m *Model, slug string) *unit {
 	return u
 }
 
-// routedHosts are the hosts of every route of the worktree, in model order.
-func routedHosts(in *Instance) ([]string, error) {
-	var hosts []string
+// RenderedRoute is one Traefik route of a worktree as its unit labels it.
+type RenderedRoute struct {
+	Service string // the routed service's id
+	Route   Route  // the pack's route
+	Router  string // Traefik's router (and service) name: <prefix>-<slug>-<route name>
+	Host    string // the expanded host, e.g. "s3.master.filial.localhost"
+}
+
+// Routes are every route of the worktree, in model order: what its units
+// label for Traefik.
+func Routes(in *Instance) ([]RenderedRoute, error) {
+	var out []RenderedRoute
 	for _, s := range in.m.Services {
 		for _, r := range s.Routes {
 			h, err := pack.Expand(r.Host, in.Scope(s.ID))
 			if err != nil {
 				return nil, fmt.Errorf("%s: route %s: %w", s.ID, r.Name, err)
 			}
-			if !slices.Contains(hosts, h) {
-				hosts = append(hosts, h)
-			}
+			out = append(out, RenderedRoute{Service: s.ID, Route: r, Router: in.m.Prefix + "-" + in.Worktree.Slug + "-" + r.Name, Host: h})
 		}
 	}
-	return hosts, nil
+	return out, nil
 }
 
-func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
+// routedHosts are the distinct hosts of routes, in order.
+func routedHosts(routes []RenderedRoute) []string {
+	var hosts []string
+	for _, r := range routes {
+		if !slices.Contains(hosts, r.Host) {
+			hosts = append(hosts, r.Host)
+		}
+	}
+	return hosts
+}
+
+func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, error) {
 	m := in.m
 	prefix, slug, ws := m.Prefix, in.Worktree.Slug, m.Inputs.Workspace
 	sc := in.Scope(s.ID)
@@ -220,7 +238,7 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 	// Entrypoint= and HealthCmd= it reads whole.
 	u.add(c, "EnvironmentFile", quoteWord(filepath.Join(ws, ".railswitch", "env", slug, s.ID+".env")))
 	if onProxy {
-		for _, h := range hosts {
+		for _, h := range routedHosts(routes) {
 			u.add(c, "AddHost", h+":"+in.Values["traefik.ip"])
 		}
 		if sh := in.Worktree.Share; sh != nil { // the tailnet URLs layer 7 gives resolve to the host (D46)
@@ -260,9 +278,12 @@ func containerUnit(in *Instance, s *Service, hosts []string) (*unit, error) {
 		label := func(v string) { u.add(c, "Label", quoteWord(v)) }
 		label("traefik.enable=true")
 		label("traefik.docker.network=" + naming.ProxyNetwork(prefix))
-		for _, r := range s.Routes {
-			name := prefix + "-" + slug + "-" + r.Name
-			label("traefik.http.routers." + name + ".rule=" + machine.RouterRule(x(r.Host), m.Inputs.Machine.Subnet))
+		for _, rr := range routes {
+			if rr.Service != s.ID {
+				continue
+			}
+			r, name := rr.Route, rr.Router
+			label("traefik.http.routers." + name + ".rule=" + machine.RouterRule(rr.Host, m.Inputs.Machine.Subnet))
 			label("traefik.http.routers." + name + ".entrypoints=web")
 			label("traefik.http.routers." + name + ".service=" + name)
 			label("traefik.http.services." + name + ".loadbalancer.server.port=" + strconv.Itoa(r.Port))

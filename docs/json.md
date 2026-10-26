@@ -180,7 +180,7 @@ still listed from the registry, with its port bases as last recorded and a
     "dozzle": {"unit": "railswitch-dozzle.service", "state": "active/running"},
     "traefik_networks": [
       {"network": "railswitch_machine", "project": "", "attached": true},
-      {"network": "filial_proxy", "project": "filial", "attached": false}
+      {"network": "filial_proxy", "project": "filial", "attached": true}
     ]
   },
   "reach": {
@@ -215,5 +215,5 @@ still listed from the registry, with its port bases as last recorded and a
 | `routes[].router` | string | Traefik's router name, `<prefix>-<slug>-<route name>`. |
 | `machine.traefik`, `machine.dozzle` | object | The machine-wide unit's `unit` name and its systemd `state`, `<ActiveState>/<SubState>` as in `status`. |
 | `machine.traefik_networks` | array | The networks Traefik must be on: the machine network `railswitch_machine` (`project` `""`), then each registered project's proxy network. `attached` is whether the running Traefik container is on it; `false` for each when Traefik isn't running. The text output flags a missing one `not attached: railswitch up`. |
-| `reach.networks` | array | One object per network with its members: `railswitch_machine` (Traefik and Dozzle), then for each project its proxy network (Traefik and the services on it) and each worktree's dev network (`<prefix>-<slug>-dev`: every service of that worktree). Members are service ids, plus `Traefik` and `Dozzle`. |
-| `reach.notes` | array of strings | Fixed lines on what the networks don't show: Traefik reaches every project network; a project's containers reach another project only through Traefik, whose routers refuse them (D50); every railswitch network is `isolate=strict`; the Traefik API (`traefik.localhost`) and Dozzle (`logs.localhost`) answer only host clients. |
+| `reach.networks` | array | One object per network with its members: `railswitch_machine` (Traefik and Dozzle), then for each project its proxy network (Traefik and the services on it) and each worktree's dev network (`<prefix>-<slug>-dev`: every service of that worktree). Members are service ids, plus `Traefik` and `Dozzle`. `Traefik` is a member only of a network it is attached to (`machine.traefik_networks`); the text output marks the others `(Traefik not attached: railswitch up)`. |
+| `reach.notes` | array of strings | Two lines on what the networks don't show. First, Traefik's reach: `Traefik reaches every project network` when every network of `machine.traefik_networks` is attached, else `Traefik reaches <attached networks, or "no network">; <the others> not attached: railswitch up`. Second, fixed: a project's containers reach another project only through Traefik, whose routers refuse them (D50); every railswitch network is `isolate=strict`; the Traefik API (`traefik.localhost`) and Dozzle (`logs.localhost`) answer only host clients. |

@@ -789,7 +789,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 		}
 		vols[name] = v
 	}
-	for _, name := range []string{"filial_gems_ruby3.3.6", "filial_npm_cache", "filial-master-node-modules", "filial_nvim_config", "filial_nvim_share"} {
+	for _, name := range []string{"filial_gems_ruby3.3.6", "filial_npm_cache", "filial-master-node-modules", "filial_nvim_config", "filial_nvim_share", "filial_npm_global_node22.11.0"} {
 		if _, ok := vols[name]; !ok {
 			t.Errorf("nvim lacks volume %s (has %v)", name, slices.Collect(maps.Keys(vols)))
 		}
@@ -798,6 +798,36 @@ func TestModelCarriesPackFields(t *testing.T) {
 	for _, mt := range rails.Mounts {
 		if mt.Source == "{base.git}" && mt.Options != "ro,z" {
 			t.Errorf("rails .git mount options = %q", mt.Options)
+		}
+	}
+}
+
+// The nvim tool's npm global prefix is shared per Node version: a worktree on
+// another Node gets its own volume, and the app never mounts it.
+func TestNvimNpmGlobalPerNodeVersion(t *testing.T) {
+	ws := fixtureWS(t)
+	writeFile(t, filepath.Join(ws, "feat", ".nvmrc"), "20.18.1\n")
+	m := mustBuild(t, fixtureInputs(t, ws, nil))
+	want := map[string]string{"master": "filial_npm_global_node22.11.0", "feat": "filial_npm_global_node20.18.1"}
+	for slug, name := range want {
+		in := mustInstance(t, m, slug)
+		got := map[string]string{}
+		for _, svc := range []string{"nvim", "rails"} {
+			for _, v := range m.service(svc).Volumes {
+				n, err := in.VolumeName(svc, v)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if v.Mount == "/home/appuser/.npm-global" {
+					got[svc] = n
+				}
+			}
+		}
+		if got["nvim"] != name {
+			t.Errorf("%s nvim npm global volume = %q; want %q", slug, got["nvim"], name)
+		}
+		if n, ok := got["rails"]; ok {
+			t.Errorf("%s rails mounts npm global volume %s", slug, n)
 		}
 	}
 }

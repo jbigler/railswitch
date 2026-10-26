@@ -5,8 +5,8 @@
 Description=mini deps of worktree master
 
 [Container]
-Label=mini.unit-hash=5ff9c7fd0126
-Image=localhost/mini/base:ruby3.3.6-node22.11.0-11d1777c
+Label=mini.unit-hash=8ec6ec047c54
+Image=localhost/mini/base:ruby3.3.6-node22.11.0-bb30b09f
 ContainerName=mini-master-deps
 Network=mini-master-dev.network:alias=deps
 UserNS=keep-id:uid=1000,gid=1000

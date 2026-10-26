@@ -22,6 +22,11 @@ name = "nvim_share"           # plugins and their state
 mount = "/home/appuser/.local/share/nvim"
 chown = true
 
+[[shared]]                    # `npm install -g` from inside nvim (language servers, CLIs)
+name = "npm_global_node{node}" # one per Node version: global packages are built for it
+mount = "/home/appuser/.npm-global"
+chown = true
+
 [[ports]]                     # loopback only: nvim RPC allows arbitrary command execution
 name = "nvim"
 env = "NVIM_PORT"

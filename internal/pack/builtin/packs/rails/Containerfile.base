@@ -52,8 +52,7 @@ RUN groupadd --gid 1000 appuser && \
   mkdir -p /app \
   /usr/local/bundle \
   /home/appuser/.npm \
-  /home/appuser/.npm-global \
-  /home/appuser/.cache/ms-playwright && \
+  /home/appuser/.npm-global && \
   chown -R 1000:1000 /app /usr/local/bundle /home/appuser
 
 ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global

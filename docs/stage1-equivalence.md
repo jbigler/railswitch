@@ -282,7 +282,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `-Volume=@@ROOT@@/%i:/app:z`, `${MAIN_WORKTREE_PATH}/.git…` / `+Volume=/WORKSPACES/filial/feat:/app:z`, `/WORKSPACES/filial/master/.git…:ro,z` | **intended change (D8, D22)** | Same mounts, with the base worktree `master/` written in. |
 | `-Volume=${GEM_VOLUME}:/usr/local/bundle` / `+Volume=filial_gems_ruby3.3.6:/usr/local/bundle` | **intended change (D8)** | Same shared gem volume, keyed by ruby version (pack `[[caches]]`). |
 | `-Volume=@@P@@-%i-node-modules…:U`, `@@P@@_npm_cache…:U` / `+` same | **same behaviour** | Same volumes and `:U`. |
-| `-Volume=@@P@@_npm_global:/home/appuser/.npm-global:U`, `-Volume=@@P@@_playwright_browsers:/home/appuser/.cache/ms-playwright:U` | **gap → Stage 4** | Not in the rails pack's `[[caches]]`, and nothing replaces them. `npm i -g` state and a local Playwright browser cache are not kept across container restarts. The browser runs in its own container, so this probably only matters for Filial-specific workflows. **Open question 1.** |
+| `-Volume=@@P@@_npm_global:/home/appuser/.npm-global:U`, `-Volume=@@P@@_playwright_browsers:/home/appuser/.cache/ms-playwright:U` | **intended change (D45)** | Dropped from rails: the app needs no `npm i -g` state, and the browser container has its own browser. The nvim tool keeps `npm_global`, per Node version (below). **Open question 1, resolved.** |
 | `+DropCapability=all` | **intended change (D34)** | App hardening. |
 | `+Label=traefik.docker.network=filial_proxy` | **intended change (D21)** | The old project-local Traefik set `--providers.docker.network=@@P@@_proxy` globally. The machine-wide Traefik serves several projects' proxy networks, so each two-network container names its own. |
 | `-…routers.@@P@@-%i-app.rule=Host(`${WORKTREE_HOST}`)` / `+…filial-feat-app.rule=Host(`feat.filial.localhost`)`, `+…routers.filial-feat-app.service=filial-feat-app` | **intended change (D5, D8)** | Same router; hostname written in. The explicit `.service=` label names the service Traefik already inferred (single service), so routing is unchanged. |
@@ -837,7 +837,7 @@ These line groups repeat in every hunk below and are not re-annotated there.
 | `-Volume=${NVIM_CONFIG_MOUNT}` / `+Volume=filial_nvim_config:/home/appuser/.config/nvim:U` | **intended change (D33)** | No host nvim config; a named volume instead. |
 | `-Volume=${SSH_PATH}…`, `${SSH_AGENT_SOCK}…`, `${GITIGNORE_PATH}…`, `${GITCONFIG_PATH}…` / `+Secret=filial_github_token,type=mount,target=/run/secrets/github_token,uid=1000,gid=1000,mode=0400` | **intended change (D33)** | Nothing of the host identity reaches a container. A GitHub token is the fixture's declared `[secrets.github_token]`, mounted read-only for the tool user (Task 16A). |
 | `-Volume=/usr/bin/kitten…`, `-Volume=%h/.local/state/kitty:/kitty-sock:z` | **gap → Stage 4** | Machine-local terminal integration. The plan (Task 4) defers it to Stage 4. |
-| `-Volume=@@P@@_npm_global…:U` | **gap → Stage 4** | As for rails: **open question 1**. |
+| `-Volume=@@P@@_npm_global:/home/appuser/.npm-global:U` / `+Volume=filial_npm_global_node22.11.0:/home/appuser/.npm-global:U` | **intended change (D45)** | The nvim tool's `[[shared]]` `npm_global_node{node}`: language servers and CLIs from `npm install -g` survive the `--rm` container, one volume per Node version. The base image already sets `NPM_CONFIG_PREFIX` and `PATH`. **Open question 1, resolved.** |
 | gems, `node-modules`, `npm_cache`, `nvim_share`, entrypoint | **same behaviour** | Same volumes (gems/npm from the pack caches). |
 | `+DropCapability=all` | **intended change (D34)** | Tool hardening. |
 | `Annotation=…firewall=agent,deps` | **same behaviour** | Same profile. |
@@ -875,5 +875,5 @@ Others are intended for different reasons:
 
 ## Open questions
 
-1. **`npm_global` and `playwright_browsers` volumes** (rails, nvim): add them as rails pack `[[caches]]`, or drop them for good (D42)?
+1. **Resolved (D45, commit `feat(nvim): npm global prefix volume per node version`):** `npm_global` is kept for the nvim tool only, as its `[[shared]]` volume `npm_global_node{node}` (keyed by Node version); `playwright_browsers` is dropped, since the browser container has its own browser (the base image no longer pre-creates `~/.cache/ms-playwright`). Was: **`npm_global` and `playwright_browsers` volumes** (rails, nvim): add them as rails pack `[[caches]]`, or drop them for good (D42)?
 2. **Resolved (D44, commit `feat(pack): options can give env to deps; playwright skips its browser download`):** the playwright option gives it to deps via the new `[deps_env]`, and to the app via `[gives]`. Was: **`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for deps:** should the playwright option give it to deps when the browser slot is on (as the design mock-up does), or should Filial set `[services.deps.env]` (Stage 4)?

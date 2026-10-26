@@ -175,6 +175,28 @@ stay by design. If the test fails mid-way, its cleanup runs
 
 ### Run log
 
-NOT YET RUN. The run is a user action on the host; record the date, host,
-podman/netavark versions, whether the share part ran, and the `go test`
-output here.
+**2026-10-27, PASS** on the user's CachyOS host (rootless, user jbigler):
+podman 6.1.4, netavark 2.1.0, branch `stage-3` at `793627d`. The share part
+ran: `tailscale status` succeeded, so `share`/`unshare` of `s3a`'s base
+worktree was checked against the live serve config.
+
+```
+$ RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a go test -tags integration ./internal/lifecycle/ -run E2ETwoProjects -timeout 60m -v
+=== RUN   TestE2ETwoProjects
+    e2e_two_integration_test.go:118: workspace /tmp/rs-e2e2-2680277871/rs-s3a
+    e2e_two_integration_test.go:118: workspace /tmp/rs-e2e2-2680277871/rs-s3ab
+--- PASS: TestE2ETwoProjects (175.63s)
+PASS
+ok     github.com/jbigler/railswitch/internal/lifecycle   175.635s
+```
+
+Earlier runs failed only on the in-container `s3.` probe, a test defect:
+curl resolves every `*.localhost` name to loopback itself, and
+`getent hosts` asks for IPv6 first, which the IPv4-only AddHost entry
+doesn't answer, so DNS (the host's resolver synthesizes `::1` for
+`*.localhost`) did. The probe now uses `getent ahosts` (getaddrinfo) and
+Ruby's Net::HTTP, the app's own path (`fb70067`, `793627d`). On the host,
+`podman exec demo-main-rails getent ahosts main.demo.localhost` gave only
+`10.214.1.2`. The host clause admitted the host's requests (each app host
+200 from the host), so the optional source-address measurement was not
+needed.

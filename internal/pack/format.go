@@ -106,8 +106,8 @@ type Port struct {
 }
 
 // PackShare is a pack's [share] table. Env overrides the pack's [env] for
-// the same services while shared; it may use {share.host} and
-// {share.url.<port name>}.
+// the same services but deps (D11) while shared; it may use {share.host}
+// and {share.url.<port name>}.
 type PackShare struct {
 	Env map[string]string `toml:"env"`
 }

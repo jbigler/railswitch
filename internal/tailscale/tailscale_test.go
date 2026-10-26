@@ -75,7 +75,8 @@ const serveStatus = `{
     "box.tail1234.ts.net:19002": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:19002"}, "/docs": {"Path": "/srv/docs"}}}
   },
   "Foreground": {
-    "abc": {"TCP": {"8443": {"HTTPS": true}}, "Web": {"box.tail1234.ts.net:8443": {"Handlers": {"/": {"Text": "hi"}}}}}
+    "abc": {"TCP": {"8443": {"HTTPS": true}}, "Web": {"box.tail1234.ts.net:8443": {"Handlers": {"/": {"Text": "hi"}}}}},
+    "def": {"TCP": {"13005": {"HTTPS": true}}, "Web": {"box.tail1234.ts.net:13005": {"Handlers": {"/": {"Proxy": "http://127.0.0.1:13005"}}}}}
   }
 }`
 
@@ -91,13 +92,17 @@ func TestServed(t *testing.T) {
 		13002: "http://127.0.0.1:13002",
 		19002: "/: http://127.0.0.1:19002, /docs: path /srv/docs",
 		5432:  "tcp 127.0.0.1:5432",
-		8443:  "text",
+		8443:  "foreground session: text",
+		13005: "foreground session: http://127.0.0.1:13005",
 	}
 	if !maps.Equal(got, want) {
 		t.Errorf("Served = %v; want %v", got, want)
 	}
 	if got[19002] == Target(19002) {
 		t.Error("a port with another handler beside railswitch's reads as railswitch's own")
+	}
+	if got[13005] == Target(13005) {
+		t.Error("a foreground session's port reads as railswitch's own")
 	}
 }
 

@@ -88,8 +88,9 @@ func optionSource(o *pack.Option) string {
 //   - secret: git wiring for the services of a secret with git_host.
 //
 // Layer 7 goes to ShareEnv, never EnvSpec: the pack's [share] env and the
-// options' [share] gives reach the services their [env] and [gives] reach,
-// then project [share] env the services project [env] reaches (D46).
+// options' [share] gives reach app, worker and tool packages, project
+// [share] env every service but deps (D46). deps gets no layer 7 (D11), so
+// sharing never changes its env or restarts it.
 func (b *builder) envSpecs() {
 	p, st := b.in.Project, b.in.Stack
 	pk := st.Pack
@@ -153,10 +154,8 @@ func (b *builder) envSpecs() {
 		}
 		b.gitWiring(s)
 
-		if consumer || s.Role == RoleDeps {
-			share(packSrc+" [share] env", s.ID, s.scheme, pk.Share.Env)
-		}
 		if consumer {
+			share(packSrc+" [share] env", s.ID, s.scheme, pk.Share.Env)
 			for _, slot := range config.Slots {
 				if ch := st.Options[slot]; ch != nil && ch.Service != s.ID {
 					share(optionSource(ch.Option)+" [share] gives", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.Share.Gives)

@@ -142,12 +142,18 @@ func (sc *serveConfig) collect(served map[int]string) error {
 		}
 		served[port] = strings.Join(parts, ", ")
 	}
+	// railswitch writes only the background config, and `serve … off` edits
+	// only that one: a foreground session's port is never railswitch's.
 	for _, f := range sc.Foreground {
 		if f == nil {
 			continue
 		}
-		if err := f.collect(served); err != nil {
+		fg := map[int]string{}
+		if err := f.collect(fg); err != nil {
 			return err
+		}
+		for port, desc := range fg {
+			served[port] = "foreground session: " + desc
 		}
 	}
 	return nil

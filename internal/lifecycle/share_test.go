@@ -1,8 +1,10 @@
 package lifecycle
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,30 +12,60 @@ import (
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/sys/systest"
 )
 
 const tsStatus = `{"BackendState": "Running", "Self": {"DNSName": "box.tail1234.ts.net.", "TailscaleIPs": ["100.64.0.7", "fd7a:115c:a1e0::7"]}}`
 
-// tailscale scripts a running tailscale whose serve config proxies each
-// HTTPS port of served to its target.
+// tsRunner is the Fake plus a tailscale serve config that `serve --bg` and
+// `serve … off` change (when the Fake scripts no failure for them) and
+// `serve status --json` reports.
+type tsRunner struct {
+	*systest.Fake
+	served map[int]string // HTTPS port → proxy target
+}
+
+func (r *tsRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
+	res, err := r.Fake.Run(ctx, c)
+	if err != nil || c.Name != "tailscale" || len(c.Args) < 2 || c.Args[0] != "serve" {
+		return res, err
+	}
+	if c.Args[1] == "status" {
+		type handler struct{ Proxy string }
+		sc := struct {
+			TCP map[string]map[string]bool               `json:",omitempty"`
+			Web map[string]map[string]map[string]handler `json:",omitempty"`
+		}{TCP: map[string]map[string]bool{}, Web: map[string]map[string]map[string]handler{}}
+		for port, target := range r.served {
+			p := strconv.Itoa(port)
+			sc.TCP[p] = map[string]bool{"HTTPS": true}
+			sc.Web["box.tail1234.ts.net:"+p] = map[string]map[string]handler{"Handlers": {"/": {Proxy: target}}}
+		}
+		data, err := json.Marshal(sc)
+		return sys.Result{Stdout: data}, err
+	}
+	args := slices.DeleteFunc(slices.Clone(c.Args[1:]), func(a string) bool { return a == "--bg" })
+	p, ok := strings.CutPrefix(args[0], "--https=")
+	if !ok || len(args) != 2 {
+		return res, err
+	}
+	port, _ := strconv.Atoi(p)
+	if args[1] == "off" {
+		delete(r.served, port)
+	} else {
+		r.served[port] = args[1]
+	}
+	return res, err
+}
+
+// tailscale scripts a running tailscale whose serve config starts out
+// proxying each HTTPS port of served to its target.
 func (e *tenv) tailscale(t *testing.T, served map[int]string) {
 	t.Helper()
-	type handler struct{ Proxy string }
-	sc := struct {
-		TCP map[string]map[string]bool               `json:",omitempty"`
-		Web map[string]map[string]map[string]handler `json:",omitempty"`
-	}{TCP: map[string]map[string]bool{}, Web: map[string]map[string]map[string]handler{}}
-	for port, target := range served {
-		p := strconv.Itoa(port)
-		sc.TCP[p] = map[string]bool{"HTTPS": true}
-		sc.Web["box.tail1234.ts.net:"+p] = map[string]map[string]handler{"Handlers": {"/": {Proxy: target}}}
-	}
-	data, err := json.Marshal(sc)
-	if err != nil {
-		t.Fatal(err)
-	}
+	r := &tsRunner{Fake: e.f, served: map[int]string{}}
+	maps.Copy(r.served, served)
+	e.l.R = r
 	e.f.On([]string{"tailscale", "status", "--json"}, sys.Result{Stdout: []byte(tsStatus)}, nil)
-	e.f.On([]string{"tailscale", "serve", "status", "--json"}, sys.Result{Stdout: data}, nil)
 }
 
 // setShare records slug as shared in the registry.
@@ -259,4 +291,72 @@ func TestDownUnsharedNoTailscale(t *testing.T) {
 	if got := e.tsCalls(); len(got) != 0 {
 		t.Errorf("tailscale calls = %q; want none", got)
 	}
+}
+
+// TestShareRollsBackReshare (I1): a share of an already shared worktree
+// whose Up fails turns off the ports an earlier share turned on and only
+// then clears the record.
+func TestShareRollsBackReshare(t *testing.T) {
+	e := setup(t)
+	e.setShare(t, "feat")
+	e.tailscale(t, map[int]string{13002: "http://127.0.0.1:13002", 19002: "http://127.0.0.1:19002", 13005: "http://127.0.0.1:13005"})
+	e.f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=inactive\nResult=success\n")}, nil)
+	if err := e.l.Share(ctx, "feat"); err == nil {
+		t.Fatal("Share succeeded though up failed")
+	}
+	want := []string{"tailscale serve --https=13002 off", "tailscale serve --https=19002 off"}
+	if got := e.serveCalls(); !slices.Equal(got, want) {
+		t.Errorf("serve calls = %q; want %q", got, want)
+	}
+	if s := e.share(t, "feat"); s != nil {
+		t.Errorf("registry share = %+v; want none", s)
+	}
+}
+
+// TestShareRollbackKeepsRecord: when the rollback cannot turn a port off,
+// the record stays, so unshare, down or wt rm can retry.
+func TestShareRollbackKeepsRecord(t *testing.T) {
+	e := setup(t)
+	e.tailscale(t, nil)
+	e.f.On([]string{"tailscale", "serve", "--bg", "--https=19002"}, sys.Result{ExitCode: 1}, fmt.Errorf("tailscale: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"tailscale", "serve", "--https=13002", "off"}, sys.Result{ExitCode: 1}, fmt.Errorf("tailscale: %w (exit 1)", sys.ErrExit))
+	err := e.l.Share(ctx, "feat")
+	if err == nil || !strings.Contains(err.Error(), "19002") || !strings.Contains(err.Error(), "13002") {
+		t.Fatalf("Share error = %v; want it to name 19002 and the port it could not turn off", err)
+	}
+	if s := e.share(t, "feat"); s == nil {
+		t.Error("the record was cleared though port 13002 is still served")
+	}
+}
+
+// TestShareKeepsDepsRunning (D11): deps gets no layer 7, so neither share
+// nor unshare restarts it; the app is restarted for its new env.
+func TestShareKeepsDepsRunning(t *testing.T) {
+	e := setup(t)
+	upTwice(t, e)
+	e.units(loadedClean)
+	e.labels(t)
+	e.tailscale(t, nil)
+	check := func(what string) {
+		t.Helper()
+		calls := e.calls()
+		if n := count(calls, "systemctl --user restart"); n == 0 {
+			t.Fatalf("%s restarted nothing:\n%s", what, dump(calls))
+		}
+		r := find(t, calls, "systemctl --user restart")
+		if !slices.Contains(r, "filial-feat-rails.service") || slices.Contains(r, "filial-feat-deps.service") {
+			t.Errorf("%s: restart = %q; want rails, not deps", what, r)
+		}
+	}
+	if err := e.l.Share(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	check("share")
+	e.reset()
+	e.labels(t)
+	if err := e.l.Unshare(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	check("unshare")
 }

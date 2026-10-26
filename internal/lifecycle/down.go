@@ -32,10 +32,8 @@ func (l *L) Down(ctx context.Context, slug string, yes bool) error {
 			return nil
 		}
 	}
-	if shared(m, slug) {
-		if err := l.DropShare(ctx, slug); err != nil {
-			return err
-		}
+	if err := l.dropShare(ctx, m, slug); err != nil {
+		return err
 	}
 	if err := l.systemd().StopLoaded(ctx, names.Units...); err != nil {
 		return err

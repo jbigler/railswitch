@@ -911,8 +911,14 @@ func TestShareEnvLayer(t *testing.T) {
 			t.Errorf("shared rails %s = %+v (set: %v); want %q at layer share", name, e, ok, want)
 		}
 	}
-	if e, _ := envVar(in, "deps", "RAILS_DEVELOPMENT_HOSTS"); e.Layer != LayerShare {
-		t.Errorf("shared deps RAILS_DEVELOPMENT_HOSTS = %+v; want the pack's [share] env, as deps gets the pack's [env]", e)
+	wt := m.Inputs.Worktrees[0]
+	wt.Share = nil
+	unshared, err := m.Instance(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := in.Env["deps"], unshared.Env["deps"]; !slices.Equal(got, want) {
+		t.Errorf("shared deps env = %+v; want the unshared one %+v (deps gets no layer 7, D11)", got, want)
 	}
 	if _, ok := envVar(in, "storage", "S3_ENDPOINT"); ok {
 		t.Error("the storage service gets its own [share] gives")
@@ -923,6 +929,16 @@ func TestShareEnvLayer(t *testing.T) {
 	}
 	hasLine(t, units, "filial-master-rails.container", "AddHost=box.tail1234.ts.net:100.64.0.7")
 	noLinePrefix(t, units, "filial-feat-rails.container", "AddHost=box.")
+	plain := m.Inputs
+	plain.Worktrees = slices.Clone(plain.Worktrees)
+	plain.Worktrees[0].Share = nil
+	plainUnits, err := Quadlet(mustBuild(t, plain))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := "filial-master-deps.container"; string(units[d]) != string(plainUnits[d]) {
+		t.Errorf("sharing changes %s (its unit-hash restarts deps):\n%s\nunshared:\n%s", d, units[d], plainUnits[d])
+	}
 	if e, _ := envVar(mustInstance(t, m, "feat"), "rails", "S3_ENDPOINT"); e.Value != "http://s3.feat.filial.localhost" {
 		t.Errorf("unshared feat S3_ENDPOINT = %q", e.Value)
 	}

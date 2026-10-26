@@ -17,8 +17,9 @@ import (
 // number (D46). It refuses a port the serve config already serves to
 // another target, records the share in the registry, brings the worktree up
 // with env layer 7 and the tailnet AddHost, then turns the ports on. A
-// failure after the registry change is rolled back: the ports it turned on
-// are turned off, the share cleared, and the worktree brought up unshared.
+// failure after the registry change is rolled back: every share port of the
+// worktree served to its own target is turned off (also those an earlier
+// share turned on), the share cleared, and the worktree brought up unshared.
 func (l *L) Share(ctx context.Context, slug string) error {
 	ts := tailscale.T{R: l.R}
 	host, ip, err := ts.Self(ctx)
@@ -44,7 +45,6 @@ func (l *L) Share(ctx context.Context, slug string) error {
 	if err := l.setShare(slug, &machine.ShareEntry{Host: host, IP: ip.String()}); err != nil {
 		return err
 	}
-	var on []int // the ports turned on
 	err = func() error {
 		if err := l.Up(ctx, slug); err != nil { // Up renders first: layer 7 and AddHost
 			return err
@@ -53,12 +53,11 @@ func (l *L) Share(ctx context.Context, slug string) error {
 			if err := ts.ServeOn(ctx, p.Port); err != nil {
 				return err
 			}
-			on = append(on, p.Port)
 		}
 		return nil
 	}()
 	if err != nil {
-		return l.rollbackShare(ctx, slug, on, err)
+		return l.rollbackShare(ctx, slug, ports, err)
 	}
 	fmt.Fprintf(l.Out, "shared: https://%s:%d/", host, ports[0].Port)
 	var more []string
@@ -72,26 +71,24 @@ func (l *L) Share(ctx context.Context, slug string) error {
 	return nil
 }
 
-// rollbackShare undoes a failed Share: it turns off the ports in on, clears
-// the share and brings the worktree up unshared. It returns shareErr, joined
-// with whatever of the rollback failed. Ctrl-C cancelled ctx; the rollback
-// still runs, each call bounded by its own timeout.
-func (l *L) rollbackShare(ctx context.Context, slug string, on []int, shareErr error) error {
-	ctx = context.WithoutCancel(ctx)
-	ts := tailscale.T{R: l.R}
-	var errs []error
-	for _, port := range on {
-		if err := ts.ServeOff(ctx, port); err != nil {
-			errs = append(errs, err)
+// rollbackShare undoes a failed Share with unserve's sweep: every port of
+// ports served to its own target is turned off, and only then is the share
+// cleared (a failed ServeOff keeps the record, so unshare can retry). Then
+// it brings the worktree up unshared, unless Ctrl-C cancelled ctx. It
+// returns shareErr, joined with whatever of the rollback failed. The
+// tailscale and registry undo still runs after Ctrl-C, each call bounded by
+// its own timeout.
+func (l *L) rollbackShare(ctx context.Context, slug string, ports []render.SharePort, shareErr error) error {
+	var err error
+	if err = l.unserve(context.WithoutCancel(ctx), slug, ports); err == nil {
+		if ctx.Err() != nil {
+			err = fmt.Errorf("%w: run `railswitch up -w %s` to restart it unshared", ctx.Err(), slug)
+		} else {
+			err = l.Up(ctx, slug)
 		}
 	}
-	if err := l.setShare(slug, nil); err != nil {
-		errs = append(errs, err)
-	} else if err := l.Up(ctx, slug); err != nil {
-		errs = append(errs, err)
-	}
-	if len(errs) > 0 {
-		return errors.Join(shareErr, fmt.Errorf("rolling back the share of %s: %w", slug, errors.Join(errs...)))
+	if err != nil {
+		return errors.Join(shareErr, fmt.Errorf("rolling back the share of %s: %w", slug, err))
 	}
 	return shareErr
 }
@@ -122,7 +119,16 @@ func (l *L) Unshare(ctx context.Context, slug string) error {
 // (down, wt rm, project rm). A worktree that is not shared is left alone,
 // and tailscale is not run.
 func (l *L) DropShare(ctx context.Context, slug string) error {
-	wt, ports, err := l.shareInfo(ctx, slug)
+	m, err := l.model(ctx)
+	if err != nil {
+		return err
+	}
+	return l.dropShare(ctx, m, slug)
+}
+
+// dropShare is DropShare on the already built model m.
+func (l *L) dropShare(ctx context.Context, m *render.Model, slug string) error {
+	wt, ports, err := worktreeShare(m, slug)
 	if err != nil || wt.Share == nil {
 		return err
 	}
@@ -154,6 +160,11 @@ func (l *L) shareInfo(ctx context.Context, slug string) (render.Worktree, []rend
 	if err != nil {
 		return render.Worktree{}, nil, err
 	}
+	return worktreeShare(m, slug)
+}
+
+// worktreeShare is m's registered worktree slug and its share ports.
+func worktreeShare(m *render.Model, slug string) (render.Worktree, []render.SharePort, error) {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w render.Worktree) bool { return w.Slug == slug })
 	if i < 0 {
 		return render.Worktree{}, nil, fmt.Errorf("worktree %s is not registered for project %s", slug, m.Prefix)
@@ -174,10 +185,4 @@ func (l *L) setShare(slug string, s *machine.ShareEntry) error {
 		return err
 	}
 	return reg.Save()
-}
-
-// shared reports whether m's worktree slug is shared on the tailnet.
-func shared(m *render.Model, slug string) bool {
-	i := slices.IndexFunc(m.Inputs.Worktrees, func(w render.Worktree) bool { return w.Slug == slug })
-	return i >= 0 && m.Inputs.Worktrees[i].Share != nil
 }

@@ -64,10 +64,11 @@ developer console open through sections 3–11: it shows no errors.
 
 ## 4. Sorting and keys
 
-Click `running`, `pr`, `agent`, then `pr` again.
+Click `running`, `pr`, `pr` again, then `agent`.
 
-Expected: the orders in docs/dashboard.md "Sorting"; the second click
-reverses (URL `?sort=-pr`). Reload: the sort stays (per project). ↑/↓ move
+Expected: the orders in docs/dashboard.md "Sorting"; clicking the active
+`pr` reverses it (URL `?sort=-pr`), `agent` then sorts forward
+(`?sort=agent`). Reload: the sort stays (per project). ↑/↓ move
 the selection and the URL follows (`/p/ftest/<slug>`); `P` opens the
 switcher, `1` jumps to the first project; Esc closes.
 
@@ -94,8 +95,9 @@ railswitch --json overview | jq '.worktrees[] | select(.slug == "master") | .lin
 ```
 
 Expected: links App, Flipper, Jobs, then the stack's: the pack's (Mailer
-previews), then each option's in slot order (e.g. Sidekiq, Storage console,
-Browser (VNC), whichever options ftest enables), and no Routes. In the page: App, Flipper, Jobs, stack
+previews), then each option's in slot order (database, cache, storage,
+jobs, mail, browser; with rustfs, sidekiq and playwright: Storage console,
+Sidekiq, Browser (VNC)), and no Routes. In the page: App, Flipper, Jobs, stack
 links, then PR and Logs quieter; each opens its page in a new tab. On a
 stopped worktree the links are greyed out. `hide_links = ["Rotues"]` makes
 `render` fail with `hide_links: no stack link labelled "Rotues"`.

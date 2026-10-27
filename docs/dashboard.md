@@ -143,7 +143,7 @@ Click a key in the sort bar; clicking the active one reverses it.
 |---|---|
 | name | the base worktree first, then by slug |
 | running | failed, up, partial, stopped |
-| PR | PR number, highest first; worktrees without a PR last |
+| pr | PR number, highest first; worktrees without a PR last |
 | agent | permission, question, reply, your turn, working, idle, off |
 
 The choice is remembered per project in the browser's `localStorage` and
@@ -171,13 +171,13 @@ Every action is a job (below).
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
   <branch>`.
 - **remove…** (not offered for the base worktree; a merged PR also shows
-  "Remove worktree"): the dialog reads `wt ls --json` for the dirty flag
+  "Remove worktree"): the dialog reads `railswitch --json wt ls` for the dirty flag
   and lists what goes: the checkout, its containers and volumes, its nvim
   and agent homes. A clean worktree → `wt rm <slug>`. A dirty one needs
   "Discard changes" ticked and the worktree name typed →
   `wt rm --force <slug>`.
 - **Refresh PRs** runs `pr ls` now instead of waiting for the next minute.
-- **Task palette** (`:`): `task ls --json` for the selected worktree,
+- **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
   filtered as you type, with an "args" field split like a shell (quotes and
   backslash, no expansion). Enter runs `railswitch task <name> <args…>` as
   a job with its output in the page; Shift+Enter runs `railswitch task
@@ -220,9 +220,9 @@ Every action is a job (below).
   show them).
 - Notifications and the tab title count need an open dashboard tab; there
   are no desktop notifications without one.
-- Polling: `overview --json` every 2 s for a project with a page open,
+- Polling: `railswitch --json overview` every 2 s for a project with a page open,
   every 10 s for the others (so their waiting agents reach the strip);
-  `pr ls --json` every 60 s for a project with a page open.
+  `railswitch --json pr ls` every 60 s for a project with a page open.
 
 ## Colours
 

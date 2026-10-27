@@ -88,7 +88,7 @@ Added here:
 
 1. **On-demand agents with no unit.**
    - `up` must not reload systemd on every run because an on-demand agent's unit is "not found".
-   - `status` shows the agent as `on-demand` (or `running` while a run is live). `down` removes a leftover container and the home volume. `stop` ignores it.
+   - `status` shows the agent as `on-demand` (or `running` while a run is live). `down` removes a leftover container and keeps the home dir `<ws>/.railswitch/agent-home/<slug>/<name>` (`wt rm --force` deletes it). `stop` ignores it.
    - An unset secret of an on-demand agent does not block `up`, only `railswitch agent <name>`.
    - *Pinned in Tasks 3 and 5.*
 2. **Two agents in one worktree.** Each sees only its own secrets (`/run/secrets/<name>` present in one, absent in the other), its own allow file and annotation `<p>.firewall=agent-<name>`, and its own status file. A secret listing `agent-a` never reaches `agent-b`. *Pinned in Tasks 3, 4 and 12.*
@@ -303,7 +303,8 @@ docs/{json.md,completion.md,nvim.md,stage4-acceptance.md}, AGENTS.md
   - `{status.dir}` → `/run/railswitch/status` with `rw,z`;
   - package `[[mounts]]` (relative paths are package assets);
   - the entrypoint (D13 override applies);
-  - volumes: `agent-<n>-home` → `/home/appuser` (Chown), the pack's worktree volumes, the pack caches, and the package `[[shared]]`.
+  - home dir `<ws>/.railswitch/agent-home/<slug>/<name>` bind-mounted at `/home/appuser` (`z`);
+  - volumes: the pack's worktree volumes, the pack caches, and the package `[[shared]]`.
 - Image steps: chain → tools → `agent-base` (`BASE_IMAGE` = chain end) → one step per distinct agent package (`BASE_IMAGE` = agent-base; the step is named `agent <pkg>`) → standalone. `image.agent-<name>` is set for every agent that uses the package.
 
 **Rules:**

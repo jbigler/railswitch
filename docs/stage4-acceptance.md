@@ -20,6 +20,13 @@ reference host is CachyOS/Arch.
   refused; replace it with an empty `[tools.nvim]` table (D54), or one with
   `config_repo`/`config_ref`. Then `railswitch lock` if `up` says
   `stack.lock` is stale.
+- Upgrading from an earlier Stage 4 build: an agent's home is now the dir
+  `<ws>/.railswitch/agent-home/<slug>/<name>`. Existing
+  `<p>-<slug>-agent-<n>-home` volumes are no longer used: log in to the agent
+  again, and remove each old volume with `podman volume rm <exact name>`. An
+  nvim home created before this fix may hold root-owned `~/.config`/`~/.local`
+  dirs; repair it with
+  `podman unshare chown -R 0:0 <ws>/.railswitch/home/<slug>`.
 
 ## Two agents in one project (`TestE2EAgents`)
 

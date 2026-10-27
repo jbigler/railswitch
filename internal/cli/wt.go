@@ -106,7 +106,7 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 
 func wtRm(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("wt rm")
-	force := fs.Bool("force", false, "remove a dirty worktree, discarding its changes, and its home dir")
+	force := fs.Bool("force", false, "remove a dirty worktree, discarding its changes, and its nvim and agent homes (agent logins)")
 	if code, ok := parse(fs, args); !ok {
 		return code
 	}

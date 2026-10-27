@@ -173,6 +173,16 @@ the gap log; nothing Filial-specific goes into the code or built-in packs
 
 | Gap | Generic feature | Commit |
 |-----|-----------------|--------|
+| A cold base build ran 30 min with no output, then hit the build timeout | `up`/`build` stream podman's build output and announce each pull | `0506b89` |
+| rustfs's first start failed (exit 1) and its output was lost with the `--rm` container; the failure report showed only podman's event lines | Container logs in journald (D64); the start-failure report prints the container's own lines | `d5e9de2` |
+| Adding an agent to a pre-Stage-4 project took four manual steps | `railswitch agent add` (D63) | `369ec68`, `4bb6e9d` |
+
+Settings only (no railswitch change), in the `ftest` project's own files:
+- `project.toml` `[env] RUSTFS_ENDPOINT = "{env.S3_ENDPOINT}"`: the app's
+  storage and seed code read `RUSTFS_ENDPOINT` (default `localhost:9000`);
+  the rustfs option gives `S3_ENDPOINT`.
+- `mise.local.toml` `S3_SECRET_KEY = "rustfsadmin"`: `config/storage.yml`
+  hard-codes the dev credentials `rustfsadmin`/`rustfsadmin`.
 
 ## Done checklist (roadmap, Stage 4)
 
@@ -205,5 +215,11 @@ every mount point under a home.
 containers the user checked, `touch .git/hooks/x` and `touch /app/.git/hooks/x`
 both fail with `Read-only file system`. nvim not checked (`demo` has no `[tools.nvim]`).
 
-Still to run: the firewall live check, the hooks check in nvim, the db round
-trip and the Filial run.
+**2026-10-27, Filial (`ftest`): running.** `project new ~/workspace/filial-test
+--prefix ftest --branch master --option storage=rustfs@1` (postgres 16,
+redis, rustfs, `claude@1`), the two settings above, then `up`: the app serves,
+`db:prepare` seeds the database, and images stored in rustfs load.
+
+Still to run: `agent` and `nvim` on `ftest`, the firewall live check, the
+hooks check in nvim, and the db round trip (`db dump` → `stop` → remove the db
+volume → `up`).

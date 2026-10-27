@@ -261,6 +261,92 @@ func TestCheckSubmodules(t *testing.T) {
 	only(t, check(t, ws, base), "commondir", cd)
 }
 
+// move renames old to new and leaves a symlink old -> new.
+func move(t *testing.T, old, new string) {
+	t.Helper()
+	if err := os.Rename(old, new); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(new, old); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A symlinked .git/worktrees (git resolves through it) or a non-directory
+// entry in it is reported; nothing behind the link is trusted.
+func TestCheckSymlinkedWorktrees(t *testing.T) {
+	ws, base := repo(t)
+	wt := filepath.Join(base, ".git", "worktrees")
+	if err := os.Symlink(filepath.Join(wt, "feat"), filepath.Join(wt, "link")); err != nil {
+		t.Fatal(err)
+	}
+	only(t, check(t, ws, base), "not-a-dir", filepath.Join(wt, "link"))
+	if err := os.Remove(filepath.Join(wt, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	move(t, wt, filepath.Join(ws, "feat", "evil-worktrees"))
+	got := check(t, ws, base)
+	has(t, got, "not-a-dir", wt)
+	has(t, got, "pointer", filepath.Join(ws, "feat", ".git"))
+}
+
+// A symlinked .git/modules, or a symlink anywhere in its name tree, is
+// reported; it is never followed.
+func TestCheckSymlinkedModules(t *testing.T) {
+	ws, base := repo(t)
+	sub := filepath.Join(ws, "subsrc")
+	git(t, ws, "init", "-q", "-b", "master", sub)
+	git(t, sub, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
+	git(t, base, "-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "lib/sub")
+	mods := filepath.Join(base, ".git", "modules")
+	mod := filepath.Join(mods, "lib", "sub")
+	write(t, filepath.Join(ws, "evil", "hooks", "post-checkout"), "#!/bin/sh\n", 0o755)
+
+	move(t, mod, filepath.Join(ws, "evil-sub"))
+	only(t, check(t, ws, base), "not-a-dir", mod)
+	if err := os.Remove(mod); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(ws, "evil-sub"), mod); err != nil {
+		t.Fatal(err)
+	}
+
+	hooks := filepath.Join(mod, "hooks")
+	if err := os.RemoveAll(hooks); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(ws, "evil", "hooks"), hooks); err != nil {
+		t.Fatal(err)
+	}
+	only(t, check(t, ws, base), "not-a-dir", hooks)
+	if err := os.Remove(hooks); err != nil {
+		t.Fatal(err)
+	}
+
+	move(t, mods, filepath.Join(ws, "evil-modules"))
+	only(t, check(t, ws, base), "not-a-dir", mods)
+}
+
+// core.worktree is a submodule's own key (git writes it in
+// modules/<name>/config), never one of the base repo's.
+func TestCheckCoreWorktree(t *testing.T) {
+	ws, base := repo(t)
+	git(t, base, "config", "core.worktree", "/tmp/elsewhere")
+	f := only(t, check(t, ws, base), "config-key", filepath.Join(base, ".git", "config"))
+	if f.Detail != "core.worktree" {
+		t.Errorf("detail = %q", f.Detail)
+	}
+	git(t, base, "config", "--unset", "core.worktree")
+
+	mod := filepath.Join(base, ".git", "modules", "sub")
+	write(t, filepath.Join(mod, "HEAD"), "ref: refs/heads/master\n", 0o644)
+	write(t, filepath.Join(mod, "config"), "[core]\n\tworktree = ../../../sub\n", 0o644)
+	if got := check(t, ws, base); len(got) != 0 {
+		t.Fatalf("core.worktree in a module config: %+v", got)
+	}
+}
+
 // failRunner fails git config on one file and runs the rest for real.
 type failRunner struct{ path string }
 

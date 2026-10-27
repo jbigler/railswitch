@@ -202,7 +202,9 @@ git dirs' `.git/modules/**/config` (those that exist) against an allowlist,
 that no `.git/commondir` (nor one in `modules/**`) exists, that each
 `.git/worktrees/*/commondir` reads `../..` and each `*/gitdir` names a
 registered worktree's `.git`, that each linked worktree's `.git` pointer names
-such an entry, and reports any hook in `.git/modules/**/hooks/`; a finding
+such an entry, and reports any hook in `.git/modules/**/hooks/` and any
+symlink or file where `.git/worktrees`, `.git/modules` or a directory under
+them should be (`not-a-dir`); a finding
 is a warning (`warn` true), and `railswitch hooks check` lists them.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.

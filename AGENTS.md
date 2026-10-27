@@ -43,7 +43,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D62: `docs/superpowers/plans/2026-10-
 - `internal/unithash` — the `<prefix>.unit-hash` label that tells `up` a container runs an older unit.
 - `internal/tailscale` — the tailscale CLI for `share`/`unshare` (`serve --bg`, `serve … off`, never `reset`).
 - `internal/agentstatus` — the agents' status files (D58), read as hostile.
-- `internal/gitguard` — git-guard (D60): installed hooks vs. their `githooks/` backups, key names (never values) in `.git/config`, `.git/config.worktree`, `.git/worktrees/*/config.worktree` and `.git/modules/**/config`; no `.git/commondir` (nor in `modules/**`); `.git/worktrees/*/commondir` is `../..` and `*/gitdir` a registered worktree's `.git`; worktree `.git` pointers name such an entry; any hook in `.git/modules/**/hooks/` (`submodule-hook`).
+- `internal/gitguard` — git-guard (D60): installed hooks vs. their `githooks/` backups, key names (never values) in `.git/config`, `.git/config.worktree`, `.git/worktrees/*/config.worktree` and `.git/modules/**/config`; no `.git/commondir` (nor in `modules/**`); `.git/worktrees/*/commondir` is `../..` and `*/gitdir` a registered worktree's `.git`; worktree `.git` pointers name such an entry; any hook in `.git/modules/**/hooks/` (`submodule-hook`); `.git/worktrees`, `.git/modules` and the dirs under them are real directories, never symlinks (`not-a-dir`); `core.worktree` is allowed only in `modules/**/config`.
 - `internal/term` — `--new-term`: detects the Linux terminal (C5) and opens a detached window through `sys.Runner`.
 - `internal/podman`, `internal/firewall`, `internal/worktree`, `internal/workspace`, `internal/lifecycle`, `internal/doctor`.
 

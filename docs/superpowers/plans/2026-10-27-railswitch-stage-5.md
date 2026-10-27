@@ -225,7 +225,7 @@ Added here:
 ### Task 8: Phoenix fixture pack and workspace
 
 **Files:**
-- Create: `testdata/fixtures/phoenix/` — `project.toml` (prefix `phx`, `[stack] pack = "local:phoenix@1"`, `app = "web"`, `[options] database = "postgres@1"`, cache/storage/browser `none`, `[tools.nvim]`, `[agents.claude] use = "claude@1"`), `master/.tool-versions` (`elixir 1.18.4-otp-27`, `erlang 27.3.4`), `master/mix.lock` (empty), `packs/phoenix/{pack.toml,Containerfile.base,entrypoints/entrypoint-app.sh,entrypoints/entrypoint-deps.sh,deps.allow,README.md}`; goldens `internal/render/testdata/golden/phoenix/`
+- Create: `testdata/fixtures/phoenix/` — `project.toml` (prefix `phx`, `[stack] pack = "local:phoenix@1"`, `app = "web"`, `[options] database = "postgres@1"`, cache/storage/browser `none`, `[tools.nvim]`, `[agents.claude] use = "claude@1"`), `master/.tool-versions` (`elixir 1.18.4`, `erlang 27.3.4`; the README notes that asdf's `1.18.4-otp-27` form must be written as `1.18.4`), `master/mix.lock` (empty), `packs/phoenix/{pack.toml,Containerfile.base,entrypoints/entrypoint-app.sh,entrypoints/entrypoint-deps.sh,deps.allow,README.md}`; goldens `internal/render/testdata/golden/phoenix/`
 - Modify: `internal/testfixture/testfixture.go` (eject list from the resolved stack, not hard-coded rails/postgres), `internal/render/quadlet_test.go` `TestGolden` and `internal/render/lint_test.go` `TestGoldensLintClean` (add `phoenix`), `internal/genericity_test.go` (`phoenixRe = (?i)\b(phoenix|elixir|erlang)\b|\bmix `)
 
 **Interfaces:**

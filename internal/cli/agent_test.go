@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/term"
 )
 
 func TestAgentArgs(t *testing.T) {
@@ -124,5 +126,16 @@ func TestAgentNewTerm(t *testing.T) {
 	}
 	if gotDir != filepath.Join(ws, "feat") || gotTitle == "" {
 		t.Errorf("title %q dir %q", gotTitle, gotDir)
+	}
+}
+
+func TestAgentNewTermExitCode(t *testing.T) {
+	ws, _ := lockedWS(t)
+	old := launchTerm
+	t.Cleanup(func() { launchTerm = old })
+	launchTerm = func(context.Context, *env, string, string, []string) error { return &term.ExitError{Code: 3} }
+	code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "claude")
+	if code != 3 || errs != "" {
+		t.Fatalf("exit %d stderr %q; want 3, silent", code, errs)
 	}
 }

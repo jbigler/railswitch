@@ -165,3 +165,13 @@ func TestQuote(t *testing.T) {
 		t.Errorf("%s", got)
 	}
 }
+
+func TestLaunchHereExitCode(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"railswitch"}, sys.Result{ExitCode: 3}, sys.ErrExit)
+	l := Launcher{R: f, Env: envOf(nil), LookPath: lookOnly(), ProcRoot: emptyProc(t), TTY: true, Err: &bytes.Buffer{}}
+	err := l.Launch(context.Background(), "T", "/w", argv)
+	if x, ok := errors.AsType[*ExitError](err); !ok || x.Code != 3 {
+		t.Fatalf("err %v; want *ExitError{3}", err)
+	}
+}

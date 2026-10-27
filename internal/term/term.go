@@ -7,6 +7,7 @@ package term
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -131,9 +132,16 @@ func parentOf(path string) int {
 	return n
 }
 
+// ExitError is the non-zero exit code of a command run in the current
+// window; its stderr already went to the user.
+type ExitError struct{ Code int }
+
+func (e *ExitError) Error() string { return "exit status " + strconv.Itoa(e.Code) }
+
 // Launch runs argv in dir in a new tab of the detected terminal, else a
 // new window of it, else a window of $TERMINAL or a fallback terminal,
-// else (TTY only) in the current window, waiting for it. title names the
+// else (TTY only) in the current window, waiting for it (a non-zero exit
+// is an *ExitError). title names the
 // tab or window where the terminal takes one.
 func (l Launcher) Launch(ctx context.Context, title, dir string, argv []string) error {
 	detected := l.Detect()
@@ -157,7 +165,10 @@ func (l Launcher) Launch(ctx context.Context, title, dir string, argv []string) 
 	}
 	if l.TTY {
 		fmt.Fprintln(l.Err, "railswitch: no terminal emulator could be launched; running here")
-		_, err := l.R.Run(ctx, sys.Cmd{Name: argv[0], Args: argv[1:], Dir: dir, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: l.Err, Timeout: sys.NoTimeout})
+		res, err := l.R.Run(ctx, sys.Cmd{Name: argv[0], Args: argv[1:], Dir: dir, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: l.Err, Timeout: sys.NoTimeout})
+		if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
+			return &ExitError{Code: res.ExitCode}
+		}
 		return err
 	}
 	return fmt.Errorf("no terminal emulator could be launched (detected: %s)", detected)

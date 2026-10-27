@@ -205,18 +205,17 @@ func (f *fakeRunner) Run(_ context.Context, c Cmd) (Result, error) {
 func TestExecDetach(t *testing.T) {
 	dir := t.TempDir()
 	out := dir + "/out"
-	start := time.Now()
 	_, err := Exec{}.Run(context.Background(), Cmd{
 		Name:   "sh",
-		Args:   []string{"-c", `sleep 0.3; { pwd; read -r _ _ _ _ _ sid _ < /proc/$$/stat; echo "$$ $sid"; readlink /proc/$$/fd/0 /proc/$$/fd/2; } > ` + out + `.tmp && mv ` + out + `.tmp ` + out},
+		Args:   []string{"-c", `sleep 1; { pwd; read -r _ _ _ _ _ sid _ < /proc/$$/stat; echo "$$ $sid"; readlink /proc/$$/fd/0 /proc/$$/fd/2; } > ` + out + `.tmp && mv ` + out + `.tmp ` + out},
 		Dir:    dir,
 		Detach: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d := time.Since(start); d > 200*time.Millisecond {
-		t.Errorf("Run took %v; want an immediate return", d)
+	if _, serr := os.Stat(out); serr == nil {
+		t.Error("output exists when Run returned; want no wait")
 	}
 	var b []byte
 	for range 100 {

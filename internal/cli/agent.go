@@ -108,6 +108,9 @@ func (e *env) agentNewTerm(ctx context.Context, root, slug, name string, argv []
 		cmd = append(append(cmd, "--"), argv...)
 	}
 	if err := launchTerm(ctx, e, title, filepath.Join(root, slug), cmd); err != nil {
+		if x, ok := errors.AsType[*term.ExitError](err); ok {
+			return x.Code
+		}
 		return e.failCommand(err)
 	}
 	return 0

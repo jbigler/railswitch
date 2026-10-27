@@ -84,7 +84,7 @@ func Load(d machine.Dirs) (*File, error) {
 				ov[k] = v
 			}
 		}
-		if err := m.dst.set(base, ov); err != nil {
+		if err := m.dst.set(m.name == "dark", base, ov); err != nil {
 			return nil, fmt.Errorf("%s: colors.%s: %w", Path(d), m.name, err)
 		}
 	}
@@ -131,14 +131,16 @@ func (f *File) Set(dark bool, base string, overrides map[string]string) error {
 	for k, v := range m.Overrides {
 		next.Overrides[k] = v
 	}
-	if err := next.set(base, overrides); err != nil {
+	if err := next.set(dark, base, overrides); err != nil {
 		return err
 	}
 	*m = next
 	return nil
 }
 
-func (m *Mode) set(base string, overrides map[string]string) error {
+// set applies base and overrides, then drops overrides equal to the base
+// preset's value so memory matches what Save writes.
+func (m *Mode) set(dark bool, base string, overrides map[string]string) error {
 	var errs []error
 	if base != "" {
 		if _, ok := presets[base]; !ok {
@@ -171,7 +173,19 @@ func (m *Mode) set(base string, overrides map[string]string) error {
 			m.Overrides[tok] = strings.ToUpper(v)
 		}
 	}
-	return errors.Join(errs...)
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
+	i := 0
+	if dark {
+		i = 1
+	}
+	for tok, v := range m.Overrides {
+		if presets[m.Base][i][tok] == v {
+			delete(m.Overrides, tok)
+		}
+	}
+	return nil
 }
 
 func validHex(s string) bool {
@@ -182,8 +196,8 @@ func validHex(s string) bool {
 	return err == nil
 }
 
-// Reset drops one mode's overrides and returns it to flexoki.
-func (f *File) Reset(dark bool) { *f.mode(dark) = defaultMode() }
+// Reset drops one mode's overrides and keeps its preset.
+func (f *File) Reset(dark bool) { f.mode(dark).Overrides = map[string]string{} }
 
 // Colors is one mode's preset with its overrides applied: all 12 tokens.
 func (f *File) Colors(dark bool) map[string]string {

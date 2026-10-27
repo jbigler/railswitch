@@ -122,6 +122,42 @@ func writeFile(t *testing.T, d machine.Dirs, s string) {
 	}
 }
 
+func TestResetKeepsBase(t *testing.T) {
+	f := &File{Light: Mode{Base: "flexoki"}, Dark: Mode{Base: "flexoki"}}
+	if err := f.Set(false, "paper", map[string]string{"accent": "#123456"}); err != nil {
+		t.Fatal(err)
+	}
+	f.Reset(false)
+	want := (&File{Light: Mode{Base: "paper"}}).Colors(false)
+	if f.Light.Base != "paper" || len(f.Light.Overrides) != 0 || !reflect.DeepEqual(f.Colors(false), want) {
+		t.Errorf("reset: %+v", f.Light)
+	}
+}
+
+func TestPresetEqualOverrideDropped(t *testing.T) {
+	d := dirs(t)
+	f, _ := Load(d)
+	if err := f.Set(true, "", map[string]string{"bg": "#100F0F"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Set(true, "paper", nil); err != nil {
+		t.Fatal(err)
+	}
+	if bg := f.Colors(true)["bg"]; bg != "#18181B" {
+		t.Errorf("bg = %s, want paper #18181B", bg)
+	}
+	if err := f.Save(d); err != nil {
+		t.Fatal(err)
+	}
+	g, err := Load(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(g.Colors(true), f.Colors(true)) || !reflect.DeepEqual(g.Dark, f.Dark) {
+		t.Errorf("disk %+v != memory %+v", g.Dark, f.Dark)
+	}
+}
+
 func TestNewerSchema(t *testing.T) {
 	d := dirs(t)
 	writeFile(t, d, "schema = 2\n")

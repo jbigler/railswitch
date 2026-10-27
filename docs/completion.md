@@ -37,6 +37,7 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - `hooks`: its subcommands `check`, `backup` and `restore`, and `restore`'s flag `--force`.
 - `agent`: its subcommands `add`, `ls` and `stop` together with the agents `project.toml` declares (`[agents.<name>]`), and its flag `--new-term`; `agent stop`: the agents. `agent add`: flags `--use` and `--run`.
 - `containerfile show|eject`: the stack's built-in Containerfile names (`show` also the workspace's own `containerfiles/Containerfile.<name>`).
+- `pack`: its subcommands `eject`, `new` and `show`; `pack eject|show`: the built-in packs and options (`rails@1`, `postgres@1`, …); `pack eject`'s flag `--as`.
 - `project rm`: every registered project prefix.
 - `project new --agent` takes `name=ref` or `none`; the flag itself completes, its value does not.
 

@@ -60,6 +60,36 @@ suggested addon that is missing from `[image] addons`.
 | `steps[].from` | array of strings | The file's `FROM` images with build args expanded, without `${BASE_IMAGE}`, `scratch` and stage names (D36). Empty for an addon that only builds on the previous step. |
 | `warnings` | array of strings | Non-fatal findings; empty when there are none. |
 
+## `pack show <ref>`
+
+One pack or option: a built-in (no workspace needed) or a local package of
+the current workspace (`local:<name>@<N>`, a pack when `packs/<name>/`
+exists, else an option under `options/<name>/`).
+
+```json
+{
+  "ref": "rails@1", "kind": "pack", "source": "built in", "path": "",
+  "app": {"service": "rails", "server": "bin/dev", "port": 3000, "health": "curl -fsS http://localhost:3000/up"},
+  "runtimes": [{"name": "bun", "from": [".bun-version", "package.json:packageManager.bun"], "fallback": ""}],
+  "ports": [{"name": "debug", "base": 33000, "container": 0}, {"name": "app", "base": 13000, "container": 3000}],
+  "pin": null, "gives": [], "readme": ""
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref` | string | The ref as given: `name@N` or `local:name@N`. |
+| `kind` | string | `pack` or `option`. |
+| `source` | string | `built in` or `local`. |
+| `path` | string | A local package's directory; `""` for a built-in. |
+| `app` | object | A pack's app: `service`, `server`, `port`, `health`. Absent for an option. |
+| `slot`, `service` | string | An option's slot and service id. Absent for a pack. |
+| `runtimes` | array | A pack's version chains, by name: `name`, `from` (sources, in order), `fallback` (`""`: none). |
+| `ports` | array | Published ports: `name`, `base` (the host port is `base` + worktree ID), `container` (`0` for `same_port`). |
+| `pin` | object or null | An option's version pin: `name`, `default`. |
+| `gives` | array of strings | The env names an option gives the app, sorted. |
+| `readme` | string | The package's `README.md` (its app-side changes); `""` when it has none. |
+
 ## `secret ls`
 
 The project's declared secrets (`project.toml [secrets]`), sorted by name.

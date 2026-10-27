@@ -37,6 +37,7 @@ var commands = map[string]command{
 	"render":        cmdRender,
 	"env":           cmdEnv,
 	"containerfile": cmdContainerfile,
+	"pack":          cmdPack,
 	"fw":            cmdFw,
 	"secret":        cmdSecret,
 	"wt":            cmdWt,

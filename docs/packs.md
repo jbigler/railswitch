@@ -146,3 +146,25 @@ port    = 3036       # the container port
 Render refuses two routes of one project with the same name or host
 (`routes: router "s3" is used by rails and storage`). `railswitch machine`
 lists every route.
+
+## Commands
+
+- `railswitch pack eject <ref> [--as <name>]` copies a built-in pack or
+  option into `packs/<name>/` (or `options/<name>/`), the manifest's `name`
+  set to `<name>` (default: the built-in's). The project keeps the built-in
+  until its ref says `local:<name>@<N>`; then `railswitch lock`. An existing
+  directory is never overwritten: a local package is yours to edit.
+- `railswitch pack new <name>` writes `packs/<name>/` with a `pack.toml`
+  listing every field (commented), a `Containerfile.base`, an
+  `entrypoints/entrypoint-app.sh` and a `README.md`. Nothing reads it until a
+  ref names it, so it can stay half-written.
+- `railswitch pack show <ref>` prints a pack's or option's summary (app,
+  runtimes and their sources, ports, pin, gives) and its `README.md`;
+  `--json` prints one document (`docs/json.md`). Built-ins need no
+  workspace.
+
+## README.md
+
+A package's `README.md` says what it expects of the app: the changes an app
+must make to run under it (bind the dev server to `0.0.0.0`, read the
+database from the env an option gives, …). `railswitch pack show` prints it.

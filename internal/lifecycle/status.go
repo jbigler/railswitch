@@ -36,16 +36,13 @@ func (l *L) Status(ctx context.Context, slug string, asJSON bool) error {
 			if err != nil {
 				return err
 			}
-			r.State = "on-demand"
-			if running {
-				r.State = "running"
-			}
+			r.State = onDemandState(running)
 		} else {
 			props, err := l.systemd().Show(ctx, unitOf(m, slug, s.ID), "ActiveState", "SubState")
 			if err != nil {
 				return err
 			}
-			r.State = props["ActiveState"] + "/" + props["SubState"]
+			r.State = unitState(props)
 		}
 		if s.Health != nil {
 			if r.Health, err = l.podman().Health(ctx, containerOf(m, slug, s.ID)); err != nil {
@@ -67,4 +64,19 @@ func (l *L) Status(ctx context.Context, slug string, asJSON bool) error {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", r.Service, r.Role, r.State, h)
 	}
 	return tw.Flush()
+}
+
+// unitState is a unit's state as status and overview show it,
+// "<ActiveState>/<SubState>".
+func unitState(props map[string]string) string {
+	return props["ActiveState"] + "/" + props["SubState"]
+}
+
+// onDemandState is an on-demand service's state: "running" while its
+// container runs, else "on-demand".
+func onDemandState(running bool) string {
+	if running {
+		return "running"
+	}
+	return "on-demand"
 }

@@ -24,7 +24,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D71: `docs/superpowers/plans/2026-10-
 - Dependencies: stdlib + `github.com/BurntSushi/toml` only. No-echo prompt uses `syscall` TCGETS/TCSETS.
 - Hardening (D34): every container has `NoNewPrivileges=true`, `Memory=`, `PidsLimit=`; app/deps/worker/tool/agent also `DropCapability=all`; browser keeps `AddCapability=NET_ADMIN`/`NET_RAW`, no `DropCapability`.
 - Schema (D39): `project.toml`, `stack.lock`, `registry.toml`, `config.toml` carry `schema = 1`; a higher schema is refused ("written by a newer railswitch").
-- `--json` (D40): every read command (`env`, `status`, `wt ls`, `project ls`, `secret ls`, `containerfile list`, `pack show`, `doctor`, `machine`, `agent ls`) prints one JSON document; schemas in `docs/json.md`.
+- `--json` (D40): every read command (`env`, `status`, `overview`, `wt ls`, `project ls`, `secret ls`, `containerfile list`, `pack show`, `doctor`, `machine`, `agent ls`) prints one JSON document; schemas in `docs/json.md`.
 - Unit tests need no podman, systemd, gh or network (`git`, `bash` allowed; use `internal/sys/systest` Fake).
 - Ports publish only on `127.0.0.1:<host>:<ctr>`.
 - Remove objects by exact name, never `--filter`/regex. Never `git worktree prune`.

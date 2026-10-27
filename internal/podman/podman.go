@@ -295,6 +295,20 @@ func (p Podman) Running(ctx context.Context, name string) (bool, error) {
 	return s == "true", err
 }
 
+// RunningNames is the set of running containers' names, from one
+// `podman ps --format {{.Names}}`; callers test exact names in it.
+func (p Podman) RunningNames(ctx context.Context) (map[string]bool, error) {
+	r, err := p.run(ctx, 0, "ps", "--format", "{{.Names}}")
+	if err != nil {
+		return nil, err
+	}
+	names := map[string]bool{}
+	for _, n := range strings.Fields(string(r.Stdout)) {
+		names[n] = true
+	}
+	return names, nil
+}
+
 // GraphRoot returns podman's storage graph root.
 func (p Podman) GraphRoot(ctx context.Context) (string, error) {
 	return p.out(ctx, "info", "--format", "{{.Store.GraphRoot}}")

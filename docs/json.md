@@ -206,6 +206,50 @@ hook writes.
 | `reply` | boolean | The agent waits for a reply: `state` is `done` and `message` ends in `?`, maybe followed by spaces, closing brackets, quotes or `*`/`_`/`` ` `` emphasis. The text table shows `reply` as its `STATE`. |
 | `running` | boolean | The agent's container runs in this worktree (podman, not the status file). At most one agent runs per worktree (D62). The text table marks it with `*` in its `RUNNING` column, and shows `running` as its `STATE` when the status file says `off`. |
 
+## `overview`
+
+One project (`-C`): every registered worktree, in registry order (by ID),
+with its stack state, services, agent and links. The dashboard polls it
+every 2 s, so it is cheap: one `systemctl --user show` for every unit of
+the project, at most one `podman ps --format {{.Names}}` (only when the
+project has agents or on-demand services), no health check and no git
+call. The text form is a table `WORKTREE BRANCH STACK AGENT` (the base
+worktree marked `(base)`) with each worktree's links indented under its
+row.
+
+```json
+{
+  "prefix": "filial",
+  "workspace": "/home/u/workspace/filial",
+  "worktrees": [
+    {
+      "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
+      "stack": "up",
+      "services": [{"service": "rails", "role": "app", "state": "active/running"}],
+      "agent": {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
+      "links": [
+        {"label": "App", "url": "http://feat-login.filial.localhost/", "group": "app"},
+        {"label": "Flipper", "url": "http://feat-login.filial.localhost/flipper", "group": "project"}
+      ]
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `prefix` | string | The project's prefix. |
+| `workspace` | string | Its workspace directory as registered. |
+| `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
+| `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
+| `worktrees[].id` | number | Its registry ID. |
+| `worktrees[].branch` | string | The branch checked out, read from its git files; `""` when detached, unreadable or the directory is gone (the worktree is still listed). |
+| `worktrees[].base` | boolean | It is the base worktree (`<workspace>/<base_branch>`). |
+| `worktrees[].stack` | string | Over the services with roles `app`, `worker`, `data` (not `deps`, `tool`, `agent`): `failed` if any unit's ActiveState is `failed`, `up` if all are `active`, `stopped` if none is `active` or `activating` (or there are none), else `partial`. |
+| `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
+| `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
+| `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
+
 ## `doctor`
 
 The host checks (among them whether another podman network uses the

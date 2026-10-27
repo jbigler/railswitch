@@ -30,6 +30,26 @@ func TestStatusAndExecCLI(t *testing.T) {
 	}
 }
 
+func TestOverviewCLI(t *testing.T) {
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	f := fakeHost()
+	code, out, errs := runWith(t, f, "-C", ws, "--json", "overview")
+	if code != 0 {
+		t.Fatalf("overview: exit %d: %s", code, errs)
+	}
+	var ov struct {
+		Prefix    string
+		Worktrees []struct{ Slug, Stack string }
+	}
+	if err := json.Unmarshal([]byte(out), &ov); err != nil || ov.Prefix != "filial" || len(ov.Worktrees) == 0 || ov.Worktrees[0].Stack != "stopped" {
+		t.Fatalf("overview %+v %v: %s", ov, err, out)
+	}
+	if code, _, _ := runWith(t, f, "-C", ws, "overview", "x"); code != 2 {
+		t.Fatalf("overview x: exit %d; want 2", code)
+	}
+}
+
 // TestExecDepsExitCode: exec and deps exit with the container command's
 // exit code, without a railswitch error line.
 func TestExecDepsExitCode(t *testing.T) {

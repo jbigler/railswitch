@@ -93,6 +93,40 @@ func (s Systemd) Show(ctx context.Context, unit string, props ...string) (map[st
 	return m, nil
 }
 
+// ShowMany runs one `systemctl --user show -p Id,A,B <units…>` and parses
+// its blocks (one per unit, separated by a blank line) into each unit's
+// K=V map, keyed by its Id. No units: no call.
+func (s Systemd) ShowMany(ctx context.Context, units []string, props ...string) (map[string]map[string]string, error) {
+	out := map[string]map[string]string{}
+	if len(units) == 0 {
+		return out, nil
+	}
+	args := append([]string{"show", "-p", strings.Join(append([]string{"Id"}, props...), ",")}, units...)
+	r, err := s.run(ctx, 0, args...)
+	if err != nil {
+		return nil, err
+	}
+	block := map[string]string{}
+	flush := func() {
+		if id := block["Id"]; id != "" {
+			out[id] = block
+		}
+		block = map[string]string{}
+	}
+	for line := range strings.Lines(string(r.Stdout)) {
+		line = strings.TrimRight(line, "\n")
+		if line == "" {
+			flush()
+			continue
+		}
+		if k, v, ok := strings.Cut(line, "="); ok {
+			block[k] = v
+		}
+	}
+	flush()
+	return out, nil
+}
+
 // UnitState is what systemd knows of a unit.
 type UnitState struct {
 	Load       string // LoadState: "loaded", "not-found", …

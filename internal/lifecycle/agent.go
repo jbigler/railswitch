@@ -143,6 +143,12 @@ func (l *L) AgentList(ctx context.Context, slug string) ([]AgentRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	return agentRows(m, in, running), nil
+}
+
+// agentRows are m's agents in [agents] order with their status in in's
+// worktree; running names the ones whose containers run there.
+func agentRows(m *render.Model, in *render.Instance, running []string) []AgentRow {
 	rows := []AgentRow{}
 	for _, a := range m.Inputs.Stack.Agents {
 		st := agentstatus.Read(filepath.Join(in.Values["status.dir"], a.Name+".json"))
@@ -152,7 +158,7 @@ func (l *L) AgentList(ctx context.Context, slug string) ([]AgentRow, error) {
 			Running: slices.Contains(running, a.Name),
 		})
 	}
-	return rows, nil
+	return rows
 }
 
 // RunningAgents are the names of the agents whose containers run in

@@ -16,6 +16,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
+	builtinfs "github.com/jbigler/railswitch/internal/pack/builtin"
 )
 
 // builtinDefault is a built-in default Containerfile's bytes.
@@ -329,7 +330,16 @@ func TestNewAddon(t *testing.T) {
 		t.Errorf("list text:\n%s", out)
 	}
 
-	for _, name := range []string{"base", "pg-client", "nvim", "playwright", "Bad_Name", "-x"} {
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref, ok := cat.DefaultAgent()
+	if !ok {
+		t.Fatal("no default agent")
+	}
+	agentCF := strings.TrimPrefix(cat.Agents[ref].Image.File, "Containerfile.")
+	for _, name := range []string{"base", "pg-client", "nvim", "playwright", "agent-base", agentCF, "Bad_Name", "-x"} {
 		if code, _, errs := runIn(t, "-C", ws, "containerfile", "new", name); code != 2 {
 			t.Errorf("new %s: exit %d; want 2 (stderr %q)", name, code, errs)
 		}
@@ -395,8 +405,12 @@ func TestBuiltinContainerfilesSelfContained(t *testing.T) {
 	for _, tl := range cat.Tools {
 		all = append(all, file{tl.Files, tl.Image.File})
 	}
-	if len(all) < 4 {
-		t.Fatalf("found %d built-in Containerfiles; want base, pg-client, playwright and nvim at least", len(all))
+	for _, a := range cat.Agents {
+		all = append(all, file{a.Files, a.Image.File})
+	}
+	all = append(all, file{builtinfs.FS, "agentbase/Containerfile.agent-base"})
+	if len(all) < 6 {
+		t.Fatalf("found %d built-in Containerfiles; want base, pg-client, playwright, nvim, an agent and agent-base at least", len(all))
 	}
 	for _, f := range all {
 		data, err := fs.ReadFile(f.files, f.name)

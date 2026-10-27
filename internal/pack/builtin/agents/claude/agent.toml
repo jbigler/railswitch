@@ -1,0 +1,51 @@
+name = "claude"
+version = 1
+default = true                # railswitch project new adds this agent unless --agent is given
+run = "on-demand"
+entrypoint = "entrypoints/entrypoint-claude.sh"
+
+# Firewall hosts (profile agent-claude, always enforced: D55).
+allow = [
+  "claude.ai",
+  "api.anthropic.com",
+  "statsig.com",
+  "sentry.io",
+  "registry.npmjs.org",       # chrome-devtools-mcp via npx
+  "meta:github",
+  "github.com",
+  "api.github.com",
+  "codeload.github.com",
+]
+
+[image]                       # built on the agent base image
+file = "Containerfile.claude"
+
+[[shared]]                    # plugins shared by every worktree
+name = "claude_plugins_cache"
+mount = "/home/appuser/.claude/plugins/cache"
+chown = true
+
+[[shared]]
+name = "claude_plugins_marketplaces"
+mount = "/home/appuser/.claude/plugins/marketplaces"
+chown = true
+
+[[mounts]]                    # copied to ~/.claude/CLAUDE.md by the entrypoint
+source = "CLAUDE.md"
+target = "/opt/railswitch/agent/CLAUDE.md"
+options = "ro,z"
+
+[[mounts]]                    # registered as a hook by the entrypoint (D58)
+source = "claude-status-hook.sh"
+target = "/usr/local/bin/claude-status-hook.sh"
+options = "ro,z"
+
+[[secrets]]                   # claude setup-token
+name = "token"
+env = "CLAUDE_CODE_OAUTH_TOKEN"
+
+[env]
+DISABLE_AUTOUPDATER = "1"
+
+[unit]
+tty = true

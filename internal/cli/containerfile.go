@@ -79,9 +79,10 @@ func stackBuiltins(st *pack.Stack) map[string]builtin {
 	return out
 }
 
-// builtinNames is every name a built-in default has in any stack of cat.
+// builtinNames is every name a built-in default has in any stack of cat,
+// and the agent images' defaults: agent-base and each agent package's.
 func builtinNames(cat *pack.Catalog) map[string]bool {
-	names := map[string]bool{"base": true}
+	names := map[string]bool{"base": true, "agent-base": true}
 	for _, o := range cat.Options {
 		if o.AppAddon != nil {
 			names[cfName(o.AppAddon.File)] = true
@@ -92,6 +93,11 @@ func builtinNames(cat *pack.Catalog) map[string]bool {
 	}
 	for _, t := range cat.Tools {
 		names[cfName(t.Image.File)] = true
+	}
+	for r, a := range cat.Agents {
+		if !r.Local {
+			names[cfName(a.Image.File)] = true
+		}
 	}
 	return names
 }

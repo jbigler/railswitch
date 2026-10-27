@@ -180,3 +180,14 @@ func TestResolveContainerfileCollision(t *testing.T) {
 		t.Errorf("collision: %v", err)
 	}
 }
+
+func TestDefaultAgentUnique(t *testing.T) {
+	fsys := withAgent()
+	fsys["agents/a/agent.toml"] = &fstest.MapFile{Data: []byte("default = true\n" + agentToml)}
+	fsys["agents/b/agent.toml"] = &fstest.MapFile{Data: []byte("default = true\n" + strings.ReplaceAll(agentToml, `"a"`, `"b"`))}
+	fsys["agents/b/Containerfile.a"] = &fstest.MapFile{Data: []byte("FROM base\n")}
+	_, err := Load(fsys)
+	if err == nil || !strings.Contains(err.Error(), "a@1") || !strings.Contains(err.Error(), "b@1") {
+		t.Errorf("two defaults: %v, want both named", err)
+	}
+}

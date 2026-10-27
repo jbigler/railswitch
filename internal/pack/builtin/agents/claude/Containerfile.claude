@@ -1,0 +1,31 @@
+# claude agent: Claude Code's native binary on the agent base image.
+# railswitch passes BASE_IMAGE, the agent base image.
+ARG BASE_IMAGE
+
+# The native binary, downloaded in a builder stage so the agent image gets
+# no download tooling of its own.
+FROM docker.io/library/debian:trixie-slim AS claude-cli
+ARG CLAUDE_CODE_VERSION=latest
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y wget ca-certificates && \
+  rm -rf /var/lib/apt/lists/*
+RUN GCS_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases" && \
+  case "$(uname -m)" in \
+    x86_64) ARCH=x64 ;; \
+    aarch64 | arm64) ARCH=arm64 ;; \
+    *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+  esac && \
+  if [ "$CLAUDE_CODE_VERSION" = "latest" ]; then \
+  CLAUDE_CODE_VERSION=$(wget -qO- https://registry.npmjs.org/@anthropic-ai/claude-code/latest | sed -n 's/.*"version":"\([^"]*\)".*/\1/p'); \
+  fi && \
+  mkdir -p /opt/claude-code/bin && \
+  wget -q -O /opt/claude-code/bin/claude "${GCS_BUCKET}/${CLAUDE_CODE_VERSION}/linux-${ARCH}/claude" && \
+  chmod 755 /opt/claude-code/bin/claude
+
+FROM ${BASE_IMAGE}
+USER root
+COPY --from=claude-cli /opt/claude-code /opt/claude-code
+# The wrapper turns the self-updater off: the image pins the version.
+RUN printf '#!/bin/sh\nexport DISABLE_AUTOUPDATER=1\nexec /opt/claude-code/bin/claude "$@"\n' > /usr/bin/claude && \
+  chmod 755 /usr/bin/claude
+USER appuser

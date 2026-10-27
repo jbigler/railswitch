@@ -1,0 +1,12 @@
+# Agent base: extends the worktree's base image for every agent package, with
+# the tools agents and their entrypoints use. railswitch passes BASE_IMAGE, the
+# base chain's last image (D31), and builds each agent's Containerfile on this.
+# It uses apt-get: a base image that is not Debian-based needs this file edited
+# (railswitch containerfile eject agent-base).
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER root
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y git curl ca-certificates jq ripgrep fd-find socat openssh-client less procps && \
+  rm -rf /var/lib/apt/lists/*
+USER appuser

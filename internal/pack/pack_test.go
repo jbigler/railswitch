@@ -55,6 +55,9 @@ func TestLoadBuiltins(t *testing.T) {
 	for _, tl := range cat.Tools {
 		dirs = append(dirs, tl.Files)
 	}
+	for _, a := range cat.Agents {
+		dirs = append(dirs, a.Files)
+	}
 	for _, d := range dirs {
 		mustHash(t, d)
 	}
@@ -359,8 +362,8 @@ func TestBuiltinFromQualified(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if seen < 4 {
-		t.Errorf("found %d built-in Containerfiles, want at least 4", seen)
+	if seen < 6 { // base, pg-client, playwright, nvim, an agent's, agent-base
+		t.Errorf("found %d built-in Containerfiles, want at least 6", seen)
 	}
 }
 

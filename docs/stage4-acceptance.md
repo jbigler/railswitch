@@ -225,5 +225,7 @@ redis, rustfs, `claude@1`), the two settings above, then `up`: the app serves,
 the database came back from `<db>.dump` and the rustfs objects from
 `rustfs_data.tar.gz`.
 
-Still to run: `agent` and `nvim` on `ftest`, the firewall live check and the
-hooks check in nvim.
+**2026-10-27, `railswitch agent` on `ftest`: works** (`claude@1`).
+
+Still to run: `nvim` on `ftest` (with the hooks check in nvim) and the
+firewall live check.

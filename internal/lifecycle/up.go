@@ -56,6 +56,8 @@ type L struct {
 	// 30s).
 	TraefikAPI              string
 	RoutePoll, RouteTimeout time.Duration
+	// SpinEvery paces the activity spinner on a terminal (zero: 100ms).
+	SpinEvery time.Duration
 	// NvimPoll and NvimTimeout pace the wait for the nvim server to answer
 	// (zero: 500ms, 2m).
 	NvimPoll, NvimTimeout time.Duration
@@ -241,7 +243,10 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		}
 	}
 	if len(restart) > 0 {
-		if err := sd.Restart(ctx, restart...); err != nil {
+		done := l.busy("restarting "+strings.Join(restart, ", "), "restarted "+strings.Join(restart, ", "))
+		err := sd.Restart(ctx, restart...)
+		done()
+		if err != nil {
 			return err
 		}
 	}
@@ -256,10 +261,26 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		return err
 	}
 	app := unitOf(m, slug, m.Services[0].ID)
-	if err := sd.Start(ctx, app); err != nil {
+	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m), ", "), "started "+slug)
+	err = sd.Start(ctx, app)
+	done()
+	if err != nil {
 		return l.startFailure(ctx, sd, slug, failed, err)
 	}
 	return l.waitRoute(ctx, m, in, slug)
+}
+
+// startedServices are the service IDs starting the app brings up (its
+// Requires= and Wants=), the app last: every service but agents, which up
+// never starts (D62).
+func startedServices(m *render.Model) []string {
+	var ids []string
+	for _, s := range m.Services[1:] {
+		if s.Role != render.RoleAgent {
+			ids = append(ids, s.ID)
+		}
+	}
+	return append(ids, m.Services[0].ID)
 }
 
 // startFailure turns a failed `systemctl start` into an error naming the

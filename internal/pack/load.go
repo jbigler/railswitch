@@ -15,6 +15,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
+	"github.com/jbigler/railswitch/internal/placeholder"
 	"github.com/jbigler/railswitch/internal/version"
 )
 
@@ -392,6 +393,11 @@ func (l *loader) links(file string, links []Link) {
 	for i, k := range links {
 		l.required(file, fmt.Sprintf("links[%d].label", i), k.Label)
 		l.required(file, fmt.Sprintf("links[%d].url", i), k.URL)
+		for _, n := range placeholder.Names(k.URL) {
+			if !placeholder.LinkNames[n] {
+				l.add(file, "links[%d].url: unknown placeholder {%s} (allowed: {worktree.host}, {worktree.slug}, {branch})", i, n)
+			}
+		}
 	}
 }
 

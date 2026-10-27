@@ -147,6 +147,36 @@ Render refuses two routes of one project with the same name or host
 (`routes: router "s3" is used by rails and storage`). `railswitch machine`
 lists every route.
 
+## Links and tasks
+
+A pack, option or tool `[[links]]` (`label`, `url`), like a project's
+`[[links]]` in `project.toml`, is a worktree link. Its `url` may use only
+`{worktree.host}`, `{worktree.slug}` and `{branch}`; any other placeholder
+is a load error naming the file. A URL without a `scheme://` gets
+`http://` (`vnc.{worktree.host}` → `http://vnc.<slug>.<prefix>.localhost`).
+A worktree's links, in order: App (`http://{worktree.host}/`), the
+project's `[[links]]` in file order, then the stack's: the pack's, the
+options' in slot order, then the enabled tools', each in file order.
+
+`project.toml` hides stack links by label; a label that no pack, option
+or tool link of the project carries is an error at render
+(`hide_links: no stack link labelled "Nope"`):
+
+```toml
+hide_links = ["Routes", "Mailer previews"]   # top level, before any table
+```
+
+A project's `[tasks]` adds to the pack's `[tasks]`: a project task
+overrides the pack's of the same name, and `""` removes it. A task name
+must be non-empty and one line.
+
+```toml
+[tasks]
+test    = "bin/rspec"     # overrides the pack's test
+console = ""              # removes the pack's console
+lint    = "bin/rubocop"   # a project task
+```
+
 ## Commands
 
 - `railswitch pack eject <ref> [--as <name>]` copies a built-in pack or

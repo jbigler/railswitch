@@ -34,7 +34,9 @@ type Project struct {
 	Worktrees map[string]WorktreeOverride `toml:"worktrees"`
 	Secrets   map[string]Secret           `toml:"secrets"` // key = secret name; values live in podman secrets (D33)
 	Links     []Link                      `toml:"links"`
-	Routes    []Route                     `toml:"routes"` // extra Traefik routes to a service's port (D67)
+	HideLinks []string                    `toml:"hide_links"` // labels of stack links not shown
+	Tasks     map[string]string           `toml:"tasks"`      // project tasks; "" removes a pack task
+	Routes    []Route                     `toml:"routes"`     // extra Traefik routes to a service's port (D67)
 	Tools     Tools                       `toml:"tools"`
 	Firewall  Firewall                    `toml:"firewall"`
 	Image     ImageConfig                 `toml:"image"`
@@ -314,6 +316,25 @@ func (p *Project) Validate() error {
 				v.add(path+".url", "unknown placeholder {%s} (allowed: {worktree.host}, {worktree.slug}, {branch})", n)
 			}
 		}
+	}
+
+	for i, l := range p.HideLinks {
+		path := fmt.Sprintf("hide_links[%d]", i)
+		if l == "" {
+			v.add(path, "is empty")
+		}
+		v.oneLine(path, l)
+	}
+
+	for _, name := range sortedKeys(p.Tasks) {
+		path := "tasks." + key(name)
+		switch {
+		case name == "":
+			v.add(path, "a task name is required")
+		case strings.ContainsAny(name, "\r\n"):
+			v.add(path, "the task name contains a newline")
+		}
+		v.oneLine(path, p.Tasks[name])
 	}
 
 	for i, r := range p.Routes {

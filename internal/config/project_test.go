@@ -316,6 +316,50 @@ func TestGitSigningValidate(t *testing.T) {
 	}
 }
 
+func TestHideLinksAndTasksDecode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "project.toml")
+	src, err := os.ReadFile(filial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src = append([]byte("hide_links = [\"Routes\"]\n"), src...)
+	src = append(src, []byte("\n[tasks]\nlint = \"bin/rubocop\"\nconsole = \"\"\n")...)
+	if err := os.WriteFile(path, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.HideLinks) != 1 || p.HideLinks[0] != "Routes" {
+		t.Errorf("HideLinks = %q", p.HideLinks)
+	}
+	if p.Tasks["lint"] != "bin/rubocop" || p.Tasks["console"] != "" || len(p.Tasks) != 2 {
+		t.Errorf("Tasks = %q", p.Tasks)
+	}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("Validate = %v", err)
+	}
+	for _, c := range []struct {
+		mutate func(p *Project)
+		want   string
+	}{
+		{func(p *Project) { p.Tasks["a\nb"] = "x" }, `tasks."a\nb"`},
+		{func(p *Project) { p.Tasks[""] = "x" }, `tasks."": `},
+		{func(p *Project) { p.Tasks["lint"] = "a\nb" }, "tasks.lint: value contains a newline"},
+		{func(p *Project) { p.HideLinks = []string{"Routes", ""} }, "hide_links[1]: "},
+	} {
+		q, err := Load(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.mutate(q)
+		if err := q.Validate(); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("Validate = %v; want %q", err, c.want)
+		}
+	}
+}
+
 // D67: [[routes]] name a DNS label and a port of a service.
 func TestRoutesValidate(t *testing.T) {
 	p := loadFilial(t)

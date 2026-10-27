@@ -168,7 +168,7 @@ commands below are new and are documented in `docs/json.md`.
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
       "stack": "up",
-      "services": [{"service": "web", "role": "app", "state": "active/running", "health": "healthy"}],
+      "services": [{"service": "web", "role": "app", "state": "active/running"}],
       "agent": {"name": "claude", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
       "links": [
         {"label": "App", "url": "http://feat-login.ftest.localhost/", "group": "app"},
@@ -184,8 +184,10 @@ commands below are new and are documented in `docs/json.md`.
   `worker`, `data`; not `deps`, `tool`, `agent`): `failed` if any unit is
   failed, `up` if all are active, `stopped` if none is active or activating,
   otherwise `partial`.
-- `services`: the `status --json` rows, from one batched
-  `systemctl --user show` for the whole project **(my call)**.
+- `services`: service, role and state as in `status --json`, without
+  `health` (one `podman` health call per container on a 2 s poll costs
+  too much), from one batched `systemctl --user show` for the whole project
+  **(my call)**.
 - `agent`: the worktree's running agent (D62), else the first configured agent
   whose status is not `off`, else `null`; fields as `agent ls --json`.
 - `links`, in order: `app` (App, `http://{worktree.host}/`); `project` (the

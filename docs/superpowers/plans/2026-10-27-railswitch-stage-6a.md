@@ -271,7 +271,7 @@
 - Modify: `internal/cli/dashboard.go` (`serve`)
 
 **Interfaces:**
-- Consumes: Task 1 `jobs.Hub`, Task 4 `dashconf`, Task 5/6/7 JSON shapes (decode into local structs mirroring `docs/json.md`; don't import `lifecycle`).
+- Consumes: Task 1 `jobs.Hub`, Task 4/7 `dashboard colors --json` (read through `CLI`, like every other read; don't import `dashconf`), Task 5/6/7 JSON shapes (decode into local structs mirroring `docs/json.md`; don't import `lifecycle`).
 - Produces:
   ```go
   package web
@@ -282,7 +282,6 @@
       CLI     CLI
       Jobs    *jobs.Hub
       Exe     string            // for job argv[0]
-      Dirs    machine.Dirs      // colours file
       Version string
       Now     func() time.Time
   }

@@ -124,4 +124,4 @@ CPU in 15 min).
 
 | Gap | Generic feature | Commit |
 |-----|-----------------|--------|
-| A stalled binary download (Erlang's `:httpc` sets no timeout) hung the deps service until its 15 min limit; every worktree downloaded tailwind (~100 MB) again | None needed in core: the Phoenix pack bounds `mix assets.setup` (`timeout 300`, 3 tries) and keeps tailwind's versioned binaries in a shared cache volume (`phoenix_assets`) | (this commit) |
+| A stalled binary download (Erlang's `:httpc` sets no timeout) hung the deps service until its 15 min limit; every worktree downloaded tailwind (~100 MB) again | None needed in core: the Phoenix pack bounds `mix assets.setup` (`timeout 300`, 3 tries) and keeps tailwind's versioned binaries in a shared cache volume (`phoenix_assets`) | `8b62dc7` |

@@ -712,3 +712,35 @@ docs/{json.md,completion.md,nvim.md,stage4-acceptance.md}, AGENTS.md
   - **Done checklist:** the roadmap's Stage 4 "Done" bullets, verbatim.
 - [ ] **Step 4:** `make check && git commit -m "test: Stage 4 genericity and agent e2e; acceptance doc"`
 - [ ] **Step 5 (user, host):** `RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2EAgents -timeout 60m -v`, then the Filial steps. Every gap goes through a fix task (generic feature + test) and into the gap log. The run log is recorded as in Stage 3.
+
+### Task 13: One running agent per worktree (D62)
+
+**Files:**
+- Modify: `internal/render/model.go` (+ goldens: service agents leave `app.Wants`), `internal/lifecycle/{agent.go,up.go}` (+ tests), `internal/cli/{agent.go,completion.go}` (+ tests), `internal/lifecycle/e2e_agents_integration_test.go`, `docs/{json.md,completion.md,stage4-acceptance.md}`, `AGENTS.md`.
+
+**Interfaces:**
+- Produces:
+  ```go
+  func (l *L) RunningAgent(ctx context.Context, m *render.Model, slug string) (string, error) // name of the agent whose container runs in slug, "" if none
+  func (l *L) AgentStop(ctx context.Context, slug, name string) error                         // "" = the running one; no-op message when none
+  // AgentRow gains Running bool `json:"running"`
+  ```
+- Rules (D62):
+  - Render: no agent service is in the app's `Wants=`; `up` never starts an agent. A service agent's unit still exists (it is started by `railswitch agent`).
+  - `railswitch agent <name>`: after `l.Up`, `RunningAgent` for the worktree. Another agent running → error `agent <other> is running in <slug>; one agent per worktree: railswitch agent stop <other>`, nothing started. The same agent running → service mode attaches; on-demand mode refuses `agent <name> is already running in <slug>` (its container name is taken).
+  - `railswitch agent stop [<name>]`: service agent → `systemctl --user stop <unit>`; on-demand → `podman stop <ctr>` (its `--rm` removes it). A name that isn't running → error naming the running one, if any.
+  - Running is decided by `podman().Running` on each agent container of that worktree (exact names from `NamesFor`), never by status files.
+  - `--json agent ls` rows gain `running`; text output marks the running agent with `*` in a new `RUN` column, or `running` in STATE for agents without a status file.
+  - Completion: `agent` first word offers `ls`, `stop` and agent names; `agent stop` offers agent names.
+
+- [ ] **Step 1: Write failing tests**
+  - `TestServiceAgentNotWanted` (render): no app unit `Wants=` contains `-agent-`; `filial-feat-agent-probe.container` still exists.
+  - `TestAgentRefusesOtherRunning` (lifecycle, Fake): `filial-feat-agent-probe` running → `Agent(…,"feat","claude",…)` errors with `probe` and `railswitch agent stop probe`, and no `podman … run` call is made. `filial-master-agent-probe` running (other worktree) → the claude run in feat proceeds.
+  - `TestAgentServiceStartsOnRequest`: no agent running → `Agent(…,"probe",nil)` starts `filial-feat-agent-probe.service` then attaches; `up` alone makes no start call for any agent unit.
+  - `TestAgentStop`: probe running → `systemctl --user stop filial-feat-agent-probe.service`; claude running → `podman stop filial-feat-agent-claude`; nothing running → message, exit 0; `agent stop claude` while probe runs → error naming probe.
+  - `TestAgentLsRunning` (cli, `--json`): the running agent has `"running": true`, the other `false`.
+  - `TestCompleteAgent` updated: `ls`, `stop`, `claude`, `probe`.
+- [ ] **Step 2:** `go test ./internal/render/ ./internal/lifecycle/ ./internal/cli/`. Expected: FAIL.
+- [ ] **Step 3: Implement.** Update goldens (`-update`; only `Wants=`/`After=` lines and unit-hash change) and run the Quadlet dry-run.
+- [ ] **Step 4:** Same command. Expected: PASS.
+- [ ] **Step 5:** Update `TestE2EAgents`: after `up`, no agent unit is active; `railswitch agent probe` is started detached-equivalent via `systemctl --user start` through `railswitch agent stop`/start semantics — concretely: start probe with `railswitch agent probe` fed an immediate EOF on stdin (attach ends, the service stays up), assert `agent claude -- --version` is refused naming probe, `agent stop probe`, then `agent claude -- --version` succeeds; keep the secret/firewall assertions against the running probe before stopping it. Update docs (json `running`, completion `agent stop`, AGENTS.md D62, acceptance doc steps). `make check`, `go vet -tags integration ./...`, commit `feat: one running agent per worktree (D62)`.

@@ -143,6 +143,11 @@ own Node; the Phoenix image has none). `fw show`: web and db
 rejected. The host's own mise warns `missing: elixir@1.19.6 erlang@28` in
 the worktree (it reads `.tool-versions`); that is the host, not railswitch.
 
+**2026-10-27, nvim on a rails project (`ftest`) keeps the app's Node: PASS.**
+After `containerfile eject nvim --force` and `up`, `:!node --version` in
+nvim prints `v24.20.0`, Filial's `.nvmrc`, not nvim's own Node (`v24.22.1`
+from `node:24-slim` on the Phoenix project).
+
 ## Gap log
 
 | Gap | Generic feature | Commit |

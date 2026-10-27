@@ -12,7 +12,7 @@ reference host is CachyOS/Arch.
   warning is fine; it never changes the exit code).
 - Build and install from the `stage-4` branch:
   `git switch stage-4 && git pull && make build && install -m755 railswitch ~/.local/bin/`.
-- A generated app at `/tmp/rs-demo/demo` (docs/stage2-acceptance.md Step 1).
+- A generated app at `~/tmp/rs-demo/demo` (docs/stage2-acceptance.md Step 1).
 - No project with prefix `s4a` registered (`railswitch project ls`).
 - Network access to `example.com` and `api.anthropic.com` from the host (the
   firewall check expects the first allowed and the second refused).
@@ -24,7 +24,7 @@ reference host is CachyOS/Arch.
 ## Two agents in one project (`TestE2EAgents`)
 
 ```sh
-RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s4a \
+RAILSWITCH_E2E_REPO=$HOME/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s4a \
   go test -tags integration ./internal/lifecycle/ -run E2EAgents -timeout 60m -v
 ```
 

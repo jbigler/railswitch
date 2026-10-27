@@ -21,14 +21,17 @@ not in a sandbox. The reference host is CachyOS/Arch.
 
 ### 1. Generate a fresh app without host Ruby
 
+The app lives in `~/tmp/rs-demo` rather than `/tmp`, which is wiped at every
+boot on hosts that mount `/tmp` as tmpfs (CachyOS/Arch).
+
 ```bash
-mkdir -p /tmp/rs-demo
-podman run --rm -v /tmp/rs-demo:/w:Z -w /w docker.io/library/ruby:3.4 \
+mkdir -p ~/tmp/rs-demo
+podman run --rm -v "$HOME/tmp/rs-demo":/w:Z -w /w docker.io/library/ruby:3.4 \
   sh -c 'gem install rails && rails new demo -d postgresql && cd demo && git config --global user.email t@t && git config --global user.name t && git add -A && git commit -qm init'
 ```
 
-Expected: `/tmp/rs-demo/demo/.git` exists. Note which branch it is on
-(`git -C /tmp/rs-demo/demo branch --show-current`): the base worktree's slug
+Expected: `~/tmp/rs-demo/demo/.git` exists. Note which branch it is on
+(`git -C ~/tmp/rs-demo/demo branch --show-current`): the base worktree's slug
 is that branch, `main` in the commands below. Use `master` instead if that is
 what `rails new` created.
 
@@ -44,7 +47,7 @@ privileged), run `railswitch allow-ports` first, then re-run `doctor`.
 ### 3. New project, base worktree up
 
 ```bash
-railswitch project new ~/workspace/rs-demo --repo /tmp/rs-demo/demo --prefix demo
+railswitch project new ~/workspace/rs-demo --repo ~/tmp/rs-demo/demo --prefix demo
 cd ~/workspace/rs-demo/main && railswitch up
 ```
 
@@ -124,7 +127,7 @@ manual steps. railswitch has no command to unregister a project, so the
 registry entry remains after the run.
 
 ```bash
-RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 45m -v
+RAILSWITCH_E2E_REPO=$HOME/tmp/rs-demo/demo go test -tags integration ./internal/lifecycle/ -run E2E -timeout 45m -v
 ```
 
 Expected: `PASS`.

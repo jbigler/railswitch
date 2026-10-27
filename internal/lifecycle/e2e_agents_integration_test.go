@@ -37,7 +37,7 @@ var versionRe = regexp.MustCompile(`^\d+\.\d+\.\d+`)
 // refused (D62) until `agent stop probe`, then runs without the probe's
 // secret; `agent ls` lists both.
 //
-//	RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s4a \
+//	RAILSWITCH_E2E_REPO=$HOME/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s4a \
 //	  go test -tags integration ./internal/lifecycle/ -run E2EAgents -timeout 60m -v
 func TestE2EAgents(t *testing.T) {
 	repo := os.Getenv("RAILSWITCH_E2E_REPO")

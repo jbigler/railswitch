@@ -68,7 +68,7 @@ type e2eProject struct {
 // Traefik (and there not the other's hosts), and `project rm` of both leaves
 // nothing of either.
 //
-//	RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a \
+//	RAILSWITCH_E2E_REPO=$HOME/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a \
 //	  go test -tags integration ./internal/lifecycle/ -run E2ETwoProjects -timeout 60m
 func TestE2ETwoProjects(t *testing.T) {
 	repo := os.Getenv("RAILSWITCH_E2E_REPO")

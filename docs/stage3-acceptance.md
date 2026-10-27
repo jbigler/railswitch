@@ -21,7 +21,7 @@ no `~/.config/containers/systemd/*.container` with a railswitch marker), skip
 3. `railswitch doctor`: every host check OK. If `unprivileged port 80`
    fails, run `railswitch allow-ports`, then `doctor` again. `machine subnet
    free` must pass (no other podman network on 10.214.255.0/24).
-4. A fresh app at `/tmp/rs-demo/demo`, as in docs/stage2-acceptance.md
+4. A fresh app at `~/tmp/rs-demo/demo`, as in docs/stage2-acceptance.md
    Step 1 (no host Ruby needed).
 5. Run "Two projects at once" below.
 
@@ -131,13 +131,13 @@ Record here:
 ## Two projects at once (`TestE2ETwoProjects`)
 
 Prerequisites as in docs/stage2-acceptance.md (podman, a systemd user
-session, `curl`, a generated app at `/tmp/rs-demo/demo`, `railswitch doctor`
+session, `curl`, a generated app at `~/tmp/rs-demo/demo`, `railswitch doctor`
 all OK). No project with prefix `s3a` or `s3ab` may be registered. With
 `tailscale status` working the share check runs too; otherwise the test logs
 that it skipped it.
 
 ```sh
-RAILSWITCH_E2E_REPO=/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a \
+RAILSWITCH_E2E_REPO=$HOME/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s3a \
   go test -tags integration ./internal/lifecycle/ -run E2ETwoProjects -timeout 60m -v
 ```
 

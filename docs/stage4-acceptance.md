@@ -126,8 +126,34 @@ fails. On the host, `touch` still works (nothing refuses there, D60).
 ## Filial run (user, host)
 
 1. Stop the old stack (only one Traefik can own `127.0.0.1:80`).
-2. `railswitch project new <ws> --repo <filial repo> --prefix filial --option <slot>=<ref> …`
-   with the option slots Filial uses (`--tool nvim` for nvim).
+2. Create the project. `--repo` is anything `git clone` accepts on the host
+   (`git@github.com:<org>/<repo>.git`, an `https://` URL, or a local path); the
+   clone runs on the host with your own git and SSH setup. `--branch` is the
+   base branch (default: the remote's HEAD). Each `--option` is
+   `<slot>=<ref>`; a slot left out takes the rails pack's default:
+
+   | Slot | Built-in refs | Rails pack default | Gemfile.lock hint |
+   |---|---|---|---|
+   | `database` | `postgres@1` | `postgres@1` | `pg` |
+   | `cache` | `redis@1` | `redis@1` | `redis` |
+   | `storage` | `rustfs@1` (S3-compatible) | `none` | `aws-sdk-s3` |
+   | `jobs` | `sidekiq@1` | `none` | `sidekiq` |
+   | `mail` | none built in | `none` | — |
+   | `browser` | `playwright@1` | `none` | `capybara-playwright-driver` / `playwright-ruby-client` |
+
+   `none` turns a slot off. Check the app with
+   `grep -E '^    (pg|redis|sidekiq|aws-sdk-s3|capybara-playwright-driver|playwright-ruby-client) ' Gemfile.lock`.
+   For a Rails app on postgres + redis + S3 storage + Playwright system tests,
+   with nvim:
+
+   ```sh
+   railswitch project new ~/workspace/filial \
+     --repo git@github.com:<org>/<repo>.git --prefix filial --branch master \
+     --option storage=rustfs@1 --option browser=playwright@1 --tool nvim
+   ```
+
+   The default agent (`claude@1`) is added unless `--agent none`. A slot can
+   be changed later in `project.toml` `[options]`, then `railswitch lock`.
 3. In `<ws>/project.toml`: the `[image] addons` and env settings Filial
    needs; `[tools.nvim] config_repo`/`config_ref` if you keep the nvim config
    in a repo. Then `railswitch secret set …` for every declared secret.

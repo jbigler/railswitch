@@ -176,6 +176,8 @@ the gap log; nothing Filial-specific goes into the code or built-in packs
 | A cold base build ran 30 min with no output, then hit the build timeout | `up`/`build` stream podman's build output and announce each pull | `0506b89` |
 | rustfs's first start failed (exit 1) and its output was lost with the `--rm` container; the failure report showed only podman's event lines | Container logs in journald (D64); the start-failure report prints the container's own lines | `d5e9de2` |
 | Adding an agent to a pre-Stage-4 project took four manual steps | `railswitch agent add` (D63) | `369ec68`, `4bb6e9d` |
+| `up` sat silent for minutes while the app's dependencies passed their health checks | Spinner with elapsed time on a terminal; a phase line otherwise | `f4e949b` |
+| nvim added to a running stack stayed inactive: starting the active app unit starts none of its new `Wants=` | `up` starts every long-running service by name | `9ef9c7f` |
 
 Settings only (no railswitch change), in the `ftest` project's own files:
 - `project.toml` `[env] RUSTFS_ENDPOINT = "{env.S3_ENDPOINT}"`: the app's
@@ -183,15 +185,18 @@ Settings only (no railswitch change), in the `ftest` project's own files:
   the rustfs option gives `S3_ENDPOINT`.
 - `mise.local.toml` `S3_SECRET_KEY = "rustfsadmin"`: `config/storage.yml`
   hard-codes the dev credentials `rustfsadmin`/`rustfsadmin`.
+- `project.toml` `[tools.nvim] config_repo` as an `https://` URL: containers
+  have no SSH keys (D33), so a `git@` URL needs a git-host token whose
+  `services` include `nvim`.
 
 ## Done checklist (roadmap, Stage 4)
 
-- [ ] the Filial repo runs end to end from a fresh `new`;
+- [x] the Filial repo runs end to end from a fresh `new` (`ftest`, 2026-10-27: up, seeds, rustfs, agent, nvim, db round trip);
 - [x] `grep -ri filial` over the code and built-in packs finds nothing outside test fixtures (`TestGenericity`, in `make check`);
 - [x] `grep -ri claude` over the code finds nothing outside `internal/pack/builtin/agents/claude/` (`TestGenericity`);
 - [x] two agents in one project (the built-in `claude@1` and a minimal test agent package, `CMD ["sh"]`, one `run = "on-demand"`, one `run = "service"`) build on one shared agent base and run through the same `railswitch agent <name>` path, each with only its own secrets and allow list (`TestE2EAgents`, 2026-10-27);
 - [x] at most one agent runs in a worktree (D62): `up` starts none, `railswitch agent <name>` refuses while another runs, `railswitch agent stop` stops it (`TestE2EAgents`, 2026-10-27);
-- [ ] every gap Filial hit is closed by a generic feature.
+- [x] every gap Filial hit is closed by a generic feature (gap log above; the rest are the project's own settings).
 
 ## Run log
 
@@ -227,5 +232,12 @@ the database came back from `<db>.dump` and the rustfs objects from
 
 **2026-10-27, `railswitch agent` on `ftest`: works** (`claude@1`).
 
-Still to run: `nvim` on `ftest` (with the hooks check in nvim) and the
-firewall live check.
+**2026-10-27, `nvim` on `ftest`: works** (config cloned from `config_repo`,
+server stays up between attaches). Hooks read-only in nvim: PASS
+(`touch .git/hooks/x` → `Read-only file system`).
+
+**2026-10-27, agent firewall live check: PASS.** `ftest-master-agent-claude`
+carries `ftest.firewall=agent-claude`, mode `enforce`; `curl
+https://example.org` from the agent exits 7.
+
+Stage 4 acceptance: complete.

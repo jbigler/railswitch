@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -97,9 +98,18 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		cmd.Stdout = &stdout
 	}
 	cmd.Stderr = &stderr
-	if c.Stderr != nil {
+	if f, ok := c.Stderr.(*os.File); ok && c.Stderr == c.Stdout {
+		// One file for both streams (a job log): the child writes it
+		// directly, with no pipe through this process, so it outlives us.
+		// The exit error then has no stderr tail.
+		cmd.Stderr = f
+	} else if c.Stderr != nil {
 		cmd.Stderr = io.MultiWriter(c.Stderr, &tail)
 	}
+	// kill is the SIGKILL that follows a graceful SIGTERM; stopped once the
+	// command is reaped, so it never hits a reused process group id.
+	// cmd.Cancel has returned before cmd.Run does.
+	var kill *time.Timer
 	switch {
 	case c.KillGrace > 0:
 		// A graceful group: SIGTERM first so the command can clean up, then
@@ -107,7 +117,7 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		cmd.Cancel = func() error {
 			pgid := cmd.Process.Pid
-			time.AfterFunc(c.KillGrace, func() { _ = syscall.Kill(-pgid, syscall.SIGKILL) })
+			kill = time.AfterFunc(c.KillGrace, func() { _ = syscall.Kill(-pgid, syscall.SIGKILL) })
 			return syscall.Kill(-pgid, syscall.SIGTERM)
 		}
 		cmd.WaitDelay = c.KillGrace + 2*time.Second
@@ -125,6 +135,9 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	}
 
 	err := cmd.Run()
+	if kill != nil {
+		kill.Stop()
+	}
 	res := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
 	if cmd.ProcessState != nil {
 		res.ExitCode = cmd.ProcessState.ExitCode()

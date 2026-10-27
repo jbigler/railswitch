@@ -108,8 +108,8 @@ func TestKillGraceTERMThenKILL(t *testing.T) {
 		Timeout:   NoTimeout,
 		KillGrace: 200 * time.Millisecond,
 	})
-	if d := time.Since(start); d > 2*time.Second {
-		t.Fatalf("took %v", d)
+	if d := time.Since(start); d > 2*time.Second || d < 100*time.Millisecond+200*time.Millisecond {
+		t.Fatalf("took %v, want between cancel+KillGrace and 2s", d)
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want Canceled", err)

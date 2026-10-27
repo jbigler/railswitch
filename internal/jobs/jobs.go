@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -240,9 +239,9 @@ func (h *Hub) run(ctx context.Context, j *job, t *logTail, env []string) {
 		Args:      append(slices.Clone(scope[1:]), s.Argv...),
 		Dir:       s.Dir,
 		Env:       env,
-		Stdin:     strings.NewReader(""),
-		Stdout:    t.w,
-		Stderr:    t.w,
+		Stdin:     nil, // /dev/null
+		Stdout:    t.w, // the same *os.File for both: written directly,
+		Stderr:    t.w, // no pipe through the dashboard
 		Timeout:   sys.NoTimeout,
 		KillGrace: Grace,
 	})

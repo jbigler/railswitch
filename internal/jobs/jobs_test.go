@@ -132,11 +132,28 @@ func TestLogFileMode(t *testing.T) {
 	}
 }
 
+func TestStdioIsTheLogFile(t *testing.T) {
+	h, _, dir := newHub(t)
+	j := run(t, h, sh("p", "a", `readlink /proc/self/fd/0 /proc/self/fd/1 /proc/self/fd/2`))
+	log := filepath.Join(dir, j.ID+".log")
+	if want := []string{"/dev/null", log, log}; !slices.Equal(j.Lines, want) {
+		t.Errorf("child stdio = %q, want %q (no pipe through the hub)", j.Lines, want)
+	}
+}
+
 func TestOutputCaps(t *testing.T) {
 	h, _, _ := newHub(t)
-	lines, _ := h.Start(context.Background(), sh("p", "lines", `i=0; while [ $i -lt 6000 ]; do echo line$i; i=$((i+1)); done`))
-	long, _ := h.Start(context.Background(), sh("p", "long", `head -c 102400 /dev/zero | tr '\0' a; echo; echo next`))
-	ansi, _ := h.Start(context.Background(), sh("p", "ansi", `printf '\033[31mred\033[0m\n'; printf '\033]0;title\007osc\n'; printf 'a\377b\n'`))
+	start := func(s Spec) Snapshot {
+		t.Helper()
+		j, err := h.Start(context.Background(), s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return j
+	}
+	lines := start(sh("p", "lines", `i=0; while [ $i -lt 6000 ]; do echo line$i; i=$((i+1)); done`))
+	long := start(sh("p", "long", `head -c 102400 /dev/zero | tr '\0' a; echo; echo next`))
+	ansi := start(sh("p", "ansi", `printf '\033[31mred\033[0m\n'; printf '\033]0;title\007osc\n'; printf 'a\377b\n'`))
 
 	j := waitDone(t, h, lines)
 	if len(j.Lines) != KeepLines || j.Lines[0] != "line1000" || j.Lines[len(j.Lines)-1] != "line5999" {

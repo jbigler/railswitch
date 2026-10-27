@@ -319,9 +319,31 @@ func networksIsolated(ctx context.Context, r sys.Runner, dirs machine.Dirs) Chec
 	return c
 }
 
-// secrets checks the pass secret driver's needs (D37): pass and gpg on PATH
-// and the GPG key in driver_opts.key. With another driver, or no machine
-// config, it checks nothing.
+// mounts checks that every non-optional [[mount]] source exists (D57): a
+// missing one fails railswitch up's preflight.
+func mounts(cfg *machine.Config, cfgPath string) Check {
+	c := Check{Name: "machine mounts", Fix: "create the missing source, set optional = true on its [[mount]], or remove it from " + cfgPath}
+	var missing []string
+	for i, m := range cfg.Mounts {
+		if m.Optional {
+			continue
+		}
+		if _, err := os.Stat(m.Source); err != nil {
+			missing = append(missing, fmt.Sprintf("%s ([[mount]] #%d service = %q)", m.Source, i, m.Service))
+		}
+	}
+	if len(missing) > 0 {
+		c.Detail = "missing: " + strings.Join(missing, ", ")
+		return c
+	}
+	c.OK, c.Detail = true, fmt.Sprintf("%d mount(s)", len(cfg.Mounts))
+	return c
+}
+
+// secrets checks the machine config: its [[mount]] sources (machine mounts,
+// when there are mounts) and the pass secret driver's needs (D37): pass and
+// gpg on PATH and the GPG key in driver_opts.key. With another driver, or no
+// machine config, it checks no secrets.
 func (h Host) secrets(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []Check {
 	var dirs machine.Dirs
 	if ws != nil {
@@ -336,14 +358,18 @@ func (h Host) secrets(ctx context.Context, r sys.Runner, ws *workspace.Workspace
 	if err != nil {
 		return []Check{{Name: "machine config", Detail: err.Error(), Fix: "fix " + filepath.Join(dirs.Config, "config.toml")}}
 	}
-	if cfg.Secrets.Driver != "pass" {
-		return nil
-	}
 	cfgPath := filepath.Join(dirs.Config, "config.toml")
-	out := []Check{
+	var out []Check
+	if len(cfg.Mounts) > 0 {
+		out = append(out, mounts(cfg, cfgPath))
+	}
+	if cfg.Secrets.Driver != "pass" {
+		return out
+	}
+	out = append(out,
 		h.onPath("pass", "install pass (the pass secret driver in "+cfgPath+" stores secrets with it)"),
 		h.onPath("gpg", "install gnupg (the pass secret driver encrypts with gpg)"),
-	}
+	)
 	c := Check{Name: "gpg secret key"}
 	key := cfg.Secrets.DriverOpts["key"]
 	if key == "" {

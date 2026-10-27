@@ -187,7 +187,9 @@ fixed order. A workspace that doesn't load (a bad `project.toml`, no
 its project checks are skipped. The pass secret driver's checks (`pass`,
 `gpg`, `gpg secret key`) are listed only when the machine config's
 `[secrets] driver` is `pass` (D37); a machine config that can't be read is a
-failed `machine config` check. `doctor` exits 1 when any check fails.
+failed `machine config` check. `machine mounts` is listed only when the
+machine config has `[[mount]]` entries (D57); it fails when a non-optional
+source is missing. `doctor` exits 1 when any check fails.
 
 ```json
 [
@@ -199,7 +201,7 @@ failed `machine config` check. `doctor` exits 1 when any check fails.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `cgroup v2`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a stale or missing `stack.lock`); `""` for a passed check. |

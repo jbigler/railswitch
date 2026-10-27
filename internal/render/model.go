@@ -47,6 +47,15 @@ type Worktree struct {
 type Host struct {
 	CPUs                                int
 	Home, NetworkDir, GitName, GitEmail string
+	Missing                             map[string]bool // optional machine mount sources absent at render time (D57)
+}
+
+// MachineMount is a config.toml [[mount]] of this project (D57). Index is
+// its position in config.toml, for messages.
+type MachineMount struct {
+	Service, Source, Target string
+	RO, Optional            bool
+	Index                   int
 }
 
 // Inputs is everything Build reads.
@@ -59,6 +68,7 @@ type Inputs struct {
 	Worktrees []Worktree
 	Generated map[string]string // D17 values from mise.local.toml
 	Host      Host
+	Mounts    []MachineMount // machine-local mounts (D57), already filtered to this project
 }
 
 // Model is a project's services, independent of any worktree. Every string
@@ -164,9 +174,11 @@ type Volume struct {
 	Seed   string // file under <workspace>/db-dumps/ imported when the volume is created (D18)
 }
 
-// Mount is a bind mount; Source and Target are templates.
+// Mount is a bind mount; Source and Target are templates. Origin is "" for
+// package mounts and `[[mount]] #<i> service = "<svc>"` for machine mounts.
 type Mount struct {
 	Source, Target, Options string
+	Origin                  string
 }
 
 // UnitExtras are a service's unit settings. Memory and PidsLimit are
@@ -350,8 +362,26 @@ func (b *builder) services() error {
 		if s.Worktree {
 			s.Workdir = "/app"
 		}
+		s.Mounts = append(s.Mounts, b.machineMounts(s.ID)...)
 	}
 	return nil
+}
+
+// machineMounts are the machine-local mounts of service id (D57), less the
+// optional ones whose source is missing.
+func (b *builder) machineMounts(id string) []Mount {
+	var out []Mount
+	for _, mm := range b.in.Mounts {
+		if mm.Service != id || mm.Optional && b.in.Host.Missing[mm.Source] {
+			continue
+		}
+		opts := "z"
+		if mm.RO {
+			opts = "ro,z"
+		}
+		out = append(out, Mount{Source: literal(mm.Source), Target: literal(mm.Target), Options: opts, Origin: fmt.Sprintf("[[mount]] #%d service = %q", mm.Index, mm.Service)})
+	}
+	return out
 }
 
 // worktreeMounts are the app's view of the worktree: itself at /app, and the

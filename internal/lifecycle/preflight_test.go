@@ -68,3 +68,15 @@ func TestPreflightMissingSecret(t *testing.T) {
 		t.Fatal("unregistered slug: want error")
 	}
 }
+
+func TestPreflightNamesMount(t *testing.T) {
+	m := filialModel(t)
+	gone := filepath.Join(t.TempDir(), "gone")
+	s := &m.Services[0] // checked first: later mounts need applied assets
+	s.Mounts = append([]render.Mount{{Source: gone, Target: "/k", Options: "z", Origin: `[[mount]] #0 service = "nvim"`}}, s.Mounts...)
+	l := &L{R: &systest.Fake{}}
+	err := l.Preflight(context.Background(), m, "master")
+	if err == nil || !strings.Contains(err.Error(), gone) || !strings.Contains(err.Error(), `[[mount]] #0 service = "nvim"`) {
+		t.Fatalf("got %v", err)
+	}
+}

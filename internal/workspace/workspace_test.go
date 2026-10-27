@@ -5,12 +5,15 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 )
 
@@ -247,5 +250,29 @@ func TestLockAgents(t *testing.T) {
 	err = w.CheckLock()
 	if !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "for local:probe@1:") {
 		t.Errorf("CheckLock after edit: %v", err)
+	}
+}
+
+func TestMachineMounts(t *testing.T) {
+	src := t.TempDir()
+	gone := filepath.Join(src, "gone")
+	f := false
+	cfg := &machine.Config{Mounts: []machine.Mount{
+		{Service: "nvim", Source: src, Target: "/a", RO: &f},
+		{Service: "nvim", Source: src, Target: "/b", Projects: []string{"other"}},
+		{Service: "nvim", Source: gone, Target: "/c", Optional: true, Projects: []string{"other", "filial"}},
+		{Service: "nvim", Source: gone, Target: "/d"},
+	}}
+	ms, missing := machineMounts(cfg, "filial")
+	want := []render.MachineMount{
+		{Service: "nvim", Source: src, Target: "/a", Index: 0},
+		{Service: "nvim", Source: gone, Target: "/c", RO: true, Optional: true, Index: 2},
+		{Service: "nvim", Source: gone, Target: "/d", RO: true, Index: 3},
+	}
+	if !reflect.DeepEqual(ms, want) {
+		t.Errorf("mounts = %+v", ms)
+	}
+	if !reflect.DeepEqual(missing, map[string]bool{gone: true}) {
+		t.Errorf("missing = %v (only optional sources are statted)", missing)
 	}
 }

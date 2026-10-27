@@ -193,6 +193,9 @@ func (l *L) Preflight(ctx context.Context, m *render.Model, slug string) error {
 				continue
 			}
 			if _, err := os.Stat(src); err != nil {
+				if mt.Origin != "" {
+					return fmt.Errorf("%s: bind mount source %s of %s in config.toml is missing: %w", s.ID, src, mt.Origin, err)
+				}
 				return fmt.Errorf("%s: bind mount source %s is missing: %w", s.ID, src, err)
 			}
 		}

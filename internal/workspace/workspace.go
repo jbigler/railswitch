@@ -276,6 +276,12 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 	if err != nil {
 		return nil, err
 	}
+	cfg, err := machine.LoadConfig(w.Dirs)
+	if err != nil {
+		return nil, err
+	}
+	mounts, missing := machineMounts(cfg, prefix)
+	host.Missing = missing
 	return render.Build(render.Inputs{
 		Workspace: w.Root,
 		Project:   w.Project,
@@ -285,7 +291,31 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 		Worktrees: wts,
 		Generated: gen,
 		Host:      host,
+		Mounts:    mounts,
 	})
+}
+
+// machineMounts are cfg's [[mount]]s of project prefix (D57), and which of
+// their optional sources are missing now (render leaves those out; a
+// missing non-optional source fails Preflight).
+func machineMounts(cfg *machine.Config, prefix string) ([]render.MachineMount, map[string]bool) {
+	var out []render.MachineMount
+	var missing map[string]bool
+	for i, m := range cfg.Mounts {
+		if len(m.Projects) > 0 && !slices.Contains(m.Projects, prefix) {
+			continue
+		}
+		out = append(out, render.MachineMount{Service: m.Service, Source: m.Source, Target: m.Target, RO: m.ReadOnly(), Optional: m.Optional, Index: i})
+		if m.Optional {
+			if _, err := os.Stat(m.Source); err != nil {
+				if missing == nil {
+					missing = map[string]bool{}
+				}
+				missing[m.Source] = true
+			}
+		}
+	}
+	return out, missing
 }
 
 // samePath reports whether a and b name the same directory, through

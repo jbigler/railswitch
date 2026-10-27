@@ -425,3 +425,21 @@ func TestNetworksIsolated(t *testing.T) {
 		t.Errorf("all isolated: %+v", c)
 	}
 }
+
+func TestDoctorMachineMounts(t *testing.T) {
+	ws := workspaceAt(t, true)
+	src := t.TempDir()
+	gone := filepath.Join(src, "gone")
+	writeConfig(t, ws.Dirs, "[[mount]]\nservice = \"nvim\"\nsource = \""+src+"\"\ntarget = \"/a\"\n"+
+		"[[mount]]\nservice = \"nvim\"\nsource = \""+gone+"\"\ntarget = \"/b\"\noptional = true\n")
+	c, ok := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["machine mounts"]
+	if !ok || !c.OK {
+		t.Errorf("present source and missing optional one: %+v (present %v)", c, ok)
+	}
+	writeConfig(t, ws.Dirs, "[[mount]]\nservice = \"nvim\"\nsource = \""+gone+"\"\ntarget = \"/b\"\n")
+	got := host(t, "80", true).Run(context.Background(), fakeHost(), ws)
+	c = byName(got)["machine mounts"]
+	if c.OK || !strings.Contains(c.Detail, gone) || !strings.Contains(c.Detail, `[[mount]] #0 service = "nvim"`) || c.Fix == "" {
+		t.Errorf("missing source: %+v", c)
+	}
+}

@@ -519,14 +519,15 @@ func clone(ctx context.Context, r sys.Runner, repo, base, dir string) error {
 	return nil
 }
 
-// prepare creates <ws>/db-dumps/ (0700: postgres mounts it and up's
-// preflight needs every bind source) and, in the base worktree, the mount
+// prepare creates <ws>/db-dumps/ (0755: the database container mounts it
+// and runs its initdb restore as the image's own non-root user, which must
+// list it; up's preflight needs every bind source) and, in the base worktree, the mount
 // points of the pack's worktree volumes, as wt add does.
 func prepare(ws, slug string, st *pack.Stack) error {
 	dumps := filepath.Join(ws, "db-dumps")
-	switch err := os.Mkdir(dumps, 0o700); {
+	switch err := os.Mkdir(dumps, 0o755); {
 	case err == nil:
-		if err := os.Chmod(dumps, 0o700); err != nil {
+		if err := os.Chmod(dumps, 0o755); err != nil {
 			return err
 		}
 	case !errors.Is(err, fs.ErrExist):

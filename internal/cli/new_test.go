@@ -191,8 +191,8 @@ func TestNew(t *testing.T) {
 		t.Errorf("new printed the generated password:\n%s", out)
 	}
 
-	if m := mode(t, filepath.Join(ws, "db-dumps")); m != 0o700 {
-		t.Errorf("db-dumps mode = %v; want 0700", m)
+	if m := mode(t, filepath.Join(ws, "db-dumps")); m != 0o755 {
+		t.Errorf("db-dumps mode = %v; want 0755", m)
 	}
 	if _, err := os.Stat(filepath.Join(ws, "main", "README")); err != nil {
 		t.Errorf("base worktree not cloned: %v", err)
@@ -512,8 +512,8 @@ func TestInitJoin(t *testing.T) {
 	} else if strings.Contains(out, pw) {
 		t.Error("init printed the generated password")
 	}
-	if m := mode(t, filepath.Join(join, "db-dumps")); m != 0o700 {
-		t.Errorf("db-dumps mode = %v; want 0700", m)
+	if m := mode(t, filepath.Join(join, "db-dumps")); m != 0o755 {
+		t.Errorf("db-dumps mode = %v; want 0755", m)
 	}
 	reg := registry(t, dirs)
 	if pe, ok := reg.Project("shop"); !ok || pe.Workspace != join {

@@ -63,7 +63,14 @@ func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
 		return nil, fmt.Errorf("%s is not running: railswitch up", ctr)
 	}
 	dir := in.Values["dumps"]
+	// 0755 dir and 0644 files: the database container restores the dumps
+	// at initdb as the image's own non-root user (no keep-id), to which the
+	// user's files appear as another owner's. Dumps hold dev data and the
+	// workspace dir is the user's own.
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(dir, 0o755); err != nil {
 		return nil, err
 	}
 	var paths []string
@@ -82,7 +89,7 @@ func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
 	}
 	for _, s := range m.Services {
 		for _, v := range s.Volumes {
-			if v.Seed == "" || v.Shared {
+			if v.Seed == "" {
 				continue
 			}
 			vol, err := in.VolumeName(s.ID, v)
@@ -98,7 +105,7 @@ func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
 	return paths, nil
 }
 
-// writeStream runs c with its stdout (gzipped when gz) going to a 0600 temp
+// writeStream runs c with its stdout (gzipped when gz) going to a 0644 temp
 // file next to path, which it renames over path once c succeeded; on any
 // failure the temp file is removed. It returns path's size.
 func writeStream(ctx context.Context, r sys.Runner, path string, gz bool, c sys.Cmd) (int64, error) {
@@ -125,6 +132,9 @@ func writeStream(ctx context.Context, r sys.Runner, path string, gz bool, c sys.
 		}
 		return f.Sync()
 	}()
+	if err == nil {
+		err = f.Chmod(0o644)
+	}
 	err = errors.Join(err, f.Close())
 	if err == nil {
 		err = os.Rename(tmp, path)

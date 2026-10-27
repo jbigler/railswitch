@@ -39,6 +39,9 @@ func TestDBDump(t *testing.T) {
 	e.dbRunning("feat")
 	e.f.On([]string{"podman", "exec", "filial-feat-db"}, sys.Result{Stdout: []byte("PGDMP\x00dump")}, nil)
 	e.f.On([]string{"podman", "volume", "export"}, sys.Result{Stdout: []byte("tar bytes")}, nil)
+	if err := os.Chmod(filepath.Join(e.ws, "db-dumps"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	paths, err := e.l.DBDump(ctx, "feat")
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +55,7 @@ func TestDBDump(t *testing.T) {
 	if err != nil || string(got) != "PGDMP\x00dump" {
 		t.Errorf("dump = %q, %v", got, err)
 	}
-	if fi, err := os.Stat(dump); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(dump); err != nil || fi.Mode().Perm() != 0o644 {
 		t.Errorf("dump mode: %v, %v", fi, err)
 	}
 	wantInOrder(t, e.calls(), "podman exec filial-feat-db pg_dump -Fc -U postgres filial_dev", "podman volume export filial-feat-")
@@ -72,7 +75,7 @@ func TestDBDump(t *testing.T) {
 	if b, err := io.ReadAll(zr); err != nil || string(b) != "tar bytes" {
 		t.Errorf("seed = %q, %v", b, err)
 	}
-	if fi, err := os.Stat(seed); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(seed); err != nil || fi.Mode().Perm() != 0o644 {
 		t.Errorf("seed mode: %v, %v", fi, err)
 	}
 	for _, c := range e.f.Cmds {
@@ -84,6 +87,9 @@ func TestDBDump(t *testing.T) {
 		if !strings.Contains(e.out.String(), p) {
 			t.Errorf("output lacks %s:\n%s", p, e.out)
 		}
+	}
+	if fi, err := os.Stat(dumps); err != nil || fi.Mode().Perm() != 0o755 {
+		t.Errorf("db-dumps mode: %v, %v", fi, err)
 	}
 	noTemps(t, dumps)
 }

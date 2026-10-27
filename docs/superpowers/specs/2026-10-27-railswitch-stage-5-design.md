@@ -113,11 +113,25 @@ not a known source form; unknown keys still refused.
   same name (the rails pack reads `Gemfile.lock:playwright-ruby-client`), the
   pin default. This keeps today's rule that `[versions]` beats a pin, so a
   deliberate pin works. *(My call.)*
-- **nvim:** its `npm_global_node{node}` shared volume no longer requires a
-  pack runtime named `node`. Placeholders gain an optional form `{name?}`
-  that expands to `""` when `name` is unset (only for runtime/pin values);
-  nvim's volume becomes `npm_global_node{node?}`, so a pack without Node
-  shares one `<prefix>_npm_global_node`. *(My call.)*
+- **nvim:** language servers installed with npm (Mason and the like) need
+  Node in the nvim image whatever the project uses (user, 2026-10-27). The
+  nvim image is built on the project's base image (D23/D31) and today gets
+  Node only from it. `Containerfile.nvim` gains its own Node
+  (`ARG NVIM_NODE_VERSION=24`, copied from `docker.io/library/node:<v>-slim`
+  into `/opt/nvim-node`), linked into `/usr/local/bin` only when the base has
+  no `node`, so a rails base keeps the app's Node. It also sets
+  `NPM_CONFIG_PREFIX=/home/appuser/.npm-global`, adds its `bin` to `PATH`
+  and creates that directory for `appuser`, which today only the rails base
+  does. Existing projects keep their ejected `Containerfile.nvim` until
+  `railswitch containerfile eject nvim --force`. *(My call: the version is an
+  ARG default in the ejected file, edited per project; no new tool pin.)*
+- **nvim's npm volume:** `npm_global_node{node}` no longer requires a pack
+  runtime named `node`. Placeholders gain an optional form `{name?}` that
+  expands to `""` when `name` is unknown; the volume becomes
+  `npm_global_node{node?}` (unchanged for rails), so a pack without Node
+  shares one `<prefix>_npm_global_node`, holding packages for nvim's own
+  Node. After changing `NVIM_NODE_VERSION`, remove that volume (docs/nvim.md).
+  *(My call.)*
 - **Version sources:** `mise.toml:<tool>` (and `.mise.toml`) joins the
   generic sources next to `.tool-versions:<tool>`.
 

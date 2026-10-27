@@ -23,6 +23,7 @@
 - **C4. Project routes** may target any long-running service except agents; the target joins the proxy network (as option routes do). Host is `<name>.{worktree.host}`.
 - **C5. `pack eject` copies built-ins only, refuses an existing directory** (no `--force`: a local pack is the user's code).
 - **C6. One Phoenix copy**, in the fixture workspace `testdata/fixtures/phoenix/` (outside `internal/`, so `TestGenericity` exempts it).
+- **C7. nvim brings its own Node** (user, 2026-10-27: LSPs need it whatever the project uses): `Containerfile.nvim` copies Node (`ARG NVIM_NODE_VERSION=24`) to `/opt/nvim-node` and links it only when the base has no `node`; no new tool pin.
 
 ## Global Constraints
 
@@ -129,13 +130,14 @@ Added here:
 ### Task 4: Browser and nvim without Rails runtimes
 
 **Files:**
-- Modify: `internal/pack/builtin/options/playwright/option.toml` (`[pin] name = "playwright"`, `default = "1.60.0"`), `internal/render/model.go` (`values()` pin loop), `internal/cli/new.go:316-323` (pin copy, C3), `internal/pack/builtin/tools/nvim/tool.toml` (`npm_global_node{node?}`)
-- Test: `internal/render/model_test.go`, `internal/cli/new_test.go`, render goldens (expected unchanged)
-- Docs: `docs/nvim.md` (volume name), `docs/packs.md` ("Option pins and pack runtimes")
+- Modify: `internal/pack/builtin/options/playwright/option.toml` (`[pin] name = "playwright"`, `default = "1.60.0"`), `internal/render/model.go` (`values()` pin loop), `internal/cli/new.go:316-323` (pin copy, C3), `internal/pack/builtin/tools/nvim/tool.toml` (`npm_global_node{node?}`), `internal/pack/builtin/tools/nvim/Containerfile.nvim` (own Node, C7)
+- Test: `internal/render/model_test.go`, `internal/cli/new_test.go`, render goldens (expected unchanged), `TestBuiltinContainerfilesSelfContained` (still passes)
+- Docs: `docs/nvim.md` (Node in the nvim image, `NVIM_NODE_VERSION`, volume name, remove the volume after a Node change, `containerfile eject nvim --force` for existing projects), `docs/packs.md` ("Option pins and pack runtimes")
 
 **Interfaces:**
 - Consumes: Task 3 `{name?}`.
 - Produces: version precedence for a pinned name, high to low: `[worktrees.<slug>.versions]`, `[versions]`, the pack runtime of the same name, the pin default; `from` strings `worktrees.<slug>.versions`, `versions`, `runtimes.<n> (<source>)`, `<option> pin default`.
+- Produces (C7) `Containerfile.nvim`: `ARG NVIM_NODE_VERSION=24` before the first `FROM`; a stage `FROM docker.io/library/node:${NVIM_NODE_VERSION}-slim AS nvim-node`; in the final stage, as root, copy its `/usr/local/bin/node` and `/usr/local/lib/node_modules` to `/opt/nvim-node/{bin,lib/node_modules}` and, only when `command -v node` fails, link `node`, `npm`, `npx` into `/usr/local/bin`; `ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global`, `PATH` gains `/home/appuser/.npm-global/bin`; `mkdir -p /home/appuser/.npm-global` owned by 1000. No source-text test: the host acceptance checks it (Task 9: `node --version` in a Phoenix nvim container works; in a rails nvim container it equals the app's Node).
 
 - [ ] **Step 1: Write failing tests:**
   - `TestPlaywrightPinWithoutRuntime`: a fixture pack without `[runtimes.playwright]` plus `browser = "playwright@1"` → playwright tag value `1.60.0`.
@@ -259,7 +261,7 @@ Added here:
 - `TestE2EPhoenix` (skipped unless `RAILSWITCH_E2E_PHX_REPO` is set; prefix `RAILSWITCH_E2E_PREFIX`, default `s5p`): copy `testdata/fixtures/phoenix/packs/phoenix` into a temp workspace → `project new --pack local:phoenix@1 --option database=postgres@1 --agent none` → `up` → `curl` the app host → 200 → `wt add feat` → `up` in feat → 200, and `PGDATABASE` differs between the two (`railswitch env web`) → append a comment to `packs/phoenix/README.md` → `up` fails with `stack.lock is out of date` → `lock` → `up` OK → `down --yes` both, `wt rm feat`, `project rm --yes --purge`; afterwards no object named `<prefix>-…`/`<prefix>_…` remains.
 
 - [ ] **Step 1:** Write the e2e test; `go vet -tags integration ./...` clean.
-- [ ] **Step 2:** Write `docs/stage5-acceptance.md`: prerequisites, the bootstrap `podman run`, the app-side edits, `TestE2EPhoenix` command, by-hand checks (live reload: edit a `.heex` template, the page reloads; `railswitch nvim`; `railswitch agent` with `[agents.claude]` added via `agent add`), `rails new -j bun` check (`deps` uses `bun install --frozen-lockfile`), run log section, done checklist from the roadmap.
+- [ ] **Step 2:** Write `docs/stage5-acceptance.md`: prerequisites, the bootstrap `podman run`, the app-side edits, `TestE2EPhoenix` command, by-hand checks (live reload: edit a `.heex` template, the page reloads; `railswitch nvim`, then in the nvim container `node --version` and `npm install -g` of a language server work (C7), and on a rails project the nvim container's `node --version` equals the app's; `railswitch agent` with `[agents.claude]` added via `agent add`), `rails new -j bun` check (`deps` uses `bun install --frozen-lockfile`), run log section, done checklist from the roadmap.
 - [ ] **Step 3:** Docs and decisions as listed; `make check`.
 - [ ] **Step 4:** Commit `docs: Stage 5 pack reference, decisions, acceptance; Phoenix e2e test`.
 - [ ] **Step 5 (user, host):** run the acceptance doc; every gap goes through a fix task (generic feature + test) and the gap log.

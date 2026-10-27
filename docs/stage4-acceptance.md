@@ -149,10 +149,29 @@ the gap log; nothing Filial-specific goes into the code or built-in packs
 ## Done checklist (roadmap, Stage 4)
 
 - [ ] the Filial repo runs end to end from a fresh `new`;
-- [ ] `grep -ri filial` over the code and built-in packs finds nothing outside test fixtures;
-- [ ] `grep -ri claude` over the code finds nothing outside `internal/pack/builtin/agents/claude/`;
-- [ ] two agents in one project (the built-in `claude@1` and a minimal test agent package, `CMD ["sh"]`, one `run = "on-demand"`, one `run = "service"`) build on one shared agent base and run through the same `railswitch agent <name>` path, each with only its own secrets and allow list;
-- [ ] at most one agent runs in a worktree (D62): `up` starts none, `railswitch agent <name>` refuses while another runs, `railswitch agent stop` stops it;
+- [x] `grep -ri filial` over the code and built-in packs finds nothing outside test fixtures (`TestGenericity`, in `make check`);
+- [x] `grep -ri claude` over the code finds nothing outside `internal/pack/builtin/agents/claude/` (`TestGenericity`);
+- [x] two agents in one project (the built-in `claude@1` and a minimal test agent package, `CMD ["sh"]`, one `run = "on-demand"`, one `run = "service"`) build on one shared agent base and run through the same `railswitch agent <name>` path, each with only its own secrets and allow list (`TestE2EAgents`, 2026-10-27);
+- [x] at most one agent runs in a worktree (D62): `up` starts none, `railswitch agent <name>` refuses while another runs, `railswitch agent stop` stops it (`TestE2EAgents`, 2026-10-27);
 - [ ] every gap Filial hit is closed by a generic feature.
 
 ## Run log
+
+**2026-10-27, `TestE2EAgents` PASS** on the user's CachyOS host (rootless), branch
+`stage-4` at `7fd26e1`, demo app at `~/tmp/rs-demo/demo`.
+
+```
+$ RAILSWITCH_E2E_REPO=$HOME/tmp/rs-demo/demo RAILSWITCH_E2E_PREFIX=s4a go test -tags integration ./internal/lifecycle/ -run E2EAgents -timeout 60m -v
+=== RUN   TestE2EAgents
+--- PASS: TestE2EAgents (79.50s)
+PASS
+ok     github.com/jbigler/railswitch/internal/lifecycle   79.500s
+```
+
+The first run failed in `railswitch agent claude -- --version`: `~/.claude` was
+created root-owned by the runtime (a mount point nested in the agent's home
+volume). Fixed in `caa5b19`: agent homes are bind dirs and render pre-creates
+every mount point under a home.
+
+Still to run: the live checks above (firewall, read-only hooks, db round trip)
+and the Filial run.

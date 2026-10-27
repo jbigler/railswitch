@@ -844,6 +844,9 @@ func TestTransientMatchesUnit(t *testing.T) {
 		if got, want := flagValues(argv, "-v"), unitValues(unit, "Volume"); !slices.Equal(got, want) {
 			t.Errorf("%s: mounts %q, unit %q", s, got, want)
 		}
+		if got, want := flagValues(argv, "--cpus"), unitCPUs(t, unit); len(got) != 1 || got[0] != want {
+			t.Errorf("%s: cpus %q, unit %s", s, got, want)
+		}
 		if got, want := flagValues(argv, "--userns"), unitValues(unit, "UserNS"); !slices.Equal(got, want) {
 			t.Errorf("%s: userns %q, unit %q", s, got, want)
 		}

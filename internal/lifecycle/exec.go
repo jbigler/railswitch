@@ -130,6 +130,9 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	if s.DropsAllCaps() {
 		args = append(args, "--cap-drop", "all")
 	}
+	if n := in.CPUs(s); n != "" {
+		args = append(args, "--cpus", n)
+	}
 	args = append(args, "--security-opt", "no-new-privileges",
 		"--memory", s.Unit.Memory, "--pids-limit", strconv.Itoa(s.Unit.PidsLimit),
 		"--env-file", envFile)

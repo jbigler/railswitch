@@ -325,14 +325,8 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 	}
 
 	var args []string
-	cpus := m.Inputs.Host.CPUs
-	switch s.Role {
-	case RoleApp, RoleWorker, RoleDeps:
-		args = append(args, "--cpus="+strconv.Itoa(max(1, cpus*3/4)))
-	case RoleTool:
-		args = append(args, "--cpus="+strconv.Itoa(max(1, cpus/4)))
-	case RoleAgent:
-		args = append(args, "--cpus="+strconv.Itoa(max(1, cpus/2)))
+	if n := in.CPUs(s); n != "" {
+		args = append(args, "--cpus="+n)
 	}
 	if ux.TTY {
 		args = append(args, "--tty", "--interactive")

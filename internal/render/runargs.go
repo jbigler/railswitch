@@ -3,6 +3,7 @@ package render
 import (
 	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/naming"
@@ -75,6 +76,22 @@ func (in *Instance) AddHosts(s *Service) ([]string, error) {
 		hosts = append(hosts, sh.Host+":"+sh.IP)
 	}
 	return hosts, nil
+}
+
+// CPUs is the --cpus cap of s's container, given the host's CPUs: app,
+// worker and deps get 3/4, a tool 1/4 and an agent 1/2 (at least 1); ""
+// for a data service (no cap).
+func (in *Instance) CPUs(s *Service) string {
+	cpus := in.m.Inputs.Host.CPUs
+	switch s.Role {
+	case RoleApp, RoleWorker, RoleDeps:
+		return strconv.Itoa(max(1, cpus*3/4))
+	case RoleTool:
+		return strconv.Itoa(max(1, cpus/4))
+	case RoleAgent:
+		return strconv.Itoa(max(1, cpus/2))
+	}
+	return ""
 }
 
 // FirewallAnnotations are the annotations the firewall hook reads for a

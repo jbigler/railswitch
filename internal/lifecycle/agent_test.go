@@ -84,6 +84,14 @@ func TestAgentOnDemandArgv(t *testing.T) {
 	if !strings.HasPrefix(c[len(c)-2], "localhost/filial/agent-claude:") || c[len(c)-1] != "--version" {
 		t.Errorf("argv does not end with the claude image and --version: %q", c[len(c)-2:])
 	}
+	// An agent's cap is its role's: the service agent's unit shows it.
+	probe, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-agent-probe.container"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := flagValues(c, "--cpus"), unitCPUs(t, string(probe)); len(got) != 1 || got[0] != want {
+		t.Errorf("--cpus %q; want %s (the agent role's cap)", got, want)
+	}
 	if to := e.f.Cmds[len(e.f.Cmds)-1].Timeout; to != sys.NoTimeout {
 		t.Errorf("timeout %v; want NoTimeout", to)
 	}
@@ -321,7 +329,24 @@ func TestAgentTransientMatchesUnit(t *testing.T) {
 	if got, want := flagValues(argv, "--annotation"), unitValues(unit, "Annotation"); !slices.Equal(got, want) {
 		t.Errorf("annotations %q, unit %q", got, want)
 	}
+	if got, want := flagValues(argv, "--cpus"), unitCPUs(t, unit); len(got) != 1 || got[0] != want {
+		t.Errorf("cpus %q, unit %s", got, want)
+	}
 	if got, want := flagValues(argv, "-v"), unitValues(unit, "Volume"); !slices.Equal(got, want) {
 		t.Errorf("mounts %q, unit %q", got, want)
 	}
+}
+
+// unitCPUs is the --cpus= value of a unit's PodmanArgs.
+func unitCPUs(t *testing.T, unit string) string {
+	t.Helper()
+	for _, a := range unitValues(unit, "PodmanArgs") {
+		for _, w := range strings.Fields(a) {
+			if v, ok := strings.CutPrefix(w, "--cpus="); ok {
+				return v
+			}
+		}
+	}
+	t.Fatalf("unit has no --cpus:\n%s", unit)
+	return ""
 }

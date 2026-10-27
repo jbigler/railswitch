@@ -60,16 +60,26 @@ updates `docs/`.
   `entrypoints/`, `deps.allow`, `initdb/`, plus an optional `README.md`.
 - The manifest's `name` and `version` must equal the ref's `<name>` and `<N>`;
   a mismatch is an error naming the file and both values.
+- Local packages are loaded on demand: only the `local:` refs a project uses
+  are read, so a half-written pack under `packs/` (e.g. right after
+  `pack new`) breaks nothing until a ref points at it; `pack show` loads one
+  by ref. Local agents (Stage 4) move to the same rule. *(My call.)*
 - `stack.lock` records local packages with `source = "local"` and the D14
   sha256 of the directory. `up`/`render` refuse when the hash differs and say
-  to run `railswitch lock`. `CheckLock` also compares `source`, so switching a
-  slot between a built-in and a local package of the same name is a lock change.
+  to run `railswitch lock`. `CheckLock` also compares whether an entry is
+  local, so switching a slot between a built-in and a byte-identical local
+  copy of the same name is a lock change. (It does not compare the built-in
+  `source` text, which carries the railswitch version.)
 - Port bases and port names are checked for collisions across every package a
   project uses, built-in and local together.
 - `project new --pack local:<name>@<N>` (and `--option slot=local:…`) works
   when `<workspace>/packs/<name>/` already exists before `project new`; if it
   doesn't, the error names the missing path. `project new` already accepts an
   existing workspace directory without `project.toml`. *(My call.)*
+- The pack format gets a reference, `docs/packs.md` (there is none today):
+  every manifest field, the source forms, the conventions a pack must keep
+  (`/app`, `appuser` uid 1000 as the last `USER`, Debian when the project has
+  agents, since the agent base uses apt) and the `README.md` convention.
 
 ### Pack commands
 
@@ -93,7 +103,7 @@ updates `docs/`.
 
 Load errors name the file and the field, joined (as today). Added: ref
 name/version mismatch; cross-package port collisions; chain sources that are
-not a known source form; health `cmd` empty; unknown keys still refused.
+not a known source form; unknown keys still refused.
 
 ### Generic fixes found in the Stage 5 map
 
@@ -102,10 +112,12 @@ not a known source form; health `cmd` empty; unknown keys still refused.
   to low: `[worktrees.<slug>.versions]`, `[versions]`, a pack runtime of the
   same name (the rails pack reads `Gemfile.lock:playwright-ruby-client`), the
   pin default. This keeps today's rule that `[versions]` beats a pin, so a
-  deliberate pin works; `railswitch env` shows the source. *(My call.)*
+  deliberate pin works. *(My call.)*
 - **nvim:** its `npm_global_node{node}` shared volume no longer requires a
-  pack runtime named `node`. Without one the volume is named without the
-  version (or is omitted; builder's choice, documented in docs/nvim.md).
+  pack runtime named `node`. Placeholders gain an optional form `{name?}`
+  that expands to `""` when `name` is unset (only for runtime/pin values);
+  nvim's volume becomes `npm_global_node{node?}`, so a pack without Node
+  shares one `<prefix>_npm_global_node`. *(My call.)*
 - **Version sources:** `mise.toml:<tool>` (and `.mise.toml`) joins the
   generic sources next to `.tool-versions:<tool>`.
 
@@ -121,9 +133,11 @@ port = 3036              # the container port
 ```
 
 Rendered as an extra Traefik router/service on that container, with the same
-`Host(…) && (ClientIP(…) || <host clause>)` rule as every router (D50), and
-checked by the duplicate-hostname check (Stage 3). The service must be on the
-proxy network; render says so if it isn't.
+`Host(…) && (ClientIP(…) || <host clause>)` rule as every router (D50). A
+routed service joins the proxy network, as option routes already make it do.
+Render refuses two routes with the same router name or host within a project
+(app, option and project routes together); today nothing checks this, and
+hosts of different projects can't collide because they carry the prefix.
 
 ### JavaScript package managers (rails pack)
 
@@ -136,19 +150,28 @@ missing, fails with a message naming the fix.
 
 Bun is a rails pack runtime, not a new package kind *(my call; the roadmap
 said "built-in ejectable bun addon")*: `[runtimes.bun] from = [".bun-version",
-"package.json:packageManager"]` with no fallback. A chain may now have no
+"package.json:packageManager.bun"]` with no fallback. A chain may now have no
 fallback: when no source matches, the value is empty. The new source form
-`package.json:packageManager` yields the version only when `packageManager`
-names the runtime (`bun@1.2.3` for `bun`). The rails `Containerfile.base`
+`package.json:packageManager.<name>` yields the version only when
+`packageManager` names that tool (`bun@1.2.3+sha512…` gives `1.2.3`; `yarn@4`
+gives nothing for `bun`). The rails `Containerfile.base`
 takes `BUN_VERSION` and installs bun only when it is non-empty, so apps
 without bun get no bun. Existing projects carry an ejected
 `containerfiles/Containerfile.base` from before; the deps error for a bun
 lockfile without bun says to run `railswitch containerfile eject base --force`
 (or to merge the bun step by hand).
 
+Any pack can declare the same `[runtimes.bun]` (an Ember pack would, and could
+start `FROM docker.io/oven/bun:{bun}`): the sources, the empty-chain rule and
+`{bun}` are core; the install step and the lockfile-to-command deps script are
+copied into each pack that wants them. User, 2026-10-27: a copy per pack is
+fine for now; a shared add-on package kind can come later (Stage 7) if the
+copies drift.
+
 ### Phoenix fixture pack
 
-`internal/pack/testdata/packs/phoenix/` (never embedded):
+`testdata/fixtures/phoenix/packs/phoenix/`, inside a fixture workspace
+`testdata/fixtures/phoenix/` (never embedded; the acceptance run copies it):
 
 - base image from Elixir/Erlang versions read from `.tool-versions`
   (`elixir`, `erlang`), then `mise.toml`, then pinned fallbacks;

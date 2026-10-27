@@ -3,7 +3,9 @@ package pack
 import (
 	"io/fs"
 	"maps"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -497,6 +499,76 @@ func TestLoadUnknownSource(t *testing.T) {
 		_, err := Load(fsys)
 		if err == nil || !strings.Contains(err.Error(), "packs/p/pack.toml: "+want) {
 			t.Errorf("Load with %q = %v; want %q", extra, err, want)
+		}
+	}
+}
+
+// runRailsDeps runs the rails deps entrypoint in a temp app dir holding
+// files, with fake tools on PATH that log their argv to calls. tools are
+// the fakes besides bundle and node.
+func runRailsDeps(t *testing.T, app string, files []string, tools []string) (out string, calls string, err error) {
+	t.Helper()
+	script, rerr := fs.ReadFile(builtin.FS, "packs/rails/entrypoints/entrypoint-deps.sh")
+	if rerr != nil {
+		t.Fatal(rerr)
+	}
+	bin := t.TempDir()
+	log := filepath.Join(bin, "calls")
+	for _, tool := range append([]string{"bundle", "node"}, tools...) {
+		fake := "#!/bin/sh\necho \"" + tool + " $*\" >> " + log + "\n[ \"$1\" = --version ] && echo 1.0.0\nexit 0\n"
+		if err := os.WriteFile(filepath.Join(bin, tool), []byte(fake), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range files {
+		if err := os.WriteFile(filepath.Join(app, f), []byte(f+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body := strings.Replace(string(script), "cd /app", "cd "+app, 1)
+	cmd := exec.Command("sh", "-c", body, "entrypoint-deps.sh")
+	cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin"}
+	b, err := cmd.CombinedOutput()
+	data, _ := os.ReadFile(log)
+	return string(b), string(data), err
+}
+
+// D69, Review Focus 5: the JS install follows the lockfile, first match in
+// the documented order; a lockfile whose tool is missing names the fix.
+func TestRailsDepsLockfiles(t *testing.T) {
+	all := []string{"npm", "bun", "yarn", "pnpm"}
+	for _, c := range []struct {
+		files, tools []string
+		want         string // the install call, or the error text
+		fails        bool
+	}{
+		{[]string{"package.json", "package-lock.json"}, all, "npm ci --no-audit --no-fund", false},
+		{[]string{"package.json", "bun.lock"}, all, "bun install --frozen-lockfile", false},
+		{[]string{"package.json", "bun.lockb"}, all, "bun install --frozen-lockfile", false},
+		{[]string{"package.json", "yarn.lock"}, all, "yarn install --immutable", false},
+		{[]string{"package.json", "pnpm-lock.yaml"}, all, "pnpm install --frozen-lockfile", false},
+		{[]string{"package.json", "package-lock.json", "yarn.lock"}, all, "npm ci --no-audit --no-fund", false},
+		{[]string{"package.json", "bun.lock"}, []string{"npm"}, `bun.lock needs bun, which is not in the image: pin it in .bun-version or package.json "packageManager"`, true},
+		{[]string{"package.json", "yarn.lock"}, []string{"npm"}, `yarn.lock needs yarn, which is not in the image: set package.json "packageManager"`, true},
+		{[]string{"package.json"}, all, "package.json has no lockfile", true},
+	} {
+		name := strings.Join(c.files, "+") + " with " + strings.Join(c.tools, ",")
+		app := t.TempDir()
+		out, calls, err := runRailsDeps(t, app, c.files, c.tools)
+		if c.fails {
+			if err == nil || !strings.Contains(out, c.want) {
+				t.Errorf("%s: err %v, output %q; want a failure saying %q", name, err, out, c.want)
+			}
+			continue
+		}
+		if err != nil || !strings.Contains(calls, c.want+"\n") {
+			t.Errorf("%s: err %v, output %q, calls %q; want %q", name, err, out, calls, c.want)
+			continue
+		}
+		// Same inputs again: the stamp says up to date, nothing installs.
+		out, calls, err = runRailsDeps(t, app, nil, c.tools)
+		if err != nil || !strings.Contains(out, "node_modules up to date") || strings.Contains(calls, " install") || strings.Contains(calls, "npm ci") {
+			t.Errorf("%s, second run: err %v, output %q, calls %q", name, err, out, calls)
 		}
 	}
 }

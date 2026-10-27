@@ -1,11 +1,13 @@
 # The rails pack's default base image (D31): app, deps and worker run it, and
 # every addon and tool image is built on top of it. railswitch passes
-# RUBY_VERSION and NODE_VERSION from the worktree's own version files.
+# RUBY_VERSION, NODE_VERSION and BUN_VERSION from the worktree's own version
+# files; BUN_VERSION is empty unless the app pins bun (D69).
 #
 # Database clients are not here: the database option's addon adds them
 # (postgres: Containerfile.pg-client). Nothing is read from the build context.
 ARG RUBY_VERSION
 ARG NODE_VERSION
+ARG BUN_VERSION
 
 # Node, only to copy its runtime into the image below.
 FROM docker.io/library/node:${NODE_VERSION}-slim AS node
@@ -13,6 +15,7 @@ FROM docker.io/library/node:${NODE_VERSION}-slim AS node
 FROM docker.io/library/ruby:${RUBY_VERSION}-slim
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG BUN_VERSION
 
 # What a Rails app needs to build its gems and run: compilers and headers for
 # native extensions, git for git-sourced gems, curl for the health check,
@@ -40,6 +43,21 @@ ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so
 
 COPY --from=node /usr/local/bin /usr/local/bin
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+# yarn and pnpm through corepack, at the version package.json's
+# "packageManager" names (Node 25 no longer ships corepack). Without a prompt:
+# deps runs unattended.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN if command -v corepack >/dev/null; then corepack enable; fi
+
+# bun, only when the app pins it (.bun-version or "packageManager": "bun@…").
+RUN if [ -n "${BUN_VERSION}" ]; then \
+    case "$(uname -m)" in x86_64) arch=x64 ;; aarch64) arch=aarch64 ;; *) echo "bun: no build for $(uname -m)" >&2; exit 1 ;; esac && \
+    apt-get update -qq && apt-get install --no-install-recommends -y unzip && rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL -o /tmp/bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${arch}.zip" && \
+    unzip -q -j /tmp/bun.zip -d /usr/local/bin && rm /tmp/bun.zip && \
+    ln -s bun /usr/local/bin/bunx; \
+  fi
 
 RUN gem update --system && \
   gem install -N bundler

@@ -17,7 +17,7 @@ frozen_env = { BUNDLE_FROZEN = "true" }         # set on the deps service; `rail
 file = "Containerfile.base"
 tag = "ruby{ruby}-node{node}"
 os = "debian"
-args = { RUBY_VERSION = "{ruby}", NODE_VERSION = "{node}" }
+args = { RUBY_VERSION = "{ruby}", NODE_VERSION = "{node}", BUN_VERSION = "{bun}" }
 
 [runtimes.ruby]
 from = [".ruby-version", ".tool-versions:ruby", "Gemfile", "Gemfile.lock"]
@@ -26,6 +26,9 @@ fallback = "3.4.2"
 [runtimes.node]
 from = [".nvmrc", ".node-version", ".tool-versions:nodejs", "package.json"]
 fallback = "22.11.0"
+
+[runtimes.bun]             # no fallback: an app that pins no bun version gets no bun in its image (D69)
+from = [".bun-version", ".tool-versions:bun", "package.json:packageManager.bun"]
 
 [runtimes.playwright]
 from = ["Gemfile.lock:playwright-ruby-client"]

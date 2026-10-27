@@ -16,3 +16,7 @@ codeload.github.com
 objects.githubusercontent.com
 release-assets.githubusercontent.com
 registry.npmjs.org
+# yarn through corepack: the yarn release itself and its registry (pnpm and
+# bun install from registry.npmjs.org).
+repo.yarnpkg.com
+registry.yarnpkg.com

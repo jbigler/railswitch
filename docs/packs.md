@@ -168,3 +168,35 @@ lists every route.
 A package's `README.md` says what it expects of the app: the changes an app
 must make to run under it (bind the dev server to `0.0.0.0`, read the
 database from the env an option gives, …). `railswitch pack show` prints it.
+
+## The rails pack: JavaScript
+
+The rails deps service installs the app's JavaScript with the tool its
+lockfile names, first match in this order (D69):
+
+| Lockfile | Install |
+|---|---|
+| `package-lock.json` | `npm ci --no-audit --no-fund` |
+| `bun.lock` or `bun.lockb` | `bun install --frozen-lockfile` |
+| `yarn.lock` | `yarn install --immutable` |
+| `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
+
+- A `package.json` without a lockfile fails: create one with
+  `railswitch deps -- npm install` (or `bun`, `yarn`, `pnpm install`).
+- **bun** is in the image only when the app pins a version: the pack's
+  `[runtimes.bun]` reads `.bun-version`, `.tool-versions:bun` and
+  `package.json` `"packageManager": "bun@<version>"`, with no fallback, and
+  `Containerfile.base` installs that release when `BUN_VERSION` is set. A
+  `bun.lock` without a pinned version fails naming the fix. A project
+  created before this keeps its ejected `containerfiles/Containerfile.base`
+  without the bun step until `railswitch containerfile eject base --force`
+  (or merging the step by hand).
+- **yarn and pnpm** come through corepack (`corepack enable` in the image),
+  at the version `package.json` `"packageManager"` names. Node 25 and later
+  no longer ship corepack: such an app fails naming the fix.
+- The install is skipped when nothing changed since the last one: a stamp
+  in `node_modules/` records the Node and tool versions and the lockfile.
+
+Another pack that wants the same (an Ember pack on bun, say) declares its
+own `[runtimes.bun]` and copies the install step and the lockfile switch;
+there is no shared add-on package (user, 2026-10-27).

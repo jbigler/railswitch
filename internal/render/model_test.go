@@ -1067,18 +1067,12 @@ func builtinCatalogWith(t *testing.T, ws string, edit func(path string, data []b
 }
 
 // D69: a runtime with no fallback and no source is empty, and a build arg
-// built from it is "" (the rails Containerfile then skips bun).
+// built from it is "" (the rails Containerfile then skips bun). The rails
+// pack's bun runtime has no fallback.
 func TestEmptyRuntime(t *testing.T) {
 	ws := fixtureWS(t)
-	cat := builtinCatalogWith(t, ws, func(p string, data []byte) []byte {
-		if p != "packs/rails/pack.toml" {
-			return data
-		}
-		data = bytes.Replace(data, []byte(`args = { RUBY_VERSION = "{ruby}"`), []byte(`args = { BUN_VERSION = "{bun}", RUBY_VERSION = "{ruby}"`), 1)
-		return append(data, []byte("\n[runtimes.bun]\nfrom = [\".bun-version\", \"package.json:packageManager.bun\"]\n")...)
-	})
 	writeFile(t, filepath.Join(ws, "feat", ".bun-version"), "1.2.3\n")
-	m := mustBuild(t, catalogInputs(t, ws, cat, nil))
+	m := mustBuild(t, fixtureInputs(t, ws, nil))
 	for slug, want := range map[string]string{"master": "", "feat": "1.2.3"} {
 		in := mustInstance(t, m, slug)
 		if got, ok := in.Values["bun"]; !ok || got != want {

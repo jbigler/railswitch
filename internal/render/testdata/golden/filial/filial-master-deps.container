@@ -5,8 +5,8 @@
 Description=filial deps of worktree master
 
 [Container]
-Label=filial.unit-hash=6aeaa784739f
-Image=localhost/filial/base:ruby3.3.6-node22.11.0-5fcbbafc
+Label=filial.unit-hash=9e125dcc39a6
+Image=localhost/filial/base:ruby3.3.6-node22.11.0-09898804
 ContainerName=filial-master-deps
 Network=filial-master-dev.network:alias=deps
 UserNS=keep-id:uid=1000,gid=1000

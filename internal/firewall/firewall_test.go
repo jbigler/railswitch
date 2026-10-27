@@ -145,6 +145,8 @@ func TestDepsAllow(t *testing.T) {
 		"objects.githubusercontent.com",
 		"release-assets.githubusercontent.com",
 		"registry.npmjs.org",
+		"repo.yarnpkg.com",
+		"registry.yarnpkg.com",
 		"example.org",
 	}
 	if got := listed(f.Data); !slices.Equal(got, want) || f.Mode != 0o644 {

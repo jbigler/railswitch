@@ -5,11 +5,13 @@
 #
 # This is the only worktree container that fetches packages. Installs are
 # lockfile-frozen (D35): BUNDLE_FROZEN=true comes from the service env, so
-# bundler refuses to change Gemfile.lock, and npm ci installs package-lock.json
-# as written. To change a dependency, run `railswitch deps -- <command>`.
+# bundler refuses to change Gemfile.lock, and the JavaScript install keeps
+# its lockfile as written. To change a dependency, run
+# `railswitch deps -- <command>`.
 #
 # Both checks below are offline, so an unchanged worktree starts the app
-# without touching the network.
+# without touching the network (yarn and pnpm come through corepack, which
+# may fetch the version package.json names on first use).
 #
 # Given a command (a pack's [app] install, rendered as the unit's Exec=), it
 # runs that instead, after the setup.
@@ -33,20 +35,44 @@ if [ -f Procfile.dev ]; then
   gem list foreman -i --silent || gem install foreman --no-document
 fi
 
-# npm has no offline "already satisfied" check like `bundle check`, so record
-# what the last successful install was for. The node version is part of it:
-# a node bump means a new image, and native modules must be rebuilt for it.
+# JavaScript: the lockfile picks the tool (D69), first match in this order.
+# None of them has an offline "already satisfied" check like `bundle check`,
+# so record what the last successful install was for. The node and tool
+# versions are part of it: a bump means a new image, and native modules must
+# be rebuilt for it.
 if [ -f package.json ]; then
-  if [ ! -f package-lock.json ]; then
-    echo "no package-lock.json: run railswitch deps -- npm install" >&2
+  if [ -f package-lock.json ]; then
+    lock=package-lock.json tool=npm
+    set -- npm ci --no-audit --no-fund
+  elif [ -f bun.lock ] || [ -f bun.lockb ]; then
+    lock=bun.lock tool=bun
+    [ -f bun.lock ] || lock=bun.lockb
+    set -- bun install --frozen-lockfile
+  elif [ -f yarn.lock ]; then
+    lock=yarn.lock tool=yarn
+    set -- yarn install --immutable
+  elif [ -f pnpm-lock.yaml ]; then
+    lock=pnpm-lock.yaml tool=pnpm
+    set -- pnpm install --frozen-lockfile
+  else
+    echo "deps: package.json has no lockfile: run railswitch deps -- npm install (or bun, yarn or pnpm install)" >&2
+    exit 1
+  fi
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    case "$tool" in
+    bun) fix='pin it in .bun-version or package.json "packageManager": "bun@<version>", then railswitch build (an older ejected containerfiles/Containerfile.base needs railswitch containerfile eject base --force)' ;;
+    *) fix='set package.json "packageManager": "'"$tool"'@<version>" and use a Node that ships corepack (24 or older)' ;;
+    esac
+    echo "deps: $lock needs $tool, which is not in the image: $fix" >&2
     exit 1
   fi
   stamp=node_modules/.deps-stamp
-  want="$({ node --version; cat package.json package-lock.json; } | sha256sum | cut -d' ' -f1)"
+  want="$({ node --version; "$tool" --version; cat package.json "$lock"; } | sha256sum | cut -d' ' -f1)"
   if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$want" ]; then
     echo "deps: node_modules up to date"
   else
-    npm ci --no-audit --no-fund
+    "$@"
+    mkdir -p node_modules
     printf '%s\n' "$want" > "$stamp"
   fi
 fi

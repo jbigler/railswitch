@@ -260,9 +260,19 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	if err := l.AttachTraefik(ctx); err != nil {
 		return err
 	}
-	app := unitOf(m, slug, m.Services[0].ID)
+	// The app first, then every other long-running service by name: a
+	// service added to a running stack (a new tool, an option) would not
+	// start through the app's Wants=, because starting an active unit
+	// starts none of its new dependencies. Oneshots (deps) stay behind the
+	// app's Requires=: started by name, one would rerun on every up.
+	start := []string{unitOf(m, slug, m.Services[0].ID)}
+	for _, s := range m.Services[1:] {
+		if s.Role != render.RoleAgent && !s.Oneshot {
+			start = append(start, unitOf(m, slug, s.ID))
+		}
+	}
 	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m), ", "), "started "+slug)
-	err = sd.Start(ctx, app)
+	err = sd.Start(ctx, start...)
 	done()
 	if err != nil {
 		return l.startFailure(ctx, sd, slug, failed, err)

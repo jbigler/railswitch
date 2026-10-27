@@ -243,7 +243,7 @@ func TestUpOrder(t *testing.T) {
 	if pw := b[len(b)-1]; !slices.Contains(pw, "PLAYWRIGHT_VERSION=1.54.0") || strings.Contains(joined(pw), "BASE_IMAGE") {
 		t.Errorf("playwright argv: %q", pw)
 	}
-	if last := calls[len(calls)-1]; joined(last) != "systemctl --user start filial-feat-rails.service" {
+	if last := calls[len(calls)-1]; !strings.HasPrefix(joined(last), "systemctl --user start filial-feat-rails.service ") {
 		t.Errorf("last call %q", last)
 	}
 }

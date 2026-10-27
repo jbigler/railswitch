@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -80,5 +81,34 @@ func TestUpPhaseLinesNoTTY(t *testing.T) {
 	}
 	if strings.Contains(got, "\r") || strings.Contains(got, "\x1b[") {
 		t.Errorf("terminal control codes without a terminal:\n%q", got)
+	}
+}
+
+// up starts every long-running service of the worktree itself, not only
+// the app: a service added to a running stack (e.g. [tools.nvim] after the
+// first up) starts on the next up, although the app is already active and
+// `systemctl start` of an active unit does not start its new Wants=.
+// Oneshots (deps) are left to the app's Requires=: starting one explicitly
+// would rerun it on every up. Agents are never started by up (D62).
+func TestUpStartsEveryService(t *testing.T) {
+	e := setup(t)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	var start []string
+	for _, c := range e.calls() {
+		if len(c) > 3 && c[0] == "systemctl" && c[2] == "start" && c[3] == "filial-feat-rails.service" {
+			start = c[3:]
+		}
+	}
+	for _, want := range []string{"filial-feat-db.service", "filial-feat-storage.service", "filial-feat-browser.service", "filial-feat-nvim.service"} {
+		if !slices.Contains(start, want) {
+			t.Errorf("start %q lacks %s", start, want)
+		}
+	}
+	for _, not := range []string{"filial-feat-deps.service", "filial-feat-agent-probe.service", "filial-feat-agent-claude.service"} {
+		if slices.Contains(start, not) {
+			t.Errorf("start %q includes %s", start, not)
+		}
 	}
 }

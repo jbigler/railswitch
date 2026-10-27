@@ -2,6 +2,13 @@
 # the editor sees the app's runtimes and OS packages. railswitch passes
 # BASE_IMAGE, the base chain's last image (D31). No agent software (D30).
 ARG BASE_IMAGE
+# Node for language servers installed with npm (D71). It is used only when
+# the base image has no npm (a bun-only image answers `node` with bun, but
+# has no npm); a base with Node keeps the app's. Change it here; then remove
+# the <prefix>_npm_global_node volume, whose packages were built for the old one.
+ARG NVIM_NODE_VERSION=24
+
+FROM docker.io/library/node:${NVIM_NODE_VERSION}-slim AS nvim-node
 
 # Neovim, built from source.
 FROM docker.io/library/debian:trixie-slim AS build-nvim
@@ -43,6 +50,16 @@ COPY --from=build-nvim /usr/local/bin/nvim /usr/local/bin/nvim
 COPY --from=build-nvim /usr/local/lib/nvim /usr/local/lib/nvim
 COPY --from=build-nvim /usr/local/share/nvim /usr/local/share/nvim
 
+# nvim's own Node in /opt/nvim-node, linked into /usr/local/bin (ahead of a
+# bun image's node fallback in PATH) only when the base has no npm.
+COPY --from=nvim-node /usr/local/bin/node /opt/nvim-node/bin/node
+COPY --from=nvim-node /usr/local/lib/node_modules /opt/nvim-node/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /opt/nvim-node/bin/npm && \
+  ln -s ../lib/node_modules/npm/bin/npx-cli.js /opt/nvim-node/bin/npx && \
+  if ! command -v npm >/dev/null 2>&1; then \
+    ln -sf /opt/nvim-node/bin/node /opt/nvim-node/bin/npm /opt/nvim-node/bin/npx /usr/local/bin/; \
+  fi
+
 # Editor tooling: search, fuzzy finding, tags, clipboard, Lua for plugins.
 RUN apt-get update -qq && \
   apt-get install --no-install-recommends -y \
@@ -59,8 +76,12 @@ RUN apt-get update -qq && \
   rm -rf /var/lib/apt/lists/*
 
 # The volumes mounted under ~ need their parents to belong to appuser.
-RUN mkdir -p /home/appuser/.config /home/appuser/.local/share && \
-  chown -R 1000:1000 /home/appuser/.config /home/appuser/.local
+RUN mkdir -p /home/appuser/.config /home/appuser/.local/share /home/appuser/.npm-global && \
+  chown -R 1000:1000 /home/appuser/.config /home/appuser/.local /home/appuser/.npm-global
+
+# `npm install -g` goes to the shared npm volume, whatever the base sets.
+ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global
+ENV PATH=/home/appuser/.npm-global/bin:${PATH}
 
 USER appuser
 

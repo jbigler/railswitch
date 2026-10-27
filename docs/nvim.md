@@ -12,6 +12,27 @@ config_ref  = "v2"                                       # optional: a branch or
 `project new --tool nvim` writes an empty `[tools.nvim]` table. The old
 `[tools] nvim = true` is refused; write the table instead.
 
+## Node for language servers (D71)
+
+The nvim image is built on the project's base image, so it sees the app's
+runtimes. Language servers installed with npm (Mason and the like) need
+Node whatever the project uses, so `Containerfile.nvim` brings its own
+(`ARG NVIM_NODE_VERSION=24`, from `docker.io/library/node:<version>-slim`,
+in `/opt/nvim-node`):
+
+- a base with npm (the rails pack's) keeps the app's Node and npm;
+- a base without npm gets nvim's Node, `npm` and `npx` in `/usr/local/bin`.
+  That includes a bun-only image, whose `node` is bun (the official bun
+  images link it at the end of `PATH`); the project's `bun` stays usable.
+
+`npm install -g` goes to the volume `<prefix>_npm_global_node<version>`
+(the pack's `node` version), or `<prefix>_npm_global_node` for a pack
+without a `node` runtime. To use another Node, edit `NVIM_NODE_VERSION` in
+`containerfiles/Containerfile.nvim` and remove that volume
+(`podman volume rm <prefix>_npm_global_node`), whose packages were built
+for the old one. A project created before this keeps its ejected
+`Containerfile.nvim` until `railswitch containerfile eject nvim --force`.
+
 ## The config (D54)
 
 `~/.config/nvim` in the container is the volume `<prefix>_nvim_config`.

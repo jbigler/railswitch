@@ -279,6 +279,22 @@ func TestNewPlaywright(t *testing.T) {
 	}
 }
 
+// C3: a pin the pack also resolves as a runtime (rails reads playwright from
+// Gemfile.lock) is not written to [versions], which would beat the app's
+// lockfile; a pin with no runtime is.
+func TestNewKeepsRuntimePinsOut(t *testing.T) {
+	newEnv(t)
+	ws := filepath.Join(t.TempDir(), "shop")
+	mustNew(t, ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--option", "browser=playwright@1", "--agent", "none")
+	p := loadProject(t, ws)
+	if v, ok := p.Versions["playwright"]; ok {
+		t.Errorf("[versions] playwright = %q; want none", v)
+	}
+	if p.Versions["postgres"] != "16" {
+		t.Errorf("[versions] postgres = %q; want 16", p.Versions["postgres"])
+	}
+}
+
 // A repo with no commits and one with a detached HEAD name no branch; the
 // error says which, so the fix is clear.
 func TestRemoteHeadNoBranch(t *testing.T) {

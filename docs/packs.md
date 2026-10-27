@@ -103,3 +103,20 @@ its `Containerfile.base` installs bun only when `BUN_VERSION` is set.
 `{<name>}` would be an error. The nvim tool names its npm volume
 `npm_global_node{node?}`, so it works with a pack that has no `node` runtime.
 `{env.X?}` still needs `X` set.
+
+## Option pins and pack runtimes
+
+An option can pin the version of its image (`[pin] name`, `default`):
+`postgres = "16"`, `playwright = "1.60.0"`. When the project's pack also
+has a runtime of that name, the pack's chain finds the version in the app
+(the rails pack reads `playwright` from `Gemfile.lock`, so the browser
+matches the app's client). High to low:
+
+1. `[worktrees.<slug>.versions] <name>`
+2. `[versions] <name>`
+3. the pack's `[runtimes.<name>]`
+4. the pin's `default`
+
+`railswitch project new` writes a chosen option's pin default to
+`[versions]` (`postgres = "16"`), except one the pack has a runtime for,
+which would otherwise beat the app's own file.

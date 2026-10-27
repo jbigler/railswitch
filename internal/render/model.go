@@ -824,8 +824,11 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		return nil
 	}
 
+	// from records where each runtime's value came from, for a pin of the
+	// same name below.
+	from := map[string]string{}
 	for _, name := range sortedKeys(pk.Runtimes) {
-		val, from := override[name], fmt.Sprintf("worktrees.%s.versions", wt.Slug)
+		val, src := override[name], fmt.Sprintf("worktrees.%s.versions", wt.Slug)
 		if val == "" {
 			ch := pk.Runtimes[name]
 			r := version.Resolve(wt.Dir, ch.From, ch.Fallback, version.ValidVersion)
@@ -834,25 +837,32 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 				v[name], v[name+".major"] = "", ""
 				continue
 			}
-			val, from = r.Value, "runtimes."+name+" ("+r.Source+")"
+			val, src = r.Value, "runtimes."+name+" ("+r.Source+")"
 		}
-		if err := setVersion(name, val, from); err != nil {
+		if err := setVersion(name, val, src); err != nil {
 			return nil, err
 		}
+		from[name] = src
 	}
+	// An option's pin, high to low: [worktrees.<slug>.versions], [versions],
+	// the pack's runtime of the same name (rails reads playwright from
+	// Gemfile.lock), the pin's default (D68).
 	for _, slot := range config.Slots {
 		ch := st.Options[slot]
 		if ch == nil || ch.Option.Pin == nil {
 			continue
 		}
-		name, val, from := ch.Option.Pin.Name, ch.Option.Pin.Default, ch.Option.Name+" pin default"
+		name, val, src := ch.Option.Pin.Name, ch.Option.Pin.Default, ch.Option.Name+" pin default"
+		if s, ok := from[name]; ok {
+			val, src = v[name], s
+		}
 		if x, ok := p.Versions[name]; ok {
-			val, from = x, "versions"
+			val, src = x, "versions"
 		}
 		if x, ok := override[name]; ok {
-			val, from = x, fmt.Sprintf("worktrees.%s.versions", wt.Slug)
+			val, src = x, fmt.Sprintf("worktrees.%s.versions", wt.Slug)
 		}
-		if err := setVersion(name, val, from); err != nil {
+		if err := setVersion(name, val, src); err != nil {
 			return nil, err
 		}
 	}

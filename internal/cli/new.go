@@ -316,13 +316,20 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	if err != nil {
 		return nil, nil, err
 	}
+	// A pin the pack also resolves as a runtime stays out of [versions]: it
+	// would beat the app's own file (rails: playwright from Gemfile.lock).
 	for _, slot := range config.Slots {
-		if ch := st.Options[slot]; ch != nil && ch.Option.Pin != nil {
-			if p.Versions == nil {
-				p.Versions = map[string]string{}
-			}
-			p.Versions[ch.Option.Pin.Name] = ch.Option.Pin.Default
+		ch := st.Options[slot]
+		if ch == nil || ch.Option.Pin == nil {
+			continue
 		}
+		if _, ok := st.Pack.Runtimes[ch.Option.Pin.Name]; ok {
+			continue
+		}
+		if p.Versions == nil {
+			p.Versions = map[string]string{}
+		}
+		p.Versions[ch.Option.Pin.Name] = ch.Option.Pin.Default
 	}
 	q := *p
 	q.Project.BaseBranch = "x"

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -1087,4 +1088,71 @@ func TestEmptyRuntime(t *testing.T) {
 			t.Errorf("%s: base image BUN_VERSION = %q (set %v); want %q", slug, got, ok, want)
 		}
 	}
+}
+
+// withoutRuntime is the built-in catalog with the rails pack's
+// [runtimes.<name>] table removed.
+func withoutRuntime(t *testing.T, ws, name string) *pack.Catalog {
+	t.Helper()
+	re := regexp.MustCompile(`(?ms)^\[runtimes\.` + name + `\]\n.*?\n\n`)
+	return builtinCatalogWith(t, ws, func(p string, data []byte) []byte {
+		if p != "packs/rails/pack.toml" {
+			return data
+		}
+		out := re.ReplaceAll(data, nil)
+		if bytes.Equal(out, data) {
+			t.Fatalf("no [runtimes.%s] in the rails pack", name)
+		}
+		return out
+	})
+}
+
+// D68: the browser option pins its own version, for a pack with no
+// playwright runtime.
+func TestPlaywrightPinWithoutRuntime(t *testing.T) {
+	ws := testfixture.Workspace(t, minimalDir)
+	cat := withoutRuntime(t, ws, "playwright")
+	m := mustBuild(t, catalogInputs(t, ws, cat, func(p *config.Project) { p.Options["browser"] = "playwright@1" }))
+	if got := mustInstance(t, m, "master").Values["playwright"]; got != "1.60.0" {
+		t.Errorf("{playwright} = %q; want the pin default 1.60.0", got)
+	}
+}
+
+// D68: a pack runtime of the pinned name beats the pin default.
+func TestPlaywrightRuntimeBeatsPinDefault(t *testing.T) {
+	_, in := filial(t, nil)
+	if got := in.Values["playwright"]; got != "1.54.0" {
+		t.Errorf("{playwright} = %q; want 1.54.0 from Gemfile.lock", got)
+	}
+}
+
+// D68: [versions] and [worktrees.<slug>.versions] beat the pack runtime.
+func TestVersionsBeatRuntime(t *testing.T) {
+	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), func(p *config.Project) {
+		p.Versions["playwright"] = "1.55.0"
+		p.Worktrees["master"] = config.WorktreeOverride{Versions: map[string]string{"playwright": "1.56.0"}}
+	}))
+	for slug, want := range map[string]string{"master": "1.56.0", "feat": "1.55.0"} {
+		if got := mustInstance(t, m, slug).Values["playwright"]; got != want {
+			t.Errorf("%s: {playwright} = %q; want %q", slug, got, want)
+		}
+	}
+}
+
+// D71: nvim's npm volume needs no node runtime in the pack.
+func TestNvimWithoutNode(t *testing.T) {
+	ws := fixtureWS(t)
+	cat := builtinCatalogWith(t, ws, func(p string, data []byte) []byte {
+		data = regexp.MustCompile(`(?ms)^\[runtimes\.node\]\n.*?\n\n`).ReplaceAll(data, nil)
+		if p == "packs/rails/pack.toml" { // the base image no longer has a node arg or tag part
+			data = bytes.Replace(data, []byte(`tag = "ruby{ruby}-node{node}"`), []byte(`tag = "ruby{ruby}"`), 1)
+			data = bytes.Replace(data, []byte(`, NODE_VERSION = "{node}"`), nil, 1)
+		}
+		return data
+	})
+	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
+	if err != nil {
+		t.Fatalf("Quadlet: %v", err)
+	}
+	hasLine(t, units, "filial-master-nvim.container", "Volume=filial_npm_global_node:/home/appuser/.npm-global:U")
 }

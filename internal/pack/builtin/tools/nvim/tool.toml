@@ -23,7 +23,7 @@ mount = "/home/appuser/.local/share/nvim"
 chown = true
 
 [[shared]]                    # `npm install -g` from inside nvim (language servers, CLIs)
-name = "npm_global_node{node}" # one per Node version: global packages are built for it
+name = "npm_global_node{node?}" # one per Node version: global packages are built for it; without a pack node runtime, nvim's own Node (D71)
 mount = "/home/appuser/.npm-global"
 chown = true
 

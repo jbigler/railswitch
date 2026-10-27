@@ -203,9 +203,9 @@ func TestFromQualified(t *testing.T) {
 	if got := in.Builds[0].From; !slices.Equal(got, want) {
 		t.Errorf("base From = %v; want %v", got, want)
 	}
-	// nvim: its helper stage's FROM, never ${BASE_IMAGE}.
+	// nvim: its helper stages' FROMs (the ARG default expanded), never ${BASE_IMAGE}.
 	for _, b := range in.Builds {
-		if b.Name == "nvim" && !slices.Equal(b.From, []string{"docker.io/library/debian:trixie-slim"}) {
+		if b.Name == "nvim" && !slices.Equal(b.From, []string{"docker.io/library/node:24-slim", "docker.io/library/debian:trixie-slim"}) {
 			t.Errorf("nvim From = %v", b.From)
 		}
 	}

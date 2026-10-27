@@ -6,6 +6,10 @@ works_with = ["*"]
 firewall = "self"             # init-firewall-playwright.sh restricts its own egress; no hook
 entrypoint = "entrypoints/entrypoint-playwright.sh"
 
+[pin]                         # D68: a pack runtime named playwright (rails: Gemfile.lock) beats this default
+name = "playwright"
+default = "1.60.0"
+
 [image]                       # standalone (D31): not on the base chain, no BASE_IMAGE
 build = "Containerfile.playwright"
 tag = "{playwright}"

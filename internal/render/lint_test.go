@@ -87,7 +87,7 @@ func TestLintMachineMarker(t *testing.T) {
 }
 
 func TestGoldensLintClean(t *testing.T) {
-	for _, name := range []string{"filial", "minimal"} {
+	for _, name := range []string{"filial", "minimal", "phoenix"} {
 		dir := filepath.Join("testdata", "golden", name)
 		entries, err := os.ReadDir(dir)
 		if err != nil {

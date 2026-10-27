@@ -1,0 +1,29 @@
+schema = 1
+
+[project]
+name        = "phx"
+prefix      = "phx"
+base_branch = "master"
+
+[stack]
+pack = "local:phoenix@1"                   # packs/phoenix/: a user-written pack (D43), not shipped
+app  = "web"
+
+[options]
+database = "postgres@1"
+cache    = "none"
+storage  = "none"
+jobs     = "none"
+mail     = "none"
+browser  = "none"
+
+[versions]
+postgres = "16"
+
+[tools.nvim]
+
+[agents.claude]
+use = "claude@1"
+
+[image]
+base = "containerfiles/Containerfile.base"

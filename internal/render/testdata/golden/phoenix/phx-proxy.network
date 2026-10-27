@@ -1,0 +1,12 @@
+# railswitch: rendered from /WORKSPACES/phoenix/project.toml (prefix phx). Edit project.toml, not this file.
+
+[Unit]
+Description=Proxy network of project phx
+
+[Network]
+NetworkName=phx_proxy
+Subnet=10.214.3.0/24
+Gateway=10.214.3.1
+IPRange=10.214.3.128/25
+Options=mtu=1400
+Options=isolate=strict

@@ -1,0 +1,36 @@
+# railswitch: rendered from /WORKSPACES/phoenix/project.toml (prefix phx, worktree master). Edit project.toml, not this file.
+# role: deps
+
+[Unit]
+Description=phx deps of worktree master
+
+[Container]
+Label=phx.unit-hash=c613a848181f
+Image=localhost/phx/base:elixir1.18.4-otp27-fa946a94
+ContainerName=phx-master-deps
+Network=phx-master-dev.network:alias=deps
+UserNS=keep-id:uid=1000,gid=1000
+User=1000:1000
+EnvironmentFile=/WORKSPACES/phoenix/.railswitch/env/master/deps.env
+Volume=/WORKSPACES/phoenix/master:/app:z
+Volume=/WORKSPACES/phoenix/master/.git:/app/.git:ro,z
+Volume=/WORKSPACES/phoenix/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/.railswitch/assets/phoenix/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
+Volume=phx_hex:/home/appuser/.hex:U
+Volume=phx-master-deps:/app/deps:U
+Volume=phx-master-build:/app/_build:U
+DropCapability=all
+NoNewPrivileges=true
+Memory=4g
+PidsLimit=4096
+GlobalArgs=--hooks-dir=/WORKSPACES/phoenix/.railswitch/firewall/hooks.d
+Annotation=phx.firewall=deps
+Annotation=phx.firewall.networks=phx-master-dev
+Annotation=phx.firewall.mode=log
+PodmanArgs=--cpus=6
+LogDriver=passthrough
+Entrypoint=/usr/local/bin/entrypoint-deps.sh
+
+[Service]
+Type=oneshot
+TimeoutStartSec=900

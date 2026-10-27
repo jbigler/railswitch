@@ -1,0 +1,12 @@
+# Package hosts for mix deps.get and mix assets.setup (deps service, nvim).
+hex.pm
+repo.hex.pm
+builds.hex.pm
+# git deps and the tailwind binary (GitHub releases).
+meta:github
+github.com
+codeload.github.com
+objects.githubusercontent.com
+release-assets.githubusercontent.com
+# the esbuild binary (npm registry).
+registry.npmjs.org

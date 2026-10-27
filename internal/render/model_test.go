@@ -1150,3 +1150,31 @@ func TestNvimWithoutNode(t *testing.T) {
 	}
 	hasLine(t, units, "filial-master-nvim.container", "Volume=filial_npm_global_node:/home/appuser/.npm-global:U")
 }
+
+const phoenixDir = "../../testdata/fixtures/phoenix"
+
+// Stage 5: a user-written pack (local:phoenix@1, the fixture's packs/phoenix)
+// resolves and renders with no Phoenix knowledge in core.
+func TestPhoenixFixtureResolves(t *testing.T) {
+	ws := testfixture.Workspace(t, phoenixDir)
+	in := fixtureInputs(t, ws, nil)
+	if in.Stack.PackRef != (pack.Ref{Name: "phoenix", Version: 1, Local: true}) {
+		t.Fatalf("pack ref = %+v", in.Stack.PackRef)
+	}
+	m := mustBuild(t, in)
+	i := mustInstance(t, m, "master")
+	if v, ok := envVar(i, "web", "PGDATABASE"); !ok || v.Value != "phx_dev" {
+		t.Errorf("PGDATABASE = %+v", v)
+	}
+	if v, ok := envVar(i, "web", "DATABASE_URL"); !ok || !strings.HasPrefix(v.Value, "ecto://") {
+		t.Errorf("DATABASE_URL = %+v", v)
+	}
+	if args := i.Builds[0].Args; args["ELIXIR_VERSION"] != "1.18.4" || args["OTP_MAJOR"] != "27" {
+		t.Errorf("base image args = %v", args)
+	}
+	units, err := Quadlet(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasLine(t, units, "phx-master-nvim.container", "Volume=phx_npm_global_node:/home/appuser/.npm-global:U")
+}

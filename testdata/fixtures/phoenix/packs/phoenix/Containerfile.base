@@ -1,0 +1,36 @@
+# The phoenix pack's base image: app, deps and tools run it. railswitch passes
+# ELIXIR_VERSION and OTP_MAJOR from the worktree's .tool-versions (or mise).
+ARG ELIXIR_VERSION
+ARG OTP_MAJOR
+
+FROM docker.io/library/elixir:${ELIXIR_VERSION}-otp-${OTP_MAJOR}-slim
+
+# Compilers for NIFs, git for git deps, curl for the health check,
+# inotify-tools for live reload.
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y \
+  build-essential \
+  ca-certificates \
+  curl \
+  git \
+  inotify-tools && \
+  rm -rf /var/lib/apt/lists/*
+
+# hex and rebar live in the image (MIX_HOME), outside the volumes; hex's
+# package cache (HEX_HOME) is a shared volume.
+ENV MIX_HOME=/opt/mix
+ENV HEX_HOME=/home/appuser/.hex
+ENV MIX_ENV=dev
+RUN mix local.hex --force && mix local.rebar --force && chmod -R a+rX /opt/mix
+
+# appuser is uid/gid 1000 (keep-id); volume mount points exist and belong to it.
+RUN groupadd --gid 1000 appuser && \
+  useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home appuser && \
+  mkdir -p /app/deps /app/_build /home/appuser/.hex && \
+  chown -R 1000:1000 /app /home/appuser
+
+WORKDIR /app
+USER appuser
+
+EXPOSE 4000
+CMD ["mix", "phx.server"]

@@ -49,12 +49,22 @@ func Workspace(t testing.TB, dir string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The project's pack and agents, and every built-in option's and tool's
+	// Containerfile, so a test may switch options on without ejecting.
 	defaults := []defaultFile{
-		{cat.Packs[pack.Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"},
-		{cat.Options[pack.Ref{Name: "postgres", Version: 1}].Files, "Containerfile.pg-client"},
-		{cat.Tools["nvim"].Files, "Containerfile.nvim"},
-		{cat.Options[pack.Ref{Name: "playwright", Version: 1}].Files, "Containerfile.playwright"},
+		{st.Pack.Files, st.Pack.Image.File},
 		{agentBase, "Containerfile.agent-base"},
+	}
+	for _, o := range cat.Options {
+		if o.AppAddon != nil {
+			defaults = append(defaults, defaultFile{o.Files, o.AppAddon.File})
+		}
+		if o.Image.Build != "" {
+			defaults = append(defaults, defaultFile{o.Files, o.Image.Build})
+		}
+	}
+	for _, tl := range cat.Tools {
+		defaults = append(defaults, defaultFile{tl.Files, tl.Image.File})
 	}
 	for _, a := range st.Agents {
 		defaults = append(defaults, defaultFile{a.Agent.Files, a.Agent.Image.File})

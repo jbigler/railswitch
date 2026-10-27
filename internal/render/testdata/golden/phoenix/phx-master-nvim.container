@@ -1,0 +1,48 @@
+# railswitch: rendered from /WORKSPACES/phoenix/project.toml (prefix phx, worktree master). Edit project.toml, not this file.
+# role: tool
+
+[Unit]
+Description=phx nvim of worktree master
+
+[Container]
+Label=phx.unit-hash=5463c01f54c3
+Image=localhost/phx/nvim:elixir1.18.4-otp27-d7df63a3
+ContainerName=phx-master-nvim
+Network=phx-master-dev.network:alias=nvim
+Network=phx-proxy.network
+UserNS=keep-id:uid=1000,gid=1000
+User=1000:1000
+EnvironmentFile=/WORKSPACES/phoenix/.railswitch/env/master/nvim.env
+AddHost=master.phx.localhost:10.214.3.2
+PublishPort=127.0.0.1:17001:7777
+Volume=/WORKSPACES/phoenix/master:/app:z
+Volume=/WORKSPACES/phoenix/master:/WORKSPACES/phoenix/master:z
+Volume=/WORKSPACES/phoenix/master/.git:/WORKSPACES/phoenix/master/.git:z
+Volume=/WORKSPACES/phoenix/master/.git/hooks:/WORKSPACES/phoenix/master/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/master/.git:/app/.git:z
+Volume=/WORKSPACES/phoenix/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/.railswitch/home/master:/home/appuser:z
+Volume=/WORKSPACES/phoenix/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh:/usr/local/bin/entrypoint-nvim.sh:ro,z
+Volume=phx-master-deps:/app/deps:U
+Volume=phx-master-build:/app/_build:U
+Volume=phx_hex:/home/appuser/.hex:U
+Volume=phx_nvim_config:/home/appuser/.config/nvim:U
+Volume=phx_nvim_share:/home/appuser/.local/share/nvim:U
+Volume=phx_npm_global_node:/home/appuser/.npm-global:U
+DropCapability=all
+NoNewPrivileges=true
+Memory=2g
+PidsLimit=4096
+GlobalArgs=--hooks-dir=/WORKSPACES/phoenix/.railswitch/firewall/hooks.d
+Annotation=phx.firewall=agent,deps
+Annotation=phx.firewall.networks=phx-master-dev,phx_proxy
+Annotation=phx.firewall.mode=log
+PodmanArgs=--cpus=2 --tty --interactive
+LogDriver=journald
+Entrypoint=/usr/local/bin/entrypoint-nvim.sh
+Exec=/usr/local/bin/nvim --headless --listen 0.0.0.0:7777
+
+[Service]
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=1

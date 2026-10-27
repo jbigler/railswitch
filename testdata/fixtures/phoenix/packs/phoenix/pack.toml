@@ -1,0 +1,76 @@
+# A Phoenix pack written as a user would (Stage 5, D43): nothing in railswitch
+# knows Phoenix. Copy this directory to <workspace>/packs/phoenix/ and set
+# [stack] pack = "local:phoenix@1". README.md lists the app-side changes.
+name = "phoenix"
+version = 1
+
+[app]
+service = "web"
+server = "mix phx.server"
+port = 4000
+health = "curl -fsS -o /dev/null http://localhost:4000/"
+health_start_period = "300s"           # the first start compiles the app
+entrypoint = "entrypoints/entrypoint-app.sh"
+deps_entrypoint = "entrypoints/entrypoint-deps.sh"
+
+[image]
+file = "Containerfile.base"
+tag = "elixir{elixir}-otp{erlang.major}"
+os = "debian"
+args = { ELIXIR_VERSION = "{elixir}", OTP_MAJOR = "{erlang.major}" }
+
+[runtimes.elixir]                       # the official image has a tag per Elixir patch and OTP major
+from = [".tool-versions:elixir", "mise.toml:elixir", ".mise.toml:elixir"]
+fallback = "1.19.6"
+
+[runtimes.erlang]
+from = [".tool-versions:erlang", "mise.toml:erlang", ".mise.toml:erlang"]
+fallback = "28"
+
+[db_name]                               # README: dev.exs reads PGDATABASE
+fallback = "{project.prefix}_dev"
+
+[db_scheme]
+postgres = "ecto://"
+
+[env]
+MIX_ENV = "dev"
+PORT = "4000"
+PHX_HOST = "{worktree.host}"
+
+[share]
+env = { PHX_HOST = "{share.host}" }
+
+[[caches]]                              # hex's package cache, shared by every worktree
+name = "hex"
+mount = "/home/appuser/.hex"
+chown = true
+
+[[worktree_volumes]]                    # compiled deps and the app's build, per worktree
+name = "deps"
+mount = "/app/deps"
+chown = true
+
+[[worktree_volumes]]
+name = "build"
+mount = "/app/_build"
+chown = true
+
+[[ports]]
+name = "app"
+env = "APP_PORT"
+base = 13000
+container = 4000
+share = true
+
+[defaults]
+database = "postgres@1"
+cache = "none"
+storage = "none"
+jobs = "none"
+mail = "none"
+browser = "none"
+
+[tasks]
+console = "iex -S mix"
+test = "mix test"

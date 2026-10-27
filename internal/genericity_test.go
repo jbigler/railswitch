@@ -14,6 +14,8 @@ var (
 	claudeRe = regexp.MustCompile(`(?i)claude`)
 	// The Linux terminals of C5; only internal/term may name them.
 	termRe = regexp.MustCompile(`(?i)\b(tmux|kitty|wezterm|konsole|gnome-terminal|xfce4-terminal|terminator|ghostty|alacritty|foot|xterm)\b`)
+	// Phoenix and its toolchain: core must stay framework-free (Stage 5).
+	phoenixRe = regexp.MustCompile(`(?i)\b(phoenix|elixir|erlang)\b|\bmix `)
 )
 
 // TestGenericity keeps project, agent and terminal names out of core code.
@@ -48,6 +50,11 @@ func TestGenericity(t *testing.T) {
 			}
 			if m := termRe.Find(b); m != nil && !strings.HasPrefix(rel, "internal/term/") {
 				t.Errorf("%s: names terminal %q outside internal/term/", rel, m)
+			}
+			// Stage 5: Phoenix runs from a user-written pack; core knows
+			// nothing of it (its fixture lives in testdata/).
+			if m := phoenixRe.Find(b); m != nil {
+				t.Errorf("%s: names %q: Phoenix knowledge belongs in its pack", rel, m)
 			}
 			return nil
 		})

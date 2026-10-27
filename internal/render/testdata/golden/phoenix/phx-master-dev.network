@@ -1,0 +1,9 @@
+# railswitch: rendered from /WORKSPACES/phoenix/project.toml (prefix phx, worktree master). Edit project.toml, not this file.
+
+[Unit]
+Description=Dev network of phx worktree master
+
+[Network]
+NetworkName=phx-master-dev
+Options=mtu=1400
+Options=isolate=strict

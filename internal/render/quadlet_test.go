@@ -62,7 +62,7 @@ func noLinePrefix(t *testing.T, units map[string][]byte, file, prefix string) {
 var unitHashRe = regexp.MustCompile(`(?m)^Label=([a-z0-9-]+\.unit-hash)=[0-9a-f]{12}\n`)
 
 func TestGolden(t *testing.T) {
-	for _, dir := range []string{fixtureDir, minimalDir} {
+	for _, dir := range []string{fixtureDir, minimalDir, phoenixDir} {
 		name := filepath.Base(dir)
 		t.Run(name, func(t *testing.T) {
 			ws, units := renderUnits(t, dir, nil)

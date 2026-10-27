@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -24,13 +25,13 @@ func TestAgentArgs(t *testing.T) {
 		{[]string{"ls"}, "ls", nil},
 		{[]string{"claude", "--", "x", "--", "y"}, "claude", []string{"x", "--", "y"}},
 	} {
-		name, argv, code, ok := agentArgs(e, c.args)
+		name, argv, _, code, ok := agentArgs(e, c.args)
 		if !ok || code != 0 || name != c.name || !slices.Equal(argv, c.argv) {
 			t.Errorf("%q: name %q argv %q code %d ok %v; want %q %q", c.args, name, argv, code, ok, c.name, c.argv)
 		}
 	}
 	for _, args := range [][]string{{"a", "b"}, {"a", "b", "--", "x"}, {"--bogus"}} {
-		if _, _, code, ok := agentArgs(e, args); ok || code != 2 {
+		if _, _, _, code, ok := agentArgs(e, args); ok || code != 2 {
 			t.Errorf("%q: code %d ok %v; want a usage error", args, code, ok)
 		}
 	}
@@ -99,5 +100,29 @@ func TestCompleteAgent(t *testing.T) {
 	}
 	if got := complete(t, "agent", "ls", ""); len(got) != 0 {
 		t.Errorf("agent ls: %q; want nothing", got)
+	}
+}
+
+func TestAgentNewTerm(t *testing.T) {
+	ws, _ := lockedWS(t)
+	var gotTitle, gotDir string
+	var gotArgv []string
+	oldExe, oldLaunch := executable, launchTerm
+	t.Cleanup(func() { executable, launchTerm = oldExe, oldLaunch })
+	executable = func() (string, error) { return "/bin/railswitch", nil }
+	launchTerm = func(_ context.Context, _ *env, title, dir string, argv []string) error {
+		gotTitle, gotDir, gotArgv = title, dir, argv
+		return nil
+	}
+	code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "claude", "--", "-p", "x")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	want := []string{"/bin/railswitch", "-C", ws, "-w", "feat", "agent", "claude", "--", "-p", "x"}
+	if !slices.Equal(gotArgv, want) {
+		t.Errorf("argv %q; want %q", gotArgv, want)
+	}
+	if gotDir != filepath.Join(ws, "feat") || gotTitle == "" {
+		t.Errorf("title %q dir %q", gotTitle, gotDir)
 	}
 }

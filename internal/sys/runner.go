@@ -37,6 +37,10 @@ type Cmd struct {
 	Stdout  io.Writer     // nil = captured into Result
 	Stderr  io.Writer     // nil = captured into Result
 	Timeout time.Duration // 0 = DefaultTimeout; NoTimeout = no deadline
+	// Detach starts the process in its own session with /dev/null stdio
+	// and returns at once, without waiting (a new terminal window that
+	// outlives railswitch). Stdin, Stdout, Stderr and Timeout are ignored.
+	Detach bool
 }
 
 // Result is the outcome of a command.
@@ -69,6 +73,9 @@ func deadlineFor(c Cmd) (time.Duration, bool) {
 // Run executes c. A timeout or cancellation returns an error wrapping
 // ctx.Err(); a non-zero exit returns an error wrapping ErrExit.
 func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
+	if c.Detach {
+		return Result{}, detach(c)
+	}
 	d, timed := deadlineFor(c)
 	if timed {
 		var cancel context.CancelFunc
@@ -131,6 +138,19 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		return res, fmt.Errorf("%s: %w (exit %d): %s", c.Name, ErrExit, res.ExitCode, tail)
 	}
 	return res, fmt.Errorf("%s: %w", c.Name, err)
+}
+
+// detach starts c in a new session, stdio on /dev/null (os/exec's nil
+// streams), and releases it: it is never waited for.
+func detach(c Cmd) error {
+	cmd := exec.Command(c.Name, c.Args...)
+	cmd.Dir = c.Dir
+	cmd.Env = c.Env
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("%s: %w", c.Name, err)
+	}
+	return cmd.Process.Release()
 }
 
 // tailBuffer keeps the last few KiB written to it.

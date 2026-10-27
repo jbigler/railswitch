@@ -45,6 +45,7 @@ var completionSubs = map[string][]string{
 // TestCompletionFlagsMatch fails when the code defines a flag missing here.
 var completionFlags = map[string][]string{
 	"":                    {"-C=", "-w=", "--json"},
+	"agent":               {"--new-term"},
 	"build":               {"--force", "--pull"},
 	"containerfile eject": {"--force"},
 	"containerfile show":  {"--default"},

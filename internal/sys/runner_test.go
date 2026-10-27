@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -199,4 +200,36 @@ func (f *fakeRunner) Run(_ context.Context, c Cmd) (Result, error) {
 	f.calls = append(f.calls, c)
 	k := strings.Join(append([]string{c.Name}, c.Args...), " ")
 	return f.out[k], f.errs[k]
+}
+
+func TestExecDetach(t *testing.T) {
+	dir := t.TempDir()
+	out := dir + "/out"
+	start := time.Now()
+	_, err := Exec{}.Run(context.Background(), Cmd{
+		Name:   "sh",
+		Args:   []string{"-c", `sleep 0.3; { pwd; read -r _ _ _ _ _ sid _ < /proc/$$/stat; echo "$$ $sid"; readlink /proc/$$/fd/0 /proc/$$/fd/2; } > ` + out + `.tmp && mv ` + out + `.tmp ` + out},
+		Dir:    dir,
+		Detach: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 200*time.Millisecond {
+		t.Errorf("Run took %v; want an immediate return", d)
+	}
+	var b []byte
+	for range 100 {
+		if b, err = os.ReadFile(out); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Fields(string(b))
+	if len(lines) != 5 || lines[0] != dir || lines[1] != lines[2] || lines[3] != "/dev/null" || lines[4] != "/dev/null" {
+		t.Errorf("got %q; want dir, pid == sid (own session), /dev/null stdio", lines)
+	}
 }

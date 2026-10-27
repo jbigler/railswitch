@@ -73,3 +73,13 @@ func TestFakeRecordsCmdsAndStdin(t *testing.T) {
 		t.Fatalf("Stdins = %q", f.Stdins)
 	}
 }
+
+func TestFakeRecordsDetach(t *testing.T) {
+	f := &Fake{}
+	if _, err := f.Run(context.Background(), sys.Cmd{Name: "foot", Detach: true}); err != nil {
+		t.Fatal(err)
+	}
+	if !f.Cmds[0].Detach {
+		t.Error("Detach not recorded")
+	}
+}

@@ -15,7 +15,9 @@ import (
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
+	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
 const fixtureDir = "../../testdata/fixtures/filial"
@@ -401,5 +403,61 @@ func TestCheckLockBuiltinToLocal(t *testing.T) {
 	setPack(t, root, "rails@1")
 	if err := checkLock(t, root); !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "rails@1") {
 		t.Fatalf("CheckLock after switching back = %v", err)
+	}
+}
+
+// TestRenderWritesDashboardUnit: render writes the dashboard unit for the
+// running railswitch; render --check writes nothing.
+func TestRenderWritesDashboardUnit(t *testing.T) {
+	ctx := context.Background()
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
+	root := testfixture.Workspace(t, fixtureDir)
+	if err := os.MkdirAll(filepath.Join(root, "master", ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := Lock(ctx, root); err != nil {
+		t.Fatal(err)
+	}
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := machine.Open(dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.AddProject("filial", root, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.AddWorktree("filial", "master", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reg.Close()
+	old := executable
+	t.Cleanup(func() { executable = old })
+	executable = func() (string, error) { return "/opt/rs/railswitch", nil }
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &systest.Fake{}
+	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte("/g\n")}, nil)
+	path := filepath.Join(dirs.SystemdUser, machine.DashboardService)
+	if _, err := w.Render(ctx, f, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("render --check wrote %s (%v)", path, err)
+	}
+	if _, err := w.Render(ctx, f, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(path); err != nil || string(data) != string(machine.DashboardUnit("/opt/rs/railswitch")) {
+		t.Errorf("%s = %q, %v", path, data, err)
 	}
 }

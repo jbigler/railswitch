@@ -438,12 +438,37 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 	maps.Copy(p.Files, fw)
 	maps.Copy(p.Units, machine.ProxyUnits(reg.Registry))
 	d, err := render.Apply(p, w.Root, w.Dirs.Quadlet, prefix, check)
+	if err == nil && !check {
+		err = writeDashboardUnit(w.Dirs)
+	}
 	if err != nil || !portsChanged || !check {
 		return d, err
 	}
 	d.Changed = append(d.Changed, "registry.toml")
 	d.Text += "--- a/registry.toml\n+++ b/registry.toml\n-ports " + prefix + portList(pe.Ports) + "\n+ports " + prefix + portList(bases) + "\n"
 	return d, nil
+}
+
+// executable is the running railswitch, symlinks resolved: the dashboard
+// unit's ExecStart. Tests replace it.
+var executable = func() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(exe)
+}
+
+// writeDashboardUnit rewrites the dashboard's unit for this railswitch
+// (machine.WriteDashboardUnit); `up` restarts a running dashboard whose
+// unit file is newer than its start.
+func writeDashboardUnit(d machine.Dirs) error {
+	exe, err := executable()
+	if err != nil {
+		return fmt.Errorf("the dashboard unit needs railswitch's path: %w", err)
+	}
+	_, err = machine.WriteDashboardUnit(d, exe)
+	return err
 }
 
 // portList is " name=base" for each port, sorted by name.

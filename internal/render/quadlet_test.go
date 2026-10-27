@@ -465,7 +465,12 @@ func TestAppDependencies(t *testing.T) {
 	ws, units := renderUnits(t, fixtureDir, nil)
 	const rails = "filial-master-rails.container"
 	hasLine(t, units, rails, "Requires=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service")
-	hasLine(t, units, rails, "Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service")
+	hasLine(t, units, rails, "Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service")
+	for file, data := range units { // only the app wants the dashboard
+		if app := strings.Contains(string(data), "\n# role: app\n"); !app && strings.Contains(string(data), "railswitch-dashboard.service") {
+			t.Errorf("%s (not the app) names railswitch-dashboard.service:\n%s", file, data)
+		}
+	}
 	hasLine(t, units, rails, "UserNS=keep-id:uid=1000,gid=1000")
 	hasLine(t, units, rails, "User=1000:1000")
 	hasLine(t, units, rails, "PodmanArgs=--cpus=6")

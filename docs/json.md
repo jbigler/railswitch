@@ -373,6 +373,7 @@ still listed from the registry, with its port bases as last recorded and a
   "machine": {
     "traefik": {"unit": "railswitch-traefik.service", "state": "active/running"},
     "dozzle": {"unit": "railswitch-dozzle.service", "state": "active/running"},
+    "dashboard": {"unit": "railswitch-dashboard.service", "state": "active/running", "url": "http://railswitch.localhost:7700/"},
     "traefik_networks": [
       {"network": "railswitch_machine", "project": "", "attached": true},
       {"network": "filial_proxy", "project": "filial", "attached": true}
@@ -410,7 +411,58 @@ still listed from the registry, with its port bases as last recorded and a
 | `routes[].service` | string | The service it routes to. |
 | `routes[].router` | string | Traefik's router name, `<prefix>-<slug>-<route name>`. |
 | `machine.traefik`, `machine.dozzle` | object | The machine-wide unit's `unit` name and its systemd `state`, `<ActiveState>/<SubState>` as in `status`. |
+| `machine.dashboard` | object | The dashboard's plain systemd user unit (`unit`: `railswitch-dashboard.service`, at `$XDG_CONFIG_HOME/systemd/user/`, written by every render, started by `Wants=` from every app unit), its systemd `state` (`<ActiveState>/<SubState>`) and the `url` it is opened at, `http://railswitch.localhost:7700/` (it listens on `127.0.0.1:7700` only). `railswitch dashboard` prints the login link. The text output's line is `<unit> <state> <url>`. |
 | `machine.traefik_networks` | array | The networks Traefik must be on: the machine network `railswitch_machine` (`project` `""`), then each registered project's proxy network. `attached` is whether the running Traefik container is on it; `false` for each when Traefik isn't running. The text output flags a missing one `not attached: railswitch up`. |
 | `reach.networks` | array | One object per network with its members: `railswitch_machine` (Traefik and Dozzle), then for each project its proxy network (Traefik and the services on it) and each worktree's dev network (`<prefix>-<slug>-dev`: every service of that worktree). Members are service ids, plus `Traefik` and `Dozzle`. `Traefik` is a member only of a network it is attached to (`machine.traefik_networks`); the text output marks the others `(Traefik not attached: railswitch up)`. |
 | `reach.notes` | array of strings | Two lines on what the networks don't show. First, Traefik's reach: `Traefik reaches every project network` when every network of `machine.traefik_networks` is attached, else `Traefik reaches <attached networks, or "no network">; <the others> not attached: railswitch up`. Second, isolation: when every network of `reach.isolated` is `true`, `a project's containers reach another project only through Traefik, which refuses them (D50); networks are isolate=strict, and the Traefik API and Dozzle answer only host clients`; else `networks not isolate=strict (created before Stage 3): <networks>; other projects' containers reach them directly, not only through Traefik; recreate them (…)` with the procedure of docs/stage3-acceptance.md, "Upgrading from Stage 2". |
 | `reach.isolated` | object | One field per railswitch network that exists (`railswitch_machine`, each registered project's proxy network, each registered worktree's dev network), named after the network: `true` when `podman network inspect` shows `isolate=strict` (D50), `false` for a network created before Stage 3 with other options. A network that doesn't exist yet has no field. |
+
+## `dashboard colors`
+
+The dashboard's colours, from `~/.config/railswitch/dashboard.toml`
+(`$XDG_CONFIG_HOME/railswitch/dashboard.toml`): for each mode, its preset,
+the tokens changed from it and all twelve resulting colours, and the
+contrast warnings. `railswitch dashboard colors set [--dark] [--base
+<preset>] [<token>=#rrggbb…]` changes one mode (light without `--dark`);
+`railswitch dashboard colors reset [--dark]` drops one mode's changed
+tokens and keeps its preset. The text form is a table `MODE TOKEN COLOUR
+FROM` (`FROM` is the preset, or `set` for a changed token), then a
+`warning: <mode> <warning>` line per warning; `set` prints the changed
+mode's warnings to stderr.
+
+```json
+{
+  "light": {"base": "flexoki", "overrides": {"text": "#EEEEEE"},
+            "colors": {"bg": "#FFFCF0", "bg2": "#F2F0E5", "text": "#EEEEEE", "muted": "#6F6E69", "accent": "#BC5215", "blue": "#205EA6", "green": "#536907", "yellow": "#8E6B01", "sel": "#E6E4D9", "border": "#CECDC3", "purple": "#5E409D", "red": "#AF3029"}},
+  "dark": {"base": "flexoki", "overrides": {}, "colors": {"bg": "#100F0F", "…": "…"}},
+  "warnings": {"light": ["text: contrast 1.1:1 against bg (below 4.5:1)"], "dark": []}
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `light`, `dark` | object | One mode. |
+| `….base` | string | Its preset: `flexoki` (the default), `paper`, `solar` or `contrast`. |
+| `….overrides` | object | Token → `#RRGGBB` (upper case) for each editable token changed from the preset; `{}` when none is. |
+| `….colors` | object | All twelve tokens → `#RRGGBB`: the preset with the overrides applied. Editable: `bg`, `bg2`, `text`, `muted`, `accent`, `blue`, `green`, `yellow`; fixed by the preset: `sel`, `border`, `purple`, `red`. |
+| `warnings.light`, `warnings.dark` | array of strings | For each editable token but `bg` and `bg2` whose contrast against `bg` is below 4.5:1 (WCAG), in that order: `<token>: contrast <ratio>:1 against bg (below 4.5:1)`. `[]` when none. |
+
+### `dashboard.toml`
+
+`schema = 1` (D39), then one table per mode with its preset and only the
+tokens changed from it (railswitch writes it; a token equal to the
+preset's value is dropped). A missing file, or a missing table, is
+`flexoki` with no changes. An unknown preset or token, a fixed token, or a
+value that isn't `#rrggbb` is refused. (docs/dashboard.md will describe
+the dashboard as a whole.)
+
+```toml
+schema = 1
+
+[colors.light]
+base = "flexoki"
+accent = "#BC5215"
+
+[colors.dark]
+base = "flexoki"
+```

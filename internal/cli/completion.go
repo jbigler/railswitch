@@ -28,21 +28,24 @@ var completionFiles = map[string]string{
 }
 
 // completionSubs is each command's subcommands. A new command with
-// subcommands adds its entry here. A command with completionArgs too
-// (agent) offers both for its first word.
+// subcommands adds its entry here; a subcommand with its own entry
+// ("dashboard colors") nests. A command with completionArgs too (agent)
+// offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":         {"add", "ls", "stop"},
-	"containerfile": {"eject", "list", "new", "show"},
-	"db":            {"dump"},
-	"fw":            {"allow", "show"},
-	"hooks":         {"backup", "check", "restore"},
-	"nvim":          {"reset-config", "update"},
-	"pack":          {"eject", "new", "show"},
-	"pr":            {"ls"},
-	"project":       {"init", "ls", "new", "rm"},
-	"secret":        {"add", "ls", "rm", "set"},
-	"task":          {"ls"},
-	"wt":            {"add", "ls", "rm"},
+	"agent":            {"add", "ls", "stop"},
+	"containerfile":    {"eject", "list", "new", "show"},
+	"dashboard":        {"colors"},
+	"dashboard colors": {"reset", "set"},
+	"db":               {"dump"},
+	"fw":               {"allow", "show"},
+	"hooks":            {"backup", "check", "restore"},
+	"nvim":             {"reset-config", "update"},
+	"pack":             {"eject", "new", "show"},
+	"pr":               {"ls"},
+	"project":          {"init", "ls", "new", "rm"},
+	"secret":           {"add", "ls", "rm", "set"},
+	"task":             {"ls"},
+	"wt":               {"add", "ls", "rm"},
 }
 
 // completionFlags is each command path's flags ("": the global ones) as
@@ -50,26 +53,28 @@ var completionSubs = map[string][]string{
 // flag that takes a value. Commands are never run to collect them;
 // TestCompletionFlagsMatch fails when the code defines a flag missing here.
 var completionFlags = map[string][]string{
-	"":                    {"-C=", "-w=", "--json"},
-	"agent":               {"--new-term"},
-	"agent add":           {"--run=", "--use="},
-	"build":               {"--force", "--pull"},
-	"containerfile eject": {"--force"},
-	"containerfile show":  {"--default"},
-	"down":                {"--yes"},
-	"exec":                {"--fresh"},
-	"hooks restore":       {"--force"},
-	"logs":                {"-f"},
-	"nvim reset-config":   {"--yes"},
-	"pack eject":          {"--as="},
-	"project rm":          {"--purge", "--yes"},
-	"project new":         {"--agent=", "--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
-	"render":              {"--check"},
-	"secret add":          {"--env=", "--git-signing", "--machine", "--service="},
-	"secret set":          {"--restart"},
-	"task":                {"--new-term"},
-	"wt add":              {"--name=", "--up"},
-	"wt rm":               {"--force"},
+	"":                       {"-C=", "-w=", "--json"},
+	"agent":                  {"--new-term"},
+	"agent add":              {"--run=", "--use="},
+	"build":                  {"--force", "--pull"},
+	"containerfile eject":    {"--force"},
+	"containerfile show":     {"--default"},
+	"dashboard colors reset": {"--dark"},
+	"dashboard colors set":   {"--base=", "--dark"},
+	"down":                   {"--yes"},
+	"exec":                   {"--fresh"},
+	"hooks restore":          {"--force"},
+	"logs":                   {"-f"},
+	"nvim reset-config":      {"--yes"},
+	"pack eject":             {"--as="},
+	"project rm":             {"--purge", "--yes"},
+	"project new":            {"--agent=", "--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
+	"render":                 {"--check"},
+	"secret add":             {"--env=", "--git-signing", "--machine", "--service="},
+	"secret set":             {"--restart"},
+	"task":                   {"--new-term"},
+	"wt add":                 {"--name=", "--up"},
+	"wt rm":                  {"--force"},
 }
 
 // completer returns the candidates for an argument; dir is -C. It never
@@ -172,7 +177,8 @@ func completions(ctx context.Context, words []string) []string {
 		case path == "":
 			path, subDone = w, len(completionSubs[w]) == 0
 		case !subDone:
-			path, subDone = path+" "+w, true
+			path = path + " " + w
+			subDone = len(completionSubs[path]) == 0
 		default:
 			nargs++
 		}

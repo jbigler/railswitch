@@ -43,6 +43,7 @@ var commands = map[string]command{
 	"wt":            cmdWt,
 	"project":       cmdProject,
 	"machine":       cmdMachine,
+	"dashboard":     cmdDashboard,
 	"up":            cmdUp,
 	"stop":          cmdStop,
 	"down":          cmdDown,

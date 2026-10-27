@@ -58,12 +58,20 @@ type machineRoute struct {
 type machineState struct {
 	Traefik         unitState        `json:"traefik"`
 	Dozzle          unitState        `json:"dozzle"`
+	Dashboard       dashboardState   `json:"dashboard"`
 	TraefikNetworks []traefikNetwork `json:"traefik_networks"`
 }
 
 type unitState struct {
 	Unit  string `json:"unit"`
 	State string `json:"state"` // "<ActiveState>/<SubState>"
+}
+
+// dashboardState is the dashboard's unit, its state and its address.
+type dashboardState struct {
+	Unit  string `json:"unit"`
+	State string `json:"state"` // "<ActiveState>/<SubState>"
+	URL   string `json:"url"`
 }
 
 type traefikNetwork struct {
@@ -228,6 +236,11 @@ func (e *env) machineReport(ctx context.Context) (*machineReport, error) {
 		}
 		*u.dst = unitState{Unit: u.unit, State: props["ActiveState"] + "/" + props["SubState"]}
 	}
+	props, err := sd.Show(ctx, machine.DashboardService, "ActiveState", "SubState")
+	if err != nil {
+		return nil, err
+	}
+	r.Machine.Dashboard = dashboardState{Unit: machine.DashboardService, State: props["ActiveState"] + "/" + props["SubState"], URL: machine.DashboardURL}
 	return r, nil
 }
 
@@ -360,6 +373,7 @@ func (r *machineReport) print(w io.Writer) error {
 	for _, u := range []unitState{r.Machine.Traefik, r.Machine.Dozzle} {
 		fmt.Fprintf(tw, "%s\t%s\n", u.Unit, u.State)
 	}
+	fmt.Fprintf(tw, "%s\t%s\t%s\n", r.Machine.Dashboard.Unit, r.Machine.Dashboard.State, r.Machine.Dashboard.URL)
 	for _, n := range r.Machine.TraefikNetworks {
 		state := "attached"
 		if !n.Attached {

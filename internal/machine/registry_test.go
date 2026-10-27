@@ -403,7 +403,7 @@ func TestDefaultDirs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Dirs{Config: "/home/u/.config/railswitch", Data: "/home/u/.local/share/railswitch", Quadlet: "/home/u/.config/containers/systemd"}
+	want := Dirs{Config: "/home/u/.config/railswitch", Data: "/home/u/.local/share/railswitch", Quadlet: "/home/u/.config/containers/systemd", SystemdUser: "/home/u/.config/systemd/user"}
 	if d != want {
 		t.Errorf("DefaultDirs = %+v; want %+v", d, want)
 	}
@@ -413,7 +413,7 @@ func TestDefaultDirs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want = Dirs{Config: "/x/cfg/railswitch", Data: "/x/data/railswitch", Quadlet: "/x/cfg/containers/systemd"}
+	want = Dirs{Config: "/x/cfg/railswitch", Data: "/x/data/railswitch", Quadlet: "/x/cfg/containers/systemd", SystemdUser: "/x/cfg/systemd/user"}
 	if d != want {
 		t.Errorf("DefaultDirs (XDG) = %+v; want %+v", d, want)
 	}

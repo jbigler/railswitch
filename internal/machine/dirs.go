@@ -10,9 +10,10 @@ import (
 
 // Dirs are railswitch's machine directories.
 type Dirs struct {
-	Config  string // ~/.config/railswitch
-	Data    string // ~/.local/share/railswitch
-	Quadlet string // ~/.config/containers/systemd
+	Config      string // ~/.config/railswitch
+	Data        string // ~/.local/share/railswitch
+	Quadlet     string // ~/.config/containers/systemd
+	SystemdUser string // ~/.config/systemd/user: the dashboard's plain unit
 }
 
 // DefaultDirs reads XDG_CONFIG_HOME and XDG_DATA_HOME, falling back to $HOME.
@@ -37,8 +38,9 @@ func DefaultDirs() (Dirs, error) {
 		return Dirs{}, err
 	}
 	return Dirs{
-		Config:  filepath.Join(cfg, "railswitch"),
-		Data:    filepath.Join(data, "railswitch"),
-		Quadlet: filepath.Join(cfg, "containers", "systemd"),
+		Config:      filepath.Join(cfg, "railswitch"),
+		Data:        filepath.Join(data, "railswitch"),
+		Quadlet:     filepath.Join(cfg, "containers", "systemd"),
+		SystemdUser: filepath.Join(cfg, "systemd", "user"),
 	}, nil
 }

@@ -1345,6 +1345,44 @@ func TestUpDozzleStaleLabelRestarted(t *testing.T) {
 	}
 }
 
+// TestUpRestartsStaleDashboard: an active dashboard whose unit file is
+// newer than its start is restarted; one started after the file was
+// written, or not active, is not.
+func TestUpRestartsStaleDashboard(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		active  string
+		started time.Duration // ActiveEnterTimestamp relative to the file's mtime
+		restart bool
+	}{{"stale", "active", -time.Hour, true}, {"current", "active", time.Hour, false}, {"inactive", "inactive", -time.Hour, false}} {
+		t.Run(c.name, func(t *testing.T) {
+			e := setup(t)
+			upTwice(t, e)
+			e.units(loadedClean)
+			e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState="+c.active+"\n", machine.DashboardService)
+			mtime := time.Date(2026, 10, 27, 10, 0, 0, 0, time.Local)
+			if err := os.Chtimes(filepath.Join(e.l.WS.Dirs.SystemdUser, machine.DashboardService), mtime, mtime); err != nil {
+				t.Fatal(err)
+			}
+			ts := mtime.Add(c.started).Format("Mon 2006-01-02 15:04:05 MST")
+			e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveEnterTimestamp", machine.DashboardService},
+				sys.Result{Stdout: []byte("ActiveEnterTimestamp=" + ts + "\n")}, nil)
+			if err := e.l.Up(ctx, "feat"); err != nil {
+				t.Fatal(err)
+			}
+			n := count(e.calls(), "systemctl --user restart railswitch-dashboard.service")
+			if c.restart {
+				wantInOrder(t, e.calls(),
+					"systemctl --user restart railswitch-dashboard.service",
+					"systemctl --user start filial-feat-rails.service")
+			}
+			if want := map[bool]int{true: 1, false: 0}[c.restart]; n != want {
+				t.Errorf("dashboard restarts %d; want %d:\n%s", n, want, dump(e.calls()))
+			}
+		})
+	}
+}
+
 // TestUpShowsProgress: a build streams podman's own output as it runs, and
 // every pull is announced, so a long first `up` never sits silent.
 func TestUpShowsProgress(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -207,11 +208,32 @@ func TestMachineJSON(t *testing.T) {
 	check("worktree", first(project.(map[string]any)["worktrees"]), "id", "ports", "shared_url", "slug")
 	check("route", first(doc["routes"]), "host", "project", "router", "service", "worktree")
 	m := doc["machine"]
-	check("machine", m, "dozzle", "traefik", "traefik_networks")
+	check("machine", m, "dashboard", "dozzle", "traefik", "traefik_networks")
+	check("dashboard", m.(map[string]any)["dashboard"], "state", "unit", "url")
 	check("traefik", m.(map[string]any)["traefik"], "state", "unit")
 	check("traefik network", first(m.(map[string]any)["traefik_networks"]), "attached", "network", "project")
 	check("reach", doc["reach"], "isolated", "networks", "notes")
 	check("reach network", first(doc["reach"].(map[string]any)["networks"]), "members", "network")
+}
+
+// TestMachineJSONDashboard: machine.dashboard is the dashboard unit, its
+// state and its address; the text output has its line.
+func TestMachineJSONDashboard(t *testing.T) {
+	twoProjects(t)
+	f := machineHost("railswitch_machine")
+	f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,SubState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=inactive\nSubState=dead\n")}, nil)
+	r := machineJSON(t, f)
+	want := dashboardState{Unit: "railswitch-dashboard.service", State: "inactive/dead", URL: "http://railswitch.localhost:7700/"}
+	if r.Machine.Dashboard != want {
+		t.Errorf("machine.dashboard = %+v; want %+v", r.Machine.Dashboard, want)
+	}
+	code, out, errs := runWith(t, f, "machine")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s%s", code, out, errs)
+	}
+	if !regexp.MustCompile(`(?m)^railswitch-dashboard\.service +inactive/dead +http://railswitch\.localhost:7700/$`).MatchString(out) {
+		t.Errorf("no dashboard line:\n%s", out)
+	}
 }
 
 // TestMachineFlagsDetached: a registered project's proxy network Traefik

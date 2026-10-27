@@ -47,6 +47,12 @@ func TestCompleteCommands(t *testing.T) {
 	if got, want := complete(t, "completion", ""), []string{"bash", "fish", "zsh"}; !slices.Equal(got, want) {
 		t.Errorf("completion: %q; want %q", got, want)
 	}
+	if got, want := complete(t, "dashboard", "colors", ""), []string{"reset", "set"}; !slices.Equal(got, want) {
+		t.Errorf("dashboard colors: %q; want %q", got, want)
+	}
+	if got, want := complete(t, "dashboard", "colors", "set", "--"), []string{"--base", "--dark"}; !slices.Equal(got, want) {
+		t.Errorf("dashboard colors set --: %q; want %q", got, want)
+	}
 }
 
 // TestCompletionFlagsMatch: completionFlags lists exactly the flags each

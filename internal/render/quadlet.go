@@ -209,7 +209,7 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 		wants = append(wants, traefikUnit)
 	}
 	if s.Role == RoleApp {
-		wants = append(wants, dozzleUnit)
+		wants = append(wants, dozzleUnit, machine.DashboardService)
 	}
 	if len(requires) > 0 {
 		u.add("Unit", "Requires", strings.Join(requires, " "))

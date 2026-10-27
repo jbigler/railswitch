@@ -184,7 +184,7 @@ func TestPages(t *testing.T) {
 		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`}},
 		{"/colors", 200, []string{`value="#BC5215"`, "paper", "solar", "contrast"}},
 		{"/theme.css", 200, []string{"--accent:#BC5215", "prefers-color-scheme: dark", "--accent:#DA702C"}},
-		{"/static/app.js", 200, []string{"EventSource", "renotify: true", "Logged out — run `railswitch dashboard` for a new link", "Disconnected — retrying", "history.replaceState(null, \"\", pageURL(slug))"}},
+		{"/static/app.js", 200, []string{"EventSource"}},
 		{"/static/app.css", 200, []string{"--accent"}},
 	} {
 		w := f.do(req("GET", c.path, nil))

@@ -127,6 +127,13 @@ worktree; the tab title is `(1) RailSwitch`; on another project's page the
 strip shows `◆ ftest / <worktree> · needs permission`. Answering the prompt
 clears the count; no second notification while it stays waiting.
 
+Then let the agent go back to work (it shows `working`), and give it
+something that asks for permission again.
+
+Expected: a second desktop notification for the same worktree appears,
+even though the first one (same tag) may still be in the notification
+centre: the new one replaces it and alerts again (`renotify`).
+
 ## 8. up, stop, restart
 
 On a worktree: `stop`, then `up`, then `restart`.
@@ -146,6 +153,16 @@ Expected: a project job runs `wt add --up s6a-check`; the row appears and
 comes up. The remove dialog says `s6a-check` has uncommitted changes;
 Remove refuses until "Discard changes" is ticked and `s6a-check` typed;
 then the row disappears and `railswitch wt ls` no longer lists it.
+
+Remove the selected worktree: add `s6a-check` again (without "up after
+adding"), select it (the address bar shows `/p/ftest/s6a-check`), then
+`remove…` → Remove.
+
+Expected: when its row is gone, the detail shows another worktree and the
+address bar changes to that worktree's URL (no longer `/s6a-check`).
+Reloading works: no 404. Opening
+`http://railswitch.localhost:7700/p/ftest/s6a-check?sort=pr` by hand lands
+on `/p/ftest?sort=pr`.
 
 ## 10. Tasks
 
@@ -189,6 +206,31 @@ curl -s http://127.0.0.1:7700/healthz
 ```
 
 Expected: `403`, then `ok <version>`.
+
+## 14. The page says when it is no longer live
+
+With a dashboard page open:
+
+```sh
+rm ~/.local/share/railswitch/dashboard/token
+systemctl --user restart railswitch-dashboard.service
+```
+
+Expected: a red line under the header says "Logged out — run `railswitch
+dashboard` for a new link" (the new run made a new token, so the cookie is
+refused). `railswitch dashboard` prints the new link; opening it removes
+the line.
+
+Then:
+
+```sh
+systemctl --user stop railswitch-dashboard.service
+sleep 10
+systemctl --user start railswitch-dashboard.service
+```
+
+Expected: while it is stopped the line says "Disconnected — retrying";
+a few seconds after the start it disappears and the page updates again.
 
 ## Clean up
 

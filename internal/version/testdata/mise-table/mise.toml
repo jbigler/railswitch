@@ -1,0 +1,2 @@
+[tools]
+elixir = { version = "1.18.4", postinstall = "mix local.hex" }

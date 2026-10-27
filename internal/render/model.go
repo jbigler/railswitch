@@ -830,6 +830,10 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 			ch := pk.Runtimes[name]
 			r := version.Resolve(wt.Dir, ch.From, ch.Fallback, version.ValidVersion)
 			warn(r.Warnings)
+			if r.Source == "none" { // no source and no fallback: empty (D69)
+				v[name], v[name+".major"] = "", ""
+				continue
+			}
 			val, from = r.Value, "runtimes."+name+" ("+r.Source+")"
 		}
 		if err := setVersion(name, val, from); err != nil {

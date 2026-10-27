@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"maps"
@@ -10,10 +11,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
@@ -1035,5 +1038,53 @@ func TestGitSigningEnv(t *testing.T) {
 	got := pairs(in, "agent-claude")
 	if len(got) != 6 || got[0][0] != "credential.https://github.com.helper" || got[1][0] != "url.https://github.com/.insteadOf" || !slices.Equal(got[2:], signing) {
 		t.Errorf("agent-claude pairs with git_host = %q", got)
+	}
+}
+
+// builtinCatalogWith is the built-in catalog with each embedded file passed
+// through edit (path relative to the builtin FS), and ws as its workspace.
+func builtinCatalogWith(t *testing.T, ws string, edit func(path string, data []byte) []byte) *pack.Catalog {
+	t.Helper()
+	mfs := fstest.MapFS{}
+	err := fs.WalkDir(builtin.FS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(builtin.FS, p)
+		mfs[p] = &fstest.MapFile{Data: edit(p, data), Mode: 0o644}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, err := pack.Load(mfs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat.Root = ws
+	return cat
+}
+
+// D69: a runtime with no fallback and no source is empty, and a build arg
+// built from it is "" (the rails Containerfile then skips bun).
+func TestEmptyRuntime(t *testing.T) {
+	ws := fixtureWS(t)
+	cat := builtinCatalogWith(t, ws, func(p string, data []byte) []byte {
+		if p != "packs/rails/pack.toml" {
+			return data
+		}
+		data = bytes.Replace(data, []byte(`args = { RUBY_VERSION = "{ruby}"`), []byte(`args = { BUN_VERSION = "{bun}", RUBY_VERSION = "{ruby}"`), 1)
+		return append(data, []byte("\n[runtimes.bun]\nfrom = [\".bun-version\", \"package.json:packageManager.bun\"]\n")...)
+	})
+	writeFile(t, filepath.Join(ws, "feat", ".bun-version"), "1.2.3\n")
+	m := mustBuild(t, catalogInputs(t, ws, cat, nil))
+	for slug, want := range map[string]string{"master": "", "feat": "1.2.3"} {
+		in := mustInstance(t, m, slug)
+		if got, ok := in.Values["bun"]; !ok || got != want {
+			t.Errorf("%s: {bun} = %q (set %v); want %q", slug, got, ok, want)
+		}
+		if got, ok := in.Builds[0].Args["BUN_VERSION"]; !ok || got != want {
+			t.Errorf("%s: base image BUN_VERSION = %q (set %v); want %q", slug, got, ok, want)
+		}
 	}
 }

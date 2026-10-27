@@ -47,7 +47,8 @@ var ValidDBName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,62}$`)
 // Resolved is the outcome of a version chain.
 type Resolved struct {
 	Value string
-	// Source is "<file>", "<file>:<key>" or "fallback".
+	// Source is "<file>", "<file>:<key>", "fallback", or "none" when no
+	// source matched and the chain has no fallback (Value is "").
 	Source   string
 	Warnings []string
 }
@@ -57,13 +58,14 @@ type Resolved struct {
 // accepts. A missing file or a file without a value is skipped silently; a
 // refused or unreadable file, an unknown source or an invalid value is
 // skipped with a warning. When every source is skipped the result is
-// fallback with Source "fallback".
+// fallback with Source "fallback", or "" with Source "none" for an empty
+// fallback.
 func Resolve(dir string, from []string, fallback string, valid Validator) Resolved {
 	var r Resolved
 	for _, src := range from {
 		file, key, _ := strings.Cut(src, ":")
-		parse, ok := parsers[filepath.Base(file)]
-		if !ok {
+		s, ok := sources[filepath.Base(file)]
+		if !ok || !s.key(key) {
 			r.Warnings = append(r.Warnings, fmt.Sprintf("%s: unknown version source", src))
 			continue
 		}
@@ -75,7 +77,7 @@ func Resolve(dir string, from []string, fallback string, valid Validator) Resolv
 			r.Warnings = append(r.Warnings, fmt.Sprintf("%s: skipped: %v", src, err))
 			continue
 		}
-		v, found := parse(data, key)
+		v, found := s.parse(data, key)
 		if !found {
 			continue
 		}
@@ -84,6 +86,10 @@ func Resolve(dir string, from []string, fallback string, valid Validator) Resolv
 			continue
 		}
 		r.Value, r.Source = v, src
+		return r
+	}
+	if fallback == "" {
+		r.Source = "none"
 		return r
 	}
 	r.Value, r.Source = fallback, "fallback"

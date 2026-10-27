@@ -3,20 +3,17 @@ package render
 import (
 	"bytes"
 	"flag"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
-	"github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/testfixture"
 	"github.com/jbigler/railswitch/internal/unithash"
 )
@@ -230,27 +227,13 @@ func TestNoNonLoopbackPublish(t *testing.T) {
 // replaced by server.
 func serverUnits(t *testing.T, server string) map[string][]byte {
 	t.Helper()
-	mfs := fstest.MapFS{}
-	err := fs.WalkDir(builtin.FS, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, err := fs.ReadFile(builtin.FS, p)
+	ws := fixtureWS(t)
+	cat := builtinCatalogWith(t, ws, func(p string, data []byte) []byte {
 		if p == "packs/rails/pack.toml" {
 			data = bytes.Replace(data, []byte(`server = "bin/dev"`), []byte(`server = "`+server+`"`), 1)
 		}
-		mfs[p] = &fstest.MapFile{Data: data, Mode: 0o644}
-		return err
+		return data
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cat, err := pack.Load(mfs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ws := fixtureWS(t)
-	cat.Root = ws // the fixture's local agents load on demand
 	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
 	if err != nil {
 		t.Fatal(err)

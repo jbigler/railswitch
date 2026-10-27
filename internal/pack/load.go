@@ -15,6 +15,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
+	"github.com/jbigler/railswitch/internal/version"
 )
 
 // Catalog is every package available to a project: the built-ins, plus the
@@ -424,12 +425,15 @@ func (l *loader) checkPack(dir string, p *Pack) bool {
 	l.required(file, "image.tag", p.Image.Tag)
 	l.required(file, "image.os", p.Image.OS)
 
+	// A runtime may have no fallback: an app without a version source then
+	// gets an empty value (D69).
 	for _, name := range sortedKeys(p.Runtimes) {
 		if !nameRe.MatchString(name) {
 			l.add(file, "runtimes.%s: name must match %s", name, nameRe)
 		}
-		l.required(file, "runtimes."+name+".fallback", p.Runtimes[name].Fallback)
+		l.sources(file, "runtimes."+name, p.Runtimes[name].From)
 	}
+	l.sources(file, "db_name", p.DBName.From)
 	l.env(file, "env", p.Env)
 	l.env(file, "share.env", p.Share.Env)
 	l.volumes(file, "caches", p.Caches, false)
@@ -617,4 +621,14 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	slices.Sort(keys)
 	return keys
+}
+
+// sources checks each version-chain source of field against the forms
+// version.Resolve reads.
+func (l *loader) sources(file, field string, from []string) {
+	for i, src := range from {
+		if !version.KnownSource(src) {
+			l.add(file, "%s.from[%d]: %q is not a known version source", field, i, src)
+		}
+	}
 }

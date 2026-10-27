@@ -25,6 +25,12 @@ func TestParsers(t *testing.T) {
 		{"package-lock", "package-lock.json:playwright", "1.54.0", false},
 		{"uv-lock", "uv.lock:playwright", "1.54.0", false},
 		{"database-yml", "config/database.yml:development.database", "filial_dev", true},
+		{"package-json-pm", "package.json:packageManager.bun", "1.2.3", false},
+		{"mise-string", "mise.toml:elixir", "1.18.4", false},
+		{"mise-table", "mise.toml:elixir", "1.18.4", false},
+		{"mise-array", "mise.toml:elixir", "1.18.4", false},
+		{"dot-mise", ".mise.toml:erlang", "27.3.4", false},
+		{"bun-version", ".bun-version", "1.2.3", false},
 	}
 	for _, c := range cases {
 		t.Run(c.dir+"/"+c.src, func(t *testing.T) {
@@ -37,6 +43,30 @@ func TestParsers(t *testing.T) {
 				t.Fatalf("got %+v, want %q from %q", r, c.want, c.src)
 			}
 		})
+	}
+}
+
+// Review Focus 5: packageManager names another tool, so the bun chain (no
+// fallback) is empty, without a warning.
+func TestPackageManagerSource(t *testing.T) {
+	for _, dir := range []string{"package-json-yarn", "package-json"} {
+		r := Resolve(fixture(dir), []string{".bun-version", "package.json:packageManager.bun"}, "", ValidVersion)
+		if r.Value != "" || r.Source != "none" || len(r.Warnings) != 0 {
+			t.Errorf("%s: got %+v; want empty, source none, no warning", dir, r)
+		}
+	}
+}
+
+func TestKnownSource(t *testing.T) {
+	for _, src := range []string{".ruby-version", "Gemfile.lock", "Gemfile.lock:playwright-ruby-client", "config/database.yml:development.database", ".tool-versions:elixir", "package.json", "package.json:packageManager.bun", "mise.toml:elixir", ".mise.toml:erlang", "package-lock.json:playwright", ".bun-version"} {
+		if !KnownSource(src) {
+			t.Errorf("KnownSource(%q) = false", src)
+		}
+	}
+	for _, src := range []string{"x.lock", "package.json:packageManager", "package.json:packageManager.", ".tool-versions", "mise.toml", "package-lock.json", ".ruby-version:ruby", ""} {
+		if KnownSource(src) {
+			t.Errorf("KnownSource(%q) = true", src)
+		}
 	}
 }
 

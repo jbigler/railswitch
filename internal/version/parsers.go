@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -14,18 +15,39 @@ import (
 // ":<key>" suffix of the source. found is false when the file has no value.
 type parser func(data []byte, key string) (value string, found bool)
 
-// parsers is keyed by base filename.
-var parsers = map[string]parser{
-	".ruby-version":     parseRubyVersion,
-	".nvmrc":            parseNvmrc,
-	".node-version":     parseNvmrc,
-	".tool-versions":    parseToolVersions,
-	"Gemfile":           parseGemfile,
-	"Gemfile.lock":      parseGemfileLock,
-	"package.json":      parsePackageJSON,
-	"package-lock.json": parsePackageLock,
-	"uv.lock":           parseUvLock,
-	"database.yml":      parseDatabaseYML,
+// source is a parser and the keys it takes.
+type source struct {
+	parse parser
+	key   func(key string) bool // whether ":<key>" ("" for none) is a form the parser reads
+}
+
+func noKey(k string) bool       { return k == "" }
+func needKey(k string) bool     { return k != "" }
+func optionalKey(_ string) bool { return true }
+
+// sources is keyed by base filename.
+var sources = map[string]source{
+	".ruby-version":     {parseRubyVersion, noKey},
+	".nvmrc":            {parseNvmrc, noKey},
+	".node-version":     {parseNvmrc, noKey},
+	".bun-version":      {parseNvmrc, noKey},
+	".tool-versions":    {parseToolVersions, needKey},
+	"mise.toml":         {parseMiseToml, needKey},
+	".mise.toml":        {parseMiseToml, needKey},
+	"Gemfile":           {parseGemfile, noKey},
+	"Gemfile.lock":      {parseGemfileLock, optionalKey},
+	"package.json":      {parsePackageJSON, packageJSONKey},
+	"package-lock.json": {parsePackageLock, needKey},
+	"uv.lock":           {parseUvLock, needKey},
+	"database.yml":      {parseDatabaseYML, optionalKey},
+}
+
+// KnownSource reports whether src ("<file>" or "<file>:<key>") is a version
+// source form Resolve reads: its file has a parser that takes that key.
+func KnownSource(src string) bool {
+	file, key, _ := strings.Cut(src, ":")
+	s, ok := sources[filepath.Base(file)]
+	return ok && file != "" && s.key(key)
 }
 
 // firstLine returns the first non-empty trimmed line.
@@ -102,16 +124,38 @@ func parseGemfileLock(data []byte, key string) (string, bool) {
 	return "", false
 }
 
-// parsePackageJSON reads engines.node (or engines.<key>).
-func parsePackageJSON(data []byte, key string) (string, bool) {
-	if key == "" {
-		key = "node"
+// packageManagerKey is the package.json key form "packageManager.<tool>".
+const packageManagerKey = "packageManager."
+
+func packageJSONKey(k string) bool {
+	if tool, ok := strings.CutPrefix(k, packageManagerKey); ok {
+		return tool != ""
 	}
+	return k != "packageManager"
+}
+
+// parsePackageJSON reads engines.node (or engines.<key>), or with the key
+// "packageManager.<tool>" the version of "packageManager": "<tool>@<version>"
+// (Corepack's form, an optional "+<hash>" dropped); another tool there is no
+// value.
+func parsePackageJSON(data []byte, key string) (string, bool) {
 	var p struct {
-		Engines map[string]string `json:"engines"`
+		Engines        map[string]string `json:"engines"`
+		PackageManager string            `json:"packageManager"`
 	}
 	if json.Unmarshal(data, &p) != nil {
 		return "", false
+	}
+	if tool, ok := strings.CutPrefix(key, packageManagerKey); ok {
+		name, v, ok := strings.Cut(p.PackageManager, "@")
+		if !ok || name != tool {
+			return "", false
+		}
+		v, _, _ = strings.Cut(v, "+")
+		return v, v != ""
+	}
+	if key == "" {
+		key = "node"
 	}
 	v, ok := p.Engines[key]
 	return strings.TrimPrefix(v, "v"), ok && v != ""
@@ -145,6 +189,30 @@ func parseUvLock(data []byte, key string) (string, bool) {
 	for _, p := range l.Package {
 		if p.Name == key {
 			return p.Version, p.Version != ""
+		}
+	}
+	return "", false
+}
+
+// parseMiseToml reads [tools] <key> from a mise config: a version string, a
+// table with version, or a list (its first entry).
+func parseMiseToml(data []byte, key string) (string, bool) {
+	var m struct {
+		Tools map[string]any `toml:"tools"`
+	}
+	if toml.Unmarshal(data, &m) != nil {
+		return "", false
+	}
+	switch v := m.Tools[key].(type) {
+	case string:
+		return v, v != ""
+	case map[string]any:
+		s, _ := v["version"].(string)
+		return s, s != ""
+	case []any:
+		if len(v) > 0 {
+			s, _ := v[0].(string)
+			return s, s != ""
 		}
 	}
 	return "", false

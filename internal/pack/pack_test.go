@@ -472,3 +472,31 @@ func TestOptionDump(t *testing.T) {
 		}
 	}
 }
+
+// A runtime may have no fallback: an app without a version source gets an
+// empty value (the rails pack's bun, D69).
+func TestLoadRuntimeWithoutFallback(t *testing.T) {
+	fsys := minimal()
+	p := fsys["packs/p/pack.toml"]
+	p.Data = append(p.Data, []byte("[runtimes.bun]\nfrom = [\".bun-version\", \"package.json:packageManager.bun\"]\n")...)
+	if _, err := Load(fsys); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+}
+
+// Every chain source must be a form version.Resolve reads.
+func TestLoadUnknownSource(t *testing.T) {
+	for extra, want := range map[string]string{
+		"[runtimes.bun]\nfrom = [\".bun-version\", \"x.lock\"]\n":             `runtimes.bun.from[1]: "x.lock" is not a known version source`,
+		"[runtimes.node]\nfrom = [\"package.json:packageManager\"]\n":         `runtimes.node.from[0]: "package.json:packageManager" is not a known version source`,
+		"[db_name]\nfrom = [\"config/dev.exs:database\"]\nfallback = \"x\"\n": `db_name.from[0]: "config/dev.exs:database" is not a known version source`,
+	} {
+		fsys := minimal()
+		p := fsys["packs/p/pack.toml"]
+		p.Data = append(p.Data, []byte(extra)...)
+		_, err := Load(fsys)
+		if err == nil || !strings.Contains(err.Error(), "packs/p/pack.toml: "+want) {
+			t.Errorf("Load with %q = %v; want %q", extra, err, want)
+		}
+	}
+}

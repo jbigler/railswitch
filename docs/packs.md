@@ -63,3 +63,43 @@ switching a slot between a built-in and a local copy of it, even a
 byte-identical one. `railswitch project new --pack local:<name>@<N>` (and
 `--option <slot>=local:<name>@<N>`) works when the package is already in
 the workspace directory before `project new` runs.
+
+## Version chains
+
+A pack's `[runtimes.<name>]` and `[db_name]` are chains: `from` lists
+sources, read in the worktree, first match wins; `fallback` is the value
+when none matches. The value becomes the placeholder `{<name>}` (and
+`{<name>.major}`, the part before the first `.` or `-`), used in image tags,
+build args, volume names and env. `[worktrees.<slug>.versions]` overrides a
+runtime for one worktree.
+
+| Source | Reads |
+|---|---|
+| `.ruby-version`, `.nvmrc`, `.node-version`, `.bun-version` | the first line (a leading `v` dropped for Node and bun) |
+| `.tool-versions:<tool>` | the `<tool> <version>` line (asdf) |
+| `mise.toml:<tool>`, `.mise.toml:<tool>` | `[tools] <tool> = "<v>"`, `{ version = "<v>" }` or `["<v>", …]` (first) |
+| `Gemfile` | `ruby "<v>"` |
+| `Gemfile.lock`, `Gemfile.lock:<gem>` | `RUBY VERSION`, or the resolved version of `<gem>` |
+| `package.json`, `package.json:<engine>` | `engines.node`, or `engines.<engine>` |
+| `package.json:packageManager.<tool>` | `"packageManager": "<tool>@<v>[+<hash>]"`; nothing when it names another tool |
+| `package-lock.json:<package>` | the installed version of `<package>` |
+| `uv.lock:<package>` | the locked version of `<package>` |
+| `<path>/database.yml[:<env>.database]` | `development.database` (`[db_name]` only) |
+
+A source is a path relative to the worktree; the file name picks the
+parser, so `config/database.yml` and `.config/mise.toml` work. Loading a
+package refuses a source of any other form (`runtimes.bun.from[1]: "x.lock"
+is not a known version source`). A file that is missing or has no value is
+skipped; a file that is unreadable or holds an invalid value is skipped
+with a warning.
+
+`fallback` is optional for a runtime. With none and no matching source the
+value is empty: the rails pack's `bun` is empty unless the app pins bun, and
+its `Containerfile.base` installs bun only when `BUN_VERSION` is set.
+
+### Optional placeholders
+
+`{<name>?}` is `""` when `<name>` has no value in the package's scope, where
+`{<name>}` would be an error. The nvim tool names its npm volume
+`npm_global_node{node?}`, so it works with a pack that has no `node` runtime.
+`{env.X?}` still needs `X` set.

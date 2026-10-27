@@ -36,14 +36,19 @@ func (e *UnknownPlaceholderError) Error() string {
 }
 
 // Expand replaces each placeholder in s with its value from sc, using the
-// grammar of placeholder.Replace.
+// grammar of placeholder.Replace. An optional "{name?}" is "" when sc does
+// not know name (an env.X? still needs a value: ErrUnset).
 func Expand(s string, sc Scope) (string, error) {
 	return placeholder.Replace(s, func(name string) (string, error) {
+		name, optional := strings.CutSuffix(name, "?")
 		if v, ok := sc.Lookup(name); ok {
 			return v, nil
 		}
 		if strings.HasPrefix(name, "env.") {
 			return "", fmt.Errorf("{%s}: %w", name, ErrUnset)
+		}
+		if optional {
+			return "", nil
 		}
 		return "", &UnknownPlaceholderError{Name: name}
 	})

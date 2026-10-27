@@ -38,6 +38,22 @@ func TestExpandUnset(t *testing.T) {
 	}
 }
 
+// {name?} is "" when the scope does not know name; env.X? still needs a value.
+func TestExpandOptional(t *testing.T) {
+	for sc, want := range map[*MapScope]string{
+		{}:                     "npm_global_node",
+		{"node": "22.11.0"}:    "npm_global_node22.11.0",
+		{"node": "", "x": "y"}: "npm_global_node",
+	} {
+		if got, err := Expand("npm_global_node{node?}", *sc); err != nil || got != want {
+			t.Errorf("Expand with %v = %q, %v; want %q", *sc, got, err, want)
+		}
+	}
+	if _, err := Expand("{env.TZ?}", MapScope{}); !errors.Is(err, ErrUnset) {
+		t.Errorf("env.TZ? unset: %v; want ErrUnset", err)
+	}
+}
+
 func TestMajor(t *testing.T) {
 	for in, want := range map[string]string{"16.4": "16", "1.0.0-alpha.83": "1", "8": "8"} {
 		if got := Major(in); got != want {

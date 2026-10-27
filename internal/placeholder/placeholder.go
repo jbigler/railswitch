@@ -1,5 +1,6 @@
 // Package placeholder is the placeholder grammar shared by project.toml
-// (links) and packs: "{name}" or "{dotted.name}", with "{{" as an escaped
+// (links) and packs: "{name}" or "{dotted.name}", "{name?}" for an optional
+// value (pack.Expand: "" when the name is unknown), with "{{" as an escaped
 // literal "{". It imports nothing of railswitch.
 package placeholder
 
@@ -10,7 +11,7 @@ import (
 
 // Pattern matches one placeholder. "{{" is a literal "{" and never starts a
 // placeholder; Replace applies that rule.
-var Pattern = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_.]*\}`)
+var Pattern = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_.]*\??\}`)
 
 // anchored matches Pattern at the start of a string only.
 var anchored = regexp.MustCompile(`^` + Pattern.String())

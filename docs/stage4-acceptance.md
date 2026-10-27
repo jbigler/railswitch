@@ -38,8 +38,9 @@ agent-probe` and `secret set claude_token` (values on stdin; a dummy token,
 
 1. `<p>-<slug>-agent-probe.service` is `active`; no
    `<p>-<slug>-agent-claude.container` unit file exists (on-demand).
-2. `/run/secrets/probe_key` exists in the probe.
-3. `railswitch agent claude -- --version` exits 0 and prints a version;
+2. `/run/secrets/probe_key` exists in the probe, and `CLAUDE_CODE_OAUTH_TOKEN`
+   is not set there (each agent only its own secrets).
+3. `railswitch agent claude -- --version` exits 0 and its last line is a version;
    `railswitch agent claude -- sh -c 'test ! -e /run/secrets/probe_key'`
    exits 0 (a first argument without `-` takes the entrypoint's `exec "$@"`).
 4. The probe's annotations: `<p>.firewall=agent-probe`,
@@ -78,20 +79,27 @@ and a host outside the allow list is refused from the agent's shell
 ```sh
 railswitch db dump                 # writes <ws>/db-dumps/<db>.dump (0644; db-dumps 0755)
 ls -l <ws>/db-dumps/
-railswitch down --yes
-podman volume rm <p>-<slug>-db-data-pg<major>
+railswitch stop                    # stops the worktree; Quadlet removes the containers, volumes stay
+podman volume ls --format '{{.Name}}' | grep -- '-db-data-pg'   # the exact name: <p>-<slug>-db-data-pg<major>
+podman volume rm <p>-<slug>-db-data-pg<major>                   # only the db volume
 railswitch up                      # the fresh volume restores from the dump (initdb restore-dump.sh)
 ```
 
-Expect the app's data back (e.g. a record created before the dump is listed
-again).
+Do not use `railswitch down --yes` here: it removes every per-worktree
+volume (`node_modules`, agent homes with their credentials, seeded volumes),
+not just the db's. Expect the app's data back (e.g. a record created before
+the dump is listed again).
 
 ### git-guard: hooks are read-only in containers
+
+Run these from the base worktree (in a linked worktree `/app/.git` is a file,
+so `touch .git/hooks/x` fails with "Not a directory", a false pass), with an
+on-demand agent `<n>` (a service agent refuses arguments):
 
 ```sh
 railswitch exec -- touch .git/hooks/x       # app (base worktree): fails, read-only file system
 railswitch nvim                             # then in nvim: :!touch .git/hooks/x  -> fails
-railswitch agent -- sh -c 'touch /app/.git/hooks/x'   # fails
+railswitch agent <n> -- sh -c 'touch /app/.git/hooks/x'   # fails, read-only file system
 railswitch hooks check                      # lists findings; same as doctor's git-guard warning
 ```
 
@@ -110,8 +118,10 @@ fails. On the host, `touch` still works (nothing refuses there, D60).
 4. `railswitch wt add <branch>` for each branch you need.
 5. `railswitch up`; the app at http://master.filial.localhost/.
 6. `railswitch agent`; `railswitch nvim`.
-7. `railswitch db dump`, then delete the db volume and `railswitch up` again
-   to restore (as in "db round trip").
+7. `railswitch db dump`, then `railswitch stop`, `podman volume rm` of the
+   exact db volume (`<prefix>-<slug>-db-data-pg<major>`; never `down --yes`,
+   which removes every worktree volume), and `railswitch up` again to
+   restore; check the data is back (as in "db round trip").
 
 Every gap goes through a fix task (a generic feature plus its test) and into
 the gap log; nothing Filial-specific goes into the code or built-in packs

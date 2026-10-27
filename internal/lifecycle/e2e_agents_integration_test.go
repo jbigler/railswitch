@@ -25,7 +25,7 @@ type agentRow struct {
 	Run     string `json:"run"`
 }
 
-var versionRe = regexp.MustCompile(`\d+\.\d+`)
+var versionRe = regexp.MustCompile(`^\d+\.\d+\.\d+`)
 
 // TestE2EAgents is the Stage 4 agent acceptance run
 // (docs/stage4-acceptance.md) against real podman and systemd: a project with
@@ -127,14 +127,17 @@ func TestE2EAgents(t *testing.T) {
 		t.Errorf("%s.container: stat err %v, want not-exist (the agent is on-demand)", claude, err)
 	}
 
-	// The probe has its secret.
+	// The probe has its secret, and not the other agent's token.
 	if _, errOut, err := run(ctx, 30*time.Second, "podman", "exec", probe, "test", "-f", "/run/secrets/probe_key"); err != nil {
 		t.Errorf("podman exec %s test -f /run/secrets/probe_key: %v\n%s", probe, err, errOut)
+	}
+	if _, errOut, err := run(ctx, 30*time.Second, "podman", "exec", probe, "sh", "-c", `test -z "${CLAUDE_CODE_OAUTH_TOKEN:-}"`); err != nil {
+		t.Errorf("podman exec %s: CLAUDE_CODE_OAUTH_TOKEN is set in the probe: %v\n%s", probe, err, errOut)
 	}
 
 	// The on-demand agent runs; a first argument without "-" takes the
 	// entrypoint's exec "$@" branch, and the probe's secret isn't there.
-	if out := rs(t, 10*time.Minute, append(w, "agent", "claude", "--", "--version")...); !versionRe.MatchString(out) {
+	if out := rs(t, 10*time.Minute, append(w, "agent", "claude", "--", "--version")...); !versionRe.MatchString(strings.TrimSpace(lastLine(out))) {
 		t.Errorf("railswitch agent claude -- --version printed %q, want a version", out)
 	}
 	rs(t, 10*time.Minute, append(w, "agent", "claude", "--", "sh", "-c", "test ! -e /run/secrets/probe_key")...)

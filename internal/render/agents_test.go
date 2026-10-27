@@ -79,6 +79,22 @@ func TestAgentServices(t *testing.T) {
 	hasLine(t, units, "filial-feat-agent-probe.container", "PodmanArgs=--cpus=4 --tty --interactive")
 }
 
+// D55: an agent's firewall is enforced whatever [firewall] mode says; the
+// other services keep the project mode.
+func TestAgentAnnotations(t *testing.T) {
+	logMode := func(p *config.Project) { p.Firewall.Mode = "log" }
+	_, units := renderUnits(t, fixtureDir, logMode)
+	hasLine(t, units, "filial-master-agent-probe.container", "Annotation=filial.firewall=agent-probe")
+	hasLine(t, units, "filial-master-agent-probe.container", "Annotation=filial.firewall.mode=enforce")
+	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.mode=log")
+
+	// The on-demand agent's transient container gets the same annotations.
+	m, in := filial(t, logMode)
+	if ann := in.FirewallAnnotations(service(t, m, "agent-claude"), []string{"filial-master-dev"}); !slices.Contains(ann, "filial.firewall.mode=enforce") {
+		t.Errorf("agent-claude annotations %v", ann)
+	}
+}
+
 // C11: a service that mounts the base .git writable also mounts the worktree
 // at its own host path.
 func TestWorktreeHostPath(t *testing.T) {

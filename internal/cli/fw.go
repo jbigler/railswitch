@@ -27,6 +27,8 @@ const fwUsage = "usage: railswitch fw show [service] | railswitch fw allow <serv
 // railswitch fw show [svc] | fw allow <svc> <host…>: run the rendered
 // firewall.sh, which inspects or adjusts the live firewall of this
 // worktree's containers (show: every worktree's at the workspace root).
+// fw show agent-<n> first prints the agent's allowlist: an on-demand agent
+// rarely has a live container.
 func cmdFw(ctx context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr(fwUsage)
@@ -59,6 +61,14 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 	if _, err := os.Stat(script); err != nil {
 		return e.fail(fmt.Errorf("%w: run railswitch render", err))
 	}
+	if sub == "show" && len(rest) == 1 && isAgent(w.Stack, rest[0]) {
+		allow := filepath.Join(dir, firewall.AllowFile(rest[0]))
+		data, err := os.ReadFile(allow)
+		if err != nil {
+			return e.fail(fmt.Errorf("%w: run railswitch render", err))
+		}
+		fmt.Fprintf(e.stdout, "%s allowlist (%s):\n%s", rest[0], allow, data)
+	}
 	_, err = e.run.Run(ctx, sys.Cmd{
 		Name: script,
 		Args: append([]string{sub}, rest...),
@@ -78,6 +88,11 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	return 0
+}
+
+// isAgent reports whether svc is one of st's agent services.
+func isAgent(st *pack.Stack, svc string) bool {
+	return slices.ContainsFunc(st.Agents, func(a *pack.ChosenAgent) bool { return a.Service == svc })
 }
 
 // selfFirewalled is the ids of st's services that run their own firewall

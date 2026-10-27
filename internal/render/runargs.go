@@ -56,13 +56,17 @@ func (s *Service) onProxy() bool {
 }
 
 // FirewallAnnotations are the annotations the firewall hook reads for a
-// container of s on networks; nil when s is not firewalled.
+// container of s on networks; nil when s is not firewalled. The mode is
+// s.FirewallMode when set (an agent's: D55), else the project's.
 func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string {
 	if !s.Firewalled() {
 		return nil
 	}
 	p := in.m.Prefix
-	mode := in.m.Inputs.Project.Firewall.Mode
+	mode := s.FirewallMode
+	if mode == "" {
+		mode = in.m.Inputs.Project.Firewall.Mode
+	}
 	if mode == "" {
 		mode = "log"
 	}

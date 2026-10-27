@@ -12,7 +12,8 @@
 #   allow SVC HOST… add hostnames/IPs to a running container's allowlist, e.g.
 #                   `railswitch fw allow nvim example.com`. Live only: gone on
 #                   the next start. To keep it, add it to the profile's
-#                   [firewall] allow.<profile> list in project.toml.
+#                   [firewall] allow.<profile> list in project.toml (an
+#                   agent-<name>'s: [agents.<name>] allow).
 #
 # Environment (set by railswitch):
 #   FIREWALL_DIR     <workspace>/.railswitch/firewall: the hook's state/ dir

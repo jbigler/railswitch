@@ -106,6 +106,8 @@ func TestScriptFiles(t *testing.T) {
 	}
 	slices.Sort(keys)
 	want := []string{
+		".railswitch/firewall/agent-claude.allow",
+		".railswitch/firewall/agent-probe.allow",
 		".railswitch/firewall/agent.allow",
 		".railswitch/firewall/deps.allow",
 		".railswitch/firewall/firewall.sh",
@@ -161,6 +163,40 @@ func TestAgentAllow(t *testing.T) {
 	}
 }
 
+func TestAgentAllowFiles(t *testing.T) {
+	st, fw := filial(t)
+	fw.Allow["agent"] = []string{"shared.example"}
+	out := files(t, fw)
+	var claude []string
+	for _, a := range st.Agents {
+		if a.Name == "claude" {
+			claude = a.Agent.Allow
+		}
+	}
+	if len(claude) == 0 {
+		t.Fatal("fixture agent claude has no package allow")
+	}
+	for name, want := range map[string][]string{
+		"claude": append(slices.Clone(claude), "shared.example"),
+		"probe":  {"probe.example", "shared.example"},
+	} {
+		f, ok := out[".railswitch/firewall/agent-"+name+".allow"]
+		if !ok {
+			t.Errorf("no agent-%s.allow", name)
+			continue
+		}
+		if got := listed(f.Data); !slices.Equal(got, want) || f.Mode != 0o644 {
+			t.Errorf("agent-%s.allow mode %04o entries\n%v\nwant\n%v", name, f.Mode, got, want)
+		}
+	}
+	if got := listed(out[".railswitch/firewall/agent-claude.allow"].Data); slices.Contains(got, "probe.example") {
+		t.Errorf("agent-claude.allow lists probe's host: %v", got)
+	}
+	if got := listed(out[".railswitch/firewall/agent-probe.allow"].Data); slices.Contains(got, claude[0]) {
+		t.Errorf("agent-probe.allow lists claude's host %s: %v", claude[0], got)
+	}
+}
+
 func TestAllowRejectsBadEntry(t *testing.T) {
 	st, fw := filial(t)
 	for _, bad := range []string{"a.example b.example", "x\ny", "x#y", ""} {
@@ -207,6 +243,13 @@ func hookEnv(t *testing.T, out string) []string {
 // runHook runs assets/hook.sh filial <root> with an OCI state carrying annotations.
 func runHook(t *testing.T, root string, env []string, annotations map[string]string) ([]byte, error) {
 	t.Helper()
+	return runHookAt(t, filepath.Join("assets", "hook.sh"), root, env, annotations)
+}
+
+// runHookAt runs the hook script at script, which reads its allowlists next
+// to it.
+func runHookAt(t *testing.T, script, root string, env []string, annotations map[string]string) ([]byte, error) {
+	t.Helper()
 	state, err := json.Marshal(map[string]any{
 		"ociVersion":  "1.0.2",
 		"id":          "0123456789abcdef0123456789abcdef",
@@ -218,7 +261,7 @@ func runHook(t *testing.T, root string, env []string, annotations map[string]str
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("bash", filepath.Join("assets", "hook.sh"), "filial", root)
+	cmd := exec.Command("bash", script, "filial", root)
 	cmd.Env = env
 	cmd.Stdin = bytes.NewReader(state)
 	return cmd.CombinedOutput()
@@ -264,6 +307,52 @@ func TestHookFailsClosed(t *testing.T) {
 	}
 	if _, err := os.Stat(out); err == nil {
 		t.Error("nft ran")
+	}
+}
+
+// TestHookAgentProfile: an agent-<name> profile reads agent-<name>.allow; a
+// missing file or a name outside the agent pattern fails the start.
+func TestHookAgentProfile(t *testing.T) {
+	dir := t.TempDir()
+	hook, err := assets.ReadFile("assets/hook.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(dir, "hook.sh")
+	if err := os.WriteFile(script, hook, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent-probe.allow"), []byte("# probe\n203.0.113.7\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ann := func(profile string) map[string]string {
+		return map[string]string{
+			"filial.firewall":          profile,
+			"filial.firewall.mode":     "enforce",
+			"filial.firewall.networks": "filial-feat-dev",
+		}
+	}
+
+	out := filepath.Join(t.TempDir(), "nft.out")
+	if msg, err := runHookAt(t, script, t.TempDir(), hookEnv(t, out), ann("agent-probe")); err != nil {
+		t.Fatalf("agent-probe: %v\n%s", err, msg)
+	}
+	rules, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rules), "203.0.113.7") {
+		t.Errorf("ruleset lacks agent-probe.allow's 203.0.113.7:\n%s", rules)
+	}
+
+	for _, p := range []string{"agent-missing", "agentx", "agent-a/../x"} {
+		out := filepath.Join(t.TempDir(), "nft.out")
+		if msg, err := runHookAt(t, script, t.TempDir(), hookEnv(t, out), ann(p)); err == nil {
+			t.Errorf("profile %q: hook succeeded:\n%s", p, msg)
+		}
+		if _, err := os.Stat(out); err == nil {
+			t.Errorf("profile %q: nft ran", p)
+		}
 	}
 }
 

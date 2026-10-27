@@ -150,3 +150,45 @@ func TestFwAllow(t *testing.T) {
 		}
 	}
 }
+
+// fw show agent-<n> prints the agent's allowlist (its profile's file) before
+// the live state, which an on-demand agent rarely has.
+func TestFwShowAgent(t *testing.T) {
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	mustRun(t, "-C", ws, "render")
+
+	f := fakeHost()
+	code, out, errs := runWith(t, f, "-C", ws, "fw", "show", "agent-probe")
+	if code != 0 {
+		t.Fatalf("fw show agent-probe: exit %d, stderr %q", code, errs)
+	}
+	allow := filepath.Join(ws, ".railswitch", "firewall", "agent-probe.allow")
+	if !strings.Contains(out, allow) || !strings.Contains(out, "\nprobe.example\n") {
+		t.Errorf("stdout does not show %s:\n%s", allow, out)
+	}
+	if argv, _ := fwCall(t, f); !slices.Equal(argv, []string{filepath.Join(ws, ".railswitch", "firewall", "firewall.sh"), "show", "agent-probe"}) {
+		t.Errorf("argv %v", argv)
+	}
+
+	// Not an agent: no allowlist printed.
+	f = fakeHost()
+	if code, out, _ := runWith(t, f, "-C", ws, "fw", "show", "nvim"); code != 0 || strings.Contains(out, ".allow") {
+		t.Errorf("fw show nvim: exit %d, stdout %q", code, out)
+	}
+}
+
+// The agent's CLAUDE.md tells the human to run fw allow agent-<n> <host>.
+func TestFwAllowAgent(t *testing.T) {
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	mustRun(t, "-C", ws, "render")
+	f := fakeHost()
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "master", "fw", "allow", "agent-claude", "example.com"); code != 0 {
+		t.Fatalf("fw allow agent-claude: exit %d, stderr %q", code, errs)
+	}
+	argv, env := fwCall(t, f)
+	if !slices.Equal(argv, []string{filepath.Join(ws, ".railswitch", "firewall", "firewall.sh"), "allow", "agent-claude", "example.com"}) || env["WORKTREE"] != "master" {
+		t.Errorf("argv %v, WORKTREE %q", argv, env["WORKTREE"])
+	}
+}

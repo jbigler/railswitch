@@ -48,9 +48,10 @@ type descriptor struct {
 // Files are the firewall's workspace files for project prefix in workspace
 // ws, keyed by workspace-relative slash path: hook.sh and firewall.sh
 // (0755), deps.allow (the pack's deps.allow, then fw.Allow["deps"],
-// de-duplicated, order kept), agent.allow (fw.Allow["agent"]) and the hook
-// descriptor hooks.d/<prefix>-firewall.json, whose hook reads netavark's
-// network configs in networkDir.
+// de-duplicated, order kept), agent.allow (fw.Allow["agent"]), one
+// agent-<name>.allow per agent (its Allow, then fw.Allow["agent"]: C10) and
+// the hook descriptor hooks.d/<prefix>-firewall.json, whose hook reads
+// netavark's network configs in networkDir.
 func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (map[string]render.File, error) {
 	out := map[string]render.File{}
 	for _, name := range []string{"hook.sh", "firewall.sh"} {
@@ -81,6 +82,11 @@ func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (m
 	agent := allowlist("# The agent profile's allowlist: [firewall] allow.agent. Written by\n# railswitch render.\n", fw.Allow["agent"])
 	out[path.Join(Dir, "deps.allow")] = render.File{Data: deps, Mode: 0o644}
 	out[path.Join(Dir, "agent.allow")] = render.File{Data: agent, Mode: 0o644}
+	for _, a := range st.Agents {
+		list := allowlist("# The "+a.Service+" profile's allowlist: agent "+a.Name+"'s package ("+a.Ref.String()+") allow\n# and [agents."+a.Name+"] allow, then [firewall] allow.agent. Written by\n# railswitch render.\n",
+			a.Allow, fw.Allow["agent"])
+		out[path.Join(Dir, AllowFile(a.Service))] = render.File{Data: list, Mode: 0o644}
+	}
 
 	fwDir := filepath.Join(ws, filepath.FromSlash(Dir))
 	var d descriptor
@@ -106,6 +112,11 @@ func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (m
 // slash path.
 func descriptorRel(prefix string) string {
 	return path.Join(Dir, "hooks.d", prefix+"-firewall.json")
+}
+
+// AllowFile is profile's allowlist file name in Dir.
+func AllowFile(profile string) string {
+	return profile + ".allow"
 }
 
 // DescriptorPath is project prefix's hook descriptor in workspace ws:

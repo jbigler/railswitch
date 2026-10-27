@@ -11,8 +11,9 @@
 # Wiring: railswitch render writes the hook descriptor into hooks.d/ here.
 # Units pass --hooks-dir there plus these annotations, and the hook fires
 # only when the first is present:
-#   <prefix>.firewall        comma list of profiles: none | deps | agent
-#                            (each but none names <profile>.allow here)
+#   <prefix>.firewall        comma list of profiles: none | deps | agent |
+#                            agent-<name> (each but none names <profile>.allow
+#                            here; a missing file fails the start)
 #   <prefix>.firewall.mode   enforce: reject what is not allowed
 #                            log:     allow everything, record what enforce
 #                                     would reject (railswitch fw show)
@@ -83,7 +84,10 @@ for p in "${plist[@]}"; do
   case "$p" in
     none) ;;
     deps|agent) files+=("$HERE/$p.allow") ;;
-    *) die "unknown firewall profile '$p' in $P.firewall=$profiles" ;;
+    # agent-<name> becomes a path: a regex test, never a case glob, so no /
+    # or .. gets through.
+    *) [[ "$p" =~ ^agent-[a-z][a-z0-9-]{0,24}$ ]] || die "unknown firewall profile '$p' in $P.firewall=$profiles"
+       files+=("$HERE/$p.allow") ;;
   esac
 done
 

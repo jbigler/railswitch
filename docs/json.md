@@ -453,8 +453,8 @@ mode's warnings to stderr.
 tokens changed from it (railswitch writes it; a token equal to the
 preset's value is dropped). A missing file, or a missing table, is
 `flexoki` with no changes. An unknown preset or token, a fixed token, or a
-value that isn't `#rrggbb` is refused. (docs/dashboard.md will describe
-the dashboard as a whole.)
+value that isn't `#rrggbb` is refused. docs/dashboard.md describes the
+dashboard as a whole.
 
 ```toml
 schema = 1

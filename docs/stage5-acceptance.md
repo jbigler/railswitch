@@ -22,7 +22,7 @@ host, not in a sandbox. The reference host is CachyOS/Arch.
 
 ```sh
 mkdir -p ~/tmp/rs-phx
-podman run --rm -v "$HOME/tmp/rs-phx":/w:Z -w /w docker.io/library/elixir:1.19-otp-28 \
+podman run --rm -it --init --name rs-phx-new -v "$HOME/tmp/rs-phx":/w:Z -w /w docker.io/library/elixir:1.19-otp-28 \
   sh -c 'mix local.hex --force && mix archive.install --force hex phx_new && mix phx.new hello --inside-docker-env --no-install'
 cd ~/tmp/rs-phx/hello
 printf 'elixir 1.19.6\nerlang 28\n' > .tool-versions
@@ -85,7 +85,7 @@ railswitch pack show local:phoenix@1
 
 ```sh
 mkdir -p ~/tmp/rs-bun
-podman run --rm -v "$HOME/tmp/rs-bun":/w:Z -w /w docker.io/library/ruby:3.4 \
+podman run --rm -it --init --name rs-bun-new -v "$HOME/tmp/rs-bun":/w:Z -w /w docker.io/library/ruby:3.4 \
   sh -c 'apt-get update -qq && apt-get install -y -qq unzip >/dev/null && curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH && gem install rails && rails new demo -d postgresql -j bun && cd demo && bun --version > .bun-version && git add -A && git -c user.email=t@t -c user.name=t commit -qm init'
 railswitch project new ~/workspace/rs-bun --repo ~/tmp/rs-bun/demo --prefix bun --agent none
 cd ~/workspace/rs-bun/main && railswitch up

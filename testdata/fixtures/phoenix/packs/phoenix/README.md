@@ -8,7 +8,7 @@ the app's `.tool-versions` (or `mise.toml`), with Postgres from the
 
 ```sh
 mkdir -p ~/tmp/rs-phx
-podman run --rm -v "$HOME/tmp/rs-phx":/w:Z -w /w docker.io/library/elixir:1.19-otp-28 \
+podman run --rm -it --init --name rs-phx-new -v "$HOME/tmp/rs-phx":/w:Z -w /w docker.io/library/elixir:1.19-otp-28 \
   sh -c 'mix local.hex --force && mix archive.install --force hex phx_new && mix phx.new hello --inside-docker-env --no-install && cd hello && printf "elixir 1.19.6\nerlang 28\n" > .tool-versions && git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm init'
 ```
 

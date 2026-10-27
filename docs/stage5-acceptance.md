@@ -111,7 +111,7 @@ railswitch project rm bun --yes --purge
 - [x] it uses `mix phx.server` on :4000, `mix deps.get --check-locked` in deps, elixir/erlang from `.tool-versions`, hex registries in `deps.allow`, and a health command the pack declares;
 - [x] no change to `internal/render` or `internal/config` for Phoenix (`TestGenericity` refuses `phoenix`, `elixir`, `erlang`, `mix ` in core; the Phoenix fixture task changed no core code);
 - [x] live reload, nvim (with its own Node) and an agent work on the Phoenix project (2026-10-27);
-- [ ] a `rails new -j bun` app installs with bun.
+- [x] a `rails new -j bun` app installs with bun (2026-10-27).
 
 ## Run log
 
@@ -147,6 +147,15 @@ the worktree (it reads `.tool-versions`); that is the host, not railswitch.
 After `containerfile eject nvim --force` and `up`, `:!node --version` in
 nvim prints `v24.20.0`, Filial's `.nvmrc`, not nvim's own Node (`v24.22.1`
 from `node:24-slim` on the Phoenix project).
+
+**2026-10-27, Rails app on bun (`bun` project): PASS.** `rails new demo -d
+postgresql -j bun` with `.bun-version`, `project new --prefix bun`, `up`:
+the deps journal shows `bun install v1.4.4 (38afee6c8)` (the bun the base
+image installed from `BUN_VERSION`), and the page answers in the browser.
+The bootstrap `podman run` ignored Ctrl-C (no `-it`, `sh` as PID 1); the
+commands here now pass `-it --init --name` (`883479b`).
+
+Stage 5 acceptance: complete.
 
 ## Gap log
 

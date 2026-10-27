@@ -285,7 +285,8 @@ func configuredDriver(cfg *machine.Config) string {
 }
 
 // runningReceivers are the running containers, in every registered
-// worktree, of the services that receive sec.
+// worktree, of the services that receive sec and have a unit. An on-demand
+// service (an agent) has none: its next run gets the new value.
 func runningReceivers(ctx context.Context, p podman.Podman, m *render.Model, sec config.Secret) ([]string, error) {
 	var running []string
 	for _, wt := range m.Inputs.Worktrees {
@@ -295,7 +296,7 @@ func runningReceivers(ctx context.Context, p podman.Podman, m *render.Model, sec
 		}
 		for _, svc := range sec.Services {
 			c := naming.Container(m.Prefix, wt.Slug, svc)
-			if !slices.Contains(n.Containers, c) {
+			if !slices.Contains(n.Units, c+".service") {
 				continue
 			}
 			ok, err := p.Running(ctx, c)

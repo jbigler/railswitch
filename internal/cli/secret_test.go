@@ -173,6 +173,40 @@ func TestSecretSetRunningNotice(t *testing.T) {
 	}
 }
 
+// An on-demand agent has no unit: a running session of it is neither named
+// for a restart nor restarted; its next run gets the new value.
+func TestSecretSetOnDemandReceiver(t *testing.T) {
+	ws, _ := lockedWS(t)
+	editProject(t, ws, "services = [\"nvim\"]\n", "services = [\"nvim\", \"agent-claude\"]\n")
+	running := func() *systest.Fake {
+		f := fakeHost()
+		for _, c := range []string{"filial-master-nvim", "filial-master-agent-claude"} {
+			f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", c}, sys.Result{Stdout: []byte("true\n")}, nil)
+		}
+		return f
+	}
+	f := running()
+	code, out, errs := runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token")
+	if code != 0 || !strings.Contains(out, "filial-master-nvim") || strings.Contains(out+errs, "agent-claude") {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	f = running()
+	code, out, errs = runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token", "--restart")
+	if code != 0 {
+		t.Fatalf("--restart: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	var restarts [][]string
+	for _, c := range f.Calls {
+		if len(c) > 2 && c[0] == "systemctl" && c[2] == "restart" {
+			restarts = append(restarts, c)
+		}
+	}
+	want := []string{"systemctl", "--user", "restart", "filial-master-nvim.service"}
+	if len(restarts) != 1 || !slices.Equal(restarts[0], want) {
+		t.Fatalf("restarts = %q; want only %q", restarts, want)
+	}
+}
+
 func TestSecretLsNoValues(t *testing.T) {
 	ws, _ := lockedWS(t)
 	f := fakeHost()

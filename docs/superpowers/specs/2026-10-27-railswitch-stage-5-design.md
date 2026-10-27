@@ -119,7 +119,10 @@ not a known source form; unknown keys still refused.
   Node only from it. `Containerfile.nvim` gains its own Node
   (`ARG NVIM_NODE_VERSION=24`, copied from `docker.io/library/node:<v>-slim`
   into `/opt/nvim-node`), linked into `/usr/local/bin` only when the base has
-  no `node`, so a rails base keeps the app's Node. It also sets
+  no `npm`, so a rails base keeps the app's Node. The test is `npm`, not
+  `node`: the official bun images answer `node` with bun (a fallback symlink
+  at the end of `PATH`) but have no `npm`, so a bun-only base gets the real
+  Node ahead of that fallback in nvim. The app containers are unchanged. It also sets
   `NPM_CONFIG_PREFIX=/home/appuser/.npm-global`, adds its `bin` to `PATH`
   and creates that directory for `appuser`, which today only the rails base
   does. Existing projects keep their ejected `Containerfile.nvim` until

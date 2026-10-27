@@ -23,7 +23,7 @@
 - **C4. Project routes** may target any long-running service except agents; the target joins the proxy network (as option routes do). Host is `<name>.{worktree.host}`.
 - **C5. `pack eject` copies built-ins only, refuses an existing directory** (no `--force`: a local pack is the user's code).
 - **C6. One Phoenix copy**, in the fixture workspace `testdata/fixtures/phoenix/` (outside `internal/`, so `TestGenericity` exempts it).
-- **C7. nvim brings its own Node** (user, 2026-10-27: LSPs need it whatever the project uses): `Containerfile.nvim` copies Node (`ARG NVIM_NODE_VERSION=24`) to `/opt/nvim-node` and links it only when the base has no `node`; no new tool pin.
+- **C7. nvim brings its own Node** (user, 2026-10-27: LSPs need it whatever the project uses): `Containerfile.nvim` copies Node (`ARG NVIM_NODE_VERSION=24`) to `/opt/nvim-node` and links it only when the base has no `npm` (a bun base answers `node` with bun through `/usr/local/bun-node-fallback-bin/node`, but has no `npm`); no new tool pin.
 
 ## Global Constraints
 
@@ -137,7 +137,7 @@ Added here:
 **Interfaces:**
 - Consumes: Task 3 `{name?}`.
 - Produces: version precedence for a pinned name, high to low: `[worktrees.<slug>.versions]`, `[versions]`, the pack runtime of the same name, the pin default; `from` strings `worktrees.<slug>.versions`, `versions`, `runtimes.<n> (<source>)`, `<option> pin default`.
-- Produces (C7) `Containerfile.nvim`: `ARG NVIM_NODE_VERSION=24` before the first `FROM`; a stage `FROM docker.io/library/node:${NVIM_NODE_VERSION}-slim AS nvim-node`; in the final stage, as root, copy its `/usr/local/bin/node` and `/usr/local/lib/node_modules` to `/opt/nvim-node/{bin,lib/node_modules}` and, only when `command -v node` fails, link `node`, `npm`, `npx` into `/usr/local/bin`; `ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global`, `PATH` gains `/home/appuser/.npm-global/bin`; `mkdir -p /home/appuser/.npm-global` owned by 1000. No source-text test: the host acceptance checks it (Task 9: `node --version` in a Phoenix nvim container works; in a rails nvim container it equals the app's Node).
+- Produces (C7) `Containerfile.nvim`: `ARG NVIM_NODE_VERSION=24` before the first `FROM`; a stage `FROM docker.io/library/node:${NVIM_NODE_VERSION}-slim AS nvim-node`; in the final stage, as root, copy its `/usr/local/bin/node` and `/usr/local/lib/node_modules` to `/opt/nvim-node/{bin,lib/node_modules}` and, only when `command -v npm` fails, link `node`, `npm`, `npx` into `/usr/local/bin` (ahead of the bun image's fallback dir in `PATH`); `ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global`, `PATH` gains `/home/appuser/.npm-global/bin`; `mkdir -p /home/appuser/.npm-global` owned by 1000. No source-text test: the host acceptance checks it (Task 9: in a Phoenix nvim container `node --version` and `npm --version` work; in a rails nvim container `node --version` equals the app's).
 
 - [ ] **Step 1: Write failing tests:**
   - `TestPlaywrightPinWithoutRuntime`: a fixture pack without `[runtimes.playwright]` plus `browser = "playwright@1"` → playwright tag value `1.60.0`.

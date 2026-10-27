@@ -34,6 +34,7 @@ type Project struct {
 	Worktrees map[string]WorktreeOverride `toml:"worktrees"`
 	Secrets   map[string]Secret           `toml:"secrets"` // key = secret name; values live in podman secrets (D33)
 	Links     []Link                      `toml:"links"`
+	Routes    []Route                     `toml:"routes"` // extra Traefik routes to a service's port (D67)
 	Tools     Tools                       `toml:"tools"`
 	Firewall  Firewall                    `toml:"firewall"`
 	Image     ImageConfig                 `toml:"image"`
@@ -89,6 +90,14 @@ type WorktreeOverride struct{ Versions map[string]string }
 
 // Link is one [[links]] entry (HANDOFF §3.10).
 type Link struct{ Label, URL string }
+
+// Route is one [[routes]]: the host <name>.<slug>.<prefix>.localhost routed
+// to port of service, e.g. vite → the app's 3036 (D67).
+type Route struct {
+	Name    string `toml:"name"`
+	Service string `toml:"service"`
+	Port    int    `toml:"port"`
+}
 
 // Tools are the opt-in developer tools.
 type Tools struct {
@@ -151,6 +160,7 @@ var (
 	bareKeyRe       = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 	agentNameRe     = regexp.MustCompile(`^[a-z][a-z0-9-]{0,24}$`) // agent-<name> fits naming's service id
 	hostRe          = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
+	routeNameRe     = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`) // a DNS label: <name>.<slug>.<prefix>.localhost
 )
 
 // LocalPrefix marks a workspace-local package ref, "local:<name>@N" (D43):
@@ -303,6 +313,21 @@ func (p *Project) Validate() error {
 			if !placeholder.LinkNames[n] {
 				v.add(path+".url", "unknown placeholder {%s} (allowed: {worktree.host}, {worktree.slug}, {branch})", n)
 			}
+		}
+	}
+
+	for i, r := range p.Routes {
+		path := fmt.Sprintf("routes[%d]", i)
+		if !routeNameRe.MatchString(r.Name) {
+			v.add(path+".name", "%q must match %s", r.Name, routeNameRe)
+		} else if j := slices.IndexFunc(p.Routes[:i], func(q Route) bool { return q.Name == r.Name }); j >= 0 {
+			v.add(path+".name", "%q is already routes[%d]", r.Name, j)
+		}
+		if r.Service == "" {
+			v.add(path+".service", "is required")
+		}
+		if r.Port < 1 || r.Port > 65535 {
+			v.add(path+".port", "%d is not a port", r.Port)
 		}
 	}
 

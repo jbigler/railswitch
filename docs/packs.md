@@ -120,3 +120,29 @@ matches the app's client). High to low:
 `railswitch project new` writes a chosen option's pin default to
 `[versions]` (`postgres = "16"`), except one the pack has a runtime for,
 which would otherwise beat the app's own file.
+
+## Routes
+
+Traefik routes a host to a container port. Every router's rule is
+`Host(<host>) && (ClientIP(<project subnet>) || <host clause>)` (D50), and
+a routed service joins the project's proxy network.
+
+| Route | Host | Declared by |
+|---|---|---|
+| the app | `<slug>.<prefix>.localhost` → `[app] port` | the pack |
+| an option's | e.g. `s3.<slug>.<prefix>.localhost` | `[[routes]]` in `option.toml` (`name`, `host`, `port`, `root_redirect`) |
+| the project's own | `<name>.<slug>.<prefix>.localhost` | `[[routes]]` in `project.toml` |
+
+A project route needs no pack change, e.g. Vite's dev server for
+`vite_rails` hot reload:
+
+```toml
+[[routes]]
+name    = "vite"     # a DNS label; the router is <prefix>-<slug>-vite
+service = "rails"    # any long-running service of the project (not deps, not an agent)
+port    = 3036       # the container port
+```
+
+Render refuses two routes of one project with the same name or host
+(`routes: router "s3" is used by rails and storage`). `railswitch machine`
+lists every route.

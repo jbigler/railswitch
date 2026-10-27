@@ -350,6 +350,9 @@ func (b *builder) services() error {
 	}
 
 	b.m.Services = slices.Concat([]Service{app, deps}, workers, data, tools, agents)
+	if err := b.projectRoutes(); err != nil {
+		return err
+	}
 	for i := range b.m.Services {
 		s := &b.m.Services[i]
 		s.Networks = []string{"dev"}
@@ -366,6 +369,41 @@ func (b *builder) services() error {
 		s.Mounts = append(s.Mounts, b.machineMounts(s.ID)...)
 	}
 	return nil
+}
+
+// projectRoutes adds project.toml's [[routes]] to their services (D67), then
+// refuses two routes of the project with one router name or host: Traefik
+// would route one of them at random. Hosts of different projects carry the
+// prefix, so they never collide.
+func (b *builder) projectRoutes() error {
+	var errs []error
+	for i, r := range b.in.Project.Routes {
+		s := b.m.service(r.Service)
+		switch {
+		case s == nil:
+			errs = append(errs, fmt.Errorf("routes[%d].service: no such service %q (services: %s)", i, r.Service, strings.Join(b.m.serviceIDs(), ", ")))
+		case s.Oneshot || s.Role == RoleAgent:
+			errs = append(errs, fmt.Errorf("routes[%d].service: %s has no long-running container to route to", i, r.Service))
+		default:
+			s.Routes = append(s.Routes, Route{Name: r.Name, Host: r.Name + ".{worktree.host}", Port: r.Port})
+		}
+	}
+	routers, hosts := map[string]string{}, map[string]string{}
+	for _, s := range b.m.Services {
+		for _, r := range s.Routes {
+			if prev, ok := routers[r.Name]; ok {
+				errs = append(errs, fmt.Errorf("routes: router %q is used by %s and %s", r.Name, prev, s.ID))
+			} else {
+				routers[r.Name] = s.ID
+			}
+			if prev, ok := hosts[r.Host]; ok {
+				errs = append(errs, fmt.Errorf("routes: host %q is used by %s and %s", r.Host, prev, s.ID))
+			} else {
+				hosts[r.Host] = s.ID
+			}
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // machineMounts are the machine-local mounts of service id (D57), less the

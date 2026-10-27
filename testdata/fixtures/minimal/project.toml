@@ -16,3 +16,8 @@ browser  = "none"
 
 [image]
 base = "containerfiles/Containerfile.base"
+
+[[routes]]          # vite.<slug>.mini.localhost → the app's Vite dev server (D67)
+name    = "vite"
+service = "rails"
+port    = 3036

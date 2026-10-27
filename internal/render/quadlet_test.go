@@ -667,3 +667,63 @@ func TestNetworkIsolate(t *testing.T) {
 		}
 	}
 }
+
+func hasLinePrefix(t *testing.T, units map[string][]byte, file, prefix string) {
+	t.Helper()
+	if !slices.ContainsFunc(unitLines(t, units, file), func(l string) bool { return strings.HasPrefix(l, prefix) }) {
+		t.Errorf("%s: no line starting %q:\n%s", file, prefix, units[file])
+	}
+}
+
+// D67: a [[routes]] entry routes <name>.<slug>.<prefix>.localhost to a
+// service's port, with the same client rule as every router.
+func TestProjectRoute(t *testing.T) {
+	_, units := renderUnits(t, minimalDir, func(p *config.Project) {
+		p.Routes = []config.Route{{Name: "vite", Service: "rails", Port: 3036}}
+	})
+	hasLinePrefix(t, units, "mini-master-rails.container", "Label=\"traefik.http.routers.mini-master-vite.rule=Host(`vite.master.mini.localhost`) && (ClientIP(`10.214.3.0/24`) || ")
+	hasLine(t, units, "mini-master-rails.container", "Label=traefik.http.routers.mini-master-vite.service=mini-master-vite")
+	hasLine(t, units, "mini-master-rails.container", "Label=traefik.http.services.mini-master-vite.loadbalancer.server.port=3036")
+	hasLine(t, units, "mini-master-rails.container", "Label=traefik.http.services.mini-master-app.loadbalancer.server.port=3000")
+}
+
+// A routed data service joins the proxy network, as option routes do.
+func TestProjectRouteOnDataService(t *testing.T) {
+	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), func(p *config.Project) {
+		p.Routes = []config.Route{{Name: "pg", Service: "db", Port: 5432}}
+	}))
+	db := m.service("db")
+	if !slices.Contains(db.Networks, "proxy") || !slices.ContainsFunc(db.Routes, func(r Route) bool { return r.Name == "pg" && r.Host == "pg.{worktree.host}" && r.Port == 5432 }) {
+		t.Errorf("db networks %v routes %+v", db.Networks, db.Routes)
+	}
+}
+
+func TestProjectRouteErrors(t *testing.T) {
+	for svc, want := range map[string]string{
+		"nope":         `routes[0].service: no such service "nope" (services: `,
+		"deps":         "routes[0].service: deps has no long-running container to route to",
+		"agent-claude": "routes[0].service: agent-claude has no long-running container to route to",
+	} {
+		err := buildErr(fixtureInputs(t, fixtureWS(t), func(p *config.Project) {
+			p.Routes = []config.Route{{Name: "x", Service: svc, Port: 80}}
+		}))
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("route to %s: %v; want %q", svc, err, want)
+		}
+	}
+}
+
+// Review Focus 4: two routes of one project with one router name or host.
+func TestRouteCollisions(t *testing.T) {
+	for name, want := range map[string]string{
+		"app": `routes: router "app" is used by rails and rails`,
+		"s3":  `routes: router "s3" is used by rails and storage`,
+	} {
+		err := buildErr(fixtureInputs(t, fixtureWS(t), func(p *config.Project) {
+			p.Routes = []config.Route{{Name: name, Service: "rails", Port: 3036}}
+		}))
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("route %s: %v; want %q", name, err, want)
+		}
+	}
+}

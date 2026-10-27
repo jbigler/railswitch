@@ -315,3 +315,28 @@ func TestGitSigningValidate(t *testing.T) {
 		t.Errorf("two signing keys on rails: %v", err)
 	}
 }
+
+// D67: [[routes]] name a DNS label and a port of a service.
+func TestRoutesValidate(t *testing.T) {
+	p := loadFilial(t)
+	p.Routes = []Route{{Name: "vite", Service: "rails", Port: 3036}, {Name: "docs-2", Service: "rails", Port: 8000}}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("Validate = %v", err)
+	}
+	for _, c := range []struct {
+		r    Route
+		want string
+	}{
+		{Route{Name: "Vite", Service: "rails", Port: 3036}, `routes[1].name: "Vite" must match`},
+		{Route{Name: "", Service: "rails", Port: 3036}, `routes[1].name: "" must match`},
+		{Route{Name: "x", Port: 3036}, "routes[1].service: is required"},
+		{Route{Name: "x", Service: "rails", Port: 0}, "routes[1].port: 0 is not a port"},
+		{Route{Name: "x", Service: "rails", Port: 65536}, "routes[1].port: 65536 is not a port"},
+		{Route{Name: "vite", Service: "rails", Port: 1}, `routes[1].name: "vite" is already routes[0]`},
+	} {
+		p.Routes = []Route{{Name: "vite", Service: "rails", Port: 3036}, c.r}
+		if err := p.Validate(); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("Validate with %+v = %v; want %q", c.r, err, c.want)
+		}
+	}
+}

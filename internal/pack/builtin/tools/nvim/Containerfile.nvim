@@ -51,6 +51,7 @@ RUN apt-get update -qq && \
   lua5.4 \
   luarocks \
   netbase \
+  openssh-client \
   ripgrep \
   universal-ctags \
   unzip \

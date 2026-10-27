@@ -423,3 +423,31 @@ func TestSecretSetDriverMoveCreateFails(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errs)
 	}
 }
+
+func TestSecretAddGitSigning(t *testing.T) {
+	ws, _ := lockedWS(t)
+	path := filepath.Join(ws, "project.toml")
+	before := readFile(t, path)
+	f := fakeHost()
+	unset(f, "filial_sign")
+	const key = "-----BEGIN OPENSSH PRIVATE KEY----- AAAAsigning"
+	code, out, errs := runStdin(t, f, key+"\n", "-C", ws, "secret", "add", "sign", "--service", "rails", "--git-signing")
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	want := before + "\n[secrets.sign]\nservices = [\"rails\"]\ngit_signing = true\n"
+	if got := readFile(t, path); got != want {
+		t.Fatalf("project.toml:\n%s\nwant:\n%s", got, want)
+	}
+	calls, stdins := secretCalls(f)
+	if len(calls) != 2 || !slices.Equal(calls[1], []string{"podman", "secret", "create", "filial_sign", "-"}) || stdins[1] != key {
+		t.Fatalf("calls = %q stdins = %q", calls, stdins)
+	}
+	noValue(t, f, key, out, errs)
+
+	// env delivery is refused before anything is written.
+	code, out, errs = runStdin(t, fakeHost(), key+"\n", "-C", ws, "secret", "add", "sign2", "--service", "rails", "--git-signing", "--env", "SIGN_KEY")
+	if code != 1 || !strings.Contains(errs, "git_signing") {
+		t.Fatalf("--env: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+}

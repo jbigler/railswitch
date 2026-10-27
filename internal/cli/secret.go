@@ -23,7 +23,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const secretUsage = `usage: railswitch secret add <name> --service <id>... [--env VAR] [--machine]
+const secretUsage = `usage: railswitch secret add <name> --service <id>... [--env VAR] [--machine] [--git-signing]
        railswitch secret set <name> [--restart]
        railswitch secret ls
        railswitch secret rm <name>`
@@ -62,6 +62,7 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 	fs.Var(&services, "service", "service `id` that receives the secret (repeatable)")
 	envVar := fs.String("env", "", "deliver as env `VAR` instead of the file /run/secrets/<name>")
 	mach := fs.Bool("machine", false, "machine scope: podman secret railswitch_<name>, shared by every project")
+	signing := fs.Bool("git-signing", false, "the value is an SSH signing key: its services sign commits and tags with it (D61)")
 	name, code, ok := parseNamed(e, fs, args, secretUsage)
 	if !ok {
 		return code
@@ -89,7 +90,7 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 			return e.usageErr("secret add: no service %s (services: %s)", id, strings.Join(ids, ", "))
 		}
 	}
-	sec := config.Secret{Services: services, Env: *envVar}
+	sec := config.Secret{Services: services, Env: *envVar, GitSigning: *signing}
 	if *mach {
 		sec.Scope = "machine"
 	}
@@ -323,6 +324,7 @@ type secretRow struct {
 	Created       *string  `json:"created"` // RFC 3339; null when not set
 	Services      []string `json:"services"`
 	DriverDiffers bool     `json:"driver_differs"` // stored with another driver than config.toml's
+	GitSigning    bool     `json:"git_signing"`    // an SSH commit signing key (D61)
 }
 
 func secretLs(ctx context.Context, e *env, args []string) int {
@@ -350,6 +352,7 @@ func secretLs(ctx context.Context, e *env, args []string) int {
 			Name: name, Scope: "project", Delivery: "file", Driver: configured,
 			PodmanSecret: render.SecretName(w.Project.Project.Prefix, name, sec),
 			Services:     sec.Services,
+			GitSigning:   sec.GitSigning,
 		}
 		if sec.Scope == "machine" {
 			r.Scope = "machine"

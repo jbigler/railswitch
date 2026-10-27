@@ -991,3 +991,49 @@ func TestSharePorts(t *testing.T) {
 		t.Errorf("SharePorts(2) = %+v; want %+v", got, want)
 	}
 }
+
+func TestGitSigningEnv(t *testing.T) {
+	signing := [][2]string{
+		{"gpg.format", "ssh"},
+		{"user.signingkey", "/run/secrets/sign"},
+		{"commit.gpgsign", "true"},
+		{"tag.gpgsign", "true"},
+	}
+	pairs := func(in *Instance, svc string) [][2]string {
+		count, _ := envVar(in, svc, "GIT_CONFIG_COUNT")
+		n, err := strconv.Atoi(count.Value)
+		if err != nil {
+			t.Fatalf("%s GIT_CONFIG_COUNT = %q", svc, count.Value)
+		}
+		var out [][2]string
+		for i := range n {
+			k, _ := envVar(in, svc, "GIT_CONFIG_KEY_"+strconv.Itoa(i))
+			v, _ := envVar(in, svc, "GIT_CONFIG_VALUE_"+strconv.Itoa(i))
+			out = append(out, [2]string{k.Value, v.Value})
+		}
+		return out
+	}
+	_, in := filial(t, func(p *config.Project) {
+		p.Secrets["sign"] = config.Secret{Services: []string{"agent-claude"}, GitSigning: true}
+	})
+	if got := pairs(in, "agent-claude"); !slices.Equal(got, signing) {
+		t.Errorf("agent-claude pairs = %q; want %q", got, signing)
+	}
+	if e, _ := envVar(in, "agent-claude", "GIT_AUTHOR_NAME"); e.Value != "Dev Eloper" {
+		t.Errorf("agent-claude GIT_AUTHOR_NAME = %q", e.Value)
+	}
+	for _, e := range in.Env["rails"] {
+		if strings.HasPrefix(e.Name, "GIT_") {
+			t.Errorf("rails has %s", e.Name)
+		}
+	}
+
+	_, in = filial(t, func(p *config.Project) {
+		p.Secrets["sign"] = config.Secret{Services: []string{"agent-claude"}, GitSigning: true}
+		p.Secrets["github_token"] = config.Secret{Services: []string{"agent-claude"}, GitHost: "github.com"}
+	})
+	got := pairs(in, "agent-claude")
+	if len(got) != 6 || got[0][0] != "credential.https://github.com.helper" || got[1][0] != "url.https://github.com/.insteadOf" || !slices.Equal(got[2:], signing) {
+		t.Errorf("agent-claude pairs with git_host = %q", got)
+	}
+}

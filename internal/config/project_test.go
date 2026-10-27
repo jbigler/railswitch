@@ -267,3 +267,33 @@ func TestToolsNvimTable(t *testing.T) {
 		t.Errorf("no [tools]: %+v, %v; want nil", p.Tools.Nvim, err)
 	}
 }
+
+func TestGitSigningValidate(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		sec  Secret
+		want []string
+	}{
+		{"env", Secret{Services: []string{"rails"}, GitSigning: true, Env: "X"}, []string{"secrets.sign.git_signing", "file"}},
+		{"git_host", Secret{Services: []string{"rails"}, GitSigning: true, GitHost: "github.com"}, []string{"secrets.sign.git_signing", "git_host"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			p := loadFilial(t)
+			p.Secrets = map[string]Secret{"sign": c.sec}
+			err := p.Validate()
+			if err == nil {
+				t.Fatal("Validate = nil; want error")
+			}
+			for _, w := range c.want {
+				if !strings.Contains(err.Error(), w) {
+					t.Errorf("Validate = %q; want it to contain %q", err, w)
+				}
+			}
+		})
+	}
+	p := loadFilial(t)
+	p.Secrets = map[string]Secret{"sign": {Services: []string{"rails"}, GitSigning: true}}
+	if err := p.Validate(); err != nil {
+		t.Errorf("file-delivered signing key: %v", err)
+	}
+}

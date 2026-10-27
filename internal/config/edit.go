@@ -465,6 +465,9 @@ func AddSecret(path, name string, s Secret) error {
 				b.WriteString(kv[0] + " = " + QuoteString(kv[1]) + "\n")
 			}
 		}
+		if s.GitSigning {
+			b.WriteString("git_signing = true\n")
+		}
 		return d.appendTable([]string{"secrets", name}, b.String()), nil
 	})
 }

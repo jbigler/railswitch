@@ -61,6 +61,9 @@ type Secret struct {
 	Scope    string   `toml:"scope"`    // "project" (default): podman secret <prefix>_<name>; "machine": railswitch_<name>
 	GitHost  string   `toml:"git_host"` // e.g. "github.com": receiving services use it for git over HTTPS (D33)
 	GitUser  string   `toml:"git_user"` // default "x-access-token"
+	// GitSigning: the value is an SSH signing key; receiving services sign
+	// commits and tags with it (D61). File delivery only, never with GitHost.
+	GitSigning bool `toml:"git_signing"`
 }
 
 // Meta is the [project] table.
@@ -272,6 +275,12 @@ func (p *Project) Validate() error {
 		}
 		v.oneLine(path+".git_host", s.GitHost)
 		v.oneLine(path+".git_user", s.GitUser)
+		if s.GitSigning && s.Env != "" {
+			v.add(path+".git_signing", "a signing key is file-delivered (/run/secrets/%s); drop env", name)
+		}
+		if s.GitSigning && s.GitHost != "" {
+			v.add(path+".git_signing", "a signing key cannot also be a git_host token; declare the token as its own secret")
+		}
 	}
 
 	for i, l := range p.Links {

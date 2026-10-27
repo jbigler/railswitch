@@ -200,7 +200,8 @@ func (b *builder) envSpecs() {
 // gitWiring gives s the git setup of every secret with git_host that s
 // receives (D33): a credential helper and an ssh→HTTPS rewrite through
 // GIT_CONFIG_* env, so nothing is written into the shared .git/config, and
-// the host's commit identity.
+// the host's commit identity. A git_signing secret it receives adds SSH
+// commit and tag signing with that key file after those pairs (D61).
 func (b *builder) gitWiring(s *Service) {
 	p := b.in.Project
 	var pairs [][2]string
@@ -222,6 +223,18 @@ func (b *builder) gitWiring(s *Service) {
 		pairs = append(pairs,
 			[2]string{"credential.https://" + sec.GitHost + ".helper", helper},
 			[2]string{"url.https://" + sec.GitHost + "/.insteadOf", "git@" + sec.GitHost + ":"})
+		srcs = append(srcs, "project.toml [secrets."+name+"]")
+	}
+	for _, name := range sortedKeys(p.Secrets) {
+		sec := p.Secrets[name]
+		if !sec.GitSigning || !slices.Contains(sec.Services, s.ID) {
+			continue
+		}
+		pairs = append(pairs,
+			[2]string{"gpg.format", "ssh"},
+			[2]string{"user.signingkey", "/run/secrets/" + name},
+			[2]string{"commit.gpgsign", "true"},
+			[2]string{"tag.gpgsign", "true"})
 		srcs = append(srcs, "project.toml [secrets."+name+"]")
 	}
 	if len(pairs) == 0 {

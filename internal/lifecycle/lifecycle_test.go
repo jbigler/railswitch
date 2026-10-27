@@ -1386,6 +1386,47 @@ func TestUpRestartsStaleDashboard(t *testing.T) {
 	}
 }
 
+// TestUpDashboardNeverBlocks: a dashboard whose state can't be read, whose
+// start time is garbage, or whose restart fails is a warning; up goes on
+// to start the worktree.
+func TestUpDashboardNeverBlocks(t *testing.T) {
+	stateCmd := []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState", machine.DashboardService}
+	startCmd := []string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", machine.DashboardService}
+	restartCmd := []string{"systemctl", "--user", "restart", machine.DashboardService}
+	failed := fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit)
+	for _, c := range []struct {
+		name   string
+		script func(e *tenv)
+		warn   string
+	}{
+		{"state unreadable", func(e *tenv) { e.f.On(stateCmd, sys.Result{ExitCode: 1}, failed) }, "warning: railswitch-dashboard.service: systemctl: "},
+		{"start garbage", func(e *tenv) {
+			e.f.On(startCmd, sys.Result{Stdout: []byte("ActiveEnterTimestamp=yesterday-ish\n")}, nil)
+		}, `warning: railswitch-dashboard.service: systemctl show railswitch-dashboard.service: ActiveEnterTimestamp "yesterday-ish"`},
+		{"restart fails", func(e *tenv) {
+			e.f.On(startCmd, sys.Result{Stdout: []byte("ActiveEnterTimestamp=Thu 2000-01-01 00:00:00.000000 UTC\n")}, nil)
+			e.f.On(restartCmd, sys.Result{ExitCode: 1}, failed)
+		}, "warning: railswitch-dashboard.service: systemctl: "},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := setup(t)
+			upTwice(t, e)
+			e.units(loadedClean)
+			c.script(e)
+			if err := e.l.Up(ctx, "feat"); err != nil {
+				t.Fatalf("up failed on the dashboard: %v", err)
+			}
+			if w := e.errOut(); !strings.Contains(w, c.warn) {
+				t.Errorf("stderr %q; want %q", w, c.warn)
+			}
+			wantInOrder(t, e.calls(), "systemctl --user start filial-feat-rails.service")
+			if c.name == "restart fails" {
+				wantInOrder(t, e.calls(), joined(restartCmd), "systemctl --user start filial-feat-rails.service")
+			}
+		})
+	}
+}
+
 // TestUpShowsProgress: a build streams podman's own output as it runs, and
 // every pull is announced, so a long first `up` never sits silent.
 func TestUpShowsProgress(t *testing.T) {

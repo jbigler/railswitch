@@ -202,6 +202,10 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	key := unithash.Key(m.Prefix)
 	for _, u := range append(names.Units, traefikService, dozzleService, machine.DashboardService) {
 		st, err := sd.UnitState(ctx, u)
+		if err != nil && u == machine.DashboardService { // never blocks a worktree's up
+			l.dashboardWarning(err)
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -226,9 +230,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 			}
 			restartDozzle = stale
 		case u == machine.DashboardService:
-			if restartDashboard, err = l.staleDashboard(ctx, sd); err != nil {
-				return err
-			}
+			restartDashboard = l.staleDashboard(ctx, sd)
 		case slices.Contains(names.Containers, ctr):
 			stale, err := l.staleContainer(ctx, ctr, ctr+".container", key)
 			if err != nil {
@@ -256,7 +258,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 	if restartDashboard {
 		if err := sd.Restart(ctx, machine.DashboardService); err != nil {
-			return err
+			l.dashboardWarning(err)
 		}
 	}
 	if len(restart) > 0 {
@@ -411,20 +413,27 @@ func unitLogLines(out []byte, n int) []string {
 // staleDashboard reports whether the running dashboard's unit file (render
 // rewrites it for a new railswitch path) is newer than the dashboard's
 // start (podman.Systemd.ActiveSince, exact to the microsecond). A missing
-// file is not stale.
-func (l *L) staleDashboard(ctx context.Context, sd podman.Systemd) (bool, error) {
+// file is not stale. The dashboard never blocks a worktree's up: an error
+// is a warning (dashboardWarning) and the unit counts as not stale.
+func (l *L) staleDashboard(ctx context.Context, sd podman.Systemd) bool {
 	fi, err := os.Stat(filepath.Join(l.WS.Dirs.SystemdUser, machine.DashboardService))
 	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+		return false
+	}
+	var started time.Time
+	if err == nil {
+		started, err = sd.ActiveSince(ctx, machine.DashboardService)
 	}
 	if err != nil {
-		return false, err
+		l.dashboardWarning(err)
+		return false
 	}
-	started, err := sd.ActiveSince(ctx, machine.DashboardService)
-	if err != nil {
-		return false, err
-	}
-	return fi.ModTime().After(started), nil
+	return fi.ModTime().After(started)
+}
+
+// dashboardWarning reports a dashboard failure that up goes on past.
+func (l *L) dashboardWarning(err error) {
+	fmt.Fprintf(l.Err, "warning: %s: %v\n", machine.DashboardService, err)
 }
 
 // staleContainer reports whether container ctr was created from another

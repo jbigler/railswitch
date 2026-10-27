@@ -168,7 +168,8 @@ hide_links = ["Routes", "Mailer previews"]   # top level, before any table
 
 A project's `[tasks]` adds to the pack's `[tasks]`: a project task
 overrides the pack's of the same name, and `""` removes it. A task name
-must be non-empty and one line.
+must be non-empty and one line, and not `ls` (that is `railswitch task
+ls`), in the project's `[tasks]` and a pack's alike.
 
 ```toml
 [tasks]

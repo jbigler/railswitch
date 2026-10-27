@@ -24,6 +24,7 @@ kbd{border:1px solid var(--border);border-radius:3px;padding:0 4px;background:va
 .strip{display:flex;flex-wrap:wrap;gap:4px 18px;padding:6px 14px;background:color-mix(in srgb,var(--accent) 12%,var(--bg));border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,var(--bg))}
 .strip a{color:var(--accent);font-weight:700;text-decoration:none}
 .banner{padding:6px 14px;background:var(--bg2);color:var(--yellow);border-bottom:1px solid var(--border)}
+.banner.conn{color:var(--red);font-weight:700}
 
 /* List */
 .grid{display:grid;grid-template-columns:1.25fr 1fr;min-height:calc(100vh - 46px)}

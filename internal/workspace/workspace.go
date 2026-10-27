@@ -394,7 +394,8 @@ func samePath(a, b string) bool {
 // (SetPorts), merges every source into one render.Plan (the units and files
 // of the Model, the firewall's files, the machine's proxy units) and Applies
 // it; with check it writes nothing, and differing port bases are a change
-// in the Diff. It is the only path that writes units.
+// in the Diff. It is the only path that writes units. Without check it also
+// writes the dashboard's unit; failing that is a Diff warning, not an error.
 func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*render.Diff, error) {
 	if err := w.CheckLock(); err != nil {
 		return nil, err
@@ -439,7 +440,11 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 	maps.Copy(p.Units, machine.ProxyUnits(reg.Registry))
 	d, err := render.Apply(p, w.Root, w.Dirs.Quadlet, prefix, check)
 	if err == nil && !check {
-		err = writeDashboardUnit(w.Dirs)
+		// The dashboard is a convenience: its unit failing to be written
+		// must not stop an up.
+		if werr := writeDashboardUnit(w.Dirs); werr != nil {
+			d.Warnings = append(d.Warnings, machine.DashboardService+": "+werr.Error())
+		}
 	}
 	if err != nil || !portsChanged || !check {
 		return d, err

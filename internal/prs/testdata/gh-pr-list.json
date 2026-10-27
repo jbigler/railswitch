@@ -22,5 +22,7 @@
   {"number": 7, "title": "Closed", "url": "https://github.com/o/n/pull/7", "headRefName": "closed", "isDraft": false, "state": "CLOSED", "reviewDecision": "",
    "statusCheckRollup": [{"__typename": "StatusContext", "context": "ext", "state": "ERROR"}]},
   {"number": 8, "title": "No checks", "url": "https://github.com/o/n/pull/8", "headRefName": "nochecks", "isDraft": false, "state": "OPEN", "reviewDecision": "",
+   "statusCheckRollup": []},
+  {"number": 9, "title": "From a fork", "url": "https://github.com/o/n/pull/9", "headRefName": "main", "isCrossRepository": true, "isDraft": false, "state": "OPEN", "reviewDecision": "",
    "statusCheckRollup": []}
 ]

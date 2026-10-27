@@ -2,13 +2,17 @@ package render
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 )
+
+// schemeRe is a URL's leading scheme (RFC 3986): only there does "://"
+// mean the URL has one ({worktree.host}/login?return=https://x has not).
+var schemeRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
 
 // Link is one resolved worktree link.
 type Link struct {
@@ -65,7 +69,7 @@ func (m *Model) Links(in *Instance) ([]Link, error) {
 		if err != nil {
 			return fmt.Errorf("link %q: %w", label, err)
 		}
-		if !strings.Contains(u, "://") {
+		if !schemeRe.MatchString(u) {
 			u = "http://" + u
 		}
 		out = append(out, Link{Label: label, URL: u, Group: group})

@@ -255,12 +255,13 @@ row.
 One project (`-C`): every registered worktree, in registry order (by ID),
 with its branch's pull request. It runs `gh pr list --repo <owner/name>
 --state all --limit 200 --json
-number,title,url,headRefName,isDraft,state,reviewDecision,statusCheckRollup`
+number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup`
 on the host with `GH_PROMPT_DISABLED=1`, in the workspace root, 30 s
 timeout. The repo comes from `project.toml`'s `repo` (never a worktree's
 `.git/config`); one that is not on GitHub fails with "pr ls: <url> is not
 a GitHub repo". `gh` missing or not logged in: exit 1 with gh's message.
-The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`.
+The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
+(branch and title with control characters as spaces).
 
 ```json
 [
@@ -273,7 +274,7 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`.
 |---|---|---|
 | `slug` | string | The worktree's slug. |
 | `branch` | string | The branch checked out, as in [`overview`](#overview); `""` gets no PR. |
-| `pr` | object or null | The PR whose head branch is `branch`: an open (or draft) one first, then the highest number; `null` when there is none. |
+| `pr` | object or null | The PR whose head branch is `branch`: an open (or draft) one first, then the highest number; `null` when there is none. PRs from forks (`isCrossRepository`) never match: their head branch is the fork's. |
 | `pr.number`, `pr.title`, `pr.url` | number, string, string | As GitHub has them. |
 | `pr.state` | string | `draft` (open and draft), `open`, `merged` or `closed`. |
 | `pr.checks` | string | `fail` if any check concluded failure, error, timed out, cancelled, action required or startup failure; else `pending` if any is not completed (or a status context is pending or expected); else `pass`; `none` with no checks. |

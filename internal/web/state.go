@@ -335,8 +335,8 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		if snaps == nil {
 			snaps = s.c.Jobs.Jobs(j.Spec.Project, "")
 		}
-		_, sel := s.rows(sub.prefix, sub.sort, sub.sel)
-		html, err := render("jobs", newJobs(snaps, sel))
+		rows, sel := s.rows(sub.prefix, sub.sort, sub.sel)
+		html, err := render("jobs", newJobs(snaps, rows, sel))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
 			continue
@@ -482,7 +482,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		Header: headerView{Prefix: prefix, Need: need}, Projects: projects, Strip: strip, Banner: banner,
 		List:   newList(prefix, rows, sel, k),
 		Detail: detailView{Empty: true},
-		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), sel),
+		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),
 	}
 	for _, r := range rows {
 		if r.WT.Slug == sel {

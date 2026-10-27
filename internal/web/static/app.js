@@ -14,18 +14,39 @@ const projectStore = "railswitch.project";
 
 let es = null;
 let retry = null;
+let failures = 0;
 
 function connect() {
   if (es) es.close();
   clearTimeout(retry);
   const q = new URLSearchParams({ p: prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name" });
   es = new EventSource("/events?" + q);
+  es.onopen = () => {
+    failures = 0;
+    connection("");
+  };
   es.onmessage = (m) => handle(JSON.parse(m.data));
   es.onerror = () => {
+    failures++;
     // The browser retries a dropped stream itself; a refused one is
-    // closed, so try again later (after a restart, say).
-    if (es.readyState === EventSource.CLOSED) retry = setTimeout(connect, 3000);
+    // closed, so try again later (after a restart, or a new login).
+    if (es.readyState === EventSource.CLOSED) {
+      fetch(location.pathname, { method: "HEAD", credentials: "same-origin" })
+        .then((r) => connection(r.status === 401 ? "Logged out — run `railswitch dashboard` for a new link" : "Disconnected — retrying"))
+        .catch(() => connection("Disconnected — retrying"));
+      retry = setTimeout(connect, 3000);
+    } else if (failures > 1) {
+      connection("Disconnected — retrying");
+    }
   };
+}
+
+// connection shows why the page is no longer live ("" hides it): what it
+// shows may be stale.
+function connection(text) {
+  const c = $("#conn");
+  c.textContent = text;
+  c.hidden = !text;
 }
 
 function handle(ev) {
@@ -65,7 +86,10 @@ function afterSwap(id) {
   } else if (id === "projects") {
     filterSwitcher();
   } else if (id === "detail") {
-    body.dataset.sel = $("#detail").dataset.slug || "";
+    const slug = $("#detail").dataset.slug || "";
+    body.dataset.sel = slug;
+    // The worktree shown may not be the URL's (it was removed): follow it.
+    if (slug && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
   }
 }
 
@@ -73,7 +97,7 @@ function afterSwap(id) {
 
 function notify(ev) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  const n = new Notification(ev.title, { body: ev.body, tag: ev.tag });
+  const n = new Notification(ev.title, { body: ev.body, tag: ev.tag, renotify: true });
   n.onclick = () => {
     window.focus();
     n.close();

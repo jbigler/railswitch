@@ -57,7 +57,7 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 		Out:       e.stdout,
 		TTY:       tty,
 		Render: func(ctx context.Context) error {
-			_, err := w.Render(ctx, e.run, false)
+			_, err := e.render(ctx, w, false)
 			return err
 		},
 		Names: func(slug string) (render.Names, error) {

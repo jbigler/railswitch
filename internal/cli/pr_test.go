@@ -17,7 +17,8 @@ const ghFixture = `[
   {"number": 4, "title": "Old feat", "url": "https://github.com/o/n/pull/4", "headRefName": "feat", "isDraft": false, "state": "CLOSED", "reviewDecision": "", "statusCheckRollup": []},
   {"number": 7, "title": "Feat", "url": "https://github.com/o/n/pull/7", "headRefName": "feat", "isDraft": false, "state": "OPEN", "reviewDecision": "APPROVED",
    "statusCheckRollup": [{"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}]},
-  {"number": 9, "title": "Other", "url": "https://github.com/o/n/pull/9", "headRefName": "other", "isDraft": true, "state": "OPEN", "reviewDecision": "", "statusCheckRollup": []}
+  {"number": 9, "title": "Other", "url": "https://github.com/o/n/pull/9", "headRefName": "other", "isDraft": true, "state": "OPEN", "reviewDecision": "", "statusCheckRollup": []},
+  {"number": 11, "title": "Fork's master", "url": "https://github.com/o/n/pull/11", "headRefName": "master", "isCrossRepository": true, "isDraft": false, "state": "OPEN", "reviewDecision": "", "statusCheckRollup": []}
 ]`
 
 func TestPrLsJSON(t *testing.T) {
@@ -47,7 +48,7 @@ func TestPrLsJSON(t *testing.T) {
 		t.Fatal("no gh call")
 	}
 	wantArgv := []string{"gh", "pr", "list", "--repo", "[ORG]/[REPO]", "--state", "all", "--limit", "200",
-		"--json", "number,title,url,headRefName,isDraft,state,reviewDecision,statusCheckRollup"}
+		"--json", "number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
 	if !slices.Equal(f.Calls[i], wantArgv) || f.Cmds[i].Dir != ws {
 		t.Errorf("gh argv %q dir %q", f.Calls[i], f.Cmds[i].Dir)
 	}
@@ -92,5 +93,22 @@ func TestPrLsGhFails(t *testing.T) {
 	code, out, errs := runWith(t, f, "-C", ws, "pr", "ls")
 	if code != 1 || out != "" || !strings.Contains(errs, "gh auth login") {
 		t.Errorf("exit %d stdout %q stderr %q; want 1 with gh's message", code, out, errs)
+	}
+}
+
+// TestPrLsTextPrintable: a branch a container wrote into the worktree's
+// git files prints without its control characters.
+func TestPrLsTextPrintable(t *testing.T) {
+	ws, _ := gitWS(t)
+	head := filepath.Join(ws, "master", ".git", "worktrees", "feat", "HEAD")
+	if err := os.WriteFile(head, []byte("ref: refs/heads/jb/\x1b[31mred\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := fakeHost()
+	f.Passthrough = []string{"git"}
+	f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(`[{"number": 3, "title": "T\u001b]0;x\u0007", "url": "u", "headRefName": "jb/\u001b[31mred", "isDraft": false, "isCrossRepository": false, "state": "OPEN", "reviewDecision": "", "statusCheckRollup": []}]`)}, nil)
+	code, out, errs := runWith(t, f, "-C", ws, "pr", "ls")
+	if code != 0 || strings.Contains(out, "\x1b") || strings.Contains(out, "\x07") || !strings.Contains(out, "jb/ [31mred") || !strings.Contains(out, "#3") {
+		t.Errorf("exit %d %s\n%q", code, errs, out)
 	}
 }

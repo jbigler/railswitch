@@ -148,8 +148,10 @@ Stage 6 is split; each part is its own design and plan:
   request's allowed Host; missing or different is 403. No command runs.
 - **Every response:** `X-Frame-Options: DENY`,
   `Content-Security-Policy: default-src 'self'; frame-ancestors 'none';
-  base-uri 'none'; form-action 'self'`, `Referrer-Policy: no-referrer`,
-  `X-Content-Type-Options: nosniff`, `Cache-Control: no-store` on pages and
+  base-uri 'none'; form-action 'self'`, `Referrer-Policy: same-origin`
+  (ruling, final review: `no-referrer` makes a form POST's Origin `null`,
+  which the Origin check refuses), `X-Content-Type-Options: nosniff`,
+  `Cache-Control: no-store` on pages and
   events.
 - `/healthz` (Host check only): `ok <version>`.
 
@@ -200,7 +202,7 @@ commands below are new and are documented in `docs/json.md`.
 **`railswitch pr ls [--json]`** — one project, via the host's `gh`:
 
 - Runs `gh pr list --repo <owner/name> --state all --limit 200 --json
-  number,title,url,headRefName,isDraft,state,reviewDecision,statusCheckRollup`
+  number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup`
   with `GH_PROMPT_DISABLED=1`, in the workspace root, 30 s timeout. The repo
   comes from `project.toml`'s repo URL (never a worktree's `.git/config`,
   which containers can write). A non-GitHub repo: error "pr ls: <url> is not
@@ -215,6 +217,8 @@ commands below are new and are documented in `docs/json.md`.
   - `review`: `approved`, `changes_requested`, `pending` (review required),
     `none`.
   - Several PRs for one branch: an open one wins, then the highest number.
+    PRs from forks (`isCrossRepository`) are ignored (ruling, final review:
+    their head branch is the fork's, not ours).
 - `gh` missing or not logged in: exit 1 with gh's message; the dashboard
   shows "PRs unavailable: <message>" once and keeps going.
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -173,7 +174,7 @@ func (l *L) PrintOverview(ctx context.Context, asJSON bool) error {
 	tw := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "WORKTREE\tBRANCH\tSTACK\tAGENT")
 	for _, w := range ov.Worktrees {
-		slug, branch := w.Slug, w.Branch
+		slug, branch := w.Slug, safefile.Printable(w.Branch) // a container can write the branch
 		if w.Base {
 			slug += " (base)"
 		}
@@ -195,7 +196,7 @@ func (l *L) PrintOverview(ctx context.Context, asJSON bool) error {
 		}
 		lw := tabwriter.NewWriter(l.Out, 0, 4, 2, ' ', 0)
 		for _, k := range w.Links {
-			fmt.Fprintf(lw, "  %s\t%s\n", k.Label, k.URL)
+			fmt.Fprintf(lw, "  %s\t%s\n", k.Label, safefile.Printable(k.URL)) // {branch} expands into it
 		}
 		if err := lw.Flush(); err != nil {
 			return err

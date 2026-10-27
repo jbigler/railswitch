@@ -44,7 +44,8 @@ type File struct {
 // by filename, workspace files by their workspace-relative path.
 type Diff struct {
 	Added, Changed, Removed []string
-	Text                    string // unified diff; a private file's contents are never shown
+	Text                    string   // unified diff; a private file's contents are never shown
+	Warnings                []string // non-fatal: what the caller prints as "warning: <w>"
 }
 
 const (

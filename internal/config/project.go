@@ -20,6 +20,10 @@ const SchemaVersion = 1
 // Slots are the option slots a project may fill in [options].
 var Slots = []string{"database", "cache", "storage", "jobs", "mail", "browser"}
 
+// ReservedTasks are the words `railswitch task` takes as its own
+// subcommands: a [tasks] entry by that name could never run.
+var ReservedTasks = []string{"ls"}
+
 // Project is project.toml: the choices and overrides only (HANDOFF §3.2).
 type Project struct {
 	Schema    int                         `toml:"schema"` // must be 1 (D39)
@@ -333,6 +337,8 @@ func (p *Project) Validate() error {
 			v.add(path, "a task name is required")
 		case strings.ContainsAny(name, "\r\n"):
 			v.add(path, "the task name contains a newline")
+		case slices.Contains(ReservedTasks, name):
+			v.add(path, "%q is a railswitch task subcommand, not a task name", name)
 		}
 		v.oneLine(path, p.Tasks[name])
 	}

@@ -121,6 +121,17 @@ func (c *changes) add(d *render.Diff) {
 	}
 }
 
+// render renders the workspace (units written), printing its warnings.
+func (l *L) render(ctx context.Context) (*render.Diff, error) {
+	d, err := l.WS.Render(ctx, l.R, false)
+	if d != nil {
+		for _, w := range d.Warnings {
+			fmt.Fprintf(l.Err, "warning: %s\n", w)
+		}
+	}
+	return d, err
+}
+
 // Up renders, checks, pulls, builds and seeds what worktree slug needs, then
 // starts its app unit and waits for Traefik to route the app. It stops at
 // the first error; nothing is started after a failure, and running it
@@ -132,7 +143,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	l.warnNotIsolated(ctx)
 	l.warnGitGuard(ctx)
 	var ch changes
-	d, err := l.WS.Render(ctx, l.R, false)
+	d, err := l.render(ctx)
 	if err != nil {
 		return err
 	}
@@ -150,7 +161,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		return err
 	}
 	if pulled {
-		if d, err = l.WS.Render(ctx, l.R, false); err != nil {
+		if d, err = l.render(ctx); err != nil {
 			return err
 		}
 		ch.add(d)
@@ -164,7 +175,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		return err
 	}
 	if wrote { // a new FROM digest gives new build tags (D36)
-		if d, err = l.WS.Render(ctx, l.R, false); err != nil {
+		if d, err = l.render(ctx); err != nil {
 			return err
 		}
 		ch.add(d)

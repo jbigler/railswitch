@@ -24,7 +24,8 @@ exactly what the page sees (docs/json.md).
   `systemctl --user stop railswitch-dashboard.service`. The next `up`
   starts it again.
 - A dashboard that fails to start never fails `up`: `up` prints a warning
-  and carries on.
+  and carries on. Nor does a unit file render can't write (or railswitch's
+  own path it can't find): `warning: railswitch-dashboard.service: <why>`.
 - `railswitch machine` shows its unit, state and address.
 - Reinstalling the binary restarts it: `dashboard serve` checks its
   executable's size and mtime every 5 s and, when they change and no job
@@ -75,7 +76,8 @@ railswitch dashboard
   button.
 - Every response carries `X-Frame-Options: DENY`, a strict
   `Content-Security-Policy` (no inline script or style, no framing),
-  `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`;
+  `Referrer-Policy: same-origin` (so a form posted without the script
+  still carries the page's Origin) and `X-Content-Type-Options: nosniff`;
   pages and events are `Cache-Control: no-store`.
 - No secret value ever reaches a page, an event, a job log or argv.
 - `/healthz` needs only the Host check and answers `ok <version>`.
@@ -83,7 +85,14 @@ railswitch dashboard
 ## Layout
 
 Pages are `/p/<prefix>` and `/p/<prefix>/<slug>`; `/` opens the last
-project you looked at.
+project you looked at. The URL of a worktree that no longer exists
+(removed) redirects to its project's page, keeping `?sort=`; the address
+bar follows the worktree the page shows.
+
+When the live stream drops, a red line under the header says so:
+"Disconnected — retrying" (the page retries every few seconds), or
+"Logged out — run `railswitch dashboard` for a new link" when the cookie
+is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch"; the project button (the prefix; opens the
   switcher); `◆ N need input`; `tasks :`; `logs` (Dozzle at
@@ -194,6 +203,8 @@ Every action is a job (below).
   Its stdin is `/dev/null`.
 - One job at a time per worktree; a project-level job (`wt add`) blocks the
   whole project. A second request answers "busy: <running job>".
+- A worktree's Jobs list shows its own jobs, the project-level ones and
+  those of removed worktrees (so a `wt rm`'s output stays visible).
 - Cancel sends SIGTERM to the job's process group, SIGKILL 3 s later.
 - States: running, ok, failed (with the exit code), cancelled.
 - The hub keeps the last 5000 lines and 4 MiB per job (lines cut at 64 KiB,
@@ -269,12 +280,14 @@ docs/json.md.
   worktree's git config): number, title, url, state (`draft`, `open`,
   `merged`, `closed`), checks (`pass`, `pending`, `fail`, `none`), review
   (`approved`, `changes_requested`, `pending`, `none`). For several PRs on
-  one branch an open or draft one wins, then the highest number. Fails with gh's
+  one branch an open or draft one wins, then the highest number; a PR from
+  a fork never matches (its head branch is the fork's). Fails with gh's
   message when gh is missing or not logged in; the page then shows "PRs
   unavailable".
 - `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged
   with the project's `[tasks]` in `project.toml`; a project task replaces a
-  pack task of the same name and `""` removes one:
+  pack task of the same name and `""` removes one; no task may be named
+  `ls`:
 
   ```toml
   [tasks]

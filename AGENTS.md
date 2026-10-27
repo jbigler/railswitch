@@ -20,7 +20,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 ## CLI (Stage 6a additions)
 - `pr ls` (project; `gh pr list` with the repo from `project.toml`, never a worktree's git config), `task ls` and `task [--new-term] <name> [args…]` (worktree; `sh -c '<command> "$@"' <name> <args…>` in the app as `exec` runs, the task's exit code; a `--` right after the name is dropped), `wt add [--name <n>] [--up] <target>` (`--up`: `up` in the new worktree).
 - `dashboard` (prints the login link), `dashboard colors [set [--dark] [--base <p>] [<tok>=#rrggbb…] | reset [--dark]]` (`~/.config/railswitch/dashboard.toml`; reset keeps the preset), `dashboard serve` (the dashboard unit's ExecStart): `internal/web` on `127.0.0.1:7700`; jobs get the session's display/agent/terminal variables from `systemctl --user show-environment`; exits 0 when its executable's size or mtime changes while no job runs. The dashboard as a whole: `docs/dashboard.md`.
-- `project.toml`: `[tasks]` (`name = "command"`, `""` removes a pack task), `hide_links = [labels]` (an unknown stack-link label is a render error), `[[links]]`.
+- `project.toml`: `[tasks]` (`name = "command"`, `""` removes a pack task; `ls` is refused here and in a pack's `[tasks]`), `hide_links = [labels]` (an unknown stack-link label is a render error), `[[links]]`.
 
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
@@ -33,7 +33,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 - Unit tests need no podman, systemd, gh or network (`git`, `bash` allowed; use `internal/sys/systest` Fake).
 - Ports publish only on `127.0.0.1:<host>:<ctr>`.
 - Remove objects by exact name, never `--filter`/regex. Never `git worktree prune`.
-- Files inside a worktree are read only via `safefile.Read` (regular files, ≤ 1 MiB).
+- Files inside a worktree are read only via `safefile.Read` (regular files, ≤ 1 MiB); text from them (or from a status file) printed on a terminal goes through `safefile.Printable` (branch names included).
 - Pinned: subnet pool `10.214.0.0/16`, one `/24` per project (skipping /24s any existing podman network uses), gateway `.1`, Traefik `.2`, dynamic `10.214.<n>.128/25`; `10.214.255.0/24` reserved for the machine network `railswitch_machine` (gateway `.1`, Traefik `.2`, Dozzle `.3`), never a project's; every railswitch network (proxy, dev, machine) `isolate=strict`; dev network MTU 1400; ports DB 55432+ID, Ruby debug 33000+ID, Neovim 17000+ID, Playwright 18888+ID, App share 13000+ID, Storage share 19000+ID; two different port bases on one machine ≥ 100 (`MaxWorktreeID + 1`) apart; worktree slug ≤ 40 chars; `LogDriver=journald` for long-running units, `passthrough` for oneshots (D64).
 - railswitch's own CI lives in `.github/workflows/`; railswitch never generates or touches a project's CI (D41).
 - Dashboard (D73, D74): unit `railswitch-dashboard.service` (plain systemd user unit, `Wants=` from every app unit, never blocks `up`) on `127.0.0.1:7700` (`http://railswitch.localhost:7700/`); token `~/.local/share/railswitch/dashboard/token` 0600; every request needs the cookie, POST also `Origin`.
@@ -43,10 +43,10 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 - `internal/cli` — flag dispatch, one file per command group.
 - `internal/sys` (+ `systest`) — Runner/Cmd/Result, Fake runner; `Cmd.KillGrace` (own process group, SIGTERM then SIGKILL on cancel).
 - `internal/jobs` — the dashboard's job hub: one child per job in a `systemd-run --user --scope`, log file 0600, kept output capped, one job per worktree (project-level jobs block the project), last 20 kept.
-- `internal/prs` — `pr ls`: `gh pr list` JSON → per-branch PR state, checks and review; the repo from `project.toml`'s URL.
+- `internal/prs` — `pr ls`: `gh pr list` JSON → per-branch PR state, checks and review; the repo from `project.toml`'s URL; fork PRs (`isCrossRepository`) ignored.
 - `internal/dashconf` — `dashboard.toml`: presets, per-mode token overrides, set/reset, contrast warnings.
 - `internal/web` — the dashboard: guard (Host, token cookie, Origin on POST, CSP), pollers (`overview` 2 s with a page open, else 10 s; `pr ls` 60 s), SSE fragment diffs and notifications, actions as `internal/jobs` jobs. Reads only through `railswitch --json` (its `CLI`), never a package's files; templates and static files embedded; no inline script or style (colours at `/theme.css`).
-- `internal/safefile` — hostile-file reads. `internal/naming` — sanitize, object/unit names.
+- `internal/safefile` — hostile-file reads; `Printable` (control characters → spaces). `internal/naming` — sanitize, object/unit names.
 - `internal/placeholder`, `internal/config`, `internal/pack` (+ `builtin`; the package format and local packs: `docs/packs.md`), `internal/version`.
 - `internal/machine` — dirs, registry, proxy, machine config.
 - `internal/render` — model, env, images, quadlet, lint, diff, apply.

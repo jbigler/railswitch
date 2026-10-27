@@ -56,18 +56,21 @@ type ghPR struct {
 	Title          string    `json:"title"`
 	URL            string    `json:"url"`
 	HeadRefName    string    `json:"headRefName"`
+	IsCross        bool      `json:"isCrossRepository"`
 	IsDraft        bool      `json:"isDraft"`
 	State          string    `json:"state"`
 	ReviewDecision string    `json:"reviewDecision"`
 	Checks         []ghCheck `json:"statusCheckRollup"`
 }
 
-// List runs `gh pr list` for repo in dir (no prompts, 30 s timeout).
+// List runs `gh pr list` for repo in dir (no prompts, 30 s timeout). PRs
+// from forks are left out: their head branch names a branch of another
+// repository, which a worktree's same-named branch is not.
 func List(ctx context.Context, r sys.Runner, repo, dir string) ([]PR, error) {
 	res, err := r.Run(ctx, sys.Cmd{
 		Name: "gh",
 		Args: []string{"pr", "list", "--repo", repo, "--state", "all", "--limit", "200",
-			"--json", "number,title,url,headRefName,isDraft,state,reviewDecision,statusCheckRollup"},
+			"--json", "number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"},
 		Dir:     dir,
 		Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
 		Timeout: 30 * time.Second,
@@ -81,6 +84,9 @@ func List(ctx context.Context, r sys.Runner, repo, dir string) ([]PR, error) {
 	}
 	out := make([]PR, 0, len(raw))
 	for _, p := range raw {
+		if p.IsCross {
+			continue
+		}
 		out = append(out, PR{
 			Number: p.Number,
 			Title:  p.Title,

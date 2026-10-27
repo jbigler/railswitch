@@ -696,7 +696,7 @@ func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *works
 	if err != nil {
 		return 0, err
 	}
-	if _, err := w.Render(ctx, e.run, false); err != nil {
+	if _, err := e.render(ctx, w, false); err != nil {
 		return 0, errors.Join(err, unregister(dirs, prefix))
 	}
 	return wt.ID, nil

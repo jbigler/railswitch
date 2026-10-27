@@ -320,3 +320,20 @@ func appendFile(t *testing.T, path, data string) {
 		t.Fatal(err)
 	}
 }
+
+// TestRenderDashboardUnitWarning: a dashboard unit render can't write is
+// a warning on stderr; render still succeeds.
+func TestRenderDashboardUnitWarning(t *testing.T) {
+	ws, dirs := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	if err := os.MkdirAll(filepath.Dir(dirs.SystemdUser), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dirs.SystemdUser, []byte("not a dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := runIn(t, "-C", ws, "render")
+	if code != 0 || !strings.HasPrefix(errs, "warning: railswitch-dashboard.service: ") {
+		t.Errorf("render: exit %d, stderr %q", code, errs)
+	}
+}

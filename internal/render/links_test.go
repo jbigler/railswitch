@@ -11,7 +11,8 @@ import (
 func TestLinksOrder(t *testing.T) {
 	m, in := filial(t, func(p *config.Project) {
 		p.Options["jobs"] = "sidekiq@1"
-		p.Links = append(p.Links, config.Link{Label: "Docs", URL: "https://docs.example.com/{branch}"})
+		p.Links = append(p.Links, config.Link{Label: "Docs", URL: "https://docs.example.com/{branch}"},
+			config.Link{Label: "Login", URL: "{worktree.host}/login?return=https://x"})
 	})
 	got, err := m.Links(in)
 	if err != nil {
@@ -22,6 +23,7 @@ func TestLinksOrder(t *testing.T) {
 		{"App", "http://" + host + "/", "app"},
 		{"Admin", "http://" + host + "/admin", "project"},
 		{"Docs", "https://docs.example.com/master", "project"},
+		{"Login", "http://" + host + "/login?return=https://x", "project"},
 		{"Mailer previews", "http://" + host + "/rails/mailers", "stack"},
 		{"Routes", "http://" + host + "/rails/info/routes", "stack"},
 		{"Storage console", "http://s3-ui." + host, "stack"},

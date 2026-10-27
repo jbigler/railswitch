@@ -190,13 +190,26 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/p/"+first, http.StatusSeeOther)
 }
 
+// page is a project's page; a worktree that no longer exists (removed,
+// say, while its URL was open) redirects to the project's.
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
+	k := parseSort(r.URL.Query().Get("sort"))
+	if slug := r.PathValue("slug"); slug != "" {
+		p, ok, err := s.project(r.Context(), r.PathValue("prefix"))
+		if err == nil && ok {
+			ov, err := s.overviewOf(r.Context(), p.Prefix, p.Workspace)
+			if err == nil && !slices.ContainsFunc(ov.Worktrees, func(wt worktree) bool { return wt.Slug == slug }) {
+				http.Redirect(w, r, "/p/"+p.Prefix+k.query(), http.StatusSeeOther)
+				return
+			}
+		}
+	}
 	p, wt, ok := s.lookup(w, r)
 	if !ok {
 		return
 	}
 	s.mu.Lock()
-	pv := s.pageData(p.Prefix, wt.Slug, parseSort(r.URL.Query().Get("sort")))
+	pv := s.pageData(p.Prefix, wt.Slug, k)
 	s.mu.Unlock()
 	s.html(w, http.StatusOK, "page", pv)
 }

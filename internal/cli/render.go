@@ -30,6 +30,18 @@ func (e *env) usageErr(format string, args ...any) int {
 	return 2
 }
 
+// render renders workspace w (units written unless check), printing the
+// render's warnings to stderr.
+func (e *env) render(ctx context.Context, w *workspace.Workspace, check bool) (*render.Diff, error) {
+	d, err := w.Render(ctx, e.run, check)
+	if d != nil {
+		for _, msg := range d.Warnings {
+			fmt.Fprintf(e.stderr, "warning: %s\n", msg)
+		}
+	}
+	return d, err
+}
+
 // flags is a subcommand's flag set, printing to stderr.
 func (e *env) flags(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet("railswitch "+name, flag.ContinueOnError)
@@ -84,7 +96,7 @@ func cmdRender(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	d, err := w.Render(ctx, e.run, *check)
+	d, err := e.render(ctx, w, *check)
 	if err != nil {
 		return e.fail(err)
 	}

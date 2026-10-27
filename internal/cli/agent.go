@@ -9,11 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 	"text/tabwriter"
-	"unicode"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/term"
 )
 
@@ -172,22 +171,11 @@ func (e *env) printAgents(rows []lifecycle.AgentRow) error {
 		if r.Reply {
 			state = "reply"
 		}
-		msg := printable(r.Message)
+		msg := safefile.Printable(r.Message)
 		if msg == "" {
 			msg = "-"
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.Name, r.Package, r.Run, running, state, msg)
 	}
 	return tw.Flush()
-}
-
-// printable is s with each control character (a container wrote it: no
-// terminal escapes, no line breaks) replaced by a space.
-func printable(s string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return ' '
-		}
-		return r
-	}, s)
 }

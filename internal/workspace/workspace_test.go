@@ -406,9 +406,11 @@ func TestCheckLockBuiltinToLocal(t *testing.T) {
 	}
 }
 
-// TestRenderWritesDashboardUnit: render writes the dashboard unit for the
-// running railswitch; render --check writes nothing.
-func TestRenderWritesDashboardUnit(t *testing.T) {
+// dashboardWS is the fixture workspace registered with its master
+// worktree, and a runner answering what Render asks; railswitch's path is
+// /opt/rs/railswitch.
+func dashboardWS(t *testing.T) (*Workspace, *systest.Fake, machine.Dirs) {
+	t.Helper()
 	ctx := context.Background()
 	tmp := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
@@ -447,6 +449,14 @@ func TestRenderWritesDashboardUnit(t *testing.T) {
 	}
 	f := &systest.Fake{}
 	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte("/g\n")}, nil)
+	return w, f, dirs
+}
+
+// TestRenderWritesDashboardUnit: render writes the dashboard unit for the
+// running railswitch; render --check writes nothing.
+func TestRenderWritesDashboardUnit(t *testing.T) {
+	ctx := context.Background()
+	w, f, dirs := dashboardWS(t)
 	path := filepath.Join(dirs.SystemdUser, machine.DashboardService)
 	if _, err := w.Render(ctx, f, true); err != nil {
 		t.Fatal(err)
@@ -454,10 +464,42 @@ func TestRenderWritesDashboardUnit(t *testing.T) {
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("render --check wrote %s (%v)", path, err)
 	}
-	if _, err := w.Render(ctx, f, false); err != nil {
+	d, err := w.Render(ctx, f, false)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if data, err := os.ReadFile(path); err != nil || string(data) != string(machine.DashboardUnit("/opt/rs/railswitch")) {
 		t.Errorf("%s = %q, %v", path, data, err)
+	}
+	if len(d.Warnings) != 0 {
+		t.Errorf("warnings %q", d.Warnings)
+	}
+}
+
+// TestRenderDashboardUnitUnwritable: a dashboard unit render can't write
+// (or railswitch's own path unknown) is a warning; the render succeeds.
+func TestRenderDashboardUnitUnwritable(t *testing.T) {
+	ctx := context.Background()
+	w, f, dirs := dashboardWS(t)
+	if err := os.MkdirAll(filepath.Dir(dirs.SystemdUser), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dirs.SystemdUser, []byte("not a dir"), 0o644); err != nil { // MkdirAll fails under it
+		t.Fatal(err)
+	}
+	d, err := w.Render(ctx, f, false)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	if len(d.Warnings) != 1 || !strings.HasPrefix(d.Warnings[0], machine.DashboardService+": ") {
+		t.Errorf("warnings %q", d.Warnings)
+	}
+	if _, err := os.Stat(filepath.Join(w.Dirs.Quadlet, "filial-master-rails.container")); err != nil {
+		t.Errorf("units not written: %v", err)
+	}
+
+	executable = func() (string, error) { return "", errors.New("no /proc") }
+	if d, err := w.Render(ctx, f, false); err != nil || len(d.Warnings) != 1 || !strings.Contains(d.Warnings[0], "no /proc") {
+		t.Errorf("unknown path: %v %q", err, d.Warnings)
 	}
 }

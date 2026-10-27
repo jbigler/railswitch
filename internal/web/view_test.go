@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/jobs"
 )
 
 func slugs(rows []row) []string {
@@ -220,5 +222,28 @@ func TestRowFragment(t *testing.T) {
 		if !strings.Contains(html, want) {
 			t.Errorf("row lacks %q:\n%s", want, html)
 		}
+	}
+}
+
+// TestJobsOfRemovedWorktree: a job of a worktree the overview no longer
+// has (its `wt rm`) stays in the list; another live worktree's does not.
+func TestJobsOfRemovedWorktree(t *testing.T) {
+	rows := []row{{WT: worktree{Slug: "main", Base: true}}, {WT: worktree{Slug: "b"}}}
+	snaps := []jobs.Snapshot{
+		{ID: "1", Spec: jobs.Spec{Slug: "gone", Label: "remove"}, State: jobs.StateOK},
+		{ID: "2", Spec: jobs.Spec{Slug: "b", Label: "up"}, State: jobs.StateOK},
+		{ID: "3", Spec: jobs.Spec{Slug: "main", Label: "stop"}, State: jobs.StateOK},
+		{ID: "4", Spec: jobs.Spec{Label: "wt add x"}, State: jobs.StateOK},
+	}
+	var got []string
+	for _, j := range newJobs(snaps, rows, "main").Jobs {
+		got = append(got, j.Label)
+	}
+	if want := []string{"remove", "stop", "wt add x"}; !slices.Equal(got, want) {
+		t.Errorf("jobs %q, want %q", got, want)
+	}
+	html, err := render("jobs", newJobs(snaps, rows, "main"))
+	if err != nil || !strings.Contains(html, `id="job-1"`) {
+		t.Errorf("removed worktree's job not rendered (%v):\n%s", err, html)
 	}
 }

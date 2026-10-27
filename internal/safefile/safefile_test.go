@@ -82,3 +82,9 @@ func TestReadMissingFile(t *testing.T) {
 		t.Fatalf("err = %v, want fs.ErrNotExist", err)
 	}
 }
+
+func TestPrintable(t *testing.T) {
+	if got := Printable("jb/\x1b[31mred\x07\tx\u0085é"); got != "jb/ [31mred  x é" {
+		t.Errorf("Printable = %q", got)
+	}
+}

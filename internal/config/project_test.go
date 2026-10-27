@@ -347,6 +347,7 @@ func TestHideLinksAndTasksDecode(t *testing.T) {
 		{func(p *Project) { p.Tasks["a\nb"] = "x" }, `tasks."a\nb"`},
 		{func(p *Project) { p.Tasks[""] = "x" }, `tasks."": `},
 		{func(p *Project) { p.Tasks["lint"] = "a\nb" }, "tasks.lint: value contains a newline"},
+		{func(p *Project) { p.Tasks["ls"] = "ls -la" }, `tasks.ls: "ls" is a railswitch task subcommand`},
 		{func(p *Project) { p.HideLinks = []string{"Routes", ""} }, "hide_links[1]: "},
 	} {
 		q, err := Load(path)

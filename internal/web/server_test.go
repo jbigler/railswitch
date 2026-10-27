@@ -164,21 +164,27 @@ func TestPages(t *testing.T) {
 	if w.Code != 303 || w.Header().Get("Location") != "/p/ftest" {
 		t.Errorf("/: %d %q", w.Code, w.Header().Get("Location"))
 	}
+	// A removed worktree's URL goes to its project, keeping the order.
+	for path, want := range map[string]string{"/p/ftest/gone?sort=-pr": "/p/ftest?sort=-pr", "/p/ftest/gone": "/p/ftest"} {
+		if w := f.do(req("GET", path, nil)); w.Code != 303 || w.Header().Get("Location") != want {
+			t.Errorf("%s: %d %q, want 303 %s", path, w.Code, w.Header().Get("Location"), want)
+		}
+	}
 	for _, c := range []struct {
 		path string
 		code int
 		want []string
 	}{
-		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`}},
+		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`, `<div id="conn" class="banner conn" hidden></div>`}},
 		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
 		{"/p/nope", 404, nil},
-		{"/p/ftest/nope", 404, nil},
+		{"/p/nope/b", 404, nil},
 		{"/p/ftest/b/remove", 200, []string{"Discard changes", `name="confirm"`, "/ws/ftest/b"}},
 		{"/p/ftest/main/remove", 422, nil},
 		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`}},
 		{"/colors", 200, []string{`value="#BC5215"`, "paper", "solar", "contrast"}},
 		{"/theme.css", 200, []string{"--accent:#BC5215", "prefers-color-scheme: dark", "--accent:#DA702C"}},
-		{"/static/app.js", 200, []string{"EventSource"}},
+		{"/static/app.js", 200, []string{"EventSource", "renotify: true", "Logged out — run `railswitch dashboard` for a new link", "Disconnected — retrying", "history.replaceState(null, \"\", pageURL(slug))"}},
 		{"/static/app.css", 200, []string{"--accent"}},
 	} {
 		w := f.do(req("GET", c.path, nil))

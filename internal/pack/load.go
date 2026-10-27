@@ -456,6 +456,11 @@ func (l *loader) checkPack(dir string, p *Pack) bool {
 		}
 	}
 	l.links(file, p.Links)
+	for _, name := range sortedKeys(p.Tasks) {
+		if slices.Contains(config.ReservedTasks, name) {
+			l.add(file, "tasks.%s: %q is a railswitch task subcommand, not a task name", name, name)
+		}
+	}
 	return ok && len(l.errs) == n
 }
 

@@ -264,3 +264,25 @@ func TestOverviewOnDemandRunning(t *testing.T) {
 		t.Errorf("feat agent %+v; want claude running", a)
 	}
 }
+
+// TestOverviewTextPrintable: a branch a container wrote reaches the text
+// table without its control characters; --json keeps it as it is.
+func TestOverviewTextPrintable(t *testing.T) {
+	e, _ := overviewEnv(t, func(string, string) string { return "active/running" })
+	if err := os.WriteFile(filepath.Join(e.ws, "feat", ".git", "HEAD"), []byte("ref: refs/heads/jb/\x1b[31mred\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.l.PrintOverview(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if text := e.out.String(); strings.Contains(text, "\x1b") || !strings.Contains(text, "jb/ [31mred") {
+		t.Errorf("text:\n%q", text)
+	}
+	e.out.Reset()
+	if err := e.l.PrintOverview(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(e.out.String(), `jb/\u001b[31mred`) {
+		t.Errorf("JSON lost the raw branch: %s", e.out)
+	}
+}

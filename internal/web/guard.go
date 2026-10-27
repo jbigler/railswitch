@@ -28,7 +28,10 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Content-Security-Policy", csp)
-		h.Set("Referrer-Policy", "no-referrer")
+		// same-origin, not no-referrer: with no-referrer some browsers send
+		// a form POST's Origin as "null", refused below, and the page
+		// would not work without its script.
+		h.Set("Referrer-Policy", "same-origin")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Cache-Control", "no-store")
 		if !allowedHosts[r.Host] {

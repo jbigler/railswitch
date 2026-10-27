@@ -23,3 +23,19 @@ func TestLinkPlaceholders(t *testing.T) {
 		t.Fatalf("Load with allowed placeholders = %v", err)
 	}
 }
+
+// TestTaskNameLs: a pack task named ls could never run (`task ls` lists
+// the tasks): Load refuses it.
+func TestTaskNameLs(t *testing.T) {
+	fsys := minimal()
+	fsys["packs/p/pack.toml"].Data = append(fsys["packs/p/pack.toml"].Data, []byte("\n[tasks]\nls = \"ls -la\"\n")...)
+	_, err := Load(fsys)
+	if err == nil || !strings.Contains(err.Error(), "packs/p/pack.toml") || !strings.Contains(err.Error(), `tasks.ls: "ls" is a railswitch task subcommand`) {
+		t.Fatalf("Load = %v", err)
+	}
+	fsys = minimal()
+	fsys["packs/p/pack.toml"].Data = append(fsys["packs/p/pack.toml"].Data, []byte("\n[tasks]\nlint = \"bin/lint\"\n")...)
+	if _, err := Load(fsys); err != nil {
+		t.Fatalf("Load with a task = %v", err)
+	}
+}

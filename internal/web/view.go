@@ -510,12 +510,14 @@ type jobView struct {
 
 var jobClasses = map[jobs.State]string{jobs.StateRunning: "blue", jobs.StateOK: "green", jobs.StateFailed: "red", jobs.StateCancelled: "muted"}
 
-// newJobs is the jobs of worktree slug and the project's own, newest
-// first, each with its last viewLines lines.
-func newJobs(snaps []jobs.Snapshot, slug string) jobsView {
+// newJobs is the jobs of worktree slug, the project's own and those of a
+// worktree no longer in rows (a removed one's `wt rm` stays visible),
+// newest first, each with its last viewLines lines.
+func newJobs(snaps []jobs.Snapshot, rows []row, slug string) jobsView {
 	var v jobsView
 	for _, j := range snaps {
-		if j.Spec.Slug != slug && j.Spec.Slug != "" {
+		other := j.Spec.Slug != slug && j.Spec.Slug != ""
+		if other && slices.ContainsFunc(rows, func(r row) bool { return r.WT.Slug == j.Spec.Slug }) {
 			continue
 		}
 		jv := jobView{

@@ -50,7 +50,7 @@ func TestListArgv(t *testing.T) {
 	}
 	c := f.Cmds[0]
 	want := []string{"gh", "pr", "list", "--repo", "o/n", "--state", "all", "--limit", "200", "--json",
-		"number,title,url,headRefName,isDraft,state,reviewDecision,statusCheckRollup"}
+		"number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
 	if !slices.Equal(f.Calls[0], want) {
 		t.Errorf("argv = %q", f.Calls[0])
 	}
@@ -85,6 +85,10 @@ func TestParse(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)
+	}
+	// #9 is a fork's PR on its own "main": never the PR of our main.
+	if p := ForBranch(got, "main"); p != nil {
+		t.Errorf("fork PR matched main: %+v", p)
 	}
 }
 

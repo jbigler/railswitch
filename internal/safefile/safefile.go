@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"syscall"
+	"unicode"
 )
 
 // Limit is the default maximum size of a hostile file (1 MiB).
@@ -51,4 +53,16 @@ func Read(path string, limit int64) ([]byte, error) {
 		return nil, fmt.Errorf("%s: larger than %d bytes: %w", path, limit, ErrRefused)
 	}
 	return data, nil
+}
+
+// Printable is s with each control character replaced by a space: text a
+// container wrote (a status message, a branch in a worktree's git files)
+// made safe to print on a terminal, with no escapes and no line breaks.
+func Printable(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
 }

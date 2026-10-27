@@ -25,7 +25,7 @@ func (l *L) Build(ctx context.Context, slug string, force, pull bool) error {
 		return err
 	}
 	if wrote { // new FROM digests give new build tags (D36): the units follow
-		if _, err := l.WS.Render(ctx, l.R, false); err != nil {
+		if _, err := l.render(ctx); err != nil {
 			return err
 		}
 		if _, in, err = l.load(ctx, slug); err != nil {

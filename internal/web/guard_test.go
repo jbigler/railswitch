@@ -271,7 +271,7 @@ func checkHeaders(t *testing.T, what string, w *httptest.ResponseRecorder) {
 	if got := w.Header().Get("Content-Security-Policy"); got != wantCSP {
 		t.Errorf("%s: CSP %q", what, got)
 	}
-	if got := w.Header().Get("Referrer-Policy"); got != "no-referrer" {
+	if got := w.Header().Get("Referrer-Policy"); got != "same-origin" {
 		t.Errorf("%s: Referrer-Policy %q", what, got)
 	}
 	if got := w.Header().Get("X-Content-Type-Options"); got != "nosniff" {
@@ -387,5 +387,24 @@ func TestGuardCacheControl(t *testing.T) {
 	w := f.do(req("GET", "/p/ftest", nil))
 	if got := w.Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("page Cache-Control %q", got)
+	}
+}
+
+// TestGuardFormPost: a plain form POST (no script: no Accept JSON) with
+// the page's own Origin is accepted and answered with a page.
+func TestGuardFormPost(t *testing.T) {
+	f := newFixture(t)
+	r := httptest.NewRequest("POST", "/p/ftest/b/act/restart", strings.NewReader(""))
+	r.Host = "localhost:7700"
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Set("Accept", "text/html,application/xhtml+xml")
+	r.Header.Set("Origin", "http://localhost:7700")
+	r.AddCookie(&http.Cookie{Name: "railswitch_dashboard", Value: testToken})
+	w := f.do(r)
+	if w.Code != http.StatusAccepted || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/html") || !strings.Contains(w.Body.String(), `href="/p/ftest/b"`) {
+		t.Fatalf("%d %q %s", w.Code, w.Header().Get("Content-Type"), w.Body)
+	}
+	if got := f.run.wait(t, 1)[0]; !slices.Equal(got, []string{testExe, "-C", "/ws/ftest", "-w", "b", "restart"}) {
+		t.Errorf("argv %q", got)
 	}
 }

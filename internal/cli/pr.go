@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/prs"
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -67,7 +68,7 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 	tw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "WORKTREE\tBRANCH\tPR\tSTATE\tCHECKS\tREVIEW\tTITLE")
 	for _, r := range rows {
-		branch := r.Branch
+		branch := safefile.Printable(r.Branch) // from the worktree's git files
 		if branch == "" {
 			branch = "-"
 		}
@@ -76,7 +77,7 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 			continue
 		}
 		p := r.PR
-		fmt.Fprintf(tw, "%s\t%s\t#%s\t%s\t%s\t%s\t%s\n", r.Slug, branch, strconv.Itoa(p.Number), p.State, p.Checks, p.Review, printable(p.Title))
+		fmt.Fprintf(tw, "%s\t%s\t#%s\t%s\t%s\t%s\t%s\n", r.Slug, branch, strconv.Itoa(p.Number), p.State, p.Checks, p.Review, safefile.Printable(p.Title))
 	}
 	if err := tw.Flush(); err != nil {
 		return e.fail(err)

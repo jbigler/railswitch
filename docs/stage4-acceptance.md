@@ -175,9 +175,9 @@ created root-owned by the runtime (a mount point nested in the agent's home
 volume). Fixed in `caa5b19`: agent homes are bind dirs and render pre-creates
 every mount point under a home.
 
-**2026-10-27, read-only hooks: PASS** (agent and app container) in the `demo`
-base worktree: `touch .git/hooks/x` and `touch /app/.git/hooks/x` both fail
-with `Read-only file system`. nvim not checked (`demo` has no `[tools.nvim]`).
+**2026-10-27, read-only hooks: PASS** in the `demo` base worktree: in the
+containers the user checked, `touch .git/hooks/x` and `touch /app/.git/hooks/x`
+both fail with `Read-only file system`. nvim not checked (`demo` has no `[tools.nvim]`).
 
 Still to run: the firewall live check, the hooks check in nvim, the db round
 trip and the Filial run.

@@ -243,7 +243,10 @@ func TestUpOrder(t *testing.T) {
 	if pw := b[len(b)-1]; !slices.Contains(pw, "PLAYWRIGHT_VERSION=1.54.0") || strings.Contains(joined(pw), "BASE_IMAGE") {
 		t.Errorf("playwright argv: %q", pw)
 	}
-	if last := calls[len(calls)-1]; !strings.HasPrefix(joined(last), "systemctl --user start filial-feat-rails.service ") {
+	if app := calls[len(calls)-2]; joined(app) != "systemctl --user start filial-feat-rails.service" {
+		t.Errorf("app start %q", app)
+	}
+	if last := calls[len(calls)-1]; !strings.HasPrefix(joined(last), "systemctl --user start filial-feat-db.service ") {
 		t.Errorf("last call %q", last)
 	}
 }
@@ -779,7 +782,7 @@ func TestUpImportFailRemovesVolume(t *testing.T) {
 // the user isn't sent to `journalctl -xe` (the system journal).
 func TestUpStartFailureNamesFailedUnits(t *testing.T) {
 	e := setup(t)
-	e.f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1, Stderr: []byte("A dependency job for filial-feat-rails.service failed.\n")}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	failStart(e)
 	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=inactive\nResult=success\n")}, nil)
 	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result", "filial-feat-db.service"}, sys.Result{Stdout: []byte("ActiveState=failed\nResult=exit-code\n")}, nil)
 	// The unit journal mixes podman's own event lines (image pull, container
@@ -788,6 +791,7 @@ func TestUpStartFailureNamesFailedUnits(t *testing.T) {
 	journal := `{"SYSLOG_IDENTIFIER":"podman","MESSAGE":"container create 3e13c99a (image=docker.io/library/postgres:17, traefik.enable=true)"}
 {"SYSLOG_IDENTIFIER":"filial-feat-db","MESSAGE":"initdb: error: could not create directory"}
 {"SYSLOG_IDENTIFIER":"filial-feat-db","MESSAGE":[98,121,116,101,115]}
+{"SYSLOG_IDENTIFIER":"filial-feat-db","MESSAGE":null}
 `
 	e.f.On([]string{"journalctl", "--user", "-u", "filial-feat-db.service"}, sys.Result{Stdout: []byte(journal)}, nil)
 	err := e.l.Up(ctx, "feat")
@@ -808,8 +812,31 @@ func TestUpStartFailureNamesFailedUnits(t *testing.T) {
 		t.Fatalf("podman event lines shown; stderr:\n%s", stderr)
 	}
 	c := find(t, e.calls(), "journalctl")
-	if joined(c) != "journalctl --user -u filial-feat-db.service -b -n 400 --no-pager -o json" {
+	if joined(c) != "journalctl --user -u filial-feat-db.service -b -n 400 --no-pager -o json --all" {
 		t.Fatalf("journalctl argv %q", c)
+	}
+}
+
+// failStart makes the app's start fail, as when a unit it requires fails.
+func failStart(e *tenv) {
+	e.f.On([]string{"systemctl", "--user", "start", "filial-feat-rails.service"}, sys.Result{ExitCode: 1, Stderr: []byte("A dependency job for filial-feat-rails.service failed.\n")}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+}
+
+// A tool that fails to start (the app only Wants it, D23) is a warning:
+// up goes on and the app is served.
+func TestUpToolStartFailureWarns(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"systemctl", "--user", "start", "filial-feat-db.service"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState", "filial-feat-browser.service"}, sys.Result{Stdout: []byte("ActiveState=failed\n")}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatalf("up failed for a tool: %v", err)
+	}
+	stderr := e.l.Err.(*bytes.Buffer).String()
+	if !strings.Contains(stderr, "warning: filial-feat-browser.service did not start: ") || !strings.Contains(stderr, "; railswitch logs browser\n") {
+		t.Fatalf("no warning naming the failed tool; stderr:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "filial-feat-nvim.service") {
+		t.Fatalf("warning names a tool that started; stderr:\n%s", stderr)
 	}
 }
 

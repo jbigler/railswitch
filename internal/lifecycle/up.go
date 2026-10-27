@@ -245,7 +245,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	if len(restart) > 0 {
 		done := l.busy("restarting "+strings.Join(restart, ", "), "restarted "+strings.Join(restart, ", "))
 		err := sd.Restart(ctx, restart...)
-		done()
+		done(err)
 		if err != nil {
 			return err
 		}
@@ -264,25 +264,36 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	// service added to a running stack (a new tool, an option) would not
 	// start through the app's Wants=, because starting an active unit
 	// starts none of its new dependencies. Oneshots (deps) stay behind the
-	// app's Requires=: started by name, one would rerun on every up.
-	start := []string{unitOf(m, slug, m.Services[0].ID)}
+	// app's Requires=: started by name, one would rerun on every up. The
+	// others start in a second call, so one that fails (a tool's port taken)
+	// leaves the app up with a warning, as its Wants= would (D23).
+	app := unitOf(m, slug, m.Services[0].ID)
+	var others, otherIDs []string
 	for _, s := range m.Services[1:] {
 		if s.Role != render.RoleAgent && !s.Oneshot {
-			start = append(start, unitOf(m, slug, s.ID))
+			others = append(others, unitOf(m, slug, s.ID))
+			otherIDs = append(otherIDs, s.ID)
 		}
 	}
 	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m), ", "), "started "+slug)
-	err = sd.Start(ctx, start...)
-	done()
+	err = sd.Start(ctx, app)
+	var othersErr error
+	if err == nil && len(others) > 0 {
+		othersErr = sd.Start(ctx, others...)
+	}
+	done(err)
 	if err != nil {
 		return l.startFailure(ctx, sd, slug, failed, err)
+	}
+	if othersErr != nil {
+		l.warnFailed(ctx, sd, others, otherIDs, othersErr)
 	}
 	return l.waitRoute(ctx, m, in, slug)
 }
 
-// startedServices are the service IDs starting the app brings up (its
-// Requires= and Wants=), the app last: every service but agents, which up
-// never starts (D62).
+// startedServices are the service IDs up starts, the app last: every
+// service but agents (D62). Deps run through the app's Requires= only when
+// the app is not already active.
 func startedServices(m *render.Model) []string {
 	var ids []string
 	for _, s := range m.Services[1:] {
@@ -291,6 +302,23 @@ func startedServices(m *render.Model) []string {
 		}
 	}
 	return append(ids, m.Services[0].ID)
+}
+
+// warnFailed reports services that did not start while the app did: up
+// goes on, the app is usable without them.
+// ids are the units' service IDs.
+func (l *L) warnFailed(ctx context.Context, sd podman.Systemd, units, ids []string, startErr error) {
+	var failed, hints []string
+	for i, u := range units {
+		if st, err := sd.Show(ctx, u, "ActiveState"); err == nil && st["ActiveState"] == "failed" {
+			failed = append(failed, u)
+			hints = append(hints, "railswitch logs "+ids[i])
+		}
+	}
+	if len(failed) == 0 {
+		failed = units
+	}
+	fmt.Fprintf(l.Err, "warning: %s did not start: %v; %s\n", strings.Join(failed, ", "), startErr, strings.Join(hints, "; "))
 }
 
 // startFailure turns a failed `systemctl start` into an error naming the
@@ -312,7 +340,7 @@ func (l *L) startFailure(ctx context.Context, sd podman.Systemd, slug string, un
 		hints = append(hints, "journalctl --user -u "+u)
 		fmt.Fprintf(l.Err, "--- %s: %s/%s, last log lines:\n", u, st["ActiveState"], st["Result"])
 		// Best effort: the report must not hide the start error.
-		res, err := l.R.Run(ctx, sys.Cmd{Name: "journalctl", Args: []string{"--user", "-u", u, "-b", "-n", "400", "--no-pager", "-o", "json"}})
+		res, err := l.R.Run(ctx, sys.Cmd{Name: "journalctl", Args: []string{"--user", "-u", u, "-b", "-n", "400", "--no-pager", "-o", "json", "--all"}})
 		if err == nil {
 			for _, line := range unitLogLines(res.Stdout, 40) {
 				fmt.Fprintln(l.Err, line)
@@ -336,6 +364,9 @@ func unitLogLines(out []byte, n int) []string {
 			Msg json.RawMessage `json:"MESSAGE"`
 		}
 		if json.Unmarshal(raw, &e) != nil || e.ID == "podman" {
+			continue
+		}
+		if len(e.Msg) == 0 || string(e.Msg) == "null" {
 			continue
 		}
 		var s string

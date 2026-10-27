@@ -61,11 +61,34 @@ func TestUpSpinsWhileStarting(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "\r⠋ starting feat: deps, db, cache, storage, browser, nvim, rails (0s)") {
-		t.Errorf("no spinner frame for the start:\n%q", got)
+	if strings.Count(got, "starting feat: deps, db, cache, storage, browser, nvim, rails\n") != 1 {
+		t.Errorf("start line not printed exactly once:\n%q", got)
+	}
+	if !strings.Contains(got, "\r⠋ 0s\x1b[K") {
+		t.Errorf("no short spinner frame for the start:\n%q", got)
 	}
 	if !strings.Contains(got, "\r\x1b[Kstarted feat (") {
 		t.Errorf("spinner line not replaced by a summary:\n%q", got)
+	}
+}
+
+// On a terminal a failed start is reported as failed, never as started.
+func TestUpStartFailureTTY(t *testing.T) {
+	e := setup(t)
+	out := &lockedBuf{}
+	e.l.Out = out
+	e.l.TTY = true
+	e.l.SpinEvery = time.Millisecond
+	failStart(e)
+	if err := e.l.Up(ctx, "feat"); err == nil {
+		t.Fatal("want error")
+	}
+	got := out.String()
+	if !strings.Contains(got, "\r\x1b[Kstarting feat: deps, db, cache, storage, browser, nvim, rails failed (") {
+		t.Errorf("no failure line:\n%q", got)
+	}
+	if strings.Contains(got, "started feat") {
+		t.Errorf("failed start reported as started:\n%q", got)
 	}
 }
 
@@ -97,8 +120,8 @@ func TestUpStartsEveryService(t *testing.T) {
 	}
 	var start []string
 	for _, c := range e.calls() {
-		if len(c) > 3 && c[0] == "systemctl" && c[2] == "start" && c[3] == "filial-feat-rails.service" {
-			start = c[3:]
+		if len(c) > 3 && c[0] == "systemctl" && c[2] == "start" && c[3] != "filial-proxy-network.service" {
+			start = append(start, c[3:]...)
 		}
 	}
 	for _, want := range []string{"filial-feat-db.service", "filial-feat-storage.service", "filial-feat-browser.service", "filial-feat-nvim.service"} {

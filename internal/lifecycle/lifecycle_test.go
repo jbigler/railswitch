@@ -782,7 +782,14 @@ func TestUpStartFailureNamesFailedUnits(t *testing.T) {
 	e.f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1, Stderr: []byte("A dependency job for filial-feat-rails.service failed.\n")}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
 	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=inactive\nResult=success\n")}, nil)
 	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result", "filial-feat-db.service"}, sys.Result{Stdout: []byte("ActiveState=failed\nResult=exit-code\n")}, nil)
-	e.f.On([]string{"journalctl", "--user", "-u", "filial-feat-db.service"}, sys.Result{Stdout: []byte("initdb: error: could not create directory\n")}, nil)
+	// The unit journal mixes podman's own event lines (image pull, container
+	// create with every label) with the container's output (journald log
+	// driver). Only the container's output is worth showing.
+	journal := `{"SYSLOG_IDENTIFIER":"podman","MESSAGE":"container create 3e13c99a (image=docker.io/library/postgres:17, traefik.enable=true)"}
+{"SYSLOG_IDENTIFIER":"filial-feat-db","MESSAGE":"initdb: error: could not create directory"}
+{"SYSLOG_IDENTIFIER":"filial-feat-db","MESSAGE":[98,121,116,101,115]}
+`
+	e.f.On([]string{"journalctl", "--user", "-u", "filial-feat-db.service"}, sys.Result{Stdout: []byte(journal)}, nil)
 	err := e.l.Up(ctx, "feat")
 	if err == nil {
 		t.Fatal("want error")
@@ -793,12 +800,32 @@ func TestUpStartFailureNamesFailedUnits(t *testing.T) {
 	if strings.Contains(err.Error(), "filial-feat-cache.service") {
 		t.Fatalf("error names a unit that did not fail: %v", err)
 	}
-	if !strings.Contains(e.l.Err.(*bytes.Buffer).String(), "initdb: error: could not create directory") {
-		t.Fatalf("journal of the failed unit not shown; stderr:\n%s", e.l.Err)
+	stderr := e.l.Err.(*bytes.Buffer).String()
+	if !strings.Contains(stderr, "initdb: error: could not create directory\nbytes\n") {
+		t.Fatalf("journal of the failed unit not shown; stderr:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "container create") {
+		t.Fatalf("podman event lines shown; stderr:\n%s", stderr)
 	}
 	c := find(t, e.calls(), "journalctl")
-	if joined(c) != "journalctl --user -u filial-feat-db.service -b -n 40 --no-pager -o cat" {
+	if joined(c) != "journalctl --user -u filial-feat-db.service -b -n 400 --no-pager -o json" {
 		t.Fatalf("journalctl argv %q", c)
+	}
+}
+
+// Long-running containers log to journald, so a removed container's output
+// stays in its unit's journal; oneshots pass their output straight through.
+func TestUnitsLogToJournald(t *testing.T) {
+	e := setup(t)
+	e.render(t)
+	for _, f := range []string{"filial-feat-storage.container", "filial-feat-rails.container", "filial-feat-agent-probe.container"} {
+		u := readUnit(t, e.l.WS.Dirs.Quadlet, f)
+		if got := unitValues(u, "LogDriver"); !slices.Equal(got, []string{"journald"}) || len(unitValues(u, "LogOpt")) != 0 {
+			t.Errorf("%s: LogDriver %q LogOpt %q; want journald and no LogOpt", f, got, unitValues(u, "LogOpt"))
+		}
+	}
+	if got := unitValues(readUnit(t, e.l.WS.Dirs.Quadlet, "filial-feat-deps.container"), "LogDriver"); !slices.Equal(got, []string{"passthrough"}) {
+		t.Errorf("deps LogDriver %q; want passthrough", got)
 	}
 }
 

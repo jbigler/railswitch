@@ -1,7 +1,9 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -265,8 +267,9 @@ func (l *L) Up(ctx context.Context, slug string) error {
 // printing each one's journal to Err.
 // systemctl itself only says a dependency failed and points at
 // `journalctl -xe`, the system journal, which holds no user units. The
-// unit journal is the only record left: a failed container ran with --rm,
-// so `podman logs` (and `railswitch logs`) has nothing to show.
+// unit journal is the only record left: a failed container ran with --rm.
+// Its output is there because units log to journald; podman's own event
+// lines (image pull, container create with every label) are left out.
 func (l *L) startFailure(ctx context.Context, sd podman.Systemd, slug string, units []string, startErr error) error {
 	var failed, hints []string
 	for _, u := range units {
@@ -278,12 +281,47 @@ func (l *L) startFailure(ctx context.Context, sd podman.Systemd, slug string, un
 		hints = append(hints, "journalctl --user -u "+u)
 		fmt.Fprintf(l.Err, "--- %s: %s/%s, last log lines:\n", u, st["ActiveState"], st["Result"])
 		// Best effort: the report must not hide the start error.
-		_, _ = l.R.Run(ctx, sys.Cmd{Name: "journalctl", Args: []string{"--user", "-u", u, "-b", "-n", "40", "--no-pager", "-o", "cat"}, Stdout: l.Err, Stderr: l.Err})
+		res, err := l.R.Run(ctx, sys.Cmd{Name: "journalctl", Args: []string{"--user", "-u", u, "-b", "-n", "400", "--no-pager", "-o", "json"}})
+		if err == nil {
+			for _, line := range unitLogLines(res.Stdout, 40) {
+				fmt.Fprintln(l.Err, line)
+			}
+		}
 	}
 	if len(failed) == 0 {
 		return fmt.Errorf("%w\nno unit of worktree %s reports a failure; see journalctl --user -b -n 100", startErr, slug)
 	}
 	return fmt.Errorf("%w\nfailed: %s\nmore: %s", startErr, strings.Join(failed, ", "), strings.Join(hints, "; "))
+}
+
+// unitLogLines are the last n messages of journalctl -o json output,
+// without podman's own entries (SYSLOG_IDENTIFIER podman: its events). A
+// MESSAGE journald stored as bytes (not valid UTF-8) is decoded as such.
+func unitLogLines(out []byte, n int) []string {
+	var lines []string
+	for raw := range bytes.Lines(out) {
+		var e struct {
+			ID  string          `json:"SYSLOG_IDENTIFIER"`
+			Msg json.RawMessage `json:"MESSAGE"`
+		}
+		if json.Unmarshal(raw, &e) != nil || e.ID == "podman" {
+			continue
+		}
+		var s string
+		if json.Unmarshal(e.Msg, &s) != nil {
+			var b []byte
+			var ints []int
+			if json.Unmarshal(e.Msg, &ints) != nil {
+				continue
+			}
+			for _, c := range ints {
+				b = append(b, byte(c))
+			}
+			s = string(b)
+		}
+		lines = append(lines, strings.TrimRight(s, "\n"))
+	}
+	return lines[max(0, len(lines)-n):]
 }
 
 // staleContainer reports whether container ctr was created from another

@@ -336,11 +336,14 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 	}
 
 	if s.Oneshot {
-		// The unit's own journal is the log; k8s-file would go with the container.
+		// The unit's own journal is the log: passthrough hands it stdout.
 		u.add(c, "LogDriver", "passthrough")
 	} else {
-		u.add(c, "LogDriver", "k8s-file")
-		u.add(c, "LogOpt", "max-size=20m")
+		// journald, not k8s-file: units run with --rm, and k8s-file's log
+		// goes with the container, so a container that fails at start
+		// leaves no trace of why. journald keeps it in the unit's journal,
+		// caps its size, and still serves podman logs and Dozzle.
+		u.add(c, "LogDriver", "journald")
 	}
 	if s.Entrypoint != "" {
 		u.add(c, "Entrypoint", x(s.Entrypoint))

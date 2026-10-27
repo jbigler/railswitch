@@ -5,7 +5,7 @@
 Description=filial nvim of worktree master
 
 [Container]
-Label=filial.unit-hash=2ffdeab1731b
+Label=filial.unit-hash=b3f13c414625
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-ecd9531e
 ContainerName=filial-master-nvim
 Network=filial-master-dev.network:alias=nvim
@@ -43,8 +43,7 @@ Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
 Annotation=filial.firewall.mode=log
 Annotation=filial.firewall.extra=github.com
 PodmanArgs=--cpus=2 --tty --interactive
-LogDriver=k8s-file
-LogOpt=max-size=20m
+LogDriver=journald
 Entrypoint=/usr/local/bin/entrypoint-nvim.sh
 Exec=/usr/local/bin/nvim --headless --listen 0.0.0.0:7777
 

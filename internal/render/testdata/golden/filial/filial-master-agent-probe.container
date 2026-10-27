@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree master
 
 [Container]
-Label=filial.unit-hash=9a7d2b4d27c4
+Label=filial.unit-hash=21c6fb918a9c
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-8efb09e4
 ContainerName=filial-master-agent-probe
 Network=filial-master-dev.network:alias=agent-probe
@@ -38,8 +38,7 @@ Annotation=filial.firewall=agent-probe
 Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
 Annotation=filial.firewall.mode=enforce
 PodmanArgs=--cpus=4 --tty --interactive
-LogDriver=k8s-file
-LogOpt=max-size=20m
+LogDriver=journald
 
 [Service]
 Restart=on-failure

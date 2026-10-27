@@ -28,6 +28,7 @@ RUN apt-get update -qq && \
   libssl-dev \
   libvips \
   libyaml-dev \
+  openssh-client \
   pkg-config \
   sqlite3 \
   tzdata \

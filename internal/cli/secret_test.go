@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -430,8 +431,8 @@ func TestSecretAddGitSigning(t *testing.T) {
 	before := readFile(t, path)
 	f := fakeHost()
 	unset(f, "filial_sign")
-	const key = "-----BEGIN OPENSSH PRIVATE KEY----- AAAAsigning"
-	code, out, errs := runStdin(t, f, key+"\n", "-C", ws, "secret", "add", "sign", "--service", "rails", "--git-signing")
+	key := signingKey(t)
+	code, out, errs := runStdin(t, f, key+"\n\n", "-C", ws, "secret", "add", "sign", "--service", "rails", "--git-signing")
 	if code != 0 {
 		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
@@ -445,9 +446,33 @@ func TestSecretAddGitSigning(t *testing.T) {
 	}
 	noValue(t, f, key, out, errs)
 
+	// secret set of a declared signing secret reads the key file the same way.
+	f = fakeHost()
+	unset(f, "filial_sign")
+	if code, out, errs := runStdin(t, f, strings.TrimSuffix(key, "\n"), "-C", ws, "secret", "set", "sign"); code != 0 {
+		t.Fatalf("set: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
+	}
+	if _, stdins := secretCalls(f); len(stdins) != 2 || stdins[1] != key {
+		t.Fatalf("set stdins = %q", stdins)
+	}
+
 	// env delivery is refused before anything is written.
 	code, out, errs = runStdin(t, fakeHost(), key+"\n", "-C", ws, "secret", "add", "sign2", "--service", "rails", "--git-signing", "--env", "SIGN_KEY")
 	if code != 1 || !strings.Contains(errs, "git_signing") {
 		t.Fatalf("--env: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
+}
+
+// signingKey returns a fresh multi-line OpenSSH private key ending in one
+// newline, or a fixed PEM-shaped one without ssh-keygen.
+func signingKey(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("ssh-keygen"); err == nil {
+		path := filepath.Join(t.TempDir(), "id")
+		if out, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", path).CombinedOutput(); err != nil {
+			t.Fatalf("ssh-keygen: %v\n%s", err, out)
+		}
+		return readFile(t, path)
+	}
+	return "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACBfixturefixturefixturefixturefixturefixturefixturefixturefix\n-----END OPENSSH PRIVATE KEY-----\n"
 }

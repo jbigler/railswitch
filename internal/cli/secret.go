@@ -109,7 +109,7 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 	if m, err = e.model(ctx, w); err != nil {
 		return e.fail(err)
 	}
-	value, err := e.readSecretValue(ctx, name)
+	value, err := e.readSecretValue(ctx, name, sec.GitSigning)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -140,7 +140,7 @@ func secretSet(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	value, err := e.readSecretValue(ctx, name)
+	value, err := e.readSecretValue(ctx, name, sec.GitSigning)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -178,7 +178,14 @@ func (e *env) model(ctx context.Context, w *workspace.Workspace) (*render.Model,
 // prompt, else all of stdin with one trailing newline stripped; a \r
 // before that newline (CRLF) goes with it. An empty
 // value or one holding a newline is refused.
-func (e *env) readSecretValue(ctx context.Context, name string) ([]byte, error) {
+//
+// A key file (keyFile: a git_signing secret, D61) is read whole from stdin
+// with its line breaks and ends in exactly one newline; a terminal is
+// refused, since a no-echo line prompt cannot take a multi-line key.
+func (e *env) readSecretValue(ctx context.Context, name string, keyFile bool) ([]byte, error) {
+	if keyFile {
+		return e.readKeyFile(ctx, name)
+	}
 	var value []byte
 	if f, ok := e.stdin.(*os.File); ok && isTerminal(f) {
 		fmt.Fprintf(e.stderr, "Value for %s: ", name)
@@ -210,6 +217,33 @@ func (e *env) readSecretValue(ctx context.Context, name string) ([]byte, error) 
 		clear(value)
 		return nil, fmt.Errorf("secret %s: the value is longer than podman's limit of %d bytes", name, maxSecretValue)
 	}
+	return value, nil
+}
+
+// readKeyFile reads a signing key file from stdin for readSecretValue.
+func (e *env) readKeyFile(ctx context.Context, name string) ([]byte, error) {
+	if f, ok := e.stdin.(*os.File); ok && isTerminal(f) {
+		return nil, fmt.Errorf("secret %s: a signing key has several lines; pipe the key file: railswitch secret add %s --git-signing --service <id> < ~/.ssh/<key> (or railswitch secret set %s < ~/.ssh/<key>)", name, name, name)
+	}
+	v, err := io.ReadAll(io.LimitReader(e.stdin, maxSecretValue+2))
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		clear(v)
+		return nil, err
+	}
+	trimmed := bytes.TrimRight(v, "\r\n")
+	switch {
+	case len(trimmed) == 0:
+		clear(v)
+		return nil, fmt.Errorf("secret %s: the value is empty", name)
+	case len(trimmed)+1 > maxSecretValue:
+		clear(v)
+		return nil, fmt.Errorf("secret %s: the value is longer than podman's limit of %d bytes", name, maxSecretValue)
+	}
+	value := append(trimmed[:len(trimmed):len(trimmed)], '\n')
+	clear(v)
 	return value, nil
 }
 

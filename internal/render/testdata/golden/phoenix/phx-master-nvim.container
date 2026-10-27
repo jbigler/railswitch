@@ -5,8 +5,8 @@
 Description=phx nvim of worktree master
 
 [Container]
-Label=phx.unit-hash=5463c01f54c3
-Image=localhost/phx/nvim:elixir1.18.4-otp27-d7df63a3
+Label=phx.unit-hash=203d8bbff821
+Image=localhost/phx/nvim:elixir1.18.4-otp27-12e39b54
 ContainerName=phx-master-nvim
 Network=phx-master-dev.network:alias=nvim
 Network=phx-proxy.network
@@ -26,6 +26,7 @@ Volume=/WORKSPACES/phoenix/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.s
 Volume=phx-master-deps:/app/deps:U
 Volume=phx-master-build:/app/_build:U
 Volume=phx_hex:/home/appuser/.hex:U
+Volume=phx_phoenix_assets:/home/appuser/.cache/phoenix-assets:U
 Volume=phx_nvim_config:/home/appuser/.config/nvim:U
 Volume=phx_nvim_share:/home/appuser/.local/share/nvim:U
 Volume=phx_npm_global_node:/home/appuser/.npm-global:U

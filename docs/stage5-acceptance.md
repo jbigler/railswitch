@@ -114,9 +114,14 @@ railswitch project rm bun --yes --purge
 
 ## Run log
 
-(filled in from the host runs)
+**2026-10-27, `TestE2EPhoenix` run 1: FAIL** at the second worktree. The
+app-side edits held (section 1). `master`: deps 44 s (tailwind downloaded
+in 3 s), `up` ready, 200. `feat-x`: deps compiled in 35 s, then the tailwind
+download stalled until systemd killed deps at its 15 min limit (1 min 47 s
+CPU in 15 min).
 
 ## Gap log
 
 | Gap | Generic feature | Commit |
 |-----|-----------------|--------|
+| A stalled binary download (Erlang's `:httpc` sets no timeout) hung the deps service until its 15 min limit; every worktree downloaded tailwind (~100 MB) again | None needed in core: the Phoenix pack bounds `mix assets.setup` (`timeout 300`, 3 tries) and keeps tailwind's versioned binaries in a shared cache volume (`phoenix_assets`) | (this commit) |

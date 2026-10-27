@@ -8,8 +8,8 @@ Wants=phx-master-nvim.service railswitch-traefik.service railswitch-dozzle.servi
 After=phx-master-deps.service phx-master-db.service phx-master-nvim.service railswitch-traefik.service railswitch-dozzle.service
 
 [Container]
-Label=phx.unit-hash=2c47d1a7698c
-Image=localhost/phx/base:elixir1.18.4-otp27-fa946a94
+Label=phx.unit-hash=11a3fe81fa70
+Image=localhost/phx/base:elixir1.18.4-otp27-bac86656
 ContainerName=phx-master-web
 Network=phx-master-dev.network:alias=web
 Network=phx-proxy.network
@@ -24,6 +24,7 @@ Volume=/WORKSPACES/phoenix/master/.git:/app/.git:ro,z
 Volume=/WORKSPACES/phoenix/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/phoenix/.railswitch/assets/phoenix/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
 Volume=phx_hex:/home/appuser/.hex:U
+Volume=phx_phoenix_assets:/home/appuser/.cache/phoenix-assets:U
 Volume=phx-master-deps:/app/deps:U
 Volume=phx-master-build:/app/_build:U
 DropCapability=all

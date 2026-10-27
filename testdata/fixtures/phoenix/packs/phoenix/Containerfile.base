@@ -26,7 +26,7 @@ RUN mix local.hex --force && mix local.rebar --force && chmod -R a+rX /opt/mix
 # appuser is uid/gid 1000 (keep-id); volume mount points exist and belong to it.
 RUN groupadd --gid 1000 appuser && \
   useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home appuser && \
-  mkdir -p /app/deps /app/_build /home/appuser/.hex && \
+  mkdir -p /app/deps /app/_build /home/appuser/.hex /home/appuser/.cache/phoenix-assets && \
   chown -R 1000:1000 /app /home/appuser
 
 WORKDIR /app

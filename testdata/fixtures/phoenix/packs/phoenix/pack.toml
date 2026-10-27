@@ -46,6 +46,11 @@ name = "hex"
 mount = "/home/appuser/.hex"
 chown = true
 
+[[caches]]                              # tailwind binaries by version, so each worktree's deps doesn't download ~100 MB again
+name = "phoenix_assets"
+mount = "/home/appuser/.cache/phoenix-assets"
+chown = true
+
 [[worktree_volumes]]                    # compiled deps and the app's build, per worktree
 name = "deps"
 mount = "/app/deps"

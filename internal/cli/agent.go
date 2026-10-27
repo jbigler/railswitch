@@ -55,6 +55,14 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		return code
 	}
 	if newTerm {
+		// Checked here: the new terminal may close before its error is read.
+		if _, err := l.CheckAgent(ctx, name, argv); err != nil {
+			var u *lifecycle.UsageError
+			if errors.As(err, &u) {
+				return e.usageErr("%s", u.Msg)
+			}
+			return e.fail(err)
+		}
 		return e.agentNewTerm(ctx, l.WS.Root, slug, name, argv)
 	}
 	if name == "ls" {

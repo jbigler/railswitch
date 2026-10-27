@@ -28,8 +28,9 @@ NET_ADMIN.
   ("Connection refused" / "No route to host" / "administratively prohibited").
   That is the firewall, not an outage: do not retry or work around it.
 - If you need a host, name it and ask the human to run
-  `railswitch fw allow agent-claude <host>`, or to add it to
-  `[agents.claude] allow` in project.toml.
+  `railswitch fw allow agent-$RAILSWITCH_AGENT <host>`, or to add it to
+  `[agents.<name>] allow` in project.toml, where `<name>` is the value of
+  `$RAILSWITCH_AGENT` in your environment.
 
 # Git worktrees: NEVER prune, add or remove from inside this container
 

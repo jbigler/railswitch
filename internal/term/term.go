@@ -47,6 +47,7 @@ var procNames = map[string]string{
 	"konsole":               "konsole",
 	"gnome-terminal":        "gnome-terminal",
 	"gnome-terminal-server": "gnome-terminal",
+	"gnome-terminal-":       "gnome-terminal", // gnome-terminal-server cut to comm's 15 chars
 	"xfce4-terminal":        "xfce4-terminal",
 	"terminator":            "terminator",
 	"tmux":                  "tmux",

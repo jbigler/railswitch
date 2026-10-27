@@ -181,3 +181,21 @@ func TestAgentNewTermExitCode(t *testing.T) {
 		t.Fatalf("exit %d stderr %q; want 3, silent", code, errs)
 	}
 }
+
+// B-M2: a bad name, or arguments for a service agent, fail in this terminal
+// before any new one opens.
+func TestAgentNewTermChecksFirst(t *testing.T) {
+	ws, _ := lockedWS(t)
+	old := launchTerm
+	t.Cleanup(func() { launchTerm = old })
+	launchTerm = func(context.Context, *env, string, string, []string) error {
+		t.Error("terminal launched")
+		return nil
+	}
+	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "clade"); code == 0 || !strings.Contains(errs, "clade") {
+		t.Errorf("unknown agent: exit %d stderr %q", code, errs)
+	}
+	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "probe", "--", "x"); code != 2 || !strings.Contains(errs, "[agents.probe]") {
+		t.Errorf("service agent argv: exit %d stderr %q; want a usage error", code, errs)
+	}
+}

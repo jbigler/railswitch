@@ -74,6 +74,9 @@ type runOpts struct {
 	Name string
 	// Entrypoint overrides the image's entrypoint; "" keeps it.
 	Entrypoint string
+	// Unit adds the unit's --shm-size and --init (an on-demand agent's run
+	// stands in for its unit).
+	Unit bool
 }
 
 // transient is the podman argv of a throwaway container of service s
@@ -130,6 +133,12 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	}
 	if s.DropsAllCaps() {
 		args = append(args, "--cap-drop", "all")
+	}
+	if opts.Unit && s.Unit.ShmSize != "" {
+		args = append(args, "--shm-size", s.Unit.ShmSize)
+	}
+	if opts.Unit && s.Unit.RunInit {
+		args = append(args, "--init")
 	}
 	if n := in.CPUs(s); n != "" {
 		args = append(args, "--cpus", n)

@@ -104,12 +104,12 @@ type NvimTool struct {
 
 // UnmarshalTOML decodes the [tools.nvim] table. The TOML decoder marks
 // every key under a custom unmarshaler as decoded, so an unknown key is
-// refused here; the old `[tools] nvim = true` is refused naming the table
+// refused here; the old `[tools] nvim = <bool>` is refused naming the table
 // (C1).
 func (n *NvimTool) UnmarshalTOML(v any) error {
 	m, ok := v.(map[string]any)
 	if !ok {
-		return errors.New("[tools] nvim = true is now the table [tools.nvim] (D54)")
+		return errors.New("`[tools] nvim = <bool>` is now the table [tools.nvim] (D54); remove it or write [tools.nvim]")
 	}
 	for _, k := range sortedKeys(m) {
 		var dst *string
@@ -253,6 +253,7 @@ func (p *Project) Validate() error {
 		v.oneLines(path+".versions", p.Worktrees[slug].Versions)
 	}
 
+	signer := map[string]string{} // service id → its git_signing secret
 	for _, name := range sortedKeys(p.Secrets) {
 		path := "secrets." + key(name)
 		if !secretNameRe.MatchString(name) {
@@ -280,6 +281,16 @@ func (p *Project) Validate() error {
 		}
 		if s.GitSigning && s.GitHost != "" {
 			v.add(path+".git_signing", "a signing key cannot also be a git_host token; declare the token as its own secret")
+		}
+		for _, id := range s.Services {
+			if !s.GitSigning {
+				break
+			}
+			if other, ok := signer[id]; ok {
+				v.add(path+".git_signing", "service %s already gets the signing key %s; one git_signing secret per service", id, other)
+				continue
+			}
+			signer[id] = name
 		}
 	}
 

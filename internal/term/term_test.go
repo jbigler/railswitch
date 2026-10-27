@@ -83,6 +83,11 @@ func TestDetectParents(t *testing.T) {
 	if got := l.Detect(); got != "unknown" {
 		t.Errorf("no terminal: %q; want unknown", got)
 	}
+	// /proc/<pid>/comm is cut at 15 chars: gnome-terminal-server reads so.
+	l = Launcher{Env: envOf(nil), ProcRoot: writeProc(t, "bash", "gnome-terminal-", "systemd"), ppid: 100}
+	if got := l.Detect(); got != "gnome-terminal" {
+		t.Errorf("bash → gnome-terminal- → systemd: %q; want gnome-terminal", got)
+	}
 }
 
 var argv = []string{"railswitch", "-C", "/ws", "-w", "feat", "agent", "claude"}

@@ -98,6 +98,25 @@ func TestLoadLocalAgents(t *testing.T) {
 	}
 }
 
+// Agents run with every capability dropped (D34): a package may not add one
+// (NET_ADMIN would let the agent drop its own firewall, D55).
+func TestAgentAddCapabilityRefused(t *testing.T) {
+	root := t.TempDir()
+	writeLocalAgent(t, root, "probe", "probe")
+	p := filepath.Join(root, "agents", "probe", "agent.toml")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, append(data, "\n[unit]\nadd_capability = [\"NET_ADMIN\"]\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = LoadLocalAgents(&Catalog{Agents: map[Ref]*Agent{}}, root)
+	if err == nil || !strings.Contains(err.Error(), "unit.add_capability") {
+		t.Errorf("err = %v, want unit.add_capability refused", err)
+	}
+}
+
 func TestRefStringLocal(t *testing.T) {
 	if got := (Ref{"probe", 1, true}).String(); got != "local:probe@1" {
 		t.Errorf("String = %q", got)

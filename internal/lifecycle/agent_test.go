@@ -337,6 +337,53 @@ func TestAgentTransientMatchesUnit(t *testing.T) {
 	}
 }
 
+// T5: an on-demand run takes the package's [unit] exec (when no argv is
+// given), shm_size and run_init, as its unit would.
+func TestAgentOnDemandUnitSettings(t *testing.T) {
+	e := setup(t)
+	pkg := filepath.Join(e.ws, "agents", "probe", "agent.toml")
+	data, err := os.ReadFile(pkg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pkg, append(data, "\n[unit]\nexec = [\"probe-run\", \"--all\"]\nshm_size = \"256mb\"\nrun_init = true\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.editProject(t, func(s string) string {
+		return strings.Replace(s, "use = \"local:probe@1\"\nrun = \"service\"", "use = \"local:probe@1\"\nrun = \"on-demand\"", 1)
+	})
+	run := func(argv []string) []string {
+		t.Helper()
+		if err := e.l.Agent(ctx, "feat", "probe", argv); err != nil {
+			t.Fatal(err)
+		}
+		calls := e.calls()
+		i := -1
+		for j, c := range calls {
+			if strings.HasPrefix(joined(c), "podman --hooks-dir") {
+				i = j
+			}
+		}
+		if i < 0 {
+			t.Fatalf("no podman run:\n%s", dump(calls))
+		}
+		return calls[i]
+	}
+	c := run(nil)
+	if got := flagValues(c, "--shm-size"); !slices.Equal(got, []string{"256mb"}) {
+		t.Errorf("--shm-size %q", got)
+	}
+	if !slices.Contains(c, "--init") {
+		t.Errorf("argv lacks --init: %q", c)
+	}
+	if got := c[len(c)-2:]; !slices.Equal(got, []string{"probe-run", "--all"}) {
+		t.Errorf("argv ends %q; want the package exec", got)
+	}
+	if c := run([]string{"--version"}); c[len(c)-1] != "--version" || slices.Contains(c, "probe-run") {
+		t.Errorf("user argv: %q; want it instead of the package exec", c[len(c)-2:])
+	}
+}
+
 // unitCPUs is the --cpus= value of a unit's PodmanArgs.
 func unitCPUs(t *testing.T, unit string) string {
 	t.Helper()

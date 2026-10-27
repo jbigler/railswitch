@@ -492,6 +492,11 @@ func (l *loader) checkAgent(dir string, a *Agent) bool {
 			l.add(file, "allow[%d]: %q is not a host name or meta:<name>", i, h)
 		}
 	}
+	if len(a.Unit.AddCapability) > 0 {
+		// Agents drop every capability (D34); NET_ADMIN would let one drop
+		// its own firewall (D55).
+		l.add(file, "unit.add_capability is not allowed for an agent (agents run with every capability dropped)")
+	}
 	l.volumes(file, "shared", a.Shared, false)
 	l.mounts(file, dir, a.Mounts)
 	l.env(file, "env", a.Env)

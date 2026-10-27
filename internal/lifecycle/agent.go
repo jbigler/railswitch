@@ -40,21 +40,11 @@ func (e *UsageError) Error() string { return e.Msg }
 // deadline: the user drives it. At most one agent runs in a worktree (D62):
 // another one running is an error, never stopped for you.
 func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
-	m, err := l.model(ctx)
+	name, err := l.CheckAgent(ctx, name, argv)
 	if err != nil {
-		return err
-	}
-	if name, err = l.agentName(m, name); err != nil {
 		return err
 	}
 	id := "agent-" + name
-	s, err := service(m, id)
-	if err != nil {
-		return err
-	}
-	if !s.OnDemand && len(argv) > 0 {
-		return &UsageError{Msg: fmt.Sprintf("agent %s runs as a service; arguments go in its package or [agents.%s]", name, name)}
-	}
 	if err := l.Up(ctx, slug); err != nil {
 		return err
 	}
@@ -62,7 +52,8 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 	if err != nil {
 		return err
 	}
-	if s, err = service(m, id); err != nil {
+	s, err := service(m, id)
+	if err != nil {
 		return err
 	}
 	ctr := containerOf(m, slug, id)
@@ -87,8 +78,17 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		if err != nil {
 			return fmt.Errorf("%s: entrypoint: %w", id, err)
 		}
+		if len(argv) == 0 { // the package's [unit] exec, as the unit runs it
+			for _, a := range s.Exec {
+				w, err := pack.Expand(a, in.Scope(id))
+				if err != nil {
+					return fmt.Errorf("%s: exec: %w", id, err)
+				}
+				argv = append(argv, w)
+			}
+		}
 		envFile := filepath.Join(m.Inputs.Workspace, ".railswitch", "env", slug, id+".env")
-		args, err := l.transient(m, in, s, envFile, runOpts{Full: true, Name: ctr, Entrypoint: ep}, argv)
+		args, err := l.transient(m, in, s, envFile, runOpts{Full: true, Name: ctr, Entrypoint: ep, Unit: true}, argv)
 		if err != nil {
 			return err
 		}
@@ -109,6 +109,27 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		}
 	}
 	return l.interactive(ctx, sys.NoTimeout, "podman", []string{"attach", ctr})
+}
+
+// CheckAgent resolves agent name ("": the project's only agent) and refuses
+// argv for a service agent (a *UsageError), as Agent does before up;
+// --new-term calls it before opening a terminal.
+func (l *L) CheckAgent(ctx context.Context, name string, argv []string) (string, error) {
+	m, err := l.model(ctx)
+	if err != nil {
+		return "", err
+	}
+	if name, err = l.agentName(m, name); err != nil {
+		return "", err
+	}
+	s, err := service(m, "agent-"+name)
+	if err != nil {
+		return "", err
+	}
+	if !s.OnDemand && len(argv) > 0 {
+		return "", &UsageError{Msg: fmt.Sprintf("agent %s runs as a service; arguments go in its package or [agents.%s]", name, name)}
+	}
+	return name, nil
 }
 
 // AgentList is every agent of the project, by name, with its status in

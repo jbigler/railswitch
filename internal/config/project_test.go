@@ -261,6 +261,9 @@ func TestToolsNvimTable(t *testing.T) {
 	if _, err := load("[tools]\nnvim = true\n"); err == nil || !strings.Contains(err.Error(), "[tools.nvim]") {
 		t.Errorf("nvim = true: %v; want an error naming [tools.nvim]", err)
 	}
+	if _, err := load("[tools]\nnvim = false\n"); err == nil || strings.Contains(err.Error(), "nvim = true") || !strings.Contains(err.Error(), "remove it or write [tools.nvim]") {
+		t.Errorf("nvim = false: %v; want a message not quoting nvim = true", err)
+	}
 	if _, err := load("[tools.nvim]\nconfig_rpo = \"x\"\n"); err == nil || !strings.Contains(err.Error(), "config_rpo") {
 		t.Errorf("config_rpo: %v; want an error naming config_rpo", err)
 	}
@@ -296,5 +299,12 @@ func TestGitSigningValidate(t *testing.T) {
 	p.Secrets = map[string]Secret{"sign": {Services: []string{"rails"}, GitSigning: true}}
 	if err := p.Validate(); err != nil {
 		t.Errorf("file-delivered signing key: %v", err)
+	}
+
+	// Two signing keys for one service: the last would silently win.
+	p.Secrets["sign2"] = Secret{Services: []string{"agent-x", "rails"}, GitSigning: true}
+	err := p.Validate()
+	if err == nil || !strings.Contains(err.Error(), "rails") || !strings.Contains(err.Error(), "sign") || !strings.Contains(err.Error(), "sign2") {
+		t.Errorf("two signing keys on rails: %v", err)
 	}
 }

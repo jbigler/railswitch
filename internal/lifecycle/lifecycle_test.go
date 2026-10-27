@@ -818,7 +818,7 @@ func TestTransientMatchesUnit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		argv, err := e.l.transient(m, in, svc, "/env", []string{"true"})
+		argv, err := e.l.transient(m, in, svc, "/env", runOpts{}, []string{"true"})
 		if err != nil {
 			t.Fatal(err)
 		}

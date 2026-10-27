@@ -324,7 +324,7 @@ func (e *tenv) rolledBack(t *testing.T, slug string) {
 	if got := e.slugs(t); !slices.Equal(got, []string{"master"}) {
 		t.Errorf("registry = %v; want only master", got)
 	}
-	for _, p := range []string{slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug} {
+	for _, p := range []string{slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug, ".railswitch/status/" + slug} {
 		if exists(filepath.Join(e.ws, p)) {
 			t.Errorf("%s remains after the failed Add", p)
 		}
@@ -347,9 +347,11 @@ func TestAddRenderFailsRollsBack(t *testing.T) {
 			return err
 		}
 		if fail {
-			// As Apply would have: the home dir, besides the env dir.
-			if err := os.MkdirAll(filepath.Join(e.ws, ".railswitch", "home", "feat"), 0o700); err != nil {
-				return err
+			// As Apply would have: the home and status dirs, besides the env dir.
+			for _, d := range []string{"home", "status"} {
+				if err := os.MkdirAll(filepath.Join(e.ws, ".railswitch", d, "feat"), 0o700); err != nil {
+					return err
+				}
 			}
 			fail = false
 			return errors.New("render boom")
@@ -686,6 +688,24 @@ func TestRemoveExactNames(t *testing.T) {
 	}
 	if got := e.slugs(t); !slices.Equal(got, []string{"master", "api-v2"}) {
 		t.Errorf("registry = %v; want master, api-v2", got)
+	}
+}
+
+func TestWtRmRemovesStatusDir(t *testing.T) {
+	e := setup(t)
+	e.add(t, "feat", "")
+	e.add(t, "other", "")
+	for _, slug := range []string{"feat", "other"} {
+		writeFile(t, filepath.Join(e.ws, ".railswitch", "status", slug, "claude.json"), `{"v":1,"state":"idle","message":"","ts":1}`)
+	}
+	if err := e.m.Remove(context.Background(), "feat", false); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Join(e.ws, ".railswitch", "status", "feat")) {
+		t.Error("status/feat remains after wt rm")
+	}
+	if !exists(filepath.Join(e.ws, ".railswitch", "status", "other", "claude.json")) {
+		t.Error("wt rm feat removed status/other")
 	}
 }
 

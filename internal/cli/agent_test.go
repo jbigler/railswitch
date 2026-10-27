@@ -1,0 +1,103 @@
+package cli
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
+
+func TestAgentArgs(t *testing.T) {
+	e := &env{stderr: &bytes.Buffer{}}
+	for _, c := range []struct {
+		args []string
+		name string
+		argv []string
+	}{
+		{[]string{"--", "--version"}, "", []string{"--version"}},
+		{[]string{"claude", "--", "-p", "a b"}, "claude", []string{"-p", "a b"}},
+		{[]string{"claude"}, "claude", nil},
+		{nil, "", nil},
+		{[]string{"ls"}, "ls", nil},
+		{[]string{"claude", "--", "x", "--", "y"}, "claude", []string{"x", "--", "y"}},
+	} {
+		name, argv, code, ok := agentArgs(e, c.args)
+		if !ok || code != 0 || name != c.name || !slices.Equal(argv, c.argv) {
+			t.Errorf("%q: name %q argv %q code %d ok %v; want %q %q", c.args, name, argv, code, ok, c.name, c.argv)
+		}
+	}
+	for _, args := range [][]string{{"a", "b"}, {"a", "b", "--", "x"}, {"--bogus"}} {
+		if _, _, code, ok := agentArgs(e, args); ok || code != 2 {
+			t.Errorf("%q: code %d ok %v; want a usage error", args, code, ok)
+		}
+	}
+}
+
+func TestAgentLsJSON(t *testing.T) {
+	ws, _ := lockedWS(t)
+	mustRun(t, "-C", ws, "render")
+	if err := os.WriteFile(filepath.Join(ws, ".railswitch", "status", "feat", "claude.json"), []byte(`{"v":1,"state":"working","message":"editing","ts":42}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errs := runIn(t, "-C", ws, "-w", "feat", "--json", "agent", "ls")
+	if code != 0 {
+		t.Fatalf("agent ls: exit %d: %s", code, errs)
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows %v", rows)
+	}
+	want := map[string]any{"name": "claude", "package": "claude@1", "run": "on-demand", "state": "working", "message": "editing", "ts": float64(42), "reply": false}
+	for k, v := range want {
+		if rows[0][k] != v {
+			t.Errorf("claude %s = %v; want %v", k, rows[0][k], v)
+		}
+	}
+	if len(rows[0]) != len(want) {
+		t.Errorf("claude fields %v; want exactly %v", rows[0], want)
+	}
+	if rows[1]["name"] != "probe" || rows[1]["run"] != "service" || rows[1]["state"] != "off" {
+		t.Errorf("probe row %v", rows[1])
+	}
+
+	code, out, errs = runIn(t, "-C", ws, "-w", "feat", "agent", "ls")
+	if code != 0 {
+		t.Fatalf("agent ls: exit %d: %s", code, errs)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 3 || strings.Join(strings.Fields(lines[0]), " ") != "NAME PACKAGE RUN STATE MESSAGE" ||
+		strings.Join(strings.Fields(lines[1]), " ") != "claude claude@1 on-demand working editing" {
+		t.Errorf("text:\n%s", out)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "ls", "--", "x"); code != 2 {
+		t.Errorf("agent ls -- x: exit %d; want 2", code)
+	}
+}
+
+func TestAgentServiceArgvUsage(t *testing.T) {
+	ws, _ := lockedWS(t)
+	code, _, errs := runIn(t, "-C", ws, "-w", "feat", "agent", "probe", "--", "x")
+	if code != 2 || !strings.Contains(errs, "[agents.probe]") {
+		t.Fatalf("exit %d, stderr %q; want 2 naming [agents.probe]", code, errs)
+	}
+}
+
+func TestCompleteAgent(t *testing.T) {
+	ws, _ := lockedWS(t)
+	t.Chdir(ws)
+	if got, want := complete(t, "agent", ""), []string{"claude", "ls", "probe"}; !slices.Equal(got, want) {
+		t.Errorf("agent: %q; want %q", got, want)
+	}
+	if got := complete(t, "agent", "claude", ""); len(got) != 0 {
+		t.Errorf("agent claude: %q; want nothing", got)
+	}
+	if got := complete(t, "agent", "ls", ""); len(got) != 0 {
+		t.Errorf("agent ls: %q; want nothing", got)
+	}
+}

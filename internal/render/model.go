@@ -871,14 +871,16 @@ func (in *Instance) VolumeName(svc string, v Volume) (string, error) {
 	return naming.WorktreeVolume(in.m.Prefix, in.Worktree.Slug, name), nil
 }
 
-// Names are the exact names of one worktree's objects.
-type Names struct{ Units, Containers, Volumes, Networks []string }
+// Names are the exact names of one worktree's objects. Shared are the
+// shared "<prefix>_…" volumes its services mount, which only project rm
+// --purge removes; Volumes never holds one.
+type Names struct{ Units, Containers, Volumes, Shared, Networks []string }
 
 // NamesFor returns the exact names of a registered worktree's objects:
 // "<prefix>-<slug>-<svc>.service" of every service but an on-demand one and
 // "<prefix>-<slug>-dev-network.service", every container (on-demand ones
-// too), its per-worktree volumes only (never a shared "<prefix>_…" one) and
-// its dev network. An unregistered slug is an error.
+// too), its per-worktree volumes, the shared volumes and its dev network.
+// An unregistered slug is an error.
 func (m *Model) NamesFor(slug string) (Names, error) {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w Worktree) bool { return w.Slug == slug })
 	if i < 0 {
@@ -896,21 +898,23 @@ func (m *Model) NamesFor(slug string) (Names, error) {
 			n.Units = append(n.Units, c+".service")
 		}
 		for _, v := range s.Volumes {
-			if v.Shared {
-				continue
-			}
 			name, err := in.VolumeName(s.ID, v)
 			if err != nil {
 				return Names{}, err
 			}
-			if !slices.Contains(n.Volumes, name) {
-				n.Volumes = append(n.Volumes, name)
+			vols := &n.Volumes
+			if v.Shared {
+				vols = &n.Shared
+			}
+			if !slices.Contains(*vols, name) {
+				*vols = append(*vols, name)
 			}
 		}
 	}
 	// Quadlet runs X.network as X-network.service.
 	n.Units = append(n.Units, strings.TrimSuffix(naming.DevNetworkUnit(m.Prefix, slug), ".network")+"-network.service")
 	slices.Sort(n.Volumes)
+	slices.Sort(n.Shared)
 	n.Networks = []string{naming.DevNetwork(m.Prefix, slug)}
 	return n, nil
 }

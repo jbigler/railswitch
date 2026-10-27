@@ -32,8 +32,10 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - After `-w`, and for `wt rm`, `share` and `unshare`: the current workspace's registered worktree slugs.
 - `logs` and `fw show|allow`: the workspace's service ids.
 - `secret set|rm`: the secrets `project.toml` declares.
+- `agent`: its subcommand `ls` together with the agents `project.toml` declares (`[agents.<name>]`).
 - `containerfile show|eject`: the stack's built-in Containerfile names (`show` also the workspace's own `containerfiles/Containerfile.<name>`).
 - `project rm`: every registered project prefix.
+- `project new --agent` takes `name=ref` or `none`; the flag itself completes, its value does not.
 
 Workspace candidates honour `-C <dir>` on the command line. Outside a workspace, or on any error, completion offers nothing and prints nothing to stderr. It reads the registry without locking or creating it, and never runs podman, git or any other command.
 

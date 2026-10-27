@@ -28,7 +28,7 @@ import (
 	"github.com/jbigler/railswitch/internal/worktree"
 )
 
-const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim]"
+const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim] [--agent name=ref]... | [--agent none]"
 
 const (
 	gitCloneTimeout  = 10 * time.Minute // checks out the app's tree
@@ -59,9 +59,10 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	name := fset.String("name", "", "the project `name` (default: the dir's name)")
 	branch := fset.String("branch", "", "the `base` branch (default: the remote's HEAD branch)")
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
-	var opts, tools stringList
+	var opts, tools, agentFlags stringList
 	fset.Var(&opts, "option", "fill an option slot: `slot=ref` or slot=none (repeatable)")
 	fset.Var(&tools, "tool", "enable a developer `tool`: nvim (repeatable)")
+	fset.Var(&agentFlags, "agent", "add an agent: `name=ref` (repeatable), or none; default: the built-in default agent")
 	dir, code, ok := parseNamed(e, fset, args, newUsage)
 	if !ok {
 		return code
@@ -75,6 +76,10 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 			return e.usageErr("new: unknown tool %q (tools: nvim)", t)
 		}
 		nvim = true
+	}
+	agents, err := parseAgentFlags(agentFlags)
+	if err != nil {
+		return e.usageErr("new: %v\n%s", err, newUsage)
 	}
 	ws, err := filepath.Abs(dir)
 	if err != nil {
@@ -94,7 +99,12 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	p, st, err := newProject(cat, *packRef, *name, *prefix, *repo, opts, nvim)
+	if agentFlags == nil {
+		if ref, ok := cat.DefaultAgent(); ok {
+			agents = map[string]string{ref.Name: ref.String()}
+		}
+	}
+	p, st, err := newProject(cat, *packRef, *name, *prefix, *repo, opts, nvim, agents)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -158,12 +168,9 @@ func (e *env) createWorkspace(ctx context.Context, dirs machine.Dirs, ws, slug s
 			return nil, 0, fmt.Errorf("eject %s: %w", n, err)
 		}
 	}
-	var secrets []string
-	if p.Tools.Nvim && repoHost(p.Project.Repo) == "github.com" {
-		if err := config.AddSecret(proj, "github_token", config.Secret{Services: []string{"nvim"}, GitHost: "github.com"}); err != nil {
-			return nil, 0, err
-		}
-		secrets = append(secrets, "github_token")
+	secrets, err := addNewSecrets(proj, p, st)
+	if err != nil {
+		return nil, 0, err
 	}
 	if err := writeGenerated(ws, st); err != nil {
 		return nil, 0, err
@@ -263,9 +270,10 @@ func (e *env) printNext(ws, slug string, unset []string) {
 }
 
 // newProject is the project.toml new writes, before [image] and secrets:
-// the pack's defaults overlaid by opts (slot=ref) and the chosen options'
-// version pins. It is validated as it will be once base is ejected.
-func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim bool) (*config.Project, *pack.Stack, error) {
+// the pack's defaults overlaid by opts (slot=ref), the chosen options'
+// version pins and agents (name → package ref). It is validated as it will
+// be once base is ejected.
+func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim bool, agents map[string]string) (*config.Project, *pack.Stack, error) {
 	ref, err := pack.ParseRef(packRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("--pack: %w", err)
@@ -283,6 +291,12 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 		Stack:   config.StackRef{Pack: ref.String(), App: pk.App.Service},
 		Options: maps.Clone(pk.Defaults),
 		Tools:   config.Tools{Nvim: nvim},
+	}
+	for n, use := range agents {
+		if p.Agents == nil {
+			p.Agents = map[string]config.Agent{}
+		}
+		p.Agents[n] = config.Agent{Use: use}
 	}
 	if p.Options == nil {
 		p.Options = map[string]string{}
@@ -316,7 +330,7 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 }
 
 // projectTOML renders p's schema, [project], [stack], [options],
-// [versions] and [tools].
+// [versions], [tools] and [agents.<name>].
 func projectTOML(p *config.Project) []byte {
 	var b strings.Builder
 	kv := func(k, v string) { fmt.Fprintf(&b, "%s = %s\n", k, config.QuoteString(v)) }
@@ -343,7 +357,67 @@ func projectTOML(p *config.Project) []byte {
 	if p.Tools.Nvim {
 		b.WriteString("\n[tools]\nnvim = true\n")
 	}
+	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
+		fmt.Fprintf(&b, "\n[agents.%s]\n", n)
+		kv("use", p.Agents[n].Use)
+	}
 	return []byte(b.String())
+}
+
+// parseAgentFlags reads project new's --agent values: name=ref each, or a
+// lone none (no agents: an empty map). No flag is nil: the caller adds
+// the catalog's default agent.
+func parseAgentFlags(flags []string) (map[string]string, error) {
+	if flags == nil {
+		return nil, nil
+	}
+	agents := map[string]string{}
+	for _, f := range flags {
+		if f == "none" {
+			if len(flags) > 1 {
+				return nil, errors.New("--agent none takes no other --agent")
+			}
+			return agents, nil
+		}
+		name, ref, ok := strings.Cut(f, "=")
+		if !ok || name == "" || ref == "" {
+			return nil, fmt.Errorf("--agent %q is not name=ref or none", f)
+		}
+		if _, dup := agents[name]; dup {
+			return nil, fmt.Errorf("--agent %s is given twice", name)
+		}
+		agents[name] = ref
+	}
+	return agents, nil
+}
+
+// addNewSecrets declares the secrets a new project needs, in project.toml
+// at proj, and returns their names (all unset): each agent package's
+// [[secrets]] as <agent>_<name> ("-" in the agent's name becomes "_"),
+// received by that agent; then, for a github.com repo, github_token for
+// git over HTTPS, received by every agent and nvim.
+func addNewSecrets(proj string, p *config.Project, st *pack.Stack) ([]string, error) {
+	var secrets, gitServices []string
+	for _, a := range st.Agents {
+		for _, s := range a.Agent.Secrets {
+			name := strings.ReplaceAll(a.Name, "-", "_") + "_" + s.Name
+			if err := config.AddSecret(proj, name, config.Secret{Services: []string{a.Service}, Env: s.Env}); err != nil {
+				return nil, err
+			}
+			secrets = append(secrets, name)
+		}
+		gitServices = append(gitServices, a.Service)
+	}
+	if p.Tools.Nvim {
+		gitServices = append(gitServices, "nvim")
+	}
+	if len(gitServices) > 0 && repoHost(p.Project.Repo) == "github.com" {
+		if err := config.AddSecret(proj, "github_token", config.Secret{Services: gitServices, GitHost: "github.com"}); err != nil {
+			return nil, err
+		}
+		secrets = append(secrets, "github_token")
+	}
+	return secrets, nil
 }
 
 // ejectNames are the defaults the stack builds, in eject order: base

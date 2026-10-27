@@ -56,6 +56,7 @@ var commands = map[string]command{
 	"doctor":        cmdDoctor,
 	"allow-ports":   cmdAllowPorts,
 	"completion":    cmdCompletion,
+	"agent":         cmdAgent,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.

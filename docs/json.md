@@ -128,7 +128,7 @@ creating it; with nothing registered it is `[]`.
 
 The services of the current worktree (`-w <slug>`, or the worktree the
 working directory is in), in model order (app, deps, worker, data services,
-tools). It is an array with one object per service.
+tools, agents). It is an array with one object per service.
 
 ```json
 [
@@ -141,9 +141,35 @@ tools). It is an array with one object per service.
 | Field | Type | Meaning |
 |---|---|---|
 | `service` | string | Service id, e.g. `rails`, `db`. |
-| `role` | string | `app`, `deps`, `worker`, `data` or `tool`. |
-| `state` | string | The unit's systemd state, `<ActiveState>/<SubState>`, e.g. `active/running`, `inactive/dead`, `failed/failed`. |
+| `role` | string | `app`, `deps`, `worker`, `data`, `tool` or `agent`. |
+| `state` | string | The unit's systemd state, `<ActiveState>/<SubState>`, e.g. `active/running`, `inactive/dead`, `failed/failed`. An on-demand agent has no unit: `running` while its container runs (`railswitch agent`), else `on-demand`. |
 | `health` | string | podman's health status of the container (`starting`, `healthy`, `unhealthy`) for a service with a health check (the app included, D34); `""` for a service without one, or when its container does not exist. |
+
+## `agent ls`
+
+The project's agents (`project.toml [agents]`), sorted by name, with each
+one's status in the current worktree (`-w <slug>`, or the worktree the
+working directory is in). It is an array with one object per agent. The
+status comes from the agent's status file
+`<workspace>/.railswitch/status/<slug>/<name>.json` (D58), which the agent's
+hook writes.
+
+```json
+[
+  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true},
+  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The agent's name in `[agents]`; its service is `agent-<name>`. |
+| `package` | string | Its package ref: `<name>@<N>` for a built-in package, `local:<name>@<N>` for one under `<workspace>/agents/`. |
+| `run` | string | `on-demand` (a transient container per `railswitch agent` run) or `service` (a unit the app wants; `railswitch agent` attaches to it). |
+| `state` | string | The status file's `state`: `permission`, `question`, `working`, `done`, `idle` or `off`. `off` also when the file is missing, not a regular file (a symlink, a FIFO), larger than 64 KiB, not valid JSON, has `v` other than `1` or an unknown state. |
+| `message` | string | The status file's `message`; `""` when `state` is `off` for one of the reasons above. |
+| `ts` | number | The status file's `ts` (Unix seconds, as the hook wrote it); `0` when unusable. |
+| `reply` | boolean | The agent waits for a reply: `state` is `done` and `message` ends in `?`, maybe followed by spaces, closing brackets, quotes or `*`/`_`/`` ` `` emphasis. The text table shows `reply` as its `STATE`. |
 
 ## `doctor`
 

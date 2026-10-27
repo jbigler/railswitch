@@ -28,8 +28,10 @@ var completionFiles = map[string]string{
 }
 
 // completionSubs is each command's subcommands. A new command with
-// subcommands adds its entry here.
+// subcommands adds its entry here. A command with completionArgs too
+// (agent) offers both for its first word.
 var completionSubs = map[string][]string{
+	"agent":         {"ls"},
 	"containerfile": {"eject", "list", "new", "show"},
 	"fw":            {"allow", "show"},
 	"project":       {"init", "ls", "new", "rm"},
@@ -50,7 +52,7 @@ var completionFlags = map[string][]string{
 	"exec":                {"--fresh"},
 	"logs":                {"-f"},
 	"project rm":          {"--purge", "--yes"},
-	"project new":         {"--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
+	"project new":         {"--agent=", "--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
 	"render":              {"--check"},
 	"secret add":          {"--env=", "--machine", "--service="},
 	"secret set":          {"--restart"},
@@ -76,6 +78,7 @@ var completionArgs = map[string]completer{
 	"containerfile show":  func(_ context.Context, dir string) []string { return containerfileCandidates(dir, true) },
 	"containerfile eject": func(_ context.Context, dir string) []string { return containerfileCandidates(dir, false) },
 	"project rm":          prefixCandidates,
+	"agent":               agentCandidates,
 }
 
 // railswitch completion bash|zsh|fish: print the shell's completion script.
@@ -174,7 +177,10 @@ func completions(ctx context.Context, words []string) []string {
 	case path == "":
 		cands = slices.Collect(maps.Keys(commands))
 	case !subDone:
-		cands = completionSubs[path]
+		cands = slices.Clone(completionSubs[path])
+		if c := completionArgs[path]; c != nil {
+			cands = append(cands, c(ctx, dir)...)
+		}
 	case nargs == 0 && completionArgs[path] != nil:
 		cands = completionArgs[path](ctx, dir)
 	}
@@ -254,6 +260,15 @@ func serviceCandidates(ctx context.Context, dir string) []string {
 		out = append(out, s.ID)
 	}
 	return out
+}
+
+// agentCandidates is the agents project.toml declares.
+func agentCandidates(_ context.Context, dir string) []string {
+	_, p, ok := completionProject(dir)
+	if !ok {
+		return nil
+	}
+	return slices.Collect(maps.Keys(p.Agents))
 }
 
 // secretCandidates is the secrets project.toml declares.

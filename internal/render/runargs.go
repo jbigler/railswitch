@@ -55,6 +55,28 @@ func (s *Service) onProxy() bool {
 	return false
 }
 
+// AddHosts are the host:ip entries (Quadlet AddHost=, podman --add-host)
+// of s's container: on the proxy network, every routed host of the
+// worktree resolves to Traefik and a shared worktree's tailnet host to the
+// host (D46), so the URLs layer 7 gives work inside; nil off it.
+func (in *Instance) AddHosts(s *Service) ([]string, error) {
+	if !s.onProxy() {
+		return nil, nil
+	}
+	routes, err := Routes(in)
+	if err != nil {
+		return nil, err
+	}
+	var hosts []string
+	for _, h := range routedHosts(routes) {
+		hosts = append(hosts, h+":"+in.Values["traefik.ip"])
+	}
+	if sh := in.Worktree.Share; sh != nil {
+		hosts = append(hosts, sh.Host+":"+sh.IP)
+	}
+	return hosts, nil
+}
+
 // FirewallAnnotations are the annotations the firewall hook reads for a
 // container of s on networks; nil when s is not firewalled. The mode is
 // s.FirewallMode when set (an agent's: D55), else the project's.

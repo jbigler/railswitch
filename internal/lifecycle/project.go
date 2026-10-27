@@ -30,7 +30,8 @@ import (
 // machine units; Traefik leaves <prefix>_proxy; every network the marked
 // units name is removed (no -f, <prefix>_proxy last); the marked unit files
 // are deleted and systemd reloaded. purge also removes the "<prefix>_…"
-// volumes the units name and <workspace>/.railswitch. The workspace
+// volumes the units name (and, when the workspace loads, those its model
+// names: an on-demand agent has no unit) and <workspace>/.railswitch. The workspace
 // directory and its git repo are never deleted. It works with the
 // workspace directory gone: the names come from the registry and the unit
 // markers.
@@ -87,12 +88,31 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		}
 	}
 
-	// 2. Stop every worktree.
+	// 2. Stop every worktree. A loaded workspace's model also names the
+	// shared volumes to purge: an on-demand agent's are in no unit file.
 	sd := podman.Systemd{R: r}
+	var vols []string
 	if loaded {
 		for _, wt := range wts {
 			if err := l.Down(ctx, wt.Slug, true); err != nil {
 				return fmt.Errorf("down %s: %w", wt.Slug, err)
+			}
+		}
+		if purge {
+			m, err := l.model(ctx)
+			if err != nil {
+				return err
+			}
+			for _, wt := range wts {
+				names, err := m.NamesFor(wt.Slug)
+				if err != nil {
+					return err
+				}
+				for _, v := range names.Shared {
+					if !slices.Contains(vols, v) {
+						vols = append(vols, v)
+					}
+				}
 			}
 		}
 	} else {
@@ -143,7 +163,7 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 	// 5. Networks, exact names, the proxy network last.
 	p := podman.Podman{R: r}
 	proxy := naming.ProxyNetwork(prefix)
-	var nets, vols []string
+	var nets []string
 	for _, u := range units {
 		for _, n := range u.NetworkNames {
 			if n != proxy && !slices.Contains(nets, n) {

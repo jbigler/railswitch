@@ -46,7 +46,7 @@ func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	args, err := l.transient(m, in, s, f.Name(), argv)
+	args, err := l.transient(m, in, s, f.Name(), runOpts{}, argv)
 	if err != nil {
 		return err
 	}

@@ -39,7 +39,7 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 		}
 	}
 	envFile := filepath.Join(m.Inputs.Workspace, ".railswitch", "env", slug, app.ID+".env")
-	args, err := l.transient(m, in, app, envFile, argv)
+	args, err := l.transient(m, in, app, envFile, runOpts{}, argv)
 	if err != nil {
 		return err
 	}
@@ -62,12 +62,25 @@ func (l *L) interactive(ctx context.Context, timeout time.Duration, args []strin
 	return err
 }
 
+// runOpts are what a transient run adds to the service's shared settings.
+// The zero value (exec, deps) joins the dev network only and sets no name
+// (a running container of the service already holds it) and no entrypoint.
+type runOpts struct {
+	// Full: every network of the service, with the same --add-host entries
+	// as its unit (an agent reaches routed hosts through Traefik).
+	Full bool
+	// Name is the container's --name; "" sets none.
+	Name string
+	// Entrypoint overrides the image's entrypoint; "" keeps it.
+	Entrypoint string
+}
+
 // transient is the podman argv of a throwaway container of service s
 // running argv: s's image, env file, secrets, volumes, hardening and
-// firewall annotations (render's shared run settings), on the worktree's
-// dev network only, with no Traefik route. It refuses without the firewall
-// hook descriptor.
-func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, envFile string, argv []string) ([]string, error) {
+// firewall annotations (render's shared run settings), with no Traefik
+// route, on the worktree's dev network only unless opts.Full. It refuses
+// without the firewall hook descriptor.
+func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, envFile string, opts runOpts, argv []string) ([]string, error) {
 	ws := m.Inputs.Workspace
 	if err := requireDescriptor(ws, m.Prefix); err != nil {
 		return nil, err
@@ -81,9 +94,22 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 		return nil, err
 	}
 	networks := in.Networks(s)[:1] // the dev network: no proxy, no route
+	var hosts []string
+	if opts.Full {
+		networks = in.Networks(s)
+		if hosts, err = in.AddHosts(s); err != nil {
+			return nil, err
+		}
+	}
 	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i"}
 	if l.TTY {
 		args = append(args, "-t")
+	}
+	if opts.Name != "" {
+		args = append(args, "--name", opts.Name)
+	}
+	if opts.Entrypoint != "" {
+		args = append(args, "--entrypoint", opts.Entrypoint)
 	}
 	args = append(args, "--label", "traefik.enable=false")
 	for _, a := range in.FirewallAnnotations(s, networks) {
@@ -91,6 +117,9 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	}
 	for _, n := range networks {
 		args = append(args, "--network", n)
+	}
+	for _, h := range hosts {
+		args = append(args, "--add-host", h)
 	}
 	if s.Worktree {
 		args = append(args, "--userns", render.WorktreeUserNS, "--user", render.WorktreeUser)
@@ -108,6 +137,9 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	for _, v := range vols {
 		args = append(args, "-v", v)
 	}
-	args = append(args, "-w", "/app", image)
+	if s.Workdir != "" {
+		args = append(args, "-w", s.Workdir)
+	}
+	args = append(args, image)
 	return append(args, argv...), nil
 }

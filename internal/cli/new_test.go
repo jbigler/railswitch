@@ -142,7 +142,7 @@ func TestNew(t *testing.T) {
 	dirs := newEnv(t)
 	repo := bareRepo(t, "main")
 	ws := filepath.Join(t.TempDir(), "shop")
-	out := mustNew(t, ws, "--repo", repo, "--prefix", "shop", "--branch", "main")
+	out := mustNew(t, ws, "--repo", repo, "--prefix", "shop", "--branch", "main", "--agent", "none") // agents: TestNewDefaultAgent
 
 	p, err := config.Load(filepath.Join(ws, "project.toml"))
 	if err != nil {
@@ -239,7 +239,7 @@ func TestNewNvimGithub(t *testing.T) {
 	newEnv(t)
 	gh := asGithub(t, bareRepo(t, "main"))
 	ws := filepath.Join(t.TempDir(), "shop")
-	out := mustNew(t, ws, "--repo", gh, "--prefix", "shop", "--tool", "nvim")
+	out := mustNew(t, ws, "--repo", gh, "--prefix", "shop", "--tool", "nvim", "--agent", "none")
 
 	p := loadProject(t, ws)
 	if !p.Tools.Nvim {
@@ -259,7 +259,7 @@ func TestNewNvimGithub(t *testing.T) {
 func TestNewNvimOtherHost(t *testing.T) {
 	newEnv(t)
 	ws := filepath.Join(t.TempDir(), "shop")
-	mustNew(t, ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--tool", "nvim")
+	mustNew(t, ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--tool", "nvim", "--agent", "none")
 	if p := loadProject(t, ws); p.Secrets != nil {
 		t.Errorf("a non-github repo declares secrets %v", p.Secrets)
 	}
@@ -666,5 +666,87 @@ func TestEjectNamesAgents(t *testing.T) {
 	st.Agents = nil
 	if got, want := ejectNames(st), []string{"base", "pg-client", "nvim", "playwright"}; !slices.Equal(got, want) {
 		t.Errorf("ejectNames without agents = %q; want %q", got, want)
+	}
+}
+
+func TestNewDefaultAgent(t *testing.T) {
+	newEnv(t)
+	gh := asGithub(t, bareRepo(t, "main"))
+	ws := filepath.Join(t.TempDir(), "shop")
+	out := mustNew(t, ws, "--repo", gh, "--prefix", "shop")
+
+	raw := readFile(t, filepath.Join(ws, "project.toml"))
+	if !strings.Contains(raw, "[agents.claude]\nuse = \"claude@1\"\n") {
+		t.Errorf("project.toml lacks [agents.claude] use = \"claude@1\":\n%s", raw)
+	}
+	p := loadProject(t, ws)
+	if a := p.Agents["claude"]; len(p.Agents) != 1 || a.Use != "claude@1" {
+		t.Errorf("[agents] = %+v", p.Agents)
+	}
+	if s, ok := p.Secrets["claude_token"]; !ok || !slices.Equal(s.Services, []string{"agent-claude"}) || s.Env != "CLAUDE_CODE_OAUTH_TOKEN" {
+		t.Errorf("[secrets.claude_token] = %+v, %v", s, ok)
+	}
+	if s, ok := p.Secrets["github_token"]; !ok || !slices.Equal(s.Services, []string{"agent-claude"}) || s.GitHost != "github.com" {
+		t.Errorf("[secrets.github_token] = %+v, %v", s, ok)
+	}
+	for _, f := range []string{"Containerfile.agent-base", "Containerfile.claude"} {
+		headerOK(t, filepath.Join(ws, "containerfiles", f))
+	}
+	for _, n := range []string{"claude_token", "github_token"} {
+		if !strings.Contains(out, "next: railswitch secret set "+n+"\n") {
+			t.Errorf("next steps lack secret set %s:\n%s", n, out)
+		}
+	}
+}
+
+func TestNewAgentNone(t *testing.T) {
+	newEnv(t)
+	gh := asGithub(t, bareRepo(t, "main"))
+	ws := filepath.Join(t.TempDir(), "shop")
+	mustNew(t, ws, "--repo", gh, "--prefix", "shop", "--agent", "none")
+	p := loadProject(t, ws)
+	if len(p.Agents) != 0 || p.Secrets != nil || strings.Contains(readFile(t, filepath.Join(ws, "project.toml")), "[agents") {
+		t.Errorf("--agent none: agents %v secrets %v", p.Agents, p.Secrets)
+	}
+	if got := containerfiles(t, ws); slices.Contains(got, "Containerfile.agent-base") {
+		t.Errorf("--agent none ejected agent-base: %v", got)
+	}
+
+	ws2 := filepath.Join(t.TempDir(), "shop2")
+	mustNew(t, ws2, "--repo", gh, "--prefix", "shop2", "--agent", "none", "--tool", "nvim")
+	if s, ok := loadProject(t, ws2).Secrets["github_token"]; !ok || !slices.Equal(s.Services, []string{"nvim"}) {
+		t.Errorf("--agent none --tool nvim: github_token %+v, %v", s, ok)
+	}
+	if code, _, errs := runWith(t, gitHost(), "project", "new", filepath.Join(t.TempDir(), "x"), "--repo", gh, "--prefix", "x", "--agent", "none", "--agent", "a=claude@1"); code != 2 || !strings.Contains(errs, "none") {
+		t.Errorf("--agent none with another: exit %d, stderr %q; want a usage error", code, errs)
+	}
+}
+
+func TestNewAgentFlag(t *testing.T) {
+	newEnv(t)
+	gh := asGithub(t, bareRepo(t, "main"))
+	ws := filepath.Join(t.TempDir(), "shop")
+	mustNew(t, ws, "--repo", gh, "--prefix", "shop", "--agent", "a=claude@1", "--agent", "b-c=claude@1")
+	p := loadProject(t, ws)
+	if len(p.Agents) != 2 || p.Agents["a"].Use != "claude@1" || p.Agents["b-c"].Use != "claude@1" {
+		t.Errorf("[agents] = %+v", p.Agents)
+	}
+	cfs := containerfiles(t, ws)
+	if n := len(slices.DeleteFunc(slices.Clone(cfs), func(f string) bool { return f != "Containerfile.claude" })); n != 1 {
+		t.Errorf("containerfiles %v; want one Containerfile.claude", cfs)
+	}
+	for name, svc := range map[string]string{"a_token": "agent-a", "b_c_token": "agent-b-c"} {
+		if s, ok := p.Secrets[name]; !ok || !slices.Equal(s.Services, []string{svc}) {
+			t.Errorf("[secrets.%s] = %+v, %v", name, s, ok)
+		}
+	}
+	if s := p.Secrets["github_token"]; !slices.Equal(s.Services, []string{"agent-a", "agent-b-c"}) || s.GitHost != "github.com" {
+		t.Errorf("github_token services %v", s.Services)
+	}
+	for _, bad := range []string{"claude", "a=", "Bad=claude@1", "ls=claude@1", "a=nope@1"} {
+		code, _, _ := runWith(t, gitHost(), "project", "new", filepath.Join(t.TempDir(), "x"), "--repo", gh, "--prefix", "x", "--agent", bad)
+		if code == 0 {
+			t.Errorf("--agent %s: exit 0", bad)
+		}
 	}
 }

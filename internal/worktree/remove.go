@@ -15,7 +15,7 @@ import (
 // Remove tears down the worktree target names (see resolve) and removes
 // it: its tailnet share is turned off (Unshare), its units are stopped, its
 // containers, per-worktree volumes and dev network removed by exact name,
-// its env dir, registry entry and checkout deleted, and the project
+// its env and agent status dirs, registry entry and checkout deleted, and the project
 // re-rendered (D28). The base worktree is refused, and so is a dirty one
 // unless force. force also deletes the worktree's home dir
 // (.railswitch/home/<slug>), which is kept otherwise.
@@ -63,8 +63,10 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	} else {
 		fmt.Fprintf(m.Out, "worktree %s is not registered: no containers to remove\n", w.Slug)
 	}
-	if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", "env", w.Slug)); err != nil {
-		return err
+	for _, d := range []string{"env", "status"} {
+		if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, w.Slug)); err != nil {
+			return err
+		}
 	}
 	home := filepath.Join(m.WS, ".railswitch", "home", w.Slug)
 	if force {

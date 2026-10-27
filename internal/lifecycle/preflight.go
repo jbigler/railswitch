@@ -23,7 +23,14 @@ import (
 
 // CheckSecrets refuses to start worktree slug while a secret one of its
 // services receives has no podman secret (D33). Every missing one is named.
+// An on-demand agent's secrets are checked when it runs (L.Agent), not here:
+// up starts no on-demand service.
 func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string) error {
+	return checkSecrets(ctx, p, m, slug, func(s *render.Service) bool { return !s.OnDemand })
+}
+
+// checkSecrets is CheckSecrets for the services keep reports.
+func checkSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string, keep func(*render.Service) bool) error {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w render.Worktree) bool { return w.Slug == slug })
 	if i < 0 {
 		return fmt.Errorf("worktree %s is not registered for project %s", slug, m.Prefix)
@@ -36,7 +43,7 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 	var errs []error
 	for _, name := range slices.Sorted(maps.Keys(secrets)) {
 		received := slices.ContainsFunc(m.Services, func(s render.Service) bool {
-			return slices.Contains(secrets[name].Services, s.ID)
+			return keep(&s) && slices.Contains(secrets[name].Services, s.ID)
 		})
 		if !received {
 			continue
@@ -163,11 +170,18 @@ func requireDescriptor(ws, prefix string) error {
 // Preflight checks what worktree slug's containers need before anything
 // starts: every absolute bind-mount source exists, the firewall hook
 // descriptor exists, the worktree dir exists and every secret its services
-// receive is set.
+// receive is set. It first creates the worktree's agent status dir (0700,
+// D58) when the project has an agent and the dir is missing.
 func (l *L) Preflight(ctx context.Context, m *render.Model, slug string) error {
 	in, err := instance(m, slug)
 	if err != nil {
 		return err
+	}
+	if len(m.Agents()) > 0 {
+		dir := in.Values["status.dir"]
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return fmt.Errorf("agent status dir: %w", err)
+		}
 	}
 	for _, s := range m.Services {
 		for _, mt := range s.Mounts {

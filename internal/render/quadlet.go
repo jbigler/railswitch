@@ -241,14 +241,11 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 	// Quadlet splits EnvironmentFile= into words; Volume=, AddHost=,
 	// Entrypoint= and HealthCmd= it reads whole.
 	u.add(c, "EnvironmentFile", quoteWord(filepath.Join(ws, ".railswitch", "env", slug, s.ID+".env")))
-	if onProxy {
-		for _, h := range routedHosts(routes) {
-			u.add(c, "AddHost", h+":"+in.Values["traefik.ip"])
-		}
-		if sh := in.Worktree.Share; sh != nil { // the tailnet URLs layer 7 gives resolve to the host (D46)
-			u.add(c, "AddHost", sh.Host+":"+sh.IP)
-		}
+	hosts, err := in.AddHosts(s)
+	if err != nil {
+		return nil, err
 	}
+	u.add(c, "AddHost", hosts...)
 	for _, p := range s.Publish {
 		host, ctr := in.Values[p.Env], strconv.Itoa(p.Container)
 		if p.SamePort {

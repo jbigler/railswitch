@@ -169,7 +169,7 @@ type undo struct {
 }
 
 // rollback undoes a failed Add in reverse order: the registry entry, the
-// slug's env dir and (new) home dir, the checkout, the branch Add created;
+// slug's env and agent status dirs and (new) home dir, the checkout, the branch Add created;
 // then, when Render ran, it renders again, which deletes the slug's units
 // and env files (D28). It returns cause joined with every rollback error.
 // It stops at a failed unregister: a registered worktree whose checkout is
@@ -185,8 +185,10 @@ func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
 			fail("unregister "+u.slug, err)
 			return errors.Join(errs...)
 		}
-		if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", "env", u.slug)); err != nil {
-			fail("remove its env dir", err)
+		for _, d := range []string{"env", "status"} {
+			if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, u.slug)); err != nil {
+				fail("remove its "+d+" dir", err)
+			}
 		}
 	}
 	if u.home != "" && u.rendered { // only Render creates it

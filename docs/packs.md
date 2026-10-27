@@ -200,3 +200,72 @@ lockfile names, first match in this order (D69):
 Another pack that wants the same (an Ember pack on bun, say) declares its
 own `[runtimes.bun]` and copies the install step and the lockfile switch;
 there is no shared add-on package (user, 2026-10-27).
+
+## Conventions every package keeps
+
+- The app's worktree is mounted at `/app`; the working directory is `/app`.
+- The image's last `USER` is `appuser`, uid and gid 1000 (`UserNS=keep-id`
+  maps the host user onto it). Directories that volumes mount on exist and
+  belong to `appuser`.
+- Every `FROM` is fully qualified (`docker.io/library/…`); nothing is read
+  from the build context.
+- A project with agents builds the agent base on the pack's image with
+  `apt`, so such a pack's image is Debian-based (`[image] os = "debian"`);
+  an option's addon must match the pack's `os`.
+- Entrypoints are mounted at `/usr/local/bin/<file name>`; a workspace file
+  `entrypoints/<file name>` replaces the package's (D13).
+- The dev server listens on `0.0.0.0` (a pack sets the env its framework
+  reads, or its `README.md` says what the app must change).
+
+## Manifest fields
+
+### `pack.toml`
+
+| Field | Meaning |
+|---|---|
+| `name`, `version` | the package name (its directory) and version (the `N` of `@N`) |
+| `[app] service` | the app's service id (`[stack] app` overrides it) |
+| `[app] server` | the dev server command |
+| `[app] port` | the container port the app route sends `<slug>.<prefix>.localhost` to |
+| `[app] install` | the deps command, run through `deps_entrypoint` |
+| `[app] health`, `health_start_period` | the app's health command (empty: none) and its start grace |
+| `[app] entrypoint`, `deps_entrypoint` | package files mounted as the app's and the deps service's entrypoint |
+| `[deps] frozen_env` | env on the deps service only (a frozen install); `railswitch deps` leaves it out |
+| `[image] file`, `tag`, `os`, `args` | the base image's Containerfile (ejected to `containerfiles/`), tag part, OS family and build args |
+| `[runtimes.<name>]` | a version chain (`from`, optional `fallback`): `{<name>}` |
+| `[db_name]` | the database name chain: `{db}` |
+| `[env]` | the app's env (layer 1): only what the framework reads |
+| `[db_scheme] <option> = "<scheme>"` | the `DATABASE_URL` scheme per database option |
+| `[share] env` | env while the worktree is shared on the tailnet |
+| `[[caches]]` | volumes shared by every worktree: `name`, `mount`, `chown` |
+| `[[worktree_volumes]]` | one volume per worktree: `name`, `mount`, `chown` |
+| `[[ports]]` | `name`, `env`, `base` (host port `base` + worktree ID), `container` or `same_port`, `share` |
+| `[defaults] <slot> = "<ref>"` | the options `project new` picks |
+| `[tasks]`, `[[links]]` | named commands and worktree links |
+| `[unit]` | `exec`, `memory`, `pids_limit`, `shm_size`, `run_init`, `tty`, `success_exit_status` |
+
+### `option.toml`
+
+| Field | Meaning |
+|---|---|
+| `name`, `version`, `slot`, `service` | the option, its slot and its service id |
+| `works_with` | pack names it works with, or `"*"` |
+| `needs`, `generated` | slots that must be filled; generated passwords it uses (`{generated.X}`) |
+| `[pin]` | `name`, `default`: the image version (`[versions] <name>` overrides) |
+| `[image]` | exactly one of `pull` (a registry ref), `use = "app"`, or `build` (a standalone Containerfile with `tag`, `args`) |
+| `[app_addon]` | `file`, `os`: a Containerfile the app's base chain should add |
+| `[health]` | `cmd`, `interval`, `timeout`, `retries`, `start_period` |
+| `entrypoint`, `command`, `firewall` | its entrypoint file, command and firewall profile(s) |
+| `[gives]`, `[deps_env]`, `[agent_gives]`, `[env]` | env it gives the app, the deps service, agents, and its own service |
+| `[share] gives` | `[gives]` while shared |
+| `[dump]` | `command`, `file`: how `railswitch db dump` dumps it |
+| `[[volumes]]`, `[[mounts]]`, `[[ports]]`, `[[routes]]`, `[[links]]`, `[unit]` | as named |
+
+### `tool.toml` and `agent.toml`
+
+Tools (`nvim`) and agents (`claude@1`, or `local:<name>@N` under
+`agents/`) build on the base image; see `docs/nvim.md` and the agent
+decisions (D30, D55, D62) in the roadmap. Their fields: `name`, `service` or
+`version`/`run`/`default`, `[image] file`, `entrypoint`, `firewall` or
+`allow`, `worktree`/`home`/`caches` (tools), `[[shared]]`, `[[mounts]]`,
+`[env]`, `[[secrets]]` (agents), `[[ports]]`, `[[links]]`, `[unit]`.

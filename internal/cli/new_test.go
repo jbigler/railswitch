@@ -731,3 +731,42 @@ func TestNewAgentFlag(t *testing.T) {
 		}
 	}
 }
+
+// D43: project new takes a local pack that the workspace already holds.
+func TestNewLocalPack(t *testing.T) {
+	newEnv(t)
+	ws := filepath.Join(t.TempDir(), "shop")
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(filepath.Join(ws, "packs", "rails"), cat.Packs[pack.Ref{Name: "rails", Version: 1}].Files); err != nil {
+		t.Fatal(err)
+	}
+	mustNew(t, ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main", "--agent", "none", "--pack", "local:rails@1")
+	if p := loadProject(t, ws); p.Stack.Pack != "local:rails@1" {
+		t.Errorf("[stack] pack = %q", p.Stack.Pack)
+	}
+	l, err := config.ReadLock(filepath.Join(ws, "stack.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := l.Packs["rails"]; e.Source != "local" {
+		t.Errorf("stack.lock pack rails = %+v; want source local", e)
+	}
+	if got := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.base")); !strings.HasPrefix(got, "# Ejected from local:rails@1 Containerfile.base ") {
+		t.Errorf("Containerfile.base header: %.120s", got)
+	}
+}
+
+func TestNewLocalPackMissing(t *testing.T) {
+	newEnv(t)
+	ws := filepath.Join(t.TempDir(), "shop")
+	code, _, errs := runWith(t, gitHost(), "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main", "--pack", "local:web@1")
+	if code != 1 || !strings.Contains(errs, filepath.Join(ws, "packs", "web")+" does not exist") {
+		t.Fatalf("exit %d, stderr %q; want 1 naming %s", code, errs, filepath.Join(ws, "packs", "web"))
+	}
+	if _, err := os.Stat(ws); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("workspace created: %v", err)
+	}
+}

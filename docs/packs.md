@@ -44,3 +44,22 @@ the built-ins:
   pack rails@1 and option local:o@1`.
 - `packs/`, `options/` and `agents/` are tracked in the workspace repo (D38),
   so a local package travels with the project.
+
+## Locking
+
+`railswitch lock` writes `stack.lock`: every package the project uses with
+its version, its source (`built in (railswitch <version>)` or `local`) and
+the sha256 of its directory (D14: each regular file's path, length and
+bytes, in sorted path order; a symlink or other special file is an error
+naming it). `render` and `up` refuse a lock that no longer matches:
+
+```
+railswitch: stack.lock is out of date for local:phoenix@1: run railswitch lock
+```
+
+Any change to a local package (an edit, an added or removed file) is such a
+change, so package edits are reviewed and committed like any other. So is
+switching a slot between a built-in and a local copy of it, even a
+byte-identical one. `railswitch project new --pack local:<name>@<N>` (and
+`--option <slot>=local:<name>@<N>`) works when the package is already in
+the workspace directory before `project new` runs.

@@ -174,38 +174,38 @@ func Lock(_ context.Context, root string) error {
 	return l.Write(path)
 }
 
-// lockEntries is the lock's pack, option and agent entries for st. An
-// agent's key is its ref string ("local:probe@1" for a local package).
+// lockEntries is the lock's pack, option and agent entries for st. Packs and
+// options are keyed by name, agents by ref string ("local:probe@1"); a
+// workspace-local package's source is "local" (D43).
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
 	builtinSrc := "built in (railswitch " + buildinfo.Version + ")"
-	entry := func(version int, files fs.FS, src string) (config.LockEntry, error) {
+	entry := func(r pack.Ref, files fs.FS) (config.LockEntry, error) {
+		src := builtinSrc
+		if r.Local {
+			src = localSource
+		}
 		sum, err := pack.ContentHash(files)
-		return config.LockEntry{Version: strconv.Itoa(version), Source: src, SHA256: sum}, err
+		return config.LockEntry{Version: strconv.Itoa(r.Version), Source: src, SHA256: sum}, err
 	}
 	l := &config.Lock{Packs: map[string]config.LockEntry{}, Options: map[string]config.LockEntry{}, Agents: map[string]config.LockEntry{}}
-	e, err := entry(st.Pack.Version, st.Pack.Files, builtinSrc)
+	e, err := entry(st.PackRef, st.Pack.Files)
 	if err != nil {
-		return nil, fmt.Errorf("pack %s: %w", st.Pack.Name, err)
+		return nil, fmt.Errorf("pack %s: %w", st.PackRef, err)
 	}
 	l.Packs[st.Pack.Name] = e
 	for _, ch := range st.Options {
-		o := ch.Option
-		e, err := entry(o.Version, o.Files, builtinSrc)
+		e, err := entry(ch.Ref, ch.Option.Files)
 		if err != nil {
-			return nil, fmt.Errorf("option %s: %w", o.Name, err)
+			return nil, fmt.Errorf("option %s: %w", ch.Ref, err)
 		}
-		l.Options[o.Name] = e
+		l.Options[ch.Option.Name] = e
 	}
 	for _, a := range st.Agents {
 		key := a.Ref.String()
 		if _, ok := l.Agents[key]; ok {
 			continue
 		}
-		src := builtinSrc
-		if a.Ref.Local {
-			src = "local"
-		}
-		e, err := entry(a.Agent.Version, a.Agent.Files, src)
+		e, err := entry(a.Ref, a.Agent.Files)
 		if err != nil {
 			return nil, fmt.Errorf("agent %s: %w", key, err)
 		}
@@ -214,13 +214,19 @@ func lockEntries(st *pack.Stack) (*config.Lock, error) {
 	return l, nil
 }
 
+// localSource is a workspace-local package's lock source.
+const localSource = "local"
+
 // ErrStaleLock is wrapped by CheckLock's (and so Render's) error when
 // stack.lock differs from the resolved stack.
 var ErrStaleLock = errors.New("stack.lock is out of date")
 
 // CheckLock refuses a stack.lock whose packs, options or agents differ from
-// the resolved stack by version or content hash, or that lacks or has an
-// extra one: the hash exists to stop unreviewed package content (HANDOFF §3.11).
+// the resolved stack by version, content hash or locality (a built-in and a
+// local copy of it are different packages, even byte for byte), or that
+// lacks or has an extra one: the hash exists to stop unreviewed package
+// content (HANDOFF §3.11). The built-in source text, which carries the
+// railswitch version, is not compared.
 func (w *Workspace) CheckLock() error {
 	want, err := lockEntries(w.Stack)
 	if err != nil {
@@ -228,13 +234,14 @@ func (w *Workspace) CheckLock() error {
 	}
 	have := w.Lock
 	var stale []string
-	// label names an entry in the error: name@version for packs and
+	// label names an entry in the error: [local:]name@version for packs and
 	// options, the key itself for agents (already a ref string).
 	cmp := func(have, want map[string]config.LockEntry, label func(string, config.LockEntry) string) {
 		for _, name := range sortedKeys(want) {
 			h, ok := have[name]
-			if !ok || h.Version != want[name].Version || h.SHA256 != want[name].SHA256 {
-				stale = append(stale, label(name, want[name]))
+			x := want[name]
+			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || (h.Source == localSource) != (x.Source == localSource) {
+				stale = append(stale, label(name, x))
 			}
 		}
 		for _, name := range sortedKeys(have) {
@@ -243,7 +250,12 @@ func (w *Workspace) CheckLock() error {
 			}
 		}
 	}
-	versioned := func(name string, e config.LockEntry) string { return name + "@" + e.Version }
+	versioned := func(name string, e config.LockEntry) string {
+		if e.Source == localSource {
+			return config.LocalPrefix + name + "@" + e.Version
+		}
+		return name + "@" + e.Version
+	}
 	cmp(have.Packs, want.Packs, versioned)
 	cmp(have.Options, want.Options, versioned)
 	cmp(have.Agents, want.Agents, func(key string, _ config.LockEntry) string { return key })

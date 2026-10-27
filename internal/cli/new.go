@@ -279,7 +279,10 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	if err != nil {
 		return nil, nil, fmt.Errorf("--pack: %w", err)
 	}
-	pk := cat.Packs[ref]
+	pk, err := cat.Pack(ref)
+	if err != nil {
+		return nil, nil, fmt.Errorf("--pack: %w", err)
+	}
 	if pk == nil {
 		return nil, nil, fmt.Errorf("--pack: unknown pack %s", ref)
 	}

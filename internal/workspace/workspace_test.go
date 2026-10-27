@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -274,5 +275,131 @@ func TestMachineMounts(t *testing.T) {
 	}
 	if !reflect.DeepEqual(missing, map[string]bool{gone: true}) {
 		t.Errorf("missing = %v (only optional sources are statted)", missing)
+	}
+}
+
+// localRails copies the built-in rails pack byte for byte to root/packs/rails/
+// and points project.toml at local:rails@1 (a fresh `pack eject rails`).
+func localRails(t *testing.T, root string) {
+	t.Helper()
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(filepath.Join(root, "packs", "rails"), cat.Packs[pack.Ref{Name: "rails", Version: 1}].Files); err != nil {
+		t.Fatal(err)
+	}
+	setPack(t, root, "local:rails@1")
+}
+
+func setPack(t *testing.T, root, ref string) {
+	t.Helper()
+	path := filepath.Join(root, "project.toml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := regexp.MustCompile(`(?m)^pack = "[^"]*"`).ReplaceAll(data, []byte(`pack = "`+ref+`"`))
+	if err := os.WriteFile(path, out, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkLock(t *testing.T, root string) error {
+	t.Helper()
+	w, err := Load(context.Background(), root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return w.CheckLock()
+}
+
+func TestLockLocalPack(t *testing.T) {
+	root := projectRoot(t)
+	localRails(t, root)
+	if err := Lock(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	l, err := config.ReadLock(filepath.Join(root, "stack.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum, err := pack.ContentHash(os.DirFS(filepath.Join(root, "packs", "rails")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e := l.Packs["rails"]; e.Source != "local" || e.SHA256 != sum || e.Version != "1" {
+		t.Errorf("pack rails = %+v; want source local, sha256 %s", e, sum)
+	}
+	if err := checkLock(t, root); err != nil {
+		t.Errorf("CheckLock after lock: %v", err)
+	}
+}
+
+// Review Focus 1: any change to a locked local package makes the lock stale.
+func TestCheckLockLocalPackEdits(t *testing.T) {
+	edits := map[string]func(dir string) error{
+		"edit pack.toml": func(dir string) error {
+			f, err := os.OpenFile(filepath.Join(dir, "pack.toml"), os.O_APPEND|os.O_WRONLY, 0)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			_, err = f.WriteString("# edited\n")
+			return err
+		},
+		"add a file": func(dir string) error {
+			return os.WriteFile(filepath.Join(dir, "entrypoints", "x.sh"), []byte("#!/bin/sh\n"), 0o755)
+		},
+		"remove a file": func(dir string) error { return os.Remove(filepath.Join(dir, "deps.allow")) },
+	}
+	for name, edit := range edits {
+		t.Run(name, func(t *testing.T) {
+			root := projectRoot(t)
+			localRails(t, root)
+			if err := Lock(context.Background(), root); err != nil {
+				t.Fatal(err)
+			}
+			if err := edit(filepath.Join(root, "packs", "rails")); err != nil {
+				t.Fatal(err)
+			}
+			err := checkLock(t, root)
+			if !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "local:rails@1") {
+				t.Errorf("CheckLock = %v; want stale naming local:rails@1", err)
+			}
+		})
+	}
+	root := projectRoot(t)
+	localRails(t, root)
+	if err := Lock(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("pack.toml", filepath.Join(root, "packs", "rails", "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkLock(t, root); err == nil || !strings.Contains(err.Error(), "link") || !strings.Contains(err.Error(), "not a regular file") {
+		t.Errorf("CheckLock with a symlink = %v", err)
+	}
+}
+
+// Review Focus 2: a byte-identical local copy is still a different package.
+func TestCheckLockBuiltinToLocal(t *testing.T) {
+	root := projectRoot(t)
+	if err := Lock(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	localRails(t, root)
+	if err := checkLock(t, root); !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "local:rails@1") {
+		t.Fatalf("CheckLock after switching to the local copy = %v", err)
+	}
+	if err := Lock(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkLock(t, root); err != nil {
+		t.Fatalf("CheckLock after lock: %v", err)
+	}
+	setPack(t, root, "rails@1")
+	if err := checkLock(t, root); !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "rails@1") {
+		t.Fatalf("CheckLock after switching back = %v", err)
 	}
 }

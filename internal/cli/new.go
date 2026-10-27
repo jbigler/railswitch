@@ -393,47 +393,104 @@ func parseAgentFlags(flags []string) (map[string]string, error) {
 }
 
 // addNewSecrets declares the secrets a new project needs, in project.toml
-// at proj, and returns their names (all unset): each agent package's
-// [[secrets]] as <agent>_<name> ("-" in the agent's name becomes "_"),
-// received by that agent; then, for a github.com repo, github_token for
-// git over HTTPS, received by every agent and nvim.
+// at proj, and returns their names (all unset): see planSecrets, with
+// every agent and nvim as the git services.
 func addNewSecrets(proj string, p *config.Project, st *pack.Stack) ([]string, error) {
-	var secrets, gitServices []string
+	var gitServices []string
 	for _, a := range st.Agents {
-		names, err := addAgentSecrets(proj, p, a)
-		if err != nil {
-			return nil, err
-		}
-		secrets = append(secrets, names...)
 		gitServices = append(gitServices, a.Service)
 	}
 	if p.Tools.Nvim != nil {
 		gitServices = append(gitServices, "nvim")
 	}
-	if len(gitServices) > 0 && gitHub(p.Project.Repo) {
-		if err := config.AddSecret(proj, "github_token", config.Secret{Services: gitServices, GitHost: "github.com"}); err != nil {
-			return nil, err
-		}
-		secrets = append(secrets, "github_token")
-	}
-	return secrets, nil
+	return planSecrets(p, st.Agents, gitServices).write(proj)
 }
 
-// addAgentSecrets declares agent a's package [[secrets]] in project.toml
-// at proj as <agent>_<name> ("-" in the agent's name becomes "_"),
-// received by a, skipping those p already declares. It returns the names
-// it declared (all unset).
-func addAgentSecrets(proj string, p *config.Project, a *pack.ChosenAgent) ([]string, error) {
-	var names []string
-	for _, s := range a.Agent.Secrets {
-		name := strings.ReplaceAll(a.Name, "-", "_") + "_" + s.Name
-		if _, ok := p.Secrets[name]; ok {
+// secretPlan is the secret edits that adding agents (and nvim) makes to
+// project.toml: secrets to declare, in order, and services to add to
+// declared secrets.
+type secretPlan struct {
+	declare []namedSecret
+	extend  []namedSecret // Services: the services to add to secret Name
+}
+
+type namedSecret struct {
+	Name string
+	config.Secret
+}
+
+// planSecrets is the one rule project new and agent add share: each
+// agent's package [[secrets]] as <agent>_<name> ("-" in the agent's name
+// becomes "_"), received by that agent, unless p declares it; then git
+// over HTTPS for gitServices: every declared secret with git_host gains
+// those it lacks, or, when none has git_host and the repo is on
+// github.com, github_token is declared for them.
+func planSecrets(p *config.Project, agents []*pack.ChosenAgent, gitServices []string) secretPlan {
+	var sp secretPlan
+	for _, a := range agents {
+		for _, s := range a.Agent.Secrets {
+			name := strings.ReplaceAll(a.Name, "-", "_") + "_" + s.Name
+			if _, ok := p.Secrets[name]; !ok {
+				sp.declare = append(sp.declare, namedSecret{name, config.Secret{Services: []string{a.Service}, Env: s.Env}})
+			}
+		}
+	}
+	hasGitHost := false
+	for _, n := range slices.Sorted(maps.Keys(p.Secrets)) {
+		s := p.Secrets[n]
+		if s.GitHost == "" {
 			continue
 		}
-		if err := config.AddSecret(proj, name, config.Secret{Services: []string{a.Service}, Env: s.Env}); err != nil {
+		hasGitHost = true
+		var add []string
+		for _, id := range gitServices {
+			if !slices.Contains(s.Services, id) {
+				add = append(add, id)
+			}
+		}
+		if len(add) > 0 {
+			sp.extend = append(sp.extend, namedSecret{n, config.Secret{Services: add}})
+		}
+	}
+	if !hasGitHost && len(gitServices) > 0 && gitHub(p.Project.Repo) {
+		sp.declare = append(sp.declare, namedSecret{"github_token", config.Secret{Services: gitServices, GitHost: "github.com"}})
+	}
+	return sp
+}
+
+// apply returns p's secrets with the plan applied, for validation.
+func (sp secretPlan) apply(secrets map[string]config.Secret) map[string]config.Secret {
+	out := maps.Clone(secrets)
+	if out == nil {
+		out = map[string]config.Secret{}
+	}
+	for _, d := range sp.declare {
+		out[d.Name] = d.Secret
+	}
+	for _, x := range sp.extend {
+		s := out[x.Name]
+		s.Services = append(slices.Clone(s.Services), x.Services...)
+		out[x.Name] = s
+	}
+	return out
+}
+
+// write makes the plan's edits to project.toml at proj and returns the
+// declared secrets' names (all unset).
+func (sp secretPlan) write(proj string) ([]string, error) {
+	var names []string
+	for _, d := range sp.declare {
+		if err := config.AddSecret(proj, d.Name, d.Secret); err != nil {
 			return nil, err
 		}
-		names = append(names, name)
+		names = append(names, d.Name)
+	}
+	for _, x := range sp.extend {
+		for _, id := range x.Services {
+			if err := config.AddSecretService(proj, x.Name, id); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return names, nil
 }

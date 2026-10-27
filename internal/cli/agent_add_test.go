@@ -162,3 +162,53 @@ func TestAgentNoAgentsHint(t *testing.T) {
 		t.Errorf("agent: exit %d: %s", code, errs)
 	}
 }
+
+// dropGitHubToken removes [secrets.github_token] and sets repo.
+func dropGitHubToken(t *testing.T, ws, repo string) {
+	t.Helper()
+	path := filepath.Join(ws, "project.toml")
+	data := readFile(t, path)
+	i, j := strings.Index(data, "[secrets.github_token]"), strings.Index(data, "[tools.nvim]")
+	data = data[:i] + data[j:]
+	data = strings.Replace(data, `"git@github.com:[ORG]/[REPO].git"`, `"`+repo+`"`, 1)
+	writeFile(t, path, data)
+}
+
+func TestAgentAddDeclaresGitHubToken(t *testing.T) {
+	ws := noAgentWS(t)
+	dropGitHubToken(t, ws, "git@github.com:[ORG]/[REPO].git")
+	out := mustRun(t, "-C", ws, "agent", "add", "claude")
+	g, ok := loadProject(t, ws).Secrets["github_token"]
+	if !ok || strings.Join(g.Services, ",") != "agent-claude" || g.GitHost != "github.com" {
+		t.Errorf("github_token = %+v (%v)", g, ok)
+	}
+	if !strings.Contains(out, "railswitch secret set github_token") {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
+func TestAgentAddNoGitHubToken(t *testing.T) {
+	ws := noAgentWS(t)
+	dropGitHubToken(t, ws, "git@gitlab.com:org/repo.git")
+	mustRun(t, "-C", ws, "agent", "add", "claude")
+	if _, ok := loadProject(t, ws).Secrets["github_token"]; ok {
+		t.Error("github_token declared for a gitlab repo")
+	}
+}
+
+// The derived secret name is validated before anything is written.
+func TestAgentAddLongSecretName(t *testing.T) {
+	ws := noAgentWS(t)
+	toml := filepath.Join(ws, "agents", "probe", "agent.toml")
+	writeFile(t, toml, readFile(t, toml)+"\n[[secrets]]\nname = \"a_rather_long_key\"\nenv = \"K\"\n")
+	before := snapshot(t, ws)
+	name := strings.Repeat("a", 25)
+	code, _, errs := runIn(t, "-C", ws, "agent", "add", name, "--use", "local:probe@1")
+	if code == 0 {
+		t.Fatal("agent add succeeded")
+	}
+	if !strings.Contains(errs, name+"_a_rather_long_key") {
+		t.Errorf("stderr %q", errs)
+	}
+	sameFiles(t, before, snapshot(t, ws))
+}

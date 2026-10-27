@@ -70,26 +70,28 @@ func cmdAgentAdd(ctx context.Context, e *env, args []string) int {
 	}
 	i := slices.IndexFunc(st.Agents, func(c *pack.ChosenAgent) bool { return c.Name == name })
 	chosen := st.Agents[i]
+	plan := planSecrets(p, []*pack.ChosenAgent{chosen}, []string{chosen.Service})
+	cand.Secrets = plan.apply(p.Secrets)
+	if err := cand.Validate(); err != nil {
+		return e.fail(fmt.Errorf("%s with [agents.%s] and its secrets: %w", proj, name, err))
+	}
+	if _, err := cat.Resolve(&cand); err != nil {
+		return e.fail(err)
+	}
 
 	if err := config.AddAgent(proj, name, a); err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "added [agents.%s] use = %q to %s\n", name, a.Use, proj)
-	secrets, err := addAgentSecrets(proj, p, chosen)
+	secrets, err := plan.write(proj)
 	if err != nil {
 		return e.fail(err)
 	}
 	for _, s := range secrets {
 		fmt.Fprintf(e.stdout, "declared secret %s\n", s)
 	}
-	for _, s := range slices.Sorted(maps.Keys(p.Secrets)) {
-		if p.Secrets[s].GitHost == "" || slices.Contains(p.Secrets[s].Services, chosen.Service) {
-			continue
-		}
-		if err := config.AddSecretService(proj, s, chosen.Service); err != nil {
-			return e.fail(err)
-		}
-		fmt.Fprintf(e.stdout, "secret %s now goes to %s too\n", s, chosen.Service)
+	for _, x := range plan.extend {
+		fmt.Fprintf(e.stdout, "secret %s now goes to %s too\n", x.Name, chosen.Service)
 	}
 	if err := workspace.Lock(ctx, root); err != nil {
 		return e.fail(err)

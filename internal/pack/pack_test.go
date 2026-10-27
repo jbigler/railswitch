@@ -451,3 +451,24 @@ func TestRailsDepsEntrypointExecsArgs(t *testing.T) {
 		t.Errorf("entrypoint with args: %v\n%s", err, out)
 	}
 }
+
+// C3: an option's [dump] decodes; command must be non-empty and file a bare name.
+func TestOptionDump(t *testing.T) {
+	if d := builtins(t).Options[Ref{Name: "postgres", Version: 1}].Dump; d == nil || strings.Join(d.Command, " ") != "pg_dump -Fc -U postgres {db}" || d.File != "{db}.dump" {
+		t.Errorf("postgres dump = %+v", d)
+	}
+	for name, dump := range map[string]string{
+		"no command": "file = \"x.dump\"\n",
+		"no file":    "command = [\"d\"]\n",
+		"path":       "command = [\"d\"]\nfile = \"a/x.dump\"\n",
+		"dir":        "command = [\"d\"]\nfile = \"x/\"\n",
+		"dotdot":     "command = [\"d\"]\nfile = \"..\"\n",
+	} {
+		fsys := minimal()
+		opt := fsys["options/o/option.toml"]
+		opt.Data = append(opt.Data, []byte("[dump]\n"+dump)...)
+		if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "dump") {
+			t.Errorf("%s: Load error = %v, want a [dump] error", name, err)
+		}
+	}
+}

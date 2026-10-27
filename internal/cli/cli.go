@@ -58,6 +58,7 @@ var commands = map[string]command{
 	"completion":    cmdCompletion,
 	"agent":         cmdAgent,
 	"nvim":          cmdNvim,
+	"db":            cmdDB,
 	"hooks":         cmdHooks,
 }
 

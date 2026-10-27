@@ -427,6 +427,15 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 	l.env(file, "agent_gives", o.AgentGives)
 	l.env(file, "env", o.Env)
 	l.env(file, "share.gives", o.Share.Gives)
+	if d := o.Dump; d != nil {
+		if len(d.Command) == 0 || slices.Contains(d.Command, "") {
+			l.add(file, "dump.command must be a non-empty list of non-empty arguments")
+		}
+		l.required(file, "dump.file", d.File)
+		if d.File != "" && (strings.Contains(d.File, "/") || d.File == "." || d.File == "..") {
+			l.add(file, "dump.file %q must be a bare file name", d.File)
+		}
+	}
 	l.volumes(file, "volumes", o.Volumes, true)
 	l.mounts(file, dir, o.Mounts)
 	l.ports(file, "option "+o.Name, o.Ports)

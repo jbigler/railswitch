@@ -216,6 +216,7 @@ type Option struct {
 	AgentGives map[string]string `toml:"agent_gives"`
 	Env        map[string]string `toml:"env"`   // its own service's env
 	Share      OptionShare       `toml:"share"` // layer 7 (D46): [share] gives, while shared
+	Dump       *Dump             `toml:"dump"`  // C3: how railswitch db dump dumps it; nil = it cannot
 	Volumes    []Volume          `toml:"volumes"`
 	Mounts     []Mount           `toml:"mounts"`
 	Ports      []Port            `toml:"ports"`
@@ -224,6 +225,14 @@ type Option struct {
 	Unit       Unit              `toml:"unit"`
 
 	Files fs.FS `toml:"-"` // the option's directory
+}
+
+// Dump is an option's [dump] table (C3): Command runs in its container
+// through podman exec and writes the dump to stdout, which railswitch db
+// dump stores as <workspace>/db-dumps/<File>. Both expand {db} and {service}.
+type Dump struct {
+	Command []string `toml:"command"`
+	File    string   `toml:"file"` // a bare file name
 }
 
 // Pin is an option's version pin.

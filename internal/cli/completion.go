@@ -33,6 +33,7 @@ var completionFiles = map[string]string{
 var completionSubs = map[string][]string{
 	"agent":         {"ls"},
 	"containerfile": {"eject", "list", "new", "show"},
+	"db":            {"dump"},
 	"fw":            {"allow", "show"},
 	"hooks":         {"backup", "check", "restore"},
 	"nvim":          {"reset-config", "update"},

@@ -35,6 +35,10 @@ PGDATABASE = "{db}"
 POSTGRES_PASSWORD = "{generated.DB_PASSWORD}"
 PGTZ = "{env.TZ}"
 
+[dump]                  # C3: railswitch db dump writes its stdout to <workspace>/db-dumps/<file>
+command = ["pg_dump", "-Fc", "-U", "postgres", "{db}"]
+file = "{db}.dump"      # initdb/restore-dump.sh restores it into a new volume
+
 [[volumes]]
 name = "db-data-pg{postgres.major}"
 mount = "/var/lib/postgresql/data"

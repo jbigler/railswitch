@@ -72,6 +72,12 @@ func (l *L) model(ctx context.Context) (*render.Model, error) {
 	if err != nil {
 		return nil, err
 	}
+	return l.modelFor(host)
+}
+
+// modelFor builds the workspace's model from the machine registry with
+// host as given.
+func (l *L) modelFor(host render.Host) (*render.Model, error) {
 	reg, err := machine.Open(l.WS.Dirs.Data)
 	if err != nil {
 		return nil, err

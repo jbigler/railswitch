@@ -11,6 +11,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 // OverviewService is one service of a worktree in `railswitch overview`:
@@ -60,7 +61,7 @@ func StackState(services []OverviewService) string {
 		case "active":
 			active++
 			live++
-		case "activating", "reloading":
+		case "activating":
 			live++
 		}
 	}
@@ -76,10 +77,11 @@ func StackState(services []OverviewService) string {
 // Overview reports every registered worktree of the project: its stack and
 // service states from one batched `systemctl --user show`, on-demand
 // services and agents running from one `podman ps` (none without either),
-// its agent and links. It runs no git and no health check: the dashboard
-// calls it every 2 s.
+// its agent and links. It runs no git (the model is built without the host
+// git identity, which nothing here needs) and no health check: the
+// dashboard calls it every 2 s.
 func (l *L) Overview(ctx context.Context) (Overview, error) {
-	m, err := l.model(ctx)
+	m, err := l.modelFor(workspace.LocalHost())
 	if err != nil {
 		return Overview{}, err
 	}

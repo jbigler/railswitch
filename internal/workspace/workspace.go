@@ -468,11 +468,17 @@ func NetworkDir(ctx context.Context, r sys.Runner) (string, error) {
 	return filepath.Join(g, "networks"), nil
 }
 
-// ReadHost reads what render needs from the host: CPU count, $HOME and the
-// host git identity (`git config --global user.name/user.email`; unset or
-// no git = "").
+// LocalHost is what render needs from the host without running anything:
+// CPU count and $HOME, no git identity.
+func LocalHost() render.Host {
+	return render.Host{CPUs: runtime.NumCPU(), Home: os.Getenv("HOME")}
+}
+
+// ReadHost reads what render needs from the host: LocalHost and the host
+// git identity (`git config --global user.name/user.email`; unset or no
+// git = "").
 func ReadHost(ctx context.Context, r sys.Runner) (render.Host, error) {
-	h := render.Host{CPUs: runtime.NumCPU(), Home: os.Getenv("HOME")}
+	h := LocalHost()
 	for _, f := range []struct {
 		key string
 		dst *string

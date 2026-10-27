@@ -152,7 +152,7 @@ func TestOverview(t *testing.T) {
 		find(t, e.calls(), "podman ps --format {{.Names}}")
 	}
 	for _, c := range e.f.Calls {
-		if c[0] == "git" && !(len(c) > 1 && c[1] == "config") {
+		if c[0] == "git" {
 			t.Errorf("git call %q", c)
 		}
 	}
@@ -209,20 +209,21 @@ func TestOverviewMissingDir(t *testing.T) {
 
 func TestOverviewAgentChoice(t *testing.T) {
 	for _, c := range []struct {
-		name     string
-		running  string // podman ps output
-		statuses map[string]string
-		want     string // agent name; "" = nil
-		state    string
+		name        string
+		running     string // podman ps output
+		statuses    map[string]string
+		want        string // agent name; "" = nil
+		state       string
+		wantRunning bool
 	}{
 		{"running wins", "filial-feat-agent-probe\nfilial-master-agent-claude\n",
-			map[string]string{"claude": `{"v":1,"state":"question","message":"m","ts":1}`}, "probe", "off"},
+			map[string]string{"claude": `{"v":1,"state":"question","message":"m","ts":1}`}, "probe", "off", true},
 		{"first non-off", "filial-master-agent-claude\n",
-			map[string]string{"claude": `{"v":1,"state":"off","message":"","ts":1}`, "probe": `{"v":1,"state":"working","message":"w","ts":2}`}, "probe", "working"},
+			map[string]string{"claude": `{"v":1,"state":"off","message":"","ts":1}`, "probe": `{"v":1,"state":"working","message":"w","ts":2}`}, "probe", "working", false},
 		{"first configured non-off", "",
-			map[string]string{"claude": `{"v":1,"state":"done","message":"ok","ts":1}`, "probe": `{"v":1,"state":"working","message":"w","ts":2}`}, "claude", "done"},
+			map[string]string{"claude": `{"v":1,"state":"done","message":"ok","ts":1}`, "probe": `{"v":1,"state":"working","message":"w","ts":2}`}, "claude", "done", false},
 		{"none", "filial-feat-agent-claude-x\n",
-			map[string]string{"claude": `{"v":2,"state":"working","message":"","ts":1}`}, "", ""},
+			map[string]string{"claude": `{"v":2,"state":"working","message":"","ts":1}`}, "", "", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			e, _ := overviewEnv(t, func(string, string) string { return "active/running" })
@@ -238,10 +239,8 @@ func TestOverviewAgentChoice(t *testing.T) {
 			switch {
 			case c.want == "" && got != nil:
 				t.Errorf("agent %+v; want nil", got)
-			case c.want != "" && (got == nil || got.Name != c.want || got.State != c.state):
-				t.Errorf("agent %+v; want %s %s", got, c.want, c.state)
-			case c.want == "probe" && c.running != "" && strings.Contains(c.running, "feat-agent-probe") && !got.Running:
-				t.Errorf("agent %+v not running", got)
+			case c.want != "" && (got == nil || got.Name != c.want || got.State != c.state || got.Running != c.wantRunning):
+				t.Errorf("agent %+v; want %s %s running=%v", got, c.want, c.state, c.wantRunning)
 			}
 		})
 	}

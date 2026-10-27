@@ -227,17 +227,23 @@ func TestAgentConfigValidate(t *testing.T) {
 	}
 }
 
-func TestStackLocalRefused(t *testing.T) {
+// D43: [stack] pack, [options] and [agents.<n>] use take local: refs; from does not.
+func TestStackLocalRefs(t *testing.T) {
 	p := loadFilial(t)
 	p.Options["database"] = "local:pg@1"
-	err := p.Validate()
-	if err == nil || !strings.Contains(err.Error(), "options.database") || !strings.Contains(err.Error(), "agents only until Stage 5") {
+	p.Stack.Pack = "local:rails@1"
+	p.Agents = map[string]Agent{"probe": {Use: "local:probe@1"}}
+	if err := p.Validate(); err != nil {
 		t.Fatalf("Validate = %v", err)
 	}
+	p.Options["database"] = "local:PG@1"
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "options.database") || !strings.Contains(err.Error(), "local:name@N") {
+		t.Fatalf("Validate bad local option = %v", err)
+	}
 	p = loadFilial(t)
-	p.Stack.Pack = "local:rails@1"
-	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "stack.pack") || !strings.Contains(err.Error(), "agents only until Stage 5") {
-		t.Fatalf("Validate = %v", err)
+	p.From = "local:tpl@1"
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "from") || !strings.Contains(err.Error(), "local:") {
+		t.Fatalf("Validate local from = %v", err)
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 // Ref names one version of a package: "<name>@<version>", or for a
-// workspace-local agent package "local:<name>@<version>" (Local).
+// workspace-local package "local:<name>@<version>" (Local, D43).
 type Ref struct {
 	Name    string
 	Version int
@@ -27,28 +27,14 @@ var refRe = regexp.MustCompile(`^([a-z][a-z0-9-]*)@([1-9][0-9]{0,8})$`)
 // nameRe is the grammar of a package name on its own (tools, directories).
 var nameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
-// ParseRef parses "name@N". A "local:" ref is refused: only agents take one
-// until Stage 5 (D43); see ParseAgentRef.
+// ParseRef parses "name@N" or "local:name@N".
 func ParseRef(s string) (Ref, error) {
-	if strings.HasPrefix(s, config.LocalPrefix) {
-		return Ref{}, fmt.Errorf("%q: local: refs are supported for agents only until Stage 5 (D43)", s)
-	}
-	m := refRe.FindStringSubmatch(s)
-	if m == nil {
-		return Ref{}, fmt.Errorf("%q is not a ref name@N, e.g. \"postgres@1\"", s)
-	}
-	v, _ := strconv.Atoi(m[2]) // at most 9 digits: cannot overflow
-	return Ref{Name: m[1], Version: v}, nil
-}
-
-// ParseAgentRef parses "name@N" or "local:name@N".
-func ParseAgentRef(s string) (Ref, error) {
 	rest, local := strings.CutPrefix(s, config.LocalPrefix)
 	m := refRe.FindStringSubmatch(rest)
 	if m == nil {
-		return Ref{}, fmt.Errorf("%q is not a ref name@N or local:name@N, e.g. \"myagent@1\"", s)
+		return Ref{}, fmt.Errorf("%q is not a ref name@N or local:name@N, e.g. \"postgres@1\"", s)
 	}
-	v, _ := strconv.Atoi(m[2])
+	v, _ := strconv.Atoi(m[2]) // at most 9 digits: cannot overflow
 	return Ref{Name: m[1], Version: v, Local: local}, nil
 }
 

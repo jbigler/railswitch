@@ -78,23 +78,19 @@ func writeLocalAgent(t *testing.T, root, dir, name string) {
 func TestLoadLocalAgents(t *testing.T) {
 	root := t.TempDir()
 	writeLocalAgent(t, root, "probe", "probe")
-	c := &Catalog{Agents: map[Ref]*Agent{}}
-	if err := LoadLocalAgents(c, root); err != nil {
-		t.Fatal(err)
-	}
-	if a := c.Agents[Ref{"probe", 1, true}]; a == nil || a.Name != "probe" {
-		t.Fatalf("Agents = %+v", c.Agents)
+	c := localCatalog(t, root)
+	if a, err := c.Agent(Ref{"probe", 1, true}); err != nil || a == nil || a.Name != "probe" {
+		t.Fatalf("Agent = %+v, %v", a, err)
 	}
 
 	bad := t.TempDir()
 	writeLocalAgent(t, bad, "probe", "other")
-	if err := LoadLocalAgents(&Catalog{Agents: map[Ref]*Agent{}}, bad); err == nil || !strings.Contains(err.Error(), "probe") {
+	if _, err := localCatalog(t, bad).Agent(Ref{"probe", 1, true}); err == nil || !strings.Contains(err.Error(), "agents/probe/agent.toml") {
 		t.Errorf("name mismatch: %v", err)
 	}
 
-	c = &Catalog{Agents: map[Ref]*Agent{}}
-	if err := LoadLocalAgents(c, t.TempDir()); err != nil || len(c.Agents) != 0 {
-		t.Errorf("no agents/: %v, %v", err, c.Agents)
+	if _, err := localCatalog(t, t.TempDir()).Agent(Ref{"probe", 1, true}); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("no agents/: %v", err)
 	}
 }
 
@@ -111,7 +107,7 @@ func TestAgentAddCapabilityRefused(t *testing.T) {
 	if err := os.WriteFile(p, append(data, "\n[unit]\nadd_capability = [\"NET_ADMIN\"]\n"...), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	err = LoadLocalAgents(&Catalog{Agents: map[Ref]*Agent{}}, root)
+	_, err = localCatalog(t, root).Agent(Ref{"probe", 1, true})
 	if err == nil || !strings.Contains(err.Error(), "unit.add_capability") {
 		t.Errorf("err = %v, want unit.add_capability refused", err)
 	}
@@ -165,8 +161,8 @@ func TestResolveAgents(t *testing.T) {
 	}
 	p := agentProject(nil)
 	p.Options = map[string]string{"cache": "local:o@1"}
-	if _, err := c.Resolve(p); err == nil || !strings.Contains(err.Error(), "agents only until Stage 5") {
-		t.Errorf("local option: %v", err)
+	if _, err := c.Resolve(p); err == nil || !strings.Contains(err.Error(), "local packages need a workspace") {
+		t.Errorf("local option without a workspace: %v", err)
 	}
 }
 

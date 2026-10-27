@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,43 +17,129 @@ import (
 	"github.com/jbigler/railswitch/internal/pack/builtin"
 )
 
-// Catalog is every package available to a project.
+// Catalog is every package available to a project: the built-ins, plus the
+// workspace-local packages (Ref.Local) loaded so far. A local package is
+// read on demand, the first time its ref is looked up (D43), so a broken
+// package no ref names breaks nothing.
 type Catalog struct {
 	Packs   map[Ref]*Pack
 	Options map[Ref]*Option
 	Tools   map[string]*Tool
-	Agents  map[Ref]*Agent // built-in and workspace-local (Ref.Local) agent packages
+	Agents  map[Ref]*Agent
+	Root    string // the workspace local refs read from; "" for none
 }
 
 // LoadBuiltins loads the packages embedded in railswitch.
 func LoadBuiltins() (*Catalog, error) { return Load(builtin.FS) }
 
-// LoadCatalog is a workspace's catalog: the built-ins plus the agent
-// packages under root/agents/. Every place that resolves a workspace's
-// stack loads it through here.
+// LoadCatalog is a workspace's catalog: the built-ins, with local refs read
+// from root/packs/, root/options/ and root/agents/ on demand. Every place
+// that resolves a workspace's stack loads it through here.
 func LoadCatalog(root string) (*Catalog, error) {
 	c, err := LoadBuiltins()
 	if err != nil {
 		return nil, err
 	}
-	if err := LoadLocalAgents(c, root); err != nil {
-		return nil, err
-	}
+	c.Root = root
 	return c, nil
 }
 
-// LoadLocalAgents adds root/agents/<name>/agent.toml to c as
-// Ref{Local: true}. A root without agents/ adds nothing.
-func LoadLocalAgents(c *Catalog, root string) error {
-	if c.Agents == nil {
-		c.Agents = map[Ref]*Agent{}
+// Pack is the pack r names: a built-in (nil when there is none) or, for a
+// local ref, root/packs/<name>/, loaded once.
+func (c *Catalog) Pack(r Ref) (*Pack, error) {
+	if p, ok := c.Packs[r]; ok || !r.Local {
+		return p, nil
 	}
-	l := &loader{fsys: os.DirFS(root), bases: map[int]string{}, names: map[string]string{}}
-	l.agents(c, true)
+	l, dir, err := c.local(r, "packs")
+	if err != nil {
+		return nil, err
+	}
+	var p Pack
+	if l.decode(dir, "pack.toml", &p) {
+		p.Files = l.sub(dir)
+		if l.checkPack(dir, &p) {
+			l.version(dir+"/pack.toml", p.Version, r)
+		}
+	}
 	if err := errors.Join(l.errs...); err != nil {
-		return fmt.Errorf("%s: %w", root, err)
+		return nil, err
 	}
-	return nil
+	c.Packs[r] = &p
+	return &p, nil
+}
+
+// Option is the option r names, as Pack.
+func (c *Catalog) Option(r Ref) (*Option, error) {
+	if o, ok := c.Options[r]; ok || !r.Local {
+		return o, nil
+	}
+	l, dir, err := c.local(r, "options")
+	if err != nil {
+		return nil, err
+	}
+	var o Option
+	if l.decode(dir, "option.toml", &o) {
+		o.Files = l.sub(dir)
+		if l.checkOption(dir, &o) {
+			l.version(dir+"/option.toml", o.Version, r)
+		}
+	}
+	if err := errors.Join(l.errs...); err != nil {
+		return nil, err
+	}
+	c.Options[r] = &o
+	return &o, nil
+}
+
+// Agent is the agent package r names, as Pack.
+func (c *Catalog) Agent(r Ref) (*Agent, error) {
+	if a, ok := c.Agents[r]; ok || !r.Local {
+		return a, nil
+	}
+	l, dir, err := c.local(r, "agents")
+	if err != nil {
+		return nil, err
+	}
+	var a Agent
+	if l.decode(dir, "agent.toml", &a) {
+		a.Files = l.sub(dir)
+		if l.checkAgent(dir, &a) {
+			l.version(dir+"/agent.toml", a.Version, r)
+		}
+	}
+	if err := errors.Join(l.errs...); err != nil {
+		return nil, err
+	}
+	c.Agents[r] = &a
+	return &a, nil
+}
+
+// local is a loader over the workspace and the package directory of the
+// local ref r under top ("packs", "options", "agents"). Its errors name
+// files relative to the workspace (packs/x/pack.toml).
+func (c *Catalog) local(r Ref, top string) (*loader, string, error) {
+	if c.Root == "" {
+		return nil, "", fmt.Errorf("%s: local packages need a workspace", r)
+	}
+	dir := top + "/" + r.Name
+	fi, err := os.Stat(filepath.Join(c.Root, top, r.Name))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, "", fmt.Errorf("%s: %s does not exist", r, filepath.Join(c.Root, top, r.Name))
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: %w", r, err)
+	}
+	if !fi.IsDir() {
+		return nil, "", fmt.Errorf("%s: %s is not a directory", r, filepath.Join(c.Root, top, r.Name))
+	}
+	return &loader{fsys: os.DirFS(c.Root), bases: map[int]string{}, names: map[string]string{}}, dir, nil
+}
+
+// version checks a local package's version against the ref that names it.
+func (l *loader) version(file string, v int, r Ref) {
+	if v != r.Version {
+		l.add(file, "version %d does not match the ref %s", v, r)
+	}
 }
 
 // Load reads packs/<name>/pack.toml, options/<name>/option.toml,
@@ -96,7 +183,16 @@ func Load(fsys fs.FS) (*Catalog, error) {
 			c.Tools[t.Name] = &t
 		}
 	}
-	l.agents(c, false)
+	for _, dir := range l.dirs("agents") {
+		var a Agent
+		if !l.decode(dir, "agent.toml", &a) {
+			continue
+		}
+		a.Files = l.sub(dir)
+		if l.checkAgent(dir, &a) {
+			c.Agents[Ref{Name: a.Name, Version: a.Version}] = &a
+		}
+	}
 	var defaults []string
 	for r, a := range c.Agents {
 		if a.Default {
@@ -121,20 +217,6 @@ func (c *Catalog) DefaultAgent() (Ref, bool) {
 		}
 	}
 	return Ref{}, false
-}
-
-// agents loads agents/<name>/agent.toml into c, keyed with Local set to local.
-func (l *loader) agents(c *Catalog, local bool) {
-	for _, dir := range l.dirs("agents") {
-		var a Agent
-		if !l.decode(dir, "agent.toml", &a) {
-			continue
-		}
-		a.Files = l.sub(dir)
-		if l.checkAgent(dir, &a) {
-			c.Agents[Ref{Name: a.Name, Version: a.Version, Local: local}] = &a
-		}
-	}
 }
 
 var envNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)

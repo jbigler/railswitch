@@ -153,7 +153,8 @@ var (
 	hostRe          = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`)
 )
 
-// LocalPrefix marks a workspace-local package ref, "local:<name>@N" (agents only).
+// LocalPrefix marks a workspace-local package ref, "local:<name>@N" (D43):
+// [stack] pack, [options] and [agents.<n>] use take one.
 const LocalPrefix = "local:"
 
 // reservedAgents are names an agent cannot take: they are subcommands or
@@ -196,7 +197,7 @@ func (p *Project) Validate() error {
 	}
 
 	if p.From != "" {
-		v.ref("from", p.From)
+		v.ref("from", p.From, false)
 	}
 	if err := naming.ValidPrefix(p.Project.Prefix); err != nil {
 		v.add("project.prefix", "%v", err)
@@ -205,7 +206,7 @@ func (p *Project) Validate() error {
 	v.oneLine("project.repo", p.Project.Repo)
 	v.oneLine("project.base_branch", p.Project.BaseBranch)
 
-	v.ref("stack.pack", p.Stack.Pack)
+	v.ref("stack.pack", p.Stack.Pack, true)
 	if err := naming.ValidService(p.Stack.App); err != nil {
 		v.add("stack.app", "%v", err)
 	}
@@ -217,7 +218,7 @@ func (p *Project) Validate() error {
 			continue
 		}
 		if ref := p.Options[slot]; ref != "none" {
-			v.ref(path, ref)
+			v.ref(path, ref, true)
 		}
 	}
 
@@ -329,13 +330,7 @@ func (p *Project) Validate() error {
 			v.add(path, "%q is a reserved agent name", name)
 		}
 		a := p.Agents[name]
-		if r, ok := strings.CutPrefix(a.Use, LocalPrefix); ok {
-			if !refRe.MatchString(r) {
-				v.add(path+".use", "%q is not a ref name@N or local:name@N, e.g. \"myagent@1\"", a.Use)
-			}
-		} else {
-			v.ref(path+".use", a.Use)
-		}
+		v.ref(path+".use", a.Use, true)
 		switch a.Run {
 		case "", "on-demand", "service":
 		default:
@@ -358,12 +353,15 @@ func (v *validator) add(path, format string, args ...any) {
 	v.errs = append(v.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, args...)))
 }
 
-func (v *validator) ref(path, ref string) {
-	if strings.HasPrefix(ref, LocalPrefix) {
-		v.add(path, "%q: local: refs are supported for agents only until Stage 5 (D43)", ref)
-		return
-	}
-	if !refRe.MatchString(ref) {
+// ref checks a package ref; local allows "local:name@N" (D43).
+func (v *validator) ref(path, ref string, local bool) {
+	r, isLocal := strings.CutPrefix(ref, LocalPrefix)
+	switch {
+	case isLocal && !local:
+		v.add(path, "%q: local: refs are not allowed here", ref)
+	case !refRe.MatchString(r) && local:
+		v.add(path, "%q is not a ref name@N or local:name@N, e.g. \"postgres@1\"", ref)
+	case !refRe.MatchString(r):
 		v.add(path, "%q is not a ref name@N, e.g. \"postgres@1\"", ref)
 	}
 }

@@ -65,14 +65,14 @@ func workspaceFile(name string) string { return "containerfiles/Containerfile." 
 // package's (built-in or workspace-local).
 func stackBuiltins(st *pack.Stack) map[string]builtin {
 	pk := st.Pack
-	out := map[string]builtin{"base": {ref: pack.Ref{Name: pk.Name, Version: pk.Version}.String(), files: pk.Files, file: pk.Image.File, kind: kindBase}}
+	out := map[string]builtin{"base": {ref: st.PackRef.String(), files: pk.Files, file: pk.Image.File, kind: kindBase}}
 	for _, slot := range config.Slots {
 		ch := st.Options[slot]
 		if ch == nil {
 			continue
 		}
 		o := ch.Option
-		ref := pack.Ref{Name: o.Name, Version: o.Version}.String()
+		ref := ch.Ref.String()
 		if a := o.AppAddon; a != nil {
 			out[cfName(a.File)] = builtin{ref: ref, files: o.Files, file: a.File, kind: kindAddon, os: a.OS}
 		}
@@ -139,7 +139,7 @@ func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bo
 		return err
 	}
 	if b.kind == kindAddon && b.os != st.Pack.Image.OS {
-		return fmt.Errorf("addon %s of %s is for os %q, but pack %s@%d builds on os %q", name, b.ref, b.os, st.Pack.Name, st.Pack.Version, st.Pack.Image.OS)
+		return fmt.Errorf("addon %s of %s is for os %q, but pack %s builds on os %q", name, b.ref, b.os, st.PackRef, st.Pack.Image.OS)
 	}
 	def, err := fs.ReadFile(b.files, b.file)
 	if err != nil {
@@ -395,18 +395,16 @@ func containerfileNew(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	cat, err := pack.LoadCatalog(root)
+	p, cat, st, err := projectStack(root)
 	if err != nil {
 		return e.fail(err)
 	}
-	if builtinNames(cat)[name] {
+	// The built-ins' names, and the stack's own (its local packages load on
+	// demand, so builtinNames alone never sees them).
+	if _, ok := stackBuiltins(st)[name]; ok || builtinNames(cat)[name] {
 		return e.usageErr("containerfile new: %s is a built-in Containerfile; use railswitch containerfile eject %s", name, name)
 	}
 	proj := filepath.Join(root, "project.toml")
-	p, err := config.Load(proj)
-	if err != nil {
-		return e.fail(err)
-	}
 	rel := workspaceFile(name)
 	skeleton := "# Addon for " + p.Project.Name + `. railswitch builds it on the previous image in the chain (see: railswitch containerfile list).
 ARG BASE_IMAGE

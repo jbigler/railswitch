@@ -250,9 +250,7 @@ func serverUnits(t *testing.T, server string) map[string][]byte {
 		t.Fatal(err)
 	}
 	ws := fixtureWS(t)
-	if err := pack.LoadLocalAgents(cat, ws); err != nil {
-		t.Fatal(err)
-	}
+	cat.Root = ws // the fixture's local agents load on demand
 	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
 	if err != nil {
 		t.Fatal(err)

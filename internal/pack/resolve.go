@@ -14,6 +14,7 @@ import (
 // each slot and its enabled tools.
 type Stack struct {
 	Pack    *Pack
+	PackRef Ref                // the ref [stack] pack names (Local for a workspace pack)
 	Options map[string]*Chosen // slot → chosen; "none" (or absent) slots are absent
 	Tools   []*Tool
 	Agents  []*ChosenAgent // sorted by Name
@@ -30,9 +31,10 @@ type ChosenAgent struct {
 	Allow   []string          // package allow + project allow, deduplicated in order
 }
 
-// Chosen is the option a slot runs, and the service id it runs as.
+// Chosen is the option a slot runs, its ref and the service id it runs as.
 type Chosen struct {
 	Option  *Option
+	Ref     Ref
 	Service string
 }
 
@@ -48,12 +50,15 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stack.pack: %w", err)
 	}
-	pk := c.Packs[ref]
+	pk, err := c.Pack(ref)
+	if err != nil {
+		return nil, fmt.Errorf("stack.pack: %w", err)
+	}
 	if pk == nil {
 		return nil, fmt.Errorf("stack.pack: unknown pack %s (available: %s)", ref, refList(slices.Collect(maps.Keys(c.Packs))))
 	}
 
-	s := &Stack{Pack: pk, Options: map[string]*Chosen{}}
+	s := &Stack{Pack: pk, PackRef: ref, Options: map[string]*Chosen{}}
 	var errs []error
 	for _, slot := range config.Slots {
 		v := p.Options[slot]
@@ -65,7 +70,11 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 			errs = append(errs, fmt.Errorf("options.%s: %w", slot, err))
 			continue
 		}
-		o := c.Options[r]
+		o, err := c.Option(r)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("options.%s: %w", slot, err))
+			continue
+		}
 		if o == nil || o.Slot != slot {
 			errs = append(errs, fmt.Errorf("options.%s: unknown option %s (available for %s: %s)", slot, r, slot, c.slotRefs(slot)))
 			continue
@@ -74,7 +83,7 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 			errs = append(errs, fmt.Errorf("options.%s: %s does not work with pack %s (works with: %s)", slot, r, pk.Name, strings.Join(o.WorksWith, ", ")))
 			continue
 		}
-		s.Options[slot] = &Chosen{Option: o, Service: o.Service}
+		s.Options[slot] = &Chosen{Option: o, Ref: r, Service: o.Service}
 	}
 	for _, slot := range config.Slots {
 		ch := s.Options[slot]
@@ -98,12 +107,16 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 
 	for _, name := range slices.Sorted(maps.Keys(p.Agents)) {
 		pa := p.Agents[name]
-		r, err := ParseAgentRef(pa.Use)
+		r, err := ParseRef(pa.Use)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("agents.%s.use: %w", name, err))
 			continue
 		}
-		a := c.Agents[r]
+		a, err := c.Agent(r)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("agents.%s.use: %w", name, err))
+			continue
+		}
 		if a == nil {
 			errs = append(errs, fmt.Errorf("agents.%s.use: unknown agent package %s (available: %s)", name, r, refList(slices.Collect(maps.Keys(c.Agents)))))
 			continue
@@ -174,7 +187,7 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 		if ch := s.Options[slot]; ch != nil {
 			o := ch.Option
 			who := fmt.Sprintf("options.%s (%s)", slot, o.Name)
-			pkg := "option " + Ref{Name: o.Name, Version: o.Version}.String()
+			pkg := "option " + ch.Ref.String()
 			if o.AppAddon != nil {
 				claimFile(o.AppAddon.File, who, pkg)
 			}
@@ -186,6 +199,35 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 	}
 	for _, a := range s.Agents {
 		claimFile(a.Agent.Image.File, fmt.Sprintf("agents.%s (%s)", a.Name, a.Ref), "agent "+a.Ref.String())
+	}
+
+	// Host port = base + worktree ID and the registry keys ports by name, so
+	// each base and each name belongs to one package of the project. The
+	// built-ins are checked against each other at load; a local package is
+	// only checked here.
+	baseOwner, nameOwner := map[int]string{}, map[string]string{}
+	claimPorts := func(who string, ports []Port) {
+		for _, pt := range ports {
+			if prev, ok := baseOwner[pt.Base]; ok && prev != who {
+				errs = append(errs, fmt.Errorf("ports: base %d is used by %s and %s", pt.Base, prev, who))
+			} else {
+				baseOwner[pt.Base] = who
+			}
+			if prev, ok := nameOwner[pt.Name]; ok && prev != who {
+				errs = append(errs, fmt.Errorf("ports: name %q is used by %s and %s", pt.Name, prev, who))
+			} else {
+				nameOwner[pt.Name] = who
+			}
+		}
+	}
+	claimPorts("pack "+ref.String(), pk.Ports)
+	for _, slot := range config.Slots {
+		if ch := s.Options[slot]; ch != nil {
+			claimPorts("option "+ch.Ref.String(), ch.Option.Ports)
+		}
+	}
+	for _, t := range s.Tools {
+		claimPorts("tool "+t.Name, t.Ports)
 	}
 
 	if err := errors.Join(errs...); err != nil {

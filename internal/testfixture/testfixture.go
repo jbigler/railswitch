@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/pack/builtin"
 )
@@ -22,7 +23,7 @@ type defaultFile struct {
 // writes the built-in default Containerfiles into its containerfiles/, as
 // railswitch project new ejects them, so the fixture can't drift from the
 // built-ins: the pack's, options', tools', agent-base and every agent
-// package's of its catalog (built-in and the fixture's own agents/).
+// package's the fixture's project uses (built-in or its own agents/).
 func Workspace(t testing.TB, dir string) string {
 	t.Helper()
 	ws := filepath.Join(t.TempDir(), filepath.Base(dir))
@@ -33,6 +34,14 @@ func Workspace(t testing.TB, dir string) string {
 		t.Fatal(err)
 	}
 	cat, err := pack.LoadCatalog(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := config.Load(filepath.Join(ws, "project.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := cat.Resolve(p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +56,8 @@ func Workspace(t testing.TB, dir string) string {
 		{cat.Options[pack.Ref{Name: "playwright", Version: 1}].Files, "Containerfile.playwright"},
 		{agentBase, "Containerfile.agent-base"},
 	}
-	for _, a := range cat.Agents {
-		defaults = append(defaults, defaultFile{a.Files, a.Image.File})
+	for _, a := range st.Agents {
+		defaults = append(defaults, defaultFile{a.Agent.Files, a.Agent.Image.File})
 	}
 	if err := os.Mkdir(filepath.Join(ws, "containerfiles"), 0o755); err != nil {
 		t.Fatal(err)

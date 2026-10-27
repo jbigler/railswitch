@@ -41,6 +41,10 @@ type Cmd struct {
 	// and returns at once, without waiting (a new terminal window that
 	// outlives railswitch). Stdin, Stdout, Stderr and Timeout are ignored.
 	Detach bool
+	// KillGrace > 0 runs the command in its own process group even when
+	// untimed; cancellation sends SIGTERM to the group, then SIGKILL to
+	// the group after KillGrace.
+	KillGrace time.Duration
 }
 
 // Result is the outcome of a command.
@@ -96,7 +100,18 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	if c.Stderr != nil {
 		cmd.Stderr = io.MultiWriter(c.Stderr, &tail)
 	}
-	if timed {
+	switch {
+	case c.KillGrace > 0:
+		// A graceful group: SIGTERM first so the command can clean up, then
+		// SIGKILL for whatever is left of the group after the grace.
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.Cancel = func() error {
+			pgid := cmd.Process.Pid
+			time.AfterFunc(c.KillGrace, func() { _ = syscall.Kill(-pgid, syscall.SIGKILL) })
+			return syscall.Kill(-pgid, syscall.SIGTERM)
+		}
+		cmd.WaitDelay = c.KillGrace + 2*time.Second
+	case timed:
 		// A timed call gets its own process group so a timeout kills the
 		// whole group. Untimed (interactive) calls stay in the caller's
 		// foreground group so tty reads and Ctrl-C keep working.
@@ -104,8 +119,10 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		cmd.Cancel = func() error {
 			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
+		cmd.WaitDelay = 2 * time.Second
+	default:
+		cmd.WaitDelay = 2 * time.Second
 	}
-	cmd.WaitDelay = 2 * time.Second
 
 	err := cmd.Run()
 	res := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}

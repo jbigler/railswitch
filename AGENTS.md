@@ -35,7 +35,8 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D71: `docs/superpowers/plans/2026-10-
 ## Package map
 - `cmd/railswitch` — entry point → `cli.Main`.
 - `internal/cli` — flag dispatch, one file per command group.
-- `internal/sys` (+ `systest`) — Runner/Cmd/Result, Fake runner.
+- `internal/sys` (+ `systest`) — Runner/Cmd/Result, Fake runner; `Cmd.KillGrace` (own process group, SIGTERM then SIGKILL on cancel).
+- `internal/jobs` — the dashboard's job hub: one child per job in a `systemd-run --user --scope`, log file 0600, kept output capped, one job per worktree (project-level jobs block the project), last 20 kept.
 - `internal/safefile` — hostile-file reads. `internal/naming` — sanitize, object/unit names.
 - `internal/placeholder`, `internal/config`, `internal/pack` (+ `builtin`; the package format and local packs: `docs/packs.md`), `internal/version`.
 - `internal/machine` — dirs, registry, proxy, machine config.

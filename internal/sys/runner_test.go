@@ -98,6 +98,41 @@ func TestExecProcessGroup(t *testing.T) {
 	}
 }
 
+func TestKillGraceTERMThenKILL(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(100*time.Millisecond, cancel)
+	start := time.Now()
+	_, err := Exec{}.Run(ctx, Cmd{
+		Name:      "sh",
+		Args:      []string{"-c", `trap "" TERM; sleep 30`},
+		Timeout:   NoTimeout,
+		KillGrace: 200 * time.Millisecond,
+	})
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("took %v", d)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want Canceled", err)
+	}
+}
+
+func TestKillGraceTERMHonoured(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(200*time.Millisecond, cancel)
+	r, err := Exec{}.Run(ctx, Cmd{
+		Name:      "sh",
+		Args:      []string{"-c", `trap "exit 3" TERM; sleep 30 & wait`},
+		Timeout:   NoTimeout,
+		KillGrace: 5 * time.Second,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want Canceled", err)
+	}
+	if r.ExitCode != 3 {
+		t.Fatalf("ExitCode = %d, want 3 (TERM trap ran)", r.ExitCode)
+	}
+}
+
 func TestExecExitErrorMessage(t *testing.T) {
 	_, err := Exec{}.Run(context.Background(), Cmd{Name: "false"})
 	if strings.HasSuffix(err.Error(), ": ") || strings.HasSuffix(err.Error(), ":") {

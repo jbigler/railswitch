@@ -33,8 +33,9 @@ services, tools), and sorted by `name` within each service. With a
 
 The image builds of the current worktree (`-w <slug>`, or the worktree the
 working directory is in), in build order: the base chain (`[image] base`,
-then each `[image] addons` entry), then each tool image, then each
-standalone option image. Then the project's warnings, e.g. an option's
+then each `[image] addons` entry), then each tool image, then, when the
+project has agents, `agent-base` (on the base) and one `agent <pkg>` step per
+agent package (on `agent-base`), then each standalone option image. Then the project's warnings, e.g. an option's
 suggested addon that is missing from `[image] addons`.
 
 ```json
@@ -42,6 +43,8 @@ suggested addon that is missing from `[image] addons`.
   "steps": [
     {"name": "base", "file": "containerfiles/Containerfile.base", "tag": "localhost/filial/base:ruby3.3.6-node22.11.0-11d1777c", "from": ["docker.io/library/node:22.11.0-slim", "docker.io/library/ruby:3.3.6-slim"]},
     {"name": "addon pg-client", "file": "containerfiles/Containerfile.pg-client", "tag": "localhost/filial/base:ruby3.3.6-node22.11.0-ba118cc2", "from": []},
+    {"name": "agent-base", "file": "containerfiles/Containerfile.agent-base", "tag": "localhost/filial/agent-base:ruby3.3.6-node22.11.0-3f2a9c10", "from": []},
+    {"name": "agent claude", "file": "containerfiles/Containerfile.claude", "tag": "localhost/filial/agent-claude:ruby3.3.6-node22.11.0-7d41e0b2", "from": []},
     {"name": "playwright", "file": "containerfiles/Containerfile.playwright", "tag": "localhost/filial/playwright:1.54.0-8ed7a43c", "from": ["mcr.microsoft.com/playwright:v1.54.0-noble"]}
   ],
   "warnings": []
@@ -51,8 +54,8 @@ suggested addon that is missing from `[image] addons`.
 | Field | Type | Meaning |
 |---|---|---|
 | `steps` | array | One object per `podman build`, in build order. |
-| `steps[].name` | string | `base`, `addon <name>` for an `[image] addons` entry, a tool's name (`nvim`), or a standalone option image's name (`playwright`). |
-| `steps[].file` | string | The Containerfile, relative to the workspace: `containerfiles/Containerfile.<name>`. |
+| `steps[].name` | string | `base`, `addon <name>` for an `[image] addons` entry, a tool's name (`nvim`), `agent-base`, `agent <pkg>` for an agent package (`agent claude`), or a standalone option image's name (`playwright`). |
+| `steps[].file` | string | The Containerfile, relative to the workspace: `containerfiles/Containerfile.<name>`; `containerfiles/Containerfile.agent-base` for `agent-base` and `containerfiles/Containerfile.<pkg>` for `agent <pkg>`. |
 | `steps[].tag` | string | The image tag it builds: `localhost/<prefix>/<repo>:<version>-<hash8>` (D9). |
 | `steps[].from` | array of strings | The file's `FROM` images with build args expanded, without `${BASE_IMAGE}`, `scratch` and stage names (D36). Empty for an addon that only builds on the previous step. |
 | `warnings` | array of strings | Non-fatal findings; empty when there are none. |
@@ -194,8 +197,12 @@ machine config has `[[mount]]` entries (D57); it fails when a non-optional
 source is missing. `git-guard` (inside a workspace, D60) compares the base
 worktree's installed git hooks to their backups in the workspace repo's
 `githooks/`, checks the key names (never the values) of its `.git/config`,
-`.git/config.worktree` and `.git/worktrees/*/config.worktree` (those that
-exist) against an allowlist and each linked worktree's `.git` pointer; a finding
+`.git/config.worktree`, `.git/worktrees/*/config.worktree` and the submodule
+git dirs' `.git/modules/**/config` (those that exist) against an allowlist,
+that no `.git/commondir` (nor one in `modules/**`) exists, that each
+`.git/worktrees/*/commondir` reads `../..` and each `*/gitdir` names a
+registered worktree's `.git`, that each linked worktree's `.git` pointer names
+such an entry, and reports any hook in `.git/modules/**/hooks/`; a finding
 is a warning (`warn` true), and `railswitch hooks check` lists them.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.

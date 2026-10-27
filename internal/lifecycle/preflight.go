@@ -87,8 +87,8 @@ func (l *L) warnNotIsolated(ctx context.Context) {
 }
 
 // warnGitGuard prints a WARNING when git-guard finds something to review
-// (D60): a hook without a backup or unlike it, an unusual .git/config key,
-// a worktree's .git pointing elsewhere. It never refuses; a failed check is
+// (D60): a hook without a backup or unlike it, an unusual config key, a
+// commondir or worktree gitdir/pointer redirecting git, a submodule hook. It never refuses; a failed check is
 // a warning too.
 func (l *L) warnGitGuard(ctx context.Context) {
 	fs, err := l.WS.GitGuard(ctx, l.R)

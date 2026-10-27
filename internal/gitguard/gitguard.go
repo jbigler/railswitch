@@ -2,10 +2,13 @@
 // (D60). Containers mount the base worktree's .git writable (commits, hook
 // editing), so the places where a write becomes code the host's git runs
 // are watched: the installed hooks against their backups in the workspace
-// repo's githooks/ (tracked, D38), the key names of .git/config against an
-// allowlist (never their values: a remote URL can carry a credential), and
-// each linked worktree's .git pointer. Nothing refuses: findings are
-// warnings.
+// repo's githooks/ (tracked, D38), the key names of the config files
+// (.git/config, config.worktree, worktrees/*/config.worktree and the
+// submodule gitdirs' under modules/**) against an allowlist (never their
+// values: a remote URL can carry a credential), the commondir redirections
+// (none in .git or modules/**, "../.." in each worktrees/*), each
+// worktrees/*/gitdir, each linked worktree's .git pointer and any hook in
+// modules/**. Nothing refuses: findings are warnings.
 package gitguard
 
 import (
@@ -28,7 +31,8 @@ import (
 )
 
 // Finding is one thing to review. Kind is hook-missing-backup, hook-differs,
-// hook-not-installed, config-key or pointer; Path is the file concerned.
+// hook-not-installed, config-key, pointer, commondir, gitdir or
+// submodule-hook; Path is the file concerned, printable.
 type Finding struct {
 	Kind, Path, Detail string
 }
@@ -39,7 +43,7 @@ func (f Finding) String() string { return f.Kind + " " + f.Path + ": " + f.Detai
 // normal use; any other is a finding. Widen it when a legitimate tool adds
 // one. extensions.worktreeconfig is not in it: Check reads every
 // config.worktree too, but enabling them is still worth a look.
-var ConfigAllowed = regexp.MustCompile(`^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks)|branch\..+\.(remote|merge|rebase|pushremote|description)|remote\..+\.(url|pushurl|fetch|tagopt|prune|gh-resolved)|remote\.pushdefault|rerere\.(enabled|autoupdate)|user\.(name|email))$`)
+var ConfigAllowed = regexp.MustCompile(`^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|worktree)|submodule\..+\.(url|active|branch)|branch\..+\.(remote|merge|rebase|pushremote|description)|remote\..+\.(url|pushurl|fetch|tagopt|prune|gh-resolved)|remote\.pushdefault|rerere\.(enabled|autoupdate)|user\.(name|email))$`)
 
 // BackupDir is the workspace repo's hook backups, relative to its root.
 const BackupDir = "githooks"
@@ -48,11 +52,21 @@ const BackupDir = "githooks"
 const pointerLimit = 4096
 
 // Check compares baseDir's installed hooks to ws's backups byte for byte
-// (and the executable bit), checks the key names of baseDir's .git/config,
-// .git/config.worktree and .git/worktrees/*/config.worktree against
-// ConfigAllowed, and checks the .git pointer of each linked
-// worktree slugs (<ws>/<slug>/.git; a missing one is skipped). A base
-// worktree without .git has nothing to guard.
+// (and the executable bit) and checks every place a write in baseDir's .git
+// redirects host git to a config or hooks the writer chose:
+//   - the key names of .git/config, .git/config.worktree and
+//     .git/worktrees/*/config.worktree against ConfigAllowed;
+//   - .git/commondir must not exist;
+//   - each .git/worktrees/<name>/ must have commondir "../.." and gitdir
+//     <ws>/<slug>/.git for one of slugs;
+//   - each linked worktree's pointer <ws>/<slug>/.git must name such a
+//     <name> (a missing pointer is skipped);
+//   - submodule gitdirs under .git/modules/**: config key names, no
+//     commondir, and every installed hook (kind submodule-hook).
+//
+// A config file that cannot be read is its own finding. Paths are made
+// printable (a container chooses names under worktrees/ and modules/). A
+// base worktree without .git has nothing to guard.
 func Check(ctx context.Context, r sys.Runner, ws, baseDir string, slugs []string) ([]Finding, error) {
 	git := filepath.Join(baseDir, ".git")
 	if fi, err := os.Lstat(git); errors.Is(err, fs.ErrNotExist) {
@@ -66,19 +80,143 @@ func Check(ctx context.Context, r sys.Runner, ws, baseDir string, slugs []string
 	if err != nil {
 		return nil, err
 	}
-	for _, path := range configFiles(git) {
-		cfg, err := checkConfig(ctx, r, ws, path)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, cfg...)
+	configs := configFiles(git)
+	out = append(out, noCommondir(git)...)
+	wt, good := checkWorktrees(ws, git, slugs)
+	out = append(out, wt...)
+	mods, modConfigs := checkModules(filepath.Join(git, "modules"))
+	out = append(out, mods...)
+	for _, path := range append(configs, modConfigs...) {
+		out = append(out, checkConfig(ctx, r, ws, path)...)
 	}
 	for _, slug := range slugs {
-		if f, ok := checkPointer(ws, baseDir, slug); !ok {
+		if f, ok := checkPointer(ws, baseDir, slug, good); !ok {
 			out = append(out, f)
 		}
 	}
+	for i := range out {
+		out[i].Path, out[i].Detail = printable(out[i].Path), printable(out[i].Detail)
+	}
 	return out, nil
+}
+
+// noCommondir reports gitDir/commondir when it exists: host git would read
+// that dir's config and hooks instead.
+func noCommondir(gitDir string) []Finding {
+	path := filepath.Join(gitDir, "commondir")
+	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return []Finding{{"commondir", path, "exists: host git reads the config and hooks of the dir it names; remove it"}}
+}
+
+// checkWorktrees checks every entry of git/worktrees/ (not only those of
+// slugs: a pointer may name any): commondir must read "../.." and gitdir
+// <ws>/<slug>/.git for one of slugs. good are the entries that pass.
+func checkWorktrees(ws, git string, slugs []string) (out []Finding, good map[string]bool) {
+	good = map[string]bool{}
+	dir := filepath.Join(git, "worktrees")
+	entries, err := os.ReadDir(dir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return []Finding{{"commondir", dir, fmt.Sprintf("unreadable (%v)", err)}}, good
+	}
+	gitdirs := map[string]bool{}
+	wsReal, _ := filepath.EvalSymlinks(ws)
+	for _, slug := range slugs {
+		gitdirs[filepath.Join(ws, slug, ".git")] = true
+		if wsReal != "" {
+			gitdirs[filepath.Join(wsReal, slug, ".git")] = true
+		}
+	}
+	for _, e := range entries {
+		name, path := e.Name(), filepath.Join(dir, e.Name())
+		if !e.IsDir() {
+			out = append(out, Finding{"commondir", path, "not a directory"})
+			continue
+		}
+		ok := true
+		cd := filepath.Join(path, "commondir")
+		if line, err := readLine(cd); err != nil {
+			ok = false
+			out = append(out, Finding{"commondir", cd, fmt.Sprintf("unreadable (%v); it must read ../..", err)})
+		} else if line != "../.." {
+			ok = false
+			out = append(out, Finding{"commondir", cd, fmt.Sprintf("reads %q; it must read ../..", line)})
+		}
+		gd := filepath.Join(path, "gitdir")
+		if line, err := readLine(gd); err != nil {
+			ok = false
+			out = append(out, Finding{"gitdir", gd, fmt.Sprintf("unreadable (%v); it must name a worktree's .git under %s", err, ws)})
+		} else if !gitdirs[line] {
+			ok = false
+			out = append(out, Finding{"gitdir", gd, fmt.Sprintf("reads %q, not a worktree's .git under %s", line, ws)})
+		}
+		if ok {
+			good[name] = true
+		}
+	}
+	return out, good
+}
+
+// readLine is a small file a container may have written, one trailing
+// newline trimmed.
+func readLine(path string) (string, error) {
+	data, err := safefile.Read(path, pointerLimit)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(string(data), "\n"), nil
+}
+
+// checkModules walks the submodule gitdirs under dir (.git/modules; names
+// may hold slashes and submodules nest under <gitdir>/modules). A dir with
+// a HEAD or config is a gitdir: it must have no commondir, and every hook
+// installed in it is a finding. configs are its config files to check.
+func checkModules(dir string) (out []Finding, configs []string) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return []Finding{{"submodule-hook", dir, fmt.Sprintf("unreadable (%v)", err)}}, nil
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		if !isGitDir(path) {
+			o, c := checkModules(path)
+			out, configs = append(out, o...), append(configs, c...)
+			continue
+		}
+		out = append(out, noCommondir(path)...)
+		for _, f := range []string{"config", "config.worktree"} {
+			if _, err := os.Lstat(filepath.Join(path, f)); err == nil {
+				configs = append(configs, filepath.Join(path, f))
+			}
+		}
+		hooks := filepath.Join(path, "hooks")
+		names, err := hookNames(hooks)
+		if err != nil {
+			out = append(out, Finding{"submodule-hook", hooks, fmt.Sprintf("unreadable (%v)", err)})
+		}
+		for _, n := range names {
+			out = append(out, Finding{"submodule-hook", filepath.Join(hooks, n), "a hook in a submodule's git dir runs on the host; read it, and remove it unless it is yours"})
+		}
+		o, c := checkModules(filepath.Join(path, "modules"))
+		out, configs = append(out, o...), append(configs, c...)
+	}
+	return out, configs
+}
+
+func isGitDir(path string) bool {
+	for _, f := range []string{"HEAD", "config"} {
+		if _, err := os.Lstat(filepath.Join(path, f)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func hooksDir(baseDir string) string { return filepath.Join(baseDir, ".git", "hooks") }
@@ -188,7 +326,7 @@ func configFiles(git string) []string {
 // checkConfig lists the key names of the config file path (never values)
 // and reports each outside ConfigAllowed. Host git runs defused (no hooks,
 // no fsmonitor) in ws, the workspace repo.
-func checkConfig(ctx context.Context, r sys.Runner, ws, path string) ([]Finding, error) {
+func checkConfig(ctx context.Context, r sys.Runner, ws, path string) []Finding {
 	res, err := r.Run(ctx, sys.Cmd{
 		Name: "git",
 		Args: []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "config", "--file", path, "--name-only", "--list"},
@@ -196,9 +334,9 @@ func checkConfig(ctx context.Context, r sys.Runner, ws, path string) ([]Finding,
 	})
 	if err != nil {
 		if errors.Is(err, sys.ErrExit) {
-			return []Finding{{"config-key", path, "does not parse (git config exit " + strconv.Itoa(res.ExitCode) + "): inspect it"}}, nil
+			return []Finding{{"config-key", path, "does not parse (git config exit " + strconv.Itoa(res.ExitCode) + "): inspect it"}}
 		}
-		return nil, err
+		return []Finding{{"config-key", path, fmt.Sprintf("could not read (%v): inspect it", err)}}
 	}
 	var out []Finding
 	seen := map[string]bool{}
@@ -209,7 +347,7 @@ func checkConfig(ctx context.Context, r sys.Runner, ws, path string) ([]Finding,
 		seen[name] = true
 		out = append(out, Finding{"config-key", path, printable(name)})
 	}
-	return out, nil
+	return out
 }
 
 // printable is s, quoted when it holds a control character (a subsection
@@ -223,9 +361,10 @@ func printable(s string) string {
 
 // checkPointer checks <ws>/<slug>/.git reads exactly
 // "gitdir: <base>/.git/worktrees/<name>": anywhere else, host git in that
-// worktree reads a config and hooks the writer chose. ok is true when it
-// does, or when the file is missing (no such worktree yet).
-func checkPointer(ws, baseDir, slug string) (Finding, bool) {
+// worktree reads a config and hooks the writer chose. <name> must be one of
+// good (checkWorktrees). ok is true when it does, or when the file is
+// missing (no such worktree yet).
+func checkPointer(ws, baseDir, slug string, good map[string]bool) (Finding, bool) {
 	path := filepath.Join(ws, slug, ".git")
 	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
 		return Finding{}, true
@@ -238,7 +377,10 @@ func checkPointer(ws, baseDir, slug string) (Finding, bool) {
 	line := strings.TrimSuffix(string(data), "\n")
 	if name, ok := strings.CutPrefix(line, "gitdir: "+want+"/"); ok &&
 		name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\n\r") {
-		return Finding{}, true
+		if good[name] {
+			return Finding{}, true
+		}
+		return Finding{"pointer", path, fmt.Sprintf("names %s, which is missing or fails its commondir/gitdir check", printable(filepath.Join(want, name)))}, false
 	}
 	return Finding{"pointer", path, fmt.Sprintf("does not point into %s: %q", want, line)}, false
 }

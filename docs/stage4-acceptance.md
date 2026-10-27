@@ -107,6 +107,7 @@ railswitch exec -- touch .git/hooks/x       # app (base worktree): fails, read-o
 railswitch nvim                             # then in nvim: :!touch .git/hooks/x  -> fails
 railswitch agent <n> -- sh -c 'touch /app/.git/hooks/x'   # fails, read-only file system
 railswitch hooks check                      # lists findings; same as doctor's git-guard warning
+railswitch agent <n> -- sh -c 'echo /tmp > /app/.git/commondir'  # then: railswitch hooks check -> commondir finding; rm .git/commondir
 ```
 
 In a linked worktree, `<base>/.git/hooks` is read-only at its host path too

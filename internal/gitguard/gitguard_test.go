@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -161,6 +162,132 @@ func TestCheckNoRepo(t *testing.T) {
 	if err != nil || len(got) != 0 {
 		t.Fatalf("Check = %+v, %v", got, err)
 	}
+}
+
+// has fails unless got holds a finding of kind at path.
+func has(t *testing.T, got []Finding, kind, path string) {
+	t.Helper()
+	for _, f := range got {
+		if f.Kind == kind && f.Path == path {
+			return
+		}
+	}
+	t.Fatalf("findings = %+v, want a %s at %s", got, kind, path)
+}
+
+// commondir redirection: git honours a commondir file in any gitdir and
+// then reads that dir's config and hooks (A-I1).
+func TestCheckCommondir(t *testing.T) {
+	ws, base := repo(t)
+	gitDir := filepath.Join(base, ".git")
+	feat := filepath.Join(gitDir, "worktrees", "feat")
+
+	cd := filepath.Join(feat, "commondir")
+	write(t, cd, filepath.Join(ws, "feat", "evil")+"\n", 0o644)
+	pointer := filepath.Join(ws, "feat", ".git")
+	// The feat pointer names a worktrees entry that fails: reported too.
+	got := check(t, ws, base)
+	has(t, got, "commondir", cd)
+	has(t, got, "pointer", pointer)
+	write(t, cd, "../..\n", 0o644)
+	if got := check(t, ws, base); len(got) != 0 {
+		t.Fatalf("restored commondir: %+v", got)
+	}
+	if err := os.Remove(cd); err != nil {
+		t.Fatal(err)
+	}
+	has(t, check(t, ws, base), "commondir", cd)
+	write(t, cd, "../..\n", 0o644)
+
+	baseCD := filepath.Join(gitDir, "commondir")
+	write(t, baseCD, filepath.Join(ws, "evil")+"\n", 0o644)
+	only(t, check(t, ws, base), "commondir", baseCD)
+	if err := os.Remove(baseCD); err != nil {
+		t.Fatal(err)
+	}
+
+	gd := filepath.Join(feat, "gitdir")
+	write(t, gd, "/tmp/elsewhere/.git\n", 0o644)
+	has(t, check(t, ws, base), "gitdir", gd)
+	write(t, gd, filepath.Join(ws, "feat", ".git")+"\n", 0o644)
+
+	// A pointer to worktrees/evil, which has no commondir: git would use
+	// evil/ itself as the common dir.
+	evil := filepath.Join(gitDir, "worktrees", "evil\x1b")
+	write(t, filepath.Join(evil, "HEAD"), "ref: refs/heads/feat\n", 0o644)
+	write(t, pointer, "gitdir: "+evil+"\n", 0o644)
+	got = check(t, ws, base)
+	has(t, got, "pointer", pointer)
+	has(t, got, "commondir", strconv.Quote(filepath.Join(evil, "commondir")))
+	has(t, got, "gitdir", strconv.Quote(filepath.Join(evil, "gitdir")))
+	for _, f := range got {
+		if strings.ContainsRune(f.String(), '\x1b') {
+			t.Errorf("unescaped control character: %q", f.String())
+		}
+	}
+}
+
+// Submodule gitdirs under .git/modules are guarded like the base one.
+func TestCheckSubmodules(t *testing.T) {
+	ws, base := repo(t)
+	sub := filepath.Join(ws, "subsrc")
+	git(t, ws, "init", "-q", "-b", "master", sub)
+	git(t, sub, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
+	git(t, base, "-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "lib/sub")
+	if got := check(t, ws, base); len(got) != 0 {
+		t.Fatalf("clean submodule: %+v", got)
+	}
+	mod := filepath.Join(base, ".git", "modules", "lib", "sub")
+	if _, err := os.Stat(filepath.Join(mod, "HEAD")); err != nil {
+		t.Fatalf("submodule gitdir not at %s: %v", mod, err)
+	}
+
+	git(t, mod, "config", "core.fsmonitor", "/srv/evil")
+	f := only(t, check(t, ws, base), "config-key", filepath.Join(mod, "config"))
+	if f.Detail != "core.fsmonitor" {
+		t.Errorf("detail = %q", f.Detail)
+	}
+	git(t, mod, "config", "--unset", "core.fsmonitor")
+
+	hook := filepath.Join(mod, "hooks", "post-checkout")
+	write(t, hook, "#!/bin/sh\n", 0o755)
+	only(t, check(t, ws, base), "submodule-hook", hook)
+	if err := os.Remove(hook); err != nil {
+		t.Fatal(err)
+	}
+
+	cd := filepath.Join(mod, "commondir")
+	write(t, cd, "/tmp/evil\n", 0o644)
+	only(t, check(t, ws, base), "commondir", cd)
+}
+
+// failRunner fails git config on one file and runs the rest for real.
+type failRunner struct{ path string }
+
+func (f failRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
+	if slices.Contains(c.Args, f.path) {
+		return sys.Result{}, context.DeadlineExceeded
+	}
+	return sys.Exec{}.Run(ctx, c)
+}
+
+// One config file that cannot be read is its own finding; the rest are
+// still checked (A-M3).
+func TestCheckConfigReadFails(t *testing.T) {
+	ws, base := repo(t)
+	wt := filepath.Join(base, ".git", "worktrees", "feat", "config.worktree")
+	write(t, wt, "[user]\n\tname = t\n", 0o644)
+	hook := filepath.Join(base, ".git", "hooks", "pre-commit")
+	write(t, hook, "#!/bin/sh\n", 0o755)
+	got, err := Check(context.Background(), failRunner{wt}, ws, base, []string{"feat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("findings = %+v, want 2", got)
+	}
+	has(t, got, "config-key", wt)
+	has(t, got, "hook-missing-backup", hook)
 }
 
 func TestBackupRestore(t *testing.T) {

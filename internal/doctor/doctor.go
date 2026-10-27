@@ -193,8 +193,8 @@ func descriptor(ws *workspace.Workspace) Check {
 	return exists("firewall descriptor", firewall.DescriptorPath(ws.Root, ws.Project.Project.Prefix), "railswitch render")
 }
 
-// gitGuard is git-guard's check (D60): a hook, .git/config key or worktree
-// pointer to review is a warning, never a failure ("nothing refuses").
+// gitGuard is git-guard's check (D60): a hook, config key, commondir,
+// worktree gitdir or pointer, or submodule hook to review is a warning, never a failure ("nothing refuses").
 func gitGuard(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
 	c := Check{Name: "git-guard", Warn: true, Fix: "railswitch hooks check"}
 	fs, err := ws.GitGuard(ctx, r)
@@ -203,7 +203,7 @@ func gitGuard(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check 
 		return c
 	}
 	if len(fs) == 0 {
-		c.OK, c.Warn, c.Detail = true, false, "hooks match their backups, .git/config keys and worktree pointers as expected"
+		c.OK, c.Warn, c.Detail = true, false, "hooks match their backups; config keys, commondir, worktree gitdirs and pointers, submodule git dirs as expected"
 		return c
 	}
 	parts := make([]string, len(fs))

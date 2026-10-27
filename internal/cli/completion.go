@@ -31,7 +31,7 @@ var completionFiles = map[string]string{
 // subcommands adds its entry here. A command with completionArgs too
 // (agent) offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":         {"ls"},
+	"agent":         {"ls", "stop"},
 	"containerfile": {"eject", "list", "new", "show"},
 	"db":            {"dump"},
 	"fw":            {"allow", "show"},
@@ -85,6 +85,7 @@ var completionArgs = map[string]completer{
 	"containerfile eject": func(_ context.Context, dir string) []string { return containerfileCandidates(dir, false) },
 	"project rm":          prefixCandidates,
 	"agent":               agentCandidates,
+	"agent stop":          agentCandidates,
 }
 
 // railswitch completion bash|zsh|fish: print the shell's completion script.

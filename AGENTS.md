@@ -1,7 +1,7 @@
 # AGENTS.md — railswitch
 
 Go CLI (`railswitch`, module `github.com/jbigler/railswitch`) that runs Rails dev environments on rootless podman via Quadlet.
-Spec: `handoff/HANDOFF.md`; decisions D1–D61: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
+Spec: `handoff/HANDOFF.md`; decisions D1–D62: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
 
 ## Commands
 - `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...`, `go test ./...`.
@@ -9,7 +9,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D61: `docs/superpowers/plans/2026-10-
 - Integration tests carry `//go:build integration`; the full end-to-end test needs a systemd user session and is a manual run.
 
 ## CLI (Stage 4 additions)
-- `agent [--new-term] [<name>] [-- args]` (runs `up` first; on-demand agents get a transient container, service agents are attached to), `--json agent ls`; `project new --agent name=ref` (repeatable) or `--agent none` (default: the built-in package with `default = true`).
+- `agent [--new-term] [<name>] [-- args]` (runs `up` first; on-demand agents get a transient container, service agents are started then attached to; refused while another agent of the worktree runs, D62), `agent stop [<name>]`, `--json agent ls` (rows carry `running`); `up` never starts an agent; `project new --agent name=ref` (repeatable) or `--agent none` (default: the built-in package with `default = true`).
 - `nvim`, `nvim update`, `nvim reset-config [--yes]`; `hooks check | backup [<hook>…] | restore [--force]`; `db dump` (files 0644 in `<ws>/db-dumps/`, dir 0755); `secret add --git-signing` (key piped on stdin).
 - `project.toml`: `[tools.nvim] config_repo`/`config_ref` (replaces `[tools] nvim = true`, which is refused); `[agents.<n>] use` (`<name>@N` or `local:<name>@N` → `<ws>/agents/<name>/`), `run` (`on-demand`|`service`), `env`, `allow`.
 - `config.toml` `[[mount]]` (D57): machine-local mounts per service; `doctor` checks them (`machine mounts`).

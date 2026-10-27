@@ -343,11 +343,7 @@ func (b *builder) services() error {
 	for _, s := range tools {
 		app.Wants = append(app.Wants, s.ID)
 	}
-	for _, s := range agents {
-		if !s.OnDemand {
-			app.Wants = append(app.Wants, s.ID)
-		}
-	}
+	// D62: no agent is wanted; one starts only through `railswitch agent`.
 	for i := range workers {
 		workers[i].Requires = slices.Clone(app.Requires)
 	}

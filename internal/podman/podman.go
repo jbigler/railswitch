@@ -147,6 +147,12 @@ func (p Podman) RemoveContainer(ctx context.Context, name string) error {
 	return err
 }
 
+// Stop runs `podman stop <name>`.
+func (p Podman) Stop(ctx context.Context, name string) error {
+	_, err := p.run(ctx, 0, "stop", name)
+	return err
+}
+
 // RemoveVolume runs `podman volume rm -f <name>`; a missing volume is not an error.
 func (p Podman) RemoveVolume(ctx context.Context, name string) error {
 	r, err := p.run(ctx, 0, "volume", "rm", "-f", name)

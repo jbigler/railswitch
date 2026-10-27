@@ -36,19 +36,25 @@ appends `[agents.probe] use = "local:probe@1"`, `run = "service"`, then runs
 agent-probe` and `secret set claude_token` (values on stdin; a dummy token,
 `claude --version` needs none) and `up`. It checks:
 
-1. `<p>-<slug>-agent-probe.service` is `active`; no
-   `<p>-<slug>-agent-claude.container` unit file exists (on-demand).
+1. After `up`, `<p>-<slug>-agent-probe.service` is not `active` (`up` never
+   starts an agent, D62); no `<p>-<slug>-agent-claude.container` unit file
+   exists (on-demand). The test then runs `systemctl --user start
+   <p>-<slug>-agent-probe.service`, what `railswitch agent probe` does before
+   it attaches (the attach needs a terminal).
 2. `/run/secrets/probe_key` exists in the probe, and `CLAUDE_CODE_OAUTH_TOKEN`
    is not set there (each agent only its own secrets).
-3. `railswitch agent claude -- --version` exits 0 and its last line is a version;
-   `railswitch agent claude -- sh -c 'test ! -e /run/secrets/probe_key'`
-   exits 0 (a first argument without `-` takes the entrypoint's `exec "$@"`).
-4. The probe's annotations: `<p>.firewall=agent-probe`,
+3. The probe's annotations: `<p>.firewall=agent-probe`,
    `<p>.firewall.mode=enforce`.
-5. From the probe, `curl https://api.anthropic.com` fails (exit 7 or 28) and
+4. From the probe, `curl https://api.anthropic.com` fails (exit 7 or 28) and
    `curl https://example.com` succeeds.
-6. `railswitch --json agent ls` lists `claude` (`on-demand`) and `probe`
-   (`service`).
+5. `railswitch --json agent ls` lists `claude` (`on-demand`, `"running": false`)
+   and `probe` (`service`, `"running": true`).
+6. One running agent per worktree (D62): `railswitch agent claude -- --version`
+   fails naming `railswitch agent stop probe`; `railswitch agent stop probe`
+   exits 0; then `railswitch agent claude -- --version` exits 0 and its last
+   line is a version, and `railswitch agent claude -- sh -c 'test ! -e
+   /run/secrets/probe_key'` exits 0 (a first argument without `-` takes the
+   entrypoint's `exec "$@"`).
 
 Cleanup is `project rm <p> --yes --purge`, also when the test fails.
 
@@ -138,6 +144,7 @@ the gap log; nothing Filial-specific goes into the code or built-in packs
 - [ ] `grep -ri filial` over the code and built-in packs finds nothing outside test fixtures;
 - [ ] `grep -ri claude` over the code finds nothing outside `internal/pack/builtin/agents/claude/`;
 - [ ] two agents in one project (the built-in `claude@1` and a minimal test agent package, `CMD ["sh"]`, one `run = "on-demand"`, one `run = "service"`) build on one shared agent base and run through the same `railswitch agent <name>` path, each with only its own secrets and allow list;
+- [ ] at most one agent runs in a worktree (D62): `up` starts none, `railswitch agent <name>` refuses while another runs, `railswitch agent stop` stops it;
 - [ ] every gap Filial hit is closed by a generic feature.
 
 ## Run log

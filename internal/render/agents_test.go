@@ -70,7 +70,7 @@ func TestAgentServices(t *testing.T) {
 			wants = v
 		}
 	}
-	if w := strings.Fields(wants); !slices.Contains(w, "filial-feat-agent-probe.service") || slices.Contains(w, "filial-feat-agent-claude.service") {
+	if w := strings.Fields(wants); slices.Contains(w, "filial-feat-agent-probe.service") || slices.Contains(w, "filial-feat-agent-claude.service") {
 		t.Errorf("rails Wants=%s", wants)
 	}
 	if _, ok := units["filial-feat-agent-claude.container"]; ok {
@@ -198,5 +198,21 @@ func TestPlanStatusDirs(t *testing.T) {
 	}
 	if len(p.StatusDirs) != 0 {
 		t.Errorf("StatusDirs without agents = %v", p.StatusDirs)
+	}
+}
+
+// D62: up never starts an agent, so no app unit wants one; a service
+// agent's unit still exists for `railswitch agent` to start.
+func TestServiceAgentNotWanted(t *testing.T) {
+	_, units := renderUnits(t, fixtureDir, nil)
+	for name := range units {
+		for _, l := range unitLines(t, units, name) {
+			if v, ok := strings.CutPrefix(l, "Wants="); ok && strings.Contains(v, "-agent-") {
+				t.Errorf("%s Wants=%s", name, v)
+			}
+		}
+	}
+	if _, ok := units["filial-feat-agent-probe.container"]; !ok {
+		t.Error("no filial-feat-agent-probe.container")
 	}
 }

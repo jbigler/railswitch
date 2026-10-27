@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/agentstatus"
@@ -21,7 +22,8 @@ type AgentRow struct {
 	State   string `json:"state"`   // the status file's state; "off" when it is unusable
 	Message string `json:"message"`
 	TS      int64  `json:"ts"`
-	Reply   bool   `json:"reply"` // agentstatus.Status.Reply: the agent asks the user something
+	Reply   bool   `json:"reply"`   // agentstatus.Status.Reply: the agent asks the user something
+	Running bool   `json:"running"` // its container runs in the worktree (D62)
 }
 
 // UsageError is a lifecycle error in how the command was called.
@@ -35,7 +37,8 @@ func (e *UsageError) Error() string { return e.Msg }
 // transient container, named as its unit's would be, once its secrets are
 // set; a service agent's unit is started when it is not active, and its
 // container attached to. argv is refused for a service agent. Neither has a
-// deadline: the user drives it.
+// deadline: the user drives it. At most one agent runs in a worktree (D62):
+// another one running is an error, never stopped for you.
 func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 	m, err := l.model(ctx)
 	if err != nil {
@@ -63,6 +66,16 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		return err
 	}
 	ctr := containerOf(m, slug, id)
+	running, err := l.RunningAgent(ctx, m, slug)
+	if err != nil {
+		return err
+	}
+	switch {
+	case running != "" && running != name:
+		return fmt.Errorf("agent %s is running in %s; one agent per worktree: railswitch agent stop %s", running, slug, running)
+	case running == name && s.OnDemand:
+		return fmt.Errorf("agent %s is already running in %s", name, slug)
+	}
 	if s.OnDemand {
 		if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }); err != nil {
 			return err
@@ -102,15 +115,84 @@ func (l *L) AgentList(ctx context.Context, slug string) ([]AgentRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	running, err := l.RunningAgent(ctx, m, slug)
+	if err != nil {
+		return nil, err
+	}
 	rows := []AgentRow{}
 	for _, a := range m.Inputs.Stack.Agents {
 		st := agentstatus.Read(filepath.Join(in.Values["status.dir"], a.Name+".json"))
 		rows = append(rows, AgentRow{
 			Name: a.Name, Package: a.Ref.String(), Run: a.Run,
 			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(),
+			Running: a.Name == running,
 		})
 	}
 	return rows, nil
+}
+
+// RunningAgent is the name of the agent whose container runs in worktree
+// slug, "" if none. Only podman decides, on the exact container names of
+// the worktree (NamesFor), never a status file.
+func (l *L) RunningAgent(ctx context.Context, m *render.Model, slug string) (string, error) {
+	names, err := m.NamesFor(slug)
+	if err != nil {
+		return "", err
+	}
+	p := l.podman()
+	for _, a := range m.Inputs.Stack.Agents {
+		ctr := containerOf(m, slug, "agent-"+a.Name)
+		if !slices.Contains(names.Containers, ctr) {
+			continue
+		}
+		ok, err := p.Running(ctx, ctr)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return a.Name, nil
+		}
+	}
+	return "", nil
+}
+
+// AgentStop stops agent name of worktree slug ("": the one running): a
+// service agent through its unit, an on-demand one with podman stop (its
+// --rm removes it). Nothing running is not an error; a name that isn't
+// running is, naming the one that is.
+func (l *L) AgentStop(ctx context.Context, slug, name string) error {
+	m, err := l.model(ctx)
+	if err != nil {
+		return err
+	}
+	if name != "" {
+		if name, err = l.agentName(m, name); err != nil {
+			return err
+		}
+	}
+	running, err := l.RunningAgent(ctx, m, slug)
+	if err != nil {
+		return err
+	}
+	switch {
+	case running == "" && name == "":
+		fmt.Fprintf(l.Out, "no agent is running in %s\n", slug)
+		return nil
+	case running == "":
+		return fmt.Errorf("agent %s is not running in %s", name, slug)
+	case name != "" && name != running:
+		return fmt.Errorf("agent %s is not running in %s; agent %s is", name, slug, running)
+	}
+	id := "agent-" + running
+	s, err := service(m, id)
+	if err != nil {
+		return err
+	}
+	ctr := containerOf(m, slug, id)
+	if s.OnDemand {
+		return l.podman().Stop(ctx, ctr)
+	}
+	return l.systemd().Stop(ctx, ctr+".service")
 }
 
 // agentName is the agent name names: name itself when the project has it,

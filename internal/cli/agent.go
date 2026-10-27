@@ -17,7 +17,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls"
+const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -37,8 +37,12 @@ var launchTerm = func(ctx context.Context, e *env, title, dir string, argv []str
 // railswitch agent [--new-term] [<name>] [-- args…]: run the worktree's
 // agent (up first), or with --new-term re-run this command in a new
 // terminal tab or window; railswitch agent ls: every agent and its status
-// (D58).
+// (D58); railswitch agent stop [<name>]: stop the worktree's running agent
+// (D62).
 func cmdAgent(ctx context.Context, e *env, args []string) int {
+	if len(args) > 0 && args[0] == "stop" {
+		return cmdAgentStop(ctx, e, args[1:])
+	}
 	name, argv, newTerm, code, ok := agentArgs(e, args)
 	if !ok {
 		return code
@@ -68,6 +72,26 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		if errors.As(err, &u) {
 			return e.usageErr("%s", u.Msg)
 		}
+		return e.failCommand(err)
+	}
+	return 0
+}
+
+// railswitch agent stop [<name>]: stop the worktree's running agent, which
+// must be name when given.
+func cmdAgentStop(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("agent stop")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() > 1 || slices.Contains(args, "--") {
+		return e.usageErr("%s", agentUsage)
+	}
+	l, slug, code := e.lifecycle(ctx, "agent")
+	if code != 0 {
+		return code
+	}
+	if err := l.AgentStop(ctx, slug, fs.Arg(0)); err != nil {
 		return e.failCommand(err)
 	}
 	return 0
@@ -116,16 +140,24 @@ func (e *env) agentNewTerm(ctx context.Context, root, slug, name string, argv []
 	return 0
 }
 
-// printAgents prints agent ls: JSON with --json, else a table whose STATE
-// is "reply" when the agent asks the user something.
+// printAgents prints agent ls: JSON with --json, else a table whose RUNNING
+// marks the running agent with "*", and whose STATE is "reply" when the
+// agent asks the user something, or "running" for a running agent whose
+// status file says nothing ("off").
 func (e *env) printAgents(rows []lifecycle.AgentRow) error {
 	if e.json {
 		return json.NewEncoder(e.stdout).Encode(rows)
 	}
 	tw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "NAME\tPACKAGE\tRUN\tSTATE\tMESSAGE")
+	fmt.Fprintln(tw, "NAME\tPACKAGE\tRUN\tRUNNING\tSTATE\tMESSAGE")
 	for _, r := range rows {
-		state := r.State
+		state, running := r.State, "-"
+		if r.Running {
+			running = "*"
+			if state == "off" {
+				state = "running"
+			}
+		}
 		if r.Reply {
 			state = "reply"
 		}
@@ -133,7 +165,7 @@ func (e *env) printAgents(rows []lifecycle.AgentRow) error {
 		if msg == "" {
 			msg = "-"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", r.Name, r.Package, r.Run, state, msg)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", r.Name, r.Package, r.Run, running, state, msg)
 	}
 	return tw.Flush()
 }

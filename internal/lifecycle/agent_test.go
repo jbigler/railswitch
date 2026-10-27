@@ -350,3 +350,89 @@ func unitCPUs(t *testing.T, unit string) string {
 	t.Fatalf("unit has no --cpus:\n%s", unit)
 	return ""
 }
+
+// agentRunning makes container ctr report running.
+func (e *tenv) agentRunning(ctr string) {
+	e.f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", ctr}, sys.Result{Stdout: []byte("true\n")}, nil)
+}
+
+// D62: one running agent per worktree; other worktrees are independent.
+func TestAgentRefusesOtherRunning(t *testing.T) {
+	e := setup(t)
+	e.agentRunning("filial-feat-agent-probe")
+	err := e.l.Agent(ctx, "feat", "claude", nil)
+	if err == nil || err.Error() != "agent probe is running in feat; one agent per worktree: railswitch agent stop probe" {
+		t.Fatalf("got %v; want the one-agent refusal naming probe", err)
+	}
+	if n := count(e.calls(), "podman --hooks-dir"); n != 0 {
+		t.Errorf("ran an agent:\n%s", dump(e.calls()))
+	}
+
+	e = setup(t)
+	e.agentRunning("filial-master-agent-probe")
+	if err := e.l.Agent(ctx, "feat", "claude", nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(e.calls(), "podman --hooks-dir"); n != 1 {
+		t.Errorf("%d podman runs:\n%s", n, dump(e.calls()))
+	}
+
+	e = setup(t)
+	e.agentRunning("filial-feat-agent-claude")
+	err = e.l.Agent(ctx, "feat", "claude", nil)
+	if err == nil || err.Error() != "agent claude is already running in feat" {
+		t.Fatalf("got %v; want already running", err)
+	}
+}
+
+func TestAgentServiceStartsOnRequest(t *testing.T) {
+	e := setup(t)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range e.calls() {
+		if j := joined(c); strings.HasPrefix(j, "systemctl --user start") && strings.Contains(j, "-agent-") {
+			t.Errorf("up started an agent: %s", j)
+		}
+	}
+	e.reset()
+	const unit = "filial-feat-agent-probe.service"
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n", unit)
+	if err := e.l.Agent(ctx, "feat", "probe", nil); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(), "systemctl --user start "+unit, "podman attach filial-feat-agent-probe")
+}
+
+func TestAgentStop(t *testing.T) {
+	e := setup(t)
+	e.agentRunning("filial-feat-agent-probe")
+	if err := e.l.AgentStop(ctx, "feat", ""); err != nil {
+		t.Fatal(err)
+	}
+	find(t, e.calls(), "systemctl --user stop filial-feat-agent-probe.service")
+	err := e.l.AgentStop(ctx, "feat", "claude")
+	if err == nil || !strings.Contains(err.Error(), "probe") {
+		t.Fatalf("stop claude while probe runs: got %v; want an error naming probe", err)
+	}
+
+	e = setup(t)
+	e.agentRunning("filial-feat-agent-claude")
+	if err := e.l.AgentStop(ctx, "feat", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	find(t, e.calls(), "podman stop filial-feat-agent-claude")
+
+	e = setup(t)
+	if err := e.l.AgentStop(ctx, "feat", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(e.out.String(), "no agent is running in feat") {
+		t.Errorf("output %q", e.out.String())
+	}
+	for _, c := range e.calls() {
+		if j := joined(c); strings.Contains(j, " stop ") {
+			t.Errorf("stopped something: %s", j)
+		}
+	}
+}

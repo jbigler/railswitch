@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/term"
 )
 
@@ -56,7 +57,7 @@ func TestAgentLsJSON(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("rows %v", rows)
 	}
-	want := map[string]any{"name": "claude", "package": "claude@1", "run": "on-demand", "state": "working", "message": "editing", "ts": float64(42), "reply": false}
+	want := map[string]any{"name": "claude", "package": "claude@1", "run": "on-demand", "state": "working", "message": "editing", "ts": float64(42), "reply": false, "running": false}
 	for k, v := range want {
 		if rows[0][k] != v {
 			t.Errorf("claude %s = %v; want %v", k, rows[0][k], v)
@@ -74,12 +75,50 @@ func TestAgentLsJSON(t *testing.T) {
 		t.Fatalf("agent ls: exit %d: %s", code, errs)
 	}
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if len(lines) != 3 || strings.Join(strings.Fields(lines[0]), " ") != "NAME PACKAGE RUN STATE MESSAGE" ||
-		strings.Join(strings.Fields(lines[1]), " ") != "claude claude@1 on-demand working editing" {
+	if len(lines) != 3 || strings.Join(strings.Fields(lines[0]), " ") != "NAME PACKAGE RUN RUNNING STATE MESSAGE" ||
+		strings.Join(strings.Fields(lines[1]), " ") != "claude claude@1 on-demand - working editing" {
 		t.Errorf("text:\n%s", out)
 	}
 	if code, _, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "ls", "--", "x"); code != 2 {
 		t.Errorf("agent ls -- x: exit %d; want 2", code)
+	}
+}
+
+// D62: the running agent is decided by podman, not by a status file.
+func TestAgentLsRunning(t *testing.T) {
+	ws, _ := lockedWS(t)
+	mustRun(t, "-C", ws, "render")
+	f := fakeHost()
+	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "filial-feat-agent-probe"}, sys.Result{Stdout: []byte("true\n")}, nil)
+	code, out, errs := runWith(t, f, "-C", ws, "-w", "feat", "--json", "agent", "ls")
+	if code != 0 {
+		t.Fatalf("agent ls: exit %d: %s", code, errs)
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if len(rows) != 2 || rows[0]["name"] != "claude" || rows[0]["running"] != false || rows[1]["name"] != "probe" || rows[1]["running"] != true {
+		t.Errorf("rows %v", rows)
+	}
+	code, out, _ = runWith(t, f, "-C", ws, "-w", "feat", "agent", "ls")
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if code != 0 || len(lines) != 3 || strings.Join(strings.Fields(lines[2]), " ") != "probe local:probe@1 service * running -" {
+		t.Errorf("text:\n%s", out)
+	}
+}
+
+func TestAgentStopCLI(t *testing.T) {
+	ws, _ := lockedWS(t)
+	code, out, errs := runIn(t, "-C", ws, "-w", "feat", "agent", "stop")
+	if code != 0 || !strings.Contains(out, "no agent is running in feat") {
+		t.Errorf("agent stop: exit %d out %q err %q", code, out, errs)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "stop", "a", "b"); code != 2 {
+		t.Errorf("agent stop a b: exit %d; want 2", code)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "stop", "--", "x"); code != 2 {
+		t.Errorf("agent stop -- x: exit %d; want 2", code)
 	}
 }
 
@@ -94,11 +133,14 @@ func TestAgentServiceArgvUsage(t *testing.T) {
 func TestCompleteAgent(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
-	if got, want := complete(t, "agent", ""), []string{"claude", "ls", "probe"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "agent", ""), []string{"claude", "ls", "probe", "stop"}; !slices.Equal(got, want) {
 		t.Errorf("agent: %q; want %q", got, want)
 	}
 	if got := complete(t, "agent", "claude", ""); len(got) != 0 {
 		t.Errorf("agent claude: %q; want nothing", got)
+	}
+	if got, want := complete(t, "agent", "stop", ""), []string{"claude", "probe"}; !slices.Equal(got, want) {
+		t.Errorf("agent stop: %q; want %q", got, want)
 	}
 	if got := complete(t, "agent", "ls", ""); len(got) != 0 {
 		t.Errorf("agent ls: %q; want nothing", got)

@@ -718,7 +718,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 	if rails.Command != "bin/dev" || rails.Image.Kind != ImageBase || deps.Image.Kind != ImageBase {
 		t.Errorf("rails command %q, images %v %v", rails.Command, rails.Image.Kind, deps.Image.Kind)
 	}
-	if !slices.Equal(rails.Requires, []string{"deps", "db", "cache", "storage"}) || !slices.Equal(rails.Wants, []string{"browser", "nvim", "agent-probe"}) {
+	if !slices.Equal(rails.Requires, []string{"deps", "db", "cache", "storage"}) || !slices.Equal(rails.Wants, []string{"browser", "nvim"}) {
 		t.Errorf("rails Requires %v Wants %v", rails.Requires, rails.Wants)
 	}
 	if !slices.Equal(rails.Networks, []string{"dev", "proxy"}) || !slices.Equal(db.Networks, []string{"dev"}) ||

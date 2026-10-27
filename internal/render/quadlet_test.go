@@ -484,7 +484,7 @@ func TestAppDependencies(t *testing.T) {
 	ws, units := renderUnits(t, fixtureDir, nil)
 	const rails = "filial-master-rails.container"
 	hasLine(t, units, rails, "Requires=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service")
-	hasLine(t, units, rails, "Wants=filial-master-browser.service filial-master-nvim.service filial-master-agent-probe.service railswitch-traefik.service railswitch-dozzle.service")
+	hasLine(t, units, rails, "Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service")
 	hasLine(t, units, rails, "UserNS=keep-id:uid=1000,gid=1000")
 	hasLine(t, units, rails, "User=1000:1000")
 	hasLine(t, units, rails, "PodmanArgs=--cpus=6")

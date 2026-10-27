@@ -157,8 +157,8 @@ hook writes.
 
 ```json
 [
-  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true},
-  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false}
+  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true},
+  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false}
 ]
 ```
 
@@ -166,11 +166,12 @@ hook writes.
 |---|---|---|
 | `name` | string | The agent's name in `[agents]`; its service is `agent-<name>`. |
 | `package` | string | Its package ref: `<name>@<N>` for a built-in package, `local:<name>@<N>` for one under `<workspace>/agents/`. |
-| `run` | string | `on-demand` (a transient container per `railswitch agent` run) or `service` (a unit the app wants; `railswitch agent` attaches to it). |
+| `run` | string | `on-demand` (a transient container per `railswitch agent` run) or `service` (a unit that only `railswitch agent` starts, never `up`, and then attaches to; it runs until `agent stop`, `stop`/`down` or `wt rm`). |
 | `state` | string | The status file's `state`: `permission`, `question`, `working`, `done`, `idle` or `off`. `off` also when the file is missing, not a regular file (a symlink, a FIFO), larger than 64 KiB, not valid JSON, has `v` other than `1` or an unknown state. |
 | `message` | string | The status file's `message`; `""` when `state` is `off` for one of the reasons above. |
 | `ts` | number | The status file's `ts` (Unix seconds, as the hook wrote it); `0` when unusable. |
 | `reply` | boolean | The agent waits for a reply: `state` is `done` and `message` ends in `?`, maybe followed by spaces, closing brackets, quotes or `*`/`_`/`` ` `` emphasis. The text table shows `reply` as its `STATE`. |
+| `running` | boolean | The agent's container runs in this worktree (podman, not the status file). At most one agent runs per worktree (D62). The text table marks it with `*` in its `RUNNING` column, and shows `running` as its `STATE` when the status file says `off`. |
 
 ## `doctor`
 

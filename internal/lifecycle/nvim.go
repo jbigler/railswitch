@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -27,6 +28,8 @@ const (
 	nvimHookTimeout = 30 * time.Second
 	// nvimGitTimeout bounds each git command of nvim update (a fetch).
 	nvimGitTimeout = 5 * time.Minute
+	// nvimProbeTimeout bounds one readiness probe of the nvim server.
+	nvimProbeTimeout = 5 * time.Second
 )
 
 // Nvim attaches to worktree slug's nvim server, starting its unit when it
@@ -115,7 +118,33 @@ func (l *L) nvimStarted(ctx context.Context, slug string) (*render.Model, *rende
 			return nil, nil, nil, "", l.startFailure(ctx, sd, slug, []string{unit}, err)
 		}
 	}
+	if err := l.nvimReady(ctx, ctr); err != nil {
+		return nil, nil, nil, "", err
+	}
 	return m, in, s, ctr, nil
+}
+
+// nvimReady waits until the nvim server in ctr answers an RPC: its
+// entrypoint may still be cloning the config (D54) after the unit started.
+// NvimPoll and NvimTimeout pace it (zero: 500ms, 2m).
+func (l *L) nvimReady(ctx context.Context, ctr string) error {
+	poll := cmp.Or(l.NvimPoll, 500*time.Millisecond)
+	limit := cmp.Or(l.NvimTimeout, 2*time.Minute)
+	deadline := time.Now().Add(limit)
+	for {
+		_, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"exec", ctr, "nvim", "--server", "127.0.0.1:7777", "--remote-expr", "1"}, Timeout: nvimProbeTimeout})
+		if err == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("the nvim server in %s did not answer within %s (its entrypoint may still be cloning the config): see railswitch logs nvim", ctr, limit)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(poll):
+		}
+	}
 }
 
 // NvimUpdate updates the shared nvim config from [tools.nvim] config_repo
@@ -192,11 +221,19 @@ func (l *L) NvimResetConfig(ctx context.Context, yes bool) error {
 		return fmt.Errorf("project %s has no nvim: add [tools.nvim] to project.toml", m.Prefix)
 	}
 	vol := naming.Shared(m.Prefix, nvimVolume)
+	exists, err := l.podman().VolumeExists(ctx, vol)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		fmt.Fprintf(l.Out, "volume %s does not exist: nothing to reset\n", vol)
+		return nil
+	}
 	if !yes {
 		if !l.TTY {
 			return fmt.Errorf("nvim reset-config deletes volume %s: pass --yes (no terminal to confirm on)", vol)
 		}
-		fmt.Fprintf(l.Out, "Delete volume %s, the nvim config of every worktree? [y/N] ", vol)
+		fmt.Fprintf(l.Out, "Stop every worktree's nvim and delete volume %s, the shared nvim config? [y/N] ", vol)
 		line, _ := bufio.NewReader(l.In).ReadString('\n')
 		if a := strings.ToLower(strings.TrimSpace(line)); a != "y" && a != "yes" {
 			fmt.Fprintln(l.Out, "aborted")

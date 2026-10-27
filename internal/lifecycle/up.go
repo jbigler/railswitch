@@ -54,6 +54,9 @@ type L struct {
 	// 30s).
 	TraefikAPI              string
 	RoutePoll, RouteTimeout time.Duration
+	// NvimPoll and NvimTimeout pace the wait for the nvim server to answer
+	// (zero: 500ms, 2m).
+	NvimPoll, NvimTimeout time.Duration
 }
 
 func (l *L) podman() podman.Podman   { return podman.Podman{R: l.R} }

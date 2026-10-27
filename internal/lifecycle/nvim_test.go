@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -73,7 +74,7 @@ func TestNvimAttachArgv(t *testing.T) {
 			}
 		}
 	}
-	want := []string{attach, "nvim --remote-ui --server 127.0.0.1:17002", detach}
+	want := []string{"podman exec filial-feat-nvim nvim --server 127.0.0.1:7777 --remote-expr 1", attach, "nvim --remote-ui --server 127.0.0.1:17002", detach}
 	if !slices.Equal(got, want) {
 		t.Errorf("calls\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
@@ -204,5 +205,63 @@ func TestNvimResetConfig(t *testing.T) {
 	}
 	if n := count(e.calls(), "podman volume rm"); n != 0 {
 		t.Errorf("removed the volume after no")
+	}
+}
+
+// probeRunner fails the nvim readiness probe until call n (0: never).
+type probeRunner struct {
+	sys.Runner
+	n, calls int
+}
+
+func (p *probeRunner) Run(c context.Context, cmd sys.Cmd) (sys.Result, error) {
+	if cmd.Name == "podman" && slices.Contains(cmd.Args, "--remote-expr") {
+		p.calls++
+		if p.n == 0 || p.calls < p.n {
+			p.Runner.Run(c, cmd)
+			return sys.Result{ExitCode: 1}, sys.ErrExit
+		}
+	}
+	return p.Runner.Run(c, cmd)
+}
+
+func TestNvimWaitsForServer(t *testing.T) {
+	e := setup(t)
+	e.nvimActive()
+	e.l.LookPath, e.l.NvimPoll, e.l.NvimTimeout = noNvim, time.Millisecond, 200*time.Millisecond
+	pr := &probeRunner{Runner: e.f, n: 3}
+	e.l.R = pr
+	if err := e.l.Nvim(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	probe := "podman exec filial-feat-nvim nvim --server 127.0.0.1:7777 --remote-expr 1"
+	calls := e.calls()
+	if n := count(calls, probe); n != 3 {
+		t.Errorf("%d probes; want 3", n)
+	}
+	wantInOrder(t, calls, probe, probe, probe, "podman exec -i filial-feat-nvim nvim --remote-ui")
+
+	e.reset()
+	pr.n, pr.calls = 0, 0
+	err := e.l.Nvim(ctx, "feat")
+	if err == nil || !strings.Contains(err.Error(), "railswitch logs nvim") {
+		t.Fatalf("Nvim = %v; want an error naming railswitch logs nvim", err)
+	}
+	if n := count(e.calls(), "podman exec -i filial-feat-nvim nvim --remote-ui"); n != 0 {
+		t.Errorf("attached to a server that never answered")
+	}
+}
+
+func TestNvimResetConfigNoVolume(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "volume", "exists")
+	if err := e.l.NvimResetConfig(ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(e.calls(), "podman volume rm") + count(e.calls(), "systemctl --user stop"); n != 0 {
+		t.Errorf("acted on a missing volume:\n%s", dump(e.calls()))
+	}
+	if !strings.Contains(e.out.String(), "nothing to reset") {
+		t.Errorf("out %q", e.out.String())
 	}
 }

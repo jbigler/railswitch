@@ -40,12 +40,12 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	props, err := podman.Systemd{R: e.run}.Show(ctx, machine.DashboardService, "ActiveState")
-	if err != nil {
-		return e.fail(err)
-	}
 	fmt.Fprintf(e.stdout, "%slogin?token=%s\n", machine.DashboardURL, tok)
-	if props["ActiveState"] != "active" {
+	props, err := podman.Systemd{R: e.run}.Show(ctx, machine.DashboardService, "ActiveState")
+	switch {
+	case err != nil: // the link stands; only whether to start it is unknown
+		fmt.Fprintf(e.stderr, "railswitch: dashboard state unknown: %v\n", err)
+	case props["ActiveState"] != "active":
 		fmt.Fprintf(e.stdout, "start it: systemctl --user start %s\n", machine.DashboardService)
 	}
 	return 0

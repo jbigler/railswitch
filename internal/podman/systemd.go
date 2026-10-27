@@ -3,6 +3,7 @@ package podman
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -141,4 +142,29 @@ func (s Systemd) UnitState(ctx context.Context, unit string) (UnitState, error) 
 		return UnitState{}, err
 	}
 	return UnitState{Load: m["LoadState"], NeedReload: m["NeedDaemonReload"] == "yes", Active: m["ActiveState"]}, nil
+}
+
+// activeEnterLayout is ActiveEnterTimestamp under --timestamp=us+utc.
+const activeEnterLayout = "Mon 2006-01-02 15:04:05.000000 UTC"
+
+// ActiveSince is when unit last entered the active state, read exactly
+// (microseconds, UTC) with `systemctl --user show --timestamp=us+utc -p
+// ActiveEnterTimestamp <unit>`; the zero time when it never has.
+func (s Systemd) ActiveSince(ctx context.Context, unit string) (time.Time, error) {
+	r, err := s.run(ctx, 0, "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", unit)
+	if err != nil {
+		return time.Time{}, err
+	}
+	v, ok := strings.CutPrefix(strings.TrimSpace(string(r.Stdout)), "ActiveEnterTimestamp=")
+	if !ok {
+		return time.Time{}, fmt.Errorf("systemctl show %s: no ActiveEnterTimestamp in %q", unit, r.Stdout)
+	}
+	if v == "" || v == "n/a" {
+		return time.Time{}, nil
+	}
+	t, err := time.ParseInLocation(activeEnterLayout, v, time.UTC)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("systemctl show %s: ActiveEnterTimestamp %q: %w", unit, v, err)
+	}
+	return t, nil
 }

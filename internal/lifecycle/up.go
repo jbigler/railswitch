@@ -408,16 +408,10 @@ func unitLogLines(out []byte, n int) []string {
 	return lines[max(0, len(lines)-n):]
 }
 
-// dashboardStarted is the layout of systemd's ActiveEnterTimestamp without
-// its trailing zone ("Tue 2026-10-27 10:00:00 CET").
-const dashboardStarted = "Mon 2006-01-02 15:04:05"
-
 // staleDashboard reports whether the running dashboard's unit file (render
 // rewrites it for a new railswitch path) is newer than the dashboard's
-// start. systemd shows the start in whole seconds, in the local zone (UTC
-// when that is UTC); the file's mtime is cut to the second, so a file
-// written in the second the dashboard started counts as older. A missing
-// file, or a start systemd doesn't show, is not stale.
+// start (podman.Systemd.ActiveSince, exact to the microsecond). A missing
+// file is not stale.
 func (l *L) staleDashboard(ctx context.Context, sd podman.Systemd) (bool, error) {
 	fi, err := os.Stat(filepath.Join(l.WS.Dirs.SystemdUser, machine.DashboardService))
 	if errors.Is(err, fs.ErrNotExist) {
@@ -426,23 +420,11 @@ func (l *L) staleDashboard(ctx context.Context, sd podman.Systemd) (bool, error)
 	if err != nil {
 		return false, err
 	}
-	props, err := sd.Show(ctx, machine.DashboardService, "ActiveEnterTimestamp")
+	started, err := sd.ActiveSince(ctx, machine.DashboardService)
 	if err != nil {
 		return false, err
 	}
-	ts, zone := props["ActiveEnterTimestamp"], ""
-	if i := strings.LastIndexByte(ts, ' '); i >= 0 {
-		ts, zone = ts[:i], ts[i+1:]
-	}
-	loc := time.Local
-	if zone == "UTC" {
-		loc = time.UTC
-	}
-	started, err := time.ParseInLocation(dashboardStarted, ts, loc)
-	if err != nil {
-		return false, nil
-	}
-	return fi.ModTime().Truncate(time.Second).After(started), nil
+	return fi.ModTime().After(started), nil
 }
 
 // staleContainer reports whether container ctr was created from another

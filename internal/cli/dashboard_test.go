@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -52,6 +53,18 @@ func TestDashboardPrintsLogin(t *testing.T) {
 	}
 }
 
+// TestDashboardLoginSystemctlFails: the link is printed even when
+// systemctl can't tell the unit's state; the failure goes to stderr.
+func TestDashboardLoginSystemctlFails(t *testing.T) {
+	dashEnv(t)
+	f := &systest.Fake{}
+	f.On([]string{"systemctl"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	code, out, errs := runWith(t, f, "dashboard")
+	if code != 0 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "start it") || !strings.Contains(errs, "dashboard state unknown") {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errs)
+	}
+}
+
 type colorsDoc struct {
 	Light, Dark struct {
 		Base      string            `json:"base"`
@@ -88,8 +101,13 @@ func TestColorsCLI(t *testing.T) {
 	if doc := colorsJSON(t); doc.Light.Base != "flexoki" || len(doc.Light.Overrides) != 0 || doc.Light.Colors["bg"] != "#FFFCF0" || len(doc.Warnings.Light) != 0 {
 		t.Fatalf("default: %+v", doc)
 	}
-	mustRun(t, "dashboard", "colors", "set", "text=#eeeeee", "accent=#BC5215")
-	mustRun(t, "dashboard", "colors", "set", "--dark", "--base", "paper")
+	code, out, errs := run(t, "dashboard", "colors", "set", "text=#eeeeee", "accent=#BC5215")
+	if code != 0 || out != "" || !strings.HasPrefix(errs, "railswitch: warning: light text: contrast ") || strings.Count(errs, "\n") != 1 {
+		t.Errorf("set light: exit %d, stdout %q, stderr %q; want one light text warning", code, out, errs)
+	}
+	if code, _, errs := run(t, "dashboard", "colors", "set", "--dark", "--base", "paper"); code != 0 || errs != "" {
+		t.Errorf("set dark: exit %d, stderr %q; want no warning", code, errs)
+	}
 	doc := colorsJSON(t)
 	if doc.Light.Overrides["text"] != "#EEEEEE" || doc.Light.Colors["text"] != "#EEEEEE" || len(doc.Light.Overrides) != 1 {
 		t.Errorf("light after set: %+v", doc.Light)
@@ -100,7 +118,7 @@ func TestColorsCLI(t *testing.T) {
 	if doc.Dark.Base != "paper" || doc.Dark.Colors["bg"] != "#18181B" || len(doc.Warnings.Dark) != 0 {
 		t.Errorf("dark after set: %+v %q", doc.Dark, doc.Warnings.Dark)
 	}
-	code, out, errs := run(t, "dashboard", "colors", "set", "sel=#000000", "nope=#000000")
+	code, out, errs = run(t, "dashboard", "colors", "set", "sel=#000000", "nope=#000000")
 	if code == 0 || !strings.Contains(errs, "sel is fixed") || !strings.Contains(errs, `unknown token "nope"`) {
 		t.Errorf("bad tokens: exit %d\n%s%s", code, out, errs)
 	}

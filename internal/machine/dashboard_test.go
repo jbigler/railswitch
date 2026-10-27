@@ -105,6 +105,9 @@ func TestDashboardToken(t *testing.T) {
 	if err != nil || again != tok {
 		t.Errorf("second call = %q, %v; want %q", again, err, tok)
 	}
+	if ents, err := os.ReadDir(filepath.Dir(path)); err != nil || len(ents) != 1 || ents[0].Name() != "token" {
+		t.Errorf("token dir holds %v (%v); want only token", ents, err)
+	}
 	if err := os.WriteFile(path, []byte("short\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -93,6 +93,7 @@ func DashboardToken(d Dirs) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer os.Remove(tmp.Name()) // the link to token, if made, stays
 	b := make([]byte, 32)
 	rand.Read(b) // never fails (crypto/rand)
 	err = tmp.Chmod(0o600)

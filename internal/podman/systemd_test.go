@@ -3,6 +3,7 @@ package podman
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -45,4 +46,26 @@ func TestRunningNames(t *testing.T) {
 		t.Errorf("RunningNames = %v; want %v", got, want)
 	}
 	wantCalls(t, f, []string{"podman", "ps", "--format", "{{.Names}}"})
+}
+
+// TestActiveSince: the exact (us, UTC) ActiveEnterTimestamp; never active
+// is the zero time; an unparsable value is an error.
+func TestActiveSince(t *testing.T) {
+	for _, c := range []struct {
+		out  string
+		want time.Time
+		err  bool
+	}{
+		{"ActiveEnterTimestamp=Tue 2026-10-27 09:00:00.123456 UTC\n", time.Date(2026, 10, 27, 9, 0, 0, 123456000, time.UTC), false},
+		{"ActiveEnterTimestamp=\n", time.Time{}, false},
+		{"ActiveEnterTimestamp=Tue 2026-10-27 10:00:00 CET\n", time.Time{}, true},
+	} {
+		f := &systest.Fake{}
+		f.On([]string{"systemctl"}, sys.Result{Stdout: []byte(c.out)}, nil)
+		got, err := Systemd{R: f}.ActiveSince(ctx, "x.service")
+		if (err != nil) != c.err || !got.Equal(c.want) {
+			t.Errorf("%q: ActiveSince = %v, %v; want %v (error %v)", c.out, got, err, c.want, c.err)
+		}
+		wantCalls(t, f, []string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", "x.service"})
+	}
 }

@@ -98,6 +98,8 @@ func setup(t *testing.T, slugs ...string) *tenv {
 	}
 	f := &systest.Fake{}
 	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte("/g\n")}, nil)
+	// The dashboard started after any unit file a test writes: not stale.
+	f.On([]string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp"}, sys.Result{Stdout: []byte("ActiveEnterTimestamp=Fri 2100-01-01 00:00:00.000000 UTC\n")}, nil)
 	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
 	out := &bytes.Buffer{}
 	var routers []string
@@ -1354,18 +1356,19 @@ func TestUpRestartsStaleDashboard(t *testing.T) {
 		active  string
 		started time.Duration // ActiveEnterTimestamp relative to the file's mtime
 		restart bool
-	}{{"stale", "active", -time.Hour, true}, {"current", "active", time.Hour, false}, {"inactive", "inactive", -time.Hour, false}} {
+	}{{"stale", "active", -time.Hour, true}, {"stale by a millisecond", "active", -time.Millisecond, true},
+		{"current", "active", time.Hour, false}, {"inactive", "inactive", -time.Hour, false}} {
 		t.Run(c.name, func(t *testing.T) {
 			e := setup(t)
 			upTwice(t, e)
 			e.units(loadedClean)
 			e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState="+c.active+"\n", machine.DashboardService)
-			mtime := time.Date(2026, 10, 27, 10, 0, 0, 0, time.Local)
+			mtime := time.Date(2026, 10, 27, 10, 0, 0, 500_000_000, time.Local)
 			if err := os.Chtimes(filepath.Join(e.l.WS.Dirs.SystemdUser, machine.DashboardService), mtime, mtime); err != nil {
 				t.Fatal(err)
 			}
-			ts := mtime.Add(c.started).Format("Mon 2006-01-02 15:04:05 MST")
-			e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveEnterTimestamp", machine.DashboardService},
+			ts := mtime.Add(c.started).UTC().Format("Mon 2006-01-02 15:04:05.000000 UTC")
+			e.f.On([]string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", machine.DashboardService},
 				sys.Result{Stdout: []byte("ActiveEnterTimestamp=" + ts + "\n")}, nil)
 			if err := e.l.Up(ctx, "feat"); err != nil {
 				t.Fatal(err)

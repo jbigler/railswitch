@@ -288,7 +288,7 @@ type packDoc struct {
 	Service  string       `json:"service,omitempty"`
 	Runtimes []runtimeDoc `json:"runtimes"`
 	Ports    []portDoc    `json:"ports"`
-	Pin      *pack.Pin    `json:"pin"`
+	Pin      *pinDoc      `json:"pin"`
 	Gives    []string     `json:"gives"`
 	Readme   string       `json:"readme"`
 }
@@ -304,6 +304,11 @@ type runtimeDoc struct {
 	Name     string   `json:"name"`
 	From     []string `json:"from"`
 	Fallback string   `json:"fallback"`
+}
+
+type pinDoc struct {
+	Name    string `json:"name"`
+	Default string `json:"default"`
 }
 
 type portDoc struct {
@@ -381,7 +386,10 @@ func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
 			return nil, fmt.Errorf("no pack or option %s (packs: %s; options: %s)", ref, refNames(cat.Packs), refNames(cat.Options))
 		}
 		doc.Kind, files, ports = "option", o.Files, o.Ports
-		doc.Slot, doc.Service, doc.Pin = o.Slot, o.Service, o.Pin
+		doc.Slot, doc.Service = o.Slot, o.Service
+		if o.Pin != nil {
+			doc.Pin = &pinDoc{Name: o.Pin.Name, Default: o.Pin.Default}
+		}
 		doc.Gives = slices.Sorted(maps.Keys(o.Gives))
 	}
 	for _, pt := range ports {

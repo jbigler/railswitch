@@ -4,25 +4,21 @@ package lifecycle_test
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
-)
 
-// envRow is one row of `railswitch --json env` (docs/json.md).
-type envRow struct {
-	Name  string  `json:"name"`
-	Value *string `json:"value"`
-}
+	"github.com/jbigler/railswitch/internal/naming"
+)
 
 // TestE2EPhoenix is the Stage 5 acceptance run (docs/stage5-acceptance.md):
 // a fresh `mix phx.new` app runs from the user-written pack local:phoenix@1
 // (testdata/fixtures/phoenix/packs/phoenix, copied into the workspace),
-// with no Phoenix knowledge in railswitch. Two worktrees each get their
-// database; editing the pack makes up refuse until railswitch lock.
+// with no Phoenix knowledge in railswitch. Each worktree runs its own
+// database container; editing the pack makes up refuse until railswitch lock.
 //
 //	RAILSWITCH_E2E_PHX_REPO=$HOME/tmp/rs-phx/hello RAILSWITCH_E2E_PREFIX=s5p \
 //	  go test -tags integration ./internal/lifecycle/ -run E2EPhoenix -timeout 60m -v
@@ -89,30 +85,19 @@ func TestE2EPhoenix(t *testing.T) {
 			t.Fatalf("GET %s: status %s, want 200", url, code)
 		}
 	}
-	pgdatabase := func(slug string) string {
-		t.Helper()
-		var rows []envRow
-		out := rs(t, time.Minute, "-C", ws, "-w", slug, "--json", "env", "web")
-		if err := json.Unmarshal([]byte(out), &rows); err != nil {
-			t.Fatalf("env --json: %v\n%s", err, out)
-		}
-		for _, r := range rows {
-			if r.Name == "PGDATABASE" && r.Value != nil {
-				return *r.Value
-			}
-		}
-		t.Fatalf("%s: no PGDATABASE in env web:\n%s", slug, out)
-		return ""
-	}
 
 	up(base)
 
-	// A second worktree: its own ports, host and database.
+	// A second worktree: its own ports, host and database container (the
+	// database name, {project.prefix}_dev, is the same in each).
 	const feat = "feat-x"
 	rs(t, 2*time.Minute, "-C", ws, "wt", "add", feat)
 	up(feat)
-	if a, b := pgdatabase(base), pgdatabase(feat); a == b {
-		t.Errorf("both worktrees use database %q", a)
+	running := lines(podman(ctx, t, "ps", "--format", "{{.Names}}"))
+	for _, slug := range []string{base, feat} {
+		if c := naming.Container(prefix, slug, "db"); !slices.Contains(running, c) {
+			t.Errorf("%s is not running; running: %v", c, running)
+		}
 	}
 
 	// An edit to the local pack is a lock change.

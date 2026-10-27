@@ -8,8 +8,8 @@ Wants=filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.se
 After=filial-feat-deps.service filial-feat-db.service filial-feat-cache.service filial-feat-storage.service filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.service railswitch-dozzle.service
 
 [Container]
-Label=filial.unit-hash=2b63a53c2c14
-Image=localhost/filial/base:ruby3.3.6-node22.11.0-09898804
+Label=filial.unit-hash=0e58e97e2409
+Image=localhost/filial/base:ruby3.3.6-node22.11.0-b6727231
 ContainerName=filial-feat-rails
 Network=filial-feat-dev.network:alias=rails
 Network=filial-proxy.network

@@ -66,8 +66,14 @@ if [ -f package.json ]; then
     echo "deps: $lock needs $tool, which is not in the image: $fix" >&2
     exit 1
   fi
+  version="$("$tool" --version)"
+  # yarn 1 (no "packageManager", or "yarn@1…") ignores --immutable and would
+  # rewrite yarn.lock; its frozen flag is --frozen-lockfile.
+  case "$tool $version" in
+  "yarn 1."*) set -- yarn install --frozen-lockfile ;;
+  esac
   stamp=node_modules/.deps-stamp
-  want="$({ node --version; "$tool" --version; cat package.json "$lock"; } | sha256sum | cut -d' ' -f1)"
+  want="$({ node --version; echo "$version"; cat package.json "$lock"; } | sha256sum | cut -d' ' -f1)"
   if [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$want" ]; then
     echo "deps: node_modules up to date"
   else

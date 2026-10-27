@@ -49,7 +49,7 @@ It copies `testdata/fixtures/phoenix/packs/phoenix` into a temp workspace,
 runs `project new --pack local:phoenix@1 --option database=postgres@1
 --agent none`, `up` (the first start compiles: allow several minutes), GETs
 `http://<branch>.s5p.localhost/` (200), adds worktree `feat-x`, brings it up
-(200) and checks that the two worktrees use different `PGDATABASE`s, then
+(200) and checks that each worktree runs its own database container, then
 edits the pack's `README.md` and expects `up` to refuse with
 `stack.lock is out of date for local:phoenix@1` until `railswitch lock`.
 It removes the project at the end. Expected: `PASS`.

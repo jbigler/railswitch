@@ -8,8 +8,8 @@ Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefi
 After=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service
 
 [Container]
-Label=filial.unit-hash=4936e557f6f0
-Image=localhost/filial/base:ruby3.3.6-node22.11.0-09898804
+Label=filial.unit-hash=9b2a95c3ec4f
+Image=localhost/filial/base:ruby3.3.6-node22.11.0-b6727231
 ContainerName=filial-master-rails
 Network=filial-master-dev.network:alias=rails
 Network=filial-proxy.network

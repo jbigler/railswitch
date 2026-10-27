@@ -168,3 +168,16 @@ func TestPackShowReadme(t *testing.T) {
 		t.Errorf("show:\n%s", out)
 	}
 }
+
+// docs/json.md: pin's keys are name and default (case-sensitive).
+func TestPackShowJSONPinKeys(t *testing.T) {
+	newEnv(t)
+	var doc map[string]any
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", t.TempDir(), "--json", "pack", "show", "postgres@1")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	pin, ok := doc["pin"].(map[string]any)
+	if !ok || pin["name"] != "postgres" || pin["default"] != "16" {
+		t.Errorf("pin = %v; want {\"name\": \"postgres\", \"default\": \"16\"}", doc["pin"])
+	}
+}

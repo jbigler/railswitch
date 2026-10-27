@@ -505,7 +505,8 @@ func TestLoadUnknownSource(t *testing.T) {
 
 // runRailsDeps runs the rails deps entrypoint in a temp app dir holding
 // files, with fake tools on PATH that log their argv to calls. tools are
-// the fakes besides bundle and node.
+// the fakes besides bundle and node, as "name" or "name@version" (the
+// fake's --version output; default 1.0.0).
 func runRailsDeps(t *testing.T, app string, files []string, tools []string) (out string, calls string, err error) {
 	t.Helper()
 	script, rerr := fs.ReadFile(builtin.FS, "packs/rails/entrypoints/entrypoint-deps.sh")
@@ -514,8 +515,12 @@ func runRailsDeps(t *testing.T, app string, files []string, tools []string) (out
 	}
 	bin := t.TempDir()
 	log := filepath.Join(bin, "calls")
-	for _, tool := range append([]string{"bundle", "node"}, tools...) {
-		fake := "#!/bin/sh\necho \"" + tool + " $*\" >> " + log + "\n[ \"$1\" = --version ] && echo 1.0.0\nexit 0\n"
+	for _, spec := range append([]string{"bundle", "node"}, tools...) {
+		tool, version, ok := strings.Cut(spec, "@")
+		if !ok {
+			version = "1.0.0"
+		}
+		fake := "#!/bin/sh\necho \"" + tool + " $*\" >> " + log + "\n[ \"$1\" = --version ] && echo " + version + "\nexit 0\n"
 		if err := os.WriteFile(filepath.Join(bin, tool), []byte(fake), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -536,7 +541,7 @@ func runRailsDeps(t *testing.T, app string, files []string, tools []string) (out
 // D69, Review Focus 5: the JS install follows the lockfile, first match in
 // the documented order; a lockfile whose tool is missing names the fix.
 func TestRailsDepsLockfiles(t *testing.T) {
-	all := []string{"npm", "bun", "yarn", "pnpm"}
+	all := []string{"npm", "bun", "yarn@4.1.0", "pnpm"}
 	for _, c := range []struct {
 		files, tools []string
 		want         string // the install call, or the error text
@@ -546,6 +551,8 @@ func TestRailsDepsLockfiles(t *testing.T) {
 		{[]string{"package.json", "bun.lock"}, all, "bun install --frozen-lockfile", false},
 		{[]string{"package.json", "bun.lockb"}, all, "bun install --frozen-lockfile", false},
 		{[]string{"package.json", "yarn.lock"}, all, "yarn install --immutable", false},
+		// yarn 1 ignores --immutable and would rewrite yarn.lock.
+		{[]string{"package.json", "yarn.lock"}, []string{"yarn@1.22.22"}, "yarn install --frozen-lockfile", false},
 		{[]string{"package.json", "pnpm-lock.yaml"}, all, "pnpm install --frozen-lockfile", false},
 		{[]string{"package.json", "package-lock.json", "yarn.lock"}, all, "npm ci --no-audit --no-fund", false},
 		{[]string{"package.json", "bun.lock"}, []string{"npm"}, `bun.lock needs bun, which is not in the image: pin it in .bun-version or package.json "packageManager"`, true},

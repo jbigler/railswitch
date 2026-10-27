@@ -5,8 +5,8 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=1105b21785fa
-Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-a27d75c8
+Label=filial.unit-hash=c951a39eed32
+Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-0837f09e
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
 Network=filial-proxy.network

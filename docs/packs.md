@@ -178,7 +178,7 @@ lockfile names, first match in this order (D69):
 |---|---|
 | `package-lock.json` | `npm ci --no-audit --no-fund` |
 | `bun.lock` or `bun.lockb` | `bun install --frozen-lockfile` |
-| `yarn.lock` | `yarn install --immutable` |
+| `yarn.lock` | `yarn install --immutable` (yarn 1: `--frozen-lockfile`) |
 | `pnpm-lock.yaml` | `pnpm install --frozen-lockfile` |
 
 - A `package.json` without a lockfile fails: create one with
@@ -192,8 +192,10 @@ lockfile names, first match in this order (D69):
   without the bun step until `railswitch containerfile eject base --force`
   (or merging the step by hand).
 - **yarn and pnpm** come through corepack (`corepack enable` in the image),
-  at the version `package.json` `"packageManager"` names. Node 25 and later
-  no longer ship corepack: such an app fails naming the fix.
+  at the version `package.json` `"packageManager"` names (yarn 1 without
+  one). Corepack never writes `packageManager` into `package.json`
+  (`COREPACK_ENABLE_AUTO_PIN=0`). Node 25 and later no longer ship
+  corepack: such an app fails naming the fix.
 - The install is skipped when nothing changed since the last one: a stamp
   in `node_modules/` records the Node and tool versions and the lockfile.
 

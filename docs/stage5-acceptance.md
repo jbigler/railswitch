@@ -161,4 +161,4 @@ Stage 5 acceptance: complete.
 
 | Gap | Generic feature | Commit |
 |-----|-----------------|--------|
-| A stalled binary download (Erlang's `:httpc` sets no timeout) hung the deps service until its 15 min limit; every worktree downloaded tailwind (~100 MB) again | None needed in core: the Phoenix pack bounds `mix assets.setup` (`timeout 300`, 3 tries) and keeps tailwind's versioned binaries in a shared cache volume (`phoenix_assets`) | `8b62dc7` |
+| A stalled binary download (Erlang's `:httpc` sets no timeout) hung the deps service until its 15 min limit; every worktree downloaded tailwind (~110 MB) again | None needed in core: the Phoenix pack bounds `mix assets.setup` (`timeout 300`, 3 tries) and keeps tailwind's version-named binaries (tailwind hex 0.5+, `tailwind-<target>-<version>`) in a shared cache volume (`phoenix_assets`); older releases' unversioned binary is not cached, since it would go stale on an update | `8b62dc7` |

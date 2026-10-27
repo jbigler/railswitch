@@ -19,7 +19,9 @@ reference host is CachyOS/Arch.
 - Upgrading from Stage 3: a `project.toml` with `[tools] nvim = true` is
   refused; replace it with an empty `[tools.nvim]` table (D54), or one with
   `config_repo`/`config_ref`. Then `railswitch lock` if `up` says
-  `stack.lock` is stale.
+  `stack.lock` is stale. To add an agent to an existing project, run
+  `railswitch agent add <name>` (D63; e.g. `railswitch agent add claude`), then
+  `railswitch secret set` for each secret it lists.
 - Upgrading from an earlier Stage 4 build: an agent's home is now the dir
   `<ws>/.railswitch/agent-home/<slug>/<name>`. Existing
   `<p>-<slug>-agent-<n>-home` volumes are no longer used: log in to the agent

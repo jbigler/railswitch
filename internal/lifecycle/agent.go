@@ -242,7 +242,13 @@ func (l *L) agentName(m *render.Model, name string) (string, error) {
 	}
 	switch {
 	case len(names) == 0:
-		return "", fmt.Errorf("project %s has no agents: add one under [agents] in project.toml", m.Prefix)
+		hint := "railswitch agent add <name> --use <ref>"
+		if l.WS.Catalog != nil {
+			if ref, ok := l.WS.Catalog.DefaultAgent(); ok {
+				hint = "railswitch agent add " + ref.Name
+			}
+		}
+		return "", fmt.Errorf("project %s has no agents: %s", m.Prefix, hint)
 	case name == "" && len(names) == 1:
 		return names[0], nil
 	case name == "":

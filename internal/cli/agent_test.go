@@ -133,7 +133,7 @@ func TestAgentServiceArgvUsage(t *testing.T) {
 func TestCompleteAgent(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
-	if got, want := complete(t, "agent", ""), []string{"claude", "ls", "probe", "stop"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "agent", ""), []string{"add", "claude", "ls", "probe", "stop"}; !slices.Equal(got, want) {
 		t.Errorf("agent: %q; want %q", got, want)
 	}
 	if got := complete(t, "agent", "claude", ""); len(got) != 0 {

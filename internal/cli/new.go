@@ -400,13 +400,11 @@ func parseAgentFlags(flags []string) (map[string]string, error) {
 func addNewSecrets(proj string, p *config.Project, st *pack.Stack) ([]string, error) {
 	var secrets, gitServices []string
 	for _, a := range st.Agents {
-		for _, s := range a.Agent.Secrets {
-			name := strings.ReplaceAll(a.Name, "-", "_") + "_" + s.Name
-			if err := config.AddSecret(proj, name, config.Secret{Services: []string{a.Service}, Env: s.Env}); err != nil {
-				return nil, err
-			}
-			secrets = append(secrets, name)
+		names, err := addAgentSecrets(proj, p, a)
+		if err != nil {
+			return nil, err
 		}
+		secrets = append(secrets, names...)
 		gitServices = append(gitServices, a.Service)
 	}
 	if p.Tools.Nvim != nil {
@@ -419,6 +417,25 @@ func addNewSecrets(proj string, p *config.Project, st *pack.Stack) ([]string, er
 		secrets = append(secrets, "github_token")
 	}
 	return secrets, nil
+}
+
+// addAgentSecrets declares agent a's package [[secrets]] in project.toml
+// at proj as <agent>_<name> ("-" in the agent's name becomes "_"),
+// received by a, skipping those p already declares. It returns the names
+// it declared (all unset).
+func addAgentSecrets(proj string, p *config.Project, a *pack.ChosenAgent) ([]string, error) {
+	var names []string
+	for _, s := range a.Agent.Secrets {
+		name := strings.ReplaceAll(a.Name, "-", "_") + "_" + s.Name
+		if _, ok := p.Secrets[name]; ok {
+			continue
+		}
+		if err := config.AddSecret(proj, name, config.Secret{Services: []string{a.Service}, Env: s.Env}); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, nil
 }
 
 // ejectNames are the defaults the stack builds, in eject order: base

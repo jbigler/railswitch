@@ -471,3 +471,38 @@ func AddSecret(path, name string, s Secret) error {
 		return d.appendTable([]string{"secrets", name}, b.String()), nil
 	})
 }
+
+// AddAgent appends an [agents.<name>] table holding a's use and, when set,
+// run at the end of path. An agent name already declared is an error.
+func AddAgent(path, name string, a Agent) error {
+	return editFile(path, func(*doc) error { return nil }, func(p *Project, d *doc) (string, error) {
+		if _, ok := p.Agents[name]; ok {
+			return "", fmt.Errorf("%s: agent %s is already declared", path, name)
+		}
+		body := "use = " + QuoteString(a.Use) + "\n"
+		if a.Run != "" {
+			body += "run = " + QuoteString(a.Run) + "\n"
+		}
+		return d.appendTable([]string{"agents", name}, body), nil
+	})
+}
+
+// AddSecretService adds service to secret name's services in path, as
+// the array's last element (or a new services key); a service already
+// there changes nothing.
+func AddSecretService(path, name, service string) error {
+	return editFile(path, func(*doc) error { return nil }, func(p *Project, d *doc) (string, error) {
+		s, ok := p.Secrets[name]
+		if !ok {
+			return "", fmt.Errorf("%s: secret %s is not declared", path, name)
+		}
+		if slices.Contains(s.Services, service) {
+			return d.data, nil
+		}
+		table := []string{"secrets", name}
+		if st := d.find(table, "services"); st != nil {
+			return d.appendToArray(st, QuoteString(service))
+		}
+		return d.insertKey(table, "services", "["+QuoteString(service)+"]"), nil
+	})
+}

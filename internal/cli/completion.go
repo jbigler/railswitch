@@ -31,7 +31,7 @@ var completionFiles = map[string]string{
 // subcommands adds its entry here. A command with completionArgs too
 // (agent) offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":         {"ls", "stop"},
+	"agent":         {"add", "ls", "stop"},
 	"containerfile": {"eject", "list", "new", "show"},
 	"db":            {"dump"},
 	"fw":            {"allow", "show"},
@@ -49,6 +49,7 @@ var completionSubs = map[string][]string{
 var completionFlags = map[string][]string{
 	"":                    {"-C=", "-w=", "--json"},
 	"agent":               {"--new-term"},
+	"agent add":           {"--run=", "--use="},
 	"build":               {"--force", "--pull"},
 	"containerfile eject": {"--force"},
 	"containerfile show":  {"--default"},

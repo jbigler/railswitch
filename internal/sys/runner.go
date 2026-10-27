@@ -25,18 +25,22 @@ const DefaultTimeout = 30 * time.Second
 const NoTimeout time.Duration = -1
 
 // ErrExit is wrapped together with the exit code and stderr tail when a
-// command exits non-zero.
+// command exits non-zero (no tail for a KillGrace job whose Stderr is its
+// Stdout file; see Cmd.Stderr).
 var ErrExit = errors.New("non-zero exit")
 
 // Cmd describes one command invocation.
 type Cmd struct {
-	Name    string
-	Args    []string
-	Dir     string
-	Env     []string      // nil = inherit
-	Stdin   io.Reader     // the only channel for secret values
-	Stdout  io.Writer     // nil = captured into Result
-	Stderr  io.Writer     // nil = captured into Result
+	Name   string
+	Args   []string
+	Dir    string
+	Env    []string  // nil = inherit
+	Stdin  io.Reader // the only channel for secret values
+	Stdout io.Writer // nil = captured into Result
+	// Stderr nil = captured into Result. With KillGrace > 0 and Stderr the
+	// same *os.File as Stdout (a job log), the child writes that file
+	// directly and the ErrExit error carries no stderr tail.
+	Stderr  io.Writer
 	Timeout time.Duration // 0 = DefaultTimeout; NoTimeout = no deadline
 	// Detach starts the process in its own session with /dev/null stdio
 	// and returns at once, without waiting (a new terminal window that
@@ -98,25 +102,24 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		cmd.Stdout = &stdout
 	}
 	cmd.Stderr = &stderr
-	if f, ok := c.Stderr.(*os.File); ok && c.Stderr == c.Stdout {
-		// One file for both streams (a job log): the child writes it
+	if f, ok := c.Stderr.(*os.File); ok && c.KillGrace > 0 && c.Stderr == c.Stdout {
+		// One file for both streams of a job: the child writes it
 		// directly, with no pipe through this process, so it outlives us.
-		// The exit error then has no stderr tail.
 		cmd.Stderr = f
 	} else if c.Stderr != nil {
 		cmd.Stderr = io.MultiWriter(c.Stderr, &tail)
 	}
-	// kill is the SIGKILL that follows a graceful SIGTERM; stopped once the
-	// command is reaped, so it never hits a reused process group id.
+	// kill is the SIGKILL that follows a graceful SIGTERM to group pgid.
 	// cmd.Cancel has returned before cmd.Run does.
 	var kill *time.Timer
+	var pgid int
 	switch {
 	case c.KillGrace > 0:
 		// A graceful group: SIGTERM first so the command can clean up, then
 		// SIGKILL for whatever is left of the group after the grace.
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		cmd.Cancel = func() error {
-			pgid := cmd.Process.Pid
+			pgid = cmd.Process.Pid
 			kill = time.AfterFunc(c.KillGrace, func() { _ = syscall.Kill(-pgid, syscall.SIGKILL) })
 			return syscall.Kill(-pgid, syscall.SIGTERM)
 		}
@@ -135,7 +138,10 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	}
 
 	err := cmd.Run()
-	if kill != nil {
+	// The leader may be reaped while group members that ignore SIGTERM
+	// live on: the SIGKILL still has to reach them. Stop it only when the
+	// group is gone; a pgid is not reused while any member lives.
+	if kill != nil && errors.Is(syscall.Kill(-pgid, 0), syscall.ESRCH) {
 		kill.Stop()
 	}
 	res := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}

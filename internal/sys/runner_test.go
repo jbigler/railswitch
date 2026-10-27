@@ -133,6 +133,71 @@ func TestKillGraceTERMHonoured(t *testing.T) {
 	}
 }
 
+func TestKillGraceKillsGroupAfterLeaderExits(t *testing.T) {
+	dir := t.TempDir()
+	f, err := os.Create(dir + "/log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	pidFile := dir + "/pid"
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(300*time.Millisecond, cancel)
+	_, err = Exec{}.Run(ctx, Cmd{
+		Name:      "sh",
+		Args:      []string{"-c", `(trap "" TERM; exec sleep 30) & echo $! > ` + pidFile + `; wait`},
+		Stdout:    f,
+		Stderr:    f,
+		Timeout:   NoTimeout,
+		KillGrace: 200 * time.Millisecond,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want Canceled", err)
+	}
+	b, err := os.ReadFile(pidFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(b)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Gone, or a zombie waiting for its new parent to reap it.
+	alive := func() bool {
+		st, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+		if err != nil {
+			return false
+		}
+		_, rest, _ := strings.Cut(string(st), ") ")
+		return !strings.HasPrefix(rest, "Z")
+	}
+	for range 100 {
+		if !alive() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	_ = syscall.Kill(pid, syscall.SIGKILL)
+	t.Fatal("grandchild ignoring TERM still alive 1 s after the leader exited")
+}
+
+func TestStderrFilePassthroughOnlyForKillGrace(t *testing.T) {
+	f, err := os.Create(t.TempDir() + "/log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	script := []string{"-c", "echo boom >&2; exit 2"}
+	_, err = Exec{}.Run(context.Background(), Cmd{Name: "sh", Args: script, Stdout: f, Stderr: f})
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("without KillGrace: err = %v, want the stderr tail", err)
+	}
+	_, err = Exec{}.Run(context.Background(), Cmd{Name: "sh", Args: script, Stdout: f, Stderr: f, Timeout: NoTimeout, KillGrace: time.Second})
+	if !errors.Is(err, ErrExit) || strings.Contains(err.Error(), "boom") {
+		t.Errorf("with KillGrace: err = %v, want ErrExit without a tail (stderr not piped)", err)
+	}
+}
+
 func TestExecExitErrorMessage(t *testing.T) {
 	_, err := Exec{}.Run(context.Background(), Cmd{Name: "false"})
 	if strings.HasSuffix(err.Error(), ": ") || strings.HasSuffix(err.Error(), ":") {

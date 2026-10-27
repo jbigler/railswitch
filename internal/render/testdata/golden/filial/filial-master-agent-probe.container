@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree master
 
 [Container]
-Label=filial.unit-hash=817ad3a54355
+Label=filial.unit-hash=b3940e1d538e
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-598e6e7b
 ContainerName=filial-master-agent-probe
 Network=filial-master-dev.network:alias=agent-probe
@@ -20,6 +20,8 @@ AddHost=vnc.master.filial.localhost:10.214.3.2
 Volume=/WORKSPACES/filial/master:/app:z
 Volume=/WORKSPACES/filial/master:/WORKSPACES/filial/master:z
 Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
+Volume=/WORKSPACES/filial/master/.git/hooks:/WORKSPACES/filial/master/.git/hooks:ro,z
+Volume=/WORKSPACES/filial/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/status/master:/run/railswitch/status:rw,z
 Volume=filial-master-agent-probe-home:/home/appuser:U
 Volume=filial-master-node-modules:/app/node_modules:U

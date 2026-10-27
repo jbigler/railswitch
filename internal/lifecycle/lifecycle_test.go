@@ -269,6 +269,25 @@ func TestUpRecordsDigest(t *testing.T) {
 	}
 }
 
+// git-guard (D60): a finding is a warning; up still runs.
+func TestUpWarnsGitGuard(t *testing.T) {
+	e := setup(t)
+	hook := filepath.Join(e.ws, "master", ".git", "hooks", "pre-commit")
+	if err := os.MkdirAll(filepath.Dir(hook), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	errs := e.l.Err.(*bytes.Buffer).String()
+	if !strings.Contains(errs, "WARNING: git-guard: 1 finding(s): hook-missing-backup "+hook) || !strings.Contains(errs, "; railswitch hooks check\n") {
+		t.Errorf("stderr lacks the git-guard warning:\n%s", errs)
+	}
+}
+
 func TestUpPinsBaseImages(t *testing.T) {
 	e := setup(t)
 	e.missing("podman", "image", "exists")

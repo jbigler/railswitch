@@ -58,6 +58,7 @@ var commands = map[string]command{
 	"completion":    cmdCompletion,
 	"agent":         cmdAgent,
 	"nvim":          cmdNvim,
+	"hooks":         cmdHooks,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.

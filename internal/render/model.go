@@ -176,9 +176,11 @@ type Volume struct {
 
 // Mount is a bind mount; Source and Target are templates. Origin is "" for
 // package mounts and `[[mount]] #<i> service = "<svc>"` for machine mounts.
+// A BaseOnly mount is rendered in the base worktree only.
 type Mount struct {
 	Source, Target, Options string
 	Origin                  string
+	BaseOnly                bool
 }
 
 // UnitExtras are a service's unit settings. Memory and PidsLimit are
@@ -282,9 +284,11 @@ func (b *builder) services() error {
 		ID: "deps", Role: RoleDeps, Image: baseImage, Oneshot: true, Command: pk.App.Install,
 		Firewall: []string{"deps"},
 		Worktree: true,
-		Mounts:   []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}}, // no .git: nothing an install needs (D11)
-		Volumes:  b.appVolumes(),
-		Unit:     unitExtras(pack.Unit{}, RoleDeps, p.Services["deps"]),
+		// No .git: nothing an install needs (D11). In the base worktree /app
+		// holds it, so its hooks are read-only (D60).
+		Mounts:  []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}, appHooks},
+		Volumes: b.appVolumes(),
+		Unit:    unitExtras(pack.Unit{}, RoleDeps, p.Services["deps"]),
 	}
 	var errs []error
 	errs = append(errs, b.entrypoint(&app, pk.Name, pk.Files, pk.App.Entrypoint))
@@ -389,14 +393,24 @@ func (b *builder) machineMounts(id string) []Mount {
 // A service that may write .git ("z": tools and agents) also gets the
 // worktree at its own host path (C11), so the gitdir paths git records in
 // the base .git resolve in the container too and git never sees a worktree
-// as prunable (D30).
+// as prunable (D30). git-guard (D60): a writable .git gets its hooks
+// read-only on top, and in the base worktree, where /app is the base
+// checkout, so does /app/.git/hooks.
 func worktreeMounts(gitOptions string) []Mount {
 	m := []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}}
 	if gitOptions == "z" {
 		m = append(m, Mount{Source: "{worktree.dir}", Target: "{worktree.dir}", Options: "z"})
 	}
-	return append(m, Mount{Source: "{base.git}", Target: "{base.git}", Options: gitOptions})
+	m = append(m, Mount{Source: "{base.git}", Target: "{base.git}", Options: gitOptions})
+	if gitOptions == "z" {
+		m = append(m, Mount{Source: "{base.git}/hooks", Target: "{base.git}/hooks", Options: "ro,z"})
+	}
+	return append(m, appHooks)
 }
+
+// appHooks is git-guard's /app/.git/hooks, read-only (D60): in the base
+// worktree /app is the base checkout, its .git included.
+var appHooks = Mount{Source: "{base.git}/hooks", Target: "/app/.git/hooks", Options: "ro,z", BaseOnly: true}
 
 // appVolumes are the pack's shared caches and per-worktree volumes.
 func (b *builder) appVolumes() []Volume {
@@ -750,6 +764,21 @@ func (m *Model) Instance(wt Worktree) (*Instance, error) {
 		return nil, err
 	}
 	return in, nil
+}
+
+// Mounts are s's bind mounts in this worktree: BaseOnly ones only in the
+// base worktree.
+func (in *Instance) Mounts(s *Service) []Mount {
+	if filepath.Clean(in.Worktree.Dir) == filepath.Clean(in.m.baseDir) {
+		return s.Mounts
+	}
+	var out []Mount
+	for _, mt := range s.Mounts {
+		if !mt.BaseOnly {
+			out = append(out, mt)
+		}
+	}
+	return out
 }
 
 // values computes every Value except image.*: what NamesFor needs, with no

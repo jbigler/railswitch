@@ -189,20 +189,28 @@ its project checks are skipped. The pass secret driver's checks (`pass`,
 `[secrets] driver` is `pass` (D37); a machine config that can't be read is a
 failed `machine config` check. `machine mounts` is listed only when the
 machine config has `[[mount]]` entries (D57); it fails when a non-optional
-source is missing. `doctor` exits 1 when any check fails.
+source is missing. `git-guard` (inside a workspace, D60) compares the base
+worktree's installed git hooks to their backups in the workspace repo's
+`githooks/`, checks the key names (never the values) of its `.git/config`
+against an allowlist and each linked worktree's `.git` pointer; a finding
+is a warning (`warn` true), and `railswitch hooks check` lists them.
+`doctor` exits 1 when any check fails; a warning never changes the exit
+code, and the text output shows it as `warn`.
 
 ```json
 [
-  {"name": "podman >= 5.0", "ok": true, "detail": "podman 5.2.1", "fix": ""},
-  {"name": "unprivileged port 80", "ok": false, "detail": "net.ipv4.ip_unprivileged_port_start = 1024", "fix": "railswitch allow-ports"},
-  {"name": "units current", "ok": true, "detail": "render would change nothing", "fix": ""}
+  {"name": "podman >= 5.0", "ok": true, "warn": false, "detail": "podman 5.2.1", "fix": ""},
+  {"name": "unprivileged port 80", "ok": false, "warn": false, "detail": "net.ipv4.ip_unprivileged_port_start = 1024", "fix": "railswitch allow-ports"},
+  {"name": "units current", "ok": true, "warn": false, "detail": "render would change nothing", "fix": ""},
+  {"name": "git-guard", "ok": false, "warn": true, "detail": "1 finding(s): hook-missing-backup /home/u/app/main/.git/hooks/pre-push", "fix": "railswitch hooks check"}
 ]
 ```
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
+| `warn` | boolean | A failed check is only a warning (`git-guard`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a stale or missing `stack.lock`); `""` for a passed check. |
 

@@ -131,7 +131,7 @@ func (in *Instance) VolumeSpecs(s *Service) ([]string, error) {
 		return v
 	}
 	var out []string
-	for _, mt := range s.Mounts {
+	for _, mt := range in.Mounts(s) {
 		v := x(mt.Source) + ":" + x(mt.Target)
 		if mt.Options != "" {
 			v += ":" + mt.Options

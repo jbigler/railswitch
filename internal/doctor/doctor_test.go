@@ -148,7 +148,7 @@ func TestAllOK(t *testing.T) {
 	h := host(t, "80", true, "nft", "nsenter", "getent", "jq", "curl", "pass", "gpg")
 
 	got := h.Run(context.Background(), f, ws)
-	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "proxy subnet", "cgroup v2", "pass", "gpg", "gpg secret key")
+	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "proxy subnet", "git-guard", "cgroup v2", "pass", "gpg", "gpg secret key")
 	if !slices.Equal(names(got), want) {
 		t.Fatalf("checks = %q\nwant %q", names(got), want)
 	}
@@ -168,6 +168,7 @@ func TestAllOK(t *testing.T) {
 func TestAllFail(t *testing.T) {
 	ws := workspaceAt(t, false)
 	writeConfig(t, ws.Dirs, "[secrets]\ndriver = \"pass\"\ndriver_opts = { key = \"ABCD1234\" }\n")
+	writeHook(t, ws)
 	f := fakeHost()
 	f.On(podmanVersion, sys.Result{Stdout: []byte("4.9.3\n")}, nil)
 	f.On(socketActive, sys.Result{ExitCode: 3, Stdout: []byte("inactive\n")}, errors.New("systemctl: non-zero exit (exit 3)"))
@@ -177,7 +178,7 @@ func TestAllFail(t *testing.T) {
 	h := host(t, "1024", false)
 
 	got := h.Run(context.Background(), f, ws)
-	if len(got) != len(hostChecks)+7 {
+	if len(got) != len(hostChecks)+8 {
 		t.Fatalf("checks = %q", names(got))
 	}
 	for _, c := range got {
@@ -441,5 +442,34 @@ func TestDoctorMachineMounts(t *testing.T) {
 	c = byName(got)["machine mounts"]
 	if c.OK || !strings.Contains(c.Detail, gone) || !strings.Contains(c.Detail, `[[mount]] #0 service = "nvim"`) || c.Fix == "" {
 		t.Errorf("missing source: %+v", c)
+	}
+}
+
+// writeHook installs an unbacked-up pre-commit hook in the workspace's base
+// worktree: a git-guard finding.
+func writeHook(t *testing.T, ws *workspace.Workspace) string {
+	t.Helper()
+	hook := filepath.Join(ws.Root, "master", ".git", "hooks", "pre-commit")
+	if err := os.MkdirAll(filepath.Dir(hook), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return hook
+}
+
+// TestDoctorWarnLevel: a git-guard finding is a warning (C8), never a
+// failure; no finding passes.
+func TestDoctorWarnLevel(t *testing.T) {
+	ws := workspaceAt(t, true)
+	c, ok := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["git-guard"]
+	if !ok || !c.OK || c.Warn || c.Fix != "" {
+		t.Errorf("no finding: %+v (present %v)", c, ok)
+	}
+	hook := writeHook(t, ws)
+	c = byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["git-guard"]
+	if c.OK || !c.Warn || !strings.Contains(c.Detail, "hook-missing-backup "+hook) || c.Fix != "railswitch hooks check" {
+		t.Errorf("unbacked-up hook: %+v", c)
 	}
 }

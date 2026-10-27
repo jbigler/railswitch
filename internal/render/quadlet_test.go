@@ -165,6 +165,27 @@ func TestEntrypointOverride(t *testing.T) {
 		"Volume="+ws+"/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z")
 }
 
+// git-guard (D60): a writable base .git is followed by its hooks, read-only;
+// in the base worktree /app is the base checkout, so every service mounting
+// the worktree gets /app/.git/hooks read-only.
+func TestHooksMountReadOnly(t *testing.T) {
+	ws, units := renderUnits(t, fixtureDir, nil)
+	git := filepath.Join(ws, "master", ".git")
+	hooks := filepath.Join(git, "hooks")
+	for _, file := range []string{"filial-feat-nvim.container", "filial-feat-agent-probe.container"} {
+		lines := unitLines(t, units, file)
+		i := slices.Index(lines, "Volume="+git+":"+git+":z")
+		if i < 0 || i+1 >= len(lines) || lines[i+1] != "Volume="+hooks+":"+hooks+":ro,z" {
+			t.Errorf("%s: no read-only hooks line after the .git line:\n%s", file, units[file])
+		}
+		noLinePrefix(t, units, file, "Volume="+hooks+":/app/.git/hooks")
+	}
+	noLinePrefix(t, units, "filial-feat-rails.container", "Volume="+hooks)
+	for _, svc := range []string{"rails", "deps", "nvim", "agent-probe"} {
+		hasLine(t, units, "filial-master-"+svc+".container", "Volume="+hooks+":/app/.git/hooks:ro,z")
+	}
+}
+
 func TestDepsNotRemainAfterExit(t *testing.T) {
 	_, units := renderUnits(t, fixtureDir, nil)
 	for _, slug := range []string{"master", "feat"} {

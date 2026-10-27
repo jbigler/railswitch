@@ -34,6 +34,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D53: `docs/superpowers/plans/2026-10-
 - `internal/unithash` — the `<prefix>.unit-hash` label that tells `up` a container runs an older unit.
 - `internal/tailscale` — the tailscale CLI for `share`/`unshare` (`serve --bg`, `serve … off`, never `reset`).
 - `internal/agentstatus` — the agents' status files (D58), read as hostile.
+- `internal/gitguard` — git-guard (D60): installed hooks vs. their `githooks/` backups, `.git/config` key names (never values), worktree `.git` pointers.
 - `internal/podman`, `internal/firewall`, `internal/worktree`, `internal/workspace`, `internal/lifecycle`, `internal/doctor`.
 
 ## Rules

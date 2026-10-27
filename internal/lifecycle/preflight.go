@@ -86,6 +86,41 @@ func (l *L) warnNotIsolated(ctx context.Context) {
 	}
 }
 
+// warnGitGuard prints a WARNING when git-guard finds something to review
+// (D60): a hook without a backup or unlike it, an unusual .git/config key,
+// a worktree's .git pointing elsewhere. It never refuses; a failed check is
+// a warning too.
+func (l *L) warnGitGuard(ctx context.Context) {
+	fs, err := l.WS.GitGuard(ctx, l.R)
+	if err != nil {
+		fmt.Fprintf(l.Err, "WARNING: git-guard: could not check: %v\n", err)
+		return
+	}
+	if len(fs) == 0 {
+		return
+	}
+	parts := make([]string, len(fs))
+	for i, f := range fs {
+		parts[i] = f.Kind + " " + f.Path
+	}
+	fmt.Fprintf(l.Err, "WARNING: git-guard: %d finding(s): %s; railswitch hooks check\n", len(fs), strings.Join(parts, ", "))
+}
+
+// mkHooks creates <base>/.git/hooks (0755) when git is a directory without
+// one: it is the source of git-guard's read-only mounts. A missing git is
+// left to the mount check.
+func mkHooks(git string) error {
+	hooks := filepath.Join(git, "hooks")
+	err := os.Mkdir(hooks, 0o755)
+	switch {
+	case err == nil:
+		return os.Chmod(hooks, 0o755) // whatever the umask
+	case errors.Is(err, os.ErrExist), errors.Is(err, os.ErrNotExist):
+		return nil
+	}
+	return fmt.Errorf("git hooks dir: %w", err)
+}
+
 // checkProxySubnet runs before up renders. It refuses while another network
 // uses the machine network's subnet (checkMachineSubnet). While the project's proxy
 // network does not exist yet and another podman network overlaps the
@@ -171,7 +206,9 @@ func requireDescriptor(ws, prefix string) error {
 // starts: every absolute bind-mount source exists, the firewall hook
 // descriptor exists, the worktree dir exists and every secret its services
 // receive is set. It first creates the worktree's agent status dir (0700,
-// D58) when the project has an agent and the dir is missing.
+// D58) when the project has an agent and the dir is missing, and the base
+// worktree's .git/hooks (0755), the source of git-guard's read-only mounts
+// (D60), when its .git exists without one.
 func (l *L) Preflight(ctx context.Context, m *render.Model, slug string) error {
 	in, err := instance(m, slug)
 	if err != nil {
@@ -183,8 +220,11 @@ func (l *L) Preflight(ctx context.Context, m *render.Model, slug string) error {
 			return fmt.Errorf("agent status dir: %w", err)
 		}
 	}
+	if err := mkHooks(in.Values["base.git"]); err != nil {
+		return err
+	}
 	for _, s := range m.Services {
-		for _, mt := range s.Mounts {
+		for _, mt := range in.Mounts(&s) {
 			src, err := pack.Expand(mt.Source, in.Scope(s.ID))
 			if err != nil {
 				return fmt.Errorf("%s: mount %s: %w", s.ID, mt.Source, err)

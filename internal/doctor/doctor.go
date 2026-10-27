@@ -1,8 +1,8 @@
 // Package doctor checks that the host can run railswitch: podman and its
 // quadlet generator, the podman socket, unprivileged port 80, the tools the
-// firewall hook needs, the workspace's firewall descriptor, units and proxy
-// subnet, cgroup v2 and, with the pass secret driver (D37), pass, gpg and
-// the GPG key.
+// firewall hook needs, the workspace's firewall descriptor, units, proxy
+// subnet and git state (git-guard, D60: a warning), cgroup v2 and, with the
+// pass secret driver (D37), pass, gpg and the GPG key.
 package doctor
 
 import (
@@ -26,10 +26,13 @@ import (
 )
 
 // Check is one doctor finding: Fix says how to repair a failed check ("" for
-// a passed one). Its JSON form is `doctor --json`'s (docs/json.md).
+// a passed one). A failed check with Warn set is a warning (C8): it never
+// changes doctor's exit code. Its JSON form is `doctor --json`'s
+// (docs/json.md).
 type Check struct {
 	Name   string `json:"name"`
 	OK     bool   `json:"ok"`
+	Warn   bool   `json:"warn"`
 	Detail string `json:"detail"`
 	Fix    string `json:"fix"`
 }
@@ -72,7 +75,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	}
 	out = append(out, machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
-		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws))
+		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
 	}
 	out = append(out, h.cgroup())
 	out = append(out, h.secrets(ctx, r, ws)...)
@@ -188,6 +191,27 @@ func (h Host) onPath(name, fix string) Check {
 // starts the project's containers unfirewalled.
 func descriptor(ws *workspace.Workspace) Check {
 	return exists("firewall descriptor", firewall.DescriptorPath(ws.Root, ws.Project.Project.Prefix), "railswitch render")
+}
+
+// gitGuard is git-guard's check (D60): a hook, .git/config key or worktree
+// pointer to review is a warning, never a failure ("nothing refuses").
+func gitGuard(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
+	c := Check{Name: "git-guard", Warn: true, Fix: "railswitch hooks check"}
+	fs, err := ws.GitGuard(ctx, r)
+	if err != nil {
+		c.Detail = "could not check: " + err.Error()
+		return c
+	}
+	if len(fs) == 0 {
+		c.OK, c.Warn, c.Detail = true, false, "hooks match their backups, .git/config keys and worktree pointers as expected"
+		return c
+	}
+	parts := make([]string, len(fs))
+	for i, f := range fs {
+		parts[i] = f.Kind + " " + f.Path
+	}
+	c.Detail = fmt.Sprintf("%d finding(s): %s", len(fs), strings.Join(parts, ", "))
+	return c
 }
 
 // units checks that render would change nothing. A stale stack.lock is fixed

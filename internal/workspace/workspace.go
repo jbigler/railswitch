@@ -19,6 +19,7 @@ import (
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
+	"github.com/jbigler/railswitch/internal/gitguard"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -293,6 +294,53 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 		Host:      host,
 		Mounts:    mounts,
 	})
+}
+
+// GitGuard runs git-guard's check (D60) on the base worktree, with the
+// project's other registered worktrees as the linked ones (none without a
+// registry). A workspace reached through another path than the registered
+// one (a symlink) is checked at the registered path, the one git recorded.
+func (w *Workspace) GitGuard(ctx context.Context, r sys.Runner) ([]gitguard.Finding, error) {
+	base, err := w.baseSlug()
+	if err != nil {
+		return nil, err
+	}
+	root := w.Root
+	var linked []string
+	switch reg, err := machine.Read(w.Dirs.Data); {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return nil, err
+	default:
+		prefix := w.Project.Project.Prefix
+		if pe, ok := reg.Project(prefix); ok && samePath(pe.Workspace, w.Root) {
+			root = filepath.Clean(pe.Workspace)
+		}
+		for _, e := range reg.WorktreesOf(prefix) {
+			if e.Slug != base {
+				linked = append(linked, e.Slug)
+			}
+		}
+	}
+	return gitguard.Check(ctx, r, root, filepath.Join(root, base), linked)
+}
+
+// BaseDir is the base worktree's directory, <root>/<sanitize(base_branch)>.
+func (w *Workspace) BaseDir() (string, error) {
+	base, err := w.baseSlug()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(w.Root, base), nil
+}
+
+func (w *Workspace) baseSlug() (string, error) {
+	b := w.Project.Project.BaseBranch
+	slug, err := naming.Sanitize(b)
+	if err != nil {
+		return "", fmt.Errorf("[project] base_branch %q: %w", b, err)
+	}
+	return slug, nil
 }
 
 // machineMounts are cfg's [[mount]]s of project prefix (D57), and which of

@@ -120,6 +120,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		return err
 	}
 	l.warnNotIsolated(ctx)
+	l.warnGitGuard(ctx)
 	var ch changes
 	d, err := l.WS.Render(ctx, l.R, false)
 	if err != nil {

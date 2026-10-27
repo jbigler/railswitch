@@ -36,7 +36,8 @@ const (
 
 // workspaceGitignore is the workspace repo's allowlist (D38): worktrees,
 // .railswitch/, mise.local.toml and db-dumps/ are never tracked; local agent
-// packages under agents/ are.
+// packages under agents/ and git-guard's hook backups under githooks/ (D60)
+// are.
 const workspaceGitignore = `/*
 !/.gitignore
 !/project.toml
@@ -46,6 +47,7 @@ const workspaceGitignore = `/*
 !/packs/
 !/options/
 !/agents/
+!/githooks/
 `
 
 // railswitch project new: clone the app repo into a new workspace (its own git

@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -78,5 +79,23 @@ func TestPreflightNamesMount(t *testing.T) {
 	err := l.Preflight(context.Background(), m, "master")
 	if err == nil || !strings.Contains(err.Error(), gone) || !strings.Contains(err.Error(), `[[mount]] #0 service = "nvim"`) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// git-guard (D60): <base>/.git/hooks is a mount source; Preflight creates it.
+func TestPreflightCreatesHooks(t *testing.T) {
+	m := filialModel(t)
+	git := filepath.Join(m.Inputs.Workspace, "master", ".git")
+	if err := os.Mkdir(git, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	l := &L{R: &systest.Fake{}}
+	_ = l.Preflight(context.Background(), m, "master") // unapplied assets fail it later
+	fi, err := os.Stat(filepath.Join(git, "hooks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fi.IsDir() || fi.Mode().Perm() != 0o755 {
+		t.Errorf("hooks = %v, want a 0755 directory", fi.Mode())
 	}
 }

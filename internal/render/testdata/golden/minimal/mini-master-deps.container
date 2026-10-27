@@ -5,7 +5,7 @@
 Description=mini deps of worktree master
 
 [Container]
-Label=mini.unit-hash=8ec6ec047c54
+Label=mini.unit-hash=40d6410cd8e4
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-bb30b09f
 ContainerName=mini-master-deps
 Network=mini-master-dev.network:alias=deps
@@ -13,6 +13,7 @@ UserNS=keep-id:uid=1000,gid=1000
 User=1000:1000
 EnvironmentFile=/WORKSPACES/minimal/.railswitch/env/master/deps.env
 Volume=/WORKSPACES/minimal/master:/app:z
+Volume=/WORKSPACES/minimal/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/minimal/.railswitch/assets/rails/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
 Volume=mini_gems_ruby3.3.6:/usr/local/bundle
 Volume=mini_npm_cache:/home/appuser/.npm:U

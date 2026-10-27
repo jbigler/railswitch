@@ -8,7 +8,7 @@ Wants=railswitch-traefik.service railswitch-dozzle.service
 After=mini-master-deps.service railswitch-traefik.service railswitch-dozzle.service
 
 [Container]
-Label=mini.unit-hash=8f1d0084c850
+Label=mini.unit-hash=9a0a7a8d842d
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-bb30b09f
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails
@@ -21,6 +21,7 @@ PublishPort=127.0.0.1:33001:33001
 PublishPort=127.0.0.1:13001:3000
 Volume=/WORKSPACES/minimal/master:/app:z
 Volume=/WORKSPACES/minimal/master/.git:/WORKSPACES/minimal/master/.git:ro,z
+Volume=/WORKSPACES/minimal/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/minimal/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
 Volume=mini_gems_ruby3.3.6:/usr/local/bundle
 Volume=mini_npm_cache:/home/appuser/.npm:U

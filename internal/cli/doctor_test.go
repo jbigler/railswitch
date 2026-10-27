@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/doctor"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 )
@@ -32,7 +34,7 @@ func TestDoctorJSON(t *testing.T) {
 			keys = append(keys, k)
 		}
 		slices.Sort(keys)
-		if !slices.Equal(keys, []string{"detail", "fix", "name", "ok"}) {
+		if !slices.Equal(keys, []string{"detail", "fix", "name", "ok", "warn"}) {
 			t.Errorf("row keys = %q", keys)
 		}
 		byName[r["name"].(string)] = r
@@ -58,6 +60,40 @@ func TestDoctorText(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor output lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+// TestDoctorWarnLevel: a warning (C8) prints warn and its fix, and leaves
+// the exit code 0 when it is the only problem.
+func TestDoctorWarnLevel(t *testing.T) {
+	checks := []doctor.Check{
+		{Name: "podman >= 5.0", OK: true, Detail: "podman 5.2.1"},
+		{Name: "git-guard", Warn: true, Detail: "1 finding(s): hook-missing-backup /w/master/.git/hooks/pre-commit", Fix: "railswitch hooks check"},
+	}
+	var out bytes.Buffer
+	e := &env{stdout: &out}
+	if code := e.printChecks(checks); code != 0 {
+		t.Errorf("text: exit %d, want 0", code)
+	}
+	for _, want := range []string{"ok    podman >= 5.0", "warn  git-guard: 1 finding(s)", "      fix: railswitch hooks check"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("doctor output lacks %q:\n%s", want, out.String())
+		}
+	}
+	out.Reset()
+	e.json = true
+	if code := e.printChecks(checks); code != 0 {
+		t.Errorf("json: exit %d, want 0", code)
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &rows); err != nil {
+		t.Fatal(err)
+	}
+	if r := rows[1]; r["warn"] != true || r["ok"] != false {
+		t.Errorf("git-guard row = %v", r)
+	}
+	if code := e.printChecks(append(checks, doctor.Check{Name: "cgroup v2"})); code != 1 {
+		t.Errorf("a failed check besides: exit %d, want 1", code)
 	}
 }
 

@@ -14,7 +14,7 @@ import (
 )
 
 // railswitch doctor: check the host (and the workspace, inside one); exit 1
-// when a check fails.
+// when a check fails. A warning (C8) never changes the exit code.
 func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("doctor")
 	if code, ok := parse(fs, args); !ok {
@@ -32,10 +32,15 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 			ws, checks = nil, []doctor.Check{doctor.Workspace(err)}
 		}
 	}
-	checks = append(checks, doctor.Run(ctx, e.run, ws)...)
+	return e.printChecks(append(checks, doctor.Run(ctx, e.run, ws)...))
+}
+
+// printChecks prints doctor's checks, as JSON with --json, and returns its
+// exit code: 1 when a check failed, a warning aside.
+func (e *env) printChecks(checks []doctor.Check) int {
 	code := 0
 	for _, c := range checks {
-		if !c.OK {
+		if !c.OK && !c.Warn {
 			code = 1
 		}
 	}
@@ -47,7 +52,10 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	}
 	for _, c := range checks {
 		status := "ok  "
-		if !c.OK {
+		switch {
+		case !c.OK && c.Warn:
+			status = "warn"
+		case !c.OK:
 			status = "FAIL"
 		}
 		fmt.Fprintf(e.stdout, "%s  %s", status, c.Name)

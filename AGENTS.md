@@ -1,7 +1,7 @@
 # AGENTS.md — railswitch
 
 Go CLI (`railswitch`, module `github.com/jbigler/railswitch`) that runs Rails dev environments on rootless podman via Quadlet.
-Spec: `handoff/HANDOFF.md`; decisions D1–D63: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
+Spec: `handoff/HANDOFF.md`; decisions D1–D64: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
 
 ## Commands
 - `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...`, `go test ./...`.

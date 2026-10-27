@@ -91,11 +91,12 @@ project you looked at.
   permission is decided; `⚙` colours. The tab title is `(N) RailSwitch`,
   N counting agents in permission, question or waiting-for-reply across
   all projects.
-- **Strip:** one entry, `◆ <project> / <worktree> · <state>`, for every
+- **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
+  permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
-- **List:** the sort bar, then one row per worktree: name, branch, PR
-  (number, checks, state, review), stack state, agent state;
-  `+ New worktree` and `Refresh PRs` below.
+- **List:** a toolbar with the sort bar, `+ New worktree` and `Refresh
+  PRs`, then one row per worktree: name, branch, PR (number, checks,
+  state, review), stack state, agent state.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
   (`PR #2141 ready · checks ✓ · approved`), then Links, Services (a glyph
   and state per service), Agent (state and message), Actions and Jobs.
@@ -123,7 +124,8 @@ Placeholders `{worktree.host}`, `{worktree.slug}` and `{branch}` are
 expanded; a URL without a scheme gets `http://`. Links are greyed out
 while the stack is stopped. All open in a new tab.
 
-To hide stack links you don't use, list their labels in `project.toml`:
+To hide stack links you don't use, list their labels at the top level of
+`project.toml` (above the first table):
 
 ```toml
 hide_links = ["Routes", "Mailer previews"]
@@ -194,8 +196,9 @@ Every action is a job (below).
   whole project. A second request answers "busy: <running job>".
 - Cancel sends SIGTERM to the job's process group, SIGKILL 3 s later.
 - States: running, ok, failed (with the exit code), cancelled.
-- The page keeps the last 5000 lines and 4 MiB per job (lines cut at 64 KiB,
-  ANSI escapes stripped). The full output is in
+- The hub keeps the last 5000 lines and 4 MiB per job (lines cut at 64 KiB,
+  ANSI escapes stripped); the page shows the last 500 with "… N earlier
+  lines". The full output is in
   `~/.local/share/railswitch/dashboard/jobs/<id>.log` (0600), truncated past
   8 MiB with "… output dropped".
 - The last 20 jobs are kept; older finished ones and their logs are
@@ -258,18 +261,18 @@ working blue, your turn yellow, idle and off muted.
 The commands the dashboard reads and runs. Their `--json` output is in
 docs/json.md.
 
-- `railswitch overview [--json]` (project): every worktree with its stack
+- `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
-- `railswitch pr ls [--json]` (project): each worktree's pull request via
+- `railswitch [--json] pr ls` (project): each worktree's pull request via
   the host's `gh` (`gh pr list` on the repo from `project.toml`, never a
   worktree's git config): number, title, url, state (`draft`, `open`,
   `merged`, `closed`), checks (`pass`, `pending`, `fail`, `none`), review
   (`approved`, `changes_requested`, `pending`, `none`). For several PRs on
-  one branch an open one wins, then the highest number. Fails with gh's
+  one branch an open or draft one wins, then the highest number. Fails with gh's
   message when gh is missing or not logged in; the page then shows "PRs
   unavailable".
-- `railswitch task ls [--json]` (worktree): the pack's `[tasks]` merged
+- `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged
   with the project's `[tasks]` in `project.toml`; a project task replaces a
   pack task of the same name and `""` removes one:
 
@@ -286,7 +289,7 @@ docs/json.md.
 - `railswitch wt add [--name <n>] [--up] <branch>`: `--up` runs `up` in the
   new worktree.
 - `railswitch dashboard`: prints the login link.
-- `railswitch dashboard colors [--json]`,
+- `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,
   `dashboard colors reset [--dark]`: the colours, above.
 - `railswitch dashboard serve`: the dashboard itself (the unit's

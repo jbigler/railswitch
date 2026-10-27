@@ -33,7 +33,7 @@ cat ~/.config/systemd/user/railswitch-dashboard.service
 Expected: `up` succeeds; `active`; `railswitch-dashboard.service
 active/running http://railswitch.localhost:7700/`; the unit's `ExecStart`
 is `/home/<you>/.local/bin/railswitch dashboard serve` and it has no
-`[Install]`. `systemctl --user cat ftest-master-web.service | grep Wants`
+`[Install]`. `systemctl --user cat ftest-master-rails.service | grep Wants`
 lists `railswitch-dashboard.service` (Quadlet accepted the `Wants=`).
 
 ## 2. Login
@@ -59,11 +59,12 @@ Expected: header (RailSwitch, `ftest ▾`, `◆ N need input`, `tasks :`,
 `logs`, `⚙`), the list on the left, the selected worktree on the right
 with Links before Services. Light is Flexoki light on `#FFFCF0`, dark
 Flexoki dark on `#100F0F`; the page follows the theme without a reload.
-Nothing overlaps or is unreadable in either mode.
+Nothing overlaps or is unreadable in either mode. Keep the browser's
+developer console open through sections 3–11: it shows no errors.
 
 ## 4. Sorting and keys
 
-Click `running`, `PR`, `agent`, `name`, and the active key again.
+Click `running`, `pr`, `agent`, then `pr` again.
 
 Expected: the orders in docs/dashboard.md "Sorting"; the second click
 reverses (URL `?sort=-pr`). Reload: the sort stays (per project). ↑/↓ move
@@ -72,7 +73,8 @@ switcher, `1` jumps to the first project; Esc closes.
 
 ## 5. Links
 
-Add to `~/workspace/filial-test/project.toml`:
+Add at the top level of `~/workspace/filial-test/project.toml` (above the
+first table):
 
 ```toml
 hide_links = ["Routes"]
@@ -88,11 +90,12 @@ url = "{worktree.host}/jobs"
 
 ```sh
 cd ~/workspace/filial-test && railswitch render
-railswitch overview --json | jq '.worktrees[] | select(.slug == "master") | .links'
+railswitch --json overview | jq '.worktrees[] | select(.slug == "master") | .links'
 ```
 
-Expected: links App, Flipper, Jobs, then the stack's (Mailer previews,
-Browser (VNC) …) and no Routes. In the page: App, Flipper, Jobs, stack
+Expected: links App, Flipper, Jobs, then the stack's: the pack's (Mailer
+previews), then each option's in slot order (e.g. Sidekiq, Storage console,
+Browser (VNC), whichever options ftest enables), and no Routes. In the page: App, Flipper, Jobs, stack
 links, then PR and Logs quieter; each opens its page in a new tab. On a
 stopped worktree the links are greyed out. `hide_links = ["Rotues"]` makes
 `render` fail with `hide_links: no stack link labelled "Rotues"`.
@@ -106,7 +109,7 @@ gh pr list --state all
 
 Expected: every worktree's PR number, state and review match GitHub. In the
 page: draft gray, ready green, merged purple; review pending yellow,
-approved blue; checks ✓/…/✗. `Refresh PRs` after changing a PR on GitHub
+approved blue; checks ✓/◌/✗. `Refresh PRs` after changing a PR on GitHub
 (mark ready, approve) shows the change within seconds. A merged PR's
 worktree shows "Remove worktree".
 
@@ -119,7 +122,7 @@ browser tab.
 Expected: one notification "ftest / <worktree> needs permission" with the
 prompt as body; clicking it focuses the dashboard and selects the
 worktree; the tab title is `(1) RailSwitch`; on another project's page the
-strip shows `◆ ftest / <worktree> · permission`. Answering the prompt
+strip shows `◆ ftest / <worktree> · needs permission`. Answering the prompt
 clears the count; no second notification while it stays waiting.
 
 ## 8. up, stop, restart
@@ -127,7 +130,7 @@ clears the count; no second notification while it stays waiting.
 On a worktree: `stop`, then `up`, then `restart`.
 
 Expected: each shows a job with live output and ends `ok`; the stack column
-goes stopped → up; `systemctl --user is-active ftest-<slug>-web.service`
+goes stopped → up; `systemctl --user is-active ftest-<slug>-rails.service`
 agrees. Clicking `up` while a job runs shows "busy: …". Cancel on a running
 `up` ends it `cancelled`.
 

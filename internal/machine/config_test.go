@@ -74,7 +74,7 @@ func TestLoadConfigMounts(t *testing.T) {
 		}
 	}
 	write("schema = 1\n[[mount]]\nservice = \"nvim\"\nsource = \"~/.local/state/kitty\"\ntarget = \"/kitty\"\nprojects = [\"filial\"]\n" +
-		"[[mount]]\nservice = \"agent-claude\"\nsource = \"/usr/bin/kitten\"\ntarget = \"/usr/bin/kitten\"\nro = false\noptional = true\n")
+		"[[mount]]\nservice = \"agent-claude\"\nsource = \"/usr/bin/kitten\"\ntarget = \"/usr/bin/kitten\"\nro = false\noptional = true\nrelabel = false\n")
 	c, err := LoadConfig(d)
 	if err != nil {
 		t.Fatal(err)
@@ -83,10 +83,10 @@ func TestLoadConfigMounts(t *testing.T) {
 		t.Fatalf("mounts = %+v", c.Mounts)
 	}
 	m := c.Mounts[0]
-	if m.Service != "nvim" || m.Source != "/home/u/.local/state/kitty" || m.Target != "/kitty" || !m.ReadOnly() || m.Optional || !reflect.DeepEqual(m.Projects, []string{"filial"}) {
+	if m.Service != "nvim" || m.Source != "/home/u/.local/state/kitty" || m.Target != "/kitty" || !m.ReadOnly() || !m.Relabels() || m.Optional || !reflect.DeepEqual(m.Projects, []string{"filial"}) {
 		t.Errorf("mount[0] = %+v", m)
 	}
-	if m := c.Mounts[1]; m.ReadOnly() || !m.Optional {
+	if m := c.Mounts[1]; m.ReadOnly() || !m.Optional || m.Relabels() {
 		t.Errorf("mount[1] = %+v", m)
 	}
 	for body, want := range map[string]string{

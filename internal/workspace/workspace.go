@@ -353,7 +353,7 @@ func machineMounts(cfg *machine.Config, prefix string) ([]render.MachineMount, m
 		if len(m.Projects) > 0 && !slices.Contains(m.Projects, prefix) {
 			continue
 		}
-		out = append(out, render.MachineMount{Service: m.Service, Source: m.Source, Target: m.Target, RO: m.ReadOnly(), Optional: m.Optional, Index: i})
+		out = append(out, render.MachineMount{Service: m.Service, Source: m.Source, Target: m.Target, RO: m.ReadOnly(), Relabel: m.Relabels(), Optional: m.Optional, Index: i})
 		if m.Optional {
 			if _, err := os.Stat(m.Source); err != nil {
 				if missing == nil {

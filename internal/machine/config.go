@@ -30,12 +30,16 @@ type Mount struct {
 	Source   string   `toml:"source"`
 	Target   string   `toml:"target"`
 	RO       *bool    `toml:"ro"`       // nil = true
+	Relabel  *bool    `toml:"relabel"`  // nil = true: SELinux relabel (z); false for a root-owned source
 	Optional bool     `toml:"optional"` // a missing source skips the mount
 	Projects []string `toml:"projects"`
 }
 
 // ReadOnly is ro, true when unset.
 func (m Mount) ReadOnly() bool { return m.RO == nil || *m.RO }
+
+// Relabels is relabel, true when unset.
+func (m Mount) Relabels() bool { return m.Relabel == nil || *m.Relabel }
 
 // SecretsConfig picks the podman secret driver for every value railswitch
 // stores.

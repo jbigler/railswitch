@@ -258,7 +258,7 @@ func TestMachineMounts(t *testing.T) {
 	gone := filepath.Join(src, "gone")
 	f := false
 	cfg := &machine.Config{Mounts: []machine.Mount{
-		{Service: "nvim", Source: src, Target: "/a", RO: &f},
+		{Service: "nvim", Source: src, Target: "/a", RO: &f, Relabel: &f},
 		{Service: "nvim", Source: src, Target: "/b", Projects: []string{"other"}},
 		{Service: "nvim", Source: gone, Target: "/c", Optional: true, Projects: []string{"other", "filial"}},
 		{Service: "nvim", Source: gone, Target: "/d"},
@@ -266,8 +266,8 @@ func TestMachineMounts(t *testing.T) {
 	ms, missing := machineMounts(cfg, "filial")
 	want := []render.MachineMount{
 		{Service: "nvim", Source: src, Target: "/a", Index: 0},
-		{Service: "nvim", Source: gone, Target: "/c", RO: true, Optional: true, Index: 2},
-		{Service: "nvim", Source: gone, Target: "/d", RO: true, Index: 3},
+		{Service: "nvim", Source: gone, Target: "/c", RO: true, Relabel: true, Optional: true, Index: 2},
+		{Service: "nvim", Source: gone, Target: "/d", RO: true, Relabel: true, Index: 3},
 	}
 	if !reflect.DeepEqual(ms, want) {
 		t.Errorf("mounts = %+v", ms)

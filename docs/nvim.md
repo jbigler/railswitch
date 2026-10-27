@@ -106,3 +106,36 @@ exit 0
 ```
 
 Make both executable: `chmod +x ~/.config/railswitch/hooks/nvim-*`.
+
+### Machine-local mounts (D57)
+
+Plugins in the container that talk to the terminal (vim-kitty-navigator) need
+the terminal's socket and client inside it. Add them per machine in
+`~/.config/railswitch/config.toml`, never in `project.toml`. Each `[[mount]]`
+takes `service` (a service id: `nvim`, `agent-<name>`), `source` (absolute or
+`~/…`), `target` (absolute, not `/app`), `ro` (default `true`), `optional`
+(default `false`: a missing source skips the mount instead of failing the
+start), `relabel` (default `true`: the SELinux `z` option) and `projects`
+(prefixes; empty = every project).
+
+```toml
+schema = 1
+
+[[mount]]
+service = "nvim"
+source = "~/.local/state/kitty"
+target = "/kitty-sock"
+ro = false
+optional = true
+
+[[mount]]
+service = "nvim"
+source = "/usr/bin/kitten"
+target = "/usr/bin/kitten"
+optional = true
+relabel = false   # root-owned: rootless podman cannot relabel it on an SELinux host
+```
+
+`relabel = false` drops `z` (options `ro`, or none when `ro = false`). Use it
+for a source you do not own (it cannot be relabelled, so the start fails on an
+SELinux-enforcing host) or whose host label must stay as it is.

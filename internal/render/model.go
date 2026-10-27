@@ -55,6 +55,7 @@ type Host struct {
 type MachineMount struct {
 	Service, Source, Target string
 	RO, Optional            bool
+	Relabel                 bool // SELinux z; false renders ro or no options
 	Index                   int
 }
 
@@ -375,10 +376,14 @@ func (b *builder) machineMounts(id string) []Mount {
 		if mm.Service != id || mm.Optional && b.in.Host.Missing[mm.Source] {
 			continue
 		}
-		opts := "z"
+		var o []string
 		if mm.RO {
-			opts = "ro,z"
+			o = append(o, "ro")
 		}
+		if mm.Relabel {
+			o = append(o, "z")
+		}
+		opts := strings.Join(o, ",")
 		out = append(out, Mount{Source: literal(mm.Source), Target: literal(mm.Target), Options: opts, Origin: fmt.Sprintf("[[mount]] #%d service = %q", mm.Index, mm.Service)})
 	}
 	return out

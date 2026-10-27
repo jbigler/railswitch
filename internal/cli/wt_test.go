@@ -2,6 +2,8 @@ package cli
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/sys"
 )
 
 func gitIn(t *testing.T, dir string, args ...string) {
@@ -117,5 +120,35 @@ func TestWtAddRm(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(ws, "feat-x")); err == nil {
 		t.Error("wt rm left the checkout")
+	}
+}
+
+func TestWtAddUp(t *testing.T) {
+	ws, _ := gitWS(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})) // every router is there
+	t.Cleanup(srv.Close)
+	old := traefikAPI
+	t.Cleanup(func() { traefikAPI = old })
+	traefikAPI = srv.URL
+	f := fakeHost()
+	f.Passthrough = []string{"git"}
+	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
+	code, out, errs := runWith(t, f, "-C", ws, "wt", "add", "--up", "feat-x")
+	if code != 0 {
+		t.Fatalf("wt add --up: exit %d\n%s%s", code, out, errs)
+	}
+	if !strings.Contains(out, "added worktree feat-x") || !strings.Contains(out, "http://feat-x.") {
+		t.Errorf("stdout %q; want the add line and up's ready URL", out)
+	}
+	want := []string{"systemctl", "--user", "start", "filial-feat-x-rails.service"}
+	if !slices.ContainsFunc(f.Calls, func(c []string) bool { return slices.Equal(c, want) }) {
+		t.Errorf("no call %q", want)
+	}
+	for _, c := range f.Calls {
+		if c[0] == "systemctl" && slices.Contains(c, "start") && slices.ContainsFunc(c, func(a string) bool {
+			return strings.HasPrefix(a, "filial-feat-") && !strings.HasPrefix(a, "filial-feat-x-")
+		}) {
+			t.Errorf("started another worktree: %q", c)
+		}
 	}
 }

@@ -17,6 +17,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D71: `docs/superpowers/plans/2026-10-
 - Agents (D55, C7, C10): service `agent-<n>`, own firewall profile `agent-<n>` (allow file `agent-<n>.allow`), always `enforce`. Home: the bind dir `<ws>/.railswitch/agent-home/<slug>/<n>` at `/home/appuser` (`z`), apart from nvim's `.railswitch/home/<slug>`; render pre-creates every mount point under a home (else the runtime makes them root-owned); `down` keeps it, `wt rm --force` deletes it. git-guard: every writable `{base.git}` mount gets `{base.git}/hooks` mounted `ro,z` on top.
 - Genericity: no `filial` in non-test code or built-in packs, `claude` only under `internal/pack/builtin/agents/claude/`, terminal names only in `internal/term/` (`TestGenericity` in `internal/`).
 
+## CLI (Stage 6a additions)
+- `pr ls` (project; `gh pr list` with the repo from `project.toml`, never a worktree's git config), `task ls` and `task [--new-term] <name> [args…]` (worktree; `sh -c '<command> "$@"' <name> <args…>` in the app as `exec` runs, the task's exit code; a `--` right after the name is dropped), `wt add [--name <n>] [--up] <target>` (`--up`: `up` in the new worktree).
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Commands: argv only, never a shell; every call through `sys.Runner` with a timeout (`sys.Cmd.Timeout`, default 30 s) or explicit `sys.NoTimeout` (`logs -f`, `exec`, `deps`, `agent`, `nvim`). No podman Go bindings.
@@ -24,7 +27,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D71: `docs/superpowers/plans/2026-10-
 - Dependencies: stdlib + `github.com/BurntSushi/toml` only. No-echo prompt uses `syscall` TCGETS/TCSETS.
 - Hardening (D34): every container has `NoNewPrivileges=true`, `Memory=`, `PidsLimit=`; app/deps/worker/tool/agent also `DropCapability=all`; browser keeps `AddCapability=NET_ADMIN`/`NET_RAW`, no `DropCapability`.
 - Schema (D39): `project.toml`, `stack.lock`, `registry.toml`, `config.toml` carry `schema = 1`; a higher schema is refused ("written by a newer railswitch").
-- `--json` (D40): every read command (`env`, `status`, `overview`, `wt ls`, `project ls`, `secret ls`, `containerfile list`, `pack show`, `doctor`, `machine`, `agent ls`) prints one JSON document; schemas in `docs/json.md`.
+- `--json` (D40): every read command (`env`, `status`, `overview`, `wt ls`, `project ls`, `secret ls`, `containerfile list`, `pack show`, `doctor`, `machine`, `agent ls`, `pr ls`, `task ls`) prints one JSON document; schemas in `docs/json.md`.
 - Unit tests need no podman, systemd, gh or network (`git`, `bash` allowed; use `internal/sys/systest` Fake).
 - Ports publish only on `127.0.0.1:<host>:<ctr>`.
 - Remove objects by exact name, never `--filter`/regex. Never `git worktree prune`.

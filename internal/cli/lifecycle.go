@@ -36,8 +36,12 @@ func (e *env) projectLifecycle(ctx context.Context) (*lifecycle.L, int) {
 			tty = true
 		}
 	}
-	return &lifecycle.L{R: e.run, WS: w, Out: e.stdout, Err: e.stderr, In: e.stdin, TTY: tty, LookPath: lookPath, ConfigDir: w.Dirs.Config}, 0
+	return &lifecycle.L{R: e.run, WS: w, Out: e.stdout, Err: e.stderr, In: e.stdin, TTY: tty, LookPath: lookPath, ConfigDir: w.Dirs.Config, TraefikAPI: traefikAPI}, 0
 }
+
+// traefikAPI is the Traefik API up waits on for the app's route ("": the
+// shared proxy's); tests point it elsewhere.
+var traefikAPI string
 
 // simple is a lifecycle command that takes no arguments.
 func simple(name string, run func(*lifecycle.L, context.Context, string) error) command {

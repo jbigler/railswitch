@@ -38,8 +38,10 @@ var completionSubs = map[string][]string{
 	"hooks":         {"backup", "check", "restore"},
 	"nvim":          {"reset-config", "update"},
 	"pack":          {"eject", "new", "show"},
+	"pr":            {"ls"},
 	"project":       {"init", "ls", "new", "rm"},
 	"secret":        {"add", "ls", "rm", "set"},
+	"task":          {"ls"},
 	"wt":            {"add", "ls", "rm"},
 }
 
@@ -65,7 +67,8 @@ var completionFlags = map[string][]string{
 	"render":              {"--check"},
 	"secret add":          {"--env=", "--git-signing", "--machine", "--service="},
 	"secret set":          {"--restart"},
-	"wt add":              {"--name="},
+	"task":                {"--new-term"},
+	"wt add":              {"--name=", "--up"},
 	"wt rm":               {"--force"},
 }
 
@@ -91,6 +94,7 @@ var completionArgs = map[string]completer{
 	"pack show":           packRefCandidates,
 	"agent":               agentCandidates,
 	"agent stop":          agentCandidates,
+	"task":                taskCandidates,
 }
 
 // railswitch completion bash|zsh|fish: print the shell's completion script.
@@ -270,6 +274,28 @@ func serviceCandidates(ctx context.Context, dir string) []string {
 	var out []string
 	for _, s := range m.Services {
 		out = append(out, s.ID)
+	}
+	return out
+}
+
+// taskCandidates is the tasks task ls lists: the pack's with project.toml's
+// [tasks] over them.
+func taskCandidates(ctx context.Context, dir string) []string {
+	w, err := workspace.Load(ctx, dir, "")
+	if err != nil {
+		return nil
+	}
+	reg, ok := completionRegistry()
+	if !ok {
+		return nil
+	}
+	m, err := w.Model(reg, render.Host{})
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, t := range m.Tasks() {
+		out = append(out, t.Name)
 	}
 	return out
 }

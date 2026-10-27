@@ -15,7 +15,7 @@ import (
 	"github.com/jbigler/railswitch/internal/worktree"
 )
 
-const wtUsage = `usage: railswitch wt add [--name <name>] <branch|PR number|new branch>
+const wtUsage = `usage: railswitch wt add [--name <name>] [--up] <branch|PR number|new branch>
        railswitch wt rm [--force] <path|branch|name>
        railswitch wt ls`
 
@@ -83,9 +83,12 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 	}, nil
 }
 
+// railswitch wt add [--name <name>] [--up] <target>: add a worktree; with
+// --up, then run up in it.
 func wtAdd(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("wt add")
 	name := fs.String("name", "", "the worktree's `name` (default: the branch, sanitized)")
+	up := fs.Bool("up", false, "run up in the new worktree")
 	if code, ok := parse(fs, args); !ok {
 		return code
 	}
@@ -101,6 +104,17 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "added worktree %s (ID %d, branch %s) at %s\n", w.Slug, w.ID, w.Branch, w.Dir)
+	if !*up {
+		return 0
+	}
+	e.slug = w.Slug // up in the new worktree, wherever -C points
+	l, slug, code := e.lifecycle(ctx, "up")
+	if code != 0 {
+		return code
+	}
+	if err := l.Up(ctx, slug); err != nil {
+		return e.fail(err)
+	}
 	return 0
 }
 

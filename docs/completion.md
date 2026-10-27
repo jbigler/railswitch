@@ -40,6 +40,7 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - `pack`: its subcommands `eject`, `new` and `show`; `pack eject|show`: the built-in packs and options (`rails@1`, `postgres@1`, …); `pack eject`'s flag `--as`.
 - `project rm`: every registered project prefix.
 - `project new --agent` takes `name=ref` or `none`; the flag itself completes, its value does not.
+- `pr`: its subcommand `ls`. `task`: its subcommand `ls` together with the tasks `task ls` lists (the pack's `[tasks]` with `project.toml`'s over them), and its flag `--new-term`. `wt add`: flags `--name` and `--up`.
 
 Workspace candidates honour `-C <dir>` on the command line. Outside a workspace, or on any error, completion offers nothing and prints nothing to stderr. It reads the registry without locking or creating it, and never runs podman, git or any other command.
 

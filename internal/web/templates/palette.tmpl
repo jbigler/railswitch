@@ -1,0 +1,11 @@
+{{define "tasks"}}<form method="post" action="{{.URL}}" class="palette" data-post data-close>
+<h2>Task in {{.Slug}}</h2>
+<input type="search" class="pal-filter" placeholder="Filter tasks" autocomplete="off" autofocus>
+<label>args <input name="args" class="pal-args mono" autocomplete="off" placeholder="quotes and \ as in a shell"></label>
+<label class="check"><input type="checkbox" name="term" value="1" class="pal-term"> in a new terminal</label>
+<ul class="pal-list">
+{{range .Tasks}}<li data-filter="{{.Name}}"><button name="task" value="{{.Name}}" class="pal-task"><b>{{.Name}}</b> <span class="mono muted">{{.Command}}</span> <span class="muted">{{.Source}}</span></button></li>
+{{else}}<li class="muted">No tasks.</li>
+{{end}}</ul>
+<p class="note">Enter runs the first match as a job · Shift+Enter opens it in a terminal · Esc closes</p>
+</form>{{end}}

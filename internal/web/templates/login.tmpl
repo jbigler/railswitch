@@ -1,0 +1,15 @@
+{{/* simple: the login refusal, the no-project page and the answer to a
+form posted without JS. No CSS: /static needs the cookie. */}}
+{{define "simple"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RailSwitch</title>
+</head>
+<body>
+<h1>RailSwitch</h1>
+{{range .Lines}}<p>{{.}}</p>
+{{end}}{{with .Back}}<p><a href="{{.}}">Back</a></p>
+{{end}}</body>
+</html>
+{{end}}

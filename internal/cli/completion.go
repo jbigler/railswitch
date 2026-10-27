@@ -34,7 +34,7 @@ var completionFiles = map[string]string{
 var completionSubs = map[string][]string{
 	"agent":            {"add", "ls", "stop"},
 	"containerfile":    {"eject", "list", "new", "show"},
-	"dashboard":        {"colors"},
+	"dashboard":        {"colors", "serve"},
 	"dashboard colors": {"reset", "set"},
 	"db":               {"dump"},
 	"fw":               {"allow", "show"},

@@ -39,6 +39,18 @@ var envMarks = []struct{ key, term string }{
 	{"GHOSTTY_BIN_DIR", "ghostty"},
 }
 
+// EnvKeys are the environment variables detection reads besides DISPLAY
+// and WAYLAND_DISPLAY: TERMINAL and the fingerprints. The dashboard
+// copies them from the session into its jobs, so --new-term finds the
+// user's terminal.
+func EnvKeys() []string {
+	keys := []string{"TERMINAL"}
+	for _, m := range envMarks {
+		keys = append(keys, m.key)
+	}
+	return keys
+}
+
 // procNames maps an ancestor's comm to its terminal.
 var procNames = map[string]string{
 	"kitty":                 "kitty",

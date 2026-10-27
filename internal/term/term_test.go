@@ -32,6 +32,20 @@ func lookOnly(names ...string) func(string) (string, error) {
 // emptyProc is a procfs with no processes: the parent walk finds nothing.
 func emptyProc(t *testing.T) string { return t.TempDir() }
 
+// TestEnvKeys: every variable Detect and Launch read, for the dashboard's
+// jobs.
+func TestEnvKeys(t *testing.T) {
+	keys := EnvKeys()
+	for _, m := range envMarks {
+		if !slices.Contains(keys, m.key) {
+			t.Errorf("EnvKeys lacks %s", m.key)
+		}
+	}
+	if !slices.Contains(keys, "TERMINAL") {
+		t.Error("EnvKeys lacks TERMINAL")
+	}
+}
+
 func TestDetectEnv(t *testing.T) {
 	for _, c := range []struct{ key, want string }{
 		{"TMUX", "tmux"},

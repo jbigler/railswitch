@@ -1,0 +1,18 @@
+{{define "header"}}<header id="header" class="hd" data-need="{{.Need}}">
+<b class="logo">RailSwitch</b>
+<button type="button" class="hb proj" data-open="switcher" title="Switch project (P)"><span class="mono">{{.Prefix}}</span> ▾ <kbd>P</kbd></button>
+{{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}
+<span class="sp"></span>
+<button type="button" class="hb" data-palette title="Run a task (:)">tasks <kbd>:</kbd></button>
+<a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">logs</a>
+<button type="button" class="hb" data-notify hidden>notifications</button>
+<button type="button" class="hb" data-colors title="Colours">⚙</button>
+</header>{{end}}
+
+{{define "projects"}}<ul id="projects" class="projects">
+{{range .Items}}<li class="proj-item{{if .Current}} cur{{end}}" data-filter="{{.Prefix}}">
+<a href="{{.URL}}"{{if .N}} data-n="{{.N}}"{{end}}>{{if .N}}<kbd>{{.N}}</kbd> {{end}}<b>{{.Prefix}}</b> <span class="muted">{{.Worktrees}} worktrees · {{.Running}} running</span>{{if .Need}} <span class="need">◆ {{.Need}}</span>{{end}}</a>
+{{if .WTs}}<ul class="proj-wts">{{range .WTs}}<li class="wt-item" data-filter="{{.Slug}}" hidden><a href="{{.URL}}">{{.Slug}}{{if .Need}} <span class="need">◆</span>{{end}}</a></li>{{end}}</ul>{{end}}
+</li>
+{{else}}<li class="muted">No projects.</li>
+{{end}}</ul>{{end}}

@@ -13,17 +13,23 @@ import (
 )
 
 const (
-	dashboardUsage   = "usage: railswitch dashboard [colors …]"
+	dashboardUsage   = "usage: railswitch dashboard [colors …|serve]"
 	colorsUsage      = "usage: railswitch dashboard colors [set|reset …]"
 	colorsSetUsage   = "usage: railswitch dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]"
 	colorsResetUsage = "usage: railswitch dashboard colors reset [--dark]"
 )
 
 // railswitch dashboard: print the dashboard's login link (and how to start
-// it when its unit isn't active); `dashboard colors …` edits its colours.
+// it when its unit isn't active); `dashboard colors …` edits its colours;
+// `dashboard serve` is the dashboard.
 func cmdDashboard(ctx context.Context, e *env, args []string) int {
-	if len(args) > 0 && args[0] == "colors" {
-		return dashboardColors(e, args[1:])
+	if len(args) > 0 {
+		switch args[0] {
+		case "colors":
+			return dashboardColors(e, args[1:])
+		case "serve":
+			return dashboardServe(ctx, e, args[1:])
+		}
 	}
 	fs := e.flags("dashboard")
 	if code, ok := parse(fs, args); !ok {

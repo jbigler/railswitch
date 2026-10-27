@@ -1,0 +1,23 @@
+{{define "newwt"}}<dialog id="newwt" class="dlg">
+<form method="post" action="{{.AddURL}}" data-post data-close>
+<h2>New worktree</h2>
+<label>Branch <input name="branch" required autocomplete="off" class="mono"></label>
+<label>Name <input name="name" placeholder="from the branch" autocomplete="off" class="mono"></label>
+<label class="check"><input type="checkbox" name="up" checked> up after adding</label>
+<div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln main">Add</button></div>
+</form>
+</dialog>{{end}}
+
+{{define "remove"}}<form method="post" action="{{.URL}}" class="remove" data-post data-close data-slug="{{.Slug}}">
+<h2>Remove {{.Slug}}?</h2>
+<p>This removes:</p>
+<ul>
+<li>the checkout <code>{{.Dir}}</code></li>
+<li>its containers and volumes</li>
+<li>its nvim and agent homes</li>
+</ul>
+{{if .Dirty}}<p class="red">{{.Slug}} has uncommitted changes or untracked files. Removing it loses them.</p>
+<label class="check"><input type="checkbox" name="force" value="1" required> Discard changes</label>
+<label>Type <b>{{.Slug}}</b> to confirm <input name="confirm" required autocomplete="off" class="mono"></label>
+{{end}}<div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln danger">Remove</button></div>
+</form>{{end}}

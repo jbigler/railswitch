@@ -1,0 +1,16 @@
+{{define "colors"}}<div class="colors">
+<h2>Colours</h2>
+<p class="note">Each mode follows the system's light or dark setting. Text below 4.5:1 against the background is hard to read; saving is still allowed.</p>
+{{range .Modes}}<div class="colors-mode" data-mode="{{.Mode}}">
+<h3>{{.Mode}}</h3>
+<form method="post" action="/colors" class="colors-form" data-mode="{{.Mode}}">
+<input type="hidden" name="mode" value="{{.Mode}}">
+<label>Preset <select name="base" class="preset">{{$b := .Base}}{{range .Presets}}<option value="{{.}}"{{if eq . $b}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+<div class="fields">{{range .Fields}}<label class="field"><input type="color" name="{{.Token}}" value="{{.Value}}" data-token="{{.Token}}"> {{.Token}}{{if .Set}} <span class="muted">changed</span>{{end}}</label>{{end}}</div>
+<div class="cwarn yellow">{{range .Warnings}}<div>{{.}}</div>{{end}}</div>
+<div class="btns"><button class="ln main">Save</button></div>
+</form>
+<form method="post" action="/colors/reset" class="colors-reset"><input type="hidden" name="mode" value="{{.Mode}}"><button class="ln">Reset to preset</button></form>
+</div>
+{{end}}<div class="btns"><button type="button" class="ln" data-cancel>Close</button></div>
+</div>{{end}}

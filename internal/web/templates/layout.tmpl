@@ -1,0 +1,38 @@
+{{define "page"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/theme.css" id="theme">
+<script src="/static/app.js" defer></script>
+</head>
+<body data-prefix="{{.Prefix}}" data-sel="{{.Sel}}" data-sort="{{.Sort}}">
+{{template "header" .Header}}
+{{template "strip" .Strip}}
+{{template "banner" .Banner}}
+<div id="toast" class="toast" hidden></div>
+<main class="grid">
+<section class="left">
+{{template "list" .List}}
+<div class="note">↑↓ moves through worktrees · P switches project · : runs a task</div>
+</section>
+<section class="pane">
+{{template "detail" .Detail}}
+{{template "jobs" .Jobs}}
+</section>
+</main>
+<dialog id="switcher" class="dlg">
+<h2>Projects</h2>
+<input id="switcher-filter" type="search" placeholder="Filter projects and worktrees" autocomplete="off">
+{{template "projects" .Projects}}
+<p class="note">1–9 jump · Esc closes</p>
+</dialog>
+{{template "newwt" .List}}
+<dialog id="remove" class="dlg"></dialog>
+<dialog id="palette" class="dlg"></dialog>
+<dialog id="colors" class="dlg"></dialog>
+</body>
+</html>
+{{end}}

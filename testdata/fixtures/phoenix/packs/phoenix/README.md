@@ -24,8 +24,9 @@ Then copy this directory to `<workspace>/packs/phoenix/` and run
   `username`, `password` and `hostname` from the Repo config (Postgrex then
   reads `PGUSER`, `PGPASSWORD`, `PGHOST` and `PGPORT`, which the postgres
   option gives) and set
-  `database: System.get_env("PGDATABASE", "hello_dev")`, so each worktree
-  uses its own database.
+  `database: System.get_env("PGDATABASE", "hello_dev")`, so the name comes
+  from the pack (`{project.prefix}_dev`); each worktree has its own database
+  container.
 - **Versions.** `.tool-versions` names `elixir <version>` and
   `erlang <version>`: the image is
   `docker.io/library/elixir:<elixir>-otp-<erlang major>-slim`, so the Elixir

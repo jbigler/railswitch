@@ -77,8 +77,9 @@ railswitch pack show local:phoenix@1
 - **An agent:** `project new` added the default agent (`claude@1`):
   `railswitch secret set claude_token` (the token on stdin), then
   `railswitch agent`. The agent base builds on the Phoenix image (Debian).
-- **Firewall:** `railswitch fw show` lists `hello-master-web` with
-  `profiles=none mode=log` and `hello-master-deps` with `profiles=deps`.
+- **Firewall:** `railswitch fw show` lists the running containers:
+  `hello-master-web` with `profiles=none mode=log`, `hello-master-nvim` with
+  `profiles=agent,deps` (deps ran and exited, so it is not listed).
 
 ## 4. A Rails app on bun (D69)
 
@@ -106,10 +107,10 @@ railswitch project rm bun --yes --purge
 
 ## Done checklist (roadmap, Stage 5)
 
-- [ ] a user-written `packs/phoenix/` (a test fixture, not shipped) runs a fresh `mix phx.new` app (`TestE2EPhoenix`);
-- [ ] it uses `mix phx.server` on :4000, `mix deps.get --check-locked` in deps, elixir/erlang from `.tool-versions`, hex registries in `deps.allow`, and a health command the pack declares;
+- [x] a user-written `packs/phoenix/` (a test fixture, not shipped) runs a fresh `mix phx.new` app (`TestE2EPhoenix`, 2026-10-27);
+- [x] it uses `mix phx.server` on :4000, `mix deps.get --check-locked` in deps, elixir/erlang from `.tool-versions`, hex registries in `deps.allow`, and a health command the pack declares;
 - [x] no change to `internal/render` or `internal/config` for Phoenix (`TestGenericity` refuses `phoenix`, `elixir`, `erlang`, `mix ` in core; the Phoenix fixture task changed no core code);
-- [ ] live reload, nvim (with its own Node) and an agent work on the Phoenix project;
+- [x] live reload, nvim (with its own Node) and an agent work on the Phoenix project (2026-10-27);
 - [ ] a `rails new -j bun` app installs with bun.
 
 ## Run log
@@ -119,6 +120,28 @@ app-side edits held (section 1). `master`: deps 44 s (tailwind downloaded
 in 3 s), `up` ready, 200. `feat-x`: deps compiled in 35 s, then the tailwind
 download stalled until systemd killed deps at its 15 min limit (1 min 47 s
 CPU in 15 min).
+
+On the user's host the network was slow at the time, so the stall was a
+slow transfer with no timeout rather than a dead connection.
+
+**2026-10-27, `TestE2EPhoenix` run 2: PASS** (175.36 s), after `8b62dc7`.
+
+```
+=== RUN   TestE2EPhoenix
+    e2e_phoenix_integration_test.go:49: workspace /tmp/rs-e2e5-3906379711/rs-s5p
+--- PASS: TestE2EPhoenix (175.36s)
+PASS
+ok     github.com/jbigler/railswitch/internal/lifecycle   175.361s
+```
+
+**2026-10-27, Phoenix project `hello` by hand: works.** `pack show
+local:phoenix@1` prints the summary and README; the app answers, a template
+edit live-reloads the page, `railswitch agent` runs, nvim attaches and
+`:!node --version && npm --version` prints `v24.22.1` / `11.19.1` (nvim's
+own Node; the Phoenix image has none). `fw show`: web and db
+`profiles=none mode=log`, nvim `profiles=agent,deps mode=log`, nothing
+rejected. The host's own mise warns `missing: elixir@1.19.6 erlang@28` in
+the worktree (it reads `.tool-versions`); that is the host, not railswitch.
 
 ## Gap log
 

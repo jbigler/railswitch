@@ -83,6 +83,8 @@ func optionSource(o *pack.Option) string {
 //   - an option's, tool's or agent package's own [env]: its own service;
 //   - project [env]: every service but deps;
 //   - [agents.<n>] env: that agent, at layer project, over project [env];
+//   - [tools.nvim] config_repo/config_ref: nvim, at layer project, as
+//     NVIM_CONFIG_REPO/NVIM_CONFIG_REF when set (D54);
 //   - [services.<id>.env]: that service;
 //   - worktree: WORKTREE_ID/SLUG/HOST to app, worker, every tool service
 //     (tool options included: the browser's entrypoint needs WORKTREE_HOST)
@@ -153,6 +155,11 @@ func (b *builder) envSpecs() {
 		}
 		if s.Role != RoleDeps {
 			add(LayerProject, "project.toml [env]", s.ID, s.scheme, p.Env)
+		}
+		if n := p.Tools.Nvim; n != nil && b.tools[s.ID] != nil && b.tools[s.ID].Name == "nvim" {
+			add(LayerProject, "tools.nvim", s.ID, s.scheme, nonEmpty(map[string]string{
+				"NVIM_CONFIG_REPO": n.ConfigRepo, "NVIM_CONFIG_REF": n.ConfigRef,
+			}))
 		}
 		if agent != nil {
 			add(LayerProject, "project.toml [agents."+agent.Name+"] env", s.ID, s.scheme, agent.Env)
@@ -372,4 +379,15 @@ func (m *Model) expandEnv(in *Instance) error {
 		in.Env[s.ID] = out
 	}
 	return nil
+}
+
+// nonEmpty is vars without its empty values.
+func nonEmpty(vars map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range vars {
+		if v != "" {
+			out[k] = v
+		}
+	}
+	return out
 }

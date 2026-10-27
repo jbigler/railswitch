@@ -35,7 +35,7 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 				args = append(args, "-t")
 			}
 			args = append(append(args, "-i", "-w", "/app", ctr), argv...)
-			return l.interactive(ctx, sys.NoTimeout, args)
+			return l.interactive(ctx, sys.NoTimeout, "podman", args)
 		}
 	}
 	envFile := filepath.Join(m.Inputs.Workspace, ".railswitch", "env", slug, app.ID+".env")
@@ -43,7 +43,7 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 	if err != nil {
 		return err
 	}
-	return l.interactive(ctx, sys.NoTimeout, args)
+	return l.interactive(ctx, sys.NoTimeout, "podman", args)
 }
 
 // ExitError is the non-zero exit code of an interactive command (exec,
@@ -52,10 +52,11 @@ type ExitError struct{ Code int }
 
 func (e *ExitError) Error() string { return "exit status " + strconv.Itoa(e.Code) }
 
-// interactive runs podman args with the caller's stdin, stdout and stderr.
-// A non-zero exit is an *ExitError carrying the command's exit code.
-func (l *L) interactive(ctx context.Context, timeout time.Duration, args []string) error {
-	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: args, Stdin: l.In, Stdout: l.Out, Stderr: l.Err, Timeout: timeout})
+// interactive runs program name (podman, or the host's nvim) with args and
+// the caller's stdin, stdout and stderr. A non-zero exit is an *ExitError
+// carrying the command's exit code.
+func (l *L) interactive(ctx context.Context, timeout time.Duration, name string, args []string) error {
+	res, err := l.R.Run(ctx, sys.Cmd{Name: name, Args: args, Stdin: l.In, Stdout: l.Out, Stderr: l.Err, Timeout: timeout})
 	if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
 		return &ExitError{Code: res.ExitCode}
 	}

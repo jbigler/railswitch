@@ -8,12 +8,16 @@ import (
 )
 
 func resolveProject(options map[string]string, nvim bool) *config.Project {
+	var tools config.Tools
+	if nvim {
+		tools.Nvim = &config.NvimTool{}
+	}
 	return &config.Project{
 		Schema:  1,
 		Project: config.Meta{Prefix: "filial", BaseBranch: "master"},
 		Stack:   config.StackRef{Pack: "rails@1", App: "rails"},
 		Options: options,
-		Tools:   config.Tools{Nvim: nvim},
+		Tools:   tools,
 	}
 }
 

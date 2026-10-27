@@ -50,5 +50,5 @@ func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
 	if err != nil {
 		return err
 	}
-	return l.interactive(ctx, sys.NoTimeout, args)
+	return l.interactive(ctx, sys.NoTimeout, "podman", args)
 }

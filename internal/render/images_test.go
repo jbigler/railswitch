@@ -177,7 +177,7 @@ func TestImageChainMissingFile(t *testing.T) {
 		file, eject string
 		off         func(*config.Project)
 	}{
-		{"Containerfile.nvim", "railswitch containerfile eject nvim", func(p *config.Project) { p.Tools.Nvim = false; delete(p.Secrets, "github_token") }},
+		{"Containerfile.nvim", "railswitch containerfile eject nvim", func(p *config.Project) { p.Tools.Nvim = nil; delete(p.Secrets, "github_token") }},
 		{"Containerfile.playwright", "railswitch containerfile eject playwright", func(p *config.Project) { p.Options["browser"] = "none" }},
 		{"Containerfile.pg-client", "railswitch containerfile eject pg-client", func(p *config.Project) { p.Image.Addons = nil }},
 		{"Containerfile.agent-base", "railswitch containerfile eject agent-base", func(p *config.Project) { p.Agents = nil; delete(p.Secrets, "probe_key") }},

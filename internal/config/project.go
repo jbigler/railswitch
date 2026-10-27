@@ -88,7 +88,44 @@ type WorktreeOverride struct{ Versions map[string]string }
 type Link struct{ Label, URL string }
 
 // Tools are the opt-in developer tools.
-type Tools struct{ Nvim bool } // opt-in; default false
+type Tools struct {
+	Nvim *NvimTool `toml:"nvim"` // [tools.nvim]; nil = no nvim
+}
+
+// NvimTool is the [tools.nvim] table (D54): the git repo cloned into the
+// empty <prefix>_nvim_config volume, and the branch or tag to check out.
+type NvimTool struct {
+	ConfigRepo string `toml:"config_repo"`
+	ConfigRef  string `toml:"config_ref"`
+}
+
+// UnmarshalTOML decodes the [tools.nvim] table. The TOML decoder marks
+// every key under a custom unmarshaler as decoded, so an unknown key is
+// refused here; the old `[tools] nvim = true` is refused naming the table
+// (C1).
+func (n *NvimTool) UnmarshalTOML(v any) error {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return errors.New("[tools] nvim = true is now the table [tools.nvim] (D54)")
+	}
+	for _, k := range sortedKeys(m) {
+		var dst *string
+		switch k {
+		case "config_repo":
+			dst = &n.ConfigRepo
+		case "config_ref":
+			dst = &n.ConfigRef
+		default:
+			return fmt.Errorf("tools.nvim.%s: unknown key (keys: config_repo, config_ref)", k)
+		}
+		s, ok := m[k].(string)
+		if !ok {
+			return fmt.Errorf("tools.nvim.%s: want a string, got %T", k, m[k])
+		}
+		*dst = s
+	}
+	return nil
+}
 
 // Share is the [share] table: Env overrides every layer of the services the
 // project's [env] reaches, while a worktree is shared on the tailnet (D46).
@@ -182,6 +219,10 @@ func (p *Project) Validate() error {
 	}
 
 	v.oneLines("versions", p.Versions)
+	if n := p.Tools.Nvim; n != nil {
+		v.oneLine("tools.nvim.config_repo", n.ConfigRepo)
+		v.oneLine("tools.nvim.config_ref", n.ConfigRef)
+	}
 	v.env("env", p.Env)
 	v.env("share.env", p.Share.Env)
 

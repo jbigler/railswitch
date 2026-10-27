@@ -11,8 +11,34 @@ set -eu
 mkdir -p ~/.config ~/.local
 
 # ~/.config/nvim is the <prefix>_nvim_config volume, shared by every
-# worktree's nvim: empty on first run, and whatever you configure persists.
+# worktree's nvim: whatever you configure persists. With [tools.nvim]
+# config_repo (NVIM_CONFIG_REPO; NVIM_CONFIG_REF a branch or tag, D54), the
+# first start that finds it empty clones the repo; a failed clone is
+# reported and the editor starts anyway. A non-empty volume is never
+# touched: `railswitch nvim update` pulls, `railswitch nvim reset-config`
+# empties it. Nothing here deletes anything.
+nvim_clone() {
+	if [ -n "${NVIM_CONFIG_REF:-}" ]; then
+		git clone --branch "$NVIM_CONFIG_REF" "$NVIM_CONFIG_REPO" "$HOME/.config/nvim"
+	else
+		git clone "$NVIM_CONFIG_REPO" "$HOME/.config/nvim"
+	fi
+}
 nvim_entries=$(ls -A ~/.config/nvim 2>/dev/null | wc -l)
+if [ -n "${NVIM_CONFIG_REPO:-}" ]; then
+	if [ "$nvim_entries" -eq 0 ]; then
+		echo "nvim config: cloning $NVIM_CONFIG_REPO" >&2
+		if ! nvim_clone; then
+			echo "ERROR: nvim config: cloning $NVIM_CONFIG_REPO failed; starting the editor without it." >&2
+		fi
+		nvim_entries=$(ls -A ~/.config/nvim 2>/dev/null | wc -l)
+	else
+		origin=$(git -C ~/.config/nvim remote get-url origin 2>/dev/null || true)
+		if [ "$origin" != "$NVIM_CONFIG_REPO" ]; then
+			echo "nvim config is from ${origin:-no git origin}, project.toml says $NVIM_CONFIG_REPO: railswitch nvim reset-config" >&2
+		fi
+	fi
+fi
 if [ "$nvim_entries" -eq 0 ]; then
 	echo "nvim config: shared volume, empty. Configure nvim in here and it" >&2
 	echo "             persists across every worktree." >&2

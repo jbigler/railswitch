@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"maps"
 	"net/netip"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -70,12 +69,12 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	if *repo == "" || *prefix == "" {
 		return e.usageErr("new: --repo and --prefix are required\n%s", newUsage)
 	}
-	nvim := false
+	var nvim *config.NvimTool
 	for _, t := range tools {
 		if t != "nvim" {
 			return e.usageErr("new: unknown tool %q (tools: nvim)", t)
 		}
-		nvim = true
+		nvim = &config.NvimTool{}
 	}
 	agents, err := parseAgentFlags(agentFlags)
 	if err != nil {
@@ -273,7 +272,7 @@ func (e *env) printNext(ws, slug string, unset []string) {
 // the pack's defaults overlaid by opts (slot=ref), the chosen options'
 // version pins and agents (name → package ref). It is validated as it will
 // be once base is ejected.
-func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim bool, agents map[string]string) (*config.Project, *pack.Stack, error) {
+func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim *config.NvimTool, agents map[string]string) (*config.Project, *pack.Stack, error) {
 	ref, err := pack.ParseRef(packRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("--pack: %w", err)
@@ -354,8 +353,8 @@ func projectTOML(p *config.Project) []byte {
 			kv(k, p.Versions[k])
 		}
 	}
-	if p.Tools.Nvim {
-		b.WriteString("\n[tools]\nnvim = true\n")
+	if p.Tools.Nvim != nil {
+		b.WriteString("\n[tools.nvim]               # config_repo = \"<git url>\": cloned into the empty config volume (D54)\n")
 	}
 	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
 		fmt.Fprintf(&b, "\n[agents.%s]\n", n)
@@ -408,10 +407,10 @@ func addNewSecrets(proj string, p *config.Project, st *pack.Stack) ([]string, er
 		}
 		gitServices = append(gitServices, a.Service)
 	}
-	if p.Tools.Nvim {
+	if p.Tools.Nvim != nil {
 		gitServices = append(gitServices, "nvim")
 	}
-	if len(gitServices) > 0 && repoHost(p.Project.Repo) == "github.com" {
+	if len(gitServices) > 0 && gitHub(p.Project.Repo) {
 		if err := config.AddSecret(proj, "github_token", config.Secret{Services: gitServices, GitHost: "github.com"}); err != nil {
 			return nil, err
 		}
@@ -695,23 +694,8 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// repoHost is the host of a git URL: scheme://[user@]host/…, or the
-// scp-like [user@]host:path; "" for a local path.
-func repoHost(repo string) string {
-	if strings.Contains(repo, "://") {
-		u, err := url.Parse(repo)
-		if err != nil {
-			return ""
-		}
-		return strings.ToLower(u.Hostname())
-	}
-	i := strings.IndexByte(repo, ':')
-	if i < 0 || strings.Contains(repo[:i], "/") {
-		return ""
-	}
-	h := repo[:i]
-	if at := strings.LastIndexByte(h, '@'); at >= 0 {
-		h = h[at+1:]
-	}
-	return strings.ToLower(h)
+// gitHub reports whether repo is on github.com.
+func gitHub(repo string) bool {
+	h, ok := naming.GitHost(repo)
+	return ok && h == "github.com"
 }

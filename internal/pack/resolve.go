@@ -88,7 +88,7 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 		}
 	}
 
-	if p.Tools.Nvim {
+	if p.Tools.Nvim != nil {
 		if t := c.Tools["nvim"]; t != nil {
 			s.Tools = append(s.Tools, t)
 		} else {

@@ -109,11 +109,15 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 	if mode == "" {
 		mode = "log"
 	}
-	return []string{
+	ann := []string{
 		p + ".firewall=" + strings.Join(s.Firewall, ","),
 		p + ".firewall.networks=" + strings.Join(networks, ","),
 		p + ".firewall.mode=" + mode,
 	}
+	if len(s.FirewallExtra) > 0 {
+		ann = append(ann, p+".firewall.extra="+strings.Join(s.FirewallExtra, ","))
+	}
+	return ann
 }
 
 // VolumeSpecs are s's bind mounts, then its named volumes, as podman -v

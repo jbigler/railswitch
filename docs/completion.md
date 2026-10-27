@@ -32,6 +32,7 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - After `-w`, and for `wt rm`, `share` and `unshare`: the current workspace's registered worktree slugs.
 - `logs` and `fw show|allow`: the workspace's service ids.
 - `secret set|rm`: the secrets `project.toml` declares.
+- `nvim`: its subcommands `update` and `reset-config`, and `reset-config`'s flag `--yes`.
 - `agent`: its subcommand `ls` together with the agents `project.toml` declares (`[agents.<name>]`), and its flag `--new-term`.
 - `containerfile show|eject`: the stack's built-in Containerfile names (`show` also the workspace's own `containerfiles/Containerfile.<name>`).
 - `project rm`: every registered project prefix.

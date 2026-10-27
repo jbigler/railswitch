@@ -48,8 +48,8 @@ services = ["nvim"]
 [secrets.probe_key]
 services = ["agent-probe"]
 
-[tools]
-nvim = true
+[tools.nvim]                               # the editor; its config is cloned from a git repo (D54)
+config_repo = "https://github.com/[ORG]/nvim-config.git"
 
 [agents.claude]
 use = "claude@1"

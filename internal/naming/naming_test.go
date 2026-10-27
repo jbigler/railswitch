@@ -83,3 +83,25 @@ func TestObjectNames(t *testing.T) {
 		}
 	}
 }
+
+func TestGitHost(t *testing.T) {
+	for repo, want := range map[string]string{
+		"https://github.com/u/c":          "github.com",
+		"git@gitlab.com:u/c.git":          "gitlab.com",
+		"ssh://git@h.example:22/x":        "h.example",
+		"github.com:a/b.git":              "github.com",
+		"ssh://git@GitHub.com/a/b.git":    "github.com",
+		"https://user@github.com:443/a/b": "github.com",
+		"https://github.com.evil.org/a/b": "github.com.evil.org",
+		"git@github.com.evil.org:a/b.git": "github.com.evil.org",
+	} {
+		if got, ok := GitHost(repo); !ok || got != want {
+			t.Errorf("GitHost(%q) = %q, %v; want %q", repo, got, ok, want)
+		}
+	}
+	for _, repo := range []string{"/local/path", "file:///srv/git/github.com:a.git", "./github.com:a/b", ""} {
+		if got, ok := GitHost(repo); ok {
+			t.Errorf("GitHost(%q) = %q, true; want not ok", repo, got)
+		}
+	}
+}

@@ -76,7 +76,7 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		if err != nil {
 			return err
 		}
-		return l.interactive(ctx, sys.NoTimeout, args)
+		return l.interactive(ctx, sys.NoTimeout, "podman", args)
 	}
 	sd := l.systemd()
 	unit := ctr + ".service"
@@ -92,7 +92,7 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 			return l.startFailure(ctx, sd, slug, []string{unit}, err)
 		}
 	}
-	return l.interactive(ctx, sys.NoTimeout, []string{"attach", ctr})
+	return l.interactive(ctx, sys.NoTimeout, "podman", []string{"attach", ctr})
 }
 
 // AgentList is every agent of the project, by name, with its status in

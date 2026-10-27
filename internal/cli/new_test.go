@@ -170,7 +170,7 @@ func TestNew(t *testing.T) {
 	if p.Image.Base != "containerfiles/Containerfile.base" || !slices.Equal(p.Image.Addons, []string{"containerfiles/Containerfile.pg-client"}) {
 		t.Errorf("[image] = %+v", p.Image)
 	}
-	if p.Tools.Nvim || p.Secrets != nil || strings.Contains(raw, "[tools]") || strings.Contains(raw, "[secrets") {
+	if p.Tools.Nvim != nil || p.Secrets != nil || strings.Contains(raw, "[tools") || strings.Contains(raw, "[secrets") {
 		t.Errorf("project.toml has tools or secrets:\n%s", raw)
 	}
 
@@ -242,8 +242,8 @@ func TestNewNvimGithub(t *testing.T) {
 	out := mustNew(t, ws, "--repo", gh, "--prefix", "shop", "--tool", "nvim", "--agent", "none")
 
 	p := loadProject(t, ws)
-	if !p.Tools.Nvim {
-		t.Error("[tools] nvim is not true")
+	if p.Tools.Nvim == nil || !strings.Contains(readFile(t, filepath.Join(ws, "project.toml")), "\n[tools.nvim]") {
+		t.Error("project.toml has no [tools.nvim] table")
 	}
 	sec, ok := p.Secrets["github_token"]
 	if !ok || !slices.Equal(sec.Services, []string{"nvim"}) || sec.GitHost != "github.com" {
@@ -466,25 +466,6 @@ func TestInitRefusesOptionLikeGitValues(t *testing.T) {
 	for _, c := range f.Calls {
 		if slices.Contains(c, "clone") {
 			t.Errorf("init ran %v", c)
-		}
-	}
-}
-
-func TestRepoHost(t *testing.T) {
-	for repo, want := range map[string]string{
-		"git@github.com:a/b.git":           "github.com",
-		"github.com:a/b.git":               "github.com",
-		"ssh://git@GitHub.com/a/b.git":     "github.com",
-		"https://github.com/a/b.git":       "github.com",
-		"https://user@github.com:443/a/b":  "github.com",
-		"https://github.com.evil.org/a/b":  "github.com.evil.org",
-		"git@github.com.evil.org:a/b.git":  "github.com.evil.org",
-		"file:///srv/git/github.com:a.git": "",
-		"/srv/git/app.git":                 "",
-		"./github.com:a/b":                 "",
-	} {
-		if got := repoHost(repo); got != want {
-			t.Errorf("repoHost(%q) = %q; want %q", repo, got, want)
 		}
 	}
 }

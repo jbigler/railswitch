@@ -12,12 +12,22 @@ import (
 // lifecycle loads the workspace and wires a lifecycle.L for the current
 // worktree (-w <slug>, or the worktree the working directory is in).
 func (e *env) lifecycle(ctx context.Context, cmd string) (*lifecycle.L, string, int) {
+	l, code := e.projectLifecycle(ctx)
+	if code != 0 {
+		return nil, "", code
+	}
+	if l.WS.Slug == "" {
+		return nil, "", e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
+	}
+	return l, l.WS.Slug, 0
+}
+
+// projectLifecycle loads the workspace and wires a lifecycle.L for a
+// project-wide command: no worktree needed.
+func (e *env) projectLifecycle(ctx context.Context) (*lifecycle.L, int) {
 	w, err := workspace.Load(ctx, e.dir, e.slug)
 	if err != nil {
-		return nil, "", e.fail(err)
-	}
-	if w.Slug == "" {
-		return nil, "", e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
+		return nil, e.fail(err)
 	}
 	// -t only when both ends are a terminal: redirected output gets no tty mangling.
 	tty := false
@@ -26,7 +36,7 @@ func (e *env) lifecycle(ctx context.Context, cmd string) (*lifecycle.L, string, 
 			tty = true
 		}
 	}
-	return &lifecycle.L{R: e.run, WS: w, Out: e.stdout, Err: e.stderr, In: e.stdin, TTY: tty}, w.Slug, 0
+	return &lifecycle.L{R: e.run, WS: w, Out: e.stdout, Err: e.stderr, In: e.stdin, TTY: tty, LookPath: lookPath, ConfigDir: w.Dirs.Config}, 0
 }
 
 // simple is a lifecycle command that takes no arguments.

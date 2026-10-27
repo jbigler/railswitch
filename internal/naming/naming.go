@@ -6,6 +6,7 @@ package naming
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -109,4 +110,28 @@ func ProxyNetwork(prefix string) string {
 // ProxyNetworkUnit is the project's proxy network unit file: "filial-proxy.network".
 func ProxyNetworkUnit(prefix string) string {
 	return prefix + "-proxy.network"
+}
+
+// GitHost is the host of a git URL: scheme://[user@]host[:port]/…, or the
+// scp-like [user@]host:path; not ok for a local path.
+func GitHost(repo string) (string, bool) {
+	if strings.Contains(repo, "://") {
+		u, err := url.Parse(repo)
+		if err != nil || u.Hostname() == "" {
+			return "", false
+		}
+		return strings.ToLower(u.Hostname()), true
+	}
+	i := strings.IndexByte(repo, ':')
+	if i < 0 || strings.Contains(repo[:i], "/") {
+		return "", false
+	}
+	h := repo[:i]
+	if at := strings.LastIndexByte(h, '@'); at >= 0 {
+		h = h[at+1:]
+	}
+	if h == "" {
+		return "", false
+	}
+	return strings.ToLower(h), true
 }

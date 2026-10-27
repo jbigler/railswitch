@@ -106,7 +106,10 @@ type Service struct {
 	// FirewallMode is the firewall hook's mode for s: "" = the project's
 	// [firewall] mode; an agent's is always "enforce" (D55).
 	FirewallMode string
-	Oneshot      bool
+	// FirewallExtra are hosts the firewall hook allows s besides its
+	// profiles': nvim's config repo host (D54).
+	FirewallExtra []string
+	Oneshot       bool
 	// OnDemand: the service has no Quadlet unit and no app wants it; it runs
 	// as a transient container (an on-demand agent).
 	OnDemand bool
@@ -297,6 +300,11 @@ func (b *builder) services() error {
 		s, err := b.toolService(t)
 		errs = append(errs, err)
 		b.tools[s.ID] = t
+		if n := b.in.Project.Tools.Nvim; t.Name == "nvim" && n != nil {
+			if h, ok := naming.GitHost(n.ConfigRepo); ok {
+				s.FirewallExtra = []string{h}
+			}
+		}
 		tools = append(tools, s)
 	}
 	var agents []Service

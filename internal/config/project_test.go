@@ -238,3 +238,32 @@ func TestStackLocalRefused(t *testing.T) {
 		t.Fatalf("Validate = %v", err)
 	}
 }
+
+// C1, D54: [tools.nvim] is a table; the old bool is refused, and unknown
+// keys under it are errors (the custom decoder checks them itself).
+func TestToolsNvimTable(t *testing.T) {
+	load := func(src string) (*Project, error) {
+		path := filepath.Join(t.TempDir(), "project.toml")
+		if err := os.WriteFile(path, []byte("schema = 1\n"+src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return Load(path)
+	}
+	p, err := load("[tools.nvim]\n")
+	if err != nil || p.Tools.Nvim == nil {
+		t.Fatalf("empty [tools.nvim]: %+v, %v; want non-nil", p, err)
+	}
+	p, err = load("[tools.nvim]\nconfig_repo = \"https://github.com/u/cfg\"\nconfig_ref = \"v2\"\n")
+	if err != nil || p.Tools.Nvim == nil || p.Tools.Nvim.ConfigRepo != "https://github.com/u/cfg" || p.Tools.Nvim.ConfigRef != "v2" {
+		t.Fatalf("config_repo: %+v, %v", p.Tools.Nvim, err)
+	}
+	if _, err := load("[tools]\nnvim = true\n"); err == nil || !strings.Contains(err.Error(), "[tools.nvim]") {
+		t.Errorf("nvim = true: %v; want an error naming [tools.nvim]", err)
+	}
+	if _, err := load("[tools.nvim]\nconfig_rpo = \"x\"\n"); err == nil || !strings.Contains(err.Error(), "config_rpo") {
+		t.Errorf("config_rpo: %v; want an error naming config_rpo", err)
+	}
+	if p, err := load(""); err != nil || p.Tools.Nvim != nil {
+		t.Errorf("no [tools]: %+v, %v; want nil", p.Tools.Nvim, err)
+	}
+}

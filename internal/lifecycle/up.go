@@ -41,6 +41,13 @@ type L struct {
 	In       io.Reader
 	TTY      bool
 
+	// LookPath finds a host program (exec.LookPath; nil: none is found):
+	// railswitch nvim attaches the host's nvim when there is one (C4).
+	LookPath func(string) (string, error)
+	// ConfigDir is railswitch's config dir (machine.Dirs.Config), the
+	// parent of the user's hooks/ (nvim-attach, nvim-detach).
+	ConfigDir string
+
 	// TraefikAPI is the base URL of Traefik's API, asked with Host
 	// traefik.localhost ("": the shared proxy's, 127.0.0.1:80); RoutePoll
 	// and RouteTimeout pace up's wait for the app's route (zero: 500ms,

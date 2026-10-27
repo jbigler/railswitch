@@ -1,0 +1,26 @@
+[
+  {"number": 1, "title": "Draft", "url": "https://github.com/o/n/pull/1", "headRefName": "draft", "isDraft": true, "state": "OPEN", "reviewDecision": "",
+   "statusCheckRollup": [{"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}]},
+  {"number": 2, "title": "Approved", "url": "https://github.com/o/n/pull/2", "headRefName": "approved", "isDraft": false, "state": "OPEN", "reviewDecision": "APPROVED",
+   "statusCheckRollup": [
+     {"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"},
+     {"__typename": "CheckRun", "name": "lint", "status": "COMPLETED", "conclusion": "NEUTRAL"},
+     {"__typename": "CheckRun", "name": "deploy", "status": "COMPLETED", "conclusion": "SKIPPED"},
+     {"__typename": "StatusContext", "context": "ext", "state": "SUCCESS"}]},
+  {"number": 3, "title": "Changes", "url": "https://github.com/o/n/pull/3", "headRefName": "changes", "isDraft": false, "state": "OPEN", "reviewDecision": "CHANGES_REQUESTED",
+   "statusCheckRollup": [
+     {"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "FAILURE"},
+     {"__typename": "CheckRun", "name": "lint", "status": "IN_PROGRESS", "conclusion": ""}]},
+  {"number": 4, "title": "Running", "url": "https://github.com/o/n/pull/4", "headRefName": "running", "isDraft": false, "state": "OPEN", "reviewDecision": "REVIEW_REQUIRED",
+   "statusCheckRollup": [
+     {"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"},
+     {"__typename": "CheckRun", "name": "e2e", "status": "IN_PROGRESS", "conclusion": ""}]},
+  {"number": 5, "title": "Status pending", "url": "https://github.com/o/n/pull/5", "headRefName": "status", "isDraft": false, "state": "OPEN", "reviewDecision": "",
+   "statusCheckRollup": [{"__typename": "StatusContext", "context": "ext", "state": "PENDING"}]},
+  {"number": 6, "title": "Merged", "url": "https://github.com/o/n/pull/6", "headRefName": "merged", "isDraft": false, "state": "MERGED", "reviewDecision": "APPROVED",
+   "statusCheckRollup": [{"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}]},
+  {"number": 7, "title": "Closed", "url": "https://github.com/o/n/pull/7", "headRefName": "closed", "isDraft": false, "state": "CLOSED", "reviewDecision": "",
+   "statusCheckRollup": [{"__typename": "StatusContext", "context": "ext", "state": "ERROR"}]},
+  {"number": 8, "title": "No checks", "url": "https://github.com/o/n/pull/8", "headRefName": "nochecks", "isDraft": false, "state": "OPEN", "reviewDecision": "",
+   "statusCheckRollup": []}
+]

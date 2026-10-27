@@ -1,0 +1,167 @@
+// Package prs reads a GitHub repository's pull requests through the host's
+// gh CLI and reduces them to draft/open/merged/closed, check and review
+// states.
+package prs
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/jbigler/railswitch/internal/sys"
+)
+
+// PR is one pull request.
+type PR struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
+	Branch string `json:"-"`
+	State  string `json:"state"`  // "draft", "open", "merged", "closed"
+	Checks string `json:"checks"` // "pass", "fail", "pending", "none"
+	Review string `json:"review"` // "approved", "changes_requested", "pending", "none"
+}
+
+// Repo returns "owner/name" for a GitHub remote URL (https, scp-style or
+// ssh://), with any ".git" suffix stripped.
+func Repo(url string) (string, error) {
+	var path string
+	found := false
+	for _, p := range []string{"https://github.com/", "git@github.com:", "ssh://git@github.com/"} {
+		if rest, ok := strings.CutPrefix(url, p); ok {
+			path, found = rest, true
+			break
+		}
+	}
+	path = strings.TrimSuffix(strings.TrimSuffix(path, "/"), ".git")
+	owner, name, ok := strings.Cut(path, "/")
+	if !found || !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return "", fmt.Errorf("%s is not a GitHub repo", url)
+	}
+	return owner + "/" + name, nil
+}
+
+type ghCheck struct {
+	Typename   string `json:"__typename"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	State      string `json:"state"`
+}
+
+type ghPR struct {
+	Number         int       `json:"number"`
+	Title          string    `json:"title"`
+	URL            string    `json:"url"`
+	HeadRefName    string    `json:"headRefName"`
+	IsDraft        bool      `json:"isDraft"`
+	State          string    `json:"state"`
+	ReviewDecision string    `json:"reviewDecision"`
+	Checks         []ghCheck `json:"statusCheckRollup"`
+}
+
+// List runs `gh pr list` for repo in dir (no prompts, 30 s timeout).
+func List(ctx context.Context, r sys.Runner, repo, dir string) ([]PR, error) {
+	res, err := r.Run(ctx, sys.Cmd{
+		Name: "gh",
+		Args: []string{"pr", "list", "--repo", repo, "--state", "all", "--limit", "200",
+			"--json", "number,title,url,headRefName,isDraft,state,reviewDecision,statusCheckRollup"},
+		Dir:     dir,
+		Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
+		Timeout: 30 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var raw []ghPR
+	if err := json.Unmarshal(res.Stdout, &raw); err != nil {
+		return nil, fmt.Errorf("gh pr list: %w", err)
+	}
+	out := make([]PR, 0, len(raw))
+	for _, p := range raw {
+		out = append(out, PR{
+			Number: p.Number,
+			Title:  p.Title,
+			URL:    p.URL,
+			Branch: p.HeadRefName,
+			State:  state(p),
+			Checks: checks(p.Checks),
+			Review: review(p.ReviewDecision),
+		})
+	}
+	return out, nil
+}
+
+func state(p ghPR) string {
+	switch p.State {
+	case "MERGED":
+		return "merged"
+	case "CLOSED":
+		return "closed"
+	}
+	if p.IsDraft {
+		return "draft"
+	}
+	return "open"
+}
+
+func checks(cs []ghCheck) string {
+	if len(cs) == 0 {
+		return "none"
+	}
+	pending := false
+	for _, c := range cs {
+		if c.Typename == "StatusContext" {
+			switch c.State {
+			case "FAILURE", "ERROR":
+				return "fail"
+			case "PENDING", "EXPECTED":
+				pending = true
+			}
+			continue
+		}
+		switch c.Conclusion {
+		case "FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE":
+			return "fail"
+		}
+		if c.Status != "COMPLETED" {
+			pending = true
+		}
+	}
+	if pending {
+		return "pending"
+	}
+	return "pass"
+}
+
+func review(d string) string {
+	switch d {
+	case "APPROVED":
+		return "approved"
+	case "CHANGES_REQUESTED":
+		return "changes_requested"
+	case "REVIEW_REQUIRED":
+		return "pending"
+	}
+	return "none"
+}
+
+// ForBranch picks the PR for branch: an open or draft one first, then the
+// highest number. It returns nil when the branch has none.
+func ForBranch(prs []PR, branch string) *PR {
+	var best *PR
+	for i := range prs {
+		p := &prs[i]
+		if p.Branch != branch {
+			continue
+		}
+		if best == nil || live(p) && !live(best) || live(p) == live(best) && p.Number > best.Number {
+			best = p
+		}
+	}
+	return best
+}
+
+func live(p *PR) bool { return p.State == "open" || p.State == "draft" }

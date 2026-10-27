@@ -220,6 +220,10 @@ both fail with `Read-only file system`. nvim not checked (`demo` has no `[tools.
 redis, rustfs, `claude@1`), the two settings above, then `up`: the app serves,
 `db:prepare` seeds the database, and images stored in rustfs load.
 
-Still to run: `agent` and `nvim` on `ftest`, the firewall live check, the
-hooks check in nvim, and the db round trip (`db dump` → `stop` → remove the db
-volume → `up`).
+**2026-10-27, db round trip on `ftest`: PASS.** `db dump` → `stop` →
+`podman volume rm ftest-master-db-data-pg16 ftest-master-rustfs-data` → `up`:
+the database came back from `<db>.dump` and the rustfs objects from
+`rustfs_data.tar.gz`.
+
+Still to run: `agent` and `nvim` on `ftest`, the firewall live check and the
+hooks check in nvim.

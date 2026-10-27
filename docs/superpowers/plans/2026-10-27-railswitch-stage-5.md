@@ -254,7 +254,7 @@ Added here:
 
 **Files:**
 - Create: `docs/stage5-acceptance.md`, `internal/lifecycle/e2e_phoenix_integration_test.go` (`//go:build integration`)
-- Modify: `docs/packs.md` (complete: every manifest field of `pack.toml`/`option.toml`/`tool.toml`/`agent.toml`, conventions `/app`, `appuser` 1000, Debian with agents, `README.md`), roadmap (decisions D65–D70 below; Stage 5 row "detailed (`2026-10-27-railswitch-stage-5.md`)"), `AGENTS.md` (decisions range, `docs/packs.md` in the package map line for `internal/pack`)
+- Modify: `docs/packs.md` (complete: every manifest field of `pack.toml`/`option.toml`/`tool.toml`/`agent.toml`, conventions `/app`, `appuser` 1000, Debian with agents, `README.md`), roadmap (decisions D65–D71 below; Stage 5 row "detailed (`2026-10-27-railswitch-stage-5.md`)"), `AGENTS.md` (decisions range, `docs/packs.md` in the package map line for `internal/pack`)
 
 **Interfaces:**
 - Roadmap decisions to add: D65 local packages on demand (C1); D66 lock locality (C2); D67 project routes and route uniqueness (C4); D68 option pin vs pack runtime precedence and C3; D69 JS tool by lockfile, bun as a pack runtime, copy per pack (user, 2026-10-27); D70 `pack eject|new|show` (C5) and `{name?}`; D71 nvim's own Node (C7, amends D23/D45; user, 2026-10-27).

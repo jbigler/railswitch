@@ -268,11 +268,10 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	// others start in a second call, so one that fails (a tool's port taken)
 	// leaves the app up with a warning, as its Wants= would (D23).
 	app := unitOf(m, slug, m.Services[0].ID)
-	var others, otherIDs []string
+	var others []string
 	for _, s := range m.Services[1:] {
 		if s.Role != render.RoleAgent && !s.Oneshot {
 			others = append(others, unitOf(m, slug, s.ID))
-			otherIDs = append(otherIDs, s.ID)
 		}
 	}
 	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m), ", "), "started "+slug)
@@ -286,7 +285,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		return l.startFailure(ctx, sd, slug, failed, err)
 	}
 	if othersErr != nil {
-		l.warnFailed(ctx, sd, others, otherIDs, othersErr)
+		l.warnFailed(ctx, sd, others, othersErr)
 	}
 	return l.waitRoute(ctx, m, in, slug)
 }
@@ -305,20 +304,26 @@ func startedServices(m *render.Model) []string {
 }
 
 // warnFailed reports services that did not start while the app did: up
-// goes on, the app is usable without them.
-// ids are the units' service IDs.
-func (l *L) warnFailed(ctx context.Context, sd podman.Systemd, units, ids []string, startErr error) {
+// goes on, the app is usable without them. A unit counts as failed as in
+// startFailure (a Restart=on-failure one is activating, Result exit-code).
+func (l *L) warnFailed(ctx context.Context, sd podman.Systemd, units []string, startErr error) {
 	var failed, hints []string
-	for i, u := range units {
-		if st, err := sd.Show(ctx, u, "ActiveState"); err == nil && st["ActiveState"] == "failed" {
-			failed = append(failed, u)
-			hints = append(hints, "railswitch logs "+ids[i])
+	for _, u := range units {
+		st, err := sd.Show(ctx, u, "ActiveState", "Result")
+		if err != nil || (st["ActiveState"] != "failed" && (st["Result"] == "" || st["Result"] == "success")) {
+			continue
 		}
+		failed = append(failed, u)
+		hints = append(hints, "journalctl --user -u "+u)
 	}
 	if len(failed) == 0 {
 		failed = units
 	}
-	fmt.Fprintf(l.Err, "warning: %s did not start: %v; %s\n", strings.Join(failed, ", "), startErr, strings.Join(hints, "; "))
+	fmt.Fprintf(l.Err, "warning: %s did not start: %v", strings.Join(failed, ", "), startErr)
+	if len(hints) > 0 {
+		fmt.Fprintf(l.Err, "; %s", strings.Join(hints, "; "))
+	}
+	fmt.Fprintln(l.Err)
 }
 
 // startFailure turns a failed `systemctl start` into an error naming the

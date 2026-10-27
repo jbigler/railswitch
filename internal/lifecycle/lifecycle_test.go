@@ -827,15 +827,17 @@ func failStart(e *tenv) {
 func TestUpToolStartFailureWarns(t *testing.T) {
 	e := setup(t)
 	e.f.On([]string{"systemctl", "--user", "start", "filial-feat-db.service"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
-	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState", "filial-feat-browser.service"}, sys.Result{Stdout: []byte("ActiveState=failed\n")}, nil)
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result"}, sys.Result{Stdout: []byte("ActiveState=active\nResult=success\n")}, nil)
+	// Restart=on-failure: a failed start leaves the unit activating.
+	e.f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,Result", "filial-feat-browser.service"}, sys.Result{Stdout: []byte("ActiveState=activating\nResult=exit-code\n")}, nil)
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatalf("up failed for a tool: %v", err)
 	}
 	stderr := e.l.Err.(*bytes.Buffer).String()
-	if !strings.Contains(stderr, "warning: filial-feat-browser.service did not start: ") || !strings.Contains(stderr, "; railswitch logs browser\n") {
+	if !strings.Contains(stderr, "warning: filial-feat-browser.service did not start: ") || !strings.Contains(stderr, "; journalctl --user -u filial-feat-browser.service\n") {
 		t.Fatalf("no warning naming the failed tool; stderr:\n%s", stderr)
 	}
-	if strings.Contains(stderr, "filial-feat-nvim.service") {
+	if strings.Contains(stderr, "filial-feat-nvim.service") || strings.Contains(stderr, "filial-feat-db.service") {
 		t.Fatalf("warning names a tool that started; stderr:\n%s", stderr)
 	}
 }

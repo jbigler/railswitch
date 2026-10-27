@@ -92,9 +92,9 @@ railswitch up                      # the fresh volume restores from the dump (in
 ```
 
 Do not use `railswitch down --yes` here: it removes every per-worktree
-volume (`node_modules`, agent homes with their credentials, seeded volumes),
-not just the db's. Expect the app's data back (e.g. a record created before
-the dump is listed again).
+volume (`node_modules`, seeded volumes), not just the db's (agent homes are
+dirs under `.railswitch/agent-home/`, which `down` keeps). Expect the app's
+data back (e.g. a record created before the dump is listed again).
 
 ### git-guard: hooks are read-only in containers
 

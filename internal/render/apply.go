@@ -19,10 +19,15 @@ import (
 type Plan struct {
 	Units map[string][]byte // unit filename → content, written to the Quadlet dir at mode 0644
 	Files map[string]File   // workspace-relative slash path → content and mode (env files, package assets)
-	// Homes are the per-worktree home dirs (D30) a unit bind-mounts,
-	// workspace-relative slash paths. Apply creates a missing one 0700 and
-	// never removes one: they hold user data.
+	// Homes are the per-worktree home dirs a unit bind-mounts at
+	// /home/appuser (D30's tool home, an agent's home), workspace-relative
+	// slash paths. Apply creates a missing one 0700 and never removes one:
+	// they hold user data.
 	Homes []string
+	// HomeDirs are the mount points under a home, workspace-relative slash
+	// paths: Apply creates them 0755 so the runtime doesn't create them (or
+	// their parents) as container root, which appuser can't write.
+	HomeDirs []string
 	// StatusDirs are the per-worktree agent status dirs (D58), when the
 	// project has an agent: workspace-relative slash paths, created and kept
 	// like Homes.
@@ -46,12 +51,57 @@ const (
 	unitMode = fs.FileMode(0o644)
 	envDir   = ".railswitch/env"  // D10: <envDir>/<slug>/<svc>.env, 0600 in 0700 dirs
 	homeDir  = ".railswitch/home" // D30: <homeDir>/<slug>, a tool's per-worktree home, 0700
+	// agentHomeDir holds <agentHomeDir>/<slug>/<agent>, an agent's
+	// per-worktree home (D55), 0700: apart from homeDir, which nvim mounts,
+	// so no agent's login is visible to nvim.
+	agentHomeDir = ".railswitch/agent-home"
 	// statusDir holds <statusDir>/<slug>, a worktree's agent status files
 	// (D58), 0700, bind-mounted into its agents.
 	statusDir = ".railswitch/status"
 	// homeSource is the mount source of a per-worktree home.
 	homeSource = "{worktree.home}"
+	// agentHomeSource is the parent of an agent's home mount source:
+	// <agentHomeSource>/<agent>.
+	agentHomeSource = "{agent.home}"
+	// appHome is the container home every home dir is mounted at.
+	appHome = "/home/appuser"
 )
+
+// homeRel is the workspace-relative home dir s bind-mounts at appHome in
+// worktree slug, if any.
+func homeRel(s *Service, slug string) (string, bool) {
+	for _, mt := range s.Mounts {
+		if mt.Target != appHome {
+			continue
+		}
+		if mt.Source == homeSource {
+			return path.Join(homeDir, slug), true
+		}
+		if name, ok := strings.CutPrefix(mt.Source, agentHomeSource+"/"); ok {
+			return path.Join(agentHomeDir, slug, name), true
+		}
+	}
+	return "", false
+}
+
+// homeMountPoints are s's mount points under appHome, relative to it: a
+// volume's target, and a bind mount's parent dir (its source may be a
+// file, which a dir in its place would break).
+func homeMountPoints(s *Service) []string {
+	var rels []string
+	add := func(target string) {
+		if rel, ok := strings.CutPrefix(path.Clean(target), appHome+"/"); ok {
+			rels = append(rels, rel)
+		}
+	}
+	for _, mt := range s.Mounts {
+		add(path.Dir(mt.Target))
+	}
+	for _, v := range s.Volumes {
+		add(v.Mount)
+	}
+	return rels
+}
 
 // Plan renders the project: its units, every worktree's per-service env file
 // (D10) and every package asset.
@@ -61,10 +111,7 @@ func (m *Model) Plan() (*Plan, error) {
 		return nil, err
 	}
 	files := map[string]File{}
-	var homes, status []string
-	mountsHome := slices.ContainsFunc(m.Services, func(s Service) bool {
-		return slices.ContainsFunc(s.Mounts, func(mt Mount) bool { return mt.Source == homeSource })
-	})
+	var homes, homeDirs, status []string
 	hasAgents := len(m.Agents()) > 0
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)
@@ -73,9 +120,18 @@ func (m *Model) Plan() (*Plan, error) {
 		}
 		for _, s := range m.Services {
 			files[path.Join(envDir, wt.Slug, s.ID+".env")] = File{Data: EnvFile(in.Env[s.ID]), Mode: 0o600}
-		}
-		if mountsHome {
-			homes = append(homes, path.Join(homeDir, wt.Slug))
+			home, ok := homeRel(&s, wt.Slug)
+			if !ok {
+				continue
+			}
+			if !slices.Contains(homes, home) {
+				homes = append(homes, home)
+			}
+			for _, rel := range homeMountPoints(&s) {
+				if d := path.Join(home, rel); !slices.Contains(homeDirs, d) {
+					homeDirs = append(homeDirs, d)
+				}
+			}
 		}
 		if hasAgents {
 			status = append(status, path.Join(statusDir, wt.Slug))
@@ -84,7 +140,7 @@ func (m *Model) Plan() (*Plan, error) {
 	for _, a := range m.Assets {
 		files[a.Rel] = File{Data: a.Data, Mode: a.Mode}
 	}
-	return &Plan{Units: units, Files: files, Homes: homes, StatusDirs: status}, nil
+	return &Plan{Units: units, Files: files, Homes: homes, HomeDirs: homeDirs, StatusDirs: status}, nil
 }
 
 // EnvFile is a podman env file: NAME=value per line, the value verbatim
@@ -108,10 +164,10 @@ type target struct {
 }
 
 // Apply makes the disk match p: p.Files under ws, each missing p.Homes and
-// p.StatusDirs dir (0700; an existing one is left as it is and none is ever
-// removed), p.Units in quadletDir, then it removes every unit in quadletDir
-// whose marker names prefix but which p does not render (D28), and every env
-// dir or env file p does not render.
+// p.StatusDirs dir (0700) and p.HomeDirs dir (0755; an existing dir is left
+// as it is and none is ever removed), p.Units in quadletDir, then it removes
+// every unit in quadletDir whose marker names prefix but which p does not
+// render (D28), and every env dir or env file p does not render.
 // Unchanged files are left alone. Each file is replaced atomically, so a
 // failure leaves every file old or new, never half-written, and running again
 // finishes the job. With check, nothing is written: the Diff says what would
@@ -174,6 +230,27 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 			return nil, fmt.Errorf("%s: not a directory (a per-worktree dir a unit mounts)", filepath.Join(ws, filepath.FromSlash(rel)))
 		}
 	}
+	var subdirs []homeSubdir // the mount points under a home to create
+	for _, full := range p.HomeDirs {
+		sd, err := splitHomeDir(p.Homes, full)
+		if err != nil {
+			return nil, err
+		}
+		switch _, err := os.Stat(filepath.Join(ws, filepath.FromSlash(sd.home))); {
+		case errors.Is(err, fs.ErrNotExist): // the home is new: so is the dir
+		case err != nil:
+			return nil, err
+		default:
+			if err := sd.stat(ws); err == nil {
+				continue
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+		}
+		subdirs = append(subdirs, sd)
+		d.Added = append(d.Added, full)
+		text.WriteString("--- /dev/null\n+++ b/" + full + "/\n(new directory, mode 0755)\n")
+	}
 	for _, o := range slices.Concat(units, envs) {
 		d.Removed = append(d.Removed, o.name)
 		text.WriteString("--- a/" + o.name + "\n+++ /dev/null\n")
@@ -208,6 +285,11 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 			return nil, err
 		}
 	}
+	for _, sd := range subdirs { // after the homes they lie in
+		if err := sd.create(ws); err != nil {
+			return nil, err
+		}
+	}
 	for _, t := range writes {
 		if err := ensureDir(filepath.Dir(t.path), false); err != nil {
 			return nil, err
@@ -231,6 +313,47 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 
 // private reports whether mode gives group and others no access.
 func private(mode fs.FileMode) bool { return mode&0o077 == 0 }
+
+// homeSubdir is one p.HomeDirs entry: rel under the home dir home, both
+// slash paths, home workspace-relative.
+type homeSubdir struct{ home, rel string }
+
+// splitHomeDir finds the home of p.HomeDirs entry full among homes.
+func splitHomeDir(homes []string, full string) (homeSubdir, error) {
+	for _, h := range homes {
+		if rel, ok := strings.CutPrefix(full, h+"/"); ok && filepath.IsLocal(rel) {
+			return homeSubdir{h, rel}, nil
+		}
+	}
+	return homeSubdir{}, fmt.Errorf("%s: under no home dir of the plan", full)
+}
+
+// stat and create go through an os.Root on the home: a container writes
+// the home, so a symlink there must not lead them outside it.
+func (sd homeSubdir) stat(ws string) error {
+	root, err := os.OpenRoot(filepath.Join(ws, filepath.FromSlash(sd.home)))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	fi, err := root.Stat(sd.rel)
+	if err == nil && !fi.IsDir() {
+		return fmt.Errorf("%s: not a directory (a mount point under a home)", filepath.Join(ws, filepath.FromSlash(sd.home), filepath.FromSlash(sd.rel)))
+	}
+	return err
+}
+
+func (sd homeSubdir) create(ws string) error {
+	root, err := os.OpenRoot(filepath.Join(ws, filepath.FromSlash(sd.home)))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if err := root.MkdirAll(sd.rel, 0o755); err != nil {
+		return fmt.Errorf("create the mount point %s: %w", filepath.Join(ws, filepath.FromSlash(sd.home), filepath.FromSlash(sd.rel)), err)
+	}
+	return nil
+}
 
 func contentDiff(old, data []byte, private bool) string {
 	if !private {

@@ -667,7 +667,7 @@ func TestNamesFor(t *testing.T) {
 	if !slices.Contains(n.Containers, "filial-feat-db") {
 		t.Errorf("Containers %v lacks filial-feat-db", n.Containers)
 	}
-	wantVols := []string{"filial-feat-agent-claude-home", "filial-feat-agent-probe-home", "filial-feat-db-data-pg17", "filial-feat-node-modules", "filial-feat-rustfs-data"}
+	wantVols := []string{"filial-feat-db-data-pg17", "filial-feat-node-modules", "filial-feat-rustfs-data"}
 	if !slices.Equal(n.Volumes, wantVols) {
 		t.Errorf("Volumes = %v; want %v", n.Volumes, wantVols)
 	}

@@ -602,7 +602,7 @@ func TestDownDefaultsNo(t *testing.T) {
 	if err := e.l.Down(ctx, "feat", false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(e.out.String(), "Delete 5 volumes of feat? [y/N]") {
+	if !strings.Contains(e.out.String(), "Delete 3 volumes of feat? [y/N]") {
 		t.Errorf("prompt %q", e.out.String())
 	}
 	if r := removals(e.calls()); len(r) != 0 {

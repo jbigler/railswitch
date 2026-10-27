@@ -510,7 +510,7 @@ func (b *builder) toolService(t *pack.Tool) (Service, error) {
 		}
 	}
 	if t.Home {
-		s.Mounts = append(s.Mounts, Mount{Source: homeSource, Target: "/home/appuser", Options: "z"})
+		s.Mounts = append(s.Mounts, Mount{Source: homeSource, Target: appHome, Options: "z"})
 	}
 	if t.Caches {
 		for _, v := range pk.Caches {
@@ -535,7 +535,7 @@ func agentPkg(a *pack.Agent) string { return strings.TrimPrefix(a.Image.File, "C
 // agentService is agent a's container (D54): a worktree service on the agent
 // package's image, firewalled under its own profile agent-<name> in enforce
 // mode (D55, C10), interactive, with the worktree, the status dir, a
-// per-worktree home volume and the pack's volumes.
+// per-worktree home dir and the pack's volumes.
 func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 	pk, ag := b.in.Stack.Pack, a.Agent
 	pkg := agentPkg(ag)
@@ -549,11 +549,12 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 		Unit:         unitExtras(ag.Unit, RoleAgent, b.in.Project.Services[a.Service]),
 	}
 	s.Unit.TTY = true // an agent is a terminal program, attached to or not
-	s.Mounts = append(worktreeMounts("z"), Mount{Source: "{status.dir}", Target: statusMount, Options: "rw,z"})
+	s.Mounts = append(worktreeMounts("z"),
+		Mount{Source: "{status.dir}", Target: statusMount, Options: "rw,z"},
+		Mount{Source: agentHomeSource + "/" + a.Name, Target: appHome, Options: "z"})
 	if err := b.packageMounts(&s, pkg, ag.Files, ag.Mounts); err != nil {
 		return s, err
 	}
-	s.Volumes = []Volume{{Name: a.Service + "-home", Mount: "/home/appuser", Chown: true}}
 	for _, v := range pk.WorktreeVolumes {
 		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown})
 	}
@@ -799,7 +800,8 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		"worktree.id":    strconv.Itoa(wt.ID),
 		"worktree.host":  wt.Slug + "." + m.Prefix + ".localhost",
 		"worktree.dir":   wt.Dir,
-		"worktree.home":  filepath.Join(m.Inputs.Workspace, filepath.FromSlash(homeDir), wt.Slug), // D30's per-worktree home
+		"worktree.home":  filepath.Join(m.Inputs.Workspace, filepath.FromSlash(homeDir), wt.Slug),      // D30's per-worktree home
+		"agent.home":     filepath.Join(m.Inputs.Workspace, filepath.FromSlash(agentHomeDir), wt.Slug), // <agent.home>/<agent>: an agent's home (D55)
 		"base.git":       filepath.Join(m.baseDir, ".git"),
 		"traefik.ip":     machine.TraefikIP(m.Inputs.Machine.Subnet),
 		"branch":         wt.Branch,

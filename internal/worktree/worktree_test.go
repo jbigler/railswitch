@@ -324,7 +324,7 @@ func (e *tenv) rolledBack(t *testing.T, slug string) {
 	if got := e.slugs(t); !slices.Equal(got, []string{"master"}) {
 		t.Errorf("registry = %v; want only master", got)
 	}
-	for _, p := range []string{slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug, ".railswitch/status/" + slug} {
+	for _, p := range []string{slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug, ".railswitch/agent-home/" + slug, ".railswitch/status/" + slug} {
 		if exists(filepath.Join(e.ws, p)) {
 			t.Errorf("%s remains after the failed Add", p)
 		}
@@ -347,8 +347,8 @@ func TestAddRenderFailsRollsBack(t *testing.T) {
 			return err
 		}
 		if fail {
-			// As Apply would have: the home and status dirs, besides the env dir.
-			for _, d := range []string{"home", "status"} {
+			// As Apply would have: the home, agent home and status dirs, besides the env dir.
+			for _, d := range []string{"home", "agent-home", "status"} {
 				if err := os.MkdirAll(filepath.Join(e.ws, ".railswitch", d, "feat"), 0o700); err != nil {
 					return err
 				}
@@ -706,6 +706,41 @@ func TestWtRmRemovesStatusDir(t *testing.T) {
 	}
 	if !exists(filepath.Join(e.ws, ".railswitch", "status", "other", "claude.json")) {
 		t.Error("wt rm feat removed status/other")
+	}
+}
+
+// The home and agent home dirs hold user data (logins): wt rm keeps them
+// unless --force.
+func TestWtRmHomes(t *testing.T) {
+	e := setup(t)
+	e.add(t, "feat", "")
+	e.add(t, "other", "")
+	homes := func(slug string) []string {
+		return []string{
+			filepath.Join(e.ws, ".railswitch", "home", slug, ".bash_history"),
+			filepath.Join(e.ws, ".railswitch", "agent-home", slug, "claude", ".claude.json"),
+		}
+	}
+	for _, slug := range []string{"feat", "other"} {
+		for _, p := range homes(slug) {
+			writeFile(t, p, "x\n")
+		}
+	}
+	if err := e.m.Remove(context.Background(), "feat", false); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range homes("feat") {
+		if !exists(p) {
+			t.Errorf("wt rm without --force removed %s", p)
+		}
+	}
+	if err := e.m.Remove(context.Background(), "other", true); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{"home", "agent-home"} {
+		if exists(filepath.Join(e.ws, ".railswitch", d, "other")) {
+			t.Errorf("wt rm --force left %s/other", d)
+		}
 	}
 }
 

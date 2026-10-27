@@ -53,7 +53,7 @@ func TestAgentServices(t *testing.T) {
 		filepath.Join(ws, ".railswitch", "status", "master") + ":/run/railswitch/status:rw,z",
 		filepath.Join(ws, ".railswitch", "assets", "claude", "CLAUDE.md") + ":/opt/railswitch/agent/CLAUDE.md:ro,z",
 		filepath.Join(ws, ".railswitch", "assets", "claude", "entrypoints", "entrypoint-claude.sh") + ":/usr/local/bin/entrypoint-claude.sh:ro,z",
-		"filial-master-agent-claude-home:/home/appuser:U",
+		filepath.Join(ws, ".railswitch", "agent-home", "master", "claude") + ":/home/appuser:z",
 		"filial-master-node-modules:/app/node_modules:U",
 		"filial_gems_ruby3.3.6:/usr/local/bundle",
 		"filial_claude_plugins_cache:/home/appuser/.claude/plugins/cache:U",
@@ -168,10 +168,67 @@ func TestAgentNames(t *testing.T) {
 			t.Errorf("Containers lack %s: %v", c, n.Containers)
 		}
 	}
-	for _, v := range []string{"filial-feat-agent-claude-home", "filial-feat-agent-probe-home"} {
-		if !slices.Contains(n.Volumes, v) {
-			t.Errorf("Volumes lack %s: %v", v, n.Volumes)
+	for _, v := range n.Volumes {
+		if strings.HasSuffix(v, "-home") {
+			t.Errorf("Volumes has an agent home volume %s: %v", v, n.Volumes)
 		}
+	}
+}
+
+// An agent's home is a per-worktree bind dir, outside nvim's home (an
+// agent's login must not be visible to nvim).
+func TestPlanAgentHomes(t *testing.T) {
+	p, _, _ := filialPlan(t)
+	for _, want := range []string{".railswitch/home/feat", ".railswitch/agent-home/feat/claude", ".railswitch/agent-home/feat/probe", ".railswitch/agent-home/master/claude"} {
+		if !slices.Contains(p.Homes, want) {
+			t.Errorf("Homes = %v; want %s", p.Homes, want)
+		}
+	}
+}
+
+// The runtime creates a missing mount point's parents as container root,
+// which appuser then can't write: the plan pre-creates every mount target
+// under a bind-mounted home.
+func TestPlanHomeSubdirs(t *testing.T) {
+	p, _, _ := filialPlan(t)
+	for _, want := range []string{
+		".railswitch/agent-home/feat/claude/.claude/plugins/cache",
+		".railswitch/agent-home/feat/claude/.claude/plugins/marketplaces",
+		".railswitch/agent-home/feat/claude/.npm",
+		".railswitch/home/feat/.config/nvim",
+		".railswitch/home/feat/.local/share/nvim",
+		".railswitch/home/feat/.npm-global",
+		".railswitch/home/feat/.npm",
+	} {
+		if !slices.Contains(p.HomeDirs, want) {
+			t.Errorf("HomeDirs lack %s:\n%s", want, strings.Join(p.HomeDirs, "\n"))
+		}
+	}
+	for _, d := range p.HomeDirs {
+		if strings.Contains(d, "node_modules") || strings.Contains(d, "bundle") || strings.HasSuffix(d, "/claude") || strings.HasSuffix(d, "/feat") {
+			t.Errorf("HomeDirs has %s: not a mount point under a home", d)
+		}
+	}
+}
+
+func TestApplyCreatesHomeSubdirs(t *testing.T) {
+	p, ws, qdir := filialPlan(t)
+	mustApply(t, p, ws, qdir, false)
+	for _, rel := range []string{".railswitch/agent-home/feat/claude", ".railswitch/home/feat"} {
+		if fi, err := os.Stat(filepath.Join(ws, filepath.FromSlash(rel))); err != nil || fi.Mode().Perm() != 0o700 {
+			t.Errorf("%s: %v %v; want a 0700 dir", rel, fi, err)
+		}
+	}
+	for _, rel := range []string{".railswitch/agent-home/feat/claude/.claude/plugins/cache", ".railswitch/home/feat/.local/share/nvim"} {
+		if fi, err := os.Stat(filepath.Join(ws, filepath.FromSlash(rel))); err != nil || !fi.IsDir() {
+			t.Errorf("%s: %v %v; want a dir", rel, fi, err)
+		}
+	}
+	kept := filepath.Join(ws, ".railswitch", "agent-home", "feat", "claude", ".claude", "settings.json")
+	writeFile(t, kept, "{}\n")
+	mustApply(t, p, ws, qdir, false)
+	if !fileExists(t, kept) {
+		t.Error("a second Apply removed a file in the agent home")
 	}
 }
 

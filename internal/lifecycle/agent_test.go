@@ -234,12 +234,17 @@ func TestStatusOnDemand(t *testing.T) {
 	}
 }
 
-func TestDownRemovesAgentHome(t *testing.T) {
+// An agent home is a dir that holds its login, not a volume: down keeps it.
+func TestDownKeepsAgentHome(t *testing.T) {
 	e := setup(t)
 	if err := e.l.Down(ctx, "feat", true); err != nil {
 		t.Fatal(err)
 	}
-	find(t, e.calls(), "podman volume rm -f filial-feat-agent-claude-home")
+	for _, c := range e.calls() {
+		if l := strings.Join(c, " "); strings.Contains(l, "volume rm") && strings.Contains(l, "-home") {
+			t.Errorf("down removed an agent home: %s", l)
+		}
+	}
 	find(t, e.calls(), "podman rm -f --ignore filial-feat-agent-claude")
 }
 

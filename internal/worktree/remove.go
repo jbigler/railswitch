@@ -17,8 +17,8 @@ import (
 // containers, per-worktree volumes and dev network removed by exact name,
 // its env and agent status dirs, registry entry and checkout deleted, and the project
 // re-rendered (D28). The base worktree is refused, and so is a dirty one
-// unless force. force also deletes the worktree's home dir
-// (.railswitch/home/<slug>), which is kept otherwise.
+// unless force. force also deletes the worktree's home dirs (homeDirs:
+// nvim's and its agents'), which are kept otherwise: they hold logins.
 // Nothing changes when a registered worktree's directory is missing.
 func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	entries, err := m.registered()
@@ -68,13 +68,15 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 			return err
 		}
 	}
-	home := filepath.Join(m.WS, ".railswitch", "home", w.Slug)
-	if force {
-		if err := os.RemoveAll(home); err != nil {
-			return err
+	for _, d := range homeDirs {
+		home := filepath.Join(m.WS, ".railswitch", d, w.Slug)
+		if force {
+			if err := os.RemoveAll(home); err != nil {
+				return err
+			}
+		} else if _, err := os.Lstat(home); err == nil {
+			fmt.Fprintf(m.Out, "kept %s (--force deletes it)\n", home)
 		}
-	} else if _, err := os.Lstat(home); err == nil {
-		fmt.Fprintf(m.Out, "kept %s (--force deletes it)\n", home)
 	}
 	if err := m.unregister(w.Slug); err != nil {
 		return err
@@ -91,6 +93,10 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	}
 	return podman.Systemd{R: m.R}.DaemonReload(ctx)
 }
+
+// homeDirs are the .railswitch dirs that hold a worktree's homes, each in
+// <dir>/<slug> (render's homeDir and agentHomeDir).
+var homeDirs = []string{"home", "agent-home"}
 
 // teardown stops slug's units and removes its containers, per-worktree
 // volumes and dev network, each by its exact name. The units are reloaded

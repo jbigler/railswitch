@@ -44,6 +44,7 @@ func planNames(p *Plan) []string {
 	names := slices.Collect(maps.Keys(p.Units))
 	names = slices.AppendSeq(names, maps.Keys(p.Files))
 	names = append(names, p.Homes...)
+	names = append(names, p.HomeDirs...)
 	names = append(names, p.StatusDirs...)
 	slices.Sort(names)
 	return names

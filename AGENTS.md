@@ -14,7 +14,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D62: `docs/superpowers/plans/2026-10-
 - `project.toml`: `[tools.nvim] config_repo`/`config_ref` (replaces `[tools] nvim = true`, which is refused); `[agents.<n>] use` (`<name>@N` or `local:<name>@N` → `<ws>/agents/<name>/`), `run` (`on-demand`|`service`), `env`, `allow`.
 - `config.toml` `[[mount]]` (D57): machine-local mounts per service (`relabel = false` drops `z`; see docs/nvim.md); `doctor` checks them (`machine mounts`).
 - `doctor` checks carry `warn` (JSON `"warn"`): a warning prints `warn` and doesn't change the exit code; `git-guard` findings are warnings.
-- Agents (D55, C7, C10): service `agent-<n>`, own firewall profile `agent-<n>` (allow file `agent-<n>.allow`), always `enforce`. git-guard: every writable `{base.git}` mount gets `{base.git}/hooks` mounted `ro,z` on top.
+- Agents (D55, C7, C10): service `agent-<n>`, own firewall profile `agent-<n>` (allow file `agent-<n>.allow`), always `enforce`. Home: the bind dir `<ws>/.railswitch/agent-home/<slug>/<n>` at `/home/appuser` (`z`), apart from nvim's `.railswitch/home/<slug>`; render pre-creates every mount point under a home (else the runtime makes them root-owned); `down` keeps it, `wt rm --force` deletes it. git-guard: every writable `{base.git}` mount gets `{base.git}/hooks` mounted `ro,z` on top.
 - Genericity: no `filial` in non-test code or built-in packs, `claude` only under `internal/pack/builtin/agents/claude/`, terminal names only in `internal/term/` (`TestGenericity` in `internal/`).
 
 ## Global constraints

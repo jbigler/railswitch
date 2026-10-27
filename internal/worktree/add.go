@@ -94,9 +94,11 @@ func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktr
 		return render.Worktree{}, err
 	}
 	dir := filepath.Join(m.WS, slug)
-	home := filepath.Join(m.WS, ".railswitch", "home", slug)
-	if _, err := os.Lstat(home); errors.Is(err, fs.ErrNotExist) {
-		u.home = home // a kept home of an earlier worktree of this name is user data
+	for _, d := range homeDirs {
+		home := filepath.Join(m.WS, ".railswitch", d, slug)
+		if _, err := os.Lstat(home); errors.Is(err, fs.ErrNotExist) {
+			u.homes = append(u.homes, home) // a kept home of an earlier worktree of this name is user data
+		}
 	}
 	created, err := m.gitWorktreeAdd(ctx, base, dir, branch)
 	if err != nil {
@@ -161,15 +163,15 @@ func PrecreateVolumes(dir string, rels []string) error {
 // undo is what a failed Add has done so far.
 type undo struct {
 	base     string
-	branch   string // the branch Add created (or fetched), to delete
-	dir      string // the checkout Add created
-	home     string // the slug's home dir, absent before Add
-	slug     string // registered by Add
-	rendered bool   // Render ran
+	branch   string   // the branch Add created (or fetched), to delete
+	dir      string   // the checkout Add created
+	homes    []string // the slug's home dirs, absent before Add
+	slug     string   // registered by Add
+	rendered bool     // Render ran
 }
 
 // rollback undoes a failed Add in reverse order: the registry entry, the
-// slug's env and agent status dirs and (new) home dir, the checkout, the branch Add created;
+// slug's env and agent status dirs and (new) home dirs, the checkout, the branch Add created;
 // then, when Render ran, it renders again, which deletes the slug's units
 // and env files (D28). It returns cause joined with every rollback error.
 // It stops at a failed unregister: a registered worktree whose checkout is
@@ -191,9 +193,11 @@ func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
 			}
 		}
 	}
-	if u.home != "" && u.rendered { // only Render creates it
-		if err := os.RemoveAll(u.home); err != nil {
-			fail("remove its home dir", err)
+	if u.rendered { // only Render creates them
+		for _, home := range u.homes {
+			if err := os.RemoveAll(home); err != nil {
+				fail("remove its home dir "+home, err)
+			}
 		}
 	}
 	if u.dir != "" {

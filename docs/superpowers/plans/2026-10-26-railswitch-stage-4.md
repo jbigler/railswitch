@@ -67,7 +67,7 @@ Added here:
 - **Agent objects:**
   - service id `agent-<name>`;
   - container and unit `<prefix>-<slug>-agent-<name>`;
-  - home volume `<prefix>-<slug>-agent-<name>-home` at `/home/appuser`, with `:U`;
+  - home dir `<ws>/.railswitch/agent-home/<slug>/<name>` (0700), bind-mounted at `/home/appuser` with `z`; render pre-creates every mount point under it (host fix 1);
   - status dir `<ws>/.railswitch/status/<slug>/`, mode 0700, bind-mounted `rw,z` at `/run/railswitch/status`;
   - `RAILSWITCH_STATUS_FILE=/run/railswitch/status/<name>.json`;
   - images `localhost/<prefix>/agent-base:<ver>-<hash8>` and `localhost/<prefix>/agent-<pkg>:<ver>-<hash8>` (D9).

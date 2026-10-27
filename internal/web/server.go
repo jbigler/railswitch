@@ -118,14 +118,18 @@ func (s *Server) project(ctx context.Context, prefix string) (projectRow, bool, 
 // overviewOf is prefix's latest overview, read now when there is none.
 func (s *Server) overviewOf(ctx context.Context, prefix, ws string) (overview, error) {
 	s.mu.Lock()
-	if p := s.state[prefix]; p != nil && p.ov != nil {
+	p := s.state[prefix]
+	if p != nil && p.ov != nil {
 		ov := *p.ov
 		s.mu.Unlock()
 		return ov, nil
 	}
+	if p != nil {
+		p.ovAt = s.c.Now()
+	}
 	s.mu.Unlock()
 	ov, err := readOverview(ctx, s.c.CLI, ws)
-	s.applyOverview(prefix, ov, err, s.c.Now())
+	s.applyOverview(prefix, ov, err)
 	return ov, err
 }
 

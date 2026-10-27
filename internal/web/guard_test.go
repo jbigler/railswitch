@@ -24,19 +24,27 @@ const (
 )
 
 // fakeCLI answers `railswitch <args>` from scripted outputs, keyed by the
-// args joined with spaces, and records every call.
+// args joined with spaces, and records every call. during, when set, runs
+// inside each call (a read in flight).
 type fakeCLI struct {
-	mu    sync.Mutex
-	out   map[string]string
-	errs  map[string]error
-	calls [][]string
+	mu     sync.Mutex
+	out    map[string]string
+	errs   map[string]error
+	calls  [][]string
+	during func(key string)
 }
 
 func (f *fakeCLI) Run(_ context.Context, args ...string) ([]byte, error) {
+	key := strings.Join(args, " ")
+	f.mu.Lock()
+	during := f.during
+	f.mu.Unlock()
+	if during != nil {
+		during(key)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, slices.Clone(args))
-	key := strings.Join(args, " ")
 	if err := f.errs[key]; err != nil {
 		return nil, err
 	}

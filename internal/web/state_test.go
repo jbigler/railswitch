@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+
+	"github.com/jbigler/railswitch/internal/jobs"
 )
 
 // drain returns the events queued for sub.
@@ -305,4 +307,37 @@ func TestCadence(t *testing.T) {
 	f.clock.Add(60 * time.Second)
 	f.s.pollOnce(ctx)
 	check("closed 130s", 9, 5, 3, 0)
+}
+
+// TestJobEndDuringRead: a job that ends while its project's overview is
+// being read still makes the next poll read it again.
+func TestJobEndDuringRead(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	sub := f.s.subscribe("ftest", "b", parseSort("name"))
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	f.clock.Add(2 * time.Second)
+	ended := false
+	f.cli.mu.Lock()
+	f.cli.during = func(key string) {
+		if key == "--json -C /ws/ftest overview" && !ended {
+			ended = true
+			f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "j1", Spec: jobs.Spec{Project: "ftest", Slug: "b", Label: "up"}, State: jobs.StateOK}})
+		}
+	}
+	f.cli.mu.Unlock()
+	f.s.pollOnce(ctx)
+	if !ended {
+		t.Fatal("overview not read at 2 s")
+	}
+	before := f.cli.count("--json -C /ws/ftest overview")
+	f.s.pollOnce(ctx) // same instant: due only through the job's end
+	if n := f.cli.count("--json -C /ws/ftest overview"); n != before+1 {
+		t.Errorf("overview reads %d after the job ended mid-read, want %d", n, before+1)
+	}
+	f.s.pollOnce(ctx)
+	if n := f.cli.count("--json -C /ws/ftest overview"); n != before+1 {
+		t.Errorf("overview read again without a cause: %d", n)
+	}
 }

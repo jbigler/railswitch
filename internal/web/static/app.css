@@ -29,6 +29,7 @@ kbd{border:1px solid var(--border);border-radius:3px;padding:0 4px;background:va
 .grid{display:grid;grid-template-columns:1.25fr 1fr;min-height:calc(100vh - 46px)}
 .left{border-right:1px solid var(--border);overflow-x:auto}
 .tb{display:flex;gap:6px;align-items:center;padding:8px 12px;color:var(--muted)}
+.tb form{display:inline}
 .seg{display:inline-flex;border:1px solid var(--border);border-radius:4px;overflow:hidden}
 .seg a{padding:2px 9px;border-right:1px solid var(--border);background:var(--bg);color:var(--text);text-decoration:none}
 .seg a:last-child{border-right:0}

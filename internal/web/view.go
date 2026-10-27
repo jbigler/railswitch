@@ -372,9 +372,10 @@ type stripItem struct{ Text, URL string }
 type bannerView struct{ Lines []string }
 
 type listView struct {
-	Sorts  []sortLink
-	Rows   []rowView
-	AddURL string
+	Sorts      []sortLink
+	Rows       []rowView
+	AddURL     string
+	RefreshURL string
 }
 
 type sortLink struct {
@@ -388,7 +389,7 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 	if sel != "" {
 		base += "/" + sel
 	}
-	v := listView{AddURL: "/p/" + prefix + "/worktrees"}
+	v := listView{AddURL: "/p/" + prefix + "/worktrees", RefreshURL: "/p/" + prefix + "/prs/refresh"}
 	for _, by := range sortBys {
 		next := sortKey{By: by}
 		on := k.By == by

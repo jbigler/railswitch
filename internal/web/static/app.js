@@ -40,10 +40,19 @@ function swap(id, html) {
   t.innerHTML = html;
   const next = t.content.firstElementChild;
   if (!next) return;
-  const out = el.querySelector(".out");
-  const atEnd = out && out.scrollTop + out.clientHeight >= out.scrollHeight - 4;
+  // Each job's output stays where the reader left it; one at its end
+  // (or new) follows the new lines.
+  const scroll = {};
+  $$(".out", el).forEach((o) => {
+    const job = o.closest(".job");
+    if (job) scroll[job.id] = o.scrollTop + o.clientHeight >= o.scrollHeight - 4 ? null : o.scrollTop;
+  });
   el.replaceWith(next);
-  if (atEnd) $$(".out", next).forEach((o) => (o.scrollTop = o.scrollHeight));
+  $$(".out", next).forEach((o) => {
+    const job = o.closest(".job");
+    const top = job ? scroll[job.id] : null;
+    o.scrollTop = top == null ? o.scrollHeight : top;
+  });
   afterSwap(id);
 }
 

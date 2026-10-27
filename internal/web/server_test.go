@@ -169,7 +169,7 @@ func TestPages(t *testing.T) {
 		code int
 		want []string
 	}{
-		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>"}},
+		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`}},
 		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
 		{"/p/nope", 404, nil},
 		{"/p/ftest/nope", 404, nil},

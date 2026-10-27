@@ -193,7 +193,7 @@ func (s *Server) pollOverviews(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		s.applyOverview(j.prefix, ov, err, now)
+		s.applyOverview(j.prefix, ov, err)
 	}
 }
 
@@ -269,15 +269,15 @@ func (s *Server) loadProjects(ctx context.Context) error {
 }
 
 // applyOverview stores a project's overview, notifies of agents that
-// started waiting, and updates the pages.
-func (s *Server) applyOverview(prefix string, ov overview, err error, at time.Time) {
+// started waiting, and updates the pages. The poll time was set when the
+// read was scheduled, so a job ending during the read keeps it due.
+func (s *Server) applyOverview(prefix string, ov overview, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p := s.state[prefix]
 	if p == nil {
 		return
 	}
-	p.ovAt = at
 	if err != nil {
 		p.ovErr = err.Error()
 		s.publish()
@@ -339,7 +339,7 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		html, err := render("jobs", newJobs(snaps, sel))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
-			return
+			continue
 		}
 		sub.diff("job", "jobs", html, info)
 	}

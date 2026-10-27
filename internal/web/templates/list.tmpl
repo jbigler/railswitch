@@ -1,5 +1,5 @@
 {{define "list"}}<div id="list" class="list">
-<div class="tb">Sort <span class="seg">{{range .Sorts}}<a{{if .On}} class="on"{{end}} href="{{.URL}}" data-sort>{{.Label}}{{if .On}}{{if .Rev}} ↑{{else}} ↓{{end}}{{end}}</a>{{end}}</span><span class="sp"></span><button type="button" class="ln dim" data-open="newwt">+ New worktree</button></div>
+<div class="tb">Sort <span class="seg">{{range .Sorts}}<a{{if .On}} class="on"{{end}} href="{{.URL}}" data-sort>{{.Label}}{{if .On}}{{if .Rev}} ↑{{else}} ↓{{end}}{{end}}</a>{{end}}</span><span class="sp"></span><form method="post" action="{{.RefreshURL}}" data-post><button class="ln dim">Refresh PRs</button></form><button type="button" class="ln dim" data-open="newwt">+ New worktree</button></div>
 <table>
 <thead><tr><th>worktree</th><th>branch</th><th>PR</th><th>stack</th><th>agent</th></tr></thead>
 <tbody>

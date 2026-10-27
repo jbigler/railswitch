@@ -351,6 +351,7 @@ func (l *L) pullServiceImages(ctx context.Context, m *render.Model, in *render.I
 		}
 	}
 	for _, ref := range refs {
+		fmt.Fprintf(l.Out, "pulling %s\n", ref)
 		dg, err := l.podman().Pull(ctx, ref)
 		if err != nil {
 			return false, err
@@ -405,6 +406,7 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) (cha
 				return nil, wrote, err
 			}
 			if !ok {
+				fmt.Fprintf(l.Out, "pulling %s\n", ref)
 				if err := p.PullOnly(ctx, ref); err != nil {
 					return nil, wrote, err
 				}
@@ -413,6 +415,7 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) (cha
 		}
 		old := lock.BaseDigest(ref)
 		if old == "" || repull {
+			fmt.Fprintf(l.Out, "pulling %s\n", ref)
 			dg, err := p.Pull(ctx, ref)
 			if err != nil {
 				return nil, wrote, err
@@ -445,6 +448,7 @@ func (l *L) pinBases(ctx context.Context, in *render.Instance, repull bool) (cha
 			continue
 		}
 		pinned := repo(ref) + "@" + old
+		fmt.Fprintf(l.Out, "pulling %s\n", pinned)
 		if err := p.PullOnly(ctx, pinned); err != nil {
 			return nil, wrote, err
 		}
@@ -470,7 +474,7 @@ func (l *L) build(ctx context.Context, steps []render.BuildStep, force func(i in
 			}
 		}
 		fmt.Fprintf(l.Out, "building %s (%s)\n", s.Name, s.Tag)
-		if err := p.Build(ctx, podman.BuildArgs{File: s.File, Tag: s.Tag, Context: s.Context, Args: s.Args}); err != nil {
+		if err := p.Build(ctx, podman.BuildArgs{File: s.File, Tag: s.Tag, Context: s.Context, Args: s.Args, Progress: l.Out}); err != nil {
 			return fmt.Errorf("build %s: %w", s.Name, err)
 		}
 	}

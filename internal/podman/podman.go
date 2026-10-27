@@ -49,6 +49,10 @@ type BuildArgs struct {
 	Tag     string            // image tag (-t)
 	Context string            // build context dir
 	Args    map[string]string // --build-arg K=V, emitted sorted by key
+	// Progress, when set, receives the build's stdout and stderr as it
+	// runs, so a long build shows what it is doing; the stderr tail still
+	// ends up in the error.
+	Progress io.Writer
 }
 
 func (p Podman) run(ctx context.Context, timeout time.Duration, args ...string) (sys.Result, error) {
@@ -114,7 +118,7 @@ func (p Podman) Build(ctx context.Context, b BuildArgs) error {
 		args = append(args, "--build-arg", k+"="+b.Args[k])
 	}
 	args = append(args, b.Context)
-	_, err := p.run(ctx, BuildTimeout, args...)
+	_, err := p.R.Run(ctx, sys.Cmd{Name: "podman", Args: args, Timeout: BuildTimeout, Stdout: b.Progress, Stderr: b.Progress})
 	return err
 }
 

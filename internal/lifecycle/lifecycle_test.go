@@ -1288,3 +1288,31 @@ func TestUpDozzleStaleLabelRestarted(t *testing.T) {
 		t.Fatalf("restarted a current unit:\n%s", dump(e.calls()))
 	}
 }
+
+// TestUpShowsProgress: a build streams podman's own output as it runs, and
+// every pull is announced, so a long first `up` never sits silent.
+func TestUpShowsProgress(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "image", "exists")
+	e.missing("podman", "volume", "exists")
+	e.f.On([]string{"podman", "build"}, sys.Result{Stdout: []byte("STEP 1/9: FROM docker.io/library/ruby\n")}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	out := e.out.String()
+	for _, want := range []string{
+		"pulling docker.io/library/postgres:17\n",
+		"pulling " + ruby + "\n",
+		"building base (",
+		"STEP 1/9: FROM docker.io/library/ruby\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("up output lacks %q:\n%s", want, out)
+		}
+	}
+	for _, c := range e.f.Cmds {
+		if len(c.Args) > 0 && c.Args[0] == "build" && (c.Stdout == nil || c.Stderr == nil) {
+			t.Errorf("podman build output is captured, not streamed: %q", c.Args)
+		}
+	}
+}

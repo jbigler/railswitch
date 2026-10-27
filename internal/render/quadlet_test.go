@@ -222,6 +222,9 @@ func serverUnits(t *testing.T, server string) map[string][]byte {
 		t.Fatal(err)
 	}
 	ws := fixtureWS(t)
+	if err := pack.LoadLocalAgents(cat, ws); err != nil {
+		t.Fatal(err)
+	}
 	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
 	if err != nil {
 		t.Fatal(err)
@@ -453,7 +456,7 @@ func TestAppDependencies(t *testing.T) {
 	ws, units := renderUnits(t, fixtureDir, nil)
 	const rails = "filial-master-rails.container"
 	hasLine(t, units, rails, "Requires=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service")
-	hasLine(t, units, rails, "Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service")
+	hasLine(t, units, rails, "Wants=filial-master-browser.service filial-master-nvim.service filial-master-agent-probe.service railswitch-traefik.service railswitch-dozzle.service")
 	hasLine(t, units, rails, "UserNS=keep-id:uid=1000,gid=1000")
 	hasLine(t, units, rails, "User=1000:1000")
 	hasLine(t, units, rails, "PodmanArgs=--cpus=6")
@@ -544,14 +547,14 @@ func TestUnitHashLabel(t *testing.T) {
 // TestDepsExecFromInstall: the pack's [app] install is the deps service's
 // command, run through its entrypoint.
 func TestDepsExecFromInstall(t *testing.T) {
-	cat, err := pack.LoadBuiltins()
+	ws := testfixture.Workspace(t, fixtureDir)
+	cat, err := pack.LoadCatalog(ws)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range cat.Packs {
 		p.App.Install = "mix deps.get --only dev"
 	}
-	ws := testfixture.Workspace(t, fixtureDir)
 	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
 	if err != nil {
 		t.Fatal(err)
@@ -583,12 +586,12 @@ func TestShareAddHostWorker(t *testing.T) {
 }
 
 func TestUnroutedToolOptionOffProxy(t *testing.T) {
-	cat, err := pack.LoadBuiltins()
+	ws := testfixture.Workspace(t, fixtureDir)
+	cat, err := pack.LoadCatalog(ws)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cat.Options[pack.Ref{Name: "playwright", Version: 1}].Routes = nil
-	ws := testfixture.Workspace(t, fixtureDir)
 	units, err := Quadlet(mustBuild(t, catalogInputs(t, ws, cat, nil)))
 	if err != nil {
 		t.Fatalf("Quadlet: %v", err)

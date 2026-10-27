@@ -30,8 +30,9 @@ const dozzleUnit = machine.DozzleService
 
 // Quadlet renders the project's Quadlet files, keyed by filename: the proxy
 // network, and for every worktree its dev network and one .container per
-// service. Every value railswitch did not write itself as a literal key is
-// escaped for systemd (% → %%, $ → $$); nothing is left for systemd to expand.
+// service but an on-demand one. Every value railswitch did not write itself
+// as a literal key is escaped for systemd (% → %%, $ → $$); nothing is left
+// for systemd to expand.
 // Every .container is stamped with its <prefix>.unit-hash label (unithash).
 // Output that fails Lint is an error wrapping every Finding.
 func Quadlet(m *Model) (map[string][]byte, error) {
@@ -61,6 +62,9 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 		}
 		for i := range m.Services {
 			s := &m.Services[i]
+			if s.OnDemand {
+				continue
+			}
 			u, err := containerUnit(in, s, routes)
 			if err != nil {
 				return nil, fmt.Errorf("worktree %s: service %s: %w", wt.Slug, s.ID, err)
@@ -330,6 +334,8 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 		args = append(args, "--cpus="+strconv.Itoa(max(1, cpus*3/4)))
 	case RoleTool:
 		args = append(args, "--cpus="+strconv.Itoa(max(1, cpus/4)))
+	case RoleAgent:
+		args = append(args, "--cpus="+strconv.Itoa(max(1, cpus/2)))
 	}
 	if ux.TTY {
 		args = append(args, "--tty", "--interactive")

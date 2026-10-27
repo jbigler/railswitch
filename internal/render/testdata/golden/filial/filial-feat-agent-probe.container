@@ -1,0 +1,43 @@
+# railswitch: rendered from /WORKSPACES/filial/project.toml (prefix filial, worktree feat). Edit project.toml, not this file.
+# role: agent
+
+[Unit]
+Description=filial agent-probe of worktree feat
+
+[Container]
+Label=filial.unit-hash=40ef55cc0054
+Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-598e6e7b
+ContainerName=filial-feat-agent-probe
+Network=filial-feat-dev.network:alias=agent-probe
+Network=filial-proxy.network
+UserNS=keep-id:uid=1000,gid=1000
+User=1000:1000
+EnvironmentFile=/WORKSPACES/filial/.railswitch/env/feat/agent-probe.env
+AddHost=feat.filial.localhost:10.214.3.2
+AddHost=s3.feat.filial.localhost:10.214.3.2
+AddHost=s3-ui.feat.filial.localhost:10.214.3.2
+AddHost=vnc.feat.filial.localhost:10.214.3.2
+Volume=/WORKSPACES/filial/feat:/app:z
+Volume=/WORKSPACES/filial/feat:/WORKSPACES/filial/feat:z
+Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
+Volume=/WORKSPACES/filial/.railswitch/status/feat:/run/railswitch/status:rw,z
+Volume=filial-feat-agent-probe-home:/home/appuser:U
+Volume=filial-feat-node-modules:/app/node_modules:U
+Volume=filial_gems_ruby3.3.6:/usr/local/bundle
+Volume=filial_npm_cache:/home/appuser/.npm:U
+Secret=filial_probe_key,type=mount,target=/run/secrets/probe_key,uid=1000,gid=1000,mode=0400
+DropCapability=all
+NoNewPrivileges=true
+Memory=4g
+PidsLimit=4096
+GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
+Annotation=filial.firewall=agent-probe
+Annotation=filial.firewall.networks=filial-feat-dev,filial_proxy
+Annotation=filial.firewall.mode=log
+PodmanArgs=--cpus=4 --tty --interactive
+LogDriver=k8s-file
+LogOpt=max-size=20m
+
+[Service]
+Restart=on-failure
+RestartSec=5

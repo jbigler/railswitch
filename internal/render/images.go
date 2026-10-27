@@ -19,10 +19,10 @@ import (
 
 // BuildStep is one `podman build` of a worktree's images.
 type BuildStep struct {
-	Name    string            // "base", "addon pg-client", "nvim", "playwright"
+	Name    string            // "base", "addon pg-client", "nvim", "agent-base", "agent <pkg>", "playwright"
 	File    string            // absolute path, always under <ws>/containerfiles/
 	Context string            // always <ws>/containerfiles
-	Args    map[string]string // includes BASE_IMAGE for every chain/tool step after the first; never for a standalone step
+	Args    map[string]string // includes BASE_IMAGE for every chain/tool/agent step after the first; never for a standalone step
 	Tag     string            // D9
 	From    []string          // FROM refs of this file (ARGs expanded), excluding ${BASE_IMAGE}, scratch and stage names (D36)
 }
@@ -53,7 +53,8 @@ type fromLine struct {
 }
 
 // images reads and checks every Containerfile the stack builds: the base
-// chain, each enabled tool's and each chosen standalone option's.
+// chain, each enabled tool's, with agents agent-base and each agent
+// package's, and each chosen standalone option's.
 func (b *builder) images() error {
 	p, st := b.in.Project, b.in.Stack
 	var errs []error
@@ -78,6 +79,24 @@ func (b *builder) images() error {
 		if cf := read("containerfiles/" + t.Image.File); cf != nil {
 			errs = append(errs, cf.checkDerived())
 			b.m.tools[t.Service] = cf
+		}
+	}
+	if len(st.Agents) > 0 {
+		if cf := read("containerfiles/Containerfile.agent-base"); cf != nil {
+			errs = append(errs, cf.checkDerived())
+			b.m.agentBase = cf
+		}
+	}
+	seen := map[string]bool{}
+	for _, a := range st.Agents {
+		pkg := agentPkg(a.Agent)
+		if seen[pkg] {
+			continue
+		}
+		seen[pkg] = true
+		if cf := read("containerfiles/" + a.Agent.Image.File); cf != nil {
+			errs = append(errs, cf.checkDerived())
+			b.m.agents[pkg] = cf
 		}
 	}
 	for _, slot := range config.Slots {
@@ -331,6 +350,25 @@ func (m *Model) imageValues(in *Instance) error {
 			return err
 		}
 		in.Values["image."+t.Service] = tag
+	}
+
+	// The agent base on the chain's end, each agent package's image on it.
+	if cf := m.agentBase; cf != nil {
+		agentBase, err := step("agent-base", cf, map[string]string{"BASE_IMAGE": base}, true, "agent-base", ver)
+		if err != nil {
+			return err
+		}
+		in.Values["image.agent-base"] = agentBase
+		tags := map[string]string{} // agent package → its image
+		for _, a := range st.Agents {
+			pkg := agentPkg(a.Agent)
+			if tags[pkg] == "" {
+				if tags[pkg], err = step("agent "+pkg, m.agents[pkg], map[string]string{"BASE_IMAGE": agentBase}, true, "agent-"+pkg, ver); err != nil {
+					return err
+				}
+			}
+			in.Values["image."+a.Service] = tags[pkg]
+		}
 	}
 
 	for _, slot := range config.Slots {

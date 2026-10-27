@@ -348,7 +348,8 @@ func projectTOML(p *config.Project) []byte {
 
 // ejectNames are the defaults the stack builds, in eject order: base
 // first (it sets [image] base, which Validate requires), then each chosen
-// option's app addon, each enabled tool and each option's standalone build.
+// option's app addon, each enabled tool, agent-base and each distinct agent
+// package (when the stack has agents) and each option's standalone build.
 func ejectNames(st *pack.Stack) []string {
 	names := []string{"base"}
 	for _, slot := range config.Slots {
@@ -358,6 +359,14 @@ func ejectNames(st *pack.Stack) []string {
 	}
 	for _, t := range st.Tools {
 		names = append(names, cfName(t.Image.File))
+	}
+	if len(st.Agents) > 0 {
+		names = append(names, "agent-base")
+	}
+	for _, a := range st.Agents {
+		if n := cfName(a.Agent.Image.File); !slices.Contains(names, n) {
+			names = append(names, n)
+		}
 	}
 	for _, slot := range config.Slots {
 		if ch := st.Options[slot]; ch != nil && ch.Option.Image.Build != "" {

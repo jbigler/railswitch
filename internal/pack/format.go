@@ -211,14 +211,17 @@ type Option struct {
 
 	Gives   map[string]string `toml:"gives"`    // layer 2, to app, worker and tools; never to its own service
 	DepsEnv map[string]string `toml:"deps_env"` // to the deps service (D44): what its installs need
-	Env     map[string]string `toml:"env"`      // its own service's env
-	Share   OptionShare       `toml:"share"`    // layer 7 (D46): [share] gives, while shared
-	Volumes []Volume          `toml:"volumes"`
-	Mounts  []Mount           `toml:"mounts"`
-	Ports   []Port            `toml:"ports"`
-	Routes  []Route           `toml:"routes"`
-	Links   []Link            `toml:"links"`
-	Unit    Unit              `toml:"unit"`
+	// AgentGives goes to every agent only (C6), at layer option, with
+	// {service} the giver's, e.g. the browser's CDP endpoint (D59).
+	AgentGives map[string]string `toml:"agent_gives"`
+	Env        map[string]string `toml:"env"`   // its own service's env
+	Share      OptionShare       `toml:"share"` // layer 7 (D46): [share] gives, while shared
+	Volumes    []Volume          `toml:"volumes"`
+	Mounts     []Mount           `toml:"mounts"`
+	Ports      []Port            `toml:"ports"`
+	Routes     []Route           `toml:"routes"`
+	Links      []Link            `toml:"links"`
+	Unit       Unit              `toml:"unit"`
 
 	Files fs.FS `toml:"-"` // the option's directory
 }

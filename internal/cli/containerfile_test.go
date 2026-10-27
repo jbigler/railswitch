@@ -210,7 +210,7 @@ func TestEjectOptionAddon(t *testing.T) {
 
 	// A pack of another OS refuses the addon, naming both.
 	removeFile(t, file)
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(ws)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,10 @@ func TestEjectNoWorkspace(t *testing.T) {
 		t.Fatal("fixture has no [image]")
 	}
 	writeFile(t, filepath.Join(root, "project.toml"), data[:i+1])
-	cat, err := pack.LoadBuiltins()
+	if err := os.CopyFS(filepath.Join(root, "agents"), os.DirFS(filepath.Join(filialFixture, "agents"))); err != nil {
+		t.Fatal(err)
+	}
+	cat, err := pack.LoadCatalog(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,6 +297,44 @@ func TestEjectNoWorkspace(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "stack.lock")); !os.IsNotExist(err) {
 		t.Errorf("Eject wrote stack.lock (%v)", err)
+	}
+}
+
+// The agent images' Containerfiles are the stack's defaults too: agent-base
+// and each agent package's, built-in or the workspace's own.
+func TestStackBuiltinsAgents(t *testing.T) {
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "lock")
+	names := list(t, ws).names()
+	for _, want := range []string{"agent-base", "agent claude", "agent probe"} {
+		if !slices.Contains(names, want) {
+			t.Errorf("steps %q lack %q", names, want)
+		}
+	}
+	proj := readFile(t, filepath.Join(ws, "project.toml"))
+
+	file := filepath.Join(ws, "containerfiles", "Containerfile.agent-base")
+	removeFile(t, file)
+	mustRun(t, "-C", ws, "containerfile", "eject", "agent-base")
+	def, err := fs.ReadFile(builtinfs.FS, "agentbase/Containerfile.agent-base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := readFile(t, file), ejected("agent-base", "Containerfile.agent-base", def); got != want {
+		t.Fatalf("ejected agent-base:\n%s\nwant:\n%s", got, want)
+	}
+
+	file = filepath.Join(ws, "containerfiles", "Containerfile.probe")
+	removeFile(t, file)
+	mustRun(t, "-C", ws, "containerfile", "eject", "probe")
+	if got, want := readFile(t, file), ejected("local:probe@1", "Containerfile.probe", []byte(readFile(t, filepath.Join(filialFixture, "agents", "probe", "Containerfile.probe")))); got != want {
+		t.Fatalf("ejected probe:\n%s\nwant:\n%s", got, want)
+	}
+	if got := readFile(t, filepath.Join(ws, "project.toml")); got != proj {
+		t.Errorf("project.toml changed:\n%s", got)
+	}
+	if code, _, errs := runIn(t, "-C", ws, "containerfile", "new", "probe"); code != 2 {
+		t.Errorf("new probe: exit %d; want 2 (stderr %q)", code, errs)
 	}
 }
 
@@ -317,7 +358,7 @@ func TestNewAddon(t *testing.T) {
 	}
 	// list builds the model, which runs the Containerfile contract check on
 	// every chain step: it passes for the skeleton.
-	if n, want := list(t, ws).names(), []string{"base", "addon pg-client", "addon vips", "nvim", "playwright"}; !slices.Equal(n, want) {
+	if n, want := list(t, ws).names(), []string{"base", "addon pg-client", "addon vips", "nvim", "agent-base", "agent claude", "agent probe", "playwright"}; !slices.Equal(n, want) {
 		t.Fatalf("steps = %q; want %q", n, want)
 	}
 	out := mustRun(t, "-C", ws, "-w", "master", "containerfile", "list")
@@ -326,7 +367,7 @@ func TestNewAddon(t *testing.T) {
 	for sc.Scan() {
 		lines = append(lines, sc.Text())
 	}
-	if len(lines) != 5 || !strings.HasPrefix(lines[2], "addon vips") || !strings.Contains(lines[2], "containerfiles/Containerfile.vips") || !strings.Contains(lines[2], "localhost/filial/base:") {
+	if len(lines) != 8 || !strings.HasPrefix(lines[2], "addon vips") || !strings.Contains(lines[2], "containerfiles/Containerfile.vips") || !strings.Contains(lines[2], "localhost/filial/base:") {
 		t.Errorf("list text:\n%s", out)
 	}
 

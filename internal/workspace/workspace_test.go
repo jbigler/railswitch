@@ -16,8 +16,9 @@ import (
 
 const fixtureDir = "../../testdata/fixtures/filial"
 
-// projectRoot is a temp workspace holding only the fixture's project.toml and
-// its worktree dirs, with XDG dirs pointing into the temp dir.
+// projectRoot is a temp workspace holding only the fixture's project.toml,
+// its local agent packages (agents/) and its worktree dirs, with XDG dirs
+// pointing into the temp dir.
 func projectRoot(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
@@ -34,6 +35,9 @@ func projectRoot(t *testing.T) string {
 		}
 	}
 	if err := os.WriteFile(filepath.Join(root, "project.toml"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(filepath.Join(root, "agents"), os.DirFS(filepath.Join(fixtureDir, "agents"))); err != nil {
 		t.Fatal(err)
 	}
 	return root
@@ -195,33 +199,6 @@ func TestBranchOf(t *testing.T) {
 	}
 }
 
-// addProbeAgent gives root a local agent package probe@1 and a project
-// that uses it as agent "probe".
-func addProbeAgent(t *testing.T, root string) {
-	t.Helper()
-	dir := filepath.Join(root, "agents", "probe")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	files := map[string]string{
-		"agent.toml":          "name = \"probe\"\nversion = 1\n[image]\nfile = \"Containerfile.probe\"\n",
-		"Containerfile.probe": "FROM base\n",
-	}
-	for name, data := range files {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	f, err := os.OpenFile(filepath.Join(root, "project.toml"), os.O_APPEND|os.O_WRONLY, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	if _, err := f.WriteString("\n[agents.probe]\nuse = \"local:probe@1\"\n"); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestLockAgents(t *testing.T) {
 	builtin := &pack.Agent{Name: "a", Version: 1, Files: fstest.MapFS{"agent.toml": {Data: []byte("a")}}}
 	local := &pack.Agent{Name: "probe", Version: 1, Files: fstest.MapFS{"agent.toml": {Data: []byte("p")}}}
@@ -249,7 +226,6 @@ func TestLockAgents(t *testing.T) {
 	}
 
 	root := projectRoot(t)
-	addProbeAgent(t, root)
 	ctx := context.Background()
 	if err := Lock(ctx, root); err != nil {
 		t.Fatal(err)

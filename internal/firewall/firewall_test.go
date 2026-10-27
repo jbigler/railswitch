@@ -31,7 +31,7 @@ func filial(t *testing.T) (*pack.Stack, config.Firewall) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog("../../testdata/fixtures/filial")
 	if err != nil {
 		t.Fatal(err)
 	}

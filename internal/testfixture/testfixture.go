@@ -10,11 +10,19 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/pack/builtin"
 )
+
+type defaultFile struct {
+	files fs.FS
+	name  string
+}
 
 // Workspace copies the fixture dir to a temp workspace named after it and
 // writes the built-in default Containerfiles into its containerfiles/, as
-// railswitch project new ejects them, so the fixture can't drift from the built-ins.
+// railswitch project new ejects them, so the fixture can't drift from the
+// built-ins: the pack's, options', tools', agent-base and every agent
+// package's of its catalog (built-in and the fixture's own agents/).
 func Workspace(t testing.TB, dir string) string {
 	t.Helper()
 	ws := filepath.Join(t.TempDir(), filepath.Base(dir))
@@ -24,18 +32,23 @@ func Workspace(t testing.TB, dir string) string {
 	if err := os.Chmod(filepath.Join(ws, "db-dumps"), 0o700); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(ws)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defaults := []struct {
-		files fs.FS
-		name  string
-	}{
+	agentBase, err := fs.Sub(builtin.FS, "agentbase")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaults := []defaultFile{
 		{cat.Packs[pack.Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"},
 		{cat.Options[pack.Ref{Name: "postgres", Version: 1}].Files, "Containerfile.pg-client"},
 		{cat.Tools["nvim"].Files, "Containerfile.nvim"},
 		{cat.Options[pack.Ref{Name: "playwright", Version: 1}].Files, "Containerfile.playwright"},
+		{agentBase, "Containerfile.agent-base"},
+	}
+	for _, a := range cat.Agents {
+		defaults = append(defaults, defaultFile{a.Files, a.Image.File})
 	}
 	if err := os.Mkdir(filepath.Join(ws, "containerfiles"), 0o755); err != nil {
 		t.Fatal(err)

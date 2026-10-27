@@ -15,6 +15,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 )
@@ -643,5 +644,27 @@ func TestNewSetsPortsBeforeWorktree(t *testing.T) {
 	}
 	if pe, _ := reg.Project("shop"); pe.Ports["app"] != 13000 {
 		t.Errorf("shop ports = %v; want app 13000", pe.Ports)
+	}
+}
+
+// ejectNames puts agent-base and each distinct agent package's image after
+// the tools, and nothing for agents when the stack has none.
+func TestEjectNamesAgents(t *testing.T) {
+	p := loadProject(t, filialFixture)
+	cat, err := pack.LoadCatalog(filialFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Agents["other"] = config.Agent{Use: "claude@1"} // a second agent of one package
+	st, err := cat.Resolve(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := ejectNames(st), []string{"base", "pg-client", "nvim", "agent-base", "claude", "probe", "playwright"}; !slices.Equal(got, want) {
+		t.Errorf("ejectNames = %q; want %q", got, want)
+	}
+	st.Agents = nil
+	if got, want := ejectNames(st), []string{"base", "pg-client", "nvim", "playwright"}; !slices.Equal(got, want) {
+		t.Errorf("ejectNames without agents = %q; want %q", got, want)
 	}
 }

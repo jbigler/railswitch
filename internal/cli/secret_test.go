@@ -198,7 +198,7 @@ func TestSecretLsNoValues(t *testing.T) {
 	}
 	code, out, _ = runStdin(t, f, "", "-C", ws, "--json", "secret", "ls")
 	var rows []secretRow
-	if code != 0 || json.Unmarshal([]byte(out), &rows) != nil || len(rows) != 2 {
+	if code != 0 || json.Unmarshal([]byte(out), &rows) != nil || len(rows) != 3 {
 		t.Fatalf("--json: exit %d\n%s", code, out)
 	}
 	gh := rows[0]
@@ -206,8 +206,11 @@ func TestSecretLsNoValues(t *testing.T) {
 		gh.Delivery != "file" || gh.Set || gh.Created != nil || !slices.Equal(gh.Services, []string{"nvim"}) {
 		t.Errorf("github_token row = %+v", gh)
 	}
-	if rows[1].Delivery != "env TWILIO_AUTH_TOKEN" || !rows[1].Set || rows[1].Created == nil {
-		t.Errorf("twilio row = %+v", rows[1])
+	if p := rows[1]; p.Name != "probe_key" || !slices.Equal(p.Services, []string{"agent-probe"}) {
+		t.Errorf("probe_key row = %+v", p)
+	}
+	if rows[2].Delivery != "env TWILIO_AUTH_TOKEN" || !rows[2].Set || rows[2].Created == nil {
+		t.Errorf("twilio row = %+v", rows[2])
 	}
 }
 

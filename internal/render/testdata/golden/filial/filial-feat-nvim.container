@@ -5,7 +5,7 @@
 Description=filial nvim of worktree feat
 
 [Container]
-Label=filial.unit-hash=d669e62242ef
+Label=filial.unit-hash=86d316510aa6
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-96f4c4f3
 ContainerName=filial-feat-nvim
 Network=filial-feat-dev.network:alias=nvim
@@ -19,6 +19,7 @@ AddHost=s3-ui.feat.filial.localhost:10.214.3.2
 AddHost=vnc.feat.filial.localhost:10.214.3.2
 PublishPort=127.0.0.1:17002:7777
 Volume=/WORKSPACES/filial/feat:/app:z
+Volume=/WORKSPACES/filial/feat:/WORKSPACES/filial/feat:z
 Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
 Volume=/WORKSPACES/filial/.railswitch/home/feat:/home/appuser:z
 Volume=/WORKSPACES/filial/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh:/usr/local/bin/entrypoint-nvim.sh:ro,z

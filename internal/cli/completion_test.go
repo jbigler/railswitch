@@ -220,7 +220,7 @@ func TestCompleteEqualsSplit(t *testing.T) {
 	if got, want := complete(t, "-w", "="), []string{"feat", "master"}; !slices.Equal(got, want) {
 		t.Errorf("-w=: %q; want %q", got, want)
 	}
-	if got, want := complete(t, "-w", "=", "feat", "logs", ""), []string{"browser", "cache", "db", "deps", "nvim", "rails", "storage"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "-w", "=", "feat", "logs", ""), []string{"agent-claude", "agent-probe", "browser", "cache", "db", "deps", "nvim", "rails", "storage"}; !slices.Equal(got, want) {
 		t.Errorf("-w=feat logs: %q; want %q", got, want)
 	}
 	t.Chdir(t.TempDir())
@@ -239,7 +239,7 @@ func TestCompleteWorkspaceNames(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
 	svcs := complete(t, "logs", "")
-	if want := []string{"browser", "cache", "db", "deps", "nvim", "rails", "storage"}; !slices.Equal(svcs, want) {
+	if want := []string{"agent-claude", "agent-probe", "browser", "cache", "db", "deps", "nvim", "rails", "storage"}; !slices.Equal(svcs, want) {
 		t.Errorf("logs: %q; want %q", svcs, want)
 	}
 	if got := complete(t, "fw", "allow", ""); !slices.Equal(got, svcs) {
@@ -252,7 +252,7 @@ func TestCompleteWorkspaceNames(t *testing.T) {
 	if !slices.Contains(cfs, "base") {
 		t.Errorf("containerfile eject: %q; want base among them", cfs)
 	}
-	if got, want := complete(t, "secret", "rm", ""), []string{"github_token", "twilio_auth_token"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "secret", "rm", ""), []string{"github_token", "probe_key", "twilio_auth_token"}; !slices.Equal(got, want) {
 		t.Errorf("secret rm: %q; want %q", got, want)
 	}
 	if got, want := complete(t, "project", "rm", ""), []string{"filial"}; !slices.Equal(got, want) {

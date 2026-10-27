@@ -424,6 +424,7 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 	l.file(file, "entrypoint", dir, o.Entrypoint)
 	l.env(file, "gives", o.Gives)
 	l.env(file, "deps_env", o.DepsEnv)
+	l.env(file, "agent_gives", o.AgentGives)
 	l.env(file, "env", o.Env)
 	l.env(file, "share.gives", o.Share.Gives)
 	l.volumes(file, "volumes", o.Volumes, true)

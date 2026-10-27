@@ -45,8 +45,18 @@ env      = "TWILIO_AUTH_TOKEN"
 [secrets.github_token]
 services = ["nvim"]
 
+[secrets.probe_key]
+services = ["agent-probe"]
+
 [tools]
 nvim = true
+
+[agents.claude]
+use = "claude@1"
+
+[agents.probe]                             # test-only workspace package: agents/probe/
+use = "local:probe@1"
+run = "service"
 
 [firewall]
 allow.deps = ["github.com"]

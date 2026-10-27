@@ -4,11 +4,11 @@
 [Unit]
 Description=filial rails of worktree master
 Requires=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service
-Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service
-After=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service
+Wants=filial-master-browser.service filial-master-nvim.service filial-master-agent-probe.service railswitch-traefik.service railswitch-dozzle.service
+After=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service filial-master-browser.service filial-master-nvim.service filial-master-agent-probe.service railswitch-traefik.service railswitch-dozzle.service
 
 [Container]
-Label=filial.unit-hash=55384f38dd17
+Label=filial.unit-hash=148ba4b40772
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-53f4a85e
 ContainerName=filial-master-rails
 Network=filial-master-dev.network:alias=rails

@@ -19,6 +19,7 @@ import (
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
+	builtinfs "github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -36,11 +37,16 @@ const (
 	kindAddon                         // an option's app addon: [image] addons
 	kindTool                          // a tool's image, found by filename
 	kindStandalone                    // an option's standalone build (D31), found by filename
+	kindAgentBase                     // the agent base image, found by filename
+	kindAgent                         // an agent package's image, found by filename
 )
+
+// agentBaseFile is the agent base image's built-in Containerfile in builtinfs.FS.
+const agentBaseFile = "agentbase/Containerfile.agent-base"
 
 // builtin is a built-in default Containerfile.
 type builtin struct {
-	ref   string // its package: "rails@1", "postgres@1", or a tool's name
+	ref   string // its package: "rails@1", "postgres@1", "local:probe@1", a tool's name or "agent-base"
 	files fs.FS  // its package directory
 	file  string // its name there, e.g. "Containerfile.pg-client"
 	kind  defaultKind
@@ -54,8 +60,9 @@ func cfName(file string) string { return strings.TrimPrefix(file, "Containerfile
 func workspaceFile(name string) string { return "containerfiles/Containerfile." + name }
 
 // stackBuiltins returns the defaults the stack st uses, by name: "base"
-// (the pack's), each chosen option's addon and standalone build, and each
-// enabled tool's.
+// (the pack's), each chosen option's addon and standalone build, each
+// enabled tool's and, when it has agents, "agent-base" and each agent
+// package's (built-in or workspace-local).
 func stackBuiltins(st *pack.Stack) map[string]builtin {
 	pk := st.Pack
 	out := map[string]builtin{"base": {ref: pack.Ref{Name: pk.Name, Version: pk.Version}.String(), files: pk.Files, file: pk.Image.File, kind: kindBase}}
@@ -76,11 +83,18 @@ func stackBuiltins(st *pack.Stack) map[string]builtin {
 	for _, t := range st.Tools {
 		out[cfName(t.Image.File)] = builtin{ref: t.Name, files: t.Files, file: t.Image.File, kind: kindTool}
 	}
+	if len(st.Agents) > 0 {
+		out["agent-base"] = builtin{ref: "agent-base", files: builtinfs.FS, file: agentBaseFile, kind: kindAgentBase}
+	}
+	for _, a := range st.Agents {
+		out[cfName(a.Agent.Image.File)] = builtin{ref: a.Ref.String(), files: a.Agent.Files, file: a.Agent.Image.File, kind: kindAgent}
+	}
 	return out
 }
 
 // builtinNames is every name a built-in default has in any stack of cat,
-// and the agent images' defaults: agent-base and each agent package's.
+// and the agent images' defaults: agent-base and each agent package's,
+// built-in or workspace-local.
 func builtinNames(cat *pack.Catalog) map[string]bool {
 	names := map[string]bool{"base": true, "agent-base": true}
 	for _, o := range cat.Options {
@@ -94,10 +108,8 @@ func builtinNames(cat *pack.Catalog) map[string]bool {
 	for _, t := range cat.Tools {
 		names[cfName(t.Image.File)] = true
 	}
-	for r, a := range cat.Agents {
-		if !r.Local {
-			names[cfName(a.Image.File)] = true
-		}
+	for _, a := range cat.Agents {
+		names[cfName(a.Image.File)] = true
 	}
 	return names
 }
@@ -118,8 +130,8 @@ func lookup(cat *pack.Catalog, st *pack.Stack, name string) (builtin, error) {
 // Eject writes the default Containerfile name of the stack st to
 // <root>/containerfiles/Containerfile.<name>, under a header naming its
 // package and sha256, and for base sets [image] base, for an option addon
-// appends it to [image] addons (tools and standalone builds are found by
-// filename). An existing file is refused unless force. It needs no
+// appends it to [image] addons (tools, standalone builds and the agent images
+// are found by filename). An existing file is refused unless force. It needs no
 // stack.lock: railswitch project new ejects before it locks.
 func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error {
 	b, err := lookup(cat, st, name)

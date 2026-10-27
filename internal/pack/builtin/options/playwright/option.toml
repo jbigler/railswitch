@@ -18,6 +18,9 @@ PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"   # npm installs via `railswitch exec`: t
 [deps_env]                    # D44: npm installs in deps skip the browser download too
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
 
+[agent_gives]                 # D59: agents drive the browser over the Chrome DevTools Protocol
+BROWSER_CDP_URL = "http://{service}:9223"
+
 [env]
 CHROME_START_URL = "http://{worktree.host}"
 

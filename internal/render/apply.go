@@ -23,6 +23,10 @@ type Plan struct {
 	// workspace-relative slash paths. Apply creates a missing one 0700 and
 	// never removes one: they hold user data.
 	Homes []string
+	// StatusDirs are the per-worktree agent status dirs (D58), when the
+	// project has an agent: workspace-relative slash paths, created and kept
+	// like Homes.
+	StatusDirs []string
 }
 
 // File is one workspace file of a Plan.
@@ -42,6 +46,9 @@ const (
 	unitMode = fs.FileMode(0o644)
 	envDir   = ".railswitch/env"  // D10: <envDir>/<slug>/<svc>.env, 0600 in 0700 dirs
 	homeDir  = ".railswitch/home" // D30: <homeDir>/<slug>, a tool's per-worktree home, 0700
+	// statusDir holds <statusDir>/<slug>, a worktree's agent status files
+	// (D58), 0700, bind-mounted into its agents.
+	statusDir = ".railswitch/status"
 	// homeSource is the mount source of a per-worktree home.
 	homeSource = "{worktree.home}"
 )
@@ -54,10 +61,11 @@ func (m *Model) Plan() (*Plan, error) {
 		return nil, err
 	}
 	files := map[string]File{}
-	var homes []string
+	var homes, status []string
 	mountsHome := slices.ContainsFunc(m.Services, func(s Service) bool {
 		return slices.ContainsFunc(s.Mounts, func(mt Mount) bool { return mt.Source == homeSource })
 	})
+	hasAgents := len(m.Agents()) > 0
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)
 		if err != nil {
@@ -69,11 +77,14 @@ func (m *Model) Plan() (*Plan, error) {
 		if mountsHome {
 			homes = append(homes, path.Join(homeDir, wt.Slug))
 		}
+		if hasAgents {
+			status = append(status, path.Join(statusDir, wt.Slug))
+		}
 	}
 	for _, a := range m.Assets {
 		files[a.Rel] = File{Data: a.Data, Mode: a.Mode}
 	}
-	return &Plan{Units: units, Files: files, Homes: homes}, nil
+	return &Plan{Units: units, Files: files, Homes: homes, StatusDirs: status}, nil
 }
 
 // EnvFile is a podman env file: NAME=value per line, the value verbatim
@@ -96,11 +107,11 @@ type target struct {
 	mode       fs.FileMode
 }
 
-// Apply makes the disk match p: p.Files under ws, each missing p.Homes dir
-// (0700; an existing one is left as it is and none is ever removed), p.Units
-// in quadletDir, then it removes every unit in quadletDir whose marker names
-// prefix but which p does not render (D28), and every env dir or env file p
-// does not render.
+// Apply makes the disk match p: p.Files under ws, each missing p.Homes and
+// p.StatusDirs dir (0700; an existing one is left as it is and none is ever
+// removed), p.Units in quadletDir, then it removes every unit in quadletDir
+// whose marker names prefix but which p does not render (D28), and every env
+// dir or env file p does not render.
 // Unchanged files are left alone. Each file is replaced atomically, so a
 // failure leaves every file old or new, never half-written, and running again
 // finishes the job. With check, nothing is written: the Diff says what would
@@ -149,18 +160,18 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 	if err != nil {
 		return nil, err
 	}
-	var homes []string // the ones to create
-	for _, rel := range p.Homes {
+	var dirs []string // the private dirs to create
+	for _, rel := range slices.Concat(p.Homes, p.StatusDirs) {
 		fi, err := os.Stat(filepath.Join(ws, filepath.FromSlash(rel)))
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
-			homes = append(homes, rel)
+			dirs = append(dirs, rel)
 			d.Added = append(d.Added, rel)
 			text.WriteString("--- /dev/null\n+++ b/" + rel + "/\n(new directory, mode 0700)\n")
 		case err != nil:
 			return nil, err
 		case !fi.IsDir():
-			return nil, fmt.Errorf("%s: not a directory (the per-worktree home a unit mounts)", filepath.Join(ws, filepath.FromSlash(rel)))
+			return nil, fmt.Errorf("%s: not a directory (a per-worktree dir a unit mounts)", filepath.Join(ws, filepath.FromSlash(rel)))
 		}
 	}
 	for _, o := range slices.Concat(units, envs) {
@@ -188,7 +199,7 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 			}
 		}
 	}
-	for _, rel := range homes {
+	for _, rel := range dirs {
 		dir := filepath.Join(ws, filepath.FromSlash(rel))
 		if err := ensureDir(filepath.Dir(dir), false); err != nil {
 			return nil, err

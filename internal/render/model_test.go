@@ -36,11 +36,12 @@ func writeFile(t *testing.T, path, data string) {
 }
 
 // fixtureInputs loads the workspace's project.toml, applies mutate (may be
-// nil), and resolves it against the built-ins, with worktrees master (ID 1)
-// and feat (ID 2), each when the workspace has its directory.
+// nil), and resolves it against the workspace's catalog (the built-ins plus
+// its agents/), with worktrees master (ID 1) and feat (ID 2), each when the
+// workspace has its directory.
 func fixtureInputs(t *testing.T, ws string, mutate func(*config.Project)) Inputs {
 	t.Helper()
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(ws)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +159,7 @@ func TestFixedServiceIDs(t *testing.T) {
 	for _, s := range m.Services {
 		ids = append(ids, s.ID)
 	}
-	want := []string{"rails", "deps", "db", "cache", "storage", "browser", "nvim"}
+	want := []string{"rails", "deps", "db", "cache", "storage", "browser", "nvim", "agent-claude", "agent-probe"}
 	if !slices.Equal(ids, want) {
 		t.Errorf("services = %v; want %v", ids, want)
 	}
@@ -591,7 +592,7 @@ func TestBrowserGetsNoCredentials(t *testing.T) {
 
 func TestAssets(t *testing.T) {
 	m, _ := filial(t, nil)
-	cat, err := pack.LoadBuiltins()
+	cat, err := pack.LoadCatalog(fixtureDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -666,7 +667,7 @@ func TestNamesFor(t *testing.T) {
 	if !slices.Contains(n.Containers, "filial-feat-db") {
 		t.Errorf("Containers %v lacks filial-feat-db", n.Containers)
 	}
-	wantVols := []string{"filial-feat-db-data-pg17", "filial-feat-node-modules", "filial-feat-rustfs-data"}
+	wantVols := []string{"filial-feat-agent-claude-home", "filial-feat-agent-probe-home", "filial-feat-db-data-pg17", "filial-feat-node-modules", "filial-feat-rustfs-data"}
 	if !slices.Equal(n.Volumes, wantVols) {
 		t.Errorf("Volumes = %v; want %v", n.Volumes, wantVols)
 	}
@@ -717,7 +718,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 	if rails.Command != "bin/dev" || rails.Image.Kind != ImageBase || deps.Image.Kind != ImageBase {
 		t.Errorf("rails command %q, images %v %v", rails.Command, rails.Image.Kind, deps.Image.Kind)
 	}
-	if !slices.Equal(rails.Requires, []string{"deps", "db", "cache", "storage"}) || !slices.Equal(rails.Wants, []string{"browser", "nvim"}) {
+	if !slices.Equal(rails.Requires, []string{"deps", "db", "cache", "storage"}) || !slices.Equal(rails.Wants, []string{"browser", "nvim", "agent-probe"}) {
 		t.Errorf("rails Requires %v Wants %v", rails.Requires, rails.Wants)
 	}
 	if !slices.Equal(rails.Networks, []string{"dev", "proxy"}) || !slices.Equal(db.Networks, []string{"dev"}) ||

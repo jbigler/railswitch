@@ -73,22 +73,26 @@ func optionSource(o *pack.Option) string {
 
 // envSpecs fills each service's EnvSpec, lowest layer first (HANDOFF §3.7;
 // D10, D11 decide who gets what):
-//   - pack [env]: app, worker, deps and tool packages (nvim); deps also gets
-//     [deps] frozen_env;
-//   - options' [gives]: app, worker and tool packages, never the giver itself
-//     and never a role-tool option (the browser): least privilege, it needs
-//     no data-service credentials;
+//   - pack [env]: app, worker, deps, tool packages (nvim) and agents; deps
+//     also gets [deps] frozen_env;
+//   - options' [gives]: app, worker, tool packages and agents, never the
+//     giver itself and never a role-tool option (the browser): least
+//     privilege, it needs no data-service credentials;
 //   - options' [deps_env]: deps (D44);
-//   - an option's or tool's own [env]: its own service;
+//   - options' [agent_gives]: every agent (C6), e.g. BROWSER_CDP_URL (D59);
+//   - an option's, tool's or agent package's own [env]: its own service;
 //   - project [env]: every service but deps;
+//   - [agents.<n>] env: that agent, at layer project, over project [env];
 //   - [services.<id>.env]: that service;
-//   - worktree: WORKTREE_ID/SLUG/HOST to app, worker and every tool service
-//     (tool options included: the browser's entrypoint needs WORKTREE_HOST),
-//     plus every service's own published ports (deps publishes none);
+//   - worktree: WORKTREE_ID/SLUG/HOST to app, worker, every tool service
+//     (tool options included: the browser's entrypoint needs WORKTREE_HOST)
+//     and every agent, plus every service's own published ports (deps
+//     publishes none); an agent also gets RAILSWITCH_AGENT and
+//     RAILSWITCH_STATUS_FILE (D58);
 //   - secret: git wiring for the services of a secret with git_host.
 //
 // Layer 7 goes to ShareEnv, never EnvSpec: the pack's [share] env and the
-// options' [share] gives reach app, worker and tool packages, project
+// options' [share] gives reach app, worker, tool packages and agents, project
 // [share] env every service but deps (D46). deps gets no layer 7 (D11), so
 // sharing never changes its env or restarts it.
 func (b *builder) envSpecs() {
@@ -107,7 +111,8 @@ func (b *builder) envSpecs() {
 				s.ShareEnv = append(s.ShareEnv, EnvVar{Name: k, Value: vars[k], Layer: LayerShare, Source: src, svc: svc, scheme: scheme})
 			}
 		}
-		consumer := s.Role == RoleApp || s.Role == RoleWorker || b.tools[s.ID] != nil
+		agent := b.agents[s.ID]
+		consumer := s.Role == RoleApp || s.Role == RoleWorker || b.tools[s.ID] != nil || agent != nil
 		worktreeEnv := consumer || s.Role == RoleTool
 
 		if consumer || s.Role == RoleDeps {
@@ -138,13 +143,30 @@ func (b *builder) envSpecs() {
 		if t := b.tools[s.ID]; t != nil {
 			add(LayerOption, "tool "+t.Name+" [env]", s.ID, s.scheme, t.Env)
 		}
+		if agent != nil {
+			for _, slot := range config.Slots {
+				if ch := st.Options[slot]; ch != nil {
+					add(LayerOption, optionSource(ch.Option)+" [agent_gives]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.AgentGives)
+				}
+			}
+			add(LayerOption, "agent "+agent.Ref.String()+" [env]", s.ID, s.scheme, agent.Agent.Env)
+		}
 		if s.Role != RoleDeps {
 			add(LayerProject, "project.toml [env]", s.ID, s.scheme, p.Env)
+		}
+		if agent != nil {
+			add(LayerProject, "project.toml [agents."+agent.Name+"] env", s.ID, s.scheme, agent.Env)
 		}
 		add(LayerService, "project.toml [services."+s.ID+".env]", s.ID, s.scheme, p.Services[s.ID].Env)
 		if worktreeEnv {
 			add(LayerWorktree, "worktree", s.ID, s.scheme, map[string]string{
 				"WORKTREE_ID": "{worktree.id}", "WORKTREE_SLUG": "{worktree.slug}", "WORKTREE_HOST": "{worktree.host}",
+			})
+		}
+		if agent != nil {
+			add(LayerWorktree, "agent "+agent.Name, s.ID, s.scheme, map[string]string{
+				"RAILSWITCH_AGENT":       agent.Name,
+				"RAILSWITCH_STATUS_FILE": statusMount + "/" + agent.Name + ".json",
 			})
 		}
 		if s.Role != RoleDeps {

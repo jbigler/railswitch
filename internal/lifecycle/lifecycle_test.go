@@ -213,6 +213,9 @@ func TestUpOrder(t *testing.T) {
 		"podman image exists localhost/filial/base:", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.base",
 		"podman image exists localhost/filial/base:", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.pg-client",
 		"podman image exists localhost/filial/nvim:", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.nvim",
+		"podman image exists localhost/filial/agent-base:", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.agent-base",
+		"podman image exists localhost/filial/agent-claude:", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.claude",
+		"podman image exists localhost/filial/agent-probe:", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.probe",
 		"podman image exists localhost/filial/playwright:1.54.0-", "podman build --pull=never -f "+ws+"/containerfiles/Containerfile.playwright -t localhost/filial/playwright:1.54.0-",
 		"podman volume exists filial-feat-rustfs-data", "podman volume create filial-feat-rustfs-data",
 		"podman volume import filial-feat-rustfs-data "+ws+"/db-dumps/rustfs_data.tar.gz",
@@ -224,7 +227,7 @@ func TestUpOrder(t *testing.T) {
 		t.Errorf("restarted:\n%s", dump(calls))
 	}
 	b := builds(calls)
-	if len(b) != 4 {
+	if len(b) != 7 {
 		t.Fatalf("builds:\n%s", dump(b))
 	}
 	baseTag := argAfter(b[0], "-t")
@@ -237,8 +240,8 @@ func TestUpOrder(t *testing.T) {
 	if !slices.Contains(b[2], "BASE_IMAGE="+argAfter(b[1], "-t")) {
 		t.Errorf("nvim argv lacks the pg-client tag as BASE_IMAGE: %q", b[2])
 	}
-	if !slices.Contains(b[3], "PLAYWRIGHT_VERSION=1.54.0") || strings.Contains(joined(b[3]), "BASE_IMAGE") {
-		t.Errorf("playwright argv: %q", b[3])
+	if pw := b[len(b)-1]; !slices.Contains(pw, "PLAYWRIGHT_VERSION=1.54.0") || strings.Contains(joined(pw), "BASE_IMAGE") {
+		t.Errorf("playwright argv: %q", pw)
 	}
 	if last := calls[len(calls)-1]; joined(last) != "systemctl --user start filial-feat-rails.service" {
 		t.Errorf("last call %q", last)
@@ -351,7 +354,7 @@ func TestUpBuildFailsNoStart(t *testing.T) {
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
-	if n := len(builds(e.calls())); n != 4 {
+	if n := len(builds(e.calls())); n != 7 {
 		t.Fatalf("re-run builds = %d", n)
 	}
 	find(t, e.calls(), "systemctl --user start filial-feat-rails.service")
@@ -373,7 +376,7 @@ func TestBuildPull(t *testing.T) {
 	if strings.Contains(e.out.String(), node+":") {
 		t.Errorf("unchanged ref reported: %q", e.out.String())
 	}
-	if b := builds(e.calls()); len(b) != 4 {
+	if b := builds(e.calls()); len(b) != 7 {
 		t.Fatalf("builds (image exists for all):\n%s", dump(b))
 	}
 	l, err := config.ReadLock(filepath.Join(e.ws, "stack.lock"))
@@ -394,7 +397,7 @@ func TestBuildPull(t *testing.T) {
 	if err := e.l.Build(ctx, "feat", true, false); err != nil {
 		t.Fatal(err)
 	}
-	if b := builds(e.calls()); len(b) != 4 {
+	if b := builds(e.calls()); len(b) != 7 {
 		t.Fatalf("force:\n%s", dump(b))
 	}
 }
@@ -580,7 +583,7 @@ func TestDownDefaultsNo(t *testing.T) {
 	if err := e.l.Down(ctx, "feat", false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(e.out.String(), "Delete 3 volumes of feat? [y/N]") {
+	if !strings.Contains(e.out.String(), "Delete 5 volumes of feat? [y/N]") {
 		t.Errorf("prompt %q", e.out.String())
 	}
 	if r := removals(e.calls()); len(r) != 0 {

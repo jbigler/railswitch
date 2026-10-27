@@ -28,6 +28,7 @@ const (
 	RoleWorker = "worker"
 	RoleData   = "data"
 	RoleTool   = "tool"
+	RoleAgent  = "agent" // an agent package's container (D54)
 )
 
 // Worktree is one registered worktree: <workspace>/<slug>/ (D22). Share is
@@ -66,7 +67,7 @@ type Inputs struct {
 // host values) is stored with "{" escaped as "{{".
 type Model struct {
 	Prefix   string
-	Services []Service // ordered: app, deps, worker, data (slot order), tools
+	Services []Service // ordered: app, deps, worker, data (slot order), tools, agents (Stack.Agents order)
 	Inputs   Inputs
 	Warnings []string // non-fatal findings, e.g. a suggested option addon missing from [image] addons
 	Assets   []Asset  // every package asset a service mounts; Task 11's Plan writes them
@@ -75,6 +76,8 @@ type Model struct {
 	chain      []*containerfile          // [image] base, then each addon
 	tools      map[string]*containerfile // tool service id → containerfiles/Containerfile.<tool>
 	standalone map[string]*containerfile // option service id → its standalone Containerfile
+	agentBase  *containerfile            // containerfiles/Containerfile.agent-base; nil without agents
+	agents     map[string]*containerfile // agent package (agentPkg) → containerfiles/Containerfile.<pkg>
 }
 
 // Asset is a package file written into the workspace and bind-mounted.
@@ -100,10 +103,17 @@ type Service struct {
 	Requires   []string // service ids
 	Wants      []string
 	Firewall   []string // profiles; ["self"] = no hook
-	Oneshot    bool
+	// FirewallMode is the firewall hook's mode for s: "" = the project's
+	// [firewall] mode; an agent's is always "enforce" (D55).
+	FirewallMode string
+	Oneshot      bool
+	// OnDemand: the service has no Quadlet unit and no app wants it; it runs
+	// as a transient container (an on-demand agent).
+	OnDemand bool
 	// Worktree: the service mounts the worktree, so it runs as uid 1000 with
 	// keep-id.
 	Worktree bool
+	Workdir  string // "/app" for a worktree service: a transient run's -w
 	Unit     UnitExtras
 	EnvSpec  []EnvVar // unexpanded templates with layer provenance, lowest layer first
 	// ShareEnv is env layer 7 (D46), applied over EnvSpec only in a shared
@@ -121,6 +131,7 @@ const (
 	ImageBase                            // the worktree's base image (D31)
 	ImageBuild                           // a tool's image, built on the base (D31)
 	ImageStandalone                      // an option's own build, not on the chain (playwright)
+	ImageAgent                           // an agent package's image, built on the agent base image
 )
 
 // ImageSpec is a service's image. Its concrete ref per worktree is
@@ -128,7 +139,7 @@ const (
 type ImageSpec struct {
 	Kind ImageKind
 	Ref  string            // ImagePull: registry ref template
-	File string            // ImageBuild, ImageStandalone: absolute path under <ws>/containerfiles/
+	File string            // ImageBuild, ImageStandalone, ImageAgent: absolute path under <ws>/containerfiles/
 	Tag  string            // ImageStandalone: tag version part template
 	Args map[string]string // ImageStandalone: build arg templates
 }
@@ -172,7 +183,7 @@ var roleLimits = map[string]struct {
 	memory string
 	pids   int
 }{
-	RoleApp: {"4g", 4096}, RoleWorker: {"2g", 4096}, RoleDeps: {"4g", 4096}, RoleData: {"2g", 1024}, RoleTool: {"2g", 4096},
+	RoleApp: {"4g", 4096}, RoleWorker: {"2g", 4096}, RoleDeps: {"4g", 4096}, RoleData: {"2g", 1024}, RoleTool: {"2g", 4096}, RoleAgent: {"4g", 4096},
 }
 
 var slotRoles = map[string]string{
@@ -195,10 +206,11 @@ func Build(in Inputs) (*Model, error) {
 	}
 	b := &builder{
 		in:     in,
-		m:      &Model{Prefix: p.Project.Prefix, Inputs: in, baseDir: filepath.Join(in.Workspace, base), tools: map[string]*containerfile{}, standalone: map[string]*containerfile{}},
+		m:      &Model{Prefix: p.Project.Prefix, Inputs: in, baseDir: filepath.Join(in.Workspace, base), tools: map[string]*containerfile{}, standalone: map[string]*containerfile{}, agents: map[string]*containerfile{}},
 		assets: map[string]bool{},
 		opts:   map[string]*pack.Option{},
 		tools:  map[string]*pack.Tool{},
+		agents: map[string]*pack.ChosenAgent{},
 	}
 	if err := b.services(); err != nil {
 		return nil, err
@@ -220,9 +232,10 @@ func Build(in Inputs) (*Model, error) {
 type builder struct {
 	in     Inputs
 	m      *Model
-	assets map[string]bool         // Rel of each listed asset
-	opts   map[string]*pack.Option // option service id → its option
-	tools  map[string]*pack.Tool   // tool service id → its tool
+	assets map[string]bool              // Rel of each listed asset
+	opts   map[string]*pack.Option      // option service id → its option
+	tools  map[string]*pack.Tool        // tool service id → its tool
+	agents map[string]*pack.ChosenAgent // agent service id → its agent
 }
 
 func (b *builder) ws(rel ...string) string {
@@ -286,6 +299,13 @@ func (b *builder) services() error {
 		b.tools[s.ID] = t
 		tools = append(tools, s)
 	}
+	var agents []Service
+	for _, a := range st.Agents {
+		s, err := b.agentService(a)
+		errs = append(errs, err)
+		b.agents[s.ID] = a
+		agents = append(agents, s)
+	}
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
@@ -299,19 +319,28 @@ func (b *builder) services() error {
 	for _, s := range tools {
 		app.Wants = append(app.Wants, s.ID)
 	}
+	for _, s := range agents {
+		if !s.OnDemand {
+			app.Wants = append(app.Wants, s.ID)
+		}
+	}
 	for i := range workers {
 		workers[i].Requires = slices.Clone(app.Requires)
 	}
 
-	b.m.Services = slices.Concat([]Service{app, deps}, workers, data, tools)
+	b.m.Services = slices.Concat([]Service{app, deps}, workers, data, tools, agents)
 	for i := range b.m.Services {
 		s := &b.m.Services[i]
 		s.Networks = []string{"dev"}
-		// D49: app, workers and tool packages reach Traefik-routed hosts
-		// (S3) through the proxy network; routed services sit there for Traefik.
+		// D49: app, workers, tool packages and agents (C6) reach
+		// Traefik-routed hosts (S3) through the proxy network; routed
+		// services sit there for Traefik.
 		switch {
-		case s.Role == RoleApp, s.Role == RoleWorker, b.tools[s.ID] != nil, len(s.Routes) > 0:
+		case s.Role == RoleApp, s.Role == RoleWorker, s.Role == RoleAgent, b.tools[s.ID] != nil, len(s.Routes) > 0:
 			s.Networks = append(s.Networks, "proxy")
+		}
+		if s.Worktree {
+			s.Workdir = "/app"
 		}
 	}
 	return nil
@@ -319,11 +348,16 @@ func (b *builder) services() error {
 
 // worktreeMounts are the app's view of the worktree: itself at /app, and the
 // base worktree's .git at its own path (a worktree's .git file points there).
+// A service that may write .git ("z": tools and agents) also gets the
+// worktree at its own host path (C11), so the gitdir paths git records in
+// the base .git resolve in the container too and git never sees a worktree
+// as prunable (D30).
 func worktreeMounts(gitOptions string) []Mount {
-	return []Mount{
-		{Source: "{worktree.dir}", Target: "/app", Options: "z"},
-		{Source: "{base.git}", Target: "{base.git}", Options: gitOptions},
+	m := []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}}
+	if gitOptions == "z" {
+		m = append(m, Mount{Source: "{worktree.dir}", Target: "{worktree.dir}", Options: "z"})
 	}
+	return append(m, Mount{Source: "{base.git}", Target: "{base.git}", Options: gitOptions})
 }
 
 // appVolumes are the pack's shared caches and per-worktree volumes.
@@ -369,14 +403,24 @@ func (b *builder) optionService(ch *pack.Chosen, role string) (Service, error) {
 	for _, v := range o.Volumes {
 		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Seed: v.Seed})
 	}
-	for _, mt := range o.Mounts {
+	if err := b.packageMounts(&s, o.Name, o.Files, o.Mounts); err != nil {
+		return s, err
+	}
+	return s, b.entrypoint(&s, o.Name, o.Files, o.Entrypoint)
+}
+
+// packageMounts appends a package's [[mounts]] to s. A relative source is a
+// package file, written as an asset (default options "ro,z"); an absolute or
+// placeholder source is a template.
+func (b *builder) packageMounts(s *Service, pkg string, files fs.FS, mounts []pack.Mount) error {
+	for _, mt := range mounts {
 		if strings.HasPrefix(mt.Source, "/") || strings.HasPrefix(mt.Source, "{") {
 			s.Mounts = append(s.Mounts, Mount{Source: mt.Source, Target: mt.Target, Options: mt.Options})
 			continue
 		}
-		src, err := b.asset(o.Name, o.Files, mt.Source)
+		src, err := b.asset(pkg, files, mt.Source)
 		if err != nil {
-			return s, err
+			return err
 		}
 		opts := mt.Options
 		if opts == "" {
@@ -384,7 +428,7 @@ func (b *builder) optionService(ch *pack.Chosen, role string) (Service, error) {
 		}
 		s.Mounts = append(s.Mounts, Mount{Source: literal(src), Target: mt.Target, Options: opts})
 	}
-	return s, b.entrypoint(&s, o.Name, o.Files, o.Entrypoint)
+	return nil
 }
 
 func (b *builder) toolService(t *pack.Tool) (Service, error) {
@@ -418,6 +462,49 @@ func (b *builder) toolService(t *pack.Tool) (Service, error) {
 		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
 	}
 	return s, b.entrypoint(&s, t.Name, t.Files, t.Entrypoint)
+}
+
+// statusMount is where an agent's container sees its worktree's status dir
+// (D58): it writes RAILSWITCH_STATUS_FILE, <statusMount>/<agent>.json.
+const statusMount = "/run/railswitch/status"
+
+// agentPkg names agent package a's image, build step and assets: the <pkg>
+// of its Containerfile.<pkg>. Resolve refuses two packages with one
+// Containerfile name, so it is unique per package in a stack.
+func agentPkg(a *pack.Agent) string { return strings.TrimPrefix(a.Image.File, "Containerfile.") }
+
+// agentService is agent a's container (D54): a worktree service on the agent
+// package's image, firewalled under its own profile agent-<name> in enforce
+// mode (D55, C10), interactive, with the worktree, the status dir, a
+// per-worktree home volume and the pack's volumes.
+func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
+	pk, ag := b.in.Stack.Pack, a.Agent
+	pkg := agentPkg(ag)
+	s := Service{
+		ID: a.Service, Role: RoleAgent, Exec: ag.Unit.Exec,
+		Image:        ImageSpec{Kind: ImageAgent, File: b.ws("containerfiles", ag.Image.File)},
+		Firewall:     []string{"agent-" + a.Name},
+		FirewallMode: "enforce",
+		OnDemand:     a.Run == "on-demand",
+		Worktree:     true,
+		Unit:         unitExtras(ag.Unit, RoleAgent, b.in.Project.Services[a.Service]),
+	}
+	s.Unit.TTY = true // an agent is a terminal program, attached to or not
+	s.Mounts = append(worktreeMounts("z"), Mount{Source: "{status.dir}", Target: statusMount, Options: "rw,z"})
+	if err := b.packageMounts(&s, pkg, ag.Files, ag.Mounts); err != nil {
+		return s, err
+	}
+	s.Volumes = []Volume{{Name: a.Service + "-home", Mount: "/home/appuser", Chown: true}}
+	for _, v := range pk.WorktreeVolumes {
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown})
+	}
+	for _, v := range pk.Caches {
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+	}
+	for _, v := range ag.Shared {
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+	}
+	return s, b.entrypoint(&s, pkg, ag.Files, ag.Entrypoint)
 }
 
 // asset lists the package file rel of pkg as a Model.Assets entry and returns
@@ -508,6 +595,17 @@ func (m *Model) service(id string) *Service {
 	return nil
 }
 
+// Agents are the agent services, in Stack.Agents order (by name).
+func (m *Model) Agents() []*Service {
+	var out []*Service
+	for i := range m.Services {
+		if m.Services[i].Role == RoleAgent {
+			out = append(out, &m.Services[i])
+		}
+	}
+	return out
+}
+
 func (m *Model) serviceIDs() []string {
 	ids := make([]string, len(m.Services))
 	for i, s := range m.Services {
@@ -594,7 +692,7 @@ type Instance struct {
 	Worktree Worktree
 	Values   map[string]string   // every placeholder name → its concrete value for this worktree
 	Env      map[string][]EnvVar // svc → effective process env, highest layer per name, provenance kept
-	Builds   []BuildStep         // in build order: the base chain, then tool images, then standalone option images
+	Builds   []BuildStep         // in build order: the base chain, tool images, agent-base and agent images, then standalone option images
 	Warnings []string            // skipped version sources (a hostile or odd file), per worktree
 
 	m *Model
@@ -633,6 +731,7 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		"branch":         wt.Branch,
 		"project.prefix": m.Prefix,
 		"dumps":          filepath.Join(m.Inputs.Workspace, "db-dumps"),
+		"status.dir":     filepath.Join(m.Inputs.Workspace, filepath.FromSlash(statusDir), wt.Slug), // D58: the agents' status files
 	}
 	in.Values = v
 	override := p.Worktrees[wt.Slug].Versions
@@ -776,9 +875,10 @@ func (in *Instance) VolumeName(svc string, v Volume) (string, error) {
 type Names struct{ Units, Containers, Volumes, Networks []string }
 
 // NamesFor returns the exact names of a registered worktree's objects:
-// every "<prefix>-<slug>-<svc>.service" and "<prefix>-<slug>-dev-network.service",
-// every container, its per-worktree volumes only (never a shared "<prefix>_…"
-// one) and its dev network. An unregistered slug is an error.
+// "<prefix>-<slug>-<svc>.service" of every service but an on-demand one and
+// "<prefix>-<slug>-dev-network.service", every container (on-demand ones
+// too), its per-worktree volumes only (never a shared "<prefix>_…" one) and
+// its dev network. An unregistered slug is an error.
 func (m *Model) NamesFor(slug string) (Names, error) {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w Worktree) bool { return w.Slug == slug })
 	if i < 0 {
@@ -792,7 +892,9 @@ func (m *Model) NamesFor(slug string) (Names, error) {
 	for _, s := range m.Services {
 		c := naming.Container(m.Prefix, slug, s.ID)
 		n.Containers = append(n.Containers, c)
-		n.Units = append(n.Units, c+".service")
+		if !s.OnDemand { // an on-demand service has no unit; its container and volumes are still the worktree's
+			n.Units = append(n.Units, c+".service")
+		}
 		for _, v := range s.Volumes {
 			if v.Shared {
 				continue

@@ -54,7 +54,7 @@ func TestImageChain(t *testing.T) {
 			t.Errorf("%s: tag %q does not end in -<hash8>", b.Name, b.Tag)
 		}
 	}
-	want := []string{"base", "addon pg-client", "addon vips", "nvim", "playwright"}
+	want := []string{"base", "addon pg-client", "addon vips", "nvim", "agent-base", "agent claude", "agent probe", "playwright"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("Builds = %v; want %v", names, want)
 	}
@@ -89,7 +89,35 @@ func TestImageChain(t *testing.T) {
 		t.Errorf("nvim tag %q, image.nvim %q", b[3].Tag, in.Values["image.nvim"])
 	}
 
-	pw := b[4]
+	ab, claude, probe := b[4], b[5], b[6]
+	if ab.Args["BASE_IMAGE"] != in.Values["image.base"] || !strings.HasPrefix(ab.Tag, "localhost/filial/agent-base:ruby3.3.6-node22.11.0-") || in.Values["image.agent-base"] != ab.Tag {
+		t.Errorf("agent-base BASE_IMAGE %q tag %q image.agent-base %q", ab.Args["BASE_IMAGE"], ab.Tag, in.Values["image.agent-base"])
+	}
+	for _, a := range []struct {
+		step BuildStep
+		pkg  string
+	}{{claude, "claude"}, {probe, "probe"}} {
+		if a.step.Args["BASE_IMAGE"] != ab.Tag {
+			t.Errorf("agent %s BASE_IMAGE = %q; want agent-base %q", a.pkg, a.step.Args["BASE_IMAGE"], ab.Tag)
+		}
+		if !strings.HasPrefix(a.step.Tag, "localhost/filial/agent-"+a.pkg+":ruby3.3.6-node22.11.0-") || in.Values["image.agent-"+a.pkg] != a.step.Tag {
+			t.Errorf("agent %s tag %q image %q", a.pkg, a.step.Tag, in.Values["image.agent-"+a.pkg])
+		}
+	}
+	if a := in.Builds[5].File; a != filepath.Join(ws, "containerfiles", "Containerfile.claude") {
+		t.Errorf("agent claude File = %s", a)
+	}
+	for _, name := range []string{"Containerfile.agent-base", "Containerfile.claude"} {
+		data, err := os.ReadFile(filepath.Join(ws, "containerfiles", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := parseContainerfile(data).checkDerived(); err != nil {
+			t.Errorf("built-in %s: %v", name, err)
+		}
+	}
+
+	pw := b[7]
 	if _, ok := pw.Args["BASE_IMAGE"]; ok {
 		t.Errorf("playwright has BASE_IMAGE")
 	}
@@ -110,7 +138,7 @@ func TestImageChain(t *testing.T) {
 	before := chainTags(t, ws)
 	writeFile(t, filepath.Join(ws, "containerfiles", "Containerfile.vips"), vipsAddon+"#\n")
 	after := chainTags(t, ws)
-	for name, changed := range map[string]bool{"base": false, "addon pg-client": false, "addon vips": true, "nvim": true, "playwright": false} {
+	for name, changed := range map[string]bool{"base": false, "addon pg-client": false, "addon vips": true, "nvim": true, "agent-base": true, "agent claude": true, "agent probe": true, "playwright": false} {
 		if (before[name] != after[name]) != changed {
 			t.Errorf("vips edit: %s tag changed = %v; want %v", name, before[name] != after[name], changed)
 		}
@@ -124,9 +152,22 @@ func TestImageChain(t *testing.T) {
 	}
 	writeFile(t, base, string(data)+"#\n")
 	final := chainTags(t, ws)
-	for name, changed := range map[string]bool{"base": true, "addon pg-client": true, "addon vips": true, "nvim": true, "playwright": false} {
+	for name, changed := range map[string]bool{"base": true, "addon pg-client": true, "addon vips": true, "nvim": true, "agent-base": true, "agent claude": true, "agent probe": true, "playwright": false} {
 		if (after[name] != final[name]) != changed {
 			t.Errorf("base edit: %s tag changed = %v; want %v", name, after[name] != final[name], changed)
+		}
+	}
+
+	// One byte of agent-base: it and the agent images, nothing earlier.
+	agentBase := filepath.Join(ws, "containerfiles", "Containerfile.agent-base")
+	if data, err = os.ReadFile(agentBase); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, agentBase, string(data)+"#\n")
+	last := chainTags(t, ws)
+	for name, changed := range map[string]bool{"base": false, "addon pg-client": false, "addon vips": false, "nvim": false, "agent-base": true, "agent claude": true, "agent probe": true, "playwright": false} {
+		if (final[name] != last[name]) != changed {
+			t.Errorf("agent-base edit: %s tag changed = %v; want %v", name, final[name] != last[name], changed)
 		}
 	}
 }
@@ -139,6 +180,8 @@ func TestImageChainMissingFile(t *testing.T) {
 		{"Containerfile.nvim", "railswitch containerfile eject nvim", func(p *config.Project) { p.Tools.Nvim = false; delete(p.Secrets, "github_token") }},
 		{"Containerfile.playwright", "railswitch containerfile eject playwright", func(p *config.Project) { p.Options["browser"] = "none" }},
 		{"Containerfile.pg-client", "railswitch containerfile eject pg-client", func(p *config.Project) { p.Image.Addons = nil }},
+		{"Containerfile.agent-base", "railswitch containerfile eject agent-base", func(p *config.Project) { p.Agents = nil; delete(p.Secrets, "probe_key") }},
+		{"Containerfile.probe", "railswitch containerfile eject probe", func(p *config.Project) { delete(p.Agents, "probe"); delete(p.Secrets, "probe_key") }},
 	} {
 		ws := fixtureWS(t)
 		if err := os.Remove(filepath.Join(ws, "containerfiles", tc.file)); err != nil {
@@ -294,7 +337,7 @@ func TestTagsIncludeFromDigests(t *testing.T) {
 	}
 	deb := tags(map[string]string{ruby: "sha256:" + strings.Repeat("a", 64), debian: "sha256:" + strings.Repeat("c", 64)})
 	for name := range aa {
-		if changes := name == "nvim"; (aa[name] != deb[name]) != changes {
+		if changes := name == "nvim" || name == "agent claude"; (aa[name] != deb[name]) != changes { // both FROM debian
 			t.Errorf("debian digest: %s tag changed = %v; want %v", name, aa[name] != deb[name], changes)
 		}
 	}

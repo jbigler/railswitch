@@ -196,6 +196,25 @@ func TestOptionDepsEnv(t *testing.T) {
 	}
 }
 
+// C6, D59: an option's [agent_gives] decodes and its names are checked like [gives].
+func TestOptionAgentGives(t *testing.T) {
+	fsys := minimal()
+	opt := fsys["options/o/option.toml"]
+	base := string(opt.Data)
+	opt.Data = []byte(base + "[agent_gives]\nURL = \"http://{service}:1\"\n")
+	cat, err := Load(fsys)
+	if err != nil {
+		t.Fatalf("Load with agent_gives: %v", err)
+	}
+	if got := cat.Options[Ref{Name: "o", Version: 1}].AgentGives; !maps.Equal(got, map[string]string{"URL": "http://{service}:1"}) {
+		t.Errorf("agent_gives = %v", got)
+	}
+	opt.Data = []byte(base + "[agent_gives]\n\"bad-name\" = \"1\"\n")
+	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "agent_gives") {
+		t.Errorf("Load with bad agent_gives name: %v", err)
+	}
+}
+
 func TestPortSamePort(t *testing.T) {
 	fsys := minimal()
 	opt := fsys["options/o/option.toml"]
@@ -316,6 +335,9 @@ func TestPlaywrightOptionEnv(t *testing.T) {
 	}
 	if !maps.Equal(o.Env, map[string]string{"CHROME_START_URL": "http://{worktree.host}"}) {
 		t.Errorf("playwright env = %v", o.Env)
+	}
+	if !maps.Equal(o.AgentGives, map[string]string{"BROWSER_CDP_URL": "http://{service}:9223"}) { // D59
+		t.Errorf("playwright agent_gives = %v", o.AgentGives)
 	}
 }
 

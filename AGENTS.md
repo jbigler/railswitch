@@ -1,12 +1,21 @@
 # AGENTS.md — railswitch
 
 Go CLI (`railswitch`, module `github.com/jbigler/railswitch`) that runs Rails dev environments on rootless podman via Quadlet.
-Spec: `handoff/HANDOFF.md`; decisions D1–D53: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
+Spec: `handoff/HANDOFF.md`; decisions D1–D61: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
 
 ## Commands
 - `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...`, `go test ./...`.
 - `make build` → `./railswitch` (`VERSION=` sets `buildinfo.Version`).
 - Integration tests carry `//go:build integration`; the full end-to-end test needs a systemd user session and is a manual run.
+
+## CLI (Stage 4 additions)
+- `agent [--new-term] [<name>] [-- args]` (runs `up` first; on-demand agents get a transient container, service agents are attached to), `--json agent ls`; `project new --agent name=ref` (repeatable) or `--agent none` (default: the built-in package with `default = true`).
+- `nvim`, `nvim update`, `nvim reset-config [--yes]`; `hooks check | backup [<hook>…] | restore [--force]`; `db dump` (files 0644 in `<ws>/db-dumps/`, dir 0755); `secret add --git-signing` (key piped on stdin).
+- `project.toml`: `[tools.nvim] config_repo`/`config_ref` (replaces `[tools] nvim = true`, which is refused); `[agents.<n>] use` (`<name>@N` or `local:<name>@N` → `<ws>/agents/<name>/`), `run` (`on-demand`|`service`), `env`, `allow`.
+- `config.toml` `[[mount]]` (D57): machine-local mounts per service; `doctor` checks them (`machine mounts`).
+- `doctor` checks carry `warn` (JSON `"warn"`): a warning prints `warn` and doesn't change the exit code; `git-guard` findings are warnings.
+- Agents (D55, C7, C10): service `agent-<n>`, own firewall profile `agent-<n>` (allow file `agent-<n>.allow`), always `enforce`. git-guard: every writable `{base.git}` mount gets `{base.git}/hooks` mounted `ro,z` on top.
+- Genericity: no `filial` in non-test code or built-in packs, `claude` only under `internal/pack/builtin/agents/claude/`, terminal names only in `internal/term/` (`TestGenericity` in `internal/`).
 
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
@@ -34,7 +43,8 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D53: `docs/superpowers/plans/2026-10-
 - `internal/unithash` — the `<prefix>.unit-hash` label that tells `up` a container runs an older unit.
 - `internal/tailscale` — the tailscale CLI for `share`/`unshare` (`serve --bg`, `serve … off`, never `reset`).
 - `internal/agentstatus` — the agents' status files (D58), read as hostile.
-- `internal/gitguard` — git-guard (D60): installed hooks vs. their `githooks/` backups, `.git/config` key names (never values), worktree `.git` pointers.
+- `internal/gitguard` — git-guard (D60): installed hooks vs. their `githooks/` backups, key names (never values) in `.git/config`, `.git/config.worktree` and `.git/worktrees/*/config.worktree`, worktree `.git` pointers.
+- `internal/term` — `--new-term`: detects the Linux terminal (C5) and opens a detached window through `sys.Runner`.
 - `internal/podman`, `internal/firewall`, `internal/worktree`, `internal/workspace`, `internal/lifecycle`, `internal/doctor`.
 
 ## Rules

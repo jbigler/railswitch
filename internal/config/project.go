@@ -48,7 +48,7 @@ type ImageConfig struct {
 
 // Agent is one [agents.<name>] table.
 type Agent struct {
-	Use   string            `toml:"use"`   // "claude@1" or "local:<name>@N"
+	Use   string            `toml:"use"`   // "myagent@1" or "local:<name>@N"
 	Run   string            `toml:"run"`   // "", "on-demand", "service"
 	Env   map[string]string `toml:"env"`   // added to the agent's env
 	Allow []string          `toml:"allow"` // extra firewall hosts for this agent
@@ -320,7 +320,7 @@ func (p *Project) Validate() error {
 		a := p.Agents[name]
 		if r, ok := strings.CutPrefix(a.Use, LocalPrefix); ok {
 			if !refRe.MatchString(r) {
-				v.add(path+".use", "%q is not a ref name@N or local:name@N, e.g. \"claude@1\"", a.Use)
+				v.add(path+".use", "%q is not a ref name@N or local:name@N, e.g. \"myagent@1\"", a.Use)
 			}
 		} else {
 			v.ref(path+".use", a.Use)

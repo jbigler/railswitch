@@ -192,8 +192,9 @@ failed `machine config` check. `machine mounts` is listed only when the
 machine config has `[[mount]]` entries (D57); it fails when a non-optional
 source is missing. `git-guard` (inside a workspace, D60) compares the base
 worktree's installed git hooks to their backups in the workspace repo's
-`githooks/`, checks the key names (never the values) of its `.git/config`
-against an allowlist and each linked worktree's `.git` pointer; a finding
+`githooks/`, checks the key names (never the values) of its `.git/config`,
+`.git/config.worktree` and `.git/worktrees/*/config.worktree` (those that
+exist) against an allowlist and each linked worktree's `.git` pointer; a finding
 is a warning (`warn` true), and `railswitch hooks check` lists them.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.

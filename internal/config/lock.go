@@ -29,7 +29,7 @@ type Lock struct {
 	Schema     int                  `toml:"schema"` // 1 (D39)
 	Packs      map[string]LockEntry `toml:"pack"`   // key = name
 	Options    map[string]LockEntry `toml:"option"`
-	Agents     map[string]LockEntry `toml:"agent"`      // key = ref string: "claude@1", "local:probe@1"
+	Agents     map[string]LockEntry `toml:"agent"`      // key = ref string: "myagent@1", "local:probe@1"
 	Images     []LockImage          `toml:"image"`      // pulled service images (D15)
 	BaseImages []LockImage          `toml:"base_image"` // FROM images of built steps, by first pull (D36)
 }

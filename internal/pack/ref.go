@@ -46,7 +46,7 @@ func ParseAgentRef(s string) (Ref, error) {
 	rest, local := strings.CutPrefix(s, config.LocalPrefix)
 	m := refRe.FindStringSubmatch(rest)
 	if m == nil {
-		return Ref{}, fmt.Errorf("%q is not a ref name@N or local:name@N, e.g. \"claude@1\"", s)
+		return Ref{}, fmt.Errorf("%q is not a ref name@N or local:name@N, e.g. \"myagent@1\"", s)
 	}
 	v, _ := strconv.Atoi(m[2])
 	return Ref{Name: m[1], Version: v, Local: local}, nil

@@ -4,7 +4,7 @@
 #
 # The container never holds NET_ADMIN, so nothing running inside -- an agent,
 # code it wrote that rails hot-reloads, an npm postinstall -- can change its own
-# rules. (The claude container used to build its firewall itself through a
+# rules. (The old agent container used to build its firewall itself through a
 # sudo rule that accepted any domain as an argument, so the agent could allow
 # whatever it liked.) A failing hook fails the container start: fail closed.
 #

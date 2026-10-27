@@ -1,0 +1,10 @@
+name = "probe"
+version = 1
+run = "service"
+allow = ["example.com"]
+
+[image]
+file = "Containerfile.probe"
+
+[unit]
+tty = true                    # keeps sh alive as a service

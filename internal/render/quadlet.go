@@ -149,7 +149,7 @@ type RenderedRoute struct {
 	Service string // the routed service's id
 	Route   Route  // the pack's route
 	Router  string // Traefik's router (and service) name: <prefix>-<slug>-<route name>
-	Host    string // the expanded host, e.g. "s3.master.filial.localhost"
+	Host    string // the expanded host, e.g. "s3.master.demo.localhost"
 }
 
 // Routes are every route of the worktree, in model order: what its units

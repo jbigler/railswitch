@@ -77,37 +77,37 @@ func ValidService(id string) error {
 }
 
 // Container is the name of a worktree's service container, its .container
-// file and its .service unit: "filial-feat-rails".
+// file and its .service unit: "demo-feat-rails".
 func Container(prefix, slug, svc string) string {
 	return prefix + "-" + slug + "-" + svc
 }
 
-// DevNetworkUnit is a worktree's dev network unit file: "filial-feat-dev.network".
+// DevNetworkUnit is a worktree's dev network unit file: "demo-feat-dev.network".
 func DevNetworkUnit(prefix, slug string) string {
 	return DevNetwork(prefix, slug) + ".network"
 }
 
-// WorktreeVolume is a per-worktree volume: "filial-feat-db-data-pg16".
+// WorktreeVolume is a per-worktree volume: "demo-feat-db-data-pg16".
 func WorktreeVolume(prefix, slug, vol string) string {
 	return prefix + "-" + slug + "-" + vol
 }
 
-// Shared is a project-wide object shared by every worktree: "filial_npm_cache".
+// Shared is a project-wide object shared by every worktree: "demo_npm_cache".
 func Shared(prefix, what string) string {
 	return prefix + "_" + what
 }
 
-// DevNetwork is a worktree's dev network (NetworkName=): "filial-feat-dev".
+// DevNetwork is a worktree's dev network (NetworkName=): "demo-feat-dev".
 func DevNetwork(prefix, slug string) string {
 	return prefix + "-" + slug + "-dev"
 }
 
-// ProxyNetwork is the project's proxy network (NetworkName=): "filial_proxy".
+// ProxyNetwork is the project's proxy network (NetworkName=): "demo_proxy".
 func ProxyNetwork(prefix string) string {
 	return Shared(prefix, "proxy")
 }
 
-// ProxyNetworkUnit is the project's proxy network unit file: "filial-proxy.network".
+// ProxyNetworkUnit is the project's proxy network unit file: "demo-proxy.network".
 func ProxyNetworkUnit(prefix string) string {
 	return prefix + "-proxy.network"
 }

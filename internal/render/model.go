@@ -285,8 +285,8 @@ func (b *builder) services() error {
 		Firewall: []string{"deps"},
 		Worktree: true,
 		// No .git: nothing an install needs (D11). In the base worktree /app
-		// holds it, so its hooks are read-only (D60).
-		Mounts:  []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}, appHooks},
+		// holds it, so it is read-only there, its hooks too (D60).
+		Mounts:  append([]Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}}, appGit("ro,z")...),
 		Volumes: b.appVolumes(),
 		Unit:    unitExtras(pack.Unit{}, RoleDeps, p.Services["deps"]),
 	}
@@ -395,7 +395,7 @@ func (b *builder) machineMounts(id string) []Mount {
 // the base .git resolve in the container too and git never sees a worktree
 // as prunable (D30). git-guard (D60): a writable .git gets its hooks
 // read-only on top, and in the base worktree, where /app is the base
-// checkout, so does /app/.git/hooks.
+// checkout, /app/.git and /app/.git/hooks are mounted too (appGit).
 func worktreeMounts(gitOptions string) []Mount {
 	m := []Mount{{Source: "{worktree.dir}", Target: "/app", Options: "z"}}
 	if gitOptions == "z" {
@@ -405,12 +405,18 @@ func worktreeMounts(gitOptions string) []Mount {
 	if gitOptions == "z" {
 		m = append(m, Mount{Source: "{base.git}/hooks", Target: "{base.git}/hooks", Options: "ro,z"})
 	}
-	return append(m, appHooks)
+	return append(m, appGit(gitOptions)...)
 }
 
-// appHooks is git-guard's /app/.git/hooks, read-only (D60): in the base
-// worktree /app is the base checkout, its .git included.
-var appHooks = Mount{Source: "{base.git}/hooks", Target: "/app/.git/hooks", Options: "ro,z", BaseOnly: true}
+// appGit are git-guard's base-worktree mounts (D60): /app/.git with the
+// service's git access, a mount point so it can't be renamed away and
+// rebuilt (EBUSY), then /app/.git/hooks read-only on top.
+func appGit(gitOptions string) []Mount {
+	return []Mount{
+		{Source: "{base.git}", Target: "/app/.git", Options: gitOptions, BaseOnly: true},
+		{Source: "{base.git}/hooks", Target: "/app/.git/hooks", Options: "ro,z", BaseOnly: true},
+	}
+}
 
 // appVolumes are the pack's shared caches and per-worktree volumes.
 func (b *builder) appVolumes() []Volume {

@@ -37,8 +37,9 @@ func (f Finding) String() string { return f.Kind + " " + f.Path + ": " + f.Detai
 
 // ConfigAllowed are the .git/config keys git, gh and gh-stack write in
 // normal use; any other is a finding. Widen it when a legitimate tool adds
-// one.
-var ConfigAllowed = regexp.MustCompile(`^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks)|branch\..+\.(remote|merge|rebase|pushremote|description)|remote\..+\.(url|pushurl|fetch|tagopt|prune|gh-resolved)|remote\.pushdefault|rerere\.(enabled|autoupdate)|extensions\.worktreeconfig|user\.(name|email))$`)
+// one. extensions.worktreeconfig is not in it: Check reads every
+// config.worktree too, but enabling them is still worth a look.
+var ConfigAllowed = regexp.MustCompile(`^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks)|branch\..+\.(remote|merge|rebase|pushremote|description)|remote\..+\.(url|pushurl|fetch|tagopt|prune|gh-resolved)|remote\.pushdefault|rerere\.(enabled|autoupdate)|user\.(name|email))$`)
 
 // BackupDir is the workspace repo's hook backups, relative to its root.
 const BackupDir = "githooks"
@@ -47,8 +48,9 @@ const BackupDir = "githooks"
 const pointerLimit = 4096
 
 // Check compares baseDir's installed hooks to ws's backups byte for byte
-// (and the executable bit), checks the key names of baseDir's .git/config
-// against ConfigAllowed, and checks the .git pointer of each linked
+// (and the executable bit), checks the key names of baseDir's .git/config,
+// .git/config.worktree and .git/worktrees/*/config.worktree against
+// ConfigAllowed, and checks the .git pointer of each linked
 // worktree slugs (<ws>/<slug>/.git; a missing one is skipped). A base
 // worktree without .git has nothing to guard.
 func Check(ctx context.Context, r sys.Runner, ws, baseDir string, slugs []string) ([]Finding, error) {
@@ -64,11 +66,13 @@ func Check(ctx context.Context, r sys.Runner, ws, baseDir string, slugs []string
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := checkConfig(ctx, r, ws, baseDir)
-	if err != nil {
-		return nil, err
+	for _, path := range configFiles(git) {
+		cfg, err := checkConfig(ctx, r, ws, path)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, cfg...)
 	}
-	out = append(out, cfg...)
 	for _, slug := range slugs {
 		if f, ok := checkPointer(ws, baseDir, slug); !ok {
 			out = append(out, f)
@@ -162,14 +166,29 @@ func checkHooks(ws, baseDir string) ([]Finding, error) {
 	return out, nil
 }
 
-// checkConfig lists the key names of baseDir's .git/config (never values)
+// configFiles are the config files host git reads from git (a base .git):
+// config, config.worktree and each linked worktree's
+// worktrees/<name>/config.worktree, those that exist.
+func configFiles(git string) []string {
+	paths := []string{filepath.Join(git, "config"), filepath.Join(git, "config.worktree")}
+	if entries, err := os.ReadDir(filepath.Join(git, "worktrees")); err == nil {
+		for _, e := range entries {
+			paths = append(paths, filepath.Join(git, "worktrees", e.Name(), "config.worktree"))
+		}
+	}
+	var out []string
+	for _, p := range paths {
+		if _, err := os.Lstat(p); err == nil {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// checkConfig lists the key names of the config file path (never values)
 // and reports each outside ConfigAllowed. Host git runs defused (no hooks,
 // no fsmonitor) in ws, the workspace repo.
-func checkConfig(ctx context.Context, r sys.Runner, ws, baseDir string) ([]Finding, error) {
-	path := filepath.Join(baseDir, ".git", "config")
-	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
+func checkConfig(ctx context.Context, r sys.Runner, ws, path string) ([]Finding, error) {
 	res, err := r.Run(ctx, sys.Cmd{
 		Name: "git",
 		Args: []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "config", "--file", path, "--name-only", "--list"},

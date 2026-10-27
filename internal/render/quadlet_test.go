@@ -167,9 +167,10 @@ func TestEntrypointOverride(t *testing.T) {
 
 // git-guard (D60): a writable base .git is followed by its hooks, read-only;
 // in the base worktree /app is the base checkout, so every service mounting
-// the worktree gets /app/.git/hooks read-only.
+// the worktree gets /app/.git as its own mount (a mount point can't be
+// renamed away), then /app/.git/hooks read-only.
 func TestHooksMountReadOnly(t *testing.T) {
-	ws, units := renderUnits(t, fixtureDir, nil)
+	ws, units := renderUnits(t, fixtureDir, func(p *config.Project) { p.Options["jobs"] = "sidekiq@1" })
 	git := filepath.Join(ws, "master", ".git")
 	hooks := filepath.Join(git, "hooks")
 	for _, file := range []string{"filial-feat-nvim.container", "filial-feat-agent-probe.container"} {
@@ -178,11 +179,17 @@ func TestHooksMountReadOnly(t *testing.T) {
 		if i < 0 || i+1 >= len(lines) || lines[i+1] != "Volume="+hooks+":"+hooks+":ro,z" {
 			t.Errorf("%s: no read-only hooks line after the .git line:\n%s", file, units[file])
 		}
-		noLinePrefix(t, units, file, "Volume="+hooks+":/app/.git/hooks")
+		noLinePrefix(t, units, file, "Volume="+git+":/app/.git")
 	}
 	noLinePrefix(t, units, "filial-feat-rails.container", "Volume="+hooks)
-	for _, svc := range []string{"rails", "deps", "nvim", "agent-probe"} {
-		hasLine(t, units, "filial-master-"+svc+".container", "Volume="+hooks+":/app/.git/hooks:ro,z")
+	noLinePrefix(t, units, "filial-feat-worker.container", "Volume="+git+":/app/.git")
+	for svc, opts := range map[string]string{"rails": "ro,z", "worker": "ro,z", "deps": "ro,z", "nvim": "z", "agent-probe": "z"} {
+		file := "filial-master-" + svc + ".container"
+		lines := unitLines(t, units, file)
+		i := slices.Index(lines, "Volume="+git+":/app/.git:"+opts)
+		if i < 0 || i+1 >= len(lines) || lines[i+1] != "Volume="+hooks+":/app/.git/hooks:ro,z" {
+			t.Errorf("%s: want /app/.git (%s) then /app/.git/hooks (ro,z):\n%s", file, opts, units[file])
+		}
 	}
 }
 

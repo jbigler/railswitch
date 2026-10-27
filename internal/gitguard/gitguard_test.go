@@ -100,6 +100,33 @@ func TestCheck(t *testing.T) {
 	}
 	git(t, base, "config", "--unset", "core.hooksPath")
 
+	// extensions.worktreeConfig is reported, and per-worktree config files
+	// are checked against the same allowlist.
+	git(t, base, "config", "extensions.worktreeConfig", "true")
+	f = only(t, check(t, ws, base), "config-key", filepath.Join(base, ".git", "config"))
+	if f.Detail != "extensions.worktreeconfig" {
+		t.Errorf("config-key detail = %q", f.Detail)
+	}
+	git(t, base, "config", "--unset", "extensions.worktreeConfig")
+	wtBase := filepath.Join(base, ".git", "config.worktree")
+	write(t, wtBase, "[core]\n\thooksPath = "+value+"\n[user]\n\tname = t\n", 0o644)
+	f = only(t, check(t, ws, base), "config-key", wtBase)
+	if f.Detail != "core.hookspath" {
+		t.Errorf("config.worktree detail = %q", f.Detail)
+	}
+	if err := os.Remove(wtBase); err != nil {
+		t.Fatal(err)
+	}
+	wtFeat := filepath.Join(base, ".git", "worktrees", "feat", "config.worktree")
+	write(t, wtFeat, "[core]\n\tfsmonitor = "+value+"\n", 0o644)
+	f = only(t, check(t, ws, base), "config-key", wtFeat)
+	if f.Detail != "core.fsmonitor" {
+		t.Errorf("worktrees/feat/config.worktree detail = %q", f.Detail)
+	}
+	if err := os.Remove(wtFeat); err != nil {
+		t.Fatal(err)
+	}
+
 	pointer := filepath.Join(ws, "feat", ".git")
 	write(t, pointer, "gitdir: /tmp/evil\n", 0o644)
 	only(t, check(t, ws, base), "pointer", pointer)

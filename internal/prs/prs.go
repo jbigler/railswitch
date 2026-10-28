@@ -63,39 +63,54 @@ type ghPR struct {
 	Checks         []ghCheck `json:"statusCheckRollup"`
 }
 
-// List runs `gh pr list` for repo in dir (no prompts, 30 s timeout). PRs
-// from forks are left out: their head branch names a branch of another
+// NeutralDir is where railswitch runs gh when it names the repo itself:
+// never in a workspace, whose mise.local.toml (D17) a mise-shimmed gh would
+// read as its own config and refuse as untrusted.
+const NeutralDir = "/"
+
+// List runs `gh pr list --head=<branch>` for each of branches in repo (no
+// prompts, 30 s timeout each) in NeutralDir. One query per branch: a
+// repo-wide list of PRs with their checks outruns GitHub's GraphQL time
+// limit (HTTP 504) on a busy repo, and only worktree branches matter.
+// PRs from forks are left out: their head branch names a branch of another
 // repository, which a worktree's same-named branch is not.
-func List(ctx context.Context, r sys.Runner, repo, dir string) ([]PR, error) {
-	res, err := r.Run(ctx, sys.Cmd{
-		Name: "gh",
-		Args: []string{"pr", "list", "--repo", repo, "--state", "all", "--limit", "200",
-			"--json", "number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"},
-		Dir:     dir,
-		Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
-		Timeout: 30 * time.Second,
-	})
-	if err != nil {
-		return nil, err
-	}
-	var raw []ghPR
-	if err := json.Unmarshal(res.Stdout, &raw); err != nil {
-		return nil, fmt.Errorf("gh pr list: %w", err)
-	}
-	out := make([]PR, 0, len(raw))
-	for _, p := range raw {
-		if p.IsCross {
+func List(ctx context.Context, r sys.Runner, repo string, branches []string) ([]PR, error) {
+	var out []PR
+	seen := map[string]bool{}
+	for _, b := range branches {
+		if b == "" || seen[b] {
 			continue
 		}
-		out = append(out, PR{
-			Number: p.Number,
-			Title:  p.Title,
-			URL:    p.URL,
-			Branch: p.HeadRefName,
-			State:  state(p),
-			Checks: checks(p.Checks),
-			Review: review(p.ReviewDecision),
+		seen[b] = true
+		res, err := r.Run(ctx, sys.Cmd{
+			Name: "gh",
+			Args: []string{"pr", "list", "--repo", repo, "--head=" + b, "--state", "all", "--limit", "20",
+				"--json", "number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"},
+			Dir:     NeutralDir,
+			Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
+			Timeout: 30 * time.Second,
 		})
+		if err != nil {
+			return nil, err
+		}
+		var raw []ghPR
+		if err := json.Unmarshal(res.Stdout, &raw); err != nil {
+			return nil, fmt.Errorf("gh pr list: %w", err)
+		}
+		for _, p := range raw {
+			if p.IsCross {
+				continue
+			}
+			out = append(out, PR{
+				Number: p.Number,
+				Title:  p.Title,
+				URL:    p.URL,
+				Branch: p.HeadRefName,
+				State:  state(p),
+				Checks: checks(p.Checks),
+				Review: review(p.ReviewDecision),
+			})
+		}
 	}
 	return out, nil
 }

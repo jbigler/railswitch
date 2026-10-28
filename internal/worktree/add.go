@@ -21,6 +21,7 @@ import (
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -40,6 +41,7 @@ type Manager struct {
 	// (machine.Listening): an ID with a port in use is never handed out.
 	Proc      string
 	Base      string   // [project] base_branch; the base worktree is <WS>/<Sanitize(Base)> (D22)
+	Repo      string   // [project] repo: a GitHub URL names the repo for gh pr view
 	SeedFiles []string // [project] seed_files, relative to a worktree
 	In        io.Reader
 	Out       io.Writer
@@ -264,7 +266,13 @@ func (m *Manager) checkBranch(ctx context.Context, base, branch string) error {
 // refs/pull/<n>/head into pr-<n>, and an existing pr-<n> is used only
 // when it is that head.
 func (m *Manager) prBranch(ctx context.Context, base, n string) (string, bool, error) {
-	res, err := m.R.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"pr", "view", n, "--json", "headRefName,isCrossRepository"}, Dir: base})
+	// With a GitHub repo URL, gh needs no checkout and runs outside the
+	// workspace (prs.NeutralDir); otherwise it finds the repo in base.
+	cmd := sys.Cmd{Name: "gh", Args: []string{"pr", "view", n, "--json", "headRefName,isCrossRepository"}, Dir: base}
+	if repo, err := prs.Repo(m.Repo); err == nil {
+		cmd.Args, cmd.Dir = append(cmd.Args, "--repo", repo), prs.NeutralDir
+	}
+	res, err := m.R.Run(ctx, cmd)
 	if err != nil {
 		return "", false, fmt.Errorf("PR %s: %w", n, err)
 	}

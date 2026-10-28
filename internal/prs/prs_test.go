@@ -39,26 +39,30 @@ func TestRepo(t *testing.T) {
 	}
 }
 
+// One query per distinct worktree branch, the branch as --head=<b> (never
+// a separate argv word a "-…" name could turn into a flag).
 func TestListArgv(t *testing.T) {
 	f := &systest.Fake{}
 	f.On([]string{"gh"}, sys.Result{Stdout: []byte("[]")}, nil)
-	if _, err := List(context.Background(), f, "o/n", "/ws"); err != nil {
+	if _, err := List(context.Background(), f, "o/n", []string{"main", "feat", "main", ""}); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.Cmds) != 1 {
-		t.Fatalf("calls = %d", len(f.Cmds))
+	if len(f.Cmds) != 2 {
+		t.Fatalf("calls = %d; want one per distinct branch", len(f.Cmds))
 	}
-	c := f.Cmds[0]
-	want := []string{"gh", "pr", "list", "--repo", "o/n", "--state", "all", "--limit", "200", "--json",
-		"number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
-	if !slices.Equal(f.Calls[0], want) {
-		t.Errorf("argv = %q", f.Calls[0])
-	}
-	if c.Dir != "/ws" || c.Timeout != 30*time.Second || !slices.Contains(c.Env, "GH_PROMPT_DISABLED=1") {
-		t.Errorf("cmd = %+v", c)
-	}
-	if len(c.Env) != len(os.Environ())+1 {
-		t.Errorf("env should be os.Environ() + GH_PROMPT_DISABLED")
+	for i, b := range []string{"main", "feat"} {
+		c := f.Cmds[i]
+		want := []string{"gh", "pr", "list", "--repo", "o/n", "--head=" + b, "--state", "all", "--limit", "20", "--json",
+			"number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
+		if !slices.Equal(f.Calls[i], want) {
+			t.Errorf("argv = %q", f.Calls[i])
+		}
+		if c.Dir != NeutralDir || c.Timeout != 30*time.Second || !slices.Contains(c.Env, "GH_PROMPT_DISABLED=1") {
+			t.Errorf("cmd = %+v", c)
+		}
+		if len(c.Env) != len(os.Environ())+1 {
+			t.Errorf("env should be os.Environ() + GH_PROMPT_DISABLED")
+		}
 	}
 }
 
@@ -69,7 +73,7 @@ func TestParse(t *testing.T) {
 	}
 	f := &systest.Fake{}
 	f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: data}, nil)
-	got, err := List(context.Background(), f, "o/n", "/ws")
+	got, err := List(context.Background(), f, "o/n", []string{"main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +120,7 @@ func TestListError(t *testing.T) {
 	f := &systest.Fake{}
 	f.On([]string{"gh"}, sys.Result{Stderr: []byte("gh: not logged in"), ExitCode: 1},
 		fmt.Errorf("gh: %w (exit 1): gh: not logged in", sys.ErrExit))
-	_, err := List(context.Background(), f, "o/n", "/ws")
+	_, err := List(context.Background(), f, "o/n", []string{"main"})
 	if err == nil || !strings.Contains(err.Error(), "not logged in") {
 		t.Errorf("err = %v", err)
 	}

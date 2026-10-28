@@ -47,7 +47,11 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	list, err := prs.List(ctx, e.run, repo, w.Root)
+	var branches []string
+	for _, wt := range m.Inputs.Worktrees {
+		branches = append(branches, wt.Branch)
+	}
+	list, err := prs.List(ctx, e.run, repo, branches)
 	if err != nil {
 		return e.fail(err)
 	}

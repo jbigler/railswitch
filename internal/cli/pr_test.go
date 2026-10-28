@@ -43,14 +43,19 @@ func TestPrLsJSON(t *testing.T) {
 	if !reflect.DeepEqual(rows, want) {
 		t.Errorf("rows %v; want %v", rows, want)
 	}
-	i := slices.IndexFunc(f.Calls, func(c []string) bool { return c[0] == "gh" })
-	if i < 0 {
-		t.Fatal("no gh call")
+	// One query per worktree branch, never in the workspace (prs.NeutralDir).
+	var heads []string
+	for i, c := range f.Calls {
+		if c[0] != "gh" {
+			continue
+		}
+		heads = append(heads, c[5])
+		if !slices.Equal(c[:5], []string{"gh", "pr", "list", "--repo", "[ORG]/[REPO]"}) || f.Cmds[i].Dir != "/" {
+			t.Errorf("gh argv %q dir %q", c, f.Cmds[i].Dir)
+		}
 	}
-	wantArgv := []string{"gh", "pr", "list", "--repo", "[ORG]/[REPO]", "--state", "all", "--limit", "200",
-		"--json", "number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
-	if !slices.Equal(f.Calls[i], wantArgv) || f.Cmds[i].Dir != ws {
-		t.Errorf("gh argv %q dir %q", f.Calls[i], f.Cmds[i].Dir)
+	if !slices.Equal(heads, []string{"--head=master", "--head=feat"}) {
+		t.Errorf("gh --head args %q; want master, feat", heads)
 	}
 
 	code, out, _ = runWith(t, f, "-C", ws, "pr", "ls")
@@ -87,8 +92,9 @@ func TestPrLsNotGitHub(t *testing.T) {
 }
 
 func TestPrLsGhFails(t *testing.T) {
-	ws, _ := lockedWS(t)
+	ws, _ := gitWS(t)
 	f := fakeHost()
+	f.Passthrough = []string{"git"}
 	f.On([]string{"gh"}, sys.Result{ExitCode: 4}, errors.New("gh: non-zero exit (exit 4): To get started with GitHub CLI, please run:  gh auth login"))
 	code, out, errs := runWith(t, f, "-C", ws, "pr", "ls")
 	if code != 1 || out != "" || !strings.Contains(errs, "gh auth login") {

@@ -52,6 +52,7 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 		Data:      w.Dirs.Data,
 		Proc:      procRoot,
 		Base:      w.Project.Project.BaseBranch,
+		Repo:      w.Project.Project.Repo,
 		SeedFiles: w.Project.Project.SeedFiles,
 		In:        e.stdin,
 		Out:       e.stdout,

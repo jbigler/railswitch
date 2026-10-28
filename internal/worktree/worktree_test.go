@@ -437,6 +437,22 @@ func TestAddPR(t *testing.T) {
 	}
 }
 
+// With a GitHub repo URL, gh pr view names the repo and runs outside the
+// workspace, whose mise.local.toml a mise-shimmed gh would refuse.
+func TestAddPRNamesRepo(t *testing.T) {
+	e := setup(t)
+	e.m.Repo = "https://github.com/o/n.git"
+	git(t, e.base, "branch", "pr-head")
+	e.f.On([]string{"gh", "pr", "view", "42", "--json", "headRefName,isCrossRepository", "--repo", "o/n"}, sys.Result{Stdout: []byte(`{"headRefName":"pr-head","isCrossRepository":false}`)}, nil)
+	if w := e.add(t, "42", ""); w.Branch != "pr-head" {
+		t.Errorf("Add(42) = %+v; want pr-head", w)
+	}
+	i := slices.IndexFunc(e.f.Calls, func(c []string) bool { return c[0] == "gh" })
+	if i < 0 || e.f.Cmds[i].Dir != "/" {
+		t.Errorf("gh call %d, dir %q; want /", i, e.f.Cmds[i].Dir)
+	}
+}
+
 // TestAddPRSameRepo: a PR head on origin only becomes a tracking branch,
 // not a fetched PR ref without upstream.
 func TestAddPRSameRepo(t *testing.T) {

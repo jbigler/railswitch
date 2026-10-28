@@ -253,11 +253,13 @@ row.
 ## `pr ls`
 
 One project (`-C`): every registered worktree, in registry order (by ID),
-with its branch's pull request. It runs `gh pr list --repo <owner/name>
---state all --limit 200 --json
+with its branch's pull request. For each distinct worktree branch it runs
+`gh pr list --repo <owner/name> --head=<branch> --state all --limit 20
+--json
 number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup`
-on the host with `GH_PROMPT_DISABLED=1`, in the workspace root, 30 s
-timeout. The repo comes from `project.toml`'s `repo` (never a worktree's
+on the host with `GH_PROMPT_DISABLED=1`, in `/`, 30 s timeout each (one
+repo-wide query with checks times out at GitHub, HTTP 504, on a busy
+repo). The repo comes from `project.toml`'s `repo` (never a worktree's
 `.git/config`); one that is not on GitHub fails with "pr ls: <url> is not
 a GitHub repo". `gh` missing or not logged in: exit 1 with gh's message.
 The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`

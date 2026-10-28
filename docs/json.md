@@ -405,7 +405,7 @@ of a `changed` package is the store's copy of what the lock accepted.
 | `packages` | array | One per package the accept changes; `[]` when there is nothing to review. |
 | `packages[].ref` | string | `name@N` or `local:name@N`. |
 | `packages[].kind` | string | `pack`, `option` or `agent`. |
-| `packages[].status` | string | `changed` (same ref, new content); `first` (changed, no stored copy of what was accepted: compared against nothing, every file `added`); `added` (a ref new to the lock); `removed` (a ref the lock drops; a version or locality change is a `removed` and an `added`). |
+| `packages[].status` | string | `changed` (same ref, new content; also a ref back in the lock whose content differs from the entry `stack.lock` remembers in `[[removed]]`); `first` (changed, no stored copy of what was accepted: compared against nothing, every file `added`); `added` (a ref new to the lock); `removed` (a ref the lock drops; a version or locality change is a `removed` and an `added`). |
 | `packages[].from`, `to` | string | The content hash locked now and the one the accept locks (lowercase hex); `""` for none (`added`: no `from`, `removed`: no `to`). |
 | `packages[].also_locked_in` | array | Prefixes of other registered projects whose `stack.lock` already pins this ref at `to`; `[]` when none. |
 | `packages[].files` | array | Every file that differs, by path (unchanged files left out). |

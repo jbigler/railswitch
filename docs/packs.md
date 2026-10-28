@@ -107,6 +107,12 @@ railswitch: stack.lock is out of date for local:phoenix@1: an update is waiting 
   only the file it writes, reviewed in the editor: when any other file of
   that package changed since it was accepted, the write refuses ("other
   files of <ref> changed since it was accepted: review them first").
+- A package that leaves the lock is remembered in its `[[removed]]` list
+  (kind, key, version, source, sha256; the newest 32, one per ref). When
+  the ref comes back (an option turned off and on in Settings, a version
+  changed and changed back), it is locked at what was accepted, not at its
+  current content: a waiting update still waits, and `lock --review`
+  shows it against the remembered copy.
 
 The checks flag, and everything else is shown as a diff only (it runs
 inside a firewalled container):

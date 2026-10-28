@@ -32,6 +32,28 @@ type Lock struct {
 	Agents     map[string]LockEntry `toml:"agent"`      // key = ref string: "myagent@1", "local:probe@1"
 	Images     []LockImage          `toml:"image"`      // pulled service images (D15)
 	BaseImages []LockImage          `toml:"base_image"` // FROM images of built steps, by first pull (D36)
+	// Removed are the entries lock writes dropped, most recent first, at
+	// most MaxRemoved: a ref that comes back is locked at what was
+	// accepted, not at content nobody reviewed (D97).
+	Removed []LockRemoved `toml:"removed"`
+}
+
+// MaxRemoved is how many dropped entries a stack.lock remembers.
+const MaxRemoved = 32
+
+// LockRemoved is one dropped entry: its table (pack, option or agent),
+// its key there, and the entry.
+type LockRemoved struct {
+	Kind    string `toml:"kind"`
+	Key     string `toml:"key"`
+	Version string `toml:"version"`
+	Source  string `toml:"source"`
+	SHA256  string `toml:"sha256"`
+}
+
+// Entry is r as a table entry.
+func (r LockRemoved) Entry() LockEntry {
+	return LockEntry{Version: r.Version, Source: r.Source, SHA256: r.SHA256}
 }
 
 // LockEntry pins one pack or option.

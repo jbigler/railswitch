@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -232,6 +233,93 @@ func TestLockKeepsPending(t *testing.T) {
 	}
 	if got := lockOf(t, root).Options["redis"]; got.SHA256 == sha {
 		t.Error("Accept All kept the old entry")
+	}
+}
+
+// replaceIn replaces old with new in the file at path.
+func replaceIn(t *testing.T, path, old, new string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), old) {
+		t.Fatalf("%s has no %q", path, old)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(string(data), old, new, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A ref with a waiting update that leaves the lock and comes back (an
+// option turned off and on in Settings) still waits: the lock remembers
+// what it had accepted, and a write that accepts nothing locks that.
+func TestLockReaddKeepsWaitingUpdate(t *testing.T) {
+	ctx := context.Background()
+	root := projectRoot(t)
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
+		t.Fatal(err)
+	}
+	sha := acceptVariant(t, root, pack.KindOption, "redis", addFile)
+	proj := filepath.Join(root, "project.toml")
+	replaceIn(t, proj, `cache    = "redis@1"`, `cache    = "none"`)
+	replaceIn(t, proj, "redis    = \"8\"\n", "")
+	if err := Lock(ctx, root, Accept{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := lockOf(t, root).Options["redis"]; ok {
+		t.Fatal("redis still locked after it was turned off")
+	}
+	replaceIn(t, proj, `cache    = "none"`, `cache    = "redis@1"`)
+	pl, err := Review(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i := slices.IndexFunc(pl.Packages, func(c Change) bool { return c.Ref == redis }); i < 0 || pl.Packages[i].Status != StatusChanged || pl.Packages[i].From != sha || pl.Packages[i].Old == nil {
+		t.Errorf("review of the re-added redis: %+v", pl.Packages)
+	}
+	if err := Lock(ctx, root, Accept{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := lockOf(t, root).Options["redis"].SHA256; got != sha {
+		t.Fatalf("re-added redis locked at %s, want the accepted %s", got, sha)
+	}
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(w.Pending, redis) {
+		t.Errorf("Pending = %v, want redis", w.Pending)
+	}
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
+		t.Fatal(err)
+	}
+	if l := lockOf(t, root); l.Options["redis"].SHA256 == sha || len(l.Removed) != 0 {
+		t.Errorf("after the accept: redis %+v, removed %+v", l.Options["redis"], l.Removed)
+	}
+}
+
+// The remembered entries: newest first, one per ref, none locked again,
+// at most config.MaxRemoved.
+func TestDropped(t *testing.T) {
+	old := &config.Lock{Options: map[string]config.LockEntry{"redis": {Version: "2", Source: "built in", SHA256: "new"}}}
+	for i := range config.MaxRemoved + 5 {
+		old.Removed = append(old.Removed, config.LockRemoved{Kind: pack.KindOption, Key: "o" + strconv.Itoa(i), Version: "1", SHA256: "x"})
+	}
+	old.Removed[3] = config.LockRemoved{Kind: pack.KindOption, Key: "redis", Version: "2", SHA256: "older"}
+	old.Removed[4] = config.LockRemoved{Kind: pack.KindOption, Key: "o0", Version: "1", Source: "local", SHA256: "y"}
+	l := &config.Lock{Options: map[string]config.LockEntry{"o1": {Version: "1", SHA256: "z"}}}
+	got := dropped(old, l)
+	if len(got) != config.MaxRemoved || got[0].Key != "redis" || got[0].SHA256 != "new" || got[1].Key != "o0" || got[2].Key != "o2" {
+		t.Fatalf("%+v", got[:4])
+	}
+	for _, r := range got[1:] {
+		if r.Key == "redis" || r.Key == "o1" {
+			t.Errorf("%+v kept", r)
+		}
+	}
+	if !slices.ContainsFunc(got, func(r config.LockRemoved) bool { return r.Key == "o0" && r.Source == "local" }) {
+		t.Error("local:o0@1 is another ref than o0@1, and was dropped")
 	}
 }
 

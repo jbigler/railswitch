@@ -227,7 +227,7 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 		if err != nil {
 			return nil, err
 		}
-		if o, ok := table(old, sp.kind)[sp.key]; ok && pins(o, sp.ref) && o.SHA256 != e.SHA256 && !accept.All {
+		if o, ok := lockedAt(old, sp); ok && o.SHA256 != e.SHA256 && !accept.All {
 			if accept.Edit != nil && accept.Edit.Ref == sp.ref {
 				if err := onlyEdited(pl.store, o.SHA256, sp.files, *accept.Edit); err != nil {
 					return nil, err
@@ -245,8 +245,52 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 		table(&l, sp.kind)[sp.key] = e
 		pl.put = append(pl.put, sp)
 	}
+	l.Removed = dropped(old, &l)
 	pl.lock = &l
 	return pl, nil
+}
+
+// lockedAt is what old accepted for sp's ref: its table's entry, or the
+// entry a write dropped (Removed) when the ref left the lock since.
+func lockedAt(old *config.Lock, sp stackPkg) (config.LockEntry, bool) {
+	if o, ok := table(old, sp.kind)[sp.key]; ok && pins(o, sp.ref) {
+		return o, true
+	}
+	for _, r := range old.Removed {
+		if r.Kind == sp.kind && r.Key == sp.key && pins(r.Entry(), sp.ref) {
+			return r.Entry(), true
+		}
+	}
+	return config.LockEntry{}, false
+}
+
+// dropped is the Removed list of l, written over old: every entry of old's
+// tables l no longer pins, then old's Removed, newest first, one per ref,
+// none that l pins again, at most config.MaxRemoved.
+func dropped(old, l *config.Lock) []config.LockRemoved {
+	same := func(a, b config.LockRemoved) bool {
+		return a.Kind == b.Kind && a.Key == b.Key && a.Version == b.Version && (a.Source == localSource) == (b.Source == localSource)
+	}
+	var out []config.LockRemoved
+	add := func(r config.LockRemoved) {
+		if e, ok := table(l, r.Kind)[r.Key]; ok && same(r, config.LockRemoved{Kind: r.Kind, Key: r.Key, Version: e.Version, Source: e.Source}) {
+			return
+		}
+		if len(out) < config.MaxRemoved && !slices.ContainsFunc(out, func(x config.LockRemoved) bool { return same(x, r) }) {
+			out = append(out, r)
+		}
+	}
+	for _, kind := range []string{pack.KindPack, pack.KindOption, pack.KindAgent} {
+		t := table(old, kind)
+		for _, key := range slices.Sorted(maps.Keys(t)) {
+			e := t[key]
+			add(config.LockRemoved{Kind: kind, Key: key, Version: e.Version, Source: e.Source, SHA256: e.SHA256})
+		}
+	}
+	for _, r := range old.Removed {
+		add(r)
+	}
+	return out
 }
 
 // Change statuses of a review.
@@ -312,18 +356,21 @@ func Review(_ context.Context, root string) (*Plan, error) {
 			return nil, err
 		}
 		o, ok := table(old, sp.kind)[sp.key]
+		inTable := ok && pins(o, sp.ref)
+		if ok && !inTable {
+			removed(sp.kind, sp.key, o)
+		}
+		// A ref back in the lock is reviewed against what it last accepted.
+		prev, had := lockedAt(old, sp)
 		switch {
-		case ok && pins(o, sp.ref) && o.SHA256 == e.SHA256:
-		case ok && pins(o, sp.ref):
-			c := Change{Ref: sp.ref, Kind: sp.kind, Status: StatusChanged, From: o.SHA256, To: e.SHA256, Old: stored(o.SHA256), New: sp.files}
+		case inTable && prev.SHA256 == e.SHA256:
+		case had && prev.SHA256 != e.SHA256:
+			c := Change{Ref: sp.ref, Kind: sp.kind, Status: StatusChanged, From: prev.SHA256, To: e.SHA256, Old: stored(prev.SHA256), New: sp.files}
 			if c.Old == nil {
 				c.Status = StatusFirst
 			}
 			changes = append(changes, c)
 		default:
-			if ok {
-				removed(sp.kind, sp.key, o)
-			}
 			changes = append(changes, Change{Ref: sp.ref, Kind: sp.kind, Status: StatusAdded, To: e.SHA256, New: sp.files})
 		}
 	}

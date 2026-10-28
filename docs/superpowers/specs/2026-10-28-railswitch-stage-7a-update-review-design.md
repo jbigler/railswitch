@@ -78,9 +78,18 @@ otherwise, "other files of <ref> changed since it was accepted: review them
 first (railswitch lock --review)"), every other caller (`settings apply`, `project write`, `agent
 add`, `project new`) none. A package not accepted keeps its current lock
 entry when that entry's content is usable from the store, and the write
-refuses ("an update is waiting for review") when it isn't; a ref that is
-new to the lock (an option added in Settings) is locked as resolved, and
-stored. `lock --accept` passes its hash down, and the lock refuses before
+refuses ("an update is waiting for review") when it isn't. A ref that
+leaves the lock is remembered: `stack.lock` keeps a `[[removed]]` list
+(kind, key, version, source, sha256 of each dropped entry; newest first,
+one per ref, at most 32). A ref new to the lock that the list remembers is
+treated as locked at the remembered entry, so turning an option off and on
+(storage rustfs → none → rustfs) or a version away and back (redis@1 → @2
+→ @1) leaves its waiting update waiting, run from the stored copy, and
+`lock --review` diffs it against that copy. A ref new to the lock that the
+list doesn't remember (an option this project never used, or one dropped
+more than 32 removals ago) is locked as resolved, and stored: it is the
+user's choice of a package, previewed in Settings, not an update of one
+already accepted. `lock --accept` passes its hash down, and the lock refuses before
 writing bytes that hash differently.
 
 `overview --json` gains `review_pending: bool` (`status --json` is an array

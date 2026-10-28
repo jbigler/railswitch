@@ -175,7 +175,7 @@ func settingsApply(ctx context.Context, e *env, args []string) int {
 	if blocked {
 		return 1
 	}
-	if err := e.commitProject(ctx, se.WS.Root, data, []byte(p.NewText)); err != nil {
+	if err := e.commitProject(ctx, se.WS.Root, []byte(p.NewText)); err != nil {
 		return e.fail(err)
 	}
 	if *restart {
@@ -204,40 +204,77 @@ func (e *env) restartAll(ctx context.Context, slugs []string) int {
 	return 0
 }
 
-// commitProject replaces root's project.toml (old) with next, then locks
-// and renders. On any failure it writes old and the old stack.lock back (or
-// removes the new one when there was none), so the workspace is as it was; the units a failed render already wrote are
-// not touched.
-func (e *env) commitProject(ctx context.Context, root string, old, next []byte) (err error) {
-	path := filepath.Join(root, "project.toml")
-	lockPath := filepath.Join(root, "stack.lock")
-	fi, err := os.Stat(path)
+// commitProject replaces root's project.toml with next, keeping its mode,
+// then locks and renders (commit).
+func (e *env) commitProject(ctx context.Context, root string, next []byte) error {
+	fi, err := os.Stat(filepath.Join(root, "project.toml"))
 	if err != nil {
 		return err
 	}
-	oldLock, lockErr := os.ReadFile(lockPath)
-	if lockErr != nil && !errors.Is(lockErr, os.ErrNotExist) {
-		return lockErr
-	}
-	if err := tomlfile.WriteAtomic(path, next, fi.Mode().Perm()); err != nil {
-		return err
-	}
+	return e.commit(ctx, root, []fileChange{{Rel: "project.toml", Data: next, Mode: fi.Mode().Perm()}}, true)
+}
+
+// fileChange is one file commit writes: Data at Rel (workspace-relative,
+// slash-separated) with Mode, or Rel removed when Data is nil.
+type fileChange struct {
+	Rel  string
+	Data []byte
+	Mode os.FileMode
+}
+
+// commit writes changes under root, then with lock writes stack.lock, then
+// renders. On any failure it puts back every file it changed, stack.lock
+// included (bytes and mode; a file that did not exist is removed, with the
+// directories made for it), so the workspace is as it was; the units a
+// failed render already wrote are not touched.
+func (e *env) commit(ctx context.Context, root string, changes []fileChange, lock bool) (err error) {
+	var undo []func() error
 	defer func() {
 		if err == nil {
 			return
 		}
-		rerr := tomlfile.WriteAtomic(path, old, fi.Mode().Perm())
-		if lockErr == nil {
-			rerr = errors.Join(rerr, tomlfile.WriteAtomic(lockPath, oldLock, 0o644))
-		} else if rmErr := os.Remove(lockPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
-			rerr = errors.Join(rerr, rmErr) // no lock before: none after
+		var rerr error
+		for i := len(undo) - 1; i >= 0; i-- {
+			rerr = errors.Join(rerr, undo[i]())
 		}
 		if rerr != nil {
-			err = errors.Join(err, fmt.Errorf("restoring project.toml: %w", rerr))
+			err = errors.Join(err, fmt.Errorf("restoring the workspace: %w", rerr))
 		}
 	}()
-	if err := workspace.Lock(ctx, root); err != nil {
-		return err
+	var wrote []string
+	for _, c := range changes {
+		path := filepath.Join(root, filepath.FromSlash(c.Rel))
+		restore, err := keep(root, path)
+		if err != nil {
+			return err
+		}
+		undo = append(undo, restore)
+		if c.Data == nil {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+			wrote = append(wrote, "removed "+path)
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := tomlfile.WriteAtomic(path, c.Data, c.Mode); err != nil {
+			return err
+		}
+		wrote = append(wrote, "wrote "+path)
+	}
+	if lock {
+		lockPath := filepath.Join(root, "stack.lock")
+		restore, err := keep(root, lockPath)
+		if err != nil {
+			return err
+		}
+		undo = append(undo, restore)
+		if err := workspace.Lock(ctx, root); err != nil {
+			return err
+		}
+		wrote = append(wrote, "wrote "+lockPath)
 	}
 	w, err := workspace.Load(ctx, root, "")
 	if err != nil {
@@ -247,8 +284,115 @@ func (e *env) commitProject(ctx context.Context, root string, old, next []byte) 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(e.stdout, "wrote %s\n", path)
-	fmt.Fprintf(e.stdout, "wrote %s\n", lockPath)
+	for _, line := range wrote {
+		fmt.Fprintln(e.stdout, line)
+	}
 	e.printRendered(d)
 	return nil
+}
+
+// keep records path as it is now and returns what puts it back: its bytes
+// and mode, or, when it does not exist, its removal and that of the
+// directories below root that do not exist yet either.
+func keep(root, path string) (func() error, error) {
+	fi, err := os.Lstat(path)
+	switch {
+	case err == nil && !fi.Mode().IsRegular():
+		return nil, fmt.Errorf("%s: not a regular file", path)
+	case err == nil:
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		return func() error { return tomlfile.WriteAtomic(path, data, fi.Mode().Perm()) }, nil
+	case !errors.Is(err, os.ErrNotExist):
+		return nil, err
+	}
+	top := "" // the outermost missing directory: MkdirAll makes it
+	for dir := filepath.Dir(path); dir != root && len(dir) > len(root); dir = filepath.Dir(dir) {
+		if _, err := os.Lstat(dir); errors.Is(err, os.ErrNotExist) {
+			top = dir
+		}
+	}
+	return func() error {
+		err := os.Remove(path)
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+		if top != "" {
+			err = errors.Join(err, os.RemoveAll(top))
+		}
+		return err
+	}, nil
+}
+
+// judgedWrite is a file write judged by rendering it in memory: the new
+// text's hash and what it changes, or why it does not render.
+type judgedWrite struct {
+	hash   string
+	used   *bool            // pack file write: whether the project uses the package
+	change *settings.Change // nil with err, or for a package the project does not use
+	err    error
+}
+
+// writeDoc is `--json containerfile write --dry-run` and `--json pack file
+// write --dry-run` (docs/json.md).
+type writeDoc struct {
+	Hash    string               `json:"hash"`
+	Used    *bool                `json:"used,omitempty"`
+	Steps   []settings.TagChange `json:"steps"`
+	Restart []string             `json:"restart"`
+	Errors  []string             `json:"errors"`
+}
+
+// printJudged prints a dry run: what w changes, or why it does not render,
+// one error per line. Both exit 0, so the page can show either.
+func (e *env) printJudged(w judgedWrite) int {
+	doc := writeDoc{Hash: w.hash, Used: w.used, Steps: []settings.TagChange{}, Restart: []string{}, Errors: []string{}}
+	switch {
+	case w.err != nil:
+		for _, line := range strings.Split(w.err.Error(), "\n") {
+			if line != "" {
+				doc.Errors = append(doc.Errors, line)
+			}
+		}
+	case w.change != nil:
+		doc.Steps, doc.Restart = w.change.Steps, w.change.Restart
+	}
+	if e.json {
+		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
+	for _, s := range doc.Steps {
+		fmt.Fprintf(e.stdout, "%s %s: %s -> %s\n", s.Worktree, s.Name, s.OldTag, s.NewTag)
+	}
+	if len(doc.Restart) > 0 {
+		fmt.Fprintf(e.stdout, "restart: %s\n", strings.Join(doc.Restart, ", "))
+	}
+	for _, msg := range doc.Errors {
+		fmt.Fprintf(e.stdout, "error: %s\n", msg)
+	}
+	return 0
+}
+
+// commitJudged commits changes (commit) when w renders, prints each new
+// tag, and with restart restarts w's running worktrees (restartAll).
+func (e *env) commitJudged(ctx context.Context, root string, w judgedWrite, changes []fileChange, lock, restart bool) int {
+	if w.err != nil {
+		return e.fail(w.err)
+	}
+	if err := e.commit(ctx, root, changes, lock); err != nil {
+		return e.fail(err)
+	}
+	for _, s := range w.change.Steps {
+		if s.NewTag != "" {
+			fmt.Fprintf(e.stdout, "%s %s %s\n", s.Worktree, s.Name, s.NewTag)
+		}
+	}
+	if restart {
+		return e.restartAll(ctx, w.change.Restart)
+	}
+	return 0
 }

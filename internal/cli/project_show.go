@@ -255,7 +255,7 @@ func projectWrite(ctx context.Context, e *env, args []string) int {
 	if _, err := cat.Resolve(p); err != nil {
 		return e.fail(err)
 	}
-	if err := e.commitProject(ctx, root, old, next); err != nil {
+	if err := e.commitProject(ctx, root, next); err != nil {
 		return e.fail(err)
 	}
 	return 0

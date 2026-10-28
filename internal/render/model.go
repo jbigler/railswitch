@@ -70,6 +70,10 @@ type Inputs struct {
 	Generated map[string]string // D17 values from mise.local.toml
 	Host      Host
 	Mounts    []MachineMount // machine-local mounts (D57), already filtered to this project
+	// Overlay holds workspace Containerfiles read instead of the disk file,
+	// by workspace-relative path (nil: missing), so a render judges a change
+	// before it is written.
+	Overlay map[string][]byte
 }
 
 // Model is a project's services, independent of any worktree. Every string

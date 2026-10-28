@@ -33,7 +33,7 @@ var completionFiles = map[string]string{
 // offers both for its first word.
 var completionSubs = map[string][]string{
 	"agent":            {"add", "ls", "stop"},
-	"containerfile":    {"eject", "list", "new", "show"},
+	"containerfile":    {"eject", "list", "new", "show", "write"},
 	"dashboard":        {"colors", "serve"},
 	"dashboard colors": {"reset", "set"},
 	"db":               {"dump"},
@@ -60,6 +60,7 @@ var completionFlags = map[string][]string{
 	"build":                  {"--force", "--pull"},
 	"containerfile eject":    {"--force"},
 	"containerfile show":     {"--default"},
+	"containerfile write":    {"--dry-run", "--if-hash=", "--restart"},
 	"dashboard colors reset": {"--dark"},
 	"dashboard colors set":   {"--base=", "--dark"},
 	"down":                   {"--yes"},
@@ -99,6 +100,7 @@ var completionArgs = map[string]completer{
 	"secret rm":           secretCandidates,
 	"containerfile show":  func(_ context.Context, dir string) []string { return containerfileCandidates(dir, true) },
 	"containerfile eject": func(_ context.Context, dir string) []string { return containerfileCandidates(dir, false) },
+	"containerfile write": func(_ context.Context, dir string) []string { return containerfileCandidates(dir, true) },
 	"project rm":          prefixCandidates,
 	"pack eject":          packRefCandidates,
 	"pack show":           packRefCandidates,

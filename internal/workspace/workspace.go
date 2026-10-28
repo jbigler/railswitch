@@ -45,6 +45,8 @@ type Workspace struct {
 	Lock    *config.Lock
 	Dirs    machine.Dirs
 	Slug    string // current worktree, "" at the root
+
+	overlay map[string][]byte // WithFile's files, by workspace-relative path (nil: removed)
 }
 
 // Root walks up from startDir (the working directory when empty) to the
@@ -195,6 +197,18 @@ func (w *Workspace) WithProject(p *config.Project) (*Workspace, error) {
 	return &c, nil
 }
 
+// WithFile is a copy of w whose renders read data at rel, a
+// workspace-relative slash path (nil: rel is removed), in memory only.
+func (w *Workspace) WithFile(rel string, data []byte) *Workspace {
+	c := *w
+	c.overlay = maps.Clone(w.overlay)
+	if c.overlay == nil {
+		c.overlay = map[string][]byte{}
+	}
+	c.overlay[rel] = data
+	return &c
+}
+
 // Hash is the content hash of a project.toml: "sha256:<hex>".
 func Hash(data []byte) string {
 	sum := sha256.Sum256(data)
@@ -332,6 +346,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 		Generated: gen,
 		Host:      host,
 		Mounts:    mounts,
+		Overlay:   w.overlay,
 	})
 }
 

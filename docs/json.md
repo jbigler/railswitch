@@ -60,6 +60,61 @@ suggested addon that is missing from `[image] addons`.
 | `steps[].from` | array of strings | The file's `FROM` images with build args expanded, without `${BASE_IMAGE}`, `scratch` and stage names (D36). Empty for an addon that only builds on the previous step. |
 | `warnings` | array of strings | Non-fatal findings; empty when there are none. |
 
+## `containerfile show <name>`
+
+The workspace file `containerfiles/Containerfile.<name>` (read as a hostile
+file: regular, at most 1 MiB), the built-in default the project's stack has
+for that name, and the diff between them. A missing file is an error (run
+`containerfile eject` or `containerfile new` first). Without `--json` the
+command prints the file, or the default when there is none.
+
+```json
+{"name": "pg-client", "file": "containerfiles/Containerfile.pg-client",
+ "kind": "addon", "text": "# Ejected from postgres@1 …", "hash": "sha256:9f2c…",
+ "default": {"ref": "postgres@1", "text": "ARG BASE_IMAGE\n…"},
+ "ejected": {"ref": "postgres@1", "sha256": "4be1…"},
+ "default_changed": false,
+ "diff": "--- default\n+++ containerfiles/Containerfile.pg-client\n@@ -5,3 +5,4 @@\n…"}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name`, `file` | string | The name and the workspace-relative file. |
+| `kind` | string | `base`, `addon` (an option's addon), `tool`, `standalone` (an option's own image), `agent-base`, `agent`, or `user` (a `containerfile new` addon: no default). |
+| `text` | string | The file. |
+| `hash` | string | `sha256:<hex>` of the file's bytes: `containerfile write --if-hash` takes it. |
+| `default` | object or null | The built-in default the stack has for `name`: `ref` (its package, `agent-base` or a tool's name) and `text`. `null` when there is none. |
+| `ejected` | object or null | The file's first line read as `containerfile eject`'s header: `ref` and the `sha256` of the default it copied. `null` without one. |
+| `default_changed` | bool | `default` and `ejected` are both present and the default's sha256 is no longer the header's: the default changed since the file was ejected. |
+| `diff` | string | A unified diff (3 lines of context) from the default to the file without its header line; `""` when they are equal or there is no default. |
+
+## `containerfile write <name> --if-hash <h> --dry-run`
+
+What writing stdin (at most 1 MiB) to a Containerfile the project builds
+would change: every registered worktree rendered in memory with the new
+text, so the contract checks (D31, D36) run before anything is written.
+`name` must be a step of the build (`containerfile list`), and the file's
+hash must still be `<h>` ("changed on disk since you opened it"); both
+refusals exit 1. A new text that does not render exits 0 with `errors`.
+
+```json
+{"hash": "sha256:51d0…",
+ "steps": [{"worktree": "master", "name": "addon pg-client", "old_tag": "localhost/filial/base:ruby3.3.6-node22.11.0-ba118cc2", "new_tag": "localhost/filial/base:ruby3.3.6-node22.11.0-0c7e93aa"}],
+ "restart": ["master"], "errors": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hash` | string | `sha256:<hex>` of the new text. |
+| `steps` | array | Each worktree's build step whose tag changes, in build order: `worktree`, `name` (as `containerfile list`), `old_tag`, `new_tag`. A step only one side builds has `""` for the other tag. The steps built on a changed one change too. |
+| `restart` | array of strings | The registered worktrees whose app runs (one `systemctl show`) and whose stamped units change; `--restart` on the real write restarts them in order. |
+| `errors` | array of strings | Why the new text does not render, one line each; empty when it does. |
+
+Without `--dry-run` the write is atomic and, after it, every worktree is
+rendered; a failed render puts the file back. It prints each new tag and,
+with `--restart`, restarts the `restart` worktrees (stop, then `up`),
+stopping at the first failure.
+
 ## `pack show <ref>`
 
 One pack or option: a built-in (no workspace needed) or a local package of

@@ -31,6 +31,10 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 - Packages: `[detect] files` (pack, all must exist), `[[detect]] file/match/evidence` (option, any rule); paths are `[A-Za-z0-9._+-/]` only (passed as `/<path>` no-cone sparse patterns). Framework knowledge stays in the rules (D87).
 - `project new --dry-run` (`--json`: `project_toml`, the base worktree's routes/containers/env names, warnings, steps; D89): `planNew` (every check, read-only registry) and `writeProject` (project.toml, ejects, secrets) are shared with the real run; the dry run writes into a temp dir it removes and renders in memory on an unsaved registry entry, with no clone, podman or systemctl. `project new --up`: `up` in the base worktree after a successful create.
 
+## CLI (Stage 6d additions)
+- `containerfile show <name> --json` (D91: `kind`, `text`, `hash`, `default` {ref,text} or null, `ejected` header {ref,sha256} or null, `default_changed`, `diff` from the default to the file without its header). `containerfile write <name> --if-hash <h> [--dry-run] [--restart]` (text on stdin ≤ 1 MiB): only a file `render.Containerfiles` lists; every worktree rendered in memory first (`Workspace.WithFile` → `render.Inputs.Overlay`, judged by `settings.Env.Compare`: changed tags, restart list); `--dry-run --json` `{hash, steps, restart, errors}`, a render refusal is `errors` with exit 0.
+- Writes go through `commit` (`internal/cli/settings.go`, shared with `settings apply` and `project write`): every changed file, then optionally `stack.lock`, then render; any failure puts each back byte for byte (a new file and its new dirs removed). Restart lists count running worktrees whose stamped units or mounted package assets change.
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).

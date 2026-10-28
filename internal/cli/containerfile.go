@@ -20,6 +20,9 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	builtinfs "github.com/jbigler/railswitch/internal/pack/builtin"
+	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/settings"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -213,9 +216,9 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	return p, cat, st, nil
 }
 
-// railswitch containerfile list|show|eject|new (D32).
+// railswitch containerfile list|show|write|eject|new (D32, D91).
 func cmdContainerfile(ctx context.Context, e *env, args []string) int {
-	const usage = "usage: railswitch containerfile list | show <name> [--default] | eject <name> [--force] | new <name>"
+	const usage = "usage: railswitch containerfile list | show <name> [--default] | write <name> --if-hash <hash> [--dry-run] [--restart] | eject <name> [--force] | new <name>"
 	if len(args) == 0 {
 		return e.usageErr(usage)
 	}
@@ -224,6 +227,8 @@ func cmdContainerfile(ctx context.Context, e *env, args []string) int {
 		return containerfileList(ctx, e, args[1:])
 	case "show":
 		return containerfileShow(e, args[1:])
+	case "write":
+		return containerfileWrite(ctx, e, args[1:])
 	case "eject":
 		return containerfileEject(e, args[1:])
 	case "new":
@@ -311,8 +316,99 @@ func orEmpty(s []string) []string {
 	return s
 }
 
+// kindNames are the kinds of `containerfile show --json`; a file without a
+// default is "user".
+var kindNames = map[defaultKind]string{
+	kindBase:       "base",
+	kindAddon:      "addon",
+	kindTool:       "tool",
+	kindStandalone: "standalone",
+	kindAgentBase:  "agent-base",
+	kindAgent:      "agent",
+}
+
+// ejectHeaderRe is the first line Eject writes.
+var ejectHeaderRe = regexp.MustCompile(`^# Ejected from (\S+) Containerfile\.[a-z][a-z0-9-]* \(sha256 ([0-9a-f]{64})\)`)
+
+// parseEjectHeader reads Eject's header line: the default's package and
+// the sha256 of the default it copied.
+func parseEjectHeader(line string) (ref, sha string, ok bool) {
+	m := ejectHeaderRe.FindStringSubmatch(line)
+	if m == nil {
+		return "", "", false
+	}
+	return m[1], m[2], true
+}
+
+// cfShowDoc is `containerfile show --json` (docs/json.md).
+type cfShowDoc struct {
+	Name           string     `json:"name"`
+	File           string     `json:"file"`
+	Kind           string     `json:"kind"`
+	Text           string     `json:"text"`
+	Hash           string     `json:"hash"`
+	Default        *cfDefault `json:"default"`
+	Ejected        *cfEjected `json:"ejected"`
+	DefaultChanged bool       `json:"default_changed"`
+	Diff           string     `json:"diff"`
+}
+
+type cfDefault struct {
+	Ref  string `json:"ref"`
+	Text string `json:"text"`
+}
+
+type cfEjected struct {
+	Ref    string `json:"ref"`
+	SHA256 string `json:"sha256"`
+}
+
+// readContainerfileText reads root's Containerfile.<name> as a hostile
+// file; a missing one says how a Containerfile comes to be.
+func readContainerfileText(root, name string) ([]byte, error) {
+	rel := workspaceFile(name)
+	data, err := safefile.Read(filepath.Join(root, filepath.FromSlash(rel)), safefile.Limit)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%s does not exist: run railswitch containerfile eject %s (a default) or containerfile new %s (an addon)", rel, name, name)
+	}
+	return data, err
+}
+
+// cfShowJSON is the workspace file name with its default, the eject header
+// and the diff from the default to the file without that header.
+func cfShowJSON(root, name string) (*cfShowDoc, error) {
+	data, err := readContainerfileText(root, name)
+	if err != nil {
+		return nil, err
+	}
+	_, _, st, err := projectStack(root)
+	if err != nil {
+		return nil, err
+	}
+	rel := workspaceFile(name)
+	text := string(data)
+	doc := &cfShowDoc{Name: name, File: rel, Kind: "user", Text: text, Hash: workspace.Hash(data)}
+	first, rest, _ := strings.Cut(text, "\n")
+	body := text
+	if ref, sha, ok := parseEjectHeader(first); ok {
+		doc.Ejected, body = &cfEjected{Ref: ref, SHA256: sha}, rest
+	}
+	if b, ok := stackBuiltins(st)[name]; ok {
+		def, err := fs.ReadFile(b.files, b.file)
+		if err != nil {
+			return nil, err
+		}
+		doc.Kind = kindNames[b.kind]
+		doc.Default = &cfDefault{Ref: b.ref, Text: string(def)}
+		doc.DefaultChanged = doc.Ejected != nil && fmt.Sprintf("%x", sha256.Sum256(def)) != doc.Ejected.SHA256
+		doc.Diff = settings.UnifiedDiff("default", rel, string(def), body)
+	}
+	return doc, nil
+}
+
 // railswitch containerfile show <name> [--default]: the workspace file, or
 // the built-in default with --default or when there is no workspace file.
+// With --json: the file, its default and the diff between them.
 func containerfileShow(e *env, args []string) int {
 	fset := e.flags("containerfile show")
 	def := fset.Bool("default", false, "print the built-in default, not the workspace file")
@@ -327,8 +423,21 @@ func containerfileShow(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	if e.json {
+		if *def {
+			return e.usageErr("containerfile show: --json holds the default; drop --default")
+		}
+		doc, err := cfShowJSON(root, name)
+		if err != nil {
+			return e.fail(err)
+		}
+		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
 	if !*def {
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(workspaceFile(name))))
+		data, err := safefile.Read(filepath.Join(root, filepath.FromSlash(workspaceFile(name))), safefile.Limit)
 		if err == nil {
 			e.stdout.Write(data)
 			return 0
@@ -351,6 +460,52 @@ func containerfileShow(e *env, args []string) int {
 	}
 	e.stdout.Write(data)
 	return 0
+}
+
+// railswitch containerfile write <name> --if-hash <h> [--dry-run]
+// [--restart]: replace a Containerfile the project builds with stdin, after
+// rendering every worktree with it in memory (the D31/D36 checks).
+func containerfileWrite(ctx context.Context, e *env, args []string) int {
+	const usage = "usage: railswitch containerfile write <name> --if-hash <hash> [--dry-run] [--restart]  (the new text on stdin)"
+	fset := e.flags("containerfile write")
+	hash := fset.String("if-hash", "", "the hash of the file the edit started from (containerfile show --json; required)")
+	dry := fset.Bool("dry-run", false, "check the new text and print what it changes; write nothing")
+	restart := fset.Bool("restart", false, "restart the running worktrees whose units change")
+	name, code, ok := parseNamed(e, fset, args, usage)
+	if !ok {
+		return code
+	}
+	if *hash == "" {
+		return e.usageErr("%s", usage)
+	}
+	if !cfNameRe.MatchString(name) {
+		return e.usageErr("containerfile write: %q is not a Containerfile name (%s)", name, cfNameRe)
+	}
+	text, err := e.readStdin()
+	if err != nil {
+		return e.fail(err)
+	}
+	se, _, err := e.settingsEnv(ctx)
+	if err != nil {
+		return e.fail(err)
+	}
+	rel := workspaceFile(name)
+	if !slices.Contains(render.Containerfiles(se.WS.Project, se.WS.Stack), rel) {
+		return e.fail(fmt.Errorf("%s is not built by this project; use containerfile new or eject", rel))
+	}
+	cur, err := readContainerfileText(se.WS.Root, name)
+	if err != nil {
+		return e.fail(err)
+	}
+	if workspace.Hash(cur) != *hash {
+		return e.fail(fmt.Errorf("%s changed on disk since you opened it", rel))
+	}
+	ch, err := se.Compare(se.WS.WithFile(rel, text))
+	w := judgedWrite{hash: workspace.Hash(text), change: ch, err: err}
+	if *dry {
+		return e.printJudged(w)
+	}
+	return e.commitJudged(ctx, se.WS.Root, w, []fileChange{{Rel: rel, Data: text, Mode: 0o644}}, false, *restart)
 }
 
 // railswitch containerfile eject <name> [--force]: see Eject.

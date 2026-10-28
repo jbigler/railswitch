@@ -189,6 +189,9 @@ func Load(path string) (*Project, error) {
 	return decode(path, data)
 }
 
+// Parse is Load of a project.toml's contents.
+func Parse(data []byte) (*Project, error) { return decode("project.toml", data) }
+
 // decode is Load of path's contents data.
 func decode(path string, data []byte) (*Project, error) {
 	var p Project

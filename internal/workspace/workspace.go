@@ -5,6 +5,8 @@ package workspace
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -172,6 +174,31 @@ func Lock(_ context.Context, root string) error {
 	}
 	l.Packs, l.Options, l.Agents = want.Packs, want.Options, want.Agents
 	return l.Write(path)
+}
+
+// WithProject is w with project p in place of its own: p's stack, and a
+// lock of that stack's packages that keeps w's image digests, in memory
+// only, so p renders without writing stack.lock.
+func (w *Workspace) WithProject(p *config.Project) (*Workspace, error) {
+	st, err := w.Catalog.Resolve(p)
+	if err != nil {
+		return nil, err
+	}
+	want, err := lockEntries(st)
+	if err != nil {
+		return nil, err
+	}
+	l := *w.Lock
+	l.Packs, l.Options, l.Agents = want.Packs, want.Options, want.Agents
+	c := *w
+	c.Project, c.Stack, c.Lock = p, st, &l
+	return &c, nil
+}
+
+// Hash is the content hash of a project.toml: "sha256:<hex>".
+func Hash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 // lockEntries is the lock's pack, option and agent entries for st. Packs and

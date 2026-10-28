@@ -476,6 +476,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		}
 		if p.ov != nil {
 			item.Worktrees = len(p.ov.Worktrees)
+			item.Review = p.ov.ReviewPending
 			for _, wt := range p.ov.Worktrees {
 				kind := agentKind(wt.Agent)
 				wv := switchWT{Slug: wt.Slug, URL: "/p/" + pj.Prefix + "/" + wt.Slug, Need: needsInput(kind)}
@@ -502,6 +503,9 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		}
 		if p.prErr != "" {
 			banner.Lines = append(banner.Lines, "PRs unavailable: "+p.prErr)
+		}
+		if p.ov != nil && p.ov.ReviewPending {
+			banner.Review = reviewURL(prefix)
 		}
 	}
 	pv := pageView{

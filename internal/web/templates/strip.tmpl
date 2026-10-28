@@ -1,3 +1,3 @@
 {{define "strip"}}<div id="strip" class="strip"{{if not .Items}} hidden{{end}}>{{range .Items}}<a href="{{.URL}}">{{.Text}}</a>{{end}}</div>{{end}}
 
-{{define "banner"}}<div id="banner" class="banner"{{if not .Lines}} hidden{{end}}>{{range .Lines}}<div>{{.}}</div>{{end}}</div>{{end}}
+{{define "banner"}}<div id="banner" class="banner"{{if not (or .Lines .Review)}} hidden{{end}}>{{range .Lines}}<div>{{.}}</div>{{end}}{{if .Review}}<div class="rv-banner">Package update waiting for review. <a href="{{.Review}}">Review update</a></div>{{end}}</div>{{end}}

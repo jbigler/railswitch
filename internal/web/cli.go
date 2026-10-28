@@ -29,9 +29,10 @@ type projectRow struct {
 }
 
 type overview struct {
-	Prefix    string     `json:"prefix"`
-	Workspace string     `json:"workspace"`
-	Worktrees []worktree `json:"worktrees"`
+	Prefix        string     `json:"prefix"`
+	Workspace     string     `json:"workspace"`
+	ReviewPending bool       `json:"review_pending"` // a package update waits for lock --review
+	Worktrees     []worktree `json:"worktrees"`
 }
 
 type worktree struct {

@@ -25,6 +25,7 @@ var projectShowJSON = `{"prefix":"ftest","name":"Ftest App","repo":"git@github.c
  "options":[
   {"key":"cache","slot":true,"ref":"kv@1","choices":["kv@1","local:kv2@1","none"]},
   {"key":"analytics","slot":false,"ref":"stats@1","choices":["stats@1","none"]}],
+ "add_choices":["kv@1","stats@1","local:kv2@1"],
  "env":[{"name":"BIND","value":"0.0.0.0"}],
  "links":[
   {"label":"Flipper","url":"{worktree.host}/flipper","from":"project","hidden":false},
@@ -120,6 +121,7 @@ func TestSettingsPageRenders(t *testing.T) {
 		`data-preview="/p/ftest/settings/preview"`, `action="/p/ftest/settings/secret"`, `href="/p/ftest/settings/file"`,
 		"Nothing staged. Change a setting on the left to see what it does.",
 		`data-view="settings"`,
+		`<form class="add-row" data-stage="service">`, `<option value="local:kv2@1">local:kv2@1</option>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page lacks %q", want)

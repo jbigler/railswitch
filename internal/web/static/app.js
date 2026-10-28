@@ -602,6 +602,7 @@ if (view) {
       e.preventDefault();
       const v = (n) => f.elements[n].value.trim();
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
+      else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);
       f.reset();
       addReady(f);

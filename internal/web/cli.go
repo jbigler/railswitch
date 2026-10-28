@@ -119,6 +119,7 @@ type projectShow struct {
 	Options    []optionRow   `json:"options"`
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
+	AddChoices []string      `json:"add_choices"`
 	File       string        `json:"file"`
 }
 

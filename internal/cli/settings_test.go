@@ -198,7 +198,8 @@ func TestSettingsApplyRestart(t *testing.T) {
 
 type projectShowDoc struct {
 	Prefix, Name, Repo, Hash, File string
-	BaseBranch                     string `json:"base_branch"`
+	BaseBranch                     string   `json:"base_branch"`
+	AddChoices                     []string `json:"add_choices"`
 	Options                        []struct {
 		Key     string
 		Slot    bool
@@ -240,6 +241,9 @@ service = "db"
 	}
 	if len(d.Options) < 6 || d.Options[0].Key != "database" || !d.Options[0].Slot || d.Options[0].Ref != "postgres@1" {
 		t.Fatalf("options %+v", d.Options)
+	}
+	if !slices.Contains(d.AddChoices, "postgres@1") || !slices.Contains(d.AddChoices, "local:mariadb@1") || slices.Contains(d.AddChoices, "none") {
+		t.Errorf("add_choices %v; want every option, no none", d.AddChoices)
 	}
 	db := d.Options[0].Choices
 	if !slices.Contains(db, "postgres@1") || !slices.Contains(db, "local:mariadb@1") || db[len(db)-1] != "none" || slices.Contains(db, "redis@1") {

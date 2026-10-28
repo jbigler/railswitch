@@ -26,7 +26,13 @@
 <div class="choices" hidden>{{$k := .Key}}{{range .Choices}}<label class="choice"><input type="radio" name="opt-{{$k}}" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
 </div>
 {{else}}<p class="muted">No options.</p>
-{{end}}</section>
+{{end}}<form class="add-row" data-stage="service">
+<input name="key" placeholder="service name" class="mono" autocomplete="off" required aria-label="Service name">
+<select name="ref" required aria-label="Option">{{range .Project.AddChoices}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+<button class="ln" disabled>Add service</button>
+</form>
+<p class="note">Any other key runs an option as one more service, named after the key (a second database, ClickHouse beside Postgres).</p>
+</section>
 
 <section class="card">
 <h2>Environment</h2>

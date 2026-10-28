@@ -129,7 +129,9 @@ shows what each one does before anything is written.
 - **Stack and options:** one row per slot and extra `[options]` key with
   its current package. "Change" opens its choices (the current one tagged
   `current`); picking another stages it and the row shows `→ <new>`.
-  Picking the current one again unstages it.
+  Picking the current one again unstages it. "Add service" (a key and an
+  option from `project show`'s `add_choices`) stages a new extra key (D81);
+  setting an extra key to `none` removes it.
 - **Environment:** the project's `[env]`. Editing a value stages it when
   you leave the field; Remove stages its removal; the add form (name,
   value) stages a new one.

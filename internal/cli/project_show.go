@@ -26,6 +26,7 @@ type projectDoc struct {
 	Hash       string      `json:"hash"`
 	File       string      `json:"file"` // the raw editor's text
 	Options    []optionRow `json:"options"`
+	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
 	Env        []envPair   `json:"env"`
 	Links      []linkRow   `json:"links"`
 }
@@ -111,6 +112,10 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 		Hash: workspace.Hash(data), File: string(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
 	}
 	opts := optionRefs(w.Catalog, w.Root)
+	d.AddChoices = []string{}
+	for _, o := range opts {
+		d.AddChoices = append(d.AddChoices, o.ref.String())
+	}
 	for _, key := range pack.OptionKeys(p.Options) {
 		slot := slices.Contains(config.Slots, key)
 		ref, ok := p.Options[key]

@@ -477,6 +477,28 @@ func TestRailsAppEntrypointStops(t *testing.T) {
 	}
 }
 
+// TestRailsAppEntrypointKeepsStdin: the server command reads the
+// container's stdin, not /dev/null, though the entrypoint runs it in the
+// background. A Procfile's `rails tailwindcss:watch` exits at stdin's EOF and
+// foreman then stops every process: the app never became ready.
+func TestRailsAppEntrypointKeepsStdin(t *testing.T) {
+	script, err := fs.ReadFile(builtin.FS, "packs/rails/entrypoints/entrypoint-app.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", string(script), "entrypoint-app.sh", "sh", "-c", "timeout 1 cat; echo $?")
+	cmd.Dir, cmd.Env = t.TempDir(), []string{"PATH=/usr/bin:/bin"}
+	in, err := cmd.StdinPipe() // held open: a stdin that never reaches EOF
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+	out, err := cmd.Output()
+	if err != nil || strings.TrimSpace(string(out)) != "124" {
+		t.Errorf("the server read %q (%v); want 124: still reading the open stdin", out, err)
+	}
+}
+
 // TestRailsDepsEntrypointExecsArgs: given a command (the pack's install,
 // or another pack reusing it), the deps entrypoint execs it after its setup
 // instead of its own install.

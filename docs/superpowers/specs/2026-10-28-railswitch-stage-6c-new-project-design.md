@@ -61,13 +61,16 @@ evidence = "Gemfile: pg"            # optional; default "<file>: <match>"
    workspace dir when it exists are not considered, there is none yet).
 3. Fetch: into a new temp dir under `$XDG_RUNTIME_DIR` (else `os.TempDir`),
    `git clone --depth 1 --filter=blob:none --no-checkout --branch <b>
-   <repo> <tmp>`, then `git -C <tmp> sparse-checkout set --no-cone
-   <paths…>` and `git -C <tmp> checkout`, with `GIT_LFS_SKIP_SMUDGE=1`,
+   <repo> <tmp>`, with `GIT_LFS_SKIP_SMUDGE=1`,
    `-c core.hooksPath=/dev/null`, `GIT_TERMINAL_PROMPT=0`; every git call
-   through `sys.Runner`, 2 min timeout. The temp dir is removed on every
-   path (defer).
-4. Read each path with `safefile.Read` (regular file, ≤ 1 MiB; a symlink or
-   a missing file counts as absent).
+   through `sys.Runner`, 2 min timeout. No working tree is ever written.
+   The temp dir is removed on every path (defer).
+4. Read each path from the object store: `git ls-tree -z HEAD -- <paths…>`
+   gives each entry's mode and blob id; only mode 100644 or 100755 counts
+   (a symlink, a path under a symlinked directory, which has no entry, a
+   directory or a submodule counts as absent). `git cat-file -s <oid>`
+   (the promisor fetches the one blob, compressed) over 1 MiB counts as
+   absent; else `git cat-file blob <oid>` into a buffer capped at 1 MiB.
 5. Choose:
    - pack: `--pack` when given; else the first pack (by ref string) whose
      `files` all exist; others that matched go in `others`; none → `null`.
@@ -204,8 +207,9 @@ Metabase and record what each reads; a used prefix; an existing folder.
 
 - D87: detection rules belong to packages (`[detect] files`;
   `[[detect]] file/match/evidence`); core only runs them.
-- D88: `project detect` reads only the named files with a shallow sparse
-  fetch into a temp dir it always removes.
+- D88: `project detect` reads only the named files, from the object store
+  of a shallow blobless clone with no working tree, in a temp dir it always
+  removes.
 - D89: `project new --dry-run --json` gives the exact `project.toml` and an
   in-memory render summary; `project new --up` starts the base worktree.
 - D90: 6c scope as above.

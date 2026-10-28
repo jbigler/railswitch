@@ -21,7 +21,12 @@ fi
 # after 10 s and the unit ends failed (exit 137). The container's processes
 # share PID 1's process group (dash has no job control without a tty), so
 # the stop goes to the group, kill 0, with this shell ignoring it.
-"$@" &
+# Without job control a background command's stdin is /dev/null unless
+# redirected (and dash ignores <&0): pass the container's stdin through fd 3,
+# for servers that end at its EOF (tailwindcss:watch under foreman).
+exec 3<&0
+"$@" <&3 3<&- &
+exec 3<&-
 pid=$!
 stopping=
 stop() {

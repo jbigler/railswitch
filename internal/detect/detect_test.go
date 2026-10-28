@@ -3,6 +3,7 @@ package detect
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -239,6 +240,7 @@ func TestFetchBareRepo(t *testing.T) {
 	git(t, src, "commit", "-q", "-m", "init")
 	bare := filepath.Join(t.TempDir(), "app.git")
 	git(t, src, "clone", "-q", "--bare", src, bare)
+	git(t, bare, "config", "uploadpack.allowFilter", "true")
 	// A template hook is the one a clone installs and would run.
 	tmpl := t.TempDir()
 	write(t, filepath.Join(tmpl, "hooks", "post-checkout"), []byte("#!/bin/sh\ntouch "+filepath.Join(runtime, "HOOK-RAN")+"\n"))
@@ -247,7 +249,7 @@ func TestFetchBareRepo(t *testing.T) {
 	}
 	t.Setenv("GIT_TEMPLATE_DIR", tmpl)
 
-	paths := []string{"Gemfile", "config/application.rb", "package.json", "missing.txt", "etc", "etc/passwd"}
+	paths := []string{"Gemfile", "config/application.rb", "package.json", "missing.txt", "etc", "etc/passwd", "sub"}
 	files, err := Fetch(context.Background(), sys.Exec{}, "file://"+bare, "trunk", paths)
 	if err != nil {
 		t.Fatal(err)
@@ -276,5 +278,57 @@ func TestFetchRefusesFlags(t *testing.T) {
 		if _, err := Fetch(context.Background(), nil, tc[0], tc[1], nil); err == nil {
 			t.Errorf("Fetch(%q, %q): no error", tc[0], tc[1])
 		}
+	}
+}
+
+// diskWatch runs commands and records the most bytes ever on disk under
+// dir after one of them.
+type diskWatch struct {
+	dir  string
+	most int64
+}
+
+func (d *diskWatch) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
+	res, err := sys.Exec{}.Run(ctx, c)
+	var n int64
+	_ = filepath.WalkDir(d.dir, func(_ string, e os.DirEntry, err error) error {
+		if err == nil && e.Type().IsRegular() {
+			if fi, err := e.Info(); err == nil {
+				n += fi.Size()
+			}
+		}
+		return nil
+	})
+	d.most = max(d.most, n)
+	return res, err
+}
+
+// TestFetchInflatesNothing: a small repository whose file inflates far past
+// safefile.Limit never puts that file on disk; the file counts as absent.
+func TestFetchInflatesNothing(t *testing.T) {
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+	runtime := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", runtime)
+	src := t.TempDir()
+	git(t, src, "init", "-q", "-b", "main")
+	write(t, filepath.Join(src, "Gemfile"), []byte(strings.Repeat("gem 'pg'\n", 32<<20/9)))
+	write(t, filepath.Join(src, "config", "application.rb"), []byte("module App; end\n"))
+	git(t, src, "add", ".")
+	git(t, src, "commit", "-q", "-m", "init")
+	bare := filepath.Join(t.TempDir(), "app.git")
+	git(t, src, "clone", "-q", "--bare", src, bare)
+	git(t, bare, "config", "uploadpack.allowFilter", "true")
+
+	w := &diskWatch{dir: runtime}
+	files, err := Fetch(context.Background(), w, "file://"+bare, "main", []string{"Gemfile", "config/application.rb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := files["Gemfile"]; ok || string(files["config/application.rb"]) != "module App; end\n" {
+		t.Errorf("files = %v; want only config/application.rb", slices.Sorted(maps.Keys(files)))
+	}
+	if w.most > 4<<20 {
+		t.Errorf("%d bytes on disk under $XDG_RUNTIME_DIR during Fetch; want the compressed objects only (< 4 MiB)", w.most)
 	}
 }

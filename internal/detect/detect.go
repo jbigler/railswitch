@@ -9,11 +9,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,10 +42,12 @@ func Paths(cat *pack.Catalog) []string {
 	return slices.Compact(out)
 }
 
-// Fetch is the contents of each of paths in branch of repo, from a shallow,
-// blobless, sparse clone into a temp dir it always removes. A path that is
-// missing, a symlink (or under one), not a regular file or over
-// safefile.Limit is left out. No hook, LFS filter or prompt runs.
+// Fetch is the contents of each of paths in branch of repo, read from the
+// object store of a shallow, blobless clone with no working tree, in a
+// temp dir it always removes. Only a regular file (mode 100644 or 100755)
+// of at most safefile.Limit bytes counts: a path that is missing, a
+// symlink, under one, a directory or a submodule is left out, and no blob
+// is inflated onto disk. No hook, LFS filter or prompt runs.
 func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []string) (map[string][]byte, error) {
 	for _, a := range [][2]string{{"repository", repo}, {"branch", branch}} {
 		if a[1] == "" || strings.HasPrefix(a[1], "-") || strings.ContainsAny(a[1], "\r\n\x00") {
@@ -66,60 +69,80 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 		return nil, err
 	}
 	env = append(env, "GIT_LFS_SKIP_SMUDGE=1")
-	git := func(args ...string) error {
-		argv := append([]string{"-c", "core.hooksPath=/dev/null", "-c", "protocol.ext.allow=never"}, args...)
-		_, err := r.Run(ctx, sys.Cmd{Name: "git", Args: argv, Env: env, Timeout: gitTimeout})
-		return err
-	}
 	dir := filepath.Join(tmp, "repo")
-	if err := git("clone", "--quiet", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", branch, "--", repo, dir); err != nil {
+	git := func(stdout io.Writer, args ...string) (sys.Result, error) {
+		argv := append([]string{"--literal-pathspecs", "-c", "core.hooksPath=/dev/null", "-c", "protocol.ext.allow=never"}, args...)
+		return r.Run(ctx, sys.Cmd{Name: "git", Args: argv, Env: env, Timeout: gitTimeout, Stdout: stdout})
+	}
+	if _, err := git(nil, "clone", "--quiet", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", branch, "--", repo, dir); err != nil {
 		return nil, fmt.Errorf("git clone --branch %s %s: %w", branch, repo, err)
 	}
-	if len(paths) > 0 {
-		// Leading "/" anchors each pattern at the root; pack.Load refused
-		// any path holding pattern syntax.
-		patterns := make([]string, len(paths))
-		for i, p := range paths {
-			patterns[i] = "/" + p
-		}
-		if err := git(append([]string{"-C", dir, "sparse-checkout", "set", "--no-cone", "--"}, patterns...)...); err != nil {
-			return nil, fmt.Errorf("git sparse-checkout: %w", err)
-		}
-		if err := git("-C", dir, "checkout", "--quiet"); err != nil {
-			return nil, fmt.Errorf("git checkout: %w", err)
-		}
-	}
-
 	files := map[string][]byte{}
-	for _, p := range paths {
-		if underSymlink(dir, p) {
+	if len(paths) == 0 {
+		return files, nil
+	}
+	res, err := git(nil, append([]string{"-C", dir, "ls-tree", "-z", "HEAD", "--"}, paths...)...)
+	if err != nil {
+		return nil, fmt.Errorf("git ls-tree: %w", err)
+	}
+	for p, oid := range regularBlobs(res.Stdout, paths) {
+		// The blob is fetched (compressed) from the promisor here.
+		res, err := git(nil, "-C", dir, "cat-file", "-s", oid)
+		if err != nil {
+			return nil, fmt.Errorf("git cat-file -s %s: %w", p, err)
+		}
+		size, err := strconv.ParseInt(strings.TrimSpace(string(res.Stdout)), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("git cat-file -s %s: %q", p, res.Stdout)
+		}
+		if size > safefile.Limit {
 			continue
 		}
-		data, err := safefile.Read(filepath.Join(dir, filepath.FromSlash(p)), safefile.Limit)
-		switch {
-		case err == nil:
-			files[p] = data
-		case errors.Is(err, fs.ErrNotExist), errors.Is(err, safefile.ErrRefused):
-		default:
-			return nil, err
+		var buf capped
+		if _, err := git(&buf, "-C", dir, "cat-file", "blob", oid); err != nil {
+			if errors.Is(err, errOverLimit) || errors.Is(buf.err, errOverLimit) {
+				continue
+			}
+			return nil, fmt.Errorf("git cat-file blob %s: %w", p, err)
 		}
+		files[p] = buf.b
 	}
 	return files, nil
 }
 
-// underSymlink reports whether a parent directory of rel inside dir is a
-// symlink or not a directory: safefile.Read follows those.
-func underSymlink(dir, rel string) bool {
-	parts := strings.Split(rel, "/")
-	cur := dir
-	for _, part := range parts[:len(parts)-1] {
-		cur = filepath.Join(cur, part)
-		fi, err := os.Lstat(cur)
-		if err != nil || !fi.IsDir() {
-			return true
+// regularBlobs is path → blob id for each entry of `git ls-tree -z` output
+// that is one of paths and a regular file. A path under a symlinked or
+// missing directory has no entry.
+func regularBlobs(out []byte, paths []string) map[string]string {
+	blobs := map[string]string{}
+	for _, ent := range bytes.Split(out, []byte{0}) {
+		meta, p, ok := bytes.Cut(ent, []byte{'\t'})
+		if !ok || !slices.Contains(paths, string(p)) {
+			continue
+		}
+		f := strings.Fields(string(meta)) // <mode> <type> <oid>
+		if len(f) == 3 && (f[0] == "100644" || f[0] == "100755") && f[1] == "blob" {
+			blobs[string(p)] = f[2]
 		}
 	}
-	return false
+	return blobs
+}
+
+var errOverLimit = errors.New("blob over safefile.Limit")
+
+// capped keeps at most safefile.Limit bytes and fails the write past that.
+type capped struct {
+	b   []byte
+	err error
+}
+
+func (c *capped) Write(p []byte) (int, error) {
+	if len(c.b)+len(p) > safefile.Limit {
+		c.err = errOverLimit
+		return 0, errOverLimit
+	}
+	c.b = append(c.b, p...)
+	return len(p), nil
 }
 
 // Result is what project detect prints (docs/json.md). Pack nil means no

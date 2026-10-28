@@ -407,11 +407,14 @@ file untouched), else writes, locks and renders as `settings apply` does.
 ## `project detect <repo> [--branch <b>] [--pack <ref>]`
 
 What the new-project page reads (D88): the pack and options a repository's
-files suggest, each with its evidence. railswitch checks out only the
-files the built-in packages' detection rules name (`docs/packs.md`), in a
-shallow sparse clone with no hooks, no LFS and no prompts, into a temp dir
-under `$XDG_RUNTIME_DIR` that it always removes. A path that is a symlink,
-is under one, or is over 1 MiB counts as absent. A git failure exits 1
+files suggest, each with its evidence. railswitch reads only the files
+the built-in packages' detection rules name (`docs/packs.md`), straight
+from the object store of a shallow, blobless clone with no working tree
+(`git ls-tree`, `git cat-file`), with no hooks, no LFS and no prompts, in
+a temp dir under `$XDG_RUNTIME_DIR` that it always removes. Only a regular
+file of at most 1 MiB counts: a path that is a symlink, is under one, is a
+directory or is over 1 MiB counts as absent, and no file is inflated onto
+disk. A git failure exits 1
 with git's error; a repository or branch starting with `-` is refused
 before git runs.
 

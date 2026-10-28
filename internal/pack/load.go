@@ -255,6 +255,50 @@ const AgentBaseFile = "Containerfile.agent-base"
 // of kind at r, in place of the one r names: a built-in's, a local or a
 // library package's accepted content (D97); for KindTool the tool r.Name,
 // for KindBase the agent base image. origin, set for a library package,
+// WithoutFiles is a copy of c in which the package of kind at r keeps its
+// manifest but its files can't be read: every read fails with err. It is
+// for a package whose content changed and whose accepted copy is gone, so
+// copying its files out (an eject) fails instead of handing on unreviewed
+// text, while the rest of the catalog serves as before.
+func (c *Catalog) WithoutFiles(kind string, r Ref, err error) *Catalog {
+	n := &Catalog{Packs: maps.Clone(c.Packs), Options: maps.Clone(c.Options), Tools: maps.Clone(c.Tools), Agents: maps.Clone(c.Agents), AgentBase: c.AgentBase, Root: c.Root, Libraries: c.Libraries, overlay: c.overlay}
+	off := unreadable{err}
+	switch kind {
+	case KindPack:
+		if p := n.Packs[r]; p != nil {
+			cp := *p
+			cp.Files = off
+			n.Packs[r] = &cp
+		}
+	case KindOption:
+		if o := n.Options[r]; o != nil {
+			cp := *o
+			cp.Files = off
+			n.Options[r] = &cp
+		}
+	case KindAgent:
+		if a := n.Agents[r]; a != nil {
+			cp := *a
+			cp.Files = off
+			n.Agents[r] = &cp
+		}
+	case KindTool:
+		if t := n.Tools[r.Name]; t != nil {
+			cp := *t
+			cp.Files = off
+			n.Tools[r.Name] = &cp
+		}
+	case KindBase:
+		n.AgentBase = off
+	}
+	return n
+}
+
+// unreadable is a file system every read of which fails with err.
+type unreadable struct{ err error }
+
+func (u unreadable) Open(string) (fs.File, error) { return nil, u.err }
+
 // is the library it was accepted from (stack.lock's entry).
 func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS, origin *LibraryOrigin) (*Catalog, error) {
 	top := kindDirs[kind]

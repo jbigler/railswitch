@@ -26,7 +26,9 @@ analytics = "local:clickhouse@1"   # service analytics
 ```
 
 An option fills one key per project, and two options may not give the same
-env name. A second database of one engine is a database in its server: the
+env name. A service dropped from `[options]` (or set to `"none"`) is
+stopped by the render that removes its unit, so its container never keeps
+running on its volume. A second database of one engine is a database in its server: the
 app creates it, and `db dump` dumps it.
 
 ## Refs

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -473,6 +474,36 @@ func TestRenderWritesDashboardUnit(t *testing.T) {
 	}
 	if len(d.Warnings) != 0 {
 		t.Errorf("warnings %q", d.Warnings)
+	}
+}
+
+// A unit render removes (a service no longer in the stack) is stopped, so
+// its container does not keep running on its volume; nothing else is.
+func TestRenderStopsRemovedUnit(t *testing.T) {
+	ctx := context.Background()
+	w, f, _ := dashboardWS(t)
+	if _, err := w.Render(ctx, f, false); err != nil {
+		t.Fatal(err)
+	}
+	live, err := os.ReadFile(filepath.Join(w.Dirs.Quadlet, "filial-master-rails.container"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(w.Dirs.Quadlet, "filial-master-gone.container"), live, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.Calls = nil
+	if _, err := w.Render(ctx, f, false); err != nil {
+		t.Fatal(err)
+	}
+	var stops []string
+	for _, c := range f.Calls {
+		if len(c) > 2 && c[0] == "systemctl" && c[2] == "stop" {
+			stops = append(stops, strings.Join(c, " "))
+		}
+	}
+	if want := []string{"systemctl --user stop filial-master-gone.service"}; !slices.Equal(stops, want) {
+		t.Errorf("stops = %q; want %q", stops, want)
 	}
 }
 

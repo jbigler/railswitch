@@ -440,6 +440,18 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 	maps.Copy(p.Units, machine.ProxyUnits(reg.Registry))
 	d, err := render.Apply(p, w.Root, w.Dirs.Quadlet, prefix, check)
 	if err == nil && !check {
+		// A container whose unit render removed (a service no longer in
+		// the stack, D28) keeps running, and holds its volume, until it
+		// is stopped: stop it while systemd still has the unit loaded.
+		var gone []string
+		for _, n := range d.Removed {
+			if base, ok := strings.CutSuffix(n, ".container"); ok {
+				gone = append(gone, base+".service")
+			}
+		}
+		if err := (podman.Systemd{R: r}).StopLoaded(ctx, gone...); err != nil {
+			return d, fmt.Errorf("stop a removed unit: %w", err)
+		}
 		// The dashboard is a convenience: its unit failing to be written
 		// must not stop an up.
 		if werr := writeDashboardUnit(w.Dirs); werr != nil {

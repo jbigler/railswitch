@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -207,5 +209,334 @@ func TestAddSecretKeepsComments(t *testing.T) {
 	}
 	if err := AddSecret(path, "Bad", Secret{Services: []string{"rails"}}); err == nil {
 		t.Fatal("invalid name: want error")
+	}
+}
+
+// edited is a valid project.toml with a comment above and after every edited
+// table or key.
+const edited = `schema = 1
+
+# hide
+hide_links = ["Alpha", "Beta"]   # hidden ones
+# after hide
+
+[project]
+name   = "Demo"
+prefix = "demo"
+
+[stack]
+pack = "rails@1"
+app  = "rails"
+
+[image]
+base = "containerfiles/Containerfile.base"
+
+# options above
+[options]
+# before database
+database = "postgres@1"   # the db
+cache = "valkey@1"
+# options after
+
+# env above
+[env]
+# before A
+A = "1"   # a
+B = "2"
+# env after
+
+# link one above
+[[links]]
+# in one
+label = "One"
+url   = "http://one"   # one url
+# link one after
+
+# link two above
+[[links]]
+label = "Two"
+url   = "http://two"
+# link two after
+`
+
+func mustDoc(t *testing.T, data string) {
+	t.Helper()
+	path := writeProject(t, data)
+	p, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v\n%s", err, data)
+	}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("Validate: %v\n%s", err, data)
+	}
+}
+
+func replaceOnce(t *testing.T, s, old, new string) string {
+	t.Helper()
+	if strings.Count(s, old) != 1 {
+		t.Fatalf("%q occurs %d times", old, strings.Count(s, old))
+	}
+	return strings.Replace(s, old, new, 1)
+}
+
+func TestSetOptionKeepsComments(t *testing.T) {
+	got, err := SetOption(edited, "cache", "redis@2", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, `cache = "valkey@1"`, `cache = "redis@2"`); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	mustDoc(t, got)
+
+	got, err = SetOption(edited, "database", "none", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, `database = "postgres@1"`, `database = "none"`); got != want {
+		t.Errorf("trailing comment lost:\n%s", got)
+	}
+
+	got, err = SetOption(edited, "storage", "minio@1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, "cache = \"valkey@1\"\n", "cache = \"valkey@1\"\nstorage = \"minio@1\"\n"); got != want {
+		t.Errorf("insert lands after the last key:\n%s", got)
+	}
+}
+
+func TestSetOptionNoneSlotAndExtra(t *testing.T) {
+	got, err := SetOption(edited, "queue", "sidekiq@1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = SetOption(got, "queue", "none", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != edited {
+		t.Errorf("set then none on an extra key is not the identity:\n%s", got)
+	}
+	got, err = SetOption(edited, "absent", "none", false)
+	if err != nil || got != edited {
+		t.Errorf("none on an absent extra key: %v, changed=%v", err, got != edited)
+	}
+}
+
+func TestSetOptionNoOptionsTable(t *testing.T) {
+	data := replaceOnce(t, commented, "[options]\ndatabase = \"postgres@1\"   # the db\n", "")
+	got, err := SetOption(data, "cache", "valkey@1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := data + "\n[options]\ncache = \"valkey@1\"\n"; got != want {
+		t.Errorf("got\n%s", got)
+	}
+}
+
+func TestEnvSetUnset(t *testing.T) {
+	got, err := SetEnv(edited, "A", "9")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, `A = "1"`, `A = "9"`); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = SetEnv(edited, "C", "3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, "B = \"2\"\n", "B = \"2\"\nC = \"3\"\n"); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = UnsetEnv(edited, "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, "A = \"1\"   # a\n", ""); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	mustDoc(t, got)
+	if _, err := UnsetEnv(edited, "NOPE"); err == nil {
+		t.Error("unset of an absent name is not an error")
+	}
+	got, err = SetEnv(commented, "X", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := commented + "\n[env]\nX = \"1\"\n"; got != want {
+		t.Errorf("got\n%s", got)
+	}
+}
+
+func TestAddRemoveLink(t *testing.T) {
+	got, err := AddLink(edited, "Three", "http://three")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := edited + "\n[[links]]\nlabel = \"Three\"\nurl = \"http://three\"\n"; got != want {
+		t.Errorf("got\n%s", got)
+	}
+	mustDoc(t, got)
+	if _, err := AddLink(edited, "One", "http://x"); err == nil {
+		t.Error("duplicate label accepted")
+	}
+
+	got, err = RemoveLink(edited, "One")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, "[[links]]\n# in one\nlabel = \"One\"\nurl   = \"http://one\"   # one url\n", ""); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	mustDoc(t, got)
+	got, err = RemoveLink(edited, "Two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, "[[links]]\nlabel = \"Two\"\nurl   = \"http://two\"\n", ""); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	if _, err := RemoveLink(edited, "Nope"); err == nil {
+		t.Error("remove of an absent label is not an error")
+	}
+}
+
+func TestHideShowLink(t *testing.T) {
+	got, err := HideLink(edited, "Gamma")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, `"Beta"]`, `"Beta", "Gamma"]`); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = ShowLink(edited, "Alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, `["Alpha", "Beta"]`, `["Beta"]`); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = ShowLink(edited, "Beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, edited, `["Alpha", "Beta"]`, `["Alpha"]`); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	mustDoc(t, got)
+	if _, err := HideLink(edited, "Alpha"); err == nil {
+		t.Error("hide of a hidden label")
+	}
+	if _, err := ShowLink(edited, "Gamma"); err == nil {
+		t.Error("show of a shown label")
+	}
+	// No hide_links yet: the key lands before the first table.
+	got, err = HideLink(commented, "Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, commented, "schema = 1   # keep me\n", "schema = 1   # keep me\nhide_links = [\"Z\"]\n"); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = HideLink("# c\n[project]\nname = \"x\"\n", "Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "# c\nhide_links = [\"Z\"]\n\n[project]\nname = \"x\"\n"; got != want {
+		t.Errorf("got\n%s", got)
+	}
+	multi := replaceOnce(t, edited, `hide_links = ["Alpha", "Beta"]   # hidden ones`, "hide_links = [\n  \"Alpha\",\n  \"Beta\",   # b\n]")
+	got, err = ShowLink(multi, "Alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, multi, "  \"Alpha\",\n", ""); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = ShowLink(multi, "Beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, multi, "  \"Beta\",   # b\n", "  # b\n"); got != want {
+		t.Errorf("got\n%s", got)
+	}
+}
+
+func TestEditBlockedShapes(t *testing.T) {
+	inline := "schema = 1\nenv = { X = \"1\" }\n"
+	links := "schema = 1\nlinks = [{ label = \"A\", url = \"u\" }]\n"
+	cases := []struct {
+		name string
+		data string
+		do   func(string) (string, error)
+		line int
+	}{
+		{"inline env set", inline, func(d string) (string, error) { return SetEnv(d, "Y", "2") }, 2},
+		{"inline env unset", inline, func(d string) (string, error) { return UnsetEnv(d, "X") }, 2},
+		{"inline options", "schema = 1\noptions = { cache = \"valkey@1\" }\n", func(d string) (string, error) { return SetOption(d, "cache", "none", true) }, 2},
+		{"dotted options", "schema = 1\noptions.cache = \"valkey@1\"\n", func(d string) (string, error) { return SetOption(d, "cache", "x@1", true) }, 2},
+		{"dotted env", "schema = 1\nenv.X = \"1\"\n", func(d string) (string, error) { return SetEnv(d, "Y", "1") }, 2},
+		{"inline links add", links, func(d string) (string, error) { return AddLink(d, "B", "u") }, 2},
+		{"inline links remove", links, func(d string) (string, error) { return RemoveLink(d, "A") }, 2},
+		{"hide_links not an array", "schema = 1\nhide_links = \"A\"\n", func(d string) (string, error) { return HideLink(d, "B") }, 2},
+	}
+	for _, c := range cases {
+		_, err := c.do(c.data)
+		var be *BlockedError
+		if !errors.As(err, &be) {
+			t.Errorf("%s: %v, want *BlockedError", c.name, err)
+			continue
+		}
+		if be.Line != c.line {
+			t.Errorf("%s: line %d, want %d", c.name, be.Line, c.line)
+		}
+		if want := fmt.Sprintf("project.toml:%d: ", c.line); !strings.HasPrefix(err.Error(), want) || !strings.HasSuffix(err.Error(), ": edit project.toml directly") {
+			t.Errorf("%s: message %q", c.name, err)
+		}
+	}
+}
+
+func TestEditQuotesValues(t *testing.T) {
+	val := "a\"b\\c{x}\tz" // a newline is a Validate error, not an edit's
+	got, err := SetEnv(edited, "Q", val)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustDoc(t, got)
+	p, err := decode("project.toml", []byte(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Env["Q"] != val {
+		t.Errorf("env round trip: %q", p.Env["Q"])
+	}
+	label, url := "L\"x\\y", "{worktree.host}/a\"b\\c"
+	got, err = AddLink(edited, label, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustDoc(t, got)
+	p, err = decode("project.toml", []byte(got))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l := p.Links[len(p.Links)-1]; l.Label != label || l.URL != url {
+		t.Errorf("link round trip: %+v", l)
+	}
+	got, err = RemoveLink(got, label)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != edited+"\n" { // the blank line AddLink put before its table stays
+		t.Errorf("add then remove a quoted link:\n%s", got)
+	}
+	got, err = HideLink(edited, label)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err = ShowLink(got, label); err != nil || got != edited {
+		t.Errorf("hide then show a quoted label is not the identity: %v", err)
 	}
 }

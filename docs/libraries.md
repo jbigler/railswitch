@@ -16,6 +16,10 @@ Users verify a library and decide which keys to trust.
 - An SSH key for signing. Use a key that signs only this library, not your
   login key. Types: `ssh-ed25519` (recommended),
   `ecdsa-sha2-nistp256|384|521`, `ssh-rsa`, `sk-ssh-ed25519@openssh.com`.
+  railswitch refuses a key blob that is not in the encoding `ssh-keygen`
+  writes, such as an RSA number with a leading zero byte or bytes after
+  the last field. Such a blob is the same key to OpenSSH but would get
+  another fingerprint, so a revoked key could come back under a new name.
 
 ## Library layout
 

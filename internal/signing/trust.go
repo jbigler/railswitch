@@ -97,9 +97,12 @@ func (t *Trust) check() error {
 		seen[l.ID] = true
 		for _, k := range l.Keys {
 			fp, err := Fingerprint(k.Key)
+			canon, _ := ParseKey(k.Key)
 			switch {
 			case err != nil:
 				errs = append(errs, fmt.Errorf("library %s: %w", l.ID, err))
+			case canon != k.Key:
+				errs = append(errs, fmt.Errorf("library %s: key %q is not \"<type> <base64>\" as signer add writes it", l.ID, k.Key))
 			case fp != k.Fingerprint:
 				errs = append(errs, fmt.Errorf("library %s: key %s has fingerprint %s, the file says %s", l.ID, k.Key, fp, k.Fingerprint))
 			}

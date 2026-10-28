@@ -5,6 +5,8 @@ package signing
 
 import (
 	"bytes"
+	"crypto/ecdh"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -41,21 +43,96 @@ func ParseKey(authorizedKey string) (string, error) {
 	if err := checkBlob(f[0], blob); err != nil {
 		return "", err
 	}
-	return f[0] + " " + f[1], nil
+	return f[0] + " " + base64.StdEncoding.EncodeToString(blob), nil
 }
 
-// checkBlob checks a key blob's type: in KeyTypes and the blob's first
-// string.
+// checkBlob parses a key blob field by field: its type is typ and in
+// KeyTypes, each field has the length and form OpenSSH accepts in the one
+// encoding OpenSSH writes, and nothing follows the last. Fingerprints hash
+// the blob as given, so a second encoding of one key (an RSA mpint with a
+// leading zero, a string OpenSSH strips a trailing NUL from) would give it
+// a second fingerprint: a revoked key trusted again under another name.
 func checkBlob(typ string, blob []byte) error {
 	if !slices.Contains(KeyTypes, typ) {
 		return fmt.Errorf("public key type %q is not one of %s", typ, strings.Join(KeyTypes, ", "))
 	}
-	inner, _, err := readString(blob)
-	if err != nil {
-		return fmt.Errorf("public key: %w", err)
+	var f [][]byte
+	for rest := blob; len(rest) > 0; {
+		s, r, err := readString(rest)
+		if err != nil {
+			return fmt.Errorf("public key: %w", err)
+		}
+		f, rest = append(f, s), r
 	}
-	if string(inner) != typ {
+	if len(f) == 0 || string(f[0]) != typ {
+		var inner []byte
+		if len(f) > 0 {
+			inner = f[0]
+		}
 		return fmt.Errorf("public key: the blob is a %q key, the line says %q", inner, typ)
+	}
+	if err := checkFields(typ, f[1:]); err != nil {
+		return fmt.Errorf("public key: %s: %w", typ, err)
+	}
+	return nil
+}
+
+// checkFields checks the fields after a key blob's type.
+func checkFields(typ string, f [][]byte) error {
+	want := 2
+	if typ == "ssh-ed25519" {
+		want = 1
+	}
+	if len(f) != want {
+		return fmt.Errorf("%d fields after the type, want %d", len(f), want)
+	}
+	switch typ {
+	case "ssh-ed25519":
+		return checkLen(f[0], ed25519.PublicKeySize)
+	case "sk-ssh-ed25519@openssh.com":
+		if bytes.IndexByte(f[1], 0) >= 0 {
+			return errors.New("the application holds a NUL byte")
+		}
+		return checkLen(f[0], ed25519.PublicKeySize)
+	case "ssh-rsa":
+		if err := checkMpint(f[0]); err != nil {
+			return fmt.Errorf("e: %w", err)
+		}
+		if err := checkMpint(f[1]); err != nil {
+			return fmt.Errorf("n: %w", err)
+		}
+		return nil
+	}
+	curve := strings.TrimPrefix(typ, "ecdsa-sha2-")
+	if string(f[0]) != curve {
+		return fmt.Errorf("curve %q, want %q", f[0], curve)
+	}
+	c := map[string]ecdh.Curve{"nistp256": ecdh.P256(), "nistp384": ecdh.P384(), "nistp521": ecdh.P521()}[curve]
+	// NewPublicKey takes only an uncompressed point on the curve, each
+	// coordinate below the field prime.
+	if _, err := c.NewPublicKey(f[1]); err != nil {
+		return errors.New("the point is not an uncompressed point on the curve")
+	}
+	return nil
+}
+
+func checkLen(b []byte, n int) error {
+	if len(b) != n {
+		return fmt.Errorf("the key is %d bytes, want %d", len(b), n)
+	}
+	return nil
+}
+
+// checkMpint refuses an SSH mpint that is not positive or not minimal (a
+// leading zero byte the next byte's top bit doesn't need).
+func checkMpint(b []byte) error {
+	switch {
+	case len(b) == 0:
+		return errors.New("zero")
+	case b[0]&0x80 != 0:
+		return errors.New("negative")
+	case b[0] == 0 && (len(b) == 1 || b[1]&0x80 == 0):
+		return errors.New("a superfluous leading zero byte")
 	}
 	return nil
 }

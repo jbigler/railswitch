@@ -73,6 +73,16 @@ fingerprint = "SHA256:…"
   base64, `SHA256:` prefix), never parsed from a tool's output.
 - Keys: `ssh-ed25519`, `ecdsa-sha2-nistp256|384|521`, `ssh-rsa`
   (≥ 3072 bits not checked; the type list only), `sk-ssh-ed25519@openssh.com`.
+- Key blobs are parsed field by field and must be in the one encoding
+  OpenSSH writes, since the fingerprint hashes the blob as given: nothing
+  after the last field; ed25519 (and sk-ed25519) keys exactly 32 bytes, an
+  sk key's application with no NUL; an ecdsa key's curve name its type's,
+  its point uncompressed and on the curve; an RSA key's `e` and `n`
+  positive mpints with no superfluous leading zero. Otherwise OpenSSH reads
+  two blobs as one key and a revoked key returns under a new fingerprint.
+  This holds for keys on a command line, in a signature, in `[[rotate]]`
+  and in `signers.toml`, where each key must also be exactly
+  `<type> <base64>` (no comment, no control characters).
 
 ## Verifying
 

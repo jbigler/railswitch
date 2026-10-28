@@ -805,7 +805,12 @@ branch (`git ls-remote`).
     "Register, lock and render",
     "Start main (up)"
   ],
-  "install": null
+  "install": null,
+  "template": {
+    "ref": "rails-pg@1",
+    "sha256": "8ef3eafac52875f5c98c2d13eeb7b18d27d559c8de7cfacafdb37d9dad969e9d",
+    "ask": [{"key": "env.TZ", "prompt": "Time zone", "default": "UTC", "answer": "Asia/Bangkok"}]
+  }
 }
 ```
 
@@ -818,7 +823,8 @@ branch (`git ls-remote`).
 | `worktree.env` | string[] | The app service's env names, sorted. No values: a real run generates the passwords. |
 | `warnings` | string[] | The render's warnings. |
 | `steps` | string[] | What the real run does, in order. The last step is there only with `--up`. |
-| `install` | object or null | The Install review of the library packages the project uses, as `settings preview`'s `install`; `null` when it uses none. The real run then needs `project new … --accept-install <install.hash>`, checked before the clone and again by the lock. |
+| `install` | object or null | The Install review of the library packages the project uses, as `settings preview`'s `install`, and of a library template (a package of kind `template`, every file added and flagged); `null` when it uses neither. Its `hash` covers the template's ref and content hash too. The real run then needs `project new … --accept-install <install.hash>`, checked before the clone and again by the lock. |
+| `template` | object or null | With `--template`: `ref`, `sha256` (its content hash, lowercase hex, no prefix, as `[template] sha256` records it) and each question in order: `key`, `prompt`, `default`, `answer` (the value the project gets: the `--answer` given, `""` included, else the default). `null` without `--template`. |
 
 The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,

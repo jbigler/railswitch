@@ -50,7 +50,7 @@ const (
 )
 
 // Compare is every file that differs from old to new, a package of kind
-// ("pack", "option", "tool", "agent" or "base", the agent base image), sorted by path, each with its
+// ("pack", "option", "tool", "agent", "base", the agent base image, or "template"), sorted by path, each with its
 // flags. A nil old is an empty package: every file is added; a nil new
 // removes every file.
 func Compare(kind string, old, new fs.FS) ([]File, error) {

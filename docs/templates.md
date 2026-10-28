@@ -105,3 +105,43 @@ Containerfiles it keeps, and warns about each `local:` package the
 template uses (a new project needs its own copy). Export refuses while
 `stack.lock` is out of date or an update waits for review: a template is
 made from what was accepted.
+
+## Starting a project from a template
+
+```
+railswitch project new ~/src/shop --repo <url> --prefix shop \
+  --template rails-pg@1 --answer env.TZ=Asia/Bangkok --answer versions.postgres=17
+```
+
+`project new --template <ref> [--answer key=value]…` builds the new
+`project.toml` in this order:
+
+1. The template's lines.
+2. Each question's value: its `--answer`, else its default. An answer
+   with an empty value (`--answer env.TZ=`) sets the value empty; leave
+   the flag out to keep the default. An answer for a key the template
+   doesn't ask is refused.
+3. The other flags on top: `--pack` (only when given), `--option`,
+   `--tool`, `--agent` (when given, it replaces the template's agents;
+   without it the template's agents stay and no default agent is added),
+   and `--name`, `--prefix`, `--repo`, `--branch` for `[project]`.
+4. Each chosen option's image pin the lines lack (`[versions]`).
+5. `[template] ref` and `sha256`: where the project came from.
+
+Then the usual `project new` path runs: every check before the clone (an
+option answer the pack can't use is refused there), the clone, the
+ejects, then the template's Containerfiles written over the ejected ones,
+its user addons appended to `[image] addons`, and its `[[secret]]`
+declarations as `[secrets.<name>]`. `--dry-run` shows it all, with
+`template` (each question and its answer) in `--json` (docs/json.md).
+
+The template's content is stored beside the accepted packages
+(`<data>/locked/<sha256>/`), so a later update can be shown as a diff.
+
+A library template (`<alias>:<name>@N`) is part of the install review
+(D110): the dry run's `install` lists it as a package of kind `template`,
+its `stack.toml` and Containerfiles shown and flagged by the review checks
+(docs/packs.md, Locking), even when it installs no library
+package. `--accept-install <install.hash>` accepts it with the packages;
+the hash covers its content, so a template changed since the review is
+refused, and accepting it verifies its library again.

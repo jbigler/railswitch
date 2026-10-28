@@ -17,17 +17,19 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/template"
 	"github.com/jbigler/railswitch/internal/workspace"
 	"github.com/jbigler/railswitch/internal/worktree"
 )
 
-const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--dry-run] [--up] [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim] [--agent name=ref]... | [--agent none]"
+const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--dry-run] [--up] [--name <n>] [--branch <base>] [--template <ref> [--answer key=value]...] [--pack rails@1] [--option slot=ref]... [--tool nvim] [--agent name=ref]... | [--agent none]"
 
 const (
 	gitCloneTimeout  = 10 * time.Minute // checks out the app's tree
@@ -65,7 +67,9 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
 	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
 	up := fset.Bool("up", false, "run up in the base worktree once it is created (exit 3: created, up failed)")
-	var opts, tools, agentFlags stringList
+	tplRef := fset.String("template", "", "start from the template `ref` (template ls): its lines, the answers, then the other flags on top")
+	var opts, tools, agentFlags, answerFlags stringList
+	fset.Var(&answerFlags, "answer", "answer a --template question: `key=value` (repeatable; an empty value sets it empty, no flag keeps the default)")
 	fset.Var(&opts, "option", "fill an option slot: `slot=ref` or slot=none (repeatable)")
 	fset.Var(&tools, "tool", "enable a developer `tool`: nvim (repeatable)")
 	fset.Var(&agentFlags, "agent", "add an agent: `name=ref` (repeatable), or none; default: the built-in default agent")
@@ -87,7 +91,17 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.usageErr("new: %v\n%s", err, newUsage)
 	}
-	pl, err := planNew(ctx, e.run, newArgs{dir: dir, repo: *repo, prefix: *prefix, name: *name, branch: *branch, packRef: *packRef, opts: opts, nvim: nvim, agents: agents})
+	answers, err := parseAnswers(answerFlags)
+	if err != nil {
+		return e.usageErr("new: %v\n%s", err, newUsage)
+	}
+	if *tplRef == "" && answers != nil {
+		return e.usageErr("new: --answer answers a --template question\n%s", newUsage)
+	}
+	if *tplRef != "" && !isSet(fset, "pack") {
+		*packRef = "" // the template's
+	}
+	pl, err := planNew(ctx, e.run, newArgs{dir: dir, repo: *repo, prefix: *prefix, name: *name, branch: *branch, packRef: *packRef, opts: opts, nvim: nvim, agents: agents, template: *tplRef, answers: answers})
 	if err != nil {
 		return e.fail(err)
 	}
@@ -104,11 +118,11 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	case install == nil && *acceptHash != "":
 		return e.fail(errors.New("--accept-install: the project installs no library package"))
 	case install != nil && *acceptHash == "":
-		return e.fail(fmt.Errorf("installing %s needs review: project new --dry-run shows the install review; accept it with --accept-install <hash>", refList(refs)))
+		return e.fail(fmt.Errorf("installing %s needs review: project new --dry-run shows the install review; accept it with --accept-install <hash>", pl.reviewed(refs)))
 	case install != nil && install.Hash != *acceptHash:
 		return e.fail(errInstallChanged)
 	case install != nil:
-		accept = workspace.Accept{Install: refs, IfHash: install.Hash, Run: e.run}
+		accept = workspace.Accept{Install: refs, IfHash: install.Hash, Run: e.run, Template: pl.libTemplate}
 	}
 
 	ws, slug := pl.ws, pl.slug
@@ -149,10 +163,13 @@ const exitCreatedUpFailed = 3
 
 // newArgs are project new's flags, parsed.
 type newArgs struct {
-	dir, repo, prefix, name, branch, packRef string
-	opts                                     []string
-	nvim                                     *config.NvimTool
-	agents                                   map[string]string // nil: the catalog's default agent
+	dir, repo, prefix, name, branch string
+	packRef                         string // "": the template's
+	opts                            []string
+	nvim                            *config.NvimTool
+	agents                          map[string]string // nil: the catalog's default agent, or the template's agents
+	template                        string            // a template ref; "" for none
+	answers                         map[string]string // its questions' answers
 }
 
 // newPlan is a project new that passed every check: what the real run
@@ -164,6 +181,25 @@ type newPlan struct {
 	st       *pack.Stack
 	dirs     machine.Dirs
 	reg      *machine.Registry // read without the lock, never saved
+	// tpl is the template the project starts from (nil: none), resolved
+	// once: its files are what the review hashed and what is written.
+	tpl     *template.Template
+	answers map[string]string
+	// libTemplate is tpl as an Install review shows it, for a library
+	// template; nil otherwise.
+	libTemplate *workspace.Template
+}
+
+// reviewed names what an Install review of pl with refs covers.
+func (pl *newPlan) reviewed(refs []pack.Ref) string {
+	names := refList(refs)
+	if t := pl.libTemplate; t != nil {
+		if names != "" {
+			names += ", "
+		}
+		names += "template " + t.Ref.String()
+	}
+	return names
 }
 
 // planNew makes every check project new makes before it clones, in order,
@@ -186,16 +222,23 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 	if err != nil {
 		return nil, err
 	}
-	if a.agents == nil {
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return nil, err
+	}
+	var tpl *template.Template
+	var lines *config.Project
+	var libTemplate *workspace.Template
+	if a.template != "" {
+		if tpl, lines, libTemplate, err = newTemplate(dirs, a.template, a.answers); err != nil {
+			return nil, err
+		}
+	} else if a.agents == nil {
 		if ref, ok := cat.DefaultAgent(); ok {
 			a.agents = map[string]string{ref.Name: ref.String()}
 		}
 	}
-	p, st, err := newProject(cat, a.packRef, a.name, a.prefix, a.repo, a.opts, a.nvim, a.agents)
-	if err != nil {
-		return nil, err
-	}
-	dirs, err := machine.DefaultDirs()
+	p, st, err := newProject(cat, a.packRef, a.name, a.prefix, a.repo, a.opts, a.nvim, a.agents, lines)
 	if err != nil {
 		return nil, err
 	}
@@ -220,17 +263,68 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		return nil, fmt.Errorf("base branch %q: %w", base, err)
 	}
 	p.Project.BaseBranch = base
-	if err := newPathsFree(ws, slug, st); err != nil {
+	if err := newPathsFree(ws, slug, st, tpl); err != nil {
 		return nil, err
 	}
-	return &newPlan{ws: ws, slug: slug, p: p, cat: cat, st: st, dirs: dirs, reg: reg}, nil
+	return &newPlan{ws: ws, slug: slug, p: p, cat: cat, st: st, dirs: dirs, reg: reg, tpl: tpl, answers: a.answers, libTemplate: libTemplate}, nil
+}
+
+// newTemplate resolves the template ref on this machine (D110) and applies
+// answers: the template, the lines a new project starts from (recording
+// it in [template]) and, for a library template, what its Install review
+// shows. An answer to a question it doesn't ask is refused.
+func newTemplate(dirs machine.Dirs, ref string, answers map[string]string) (*template.Template, *config.Project, *workspace.Template, error) {
+	r, err := pack.ParseRef(ref)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("--template: %w", err)
+	}
+	libs := workspace.Libraries(dirs)
+	t, sha, err := template.Resolve(ref, dirs, libs)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	base, err := template.Apply(t, answers)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	base.Template = &config.TemplateRef{Ref: r.String(), SHA256: sha}
+	var lt *workspace.Template
+	if r.Library != "" {
+		co, err := libs.Checkout(r.Library)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		lt = &workspace.Template{Ref: r, SHA256: sha, Signer: co.Signer, Files: t.Files}
+	}
+	return t, base, lt, nil
+}
+
+// parseAnswers reads project new's --answer values: key=value each, a key
+// at most once; nil for none.
+func parseAnswers(flags []string) (map[string]string, error) {
+	if flags == nil {
+		return nil, nil
+	}
+	out := map[string]string{}
+	for _, f := range flags {
+		k, v, ok := strings.Cut(f, "=")
+		if !ok || k == "" {
+			return nil, fmt.Errorf("--answer %q is not key=value", f)
+		}
+		if _, dup := out[k]; dup {
+			return nil, fmt.Errorf("--answer %s is given twice", k)
+		}
+		out[k] = v
+	}
+	return out, nil
 }
 
 // newPathsFree refuses a workspace dir that is not a directory, and each
 // path project new creates in ws that already exists: the clone's dir,
-// the files it writes and each Containerfile it ejects. Dry and real run
-// refuse here, before the clone, with the same message.
-func newPathsFree(ws, slug string, st *pack.Stack) error {
+// the files it writes and each Containerfile it ejects or takes from the
+// template tpl (nil: none). Dry and real run refuse here, before the
+// clone, with the same message.
+func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template) error {
 	switch fi, err := os.Stat(ws); {
 	case errors.Is(err, fs.ErrNotExist):
 		return nil
@@ -242,6 +336,11 @@ func newPathsFree(ws, slug string, st *pack.Stack) error {
 	rels := []string{slug, ".gitignore", "mise.local.toml", "stack.lock"}
 	for _, n := range ejectNames(st) {
 		rels = append(rels, workspaceFile(n))
+	}
+	if tpl != nil {
+		for _, n := range slices.Sorted(maps.Keys(tpl.Containerfiles)) {
+			rels = append(rels, workspaceFile(n))
+		}
 	}
 	for _, rel := range rels {
 		p := filepath.Join(ws, filepath.FromSlash(rel))
@@ -278,6 +377,9 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace
 	if err := workspace.Lock(ctx, ws, accept); err != nil {
 		return nil, 0, err
 	}
+	if err := storeTemplate(pl); err != nil {
+		return nil, 0, err
+	}
 	w, err := workspace.Load(ctx, ws, "")
 	if err != nil {
 		return nil, 0, err
@@ -286,10 +388,13 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace
 	return secrets, id, err
 }
 
-// writeProject writes pl's project.toml into dir, ejects the stack's default
-// Containerfiles there (which sets [image]) and declares the secrets
-// (addNewSecrets), returning their names. The real run writes into the
-// workspace, the dry run into a temp dir: one path, the same bytes.
+// writeProject writes pl's project.toml into dir, ejects the stack's
+// default Containerfiles there (which sets [image]), declares the
+// template's secrets, puts the template's Containerfiles in place of the ejected ones
+// (its user addons appended to [image] addons) and declares the secrets
+// the agents and nvim need (addNewSecrets), returning the names of every
+// declared secret. The real run writes into the workspace, the dry run into
+// a temp dir: one path, the same bytes.
 func writeProject(dir string, pl *newPlan) ([]string, error) {
 	proj := filepath.Join(dir, "project.toml")
 	if err := createFile(proj, projectTOML(pl.p), 0o644); err != nil {
@@ -300,7 +405,42 @@ func writeProject(dir string, pl *newPlan) ([]string, error) {
 			return nil, fmt.Errorf("eject %s: %w", n, err)
 		}
 	}
-	return addNewSecrets(proj, pl.p, pl.st)
+	declared := slices.Sorted(maps.Keys(pl.p.Secrets)) // the template's
+	for _, n := range declared {
+		if err := config.AddSecret(proj, n, pl.p.Secrets[n]); err != nil {
+			return nil, err
+		}
+	}
+	if t := pl.tpl; t != nil {
+		for _, n := range slices.Sorted(maps.Keys(t.Containerfiles)) {
+			if _, err := writeContainerfile(dir, workspaceFile(n), t.Containerfiles[n], true); err != nil {
+				return nil, err
+			}
+		}
+		for _, a := range t.Lines.Image.Addons {
+			if err := config.AppendImageAddon(proj, a); err != nil {
+				return nil, err
+			}
+		}
+	}
+	names, err := addNewSecrets(proj, pl.p, pl.st)
+	return append(declared, names...), err
+}
+
+// storeTemplate stores pl's template in the store beside the packages
+// (D96), so template check can diff an update against what was accepted.
+func storeTemplate(pl *newPlan) error {
+	if pl.tpl == nil {
+		return nil
+	}
+	sha, err := lockstore.Store{Dir: lockstore.Dir(pl.dirs)}.Put(pl.tpl.Files)
+	if err != nil {
+		return fmt.Errorf("store template %s: %w", pl.p.Template.Ref, err)
+	}
+	if sha != pl.p.Template.SHA256 {
+		return fmt.Errorf("template %s changed while the project was created: start again", pl.p.Template.Ref)
+	}
+	return nil
 }
 
 // railswitch project init: join a project from a clone of its workspace repo (D38).
@@ -387,10 +527,14 @@ func (e *env) printNext(ws, slug string, unset []string) {
 }
 
 // newProject is the project.toml new writes, before [image] and secrets:
-// the pack's defaults overlaid by opts (slot=ref), the chosen options'
-// version pins and agents (name → package ref). It is validated as it will
-// be once base is ejected.
-func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim *config.NvimTool, agents map[string]string) (*config.Project, *pack.Stack, error) {
+// the pack's defaults, or a template's lines (base), overlaid by opts
+// (slot=ref), packRef ("": base's pack), nvim and agents (name → package
+// ref; nil: base's), and the chosen options' version pins it lacks. It is
+// validated as it will be once base is ejected.
+func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim *config.NvimTool, agents map[string]string, base *config.Project) (*config.Project, *pack.Stack, error) {
+	if packRef == "" && base != nil {
+		packRef = base.Stack.Pack
+	}
 	ref, err := pack.ParseRef(packRef)
 	if err != nil {
 		return nil, nil, fmt.Errorf("--pack: %w", err)
@@ -405,12 +549,21 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	if err := sys.GitArg("--repo", repo); err != nil {
 		return nil, nil, err
 	}
-	p := &config.Project{
-		Schema:  config.SchemaVersion,
-		Project: config.Meta{Name: name, Prefix: prefix, Repo: repo},
-		Stack:   config.StackRef{Pack: ref.String(), App: pk.App.Service},
-		Options: maps.Clone(pk.Defaults),
-		Tools:   config.Tools{Nvim: nvim},
+	p := &config.Project{Schema: config.SchemaVersion, Options: maps.Clone(pk.Defaults)}
+	if base != nil {
+		q := *base
+		p = &q
+		p.Options, p.Versions = maps.Clone(base.Options), maps.Clone(base.Versions)
+		if agents != nil {
+			p.Agents = nil
+		}
+	}
+	p.Project = config.Meta{Name: name, Prefix: prefix, Repo: repo}
+	if base == nil || p.Stack.Pack != ref.String() {
+		p.Stack = config.StackRef{Pack: ref.String(), App: pk.App.Service}
+	}
+	if nvim != nil && p.Tools.Nvim == nil {
+		p.Tools.Nvim = nvim
 	}
 	for n, use := range agents {
 		if p.Agents == nil {
@@ -444,7 +597,9 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 		if p.Versions == nil {
 			p.Versions = map[string]string{}
 		}
-		p.Versions[ch.Option.Pin.Name] = ch.Option.Pin.Default
+		if _, ok := p.Versions[ch.Option.Pin.Name]; !ok {
+			p.Versions[ch.Option.Pin.Name] = ch.Option.Pin.Default
+		}
 	}
 	q := *p
 	q.Project.BaseBranch = "x"
@@ -455,37 +610,24 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	return p, st, nil
 }
 
-// projectTOML renders p's schema, [project], [stack], [options],
-// [versions], [tools] and [agents.<name>].
+// projectTOML renders p's schema, hide_links, [project], its lines
+// (config.LinesTOML) and [template]: not [image] and [secrets], which
+// writeProject adds.
 func projectTOML(p *config.Project) []byte {
 	var b strings.Builder
 	kv := func(k, v string) { fmt.Fprintf(&b, "%s = %s\n", k, config.QuoteString(v)) }
-	fmt.Fprintf(&b, "schema = %d\n\n[project]\n", p.Schema)
+	fmt.Fprintf(&b, "schema = %d\n", p.Schema)
+	b.WriteString(config.HideLinksTOML(p))
+	b.WriteString("\n[project]\n")
 	kv("name", p.Project.Name)
 	kv("prefix", p.Project.Prefix)
 	kv("repo", p.Project.Repo)
 	kv("base_branch", p.Project.BaseBranch)
-	b.WriteString("\n[stack]\n")
-	kv("pack", p.Stack.Pack)
-	kv("app", p.Stack.App)
-	b.WriteString("\n[options]                  # one per slot; \"none\" turns a slot off; another key adds a service of that name\n")
-	for _, key := range pack.OptionKeys(p.Options) {
-		if v, ok := p.Options[key]; ok {
-			kv(key, v)
-		}
-	}
-	if len(p.Versions) > 0 {
-		b.WriteString("\n[versions]                 # the options' image pins\n")
-		for _, k := range slices.Sorted(maps.Keys(p.Versions)) {
-			kv(k, p.Versions[k])
-		}
-	}
-	if p.Tools.Nvim != nil {
-		b.WriteString("\n[tools.nvim]               # config_repo = \"<git url>\": cloned into the empty config volume (D54)\n")
-	}
-	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
-		fmt.Fprintf(&b, "\n[agents.%s]\n", n)
-		kv("use", p.Agents[n].Use)
+	b.WriteString(config.LinesTOML(p))
+	if t := p.Template; t != nil {
+		b.WriteString("\n[template]                 # the template this project started from (D111): never applied again\n")
+		kv("ref", t.Ref)
+		kv("sha256", t.SHA256)
 	}
 	return []byte(b.String())
 }

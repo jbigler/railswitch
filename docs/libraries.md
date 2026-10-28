@@ -416,7 +416,11 @@ A fetched library's templates are refs `<alias>:<name>@<N>`: `railswitch
 template ls` lists them (`source: "library <alias>"`) and `project new
 --template <alias>:<name>@N` starts a project from one. A template is
 read from the verified checkout only, when the index lists it with the
-content hash its directory has now (docs/templates.md).
+content hash its directory has now (docs/templates.md). Starting a
+project from one is an Install review: `project new --dry-run --json`
+lists the template in `install` (kind `template`, its files flagged),
+`--accept-install <hash>` accepts it with the packages, and accepting it
+verifies its library again.
 
 ## Known limits
 

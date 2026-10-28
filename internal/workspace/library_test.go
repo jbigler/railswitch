@@ -113,7 +113,7 @@ func TestReviewLibraryAdded(t *testing.T) {
 	if len(got) != 1 || got[0].Ref != acmeRedis || got[0].Status != StatusAdded || got[0].Old != nil || got[0].New == nil {
 		t.Fatalf("library changes = %+v", got)
 	}
-	in, err := Install(ctx, root, nil, nil)
+	in, err := Install(ctx, root, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestReviewLibraryAdded(t *testing.T) {
 	if e := lockOf(t, root).Options["redis"]; e.Source != "library "+acmeID {
 		t.Fatalf("option redis = %+v", e)
 	}
-	if in, err := Install(ctx, root, nil, nil); err != nil || in != nil {
+	if in, err := Install(ctx, root, nil, nil, nil); err != nil || in != nil {
 		t.Fatalf("Install after the install = %+v, %v", in, err)
 	}
 }
@@ -149,7 +149,7 @@ func TestReviewLibraryAdded(t *testing.T) {
 func TestAcceptReverifies(t *testing.T) {
 	ctx := context.Background()
 	root, lib := installRedis(t)
-	in, err := Install(ctx, root, nil, nil)
+	in, err := Install(ctx, root, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

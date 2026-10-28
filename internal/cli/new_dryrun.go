@@ -7,12 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -25,6 +27,25 @@ type newDryRunDoc struct {
 	// Install is the Install review (D106) of the library packages the
 	// project installs; nil when it installs none.
 	Install *reviewDoc `json:"install"`
+	// Template is the template the project starts from; nil without
+	// --template.
+	Template *dryTemplate `json:"template"`
+}
+
+// dryTemplate is the dry run's template: its ref, content hash and each
+// question with the value the project gets (answer: the --answer given,
+// else the default).
+type dryTemplate struct {
+	Ref    string      `json:"ref"`
+	SHA256 string      `json:"sha256"`
+	Ask    []dryAnswer `json:"ask"`
+}
+
+type dryAnswer struct {
+	Key     string `json:"key"`
+	Prompt  string `json:"prompt"`
+	Default string `json:"default"`
+	Answer  string `json:"answer"`
 }
 
 type dryWorktree struct {
@@ -72,6 +93,12 @@ func (e *env) newDryRun(ctx context.Context, pl *newPlan, up bool) int {
 	for i, s := range doc.Steps {
 		fmt.Fprintf(e.stdout, "%d. %s\n", i+1, s)
 	}
+	if t := doc.Template; t != nil {
+		fmt.Fprintf(e.stdout, "template %s (sha256 %s)\n", safefile.Printable(t.Ref), t.SHA256)
+		for _, a := range t.Ask {
+			fmt.Fprintf(e.stdout, "answer %s = %s\n", a.Key, safefile.Printable(strconv.Quote(a.Answer)))
+		}
+	}
 	if doc.Install != nil {
 		fmt.Fprintf(e.stdout, "install review (create with --accept-install %s):\n", doc.Install.Hash)
 		printReview(e.stdout, doc.Install)
@@ -95,7 +122,7 @@ func newInstall(ctx context.Context, pl *newPlan) (*reviewDoc, []pack.Ref, error
 	if err != nil {
 		return nil, nil, err
 	}
-	return installReview(ctx, tmp, p, pl.cat)
+	return installReview(ctx, tmp, p, pl.cat, pl.libTemplate)
 }
 
 // dryRunDoc writes pl's files into a temp dir with the real run's
@@ -122,7 +149,7 @@ func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error)
 	if err := p.Validate(); err != nil {
 		return nil, fmt.Errorf("project.toml: %w", err)
 	}
-	install, _, err := installReview(ctx, tmp, p, pl.cat)
+	install, _, err := installReview(ctx, tmp, p, pl.cat, pl.libTemplate)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +200,19 @@ func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error)
 	}
 	if doc.Warnings == nil {
 		doc.Warnings = []string{}
+	}
+	if t := pl.tpl; t != nil {
+		doc.Template = &dryTemplate{Ref: p.Template.Ref, SHA256: p.Template.SHA256, Ask: []dryAnswer{}}
+		for _, a := range t.Ask {
+			v, ok := pl.answers[a.Key]
+			if !ok {
+				v = a.Default
+			}
+			doc.Template.Ask = append(doc.Template.Ask, dryAnswer{Key: a.Key, Prompt: a.Prompt, Default: a.Default, Answer: v})
+		}
+		if n := len(t.Containerfiles); n > 0 {
+			doc.Steps = slices.Insert(doc.Steps, 3, fmt.Sprintf("Write the template's %d Containerfiles", n))
+		}
 	}
 	if up {
 		doc.Steps = append(doc.Steps, fmt.Sprintf("Start %s (up)", slug))

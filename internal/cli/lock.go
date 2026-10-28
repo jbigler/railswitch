@@ -147,7 +147,7 @@ func (e *env) lockReview(ctx context.Context, root string, restart bool) (*revie
 // reviewOf is pl as a review document, each package compared file by file
 // and flagged; Restart is empty.
 func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
-	doc := &reviewDoc{Hash: workspace.Hash(pl.Lock), Packages: []reviewPkg{}, Restart: []string{}}
+	doc := &reviewDoc{Hash: workspace.ReviewHash(pl.Lock, pl.Template), Packages: []reviewPkg{}, Restart: []string{}}
 	others := otherLocks(pl.Next)
 	for _, c := range pl.Packages {
 		files, err := review.Compare(c.Kind, c.Old, c.New)
@@ -156,6 +156,9 @@ func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
 		}
 		p := reviewPkg{Ref: c.Ref.String(), Kind: c.Kind, Status: c.Status, From: c.From, To: c.To, AlsoLockedIn: []string{}, Files: files, library: c.Ref.Library != ""}
 		for _, o := range others {
+			if c.Kind == pack.KindTemplate {
+				break // never locked
+			}
 			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && workspace.Pins(e, c.Ref, pl.Next.Catalog.Libraries) {
 				p.AlsoLockedIn = append(p.AlsoLockedIn, o.prefix)
 			}
@@ -169,10 +172,11 @@ func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
 }
 
 // installReview is the Install review (D106) of project p (nil: root's
-// project.toml) on cat (nil: root's catalog): nil when it installs no
-// library package.
-func installReview(ctx context.Context, root string, p *config.Project, cat *pack.Catalog) (*reviewDoc, []pack.Ref, error) {
-	pl, err := workspace.Install(ctx, root, p, cat)
+// project.toml) on cat (nil: root's catalog), with the library template
+// tpl (nil: none): nil when it installs no library package and shows no
+// template.
+func installReview(ctx context.Context, root string, p *config.Project, cat *pack.Catalog, tpl *workspace.Template) (*reviewDoc, []pack.Ref, error) {
+	pl, err := workspace.Install(ctx, root, p, cat, tpl)
 	if err != nil || pl == nil {
 		return nil, nil, err
 	}
@@ -188,7 +192,7 @@ func (e *env) acceptInstall(ctx context.Context, root string, p *config.Project,
 	if hash == "" {
 		return &workspace.Accept{}, nil
 	}
-	doc, refs, err := installReview(ctx, root, p, cat)
+	doc, refs, err := installReview(ctx, root, p, cat, nil)
 	if err != nil {
 		return nil, err
 	}

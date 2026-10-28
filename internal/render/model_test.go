@@ -249,6 +249,25 @@ func TestEnvScope(t *testing.T) {
 	}
 }
 
+// A project env value may name an env layer that holds a generated value:
+// the service env gets it expanded, Values (names, labels, links) never.
+func TestEnvRefToGenerated(t *testing.T) {
+	_, in := filial(t, func(p *config.Project) { p.Env["APP_DB_URI"] = "{env.DATABASE_URL}" })
+	db, _ := envVar(in, "rails", "DATABASE_URL")
+	got, ok := envVar(in, "rails", "APP_DB_URI")
+	if !ok || got.Value != db.Value || !strings.Contains(got.Value, "s3cret") {
+		t.Errorf("rails APP_DB_URI = %q, %v; want DATABASE_URL's %q", got.Value, ok, db.Value)
+	}
+	for k, v := range in.Values {
+		if strings.Contains(v, "s3cret") {
+			t.Errorf("Values[%s] carries a generated value", k)
+		}
+	}
+	if _, ok := envVar(in, "deps", "APP_DB_URI"); ok {
+		t.Errorf("deps got APP_DB_URI")
+	}
+}
+
 func TestDepsGetsNoSecrets(t *testing.T) {
 	_, in := filial(t, nil)
 	var names []string

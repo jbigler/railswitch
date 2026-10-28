@@ -104,6 +104,17 @@ its `Containerfile.base` installs bun only when `BUN_VERSION` is set.
 `npm_global_node{node?}`, so it works with a pack that has no `node` runtime.
 `{env.X?}` still needs `X` set.
 
+### Env references
+
+An env value may use `{env.X}`: X's value from the pack's `[env]`, an
+option's `[gives]` or the project's `[env]` (highest wins), e.g. a
+project's `CLICKHOUSE_DATABASE_URL = "{env.CLICKHOUSE_URL}/events"`. An
+`{env.X}` that holds a generated password (`{env.DATABASE_URL}`) expands
+only in env, never in names, labels or links, and `railswitch env` masks the
+result. A project `[env]` value reaches every service but deps; put one that
+carries a password in `[services.<app>.env]` to keep it in the app. A value
+whose `{env.X}` has no value at all is left out.
+
 ## Option pins and pack runtimes
 
 An option can pin the version of its image (`[pin] name`, `default`):

@@ -3,6 +3,7 @@ package render
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -302,6 +303,14 @@ func (b *builder) checkSecrets() error {
 // generated value or another env.* value is left unset, so Values never
 // carries a generated value.
 func (m *Model) envValues(in *Instance) {
+	for k, v := range m.envLayerValues(in.Values, nil) {
+		in.Values[k] = v
+	}
+}
+
+// envLayerValues expands env layers 1–3 with values (and gen, when given)
+// into "env.<NAME>" keys; a value that does not expand is left out.
+func (m *Model) envLayerValues(values, gen map[string]string) map[string]string {
 	p, st := m.Inputs.Project, m.Inputs.Stack
 	pk := st.Pack
 	app := m.Services[0].ID
@@ -322,13 +331,11 @@ func (m *Model) envValues(in *Instance) {
 	}
 	out := map[string]string{}
 	for k, c := range cands {
-		if v, err := pack.Expand(c.value, scope{values: in.Values, svc: c.svc, scheme: c.scheme}); err == nil {
+		if v, err := pack.Expand(c.value, scope{values: values, svc: c.svc, scheme: c.scheme, gen: gen}); err == nil {
 			out["env."+k] = v
 		}
 	}
-	for k, v := range out {
-		in.Values[k] = v
-	}
+	return out
 }
 
 // expandEnv resolves every service's effective env: per name the highest
@@ -359,6 +366,14 @@ func (m *Model) expandEnv(in *Instance) error {
 		return err
 	}
 
+	// Env values may name env layers that hold a generated value
+	// (MB_DB_CONNECTION_URI = "{env.DATABASE_URL}"); only env sees them.
+	values := maps.Clone(in.Values)
+	for k, v := range m.envLayerValues(in.Values, gen) {
+		if _, ok := values[k]; !ok {
+			values[k] = v
+		}
+	}
 	in.Env = map[string][]EnvVar{}
 	for _, s := range m.Services {
 		eff := map[string]EnvVar{}
@@ -373,7 +388,7 @@ func (m *Model) expandEnv(in *Instance) error {
 		var out []EnvVar
 		for _, name := range sortedKeys(eff) {
 			e := eff[name]
-			v, err := pack.Expand(e.Value, scope{values: in.Values, svc: e.svc, scheme: e.scheme, gen: gen})
+			v, err := pack.Expand(e.Value, scope{values: values, svc: e.svc, scheme: e.scheme, gen: gen})
 			var unknown *pack.UnknownPlaceholderError
 			switch {
 			case errors.Is(err, pack.ErrUnset):

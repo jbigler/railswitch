@@ -34,7 +34,7 @@ func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	ch := m.Inputs.Stack.Options["database"]
+	ch := m.Inputs.Stack.Option("database")
 	if ch == nil {
 		return nil, fmt.Errorf("project %s has no database option: project.toml sets database = \"none\"", m.Prefix)
 	}

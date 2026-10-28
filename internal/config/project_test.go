@@ -107,7 +107,7 @@ func TestValidate(t *testing.T) {
 		{"prefix upper", func(p *Project) { p.Project.Prefix = "Filial" }, []string{"project.prefix", "Filial"}},
 		{"prefix dash", func(p *Project) { p.Project.Prefix = "fi-l" }, []string{"project.prefix", "fi-l"}},
 		{"prefix short", func(p *Project) { p.Project.Prefix = "f" }, []string{"project.prefix"}},
-		{"unknown slot", func(p *Project) { p.Options["worker"] = "sidekiq@1" }, []string{"options.worker"}},
+		{"bad extra key", func(p *Project) { p.Options["Bad Key"] = "sidekiq@1" }, []string{`options."Bad Key"`, "service name"}},
 		{"ref without major", func(p *Project) { p.Options["database"] = "postgres" }, []string{"options.database", `"postgres"`}},
 		{"ref version zero", func(p *Project) { p.Options["database"] = "postgres@0" }, []string{"options.database", `"postgres@0"`}},
 		{"stack app hsts", func(p *Project) { p.Stack.App = "app" }, []string{"stack.app", "HSTS"}},

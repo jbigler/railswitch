@@ -6,7 +6,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 )
 
@@ -33,10 +32,8 @@ type Task struct {
 func (m *Model) stackLinks() []pack.Link {
 	st := m.Inputs.Stack
 	links := slices.Clone(st.Pack.Links)
-	for _, slot := range config.Slots {
-		if ch := st.Options[slot]; ch != nil {
-			links = append(links, ch.Option.Links...)
-		}
+	for _, ch := range st.Options {
+		links = append(links, ch.Option.Links...)
 	}
 	for _, t := range st.Tools {
 		links = append(links, t.Links...)

@@ -10,12 +10,12 @@ import (
 	"github.com/jbigler/railswitch/internal/config"
 )
 
-// Stack is a project's resolved packages: its pack, the option chosen for
-// each slot and its enabled tools.
+// Stack is a project's resolved packages: its pack, its chosen options and
+// its enabled tools.
 type Stack struct {
 	Pack    *Pack
-	PackRef Ref                // the ref [stack] pack names (Local for a workspace pack)
-	Options map[string]*Chosen // slot → chosen; "none" (or absent) slots are absent
+	PackRef Ref       // the ref [stack] pack names (Local for a workspace pack)
+	Options []*Chosen // the [options] in OptionKeys order; "none" ones are absent
 	Tools   []*Tool
 	Agents  []*ChosenAgent // sorted by Name
 }
@@ -31,11 +31,36 @@ type ChosenAgent struct {
 	Allow   []string          // package allow + project allow, deduplicated in order
 }
 
-// Chosen is the option a slot runs, its ref and the service id it runs as.
+// Chosen is the option an [options] key runs, its ref and the service id it
+// runs as. A slot's key (database, cache, …) runs the option's own service
+// id; any other key adds a service of that name.
 type Chosen struct {
+	Key     string // the [options] key: a slot, or an extra service's id
 	Option  *Option
 	Ref     Ref
 	Service string
+}
+
+// Option is the option chosen for slot's key, or nil.
+func (s *Stack) Option(slot string) *Chosen {
+	for _, ch := range s.Options {
+		if ch.Key == slot {
+			return ch
+		}
+	}
+	return nil
+}
+
+// OptionKeys are the [options] keys in their order: the slots in
+// config.Slots order, then the other keys by name.
+func OptionKeys(options map[string]string) []string {
+	keys := slices.Clone(config.Slots)
+	for _, k := range slices.Sorted(maps.Keys(options)) {
+		if !slices.Contains(config.Slots, k) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 // agentBaseFile is the agent base image's Containerfile, which every agent
@@ -58,41 +83,69 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 		return nil, fmt.Errorf("stack.pack: unknown pack %s (available: %s)", ref, refList(slices.Collect(maps.Keys(c.Packs))))
 	}
 
-	s := &Stack{Pack: pk, PackRef: ref, Options: map[string]*Chosen{}}
+	s := &Stack{Pack: pk, PackRef: ref}
 	var errs []error
-	for _, slot := range config.Slots {
-		v := p.Options[slot]
+	keyOf := map[string]string{} // option name → the key it fills
+	for _, key := range OptionKeys(p.Options) {
+		v := p.Options[key]
 		if v == "" || v == "none" {
 			continue
 		}
+		slot := slices.Contains(config.Slots, key)
 		r, err := ParseRef(v)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("options.%s: %w", slot, err))
+			errs = append(errs, fmt.Errorf("options.%s: %w", key, err))
 			continue
 		}
 		o, err := c.Option(r)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("options.%s: %w", slot, err))
+			errs = append(errs, fmt.Errorf("options.%s: %w", key, err))
 			continue
 		}
-		if o == nil || o.Slot != slot {
-			errs = append(errs, fmt.Errorf("options.%s: unknown option %s (available for %s: %s)", slot, r, slot, c.slotRefs(slot)))
+		switch {
+		case o == nil && !slot:
+			errs = append(errs, fmt.Errorf("options.%s: unknown option %s", key, r))
+			continue
+		case o == nil || slot && o.Slot != key:
+			errs = append(errs, fmt.Errorf("options.%s: unknown option %s (available for %s: %s)", key, r, key, c.slotRefs(key)))
 			continue
 		}
 		if !slices.Contains(o.WorksWith, "*") && !slices.Contains(o.WorksWith, pk.Name) {
-			errs = append(errs, fmt.Errorf("options.%s: %s does not work with pack %s (works with: %s)", slot, r, pk.Name, strings.Join(o.WorksWith, ", ")))
+			errs = append(errs, fmt.Errorf("options.%s: %s does not work with pack %s (works with: %s)", key, r, pk.Name, strings.Join(o.WorksWith, ", ")))
 			continue
 		}
-		s.Options[slot] = &Chosen{Option: o, Ref: r, Service: o.Service}
+		// One key per option: a second copy would share its volume, port
+		// and env names with the first.
+		if other, ok := keyOf[o.Name]; ok {
+			errs = append(errs, fmt.Errorf("options.%s: %s already fills options.%s; an option runs once per project", key, r, other))
+			continue
+		}
+		keyOf[o.Name] = key
+		svc := o.Service
+		if !slot {
+			svc = key
+		}
+		s.Options = append(s.Options, &Chosen{Key: key, Option: o, Ref: r, Service: svc})
 	}
-	for _, slot := range config.Slots {
-		ch := s.Options[slot]
-		if ch == nil {
-			continue
+	// Two options giving one env name would leave the app one of them,
+	// picked by the [options] order.
+	gives := map[string]string{}
+	for _, ch := range s.Options {
+		o := ch.Option
+		for _, table := range []map[string]string{o.Gives, o.DepsEnv, o.AgentGives, o.Share.Gives} {
+			for _, k := range slices.Sorted(maps.Keys(table)) {
+				who := fmt.Sprintf("options.%s (%s)", ch.Key, o.Name)
+				if prev, ok := gives[k]; ok && prev != who {
+					errs = append(errs, fmt.Errorf("env %s is given by %s and %s: drop one of them", k, prev, who))
+				}
+				gives[k] = who
+			}
 		}
+	}
+	for _, ch := range s.Options {
 		for _, need := range ch.Option.Needs {
-			if s.Options[need] == nil {
-				errs = append(errs, fmt.Errorf("options.%s: %s needs %s, but options.%s is none", slot, ch.Option.Name, need, need))
+			if s.Option(need) == nil {
+				errs = append(errs, fmt.Errorf("options.%s: %s needs %s, but options.%s is none", ch.Key, ch.Option.Name, need, need))
 			}
 		}
 	}
@@ -152,10 +205,8 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 	}
 	claim(app, "the app ([stack] app)")
 	claim("deps", "the deps service")
-	for _, slot := range config.Slots {
-		if ch := s.Options[slot]; ch != nil {
-			claim(ch.Service, fmt.Sprintf("options.%s (%s)", slot, ch.Option.Name))
-		}
+	for _, ch := range s.Options {
+		claim(ch.Service, fmt.Sprintf("options.%s (%s)", ch.Key, ch.Option.Name))
 	}
 	for _, t := range s.Tools {
 		claim(t.Service, "tools."+t.Name)
@@ -183,16 +234,14 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 	}
 	claimFile(pk.Image.File, "pack "+pk.Name, "pack "+ref.String())
 	claimFile(agentBaseFile, "the agent base image", agentBaseFile)
-	for _, slot := range config.Slots {
-		if ch := s.Options[slot]; ch != nil {
-			o := ch.Option
-			who := fmt.Sprintf("options.%s (%s)", slot, o.Name)
-			pkg := "option " + ch.Ref.String()
-			if o.AppAddon != nil {
-				claimFile(o.AppAddon.File, who, pkg)
-			}
-			claimFile(o.Image.Build, who, pkg)
+	for _, ch := range s.Options {
+		o := ch.Option
+		who := fmt.Sprintf("options.%s (%s)", ch.Key, o.Name)
+		pkg := "option " + ch.Ref.String()
+		if o.AppAddon != nil {
+			claimFile(o.AppAddon.File, who, pkg)
 		}
+		claimFile(o.Image.Build, who, pkg)
 	}
 	for _, t := range s.Tools {
 		claimFile(t.Image.File, "tools."+t.Name, "tool "+t.Name)
@@ -221,10 +270,8 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 		}
 	}
 	claimPorts("pack "+ref.String(), pk.Ports)
-	for _, slot := range config.Slots {
-		if ch := s.Options[slot]; ch != nil {
-			claimPorts("option "+ch.Ref.String(), ch.Option.Ports)
-		}
+	for _, ch := range s.Options {
+		claimPorts("option "+ch.Ref.String(), ch.Option.Ports)
 	}
 	for _, t := range s.Tools {
 		claimPorts("tool "+t.Name, t.Ports)

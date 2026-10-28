@@ -306,11 +306,11 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 		p.Options = map[string]string{}
 	}
 	for _, o := range opts {
-		slot, val, ok := strings.Cut(o, "=")
-		if !ok || !slices.Contains(config.Slots, slot) {
-			return nil, nil, fmt.Errorf("--option %q is not slot=ref (slots: %s)", o, strings.Join(config.Slots, ", "))
+		key, val, ok := strings.Cut(o, "=")
+		if !ok || key == "" {
+			return nil, nil, fmt.Errorf("--option %q is not key=ref (a slot: %s; or a service name for an extra service)", o, strings.Join(config.Slots, ", "))
 		}
-		p.Options[slot] = val
+		p.Options[key] = val
 	}
 	st, err := cat.Resolve(p)
 	if err != nil {
@@ -318,9 +318,8 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	}
 	// A pin the pack also resolves as a runtime stays out of [versions]: it
 	// would beat the app's own file (rails: playwright from Gemfile.lock).
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil || ch.Option.Pin == nil {
+	for _, ch := range st.Options {
+		if ch.Option.Pin == nil {
 			continue
 		}
 		if _, ok := st.Pack.Runtimes[ch.Option.Pin.Name]; ok {
@@ -353,10 +352,10 @@ func projectTOML(p *config.Project) []byte {
 	b.WriteString("\n[stack]\n")
 	kv("pack", p.Stack.Pack)
 	kv("app", p.Stack.App)
-	b.WriteString("\n[options]                  # one per slot; \"none\" turns a slot off\n")
-	for _, slot := range config.Slots {
-		if v, ok := p.Options[slot]; ok {
-			kv(slot, v)
+	b.WriteString("\n[options]                  # one per slot; \"none\" turns a slot off; another key adds a service of that name\n")
+	for _, key := range pack.OptionKeys(p.Options) {
+		if v, ok := p.Options[key]; ok {
+			kv(key, v)
 		}
 	}
 	if len(p.Versions) > 0 {
@@ -511,8 +510,8 @@ func (sp secretPlan) write(proj string) ([]string, error) {
 // package (when the stack has agents) and each option's standalone build.
 func ejectNames(st *pack.Stack) []string {
 	names := []string{"base"}
-	for _, slot := range config.Slots {
-		if ch := st.Options[slot]; ch != nil && ch.Option.AppAddon != nil {
+	for _, ch := range st.Options {
+		if ch.Option.AppAddon != nil {
 			names = append(names, cfName(ch.Option.AppAddon.File))
 		}
 	}
@@ -527,8 +526,8 @@ func ejectNames(st *pack.Stack) []string {
 			names = append(names, n)
 		}
 	}
-	for _, slot := range config.Slots {
-		if ch := st.Options[slot]; ch != nil && ch.Option.Image.Build != "" {
+	for _, ch := range st.Options {
+		if ch.Option.Image.Build != "" {
 			names = append(names, cfName(ch.Option.Image.Build))
 		}
 	}

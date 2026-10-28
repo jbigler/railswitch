@@ -268,6 +268,21 @@ func TestEnvRefToGenerated(t *testing.T) {
 	}
 }
 
+// An [options] key that is not a slot runs its option as a service of that
+// name, with the role its option's slot gives (D3 amended).
+func TestExtraOptionService(t *testing.T) {
+	m, in := filial(t, func(p *config.Project) {
+		delete(p.Options, "cache")
+		p.Options["sessions"] = "redis@1"
+	})
+	if s := service(t, m, "sessions"); s.Role != RoleData {
+		t.Errorf("sessions role = %s; want data", s.Role)
+	}
+	if e, _ := envVar(in, "rails", "REDIS_URL"); e.Value != "redis://sessions:6379/1" {
+		t.Errorf("rails REDIS_URL = %q", e.Value)
+	}
+}
+
 func TestDepsGetsNoSecrets(t *testing.T) {
 	_, in := filial(t, nil)
 	var names []string

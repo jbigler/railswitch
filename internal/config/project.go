@@ -227,13 +227,16 @@ func (p *Project) Validate() error {
 		v.add("stack.app", "%v", err)
 	}
 
-	for _, slot := range sortedKeys(p.Options) {
-		path := "options." + key(slot)
-		if !slices.Contains(Slots, slot) {
-			v.add(path, "unknown slot (slots: %s)", strings.Join(Slots, ", "))
-			continue
+	// A slot's key, or any other key naming an extra service (its id).
+	for _, k := range sortedKeys(p.Options) {
+		path := "options." + key(k)
+		if !slices.Contains(Slots, k) {
+			if err := naming.ValidService(k); err != nil {
+				v.add(path, "not a slot (%s) or a service name: %v", strings.Join(Slots, ", "), err)
+				continue
+			}
 		}
-		if ref := p.Options[slot]; ref != "none" {
+		if ref := p.Options[k]; ref != "none" {
 			v.ref(path, ref, true)
 		}
 	}

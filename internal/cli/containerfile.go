@@ -66,11 +66,7 @@ func workspaceFile(name string) string { return "containerfiles/Containerfile." 
 func stackBuiltins(st *pack.Stack) map[string]builtin {
 	pk := st.Pack
 	out := map[string]builtin{"base": {ref: st.PackRef.String(), files: pk.Files, file: pk.Image.File, kind: kindBase}}
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil {
-			continue
-		}
+	for _, ch := range st.Options {
 		o := ch.Option
 		ref := ch.Ref.String()
 		if a := o.AppAddon; a != nil {

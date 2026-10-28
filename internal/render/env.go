@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 )
 
@@ -125,19 +124,16 @@ func (b *builder) envSpecs() {
 			add(LayerPack, packSrc+" [deps] frozen_env", s.ID, s.scheme, pk.Deps.FrozenEnv)
 		}
 		if consumer {
-			for _, slot := range config.Slots {
-				ch := st.Options[slot]
-				if ch == nil || ch.Service == s.ID {
+			for _, ch := range st.Options {
+				if ch.Service == s.ID {
 					continue
 				}
 				add(LayerOption, optionSource(ch.Option)+" [gives]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.Gives)
 			}
 		}
 		if s.Role == RoleDeps {
-			for _, slot := range config.Slots {
-				if ch := st.Options[slot]; ch != nil {
-					add(LayerOption, optionSource(ch.Option)+" [deps_env]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.DepsEnv)
-				}
+			for _, ch := range st.Options {
+				add(LayerOption, optionSource(ch.Option)+" [deps_env]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.DepsEnv)
 			}
 		}
 		if o := b.opts[s.ID]; o != nil {
@@ -147,10 +143,8 @@ func (b *builder) envSpecs() {
 			add(LayerOption, "tool "+t.Name+" [env]", s.ID, s.scheme, t.Env)
 		}
 		if agent != nil {
-			for _, slot := range config.Slots {
-				if ch := st.Options[slot]; ch != nil {
-					add(LayerOption, optionSource(ch.Option)+" [agent_gives]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.AgentGives)
-				}
+			for _, ch := range st.Options {
+				add(LayerOption, optionSource(ch.Option)+" [agent_gives]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.AgentGives)
 			}
 			add(LayerOption, "agent "+agent.Ref.String()+" [env]", s.ID, s.scheme, agent.Agent.Env)
 		}
@@ -186,8 +180,8 @@ func (b *builder) envSpecs() {
 
 		if consumer {
 			share(packSrc+" [share] env", s.ID, s.scheme, pk.Share.Env)
-			for _, slot := range config.Slots {
-				if ch := st.Options[slot]; ch != nil && ch.Service != s.ID {
+			for _, ch := range st.Options {
+				if ch.Service != s.ID {
 					share(optionSource(ch.Option)+" [share] gives", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.Share.Gives)
 				}
 			}
@@ -319,11 +313,9 @@ func (m *Model) envLayerValues(values, gen map[string]string) map[string]string 
 	for k, v := range pk.Env {
 		cands[k] = cand{v, app, ""}
 	}
-	for _, slot := range config.Slots {
-		if ch := st.Options[slot]; ch != nil {
-			for k, v := range ch.Option.Gives {
-				cands[k] = cand{v, ch.Service, pk.DBScheme[ch.Option.Name]}
-			}
+	for _, ch := range st.Options {
+		for k, v := range ch.Option.Gives {
+			cands[k] = cand{v, ch.Service, pk.DBScheme[ch.Option.Name]}
 		}
 	}
 	for k, v := range p.Env {
@@ -351,11 +343,7 @@ func (m *Model) expandEnv(in *Instance) error {
 		return fmt.Errorf("%s is not set (or empty) in %s (railswitch project new generates it; restore it under [env])", name, file)
 	}
 	var errs []error
-	for _, slot := range config.Slots {
-		ch := m.Inputs.Stack.Options[slot]
-		if ch == nil {
-			continue
-		}
+	for _, ch := range m.Inputs.Stack.Options {
 		for _, g := range ch.Option.Generated {
 			if gen[g] == "" {
 				errs = append(errs, fmt.Errorf("%s: %w", ch.Option.Name, missing(g)))

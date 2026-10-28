@@ -5,7 +5,7 @@ A **package** is a directory with one manifest and its assets (D12):
 | Kind | Manifest | Chosen in `project.toml` by |
 |---|---|---|
 | pack (the app's stack) | `pack.toml` | `[stack] pack = "<ref>"` |
-| option (database, cache, storage, jobs, mail, browser) | `option.toml` | `[options] <slot> = "<ref>"` |
+| option (database, cache, storage, jobs, mail, browser) | `option.toml` | `[options] <slot> = "<ref>"`, or any other key for an extra service |
 | tool (nvim) | `tool.toml` | `[tools.nvim]` |
 | agent | `agent.toml` | `[agents.<name>] use = "<ref>"` |
 
@@ -13,6 +13,21 @@ Besides the manifest a package holds its Containerfiles (defaults that
 `railswitch project new` ejects into `containerfiles/`, D32), `entrypoints/`,
 `deps.allow` (hosts the deps service may reach), `initdb/` and an optional
 `README.md`.
+
+## Extra services
+
+`[options]` takes keys besides the six slots (D81). Each runs its option as
+a service named after the key, with the role the option's `slot` gives:
+
+```toml
+[options]
+database  = "postgres@1"           # service db
+analytics = "local:clickhouse@1"   # service analytics
+```
+
+An option fills one key per project, and two options may not give the same
+env name. A second database of one engine is a database in its server: the
+app creates it, and `db dump` dumps it.
 
 ## Refs
 

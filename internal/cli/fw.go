@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -99,8 +98,8 @@ func isAgent(st *pack.Stack, svc string) bool {
 // (firewall = "self") and so get no hook.
 func selfFirewalled(st *pack.Stack) []string {
 	var ids []string
-	for _, slot := range config.Slots {
-		if ch := st.Options[slot]; ch != nil && slices.Contains(ch.Option.Firewall, "self") {
+	for _, ch := range st.Options {
+		if slices.Contains(ch.Option.Firewall, "self") {
 			ids = append(ids, ch.Service)
 		}
 	}

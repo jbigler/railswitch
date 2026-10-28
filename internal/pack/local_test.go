@@ -101,7 +101,7 @@ func TestResolveLocalOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ch := st.Options["cache"]; ch == nil || ch.Ref != (Ref{Name: "o", Version: 1, Local: true}) || ch.Option.Name != "o" {
+	if ch := st.Option("cache"); ch == nil || ch.Ref != (Ref{Name: "o", Version: 1, Local: true}) || ch.Option.Name != "o" {
 		t.Fatalf("cache = %+v", ch)
 	}
 }

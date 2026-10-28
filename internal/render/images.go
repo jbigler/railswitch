@@ -102,9 +102,8 @@ func (b *builder) images() error {
 			b.m.agents[pkg] = cf
 		}
 	}
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil || ch.Option.Image.Build == "" {
+	for _, ch := range st.Options {
+		if ch.Option.Image.Build == "" {
 			continue
 		}
 		if cf := read("containerfiles/" + ch.Option.Image.Build); cf != nil {
@@ -443,9 +442,8 @@ func (m *Model) imageValues(in *Instance) error {
 		}
 	}
 
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil || ch.Option.Image.Build == "" {
+	for _, ch := range st.Options {
+		if ch.Option.Image.Build == "" {
 			continue
 		}
 		o, sc := ch.Option, in.Scope(ch.Service)

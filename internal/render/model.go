@@ -299,12 +299,8 @@ func (b *builder) services() error {
 	errs = append(errs, b.entrypoint(&deps, pk.Name, pk.Files, pk.App.DepsEntrypoint))
 
 	var workers, data, toolOpts, tools []Service
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil {
-			continue
-		}
-		s, err := b.optionService(ch, slotRoles[slot])
+	for _, ch := range st.Options {
+		s, err := b.optionService(ch, slotRoles[ch.Option.Slot])
 		errs = append(errs, err)
 		b.opts[s.ID] = ch.Option
 		switch s.Role {
@@ -771,9 +767,8 @@ func (b *builder) checkRefs() error {
 
 func (b *builder) addonWarnings() {
 	p, st := b.in.Project, b.in.Stack
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil || ch.Option.AppAddon == nil {
+	for _, ch := range st.Options {
+		if ch.Option.AppAddon == nil {
 			continue
 		}
 		file := ch.Option.AppAddon.File
@@ -888,9 +883,8 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 	// An option's pin, high to low: [worktrees.<slug>.versions], [versions],
 	// the pack's runtime of the same name (rails reads playwright from
 	// Gemfile.lock), the pin's default (D68).
-	for _, slot := range config.Slots {
-		ch := st.Options[slot]
-		if ch == nil || ch.Option.Pin == nil {
+	for _, ch := range st.Options {
+		if ch.Option.Pin == nil {
 			continue
 		}
 		name, val, src := ch.Option.Pin.Name, ch.Option.Pin.Default, ch.Option.Name+" pin default"

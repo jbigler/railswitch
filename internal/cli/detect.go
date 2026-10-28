@@ -10,6 +10,7 @@ import (
 	"github.com/jbigler/railswitch/internal/detect"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/sys"
 )
 
 const projectDetectUsage = "usage: railswitch project detect <repo> [--branch <b>] [--pack <ref>]"
@@ -26,11 +27,11 @@ func projectDetect(ctx context.Context, e *env, args []string) int {
 	if !ok {
 		return code
 	}
-	if err := gitArg("repository", repo); err != nil {
+	if err := sys.GitArg("repository", repo); err != nil {
 		return e.usageErr("project detect: %v", err)
 	}
 	if *branch != "" {
-		if err := gitArg("--branch", *branch); err != nil {
+		if err := sys.GitArg("--branch", *branch); err != nil {
 			return e.usageErr("project detect: %v", err)
 		}
 	}

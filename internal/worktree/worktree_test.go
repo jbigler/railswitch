@@ -824,3 +824,19 @@ func TestPrecreateVolumesRefusesEscape(t *testing.T) {
 		t.Error("PrecreateVolumes through a symlink out of the worktree succeeded")
 	}
 }
+
+// TestFetchTransportAllowlist: origin's URL comes from a config a
+// container can write; a transport off the allowlist is refused by git,
+// a file remote still fetches.
+func TestFetchTransportAllowlist(t *testing.T) {
+	e := setup(t)
+	if err := e.m.fetch(context.Background(), e.base, "master"); err != nil {
+		t.Fatalf("fetch from the file remote: %v", err)
+	}
+	for _, url := range []string{"http://127.0.0.1:1/app.git", "fd::17"} {
+		git(t, e.base, "remote", "set-url", "origin", url)
+		if err := e.m.fetch(context.Background(), e.base, "master"); err == nil || !strings.Contains(err.Error(), "not allowed") {
+			t.Errorf("fetch from %s: %v; want git's transport refusal", url, err)
+		}
+	}
+}

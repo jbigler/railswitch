@@ -57,8 +57,8 @@ func Paths(cat *pack.Catalog) []string {
 // is inflated onto disk. No hook, LFS filter or prompt runs.
 func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []string) (map[string][]byte, error) {
 	for _, a := range [][2]string{{"repository", repo}, {"branch", branch}} {
-		if a[1] == "" || strings.HasPrefix(a[1], "-") || strings.ContainsAny(a[1], "\r\n\x00") {
-			return nil, fmt.Errorf("%s %q is not a usable git value", a[0], a[1])
+		if err := sys.GitArg(a[0], a[1]); err != nil {
+			return nil, err
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
@@ -81,7 +81,8 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 	env = append(env, "GIT_LFS_SKIP_SMUDGE=1")
 	dir := filepath.Join(tmp, "repo")
 	git := func(stdout io.Writer, args ...string) (sys.Result, error) {
-		argv := append([]string{"--literal-pathspecs", "-c", "core.hooksPath=/dev/null", "-c", "protocol.ext.allow=never"}, args...)
+		argv := append([]string{"--literal-pathspecs", "-c", "core.hooksPath=/dev/null"}, sys.GitProtocols...)
+		argv = append(argv, args...)
 		return r.Run(ctx, sys.Cmd{Name: "git", Args: argv, Env: env, Timeout: fetchTimeout, Stdout: stdout})
 	}
 	if _, err := git(nil, "clone", "--quiet", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", branch, "--", repo, dir); err != nil {

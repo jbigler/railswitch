@@ -417,7 +417,8 @@ minutes, left by a killed run, goes at the next detect). Only a regular
 file of at most 1 MiB counts: a path that is a symlink, is under one, is a
 directory or is over 1 MiB counts as absent, and no file is inflated onto
 disk. A git failure exits 1
-with git's error; a repository or branch starting with `-` is refused
+with git's error; a repository or branch starting with `-`, or a
+`<transport>::` URL (`ext::`, `fd::`, any remote helper), is refused
 before git runs.
 
 ```json

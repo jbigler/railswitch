@@ -195,7 +195,7 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 			return nil, err
 		}
 	}
-	if err := gitArg("--branch", base); err != nil {
+	if err := sys.GitArg("--branch", base); err != nil {
 		return nil, err
 	}
 	slug, err := naming.Sanitize(base)
@@ -311,7 +311,7 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 		return e.fail(fmt.Errorf("%s: init needs [project] repo and base_branch", filepath.Join(root, "project.toml")))
 	}
 	for _, a := range [][2]string{{"[project] repo", pm.Repo}, {"[project] base_branch", pm.BaseBranch}} {
-		if err := gitArg(a[0], a[1]); err != nil {
+		if err := sys.GitArg(a[0], a[1]); err != nil {
 			return e.fail(err)
 		}
 	}
@@ -385,7 +385,7 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	if pk == nil {
 		return nil, nil, fmt.Errorf("--pack: unknown pack %s", ref)
 	}
-	if err := gitArg("--repo", repo); err != nil {
+	if err := sys.GitArg("--repo", repo); err != nil {
 		return nil, nil, err
 	}
 	p := &config.Project{
@@ -660,26 +660,17 @@ func prefixTaken(prefix, ws string) error {
 	return fmt.Errorf("prefix %q is already used by %s", prefix, ws)
 }
 
-// gitArg refuses a value git would read as an option, or one holding a
-// line break.
-func gitArg(what, v string) error {
-	if v == "" || strings.HasPrefix(v, "-") || strings.ContainsAny(v, "\r\n\x00") {
-		return fmt.Errorf("%s %q is not a usable git value", what, v)
-	}
-	return nil
-}
-
 // remoteHead is the branch the remote's HEAD names, from
 // `git ls-remote --symref <repo> HEAD`.
 func remoteHead(ctx context.Context, r sys.Runner, repo string) (string, error) {
-	if err := gitArg("--repo", repo); err != nil {
+	if err := sys.GitArg("--repo", repo); err != nil {
 		return "", err
 	}
 	env, err := sys.GitNetEnv(ctx, r, os.Environ())
 	if err != nil {
 		return "", err
 	}
-	res, err := r.Run(ctx, sys.Cmd{Name: "git", Args: []string{"ls-remote", "--symref", repo, "HEAD"}, Env: env, Timeout: gitRemoteTimeout})
+	res, err := r.Run(ctx, sys.Cmd{Name: "git", Args: append(slices.Clone(sys.GitProtocols), "ls-remote", "--symref", repo, "HEAD"), Env: env, Timeout: gitRemoteTimeout})
 	if err != nil {
 		return "", fmt.Errorf("git ls-remote %s: %w", repo, err)
 	}
@@ -704,7 +695,7 @@ func clone(ctx context.Context, r sys.Runner, repo, base, dir string) error {
 	if err != nil {
 		return err
 	}
-	_, err = r.Run(ctx, sys.Cmd{Name: "git", Args: []string{"clone", "--branch", base, repo, dir}, Env: env, Timeout: gitCloneTimeout})
+	_, err = r.Run(ctx, sys.Cmd{Name: "git", Args: append(slices.Clone(sys.GitProtocols), "clone", "--branch", base, repo, dir), Env: env, Timeout: gitCloneTimeout})
 	if err != nil {
 		return fmt.Errorf("git clone --branch %s %s: %w", base, repo, err)
 	}

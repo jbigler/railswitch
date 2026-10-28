@@ -33,6 +33,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
+- Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).
 - Commands: argv only, never a shell; every call through `sys.Runner` with a timeout (`sys.Cmd.Timeout`, default 30 s) or explicit `sys.NoTimeout` (`logs -f`, `exec`, `deps`, `agent`, `nvim`). No podman Go bindings.
 - Secrets (D33): values only on stdin — never argv, written files, env files, logs or job output. No host SSH agent, `~/.ssh` or host gitconfig mounted into containers. Commit signing is opt-in (D61): a file-delivered secret with `git_signing = true` (`secret add --git-signing`) holds a signing-only SSH key; its services get `gpg.format=ssh`, `user.signingkey=/run/secrets/<name>`, `commit.gpgsign`/`tag.gpgsign` via `GIT_CONFIG_*`.
 - Dependencies: stdlib + `github.com/BurntSushi/toml` only. No-echo prompt uses `syscall` TCGETS/TCSETS.

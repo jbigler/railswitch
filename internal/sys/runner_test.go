@@ -332,3 +332,17 @@ func TestExecDetach(t *testing.T) {
 		t.Errorf("got %q; want dir, pid == sid (own session), /dev/null stdio", lines)
 	}
 }
+
+func TestGitArg(t *testing.T) {
+	for _, v := range []string{"", "--upload-pack=touch /tmp/x", "-oProxyCommand=x", "-b", "main\nx", "a\rb", "a\x00b",
+		"ext::sh -c touch% /tmp/x", "fd::17", "FD::3,4", "foo+bar::x", "remote-x.1::y"} {
+		if GitArg("--branch", v) == nil {
+			t.Errorf("GitArg(%q) accepted", v)
+		}
+	}
+	for _, v := range []string{"main", "feat/x-1", "file:///tmp/a.git", "git@github.com:a/b.git", "https://h/a::b.git", "/srv/a::b"} {
+		if err := GitArg("--branch", v); err != nil {
+			t.Errorf("GitArg(%q) = %v", v, err)
+		}
+	}
+}

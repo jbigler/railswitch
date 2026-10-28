@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -203,6 +204,32 @@ func (t *tailBuffer) Write(p []byte) (int, error) {
 		t.b = append(t.b[:0], t.b[len(t.b)-tailKeep:]...)
 	}
 	return len(p), nil
+}
+
+// GitProtocols are the -c flags that limit a git call touching a remote to
+// the https, ssh, git and file transports: never ext::, fd:: or another
+// remote helper a URL could name.
+var GitProtocols = []string{
+	"-c", "protocol.allow=never",
+	"-c", "protocol.https.allow=always",
+	"-c", "protocol.ssh.allow=always",
+	"-c", "protocol.git.allow=always",
+	"-c", "protocol.file.allow=always",
+}
+
+// gitHelperURL is a URL naming a remote helper: <transport>::<address>.
+var gitHelperURL = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*::`)
+
+// GitArg refuses a value git would read as an option, a <transport>::
+// URL, or one holding a line break.
+func GitArg(what, v string) error {
+	if v == "" || strings.HasPrefix(v, "-") || strings.ContainsAny(v, "\r\n\x00") {
+		return fmt.Errorf("%s %q is not a usable git value", what, v)
+	}
+	if gitHelperURL.MatchString(v) {
+		return fmt.Errorf("%s %q names a git remote helper (<transport>::): use an https, ssh, git or file URL", what, v)
+	}
+	return nil
 }
 
 // GitNetEnv is environ for a git call that may touch the network, made

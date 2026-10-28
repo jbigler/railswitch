@@ -433,15 +433,41 @@ func TestNewRenderFailureRefreshesProxy(t *testing.T) {
 	}
 }
 
-func TestGitArg(t *testing.T) {
-	for _, v := range []string{"", "--upload-pack=touch /tmp/x", "-oProxyCommand=x", "-b", "main\nx", "a\rb", "a\x00b"} {
-		if gitArg("--branch", v) == nil {
-			t.Errorf("gitArg(%q) accepted", v)
+// TestNewRefusesHelperURLs: a <transport>:: URL is refused before any
+// git call names it, and a transport off the allowlist is refused by git
+// itself on every git call that takes the URL, while a file:// repository
+// still works (TestNewDryRunWritesNothing and the others).
+func TestNewRefusesHelperURLs(t *testing.T) {
+	newEnv(t)
+	marker := filepath.Join(t.TempDir(), "RAN")
+	for _, url := range []string{"ext::sh -c touch% " + marker, "fd::17", "FD::3,4"} {
+		for _, args := range [][]string{
+			{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", url, "--prefix", "shop", "--branch", "main"},
+			{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", url, "--prefix", "shop"},
+			{"project", "detect", url},
+			{"project", "detect", url, "--branch", "main"},
+		} {
+			f := gitHost()
+			code, _, errs := runWith(t, f, args...)
+			if code == 0 || !strings.Contains(errs, "git remote helper") {
+				t.Errorf("%v: exit %d, %q", args, code, errs)
+			}
+			if slices.ContainsFunc(f.Calls, func(c []string) bool { return slices.Contains(c, url) }) {
+				t.Errorf("%v: git ran with the URL", args)
+			}
 		}
 	}
-	for _, v := range []string{"main", "feat/x-1", "file:///tmp/a.git", "git@github.com:a/b.git"} {
-		if err := gitArg("--branch", v); err != nil {
-			t.Errorf("gitArg(%q) = %v", v, err)
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("ext:: ran its command")
+	}
+	for _, args := range [][]string{
+		{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", "http://127.0.0.1:1/app.git", "--prefix", "shop", "--branch", "main"},
+		{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", "http://127.0.0.1:1/app.git", "--prefix", "shop"},
+		{"project", "detect", "http://127.0.0.1:1/app.git"},
+		{"project", "detect", "http://127.0.0.1:1/app.git", "--branch", "main"},
+	} {
+		if code, _, errs := runWith(t, gitHost(), args...); code == 0 || !strings.Contains(errs, "transport 'http' not allowed") {
+			t.Errorf("%v: exit %d, %q; want git's transport refusal", args, code, errs)
 		}
 	}
 }

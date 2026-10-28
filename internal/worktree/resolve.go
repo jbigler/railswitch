@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,7 +47,8 @@ func (m *Manager) fetch(ctx context.Context, dir, refspec string) error {
 	if err != nil {
 		return err
 	}
-	c := m.gitCmd(gitLong, dir, "fetch", "origin", refspec)
+	// origin's URL is in a config containers can write.
+	c := m.gitCmd(gitLong, dir, append(slices.Clone(sys.GitProtocols), "fetch", "origin", refspec)...)
 	c.Env = env
 	_, err = m.R.Run(ctx, c)
 	return err

@@ -188,5 +188,20 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .toml-view{max-height:50vh}
 .proj-new{border-top:1px solid var(--sel);margin-top:4px;padding-top:4px}
 
+/* Review update */
+.rv-banner a{font-weight:700}
+.rv-file{margin:6px 0;border-top:1px solid var(--sel);padding-top:4px}
+.rv-file summary{cursor:pointer;padding:2px 0}
+.rv-notes{margin:6px 0;padding-left:18px}
+.rv-notes li{margin:2px 0;color:var(--red)}
+.rv-diff{max-height:480px;white-space:pre;overflow-wrap:normal}
+.dl{display:block;min-height:1.2em;padding-left:6px}
+.dl.meta{color:var(--muted)}
+.dl.hunk{color:var(--purple)}
+.dl.add{color:var(--green)}
+.dl.del{color:var(--red)}
+.dl.flagged{background:color-mix(in srgb,var(--red) 18%,var(--bg2));box-shadow:inset 3px 0 var(--red);font-weight:700}
+#accept label.check{display:block;margin:6px 0}
+
 .toast{position:fixed;right:16px;bottom:16px;max-width:460px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap}
 .toast.err{color:var(--red);border-color:var(--red)}

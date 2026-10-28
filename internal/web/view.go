@@ -358,6 +358,7 @@ type switchItem struct {
 	Prefix, URL              string
 	Worktrees, Running, Need int
 	Current                  bool
+	Review                   bool // a package update waits for review
 	WTs                      []switchWT
 }
 
@@ -370,7 +371,12 @@ type stripView struct{ Items []stripItem }
 
 type stripItem struct{ Text, URL string }
 
-type bannerView struct{ Lines []string }
+// bannerView is the project's banner: Review links the review page while
+// a package update waits.
+type bannerView struct {
+	Lines  []string
+	Review string
+}
 
 type listView struct {
 	Sorts      []sortLink

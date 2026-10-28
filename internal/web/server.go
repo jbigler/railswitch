@@ -106,6 +106,8 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/library/save/{ref}/{path...}", s.librarySave)
 	m.HandleFunc("POST /p/{prefix}/library/rm/{ref}/{path...}", s.libraryRm)
 	m.HandleFunc("POST /p/{prefix}/library/new", s.libraryNew)
+	m.HandleFunc("GET /p/{prefix}/review", s.reviewPage)
+	m.HandleFunc("POST /p/{prefix}/review/accept", s.reviewAccept)
 	m.HandleFunc("GET /new", s.newPage)
 	m.HandleFunc("POST /new/detect", s.newDetect)
 	m.HandleFunc("POST /new/review", s.newReview)

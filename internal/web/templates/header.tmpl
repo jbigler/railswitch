@@ -15,7 +15,7 @@
 
 {{define "projects"}}<ul id="projects" class="projects">
 {{range .Items}}<li class="proj-item{{if .Current}} cur{{end}}" data-filter="{{.Prefix}}">
-<a href="{{.URL}}"{{if .N}} data-n="{{.N}}"{{end}}>{{if .N}}<kbd>{{.N}}</kbd> {{end}}<b>{{.Prefix}}</b> <span class="muted">{{.Worktrees}} worktrees · {{.Running}} running</span>{{if .Need}} <span class="need">◆ {{.Need}}</span>{{end}}</a>
+<a href="{{.URL}}"{{if .N}} data-n="{{.N}}"{{end}}>{{if .N}}<kbd>{{.N}}</kbd> {{end}}<b>{{.Prefix}}</b> <span class="muted">{{.Worktrees}} worktrees · {{.Running}} running</span>{{if .Review}} <span class="yellow" title="Package update waiting for review">update</span>{{end}}{{if .Need}} <span class="need">◆ {{.Need}}</span>{{end}}</a>
 {{if .WTs}}<ul class="proj-wts">{{range .WTs}}<li class="wt-item" data-filter="{{.Slug}}" hidden><a href="{{.URL}}">{{.Slug}}{{if .Need}} <span class="need">◆</span>{{end}}</a></li>{{end}}</ul>{{end}}
 </li>
 {{else}}<li class="muted">No projects.</li>

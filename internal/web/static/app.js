@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -762,6 +762,39 @@ if (view === "images" || view === "library" || view === "editor") {
       else location.reload();
     });
   });
+}
+
+// Review update: Accept waits for the acknowledgement of the flagged
+// items. The job ending ok goes to the project page; so does a failed
+// restart (exit 3: the update was accepted), with a notice.
+if (view === "review") {
+  const f = $("#accept");
+  if (f) {
+    const btn = $("[data-accept]", f);
+    const ready = () => {
+      btn.disabled = f.hasAttribute("data-ack-required") && !f.elements.ack.checked;
+    };
+    f.addEventListener("change", ready);
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      const started = await startJob(f.action, new URLSearchParams(new FormData(f)), (state, _conflict, exit) => {
+        if (state === "ok") return location.assign(f.dataset.next);
+        if (exit === "3") {
+          try {
+            sessionStorage.setItem(noticeStore, "The update was accepted, but the restart failed. Its output is in the lock --accept job below.");
+          } catch {
+            // no notice kept
+          }
+          return location.assign(f.dataset.next);
+        }
+        toast("The update was not accepted: " + state + ". The output is below.", true);
+        ready();
+      });
+      if (!started) ready();
+    });
+    ready();
+  }
 }
 
 // New project: Read the repository posts repo and branch (with the

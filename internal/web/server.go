@@ -108,6 +108,9 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/library/new", s.libraryNew)
 	m.HandleFunc("GET /p/{prefix}/review", s.reviewPage)
 	m.HandleFunc("POST /p/{prefix}/review/accept", s.reviewAccept)
+	m.HandleFunc("GET /machine", s.machinePage)
+	m.HandleFunc("POST /machine/signers/add", s.signerAdd)
+	m.HandleFunc("POST /machine/signers/rm", s.signerRm)
 	m.HandleFunc("GET /new", s.newPage)
 	m.HandleFunc("POST /new/detect", s.newDetect)
 	m.HandleFunc("POST /new/review", s.newReview)
@@ -263,7 +266,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		view = ""
 	}
 	prefix := q.Get("p")
-	if view == "new" {
+	if view == "new" && prefix == machineKey {
+		// The machine page follows its machine-level jobs.
+	} else if view == "new" {
 		// The new page follows the create job of a project not registered yet.
 		if err := naming.ValidPrefix(prefix); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"bytes"
 	"io/fs"
 	"maps"
 	"os"
@@ -8,8 +9,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/pack/builtin"
 )
@@ -433,6 +436,44 @@ func TestNameMatchesDirectory(t *testing.T) {
 	fsys["packs/q/Containerfile.base"] = fsys["packs/p/Containerfile.base"]
 	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "packs/q") {
 		t.Errorf("Load with name p in packs/q: %v", err)
+	}
+}
+
+// TestRailsAppEntrypointStops: a stop's TERM reaches the whole server
+// command, also when it does not exec its server (a bin/dev that runs
+// foreman as a child), and the entrypoint then exits 0: a stopped unit,
+// not a failed one. Without a stop, the command's exit code passes through.
+func TestRailsAppEntrypointStops(t *testing.T) {
+	script, err := fs.ReadFile(builtin.FS, "packs/rails/entrypoints/entrypoint-app.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := `sh -c 'trap "echo stopped cleanly; exit 0" TERM; while :; do sleep 0.1; done'`
+	cmd := exec.Command("sh", "-c", string(script), "entrypoint-app.sh", "sh", "-c", server+"; echo bin/dev went on")
+	cmd.Dir, cmd.Env = t.TempDir(), []string{"PATH=/usr/bin:/bin"}
+	// Its own group, killed at the end: a server the TERM missed must not
+	// outlive the test or hold its output pipe open.
+	cmd.SysProcAttr, cmd.WaitDelay = &syscall.SysProcAttr{Setpgid: true}, 2*time.Second
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	time.Sleep(500 * time.Millisecond)
+	start := time.Now()
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	err = cmd.Wait()
+	if err != nil || !strings.Contains(out.String(), "stopped cleanly") || time.Since(start) > 3*time.Second {
+		t.Errorf("TERM: %v after %s\n%s", err, time.Since(start), out.String())
+	}
+
+	cmd = exec.Command("sh", "-c", string(script), "entrypoint-app.sh", "sh", "-c", "exit 3")
+	cmd.Dir, cmd.Env = t.TempDir(), []string{"PATH=/usr/bin:/bin"}
+	if err := cmd.Run(); err == nil || cmd.ProcessState.ExitCode() != 3 {
+		t.Errorf("exit 3 came back as %v", err)
 	}
 }
 

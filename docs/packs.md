@@ -289,6 +289,11 @@ there is no shared add-on package (user, 2026-10-27).
   an option's addon must match the pack's `os`.
 - Entrypoints are mounted at `/usr/local/bin/<file name>`; a workspace file
   `entrypoints/<file name>` replaces the package's (D13).
+- The app entrypoint passes a stop (SIGTERM, SIGINT) to everything its
+  command started and then exits 0, so `stop` ends a stopped unit, not a
+  failed one. As PID 1 a shell ignores SIGTERM: an entrypoint that ends in
+  `exec "$@"` relies on the command handling it itself, which a `bin/dev`
+  that runs foreman as a child does not. `rails@1`'s entrypoint does this.
 - The dev server listens on `0.0.0.0` (a pack sets the env its framework
   reads, or its `README.md` says what the app must change).
 

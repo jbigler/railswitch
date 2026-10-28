@@ -73,7 +73,7 @@ var completionFlags = map[string][]string{
 	"library index":          {"--library=", "--serial="},
 	"library rotate":         {"--new=", "--old-key="},
 	"library sign":           {"--key="},
-	"library trust":          {"--fingerprint=", "--rotation"},
+	"library trust":          {"--fingerprint=", "--new-signer", "--rotation"},
 	"logs":                   {"-f"},
 	"nvim reset-config":      {"--yes"},
 	"pack eject":             {"--as="},

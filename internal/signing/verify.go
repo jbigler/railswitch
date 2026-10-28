@@ -47,9 +47,13 @@ type Result struct {
 	Key         string `json:"key,omitempty"`
 	// NewFingerprint and NewKey are a rotation's new key, which signed the
 	// index.
-	NewFingerprint string          `json:"new_fingerprint,omitempty"`
-	NewKey         string          `json:"new_key,omitempty"`
-	Packages       []PackageResult `json:"packages"`
+	NewFingerprint string `json:"new_fingerprint,omitempty"`
+	NewKey         string `json:"new_key,omitempty"`
+	// KnownLibrary: the trust store already holds keys or revocations for
+	// the library, so a signer no trusted key vouches for is not a first
+	// trust.
+	KnownLibrary bool            `json:"known_library"`
+	Packages     []PackageResult `json:"packages"`
 }
 
 // PackageResult is one package directory: Signed when the index is
@@ -110,6 +114,7 @@ func judge(ctx context.Context, run sys.Runner, dir string, t *Trust) (*Result, 
 		return nil, err
 	}
 	l := t.Library(idx.Library)
+	res.KnownLibrary = l != nil && (len(l.Keys) > 0 || len(l.Revoked) > 0)
 	v := verifier{ctx: ctx, run: run, library: idx.Library}
 	// Every branch has ssh-keygen check the signature against only the
 	// keys that branch accepts.

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/safefile"
@@ -17,7 +18,7 @@ import (
 )
 
 const libraryUsage = `usage: railswitch library verify <dir>
-       railswitch library trust <dir> --fingerprint <fp> [--rotation]
+       railswitch library trust <dir> --fingerprint <fp> [--rotation | --new-signer]
        railswitch library index <dir> --library <id> [--serial <n>]
        railswitch library sign <dir> --key <private-key-file>
        railswitch library rotate <dir> --old-key <private-key-file> --new <public-key-file>`
@@ -67,7 +68,7 @@ func libraryVerify(ctx context.Context, e *env, args []string) int {
 			return e.fail(err)
 		}
 	} else {
-		printVerify(e, dir, res)
+		printVerify(e, dir, res, t)
 	}
 	if res.Status != signing.StatusTrusted {
 		return 1
@@ -77,7 +78,7 @@ func libraryVerify(ctx context.Context, e *env, args []string) int {
 
 // printVerify prints a Result. Everything but the status comes from the
 // library, so it goes through safefile.Printable.
-func printVerify(e *env, dir string, res *signing.Result) {
+func printVerify(e *env, dir string, res *signing.Result, t *signing.Trust) {
 	p := safefile.Printable
 	if res.Library != "" {
 		fmt.Fprintf(e.stdout, "library %s, serial %d\n", p(res.Library), res.Serial)
@@ -109,24 +110,45 @@ func printVerify(e *env, dir string, res *signing.Result) {
 	}
 	tw.Flush()
 	d := p(dir)
-	switch res.Status {
-	case signing.StatusUnknownSigner:
+	switch {
+	case res.Status == signing.StatusUnknownSigner && res.KnownLibrary:
+		fmt.Fprintf(e.stdout, "WARNING: %s; this index is signed by a different key and no trusted key vouched for it.\n"+
+			"It may be an attacker's. Trust it only if the publisher confirms a new signer through another channel:\n"+
+			"  railswitch library trust %s --fingerprint %s --new-signer\n", knownTrust(t, res.Library), d, res.Fingerprint)
+	case res.Status == signing.StatusUnknownSigner:
 		fmt.Fprintf(e.stdout, "Check the fingerprint %s with the publisher, then trust it:\n  railswitch library trust %s --fingerprint %s\n", res.Fingerprint, d, res.Fingerprint)
-	case signing.StatusRotation:
+	case res.Status == signing.StatusRotation:
 		fmt.Fprintf(e.stdout, "The trusted key %s vouches for the new key %s. Check it with the publisher, then confirm the rotation:\n  railswitch library trust %s --fingerprint %s --rotation\n", res.Fingerprint, res.NewFingerprint, d, res.NewFingerprint)
 	}
+}
+
+// knownTrust says what t holds for lib, which has keys or revocations.
+func knownTrust(t *signing.Trust, lib string) string {
+	l := t.Library(lib)
+	var fps []string
+	for _, k := range l.Keys {
+		fps = append(fps, k.Fingerprint)
+	}
+	if len(fps) == 0 {
+		return fmt.Sprintf("this library trusts no key now but has %d revoked", len(l.Revoked))
+	}
+	return "this library already trusts " + strings.Join(fps, ", ")
 }
 
 func libraryTrust(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("library trust")
 	fp := fs.String("fingerprint", "", "the `fingerprint` library verify reported, checked with the publisher")
 	rotation := fs.Bool("rotation", false, "confirm a rotation: trust the new key the trusted one vouches for")
+	newSigner := fs.Bool("new-signer", false, "trust a key no trusted key vouches for, for a library that already has keys or revocations")
 	dir, code, ok := parseNamed(e, fs, args, libraryUsage)
 	if !ok {
 		return code
 	}
 	if *fp == "" {
 		return e.usageErr("library trust: --fingerprint is required (the one library verify %s reports)", dir)
+	}
+	if *rotation && *newSigner {
+		return e.usageErr("library trust: --rotation and --new-signer don't go together")
 	}
 	t, path, err := loadTrust()
 	if err != nil {
@@ -145,6 +167,10 @@ func libraryTrust(ctx context.Context, e *env, args []string) int {
 		fmt.Fprintf(e.stdout, "%s is already trusted for %s\n", *fp, res.Library)
 		return 0
 	case res.Status == signing.StatusUnknownSigner && !*rotation && res.Fingerprint == *fp:
+		if res.KnownLibrary && !*newSigner {
+			return e.fail(fmt.Errorf("library trust: %s; %s signed this index and no trusted key vouched for it. "+
+				"Ask the publisher through another channel; to trust it anyway, pass --new-signer", knownTrust(t, res.Library), *fp))
+		}
 		key = res.Key
 	case res.Status == signing.StatusRotation && *rotation && res.NewFingerprint == *fp:
 		key = res.NewKey

@@ -216,6 +216,22 @@ railswitch library trust ./stack-library --fingerprint SHA256:FMVaaJrORVs5Xx60M4
 Without `--rotation`, `library trust` refuses a rotation, and with it,
 `library trust` refuses a signer that no trusted key vouches for.
 
+### A new signer for a library you already trust
+
+If you already trust a key for a library, or have revoked one, an index
+signed by a key that no trusted key vouches for is suspect. A publisher
+who still holds the old key rotates instead. `library verify` warns:
+
+```
+WARNING: this library already trusts SHA256:Ays0…; this index is signed by a different key and no trusted key vouched for it.
+```
+
+and `--json` reports `"known_library": true`. `library trust` refuses
+the key unless you pass `--new-signer`. Pass it only when the publisher
+confirms the new key through another channel, for example after losing
+the old key. A first trust, for a library with no entry in
+`signers.toml`, needs no `--new-signer`.
+
 ## Managing trust
 
 ```sh

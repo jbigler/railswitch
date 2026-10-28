@@ -115,7 +115,7 @@ fingerprint = "SHA256:…"
    Under any status but `trusted`, every package is `signed: false` with
    the reason `the index is not trusted`.
 
-`Result{Status, Reason, Library, Serial, Fingerprint, Key, NewFingerprint, NewKey, Packages []PackageResult{Ref, Kind, Dir, Signed, Reason}}` (`Key`/`NewKey` the keys `library trust` adds; `Reason` text from the library is printed through `safefile.Printable`). Status `trusted` records
+`Result{Status, Reason, Library, Serial, Fingerprint, Key, NewFingerprint, NewKey, KnownLibrary, Packages []PackageResult{Ref, Kind, Dir, Signed, Reason}}` (`Key`/`NewKey` the keys `library trust` adds; `Reason` text from the library is printed through `safefile.Printable`). Status `trusted` records
 `last_serial` and `last_index` and applies `[[revoke]]` (moves those fingerprints from keys
 to revoked).
 
@@ -131,10 +131,14 @@ to revoked).
   revocation or accept an older index.
 - `library verify <dir> [--json]`: the Result; exit 0 when `trusted`, 1
   otherwise (the JSON is printed either way).
-- `library trust <dir> --fingerprint <fp> [--rotation]`: re-verifies; the
-  reported fingerprint (or, with `--rotation`, the new one) must equal
-  `<fp>`; adds the key (a rotation keeps the old key; a later index's
-  `[[revoke]]` retires it).
+- `library trust <dir> --fingerprint <fp> [--rotation | --new-signer]`:
+  re-verifies; the reported fingerprint (or, with `--rotation`, the new
+  one) must equal `<fp>`; adds the key (a rotation keeps the old key; a
+  later index's `[[revoke]]` retires it). An `unknown-signer` for a library
+  whose entry already has keys or revocations (`known_library: true` in
+  the Result; `verify` warns that the library already trusts other keys
+  and none vouched for this one) is refused without `--new-signer`. A
+  first trust (no entry) needs no flag.
 - Publisher: `library index <dir> --library <id> [--serial <n>]` writes
   `library.toml` from the packages in `<dir>` (serial: given and above
   the existing one, else the existing one + 1, else 1; keeps

@@ -291,8 +291,9 @@ error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
   "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI…",
   "new_fingerprint": "SHA256:FMVaaJrORVs5Xx60M485oK5AtUTpvWqQapBKMLidPeA",
   "new_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI…",
+  "known_library": true,
   "packages": [
-    {"ref": "django@1", "kind": "pack", "dir": "packs/django", "signed": true},
+    {"ref": "django@1", "kind": "pack", "dir": "packs/django", "signed": false, "reason": "the index is not trusted"},
     {"ref": "", "kind": "option", "dir": "options/broken", "signed": false, "reason": "not in library.toml"}
   ]
 }
@@ -306,6 +307,7 @@ error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
 | `serial` | number | The index's `serial`; `0` when the index doesn't parse. |
 | `fingerprint`, `key` | string | The signing key; for a `rotation`, the trusted key that vouches for the new one. Absent when the signature doesn't parse. |
 | `new_fingerprint`, `new_key` | string | A `rotation`'s new key, which signed the index; absent otherwise. |
+| `known_library` | boolean | `signers.toml` already holds trusted keys or revocations for this library. With `unknown-signer`, the index is signed by a key no trusted key vouched for, which is not a first trust: `library trust` refuses it without `--new-signer`. |
 | `packages[]` | array | Each package the index lists, then each package directory it doesn't. `[]` when the index or the signature doesn't parse. |
 | `packages[].ref` | string | The package's ref; `""` for an unlisted directory that doesn't load. |
 | `packages[].kind` | string | `pack`, `option` or `agent`. |

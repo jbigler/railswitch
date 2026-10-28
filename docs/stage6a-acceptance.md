@@ -246,6 +246,24 @@ bar), `/theme.css`, the event stream, a POST with and without `Origin`, and
 a foreign Host. No browser exists in the sandbox, so every visual check
 above is for the host.
 
+**2026-10-28, host run (Omarchy/Arch VM, podman 6.1.4, headless
+Chromium 155 via Playwright): partial.** The `ftest` project is not on this
+host. The run used three open-source apps instead: Mastodon (`masto`,
+`rails@1` with postgres, redis and sidekiq), Plausible (`plaus`, a local
+`phoenix` pack and a local `clickhouse` option) and Metabase (`mb`, a local
+`clojure` pack). Mastodon and Plausible run end to end. Metabase stopped at
+deps: the VM has 28 GB of disk (full) and 3 GB of RAM. PR rows came from
+Plausible worktrees added by PR number (#6809 draft, #6812 ready and
+approved, #6808 merged).
+
+- PASS: 1 (unit, `Wants=`, no `[Install]`), 2 (login link, 401 without
+  the cookie), 4 (every sort order, `?sort=-pr`, reload, ↑/↓, `P`, `1`,
+  Esc), 6 (after the `pr ls` fix below), 12 (new PID after reinstall), 13
+  (403, then `ok <version>`). 3 in part: both schemes render, but nobody
+  has compared them against the mock-ups.
+- Not run: 5, 7–11, 14. They need the resources above or a desktop session.
+- Cosmetic: the page has no favicon (Chromium's `/favicon.ico` gets 404).
+
 ## Done checklist (roadmap, Stage 6a)
 
 - [ ] one page per project (`/p/<prefix>`, `/p/<prefix>/<slug>`), list and detail;
@@ -262,3 +280,21 @@ above is for the host.
 
 | Gap | Generic feature | Commit |
 |-----|-----------------|--------|
+| Node 25+ has no corepack: a yarn 4 app (Mastodon, Node 26) had no yarn | rails base image installs corepack from npm | `5f8b37c` |
+| `FROM …:${V%%-otp-*}` pre-pulled `…:-otp-28-slim` | FROM/ARG expansion with buildah's modifiers; an unknown form is an error | `563f0cd` |
+| `up` on a running stack reran deps twice; under Phoenix, mix touched `compile.lock` and the code reloader refused every request | with the app active, services start with `--job-mode=ignore-requirements` | `e1ad53f` |
+| `pack new` needed a project, `project new --pack local:` needed the pack | `pack new --dir <workspace>` | `326a63b` |
+| `MB_DB_CONNECTION_URI = "{env.DATABASE_URL}"` silently dropped | `{env.X}` holding a generated value expands in env only | `f78df40` |
+| Dashboard "PRs unavailable: mise ERROR" (mise-shimmed `gh` refused the workspace's `mise.local.toml`); `pr ls` HTTP 504 on busy repos | `gh` runs in `/`; one `--head=<branch>` query per worktree branch | `bfe6078` |
+
+Open, needing a decision: a second datastore (ClickHouse) has no slot (D3)
+and sits in `storage`; `.java-version` is no version source, and mise's
+`temurin-25.0.3+9.0.LTS` fails version validation.
+
+Settings only, in the projects' own files: Mastodon `[env] BIND`,
+`LOCAL_DOMAIN`, `STREAMING_API_BASE_URL`, `[services.rails] health =
+/health`, a `streaming` route; Plausible `[env] LISTEN_IP`, `BASE_URL`,
+`CLICKHOUSE_DATABASE_URL`, `[firewall.allow] deps = download.db-ip.com`
+for `mix download_country_database`, and three lines removed from the
+worktree's tracked `config/.env.dev` (Envy overwrites the environment
+with it); Metabase `MB_*` env, `/api/health`, two Maven hosts.

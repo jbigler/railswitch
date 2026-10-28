@@ -111,6 +111,8 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/review", s.reviewPage)
 	m.HandleFunc("POST /p/{prefix}/review/accept", s.reviewAccept)
 	m.HandleFunc("GET /machine", s.machinePage)
+	m.HandleFunc("GET /machine/templates/import", s.templateImportPage)
+	m.HandleFunc("POST /machine/templates/import", s.templateImport)
 	m.HandleFunc("POST /machine/signers/add", s.signerAdd)
 	m.HandleFunc("POST /machine/signers/rm", s.signerRm)
 	m.HandleFunc("POST /machine/signers/revoke", s.signerRevoke)

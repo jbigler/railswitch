@@ -113,6 +113,9 @@ TZ = "Asia/Bangkok"
 [tasks]
 seed = "bin/rails db:seed"
 
+[agents.claude]
+use = "claude@1"
+
 [template]                 # the template this project started from (D111): never applied again
 ref = "rails-pg@1"
 sha256 = "%SHA%"
@@ -124,6 +127,10 @@ addons = ["containerfiles/Containerfile.pg-client"]
 [secrets.rails_master_key]
 services = ["rails"]
 env = "RAILS_MASTER_KEY"
+
+[secrets.claude_token]
+services = ["agent-claude"]
+env = "CLAUDE_CODE_OAUTH_TOKEN"
 `
 
 // The dry run's project.toml is the template's lines, the answers
@@ -161,9 +168,14 @@ func TestNewTemplateDryRun(t *testing.T) {
 	if !strings.Contains(doc.ProjectTOML, "cache = \"redis@1\"\n") || !strings.Contains(doc.ProjectTOML, "[env]\nTZ = \"\"\n") || doc.Template.Ask[2].Answer != "" {
 		t.Errorf("defaults and an empty answer:\n%s", doc.ProjectTOML)
 	}
-	// No agent unless the template or --agent names one.
+	// A template brings no agents (D112): the default agent, as without
+	// one, and --agent none leaves it out.
+	if !strings.Contains(doc.ProjectTOML, "[agents.claude]\nuse = \"claude@1\"\n") {
+		t.Errorf("the default agent is missing from a template's project:\n%s", doc.ProjectTOML)
+	}
+	doc = dryRun(t, gitHost(), ws, "--repo", repo, "--prefix", "shop", "--branch", "main", "--template", "rails-pg@1", "--agent", "none")
 	if strings.Contains(doc.ProjectTOML, "[agents.") {
-		t.Errorf("the default agent was added to a template's project:\n%s", doc.ProjectTOML)
+		t.Errorf("--agent none with a template:\n%s", doc.ProjectTOML)
 	}
 }
 

@@ -22,7 +22,7 @@
 <option value="">None: read the repository</option>
 {{range .Templates}}<option value="{{.Ref}}">{{.Ref}}{{if .Description}} · {{.Description}}{{end}}</option>
 {{end}}</select>
-<span class="hint">A template brings its pack, options and overrides and asks its questions; you can still change them in Settings later.</span></label>
+<span class="hint">A template brings its pack, options and overrides and asks its questions; you can still change them in Settings later. Someone gave you a template folder? <a href="/machine#templates">Import it on the Machine page</a>.</span></label>
 {{if .TemplatesError}}<p class="red">Templates unavailable: {{.TemplatesError}}</p>
 {{end}}<div class="btns start"><button type="button" class="ln main" data-detect disabled>Read the repository</button></div>
 </section>
@@ -33,7 +33,7 @@
 {{range .Agents}}<label class="check"><input type="checkbox" name="agent" value="{{.Name}}={{.Ref}}"{{if .Default}} checked{{end}}> Agent <span class="mono">{{.Name}}</span> <span class="muted mono">{{.Ref}}</span></label>
 {{else}}{{if not .AgentsError}}<p class="muted">No agent packages.</p>
 {{end}}{{end}}{{if .AgentsError}}<p class="red">Agents unavailable: {{.AgentsError}}</p>
-{{end}}<p class="note">With no agent ticked the project gets none; from a template, the template's.</p>
+{{end}}<p class="note">With no agent ticked the project gets none. A template never brings an editor or agents: they are your own choice.</p>
 </section>
 <div id="new-warnings" class="warnings" hidden></div>
 <div class="btns"><button class="ln main" data-review disabled>Next: review</button></div>
@@ -81,7 +81,7 @@ question, prefilled with its default. */}}
 <span class="hint">Default <span class="mono">{{.Default}}</span></span></label>
 {{else}}<p class="muted">This template asks nothing.</p>
 {{end}}{{with .Doc.Containerfiles}}<p class="note">Its Containerfiles replace the packages' defaults: <span class="mono">{{range $i, $c := .}}{{if $i}}, {{end}}{{$c}}{{end}}</span>.</p>
-{{end}}<p class="note">Next: review shows the project.toml these answers give. A tool ticked below is added to the template's; agents ticked below replace the template's agents (leave them unticked to keep its own).</p>
+{{end}}<p class="note">Next: review shows the project.toml these answers give. The editor and agents are yours to pick below: a template brings neither.</p>
 </section>{{end}}
 
 {{define "newreview"}}<section id="new-review" class="card review">

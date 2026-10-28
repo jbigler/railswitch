@@ -4,7 +4,10 @@ A template is a project's stack ready to start a new project from: its
 pack, options, pins, env and other lines, the Containerfiles you edited,
 and the questions a new project answers (D108–D111). Project-only lines
 (name, prefix, repo, base branch, per-worktree overrides) and secret
-values are never in a template.
+values are never in a template. Neither is anything each person picks
+for themselves (D112): the editor (`[tools]`) and the agents
+(`[agents]`), so a template primes a teammate's project without handing
+them your editor config or your agents.
 
 ## The template directory
 
@@ -18,7 +21,11 @@ rails-pg.stack/
 Nothing else is allowed: no other file, no other directory, no symlink,
 no file over 1 MiB. `stack.toml` is read strictly: a key it doesn't
 define (`[project]`, `[worktrees]`, `[share]`, `[secrets]`, a secret
-`value`) is refused.
+`value`) is refused, and `[tools]` or `[agents]` is refused by name, as
+is `containerfiles/Containerfile.agent-base`. A template saved before
+D112 has `[agents]` (export added the default agent) and no longer
+reads: export the project again, after removing
+`~/.config/railswitch/templates/<name>.stack/`.
 
 ```toml
 schema = 1
@@ -36,8 +43,8 @@ cache = "redis@1"
 postgres = "16"
 [env]
 TZ = "UTC"
-# [services.<id>], [tasks], [[links]], hide_links, [[routes]],
-# [tools.nvim], [agents.<n>] and [firewall] likewise
+# [services.<id>], [tasks], [[links]], hide_links, [[routes]]
+# and [firewall] likewise; never [tools] or [agents]
 
 [image]                      # user addons only (containerfile new)
 addons = ["containerfiles/Containerfile.extra"]
@@ -67,7 +74,8 @@ env = "RAILS_MASTER_KEY"
 ## Where templates live
 
 - This machine: `~/.config/railswitch/templates/<name>.stack/`, ref
-  `<name>@N`. The store holds one version per name: the latest export.
+  `<name>@N`. The store holds one version per name: the latest export
+  or import.
 - A library: `templates/<name>/` in its repository, listed in its signed
   index as `kind = "template"`, ref `<alias>:<name>@N`
   (docs/libraries.md). It is read from the verified checkout only, with
@@ -99,12 +107,50 @@ Export makes:
   (below the `# Ejected from` header) differs from its default
   (`containerfile show --json` `diff`), and each user addon.
 
+It leaves out each person's own lines (D112): `[tools.nvim]`, each
+`[agents.<n>]`, `[firewall] allow.agent`, a `[services.<id>]` or
+`[[routes]]` entry of the editor or an agent (`nvim`, `agent`,
+`agent-<n>`), and those services in each secret's `services`; a secret
+only they receive is dropped. The editor's and the agents'
+Containerfiles (each tool's, `agent-base`, each agent's) are never kept,
+even when edited, and `project new` refuses a template that holds one
+(before the clone).
+
 It prints what it dropped (`from`, `[project]` keys, `[worktrees.<slug>]`,
-`[share]`, `[template]`), what it asks, the secrets it declares and the
+`[share]`, `[template]`, and the lines above), what it asks, the secrets it declares and the
 Containerfiles it keeps, and warns about each `local:` package the
 template uses (a new project needs its own copy). Export refuses while
 `stack.lock` is out of date or an update waits for review: a template is
 made from what was accepted.
+
+## Sharing a template as a folder
+
+`railswitch template export --to <dir>` writes the template as a folder
+you can hand to someone: zip it, put it on a share, or commit it
+anywhere. Unpack it as it was: the import refuses any other file, so a
+zip carrying `__MACOSX/` or `.DS_Store` must be unpacked without them.
+On their machine:
+
+- `railswitch template import <dir> [--json]` (D113) reviews it: every
+  file as a diff against the version of that name on this machine (all
+  added when there is none), flagged by the review checks, with
+  warnings for each `local:` package it uses (the new project needs its
+  own copy) and each library this machine hasn't added. Nothing is
+  saved. The folder is hostile input: only the template files above,
+  regular files ≤ 1 MiB each, at most 64, no symlink (the folder itself
+  included); any other entry refuses the import, and such an entry is
+  never opened.
+- `railswitch template import <dir> --accept <sha256>` saves it in the
+  store, once the folder still has the hash its review printed. A
+  template new to this machine, or a higher version than the one there,
+  is saved; the same content is "already on this machine"; other
+  content at a version not above the stored one is refused (exit 1,
+  also from the review).
+- The dashboard's Machine page does the same (docs/dashboard.md).
+
+A folder has no update channel: a later version is another folder,
+imported the same way. For updates that reach everyone as reviewed
+diffs, publish the template in a signed library (docs/libraries.md).
 
 ## Starting a project from a template
 
@@ -122,9 +168,9 @@ railswitch project new ~/src/shop --repo <url> --prefix shop \
    the flag out to keep the default. An answer for a key the template
    doesn't ask is refused.
 3. The other flags on top: `--pack` (only when given), `--option`,
-   `--tool`, `--agent` (when given, it replaces the template's agents;
-   without it the template's agents stay and no default agent is added),
-   and `--name`, `--prefix`, `--repo`, `--branch` for `[project]`.
+   `--tool`, `--agent` (as without a template: no flag adds the built-in
+   default agent, `--agent none` none), and `--name`, `--prefix`,
+   `--repo`, `--branch` for `[project]`.
 4. Each chosen option's image pin the lines lack (`[versions]`).
 5. `[template] ref` and `sha256`: where the project came from.
 

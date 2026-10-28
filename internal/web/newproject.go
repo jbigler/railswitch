@@ -25,7 +25,7 @@ type newForm struct {
 	Repo, Branch, Name, Prefix, Dir, Pack string
 	Options                               []string // key=ref: the slots (from opt-<key>), then the extra services
 	Nvim                                  bool
-	Agents                                []string // name=ref; none ticked is --agent none, unless from a template
+	Agents                                []string // name=ref; none ticked is --agent none
 	Template                              string   // a template ref; "": none
 	Answers                               []string // key=value, the template's questions in its order
 }
@@ -164,7 +164,7 @@ func (f newForm) args() []string {
 	if f.Nvim {
 		a = append(a, "--tool", "nvim")
 	}
-	if len(f.Agents) == 0 && f.Template == "" {
+	if len(f.Agents) == 0 {
 		return append(a, "--agent", "none")
 	}
 	for _, ag := range f.Agents {

@@ -444,6 +444,41 @@ stores that content as the next diff's base); another hash is refused.
 | `error` | string | Why `ref` doesn't resolve (gone from the store or the library, or no longer matching its signed index); `""` when it does. |
 | `files` | array | With `update`: every file that differs from the stored accepted copy to the current one, as in [`lock --review`](#lock---review) (`path`, `status`, `diff`, `flags`); a missing accepted copy shows every file `added`. `[]` without an update. |
 
+## `template import <dir>`
+
+The review of a template folder (D113, docs/templates.md): the
+[`lock --review`](#lock---review) document with one package, the
+template, plus its status. Nothing is saved. Exit 0, except `older`
+(exit 1, the document printed too).
+
+```json
+{
+  "ref": "rails-stack@2",
+  "sha256": "1b924e2a…",
+  "status": "update",
+  "replaces": {"ref": "rails-stack@1", "sha256": "df728e1a…"},
+  "hash": "1b924e2a…",
+  "flags": 1,
+  "packages": [
+    {"ref": "rails-stack@2", "kind": "template", "status": "changed", "from": "df728e1a…", "to": "1b924e2a…", "also_locked_in": [],
+     "files": [{"path": "stack.toml", "status": "changed", "diff": "--- a/…", "flags": [{"check": "firewall", "line": 0, "text": "firewall.mode: (none) -> off"}]}]}
+  ],
+  "restart": [],
+  "warnings": []
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref` | string | `<name>@<version>`, from its `stack.toml`. |
+| `sha256`, `hash` | string | Its content hash (lowercase hex, no prefix): what `--accept` takes. |
+| `status` | string | `new` (no template of its name here), `update` (a higher version than the stored one), `same` (the stored one, byte for byte), `older` (another content at a version not above the stored one: refused). |
+| `replaces` | object or null | The stored template of its name: `ref`, `sha256`; `null` for `new`. |
+| `flags` | number | The flags over every file. |
+| `packages` | array | One entry, kind `template`: status `added` (new), `changed` or `unchanged` (`same`, no files); `files` as in `lock --review`. |
+| `restart` | array | Always `[]`. |
+| `warnings` | array of strings | Each `local:` package it uses, and each library ref whose alias this machine hasn't added. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1

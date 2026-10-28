@@ -21,9 +21,9 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const templateUsage = "usage: railswitch template ls | show <ref> | export [--name <n>] [--version <N>] [--description <text>] [--to <dir>] | check [--accept <sha256>]"
+const templateUsage = "usage: railswitch template ls | show <ref> | export [--name <n>] [--version <N>] [--description <text>] [--to <dir>] | check [--accept <sha256>] | import <dir> [--accept <sha256>]"
 
-// railswitch template ls|show|export|check (D108–D111).
+// railswitch template ls|show|export|check|import (D108–D111, D113).
 func cmdTemplate(ctx context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr("%s", templateUsage)
@@ -37,6 +37,8 @@ func cmdTemplate(ctx context.Context, e *env, args []string) int {
 		return templateExport(ctx, e, args[1:])
 	case "check":
 		return templateCheck(e, args[1:])
+	case "import":
+		return templateImport(e, args[1:])
 	}
 	return e.usageErr("template: unknown subcommand %q\n%s", args[0], templateUsage)
 }
@@ -287,7 +289,7 @@ func templateExport(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "wrote template %s to %s\n", t.Ref(), dir)
 	for _, d := range dropped {
-		fmt.Fprintf(e.stdout, "dropped %s (project-only)\n", d)
+		fmt.Fprintf(e.stdout, "dropped %s\n", d)
 	}
 	for _, a := range t.Ask {
 		fmt.Fprintf(e.stdout, "asks %s (default %s)\n", a.Key, safefile.Printable(strconv.Quote(a.Default)))
@@ -324,15 +326,34 @@ func localVersion(dir string) (int, error) {
 	return t.Version, nil
 }
 
+// personalContainerfiles are the names of the editor's and the agents'
+// Containerfiles (D112): every tool's, agent-base and each of st's
+// agents'. A template never holds one.
+func personalContainerfiles(cat *pack.Catalog, st *pack.Stack) map[string]bool {
+	out := map[string]bool{"agent-base": true}
+	for _, t := range cat.Tools {
+		out[cfName(t.Image.File)] = true
+	}
+	for _, a := range st.Agents {
+		out[cfName(a.Agent.Image.File)] = true
+	}
+	return out
+}
+
 // editedContainerfiles are the Containerfiles root's stack builds that a
 // template keeps, by name: each whose body differs from the default it was
 // ejected from (the containerfile show diff), and each with no default (a
-// user addon), and the names of those with no default.
+// user addon), and the names of those with no default. The editor's and
+// the agents' are never kept (D112).
 func editedContainerfiles(root string, w *workspace.Workspace) (map[string][]byte, []string, error) {
 	out := map[string][]byte{}
 	var user []string
+	personal := personalContainerfiles(w.Catalog, w.Stack)
 	for _, rel := range render.Containerfiles(w.Project, w.Stack) {
 		name := strings.TrimPrefix(rel, "containerfiles/Containerfile.")
+		if personal[name] {
+			continue
+		}
 		doc, err := cfShowJSON(root, name)
 		if err != nil {
 			return nil, nil, err

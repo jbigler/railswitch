@@ -41,10 +41,6 @@ func templateFlags(old, new []byte) []Flag {
 		switch {
 		case strings.HasPrefix(k, "firewall."):
 			check = CheckFirewall // the project's egress mode and allow lists
-		case strings.HasPrefix(k, "agents.") && strings.HasSuffix(k, ".allow"):
-			check = CheckFirewall
-		case k == "tools.nvim.config_repo":
-			check = CheckFirewall // a repository the nvim tool clones
 		case strings.HasPrefix(k, "secret."):
 			check = CheckPrivilege // who receives a secret, and where it may go
 		case strings.HasPrefix(k, "routes."):

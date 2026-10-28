@@ -405,7 +405,22 @@ accepted until the update is accepted.
 ## Machine
 
 `/machine` (the header's "machine" link; no project needed) has a
-**Signers** section: the SSH keys trusted to sign each package library,
+**Templates** section (D113): the templates from `railswitch --json
+template ls`, and **Import from a folder**, a path field that opens
+`/machine/templates/import?dir=<path>`. That page reads `railswitch
+--json template import <dir>` and shows the template's status (new, or
+which version it replaces), its warnings and its files with the review
+component. **Import** needs "I've read the N flagged items" when
+anything is flagged; it posts the folder and hash to
+`/machine/templates/import`, which reads the review again and refuses
+(400, no job) a path that isn't absolute and clean or holds a control
+character, a hash that isn't the review's now, a missing tick, or a
+template with nothing to import (`same`, `older`); then it runs
+`railswitch template import <dir> --accept <hash>` as a machine job
+(`~machine`), the path one argv element. New project's template picker
+links here.
+
+It also has a **Signers** section: the SSH keys trusted to sign each package library,
 from `railswitch --json signer ls`. Each library lists its trusted keys
 (fingerprint, key type, added date; never the key material, and no
 comment: `signers.toml` keeps none) and its revoked fingerprints. Library
@@ -471,9 +486,8 @@ until you press Create project.
   works with the pack.
 - **Tools and agents:** Neovim, and one box per agent package `pack ls`
   lists; the package with `default = true` starts ticked. With no box
-  ticked the project gets no agent (`--agent none`); from a template it
-  gets the template's (no `--agent` flag); a ticked tool is added to the
-  template's, and ticked agents replace its agents (`--agent` replaces).
+  ticked the project gets no agent (`--agent none`), from a template
+  too: a template never brings an editor or agents (D112).
 - A slot changed away from what the repository suggests adds a warning:
   "<Slot>: you picked <X>, but the repository suggests <Y>."
 - **Next: review** runs the dry run (step 2). It is off until a pack or

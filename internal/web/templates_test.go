@@ -38,7 +38,7 @@ func tplStep(extra ...string) []string {
 }
 
 var tplArgs = []string{"project", "new", "/home/u/workspace/masto", "--repo", hostileRepo, "--prefix", "masto",
-	"--branch", "trunk", "--template", "rails-pg@2", "--answer", "options.cache=none", "--answer", "env.TZ=Europe/Paris; $(id)"}
+	"--branch", "trunk", "--template", "rails-pg@2", "--answer", "options.cache=none", "--answer", "env.TZ=Europe/Paris; $(id)", "--agent", "none"}
 
 const tplDryRun = `{"project_toml":"schema = 1\n[template]\nref = \"rails-pg@2\"\n",
  "worktree":{"slug":"trunk","routes":[],"containers":[],"env":[]},"warnings":[],"steps":["Clone"],"install":null,
@@ -172,8 +172,8 @@ func TestNewFromTemplate(t *testing.T) {
 	}
 	f.endedIn(t, "masto")
 
-	// A library template installs through the review; a ticked agent goes
-	// on top of the template's.
+	// A library template installs through the review; a ticked agent is
+	// the project's agent (a template brings none: D112).
 	f.cli.set(key+"", strings.Replace(tplDryRun, `"install":null`, `"install":`+installJSON, 1))
 	if w := f.do(req("POST", "/new/create", form(tplStep("accept_install", newHash)...))); w.Code != 400 {
 		t.Errorf("no tick: %d", w.Code)
@@ -186,7 +186,7 @@ func TestNewFromTemplate(t *testing.T) {
 		t.Errorf("argv %q\nwant %q", got, want)
 	}
 	f.endedIn(t, "masto")
-	agentKey := "--json " + strings.Join(tplArgs, " ") + " --agent helper=helper@1 --dry-run"
+	agentKey := "--json " + strings.Join(tplArgs[:len(tplArgs)-2], " ") + " --agent helper=helper@1 --dry-run"
 	f.cli.set(agentKey, tplDryRun)
 	if w := f.do(req("POST", "/new/review", form(tplStep("agent", "helper=helper@1")...))); w.Code != 200 || strings.Contains(w.Body.String(), "refusal") {
 		t.Errorf("ticked agent: %d %s", w.Code, w.Body)

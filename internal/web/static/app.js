@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -22,7 +22,7 @@ function connect() {
   if (es) es.close();
   clearTimeout(retry);
   // The new page has a prefix only once Create starts its job.
-  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" || view === "machine" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" || view === "machine" || view === "import" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -775,8 +775,9 @@ if (view === "images" || view === "library" || view === "editor" || view === "ma
 
 // Review update: Accept waits for the acknowledgement of the flagged
 // items. The job ending ok goes to the project page; so does a failed
-// restart (exit 3: the update was accepted), with a notice.
-if (view === "review") {
+// restart (exit 3: the update was accepted), with a notice. A template
+// import (view import) is the same form, going to the machine page.
+if (view === "review" || view === "import") {
   const f = $("#accept");
   if (f) {
     const btn = $("[data-accept]", f);

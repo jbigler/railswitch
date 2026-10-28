@@ -167,7 +167,7 @@ type newArgs struct {
 	packRef                         string // "": the template's
 	opts                            []string
 	nvim                            *config.NvimTool
-	agents                          map[string]string // nil: the catalog's default agent, or the template's agents
+	agents                          map[string]string // nil: the catalog's default agent
 	template                        string            // a template ref; "" for none
 	answers                         map[string]string // its questions' answers
 }
@@ -233,7 +233,8 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		if tpl, lines, libTemplate, err = newTemplate(dirs, a.template, a.answers); err != nil {
 			return nil, err
 		}
-	} else if a.agents == nil {
+	}
+	if a.agents == nil {
 		if ref, ok := cat.DefaultAgent(); ok {
 			a.agents = map[string]string{ref.Name: ref.String()}
 		}
@@ -263,6 +264,14 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		return nil, fmt.Errorf("base branch %q: %w", base, err)
 	}
 	p.Project.BaseBranch = base
+	if tpl != nil {
+		personal := personalContainerfiles(cat, st)
+		for _, n := range slices.Sorted(maps.Keys(tpl.Containerfiles)) {
+			if personal[n] {
+				return nil, fmt.Errorf("template %s holds Containerfile.%s, the editor's or an agent's image: a template never brings one (D112)", a.template, n)
+			}
+		}
+	}
 	if err := newPathsFree(ws, slug, st, tpl); err != nil {
 		return nil, err
 	}
@@ -529,7 +538,7 @@ func (e *env) printNext(ws, slug string, unset []string) {
 // newProject is the project.toml new writes, before [image] and secrets:
 // the pack's defaults, or a template's lines (base), overlaid by opts
 // (slot=ref), packRef ("": base's pack), nvim and agents (name → package
-// ref; nil: base's), and the chosen options' version pins it lacks. It is
+// ref; a template has neither: D112), and the chosen options' version pins it lacks. It is
 // validated as it will be once base is ejected.
 func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []string, nvim *config.NvimTool, agents map[string]string, base *config.Project) (*config.Project, *pack.Stack, error) {
 	if packRef == "" && base != nil {
@@ -554,9 +563,6 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 		q := *base
 		p = &q
 		p.Options, p.Versions = maps.Clone(base.Options), maps.Clone(base.Versions)
-		if agents != nil {
-			p.Agents = nil
-		}
 	}
 	p.Project = config.Meta{Name: name, Prefix: prefix, Repo: repo}
 	if base == nil || p.Stack.Pack != ref.String() {

@@ -1,0 +1,33 @@
+{{/* The review of a template folder someone handed over (D113), with the
+review component; Import needs the acknowledgement when anything is
+flagged. */}}
+{{define "templateimport"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="import">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/machine">← Machine</a></div>
+<h1>Import template</h1>
+<p class="note">A template from a folder someone gave you. Read every file before you import it: a new project started from it builds these Containerfiles and gets these firewall, route and secret lines.</p>
+{{if .Dir}}<p class="note">Folder <span class="mono">{{.Dir}}</span></p>
+{{end}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{else if eq .Status "same"}}<p class="green">This machine already has <span class="mono">{{.Ref}}</span>, byte for byte: nothing to import.</p>
+{{else}}<p>{{if eq .Status "update"}}<span class="mono">{{.Ref}}</span> replaces <span class="mono">{{.Replaces}}</span>: the diff is from the version on this machine.{{else}}<span class="mono">{{.Ref}}</span> is new on this machine: every file is shown as added.{{end}}</p>
+{{range .Warnings}}<p class="yellow notice">{{.}}</p>
+{{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.ImportURL}}" id="accept" class="editor" data-job="import" data-next="/machine"{{if .AckText}} data-ack-required{{end}}>
+<input type="hidden" name="dir" value="{{.Dir}}">
+<input type="hidden" name="hash" value="{{.Hash}}">
+{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
+{{end}}<div class="btns"><a class="ln dim" href="/machine">Cancel</a><button class="ln main" data-accept{{if .AckText}} disabled{{end}}>Import</button></div>
+</form>
+{{end}}</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

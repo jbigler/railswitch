@@ -44,7 +44,13 @@ STATE="$ROOT/state"
 LOG="$ROOT/hook.log"
 TABLE=wt_firewall
 
+# Only this user reads the state and the log (another local user would
+# learn every container's addresses and blocked hosts): new files 0600,
+# and files an older hook left 0666 are narrowed.
+umask 077
 mkdir -p "$STATE"
+chmod 700 "$STATE" || true
+chmod 600 "$STATE"/* "$LOG" 2>/dev/null || true
 log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
 die() { log "error: ${cid:-?} $*"; printf 'firewall hook: %s\n' "$*" >&2; exit 1; }
 

@@ -294,6 +294,42 @@ func TestHookReadsNetavarkSubnet(t *testing.T) {
 	}
 }
 
+// The hook keeps its state and log to this user, and narrows files an
+// older hook left world-writable.
+func TestHookFilesPrivate(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "state"), 0o777); err != nil {
+		t.Fatal(err)
+	}
+	old := filepath.Join(root, "state", "fedcba987654")
+	if err := os.WriteFile(old, nil, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(root, "state"), 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(old, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if msg, err := runHook(t, root, hookEnv(t, filepath.Join(t.TempDir(), "nft.out")), map[string]string{
+		"filial.firewall":          "none",
+		"filial.firewall.mode":     "enforce",
+		"filial.firewall.networks": "filial-feat-dev",
+	}); err != nil {
+		t.Fatalf("hook: %v\n%s", err, msg)
+	}
+	for path, want := range map[string]os.FileMode{
+		filepath.Join(root, "state"):                 0o700,
+		filepath.Join(root, "state", "0123456789ab"): 0o600,
+		old:                             0o600,
+		filepath.Join(root, "hook.log"): 0o600,
+	} {
+		if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != want {
+			t.Errorf("%s: %v %v, want %v", path, fi.Mode().Perm(), err, want)
+		}
+	}
+}
+
 func TestHookFailsClosed(t *testing.T) {
 	root := t.TempDir()
 	out := filepath.Join(t.TempDir(), "nft.out")

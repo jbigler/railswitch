@@ -2,6 +2,7 @@ package review
 
 import (
 	"fmt"
+	"maps"
 	"path"
 	"regexp"
 	"slices"
@@ -15,14 +16,14 @@ import (
 
 // manifest is what the checks read from a package manifest.
 type manifest struct {
-	allow     []string // agent allow
-	firewall  []string // option and tool firewall profiles
-	pull      string   // option [image] pull
-	imageFile string   // pack [image] file
-	mounts    []pack.Mount
-	ports     []pack.Port
-	caps      []string // [unit] add_capability
-	err       error    // the manifest does not load
+	allow    []string          // agent allow
+	firewall []string          // option and tool firewall profiles
+	image    map[string]string // what picks the image a service runs, by field ("image.pull")
+	mounts   []pack.Mount
+	ports    []pack.Port
+	routes   []pack.Route // option routes: hosts Traefik exposes
+	caps     []string     // [unit] add_capability
+	err      error        // the manifest does not load
 }
 
 // decode reads a kind's manifest strictly into the package format's types,
@@ -57,12 +58,19 @@ func decode(kind string, data []byte) manifest {
 	var m manifest
 	switch kind {
 	case "pack":
-		m.imageFile, m.ports, m.caps = p.Image.File, p.Ports, p.Unit.AddCapability
+		m.image = map[string]string{"image.file": p.Image.File, "image.tag": p.Image.Tag, "image.args": args(p.Image.Args)}
+		m.ports, m.caps = p.Ports, p.Unit.AddCapability
 	case "option":
-		m.firewall, m.pull, m.mounts, m.ports, m.caps = o.Firewall, o.Image.Pull, o.Mounts, o.Ports, o.Unit.AddCapability
+		m.image = map[string]string{"image.pull": o.Image.Pull, "image.use": o.Image.Use, "image.build": o.Image.Build, "image.tag": o.Image.Tag, "image.args": args(o.Image.Args)}
+		if o.Pin != nil {
+			m.image["pin.default"] = o.Pin.Default
+		}
+		m.firewall, m.mounts, m.ports, m.routes, m.caps = o.Firewall, o.Mounts, o.Ports, o.Routes, o.Unit.AddCapability
 	case "tool":
+		m.image = map[string]string{"image.file": t.Image.File}
 		m.firewall, m.ports, m.caps = t.Firewall, t.Ports, t.Unit.AddCapability
 	case "agent":
+		m.image = map[string]string{"image.file": a.Image.File}
 		m.allow, m.mounts, m.caps = a.Allow, a.Mounts, a.Unit.AddCapability
 	}
 	return m
@@ -86,11 +94,10 @@ func manifestFlags(old, new manifest) []Flag {
 	if !slices.Equal(old.firewall, new.firewall) {
 		add(CheckFirewall, "firewall: %s -> %s", profiles(old.firewall), profiles(new.firewall))
 	}
-	if new.pull != "" && new.pull != old.pull {
-		add(CheckImage, "image.pull: %s", new.pull)
-	}
-	if new.imageFile != "" && new.imageFile != old.imageFile {
-		add(CheckImage, "image.file: %s", new.imageFile)
+	for _, k := range slices.Sorted(maps.Keys(new.image)) {
+		if v := new.image[k]; v != old.image[k] {
+			add(CheckImage, "%s: %s -> %s", k, orNone(old.image[k]), orNone(v))
+		}
 	}
 	for _, m := range new.mounts {
 		if hostSource(m.Source) && !slices.Contains(old.mounts, m) {
@@ -103,8 +110,13 @@ func manifestFlags(old, new manifest) []Flag {
 			add(CheckPort, "ports: adds %s (base %d, container %d, share %v)", p.Name, p.Base, p.Container, p.Share)
 			continue
 		}
-		if q := old.ports[i]; q.Base != p.Base || q.Container != p.Container || q.Share != p.Share {
-			add(CheckPort, "ports.%s: base %d -> %d, container %d -> %d, share %v -> %v", p.Name, q.Base, p.Base, q.Container, p.Container, q.Share, p.Share)
+		if q := old.ports[i]; q.Base != p.Base || q.Container != p.Container || q.Share != p.Share || q.SamePort != p.SamePort {
+			add(CheckPort, "ports.%s: base %d -> %d, container %d -> %d, share %v -> %v, same_port %v -> %v", p.Name, q.Base, p.Base, q.Container, p.Container, q.Share, p.Share, q.SamePort, p.SamePort)
+		}
+	}
+	for _, r := range new.routes {
+		if !slices.ContainsFunc(old.routes, func(q pack.Route) bool { return q.Name == r.Name && q.Host == r.Host && q.Port == r.Port }) {
+			add(CheckPort, "routes: %s at %s to port %d", r.Name, r.Host, r.Port)
 		}
 	}
 	for _, c := range new.caps {
@@ -119,6 +131,21 @@ func manifestFlags(old, new manifest) []Flag {
 // path or a placeholder), not a package file.
 func hostSource(s string) bool {
 	return strings.HasPrefix(s, "/") || strings.Contains(s, "{")
+}
+
+// args is a build args table as text, keys sorted; "" for none.
+func args(m map[string]string) string {
+	if len(m) == 0 {
+		return ""
+	}
+	return fmt.Sprint(m)
+}
+
+func orNone(s string) string {
+	if s == "" {
+		return "(none)"
+	}
+	return s
 }
 
 func profiles(p []string) string {

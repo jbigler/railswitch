@@ -97,7 +97,7 @@ func TestLockReviewJSON(t *testing.T) {
 		t.Errorf("files %v", rows)
 	}
 	manifest := p.Files[1]
-	if len(manifest.Flags) != 1 || manifest.Flags[0] != (review.Flag{Check: "image", Text: "image.pull: docker.io/library/postgres:{postgres}"}) || !strings.Contains(manifest.Diff, "+pull = \"docker.io/library/postgres:{postgres}\"") {
+	if len(manifest.Flags) != 1 || manifest.Flags[0] != (review.Flag{Check: "image", Text: "image.pull: docker.io/library/oldpg:{postgres} -> docker.io/library/postgres:{postgres}"}) || !strings.Contains(manifest.Diff, "+pull = \"docker.io/library/postgres:{postgres}\"") {
 		t.Errorf("option.toml %+v", manifest)
 	}
 	if doc.Flags != 1 {

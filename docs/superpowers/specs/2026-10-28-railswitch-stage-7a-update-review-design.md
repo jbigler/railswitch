@@ -150,9 +150,9 @@ manifest flag, which is listed above the diff).
 |---|---|---|
 | `firewall` | `deps.allow` (a host per line, `#` comments); `agent.toml` `allow`; option and tool `firewall` profiles | a host added; a profile changed |
 | `runs-here` | `Containerfile.*`, added or changed instructions (continuations and heredoc bodies joined; flagged at the first changed line); any file that is not text | `curl` or `wget` piped (`\|`) into `sh`, `bash`, `zsh`, `dash`, `ash`, `ksh`, `fish`, `python`, `python3`, `perl`, `ruby`, `node` or `php` (any case or spacing), or run by `<(`, `$(` or backticks; `ADD http://` or `https://`; `--security=insecure`, `--network=host`; a NUL or invalid UTF-8 byte |
-| `image` | `Containerfile.*` `FROM`; option `[image] pull`; pack `[image]` file | a `FROM` ref or `pull` added or changed |
+| `image` | `Containerfile.*` `FROM`; option `[image]` `pull`, `use`, `build`, `tag`, `args` and `[pin] default`; pack `[image]` `file`, `tag`, `args`; tool and agent `[image] file` | a `FROM` line or any of those fields added or changed |
 | `host-mount` | manifest `[[mounts]]` | an added or changed mount whose source is an absolute path or a placeholder (`{…}`); a package file source is not flagged |
-| `port` | manifest `[[ports]]` | a port added, or its `base`, `container` or `share` changed |
+| `port` | manifest `[[ports]]`; option `[[routes]]` | a port added, or its `base`, `container`, `share` or `same_port` changed; a route added, or its `host` or `port` changed |
 | `privilege` | `[unit] add_capability`; a top-level `.sh` of a package with `add_capability` | a capability added; such a script changed |
 
 - Manifests are compared field by field after loading both (`toml`

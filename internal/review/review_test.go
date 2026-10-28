@@ -223,6 +223,40 @@ func TestImagePull(t *testing.T) {
 	}
 }
 
+// Every field that changes what image a service runs is an image flag;
+// a route (what Traefik exposes) or same_port is a port flag.
+func TestImageAndRouteFields(t *testing.T) {
+	build := strings.Replace(optionTOML, `pull = "docker.io/library/db:1"`, "build = \"Containerfile.db\"\ntag = \"t1\"\nargs = { A = \"1\" }", 1)
+	pin := optionTOML + "\n[pin]\nname = \"db\"\ndefault = \"16\"\n"
+	route := optionTOML + "\n[[routes]]\nname = \"s3\"\nhost = \"s3.{worktree.host}\"\nport = 9000\n"
+	ports := optionTOML + "\n[[ports]]\nname = \"db\"\nenv = \"DB_PORT\"\nbase = 55432\ncontainer = 5432\n"
+	for _, c := range []struct{ old, new, want string }{
+		{build, strings.Replace(build, `"Containerfile.db"`, `"Containerfile.other"`, 1), "image:0"},
+		{build, strings.Replace(build, `tag = "t1"`, `tag = "t2"`, 1), "image:0"},
+		{build, strings.Replace(build, `A = "1"`, `A = "2"`, 1), "image:0"},
+		{optionTOML, strings.Replace(optionTOML, `pull = "docker.io/library/db:1"`, `use = "app"`, 1), "image:0"},
+		{pin, strings.Replace(pin, `default = "16"`, `default = "17"`, 1), "image:0"},
+		{optionTOML, route, "port:0"},
+		{route, strings.Replace(route, "port = 9000", "port = 9001", 1), "port:0"},
+		{ports, strings.Replace(ports, "container = 5432", "container = 5432\nsame_port = true", 1), "port:0"},
+	} {
+		if f := flagsOf(t, "option", files("option.toml", c.old), files("option.toml", c.new), "option.toml"); !slices.Contains(f, c.want) {
+			t.Errorf("%s\nflags %v, want %s", c.new, f, c.want)
+		}
+	}
+	for _, next := range []string{
+		strings.Replace(packTOML, "[image]\n", "[image]\ntag = \"ruby{ruby}\"\n", 1),
+		strings.Replace(packTOML, "[image]\n", "[image]\nargs = { X = \"1\" }\n", 1),
+	} {
+		if f := flagsOf(t, "pack", files("pack.toml", packTOML), files("pack.toml", next), "pack.toml"); !slices.Equal(f, []string{"image:0"}) {
+			t.Errorf("%s\nflags %v", next, f)
+		}
+	}
+	if f := flagsOf(t, "option", files("option.toml", route), files("option.toml", strings.Replace(route, `name = "s3"`, `name = "s3"`+"\nroot_redirect = \"/ui\"", 1)), "option.toml"); len(f) != 0 {
+		t.Errorf("a route's redirect flagged %v", f)
+	}
+}
+
 func TestHostMount(t *testing.T) {
 	old := files("option.toml", optionTOML)
 	for _, src := range []string{"/etc", "{worktree.dir}/x"} {

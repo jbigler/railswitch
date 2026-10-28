@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -174,6 +175,37 @@ func reviewPackages(doc reviewDoc) []reviewPkgView {
 		pkgs = append(pkgs, pv)
 	}
 	return pkgs
+}
+
+// installView is the Install review (Stage 7c, D106): the review of the
+// library packages a staged change or a new project installs, shown with
+// the review page's component. Apply or Create then names its hash.
+type installView struct {
+	Hash, AckText string
+	Packages      []reviewPkgView
+}
+
+func newInstall(doc *reviewDoc) *installView {
+	if doc == nil {
+		return nil
+	}
+	return &installView{Hash: doc.Hash, AckText: ackText(doc.Flags), Packages: reviewPackages(*doc)}
+}
+
+// checkInstall holds a posted accept_install to the install review read
+// again: the same hash and, with flags, the tick.
+func checkInstall(doc *reviewDoc, posted, ack string) error {
+	switch {
+	case doc == nil:
+		return errors.New("the change no longer installs a library package: look at it again")
+	case !hashRe.MatchString(posted):
+		return errors.New("this installs a library package: read its Install review first")
+	case posted != doc.Hash:
+		return errors.New("the install review changed since you read it: look at it again")
+	case doc.Flags > 0 && ack != "1":
+		return fmt.Errorf("tick \"%s\" first", ackText(doc.Flags))
+	}
+	return nil
 }
 
 func (s *Server) reviewPage(w http.ResponseWriter, r *http.Request) {

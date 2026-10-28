@@ -7,12 +7,12 @@
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Library</h1>
-<p class="note">The built-in packages and this workspace's own (<code>local:</code>). Built-ins are read-only; start a local copy with New pack or New option.</p>
+<p class="note">The built-in packages, this workspace's own (<code>local:</code>) and those of this machine's libraries (<code>&lt;alias&gt;:</code>). Built-in and library packages are read-only; start a local copy of a built-in with New pack or New option.</p>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
-{{end}}{{range .Groups}}<section class="card">
+{{end}}{{template "libraries" .}}{{range .Groups}}<section class="card">
 <h2>{{.Title}}</h2>
 <ul class="lib-list">
-{{range .Items}}<li{{if .Current}} class="cur"{{end}} data-ref="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Note}} <span class="muted">{{.Note}}</span>{{end}}<span class="sp"></span>{{if .Used}}<span class="chip green">used by this project</span>{{end}}<span class="chip">{{if .Local}}local{{else}}built in{{end}}</span></a></li>
+{{range .Items}}<li{{if .Current}} class="cur"{{end}} data-ref="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Note}} <span class="muted">{{.Note}}</span>{{end}}<span class="sp"></span>{{if .Used}}<span class="chip green">used by this project</span>{{end}}<span class="chip">{{template "lib-source" .}}</span></a></li>
 {{else}}<li class="muted">None.</li>
 {{end}}</ul>
 </section>
@@ -39,8 +39,9 @@
 {{end}}</section>
 <section class="pane">
 {{with .Sel}}<section class="card">
-<h2><span class="mono">{{.Ref}}</span> <span class="chip">{{if .Local}}local{{else}}built in{{end}}</span></h2>
-{{if .Error}}<p class="red set-error">{{.Error}}</p>
+<h2><span class="mono">{{.Ref}}</span> <span class="chip">{{if .Local}}local{{else if .Library}}library {{.Library.Alias}}{{else}}built in{{end}}</span></h2>
+{{with .Library}}<p class="note lib-from">From the library <span class="mono">{{.Alias}}</span>{{if .ID}} (<span class="mono">{{.ID}}</span>){{end}}{{if .Status}} · last fetch <span class="chip {{.StatusClass}}">{{.Status}}</span>{{end}}. Read-only: a project installs it only through the Install review in Settings or New project.</p>
+{{end}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{with .Doc}}{{if .Kind}}<dl class="kv">
 <dt>Kind</dt><dd>{{.Kind}}</dd>
 {{if .Path}}<dt>Path</dt><dd class="mono">{{.Path}}</dd>
@@ -71,4 +72,56 @@
 {{template "common-dialogs" .}}
 </body>
 </html>
+{{end}}
+
+{{define "lib-source"}}{{if .Local}}local{{else if .Library}}library {{.Library}}{{else}}built in{{end}}{{end}}
+
+{{/* libraries is the Libraries section: the machine's package libraries,
+Fetch, Trust this key or Confirm rotation for a fetch that waits on its
+signer, and Add library. */}}
+{{define "libraries"}}<section class="card" id="libraries">
+<h2>Libraries</h2>
+<p class="note">Signed package libraries on this machine, for every project. A library's packages can be installed once its signer is trusted, and only after their Install review.</p>
+{{if .LibrariesError}}<p class="red set-error">Libraries unavailable: {{.LibrariesError}}</p>
+{{end}}{{range .Libraries}}{{$alias := .Alias}}<div class="lib-repo" data-alias="{{.Alias}}">
+<h3><span class="mono">{{.Alias}}</span> {{if .Status}}<span class="chip {{.StatusClass}}">{{.Status}}</span>{{else}}<span class="chip">not fetched</span>{{end}}</h3>
+<dl class="kv">
+<dt>Repository</dt><dd class="mono">{{.URL}}{{if .Branch}} · {{.Branch}}{{end}}</dd>
+{{if .ID}}<dt>Library</dt><dd class="mono">{{.ID}}</dd>
+{{end}}<dt>Fetched</dt><dd>{{if .Fetched}}{{.Fetched}} · serial {{.Serial}}{{if .Commit}} · <span class="mono">{{.Commit}}</span>{{end}} · {{.Packages}} {{if eq .Packages 1}}package{{else}}packages{{end}}{{else}}never{{end}}</dd>
+</dl>
+{{with .Pending}}<div class="lib-trust{{if .Known}} danger{{end}}">
+{{if .Rotation}}<b>Confirm rotation</b>
+<p>The last fetch is signed by a new key, and the key this machine trusts for the library vouches for it.</p>
+<span class="muted">Trusted key</span> <span class="mono fp">{{.Trusted}}</span>
+<span class="muted">New key</span> <span class="mono fp">{{.Fingerprint}}</span>
+<p class="note">Check the new key's fingerprint with the publisher, through a channel other than the library, before you confirm.</p>
+{{else}}<b>Trust this key</b>
+<p>The last fetch is signed by a key this machine doesn't trust yet:</p>
+<span class="mono fp">{{.Fingerprint}}</span>
+<p class="note">Check this fingerprint with the publisher, through a channel other than the library, before you trust it.</p>
+{{if .Known}}<p class="red">This library already trusts other keys, and none of them vouched for this one. It may be an attacker's key. Trust it only if the publisher confirms a new signer through another channel.</p>
+{{end}}{{end}}<form method="post" action="{{$.LibTrustURL}}" data-job="library-trust" data-confirm="{{if .Rotation}}Confirm the rotation of {{$alias}} to {{.Fingerprint}}?{{else}}Trust {{.Fingerprint}} to sign {{$alias}}?{{end}} Packages it signs can then be installed.">
+<input type="hidden" name="alias" value="{{$alias}}">
+<input type="hidden" name="fingerprint" value="{{.Fingerprint}}">
+<input type="hidden" name="kind" value="{{if .Rotation}}rotation{{else}}trust{{end}}">
+{{if .Known}}<label class="check"><input type="checkbox" name="new_signer" value="1" required> The publisher confirmed this new signer through another channel</label>
+{{end}}<div class="btns start"><button class="ln main">{{if .Rotation}}Confirm rotation{{else}}Trust this key{{end}}</button></div>
+</form>
+</div>
+{{end}}<form method="post" action="{{$.LibFetchURL}}" class="btns start" data-job="library-fetch">
+<input type="hidden" name="alias" value="{{.Alias}}">
+<button class="ln">Fetch</button>
+</form>
+</div>
+{{else}}{{if not .LibrariesError}}<p class="muted">No libraries.</p>
+{{end}}{{end}}<div class="lbl">Add library</div>
+<form method="post" action="{{.LibAddURL}}" class="add-row" data-job="library-add">
+<input name="url" placeholder="https://github.com/owner/library" class="mono" autocomplete="off" spellcheck="false" required aria-label="Library URL">
+<input name="alias" placeholder="alias" class="mono" autocomplete="off" spellcheck="false" required maxlength="20" pattern="[a-z][a-z0-9\-]{0,19}" aria-label="Alias">
+<input name="branch" placeholder="branch" class="mono" autocomplete="off" spellcheck="false" aria-label="Branch (empty: the default)">
+<button class="ln">Add library</button>
+</form>
+<p class="note">The alias prefixes its packages' refs (<code>&lt;alias&gt;:django@1</code>). Adding fetches it; a signer not trusted yet waits here for Trust this key.</p>
+</section>
 {{end}}

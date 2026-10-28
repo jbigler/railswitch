@@ -29,10 +29,19 @@ type projectRow struct {
 }
 
 type overview struct {
-	Prefix        string     `json:"prefix"`
-	Workspace     string     `json:"workspace"`
-	ReviewPending bool       `json:"review_pending"` // a package update waits for lock --review
-	Worktrees     []worktree `json:"worktrees"`
+	Prefix         string          `json:"prefix"`
+	Workspace      string          `json:"workspace"`
+	ReviewPending  bool            `json:"review_pending"` // a package update waits for lock --review
+	SignerWarnings []signerWarning `json:"signer_warnings"`
+	Worktrees      []worktree      `json:"worktrees"`
+}
+
+// signerWarning is a locked library package whose signer is no longer
+// trusted for its library.
+type signerWarning struct {
+	Ref         string `json:"ref"`
+	Library     string `json:"library"`
+	Fingerprint string `json:"fingerprint"`
 }
 
 type worktree struct {
@@ -150,6 +159,7 @@ type previewDoc struct {
 	Diff    string       `json:"diff"`
 	Edits   []editResult `json:"edits"`
 	Restart []string     `json:"restart"`
+	Install *reviewDoc   `json:"install"` // the library packages the edits install; nil: none
 }
 
 type editResult struct {
@@ -191,17 +201,20 @@ type optionMatch struct {
 	Others   []string `json:"others"`
 }
 
-// catalogDoc is `pack ls`: what a new project chooses from.
+// catalogDoc is `pack ls`: what a new project chooses from. Library is a
+// library package's alias, "" for the others.
 type catalogDoc struct {
 	Packs []struct {
-		Ref  string `json:"ref"`
-		Name string `json:"name"`
+		Ref     string `json:"ref"`
+		Name    string `json:"name"`
+		Library string `json:"library"`
 	} `json:"packs"`
 	Options []catalogOption `json:"options"`
 	Agents  []struct {
 		Ref     string `json:"ref"`
 		Name    string `json:"name"`
 		Default bool   `json:"default"`
+		Library string `json:"library"`
 	} `json:"agents"`
 }
 
@@ -210,6 +223,7 @@ type catalogOption struct {
 	Name      string   `json:"name"`
 	Slot      string   `json:"slot"`
 	WorksWith []string `json:"works_with"`
+	Library   string   `json:"library"`
 }
 
 // dryRunDoc is `project new --dry-run`: the project.toml it would write
@@ -228,8 +242,47 @@ type dryRunDoc struct {
 		} `json:"containers"`
 		Env []string `json:"env"`
 	} `json:"worktree"`
-	Warnings []string `json:"warnings"`
-	Steps    []string `json:"steps"`
+	Warnings []string   `json:"warnings"`
+	Steps    []string   `json:"steps"`
+	Install  *reviewDoc `json:"install"` // the library packages it installs; nil: none
+}
+
+// libraryDoc is `library ls`: the machine's package libraries.
+type libraryDoc struct {
+	Libraries []libraryRow `json:"libraries"`
+}
+
+type libraryRow struct {
+	Alias    string          `json:"alias"`
+	URL      string          `json:"url"`
+	Branch   string          `json:"branch"`
+	ID       string          `json:"id"`
+	Status   string          `json:"status"` // the last fetch's: trusted, unknown-signer, rotation, rolled-back, …
+	Serial   int             `json:"serial"`
+	Commit   string          `json:"commit"`
+	Fetched  string          `json:"fetched"`
+	Packages int             `json:"packages"`
+	Pending  *libraryPending `json:"pending"`
+}
+
+// libraryPending is a fetch waiting for its signer to be trusted. For a
+// rotation Fingerprint is the trusted key and NewFingerprint the key it
+// vouches for. KnownLibrary: the library trusts other keys, and none
+// vouched for this one.
+type libraryPending struct {
+	Fingerprint    string `json:"fingerprint"`
+	NewFingerprint string `json:"new_fingerprint"`
+	Status         string `json:"status"` // unknown-signer or rotation
+	KnownLibrary   bool   `json:"known_library"`
+}
+
+// trustFingerprint is the key `library trust` takes for p: a rotation's
+// new key, else the signing key.
+func (p libraryPending) trustFingerprint() string {
+	if p.Status == "rotation" {
+		return p.NewFingerprint
+	}
+	return p.Fingerprint
 }
 
 func readCatalog(ctx context.Context, c CLI) (catalogDoc, error) {

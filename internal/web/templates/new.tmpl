@@ -80,8 +80,14 @@
 <pre class="out mono toml-view">{{.ProjectTOML}}</pre>
 <div class="lbl">Create runs</div>
 <ol class="steps">{{range .Steps}}<li>{{.}}</li>{{end}}</ol>
-{{end}}{{end}}<form method="post" action="{{.CreateURL}}" data-create>
-{{if .Doc.Worktree.Slug}}<label class="check"><input type="checkbox" name="up" value="1" checked> Start <span class="mono">{{.Doc.Worktree.Slug}}</span> when it's created</label>
-{{end}}<div class="btns"><button class="ln main"{{if .Error}} disabled{{end}}>Create project</button></div>
+{{end}}{{with .Install}}<section id="install-review" class="install-review">
+<h2>Install review</h2>
+<p class="note">This project installs a library package. Nothing from it is locked until you create the project with this review: read every file, the flagged ones first.</p>
+{{template "review-packages" .Packages}}</section>
+{{end}}{{end}}<form method="post" action="{{.CreateURL}}" data-create{{if and .Install .Install.AckText}} data-ack-required{{end}}>
+{{with .Install}}<input type="hidden" name="accept_install" value="{{.Hash}}">
+{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
+{{end}}{{end}}{{if .Doc.Worktree.Slug}}<label class="check"><input type="checkbox" name="up" value="1" checked> Start <span class="mono">{{.Doc.Worktree.Slug}}</span> when it's created</label>
+{{end}}<div class="btns"><button class="ln main"{{if or .Error (and .Install .Install.AckText)}} disabled{{end}}>Create project</button></div>
 </form>
 {{end}}</section>{{end}}

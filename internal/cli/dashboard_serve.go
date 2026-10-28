@@ -30,6 +30,10 @@ const exeCheckEvery = 5 * time.Second
 // for gh, project detect up to 2 min for git).
 const cliTimeout = 150 * time.Second
 
+// cliGrace is how long a read has, after SIGTERM, to stop its git and
+// remove its temp dir (project detect) before the SIGKILL.
+const cliGrace = 3 * time.Second
+
 // railswitch dashboard serve: the dashboard itself (its unit's ExecStart).
 // It listens on machine.DashboardAddr until stopped, or until its
 // executable is replaced while no job runs: it exits 0 and systemd starts
@@ -140,7 +144,7 @@ func (c selfCLI) Run(ctx context.Context, args ...string) ([]byte, error) {
 
 // RunInput is Run with stdin on the command's standard input (nil: none).
 func (c selfCLI) RunInput(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
-	cmd := sys.Cmd{Name: c.exe, Args: args, Timeout: cliTimeout}
+	cmd := sys.Cmd{Name: c.exe, Args: args, Timeout: cliTimeout, KillGrace: cliGrace}
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}

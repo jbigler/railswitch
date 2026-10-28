@@ -78,6 +78,26 @@ func TestSelfCLI(t *testing.T) {
 	}
 }
 
+// TestSelfCLICancelTERM: a cancelled read gets SIGTERM first, so
+// railswitch's signal handling can stop git and remove its temp dir.
+func TestSelfCLICancelTERM(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "cleaned")
+	exe := filepath.Join(dir, "rs")
+	script := "#!/bin/bash\ntrap 'touch " + marker + "; exit 0' TERM\nsleep 10 & wait\n"
+	if err := os.WriteFile(exe, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	if _, err := (selfCLI{r: sys.Exec{}, exe: exe}).Run(ctx, "project", "detect", "x"); err == nil {
+		t.Fatal("cancelled read: no error")
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Errorf("the read never saw SIGTERM: %v", err)
+	}
+}
+
 // TestSelfCLIInput: stdin reaches the command's stdin and is not in argv.
 func TestSelfCLIInput(t *testing.T) {
 	f := &systest.Fake{}

@@ -63,8 +63,11 @@ evidence = "Gemfile: pg"            # optional; default "<file>: <match>"
    `git clone --depth 1 --filter=blob:none --no-checkout --branch <b>
    <repo> <tmp>`, with `GIT_LFS_SKIP_SMUDGE=1`,
    `-c core.hooksPath=/dev/null`, `GIT_TERMINAL_PROMPT=0`; every git call
-   through `sys.Runner`, 2 min timeout. No working tree is ever written.
-   The temp dir is removed on every path (defer).
+   through `sys.Runner`, one 2 min deadline for the whole fetch. No working
+   tree is ever written. The temp dir is removed on every path (defer);
+   the dashboard stops a read with SIGTERM (3 s grace before SIGKILL) so
+   the defer runs, and each detect first removes this user's
+   `railswitch-detect-*` dirs (real dirs, not symlinks) older than 10 min.
 4. Read each path from the object store: `git ls-tree -z HEAD -- <paths…>`
    gives each entry's mode and blob id; only mode 100644 or 100755 counts
    (a symlink, a path under a symlinked directory, which has no entry, a

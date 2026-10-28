@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
@@ -24,8 +25,14 @@ import (
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
-// gitTimeout bounds each git call of Fetch.
-const gitTimeout = 2 * time.Minute
+// fetchTimeout bounds the whole of Fetch, every git call together.
+var fetchTimeout = 2 * time.Minute
+
+// staleAfter is the age of a leftover temp dir that the next Fetch
+// removes: far past fetchTimeout, so never a running Fetch's.
+const staleAfter = 10 * time.Minute
+
+const tempPrefix = "railswitch-detect-"
 
 // Paths is every repository path a rule in cat names, sorted and unique.
 func Paths(cat *pack.Catalog) []string {
@@ -54,11 +61,14 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 			return nil, fmt.Errorf("%s %q is not a usable git value", a[0], a[1])
 		}
 	}
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	base := os.Getenv("XDG_RUNTIME_DIR")
 	if base == "" {
 		base = os.TempDir()
 	}
-	tmp, err := os.MkdirTemp(base, "railswitch-detect-")
+	removeStale(base, time.Now())
+	tmp, err := os.MkdirTemp(base, tempPrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +82,7 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 	dir := filepath.Join(tmp, "repo")
 	git := func(stdout io.Writer, args ...string) (sys.Result, error) {
 		argv := append([]string{"--literal-pathspecs", "-c", "core.hooksPath=/dev/null", "-c", "protocol.ext.allow=never"}, args...)
-		return r.Run(ctx, sys.Cmd{Name: "git", Args: argv, Env: env, Timeout: gitTimeout, Stdout: stdout})
+		return r.Run(ctx, sys.Cmd{Name: "git", Args: argv, Env: env, Timeout: fetchTimeout, Stdout: stdout})
 	}
 	if _, err := git(nil, "clone", "--quiet", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", branch, "--", repo, dir); err != nil {
 		return nil, fmt.Errorf("git clone --branch %s %s: %w", branch, repo, err)
@@ -108,6 +118,30 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 		files[p] = buf.b
 	}
 	return files, nil
+}
+
+// removeStale removes the temp dirs in base that a Fetch killed before its
+// defer left behind: real directories (not symlinks) named with
+// tempPrefix, owned by this user, last modified before now-staleAfter.
+func removeStale(base string, now time.Time) {
+	ents, err := os.ReadDir(base)
+	if err != nil {
+		return
+	}
+	for _, e := range ents {
+		if !strings.HasPrefix(e.Name(), tempPrefix) {
+			continue
+		}
+		p := filepath.Join(base, e.Name())
+		fi, err := os.Lstat(p)
+		if err != nil || !fi.IsDir() || now.Sub(fi.ModTime()) < staleAfter {
+			continue
+		}
+		if st, ok := fi.Sys().(*syscall.Stat_t); !ok || int(st.Uid) != os.Getuid() {
+			continue
+		}
+		_ = os.RemoveAll(p)
+	}
 }
 
 // regularBlobs is path → blob id for each entry of `git ls-tree -z` output

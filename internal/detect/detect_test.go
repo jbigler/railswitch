@@ -3,6 +3,8 @@ package detect
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"os/exec"
@@ -12,6 +14,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -331,4 +334,95 @@ func TestFetchInflatesNothing(t *testing.T) {
 	if w.most > 4<<20 {
 		t.Errorf("%d bytes on disk under $XDG_RUNTIME_DIR during Fetch; want the compressed objects only (< 4 MiB)", w.most)
 	}
+}
+
+// slowGit answers each git call after 100 ms, like a slow remote.
+type slowGit struct{}
+
+func (slowGit) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
+	select {
+	case <-ctx.Done():
+		return sys.Result{}, ctx.Err()
+	case <-time.After(100 * time.Millisecond):
+	}
+	switch {
+	case slices.Contains(c.Args, "ls-tree"):
+		var out string
+		for i := range 10 {
+			out += fmt.Sprintf("100644 blob %040d\tf%d\x00", i, i)
+		}
+		return sys.Result{Stdout: []byte(out)}, nil
+	case slices.Contains(c.Args, "-s"):
+		return sys.Result{Stdout: []byte("1\n")}, nil
+	case slices.Contains(c.Args, "blob"):
+		_, _ = c.Stdout.Write([]byte("x"))
+	}
+	return sys.Result{}, nil
+}
+
+// TestFetchOneDeadline: the deadline is for the whole Fetch, not each git
+// call: 22 calls of 100 ms each don't fit in 300 ms.
+func TestFetchOneDeadline(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	defer func(d time.Duration) { fetchTimeout = d }(fetchTimeout)
+	fetchTimeout = 300 * time.Millisecond
+	var paths []string
+	for i := range 10 {
+		paths = append(paths, fmt.Sprintf("f%d", i))
+	}
+	start := time.Now()
+	_, err := Fetch(context.Background(), slowGit{}, "file:///x", "main", paths)
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > time.Second {
+		t.Errorf("Fetch = %v after %v; want the deadline after about 300ms", err, time.Since(start))
+	}
+}
+
+// TestFetchRemovesStale: a temp dir a killed Fetch left behind goes once
+// it is old; a fresh one, a symlink and a file of the same prefix stay,
+// and so does a stale dir of another name.
+func TestFetchRemovesStale(t *testing.T) {
+	runtime := t.TempDir()
+	t.Setenv("XDG_RUNTIME_DIR", runtime)
+	old := time.Now().Add(-11 * time.Minute)
+	mk := func(name string, dir bool) string {
+		p := filepath.Join(runtime, name)
+		if dir {
+			write(t, filepath.Join(p, "repo", "x"), []byte("x"))
+		} else {
+			write(t, p, []byte("x"))
+		}
+		return p
+	}
+	stale := mk("railswitch-detect-111", true)
+	fresh := mk("railswitch-detect-222", true)
+	file := mk("railswitch-detect-333", false)
+	other := mk("other-detect-444", true)
+	target := mk("target", true)
+	link := filepath.Join(runtime, "railswitch-detect-555")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{stale, file, other, target} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Lchown(link, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = Fetch(context.Background(), failGit{}, "file:///x", "main", nil)
+	if _, err := os.Lstat(stale); err == nil {
+		t.Errorf("%s still there", stale)
+	}
+	for _, p := range []string{fresh, file, other, link, filepath.Join(target, "repo", "x")} {
+		if _, err := os.Lstat(p); err != nil {
+			t.Errorf("%s removed: %v", p, err)
+		}
+	}
+}
+
+type failGit struct{}
+
+func (failGit) Run(context.Context, sys.Cmd) (sys.Result, error) {
+	return sys.Result{}, errors.New("no git here")
 }

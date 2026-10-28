@@ -210,8 +210,9 @@ until you press Create project.
   `~/workspace/<prefix>` and follows the prefix until you edit it.
 - **Read the repository** runs `railswitch --json project detect <repo>
   [--branch <b>]` while you wait (it fetches only the files the packages'
-  detection rules name, up to 2 minutes). git's error shows under
-  Repository. An empty Base branch is filled with the branch it read.
+  detection rules name, up to 2 minutes; the dashboard stops a read that
+  runs too long with SIGTERM, then SIGKILL 3 s later, so its temp dir is
+  removed). git's error shows under Repository. An empty Base branch is filled with the branch it read.
 - **Stack:** the pack it matched, with the files that matched, and a
   picker of every pack (`railswitch --json pack ls`). When no pack
   matched, the card says "No pack matched; pick one". Picking a pack

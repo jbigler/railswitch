@@ -411,7 +411,9 @@ files suggest, each with its evidence. railswitch reads only the files
 the built-in packages' detection rules name (`docs/packs.md`), straight
 from the object store of a shallow, blobless clone with no working tree
 (`git ls-tree`, `git cat-file`), with no hooks, no LFS and no prompts, in
-a temp dir under `$XDG_RUNTIME_DIR` that it always removes. Only a regular
+a temp dir under `$XDG_RUNTIME_DIR` that it always removes (the fetch has
+2 minutes in all; a `railswitch-detect-*` dir of yours older than 10
+minutes, left by a killed run, goes at the next detect). Only a regular
 file of at most 1 MiB counts: a path that is a symlink, is under one, is a
 directory or is over 1 MiB counts as absent, and no file is inflated onto
 disk. A git failure exits 1

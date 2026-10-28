@@ -36,8 +36,11 @@ POSTGRES_PASSWORD = "{generated.DB_PASSWORD}"
 PGTZ = "{env.TZ}"
 
 [dump]                  # C3: railswitch db dump writes its stdout to <workspace>/db-dumps/<file>
-command = ["pg_dump", "-Fc", "-U", "postgres", "{db}"]
-file = "{db}.dump"      # initdb/restore-dump.sh restores it into a new volume
+# Every database the app created in the server, not only {db}: a Rails
+# multi-database app (primary, queue, cache, cable) or a second Ecto repo.
+list = ["psql", "-U", "postgres", "-Atc", "SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname"]
+command = ["pg_dump", "-Fc", "-U", "postgres", "{dump.db}"]
+file = "{dump.db}.dump" # initdb/restore-dump.sh restores each into a new volume
 
 [[volumes]]
 name = "db-data-pg{postgres.major}"

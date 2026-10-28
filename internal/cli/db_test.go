@@ -14,6 +14,7 @@ func TestDBDumpCommand(t *testing.T) {
 	f := fakeHost()
 	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "filial-feat-db"}, sys.Result{Stdout: []byte("true\n")}, nil)
 	f.On([]string{"podman", "exec", "filial-feat-db"}, sys.Result{Stdout: []byte("PGDMP")}, nil)
+	f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\n")}, nil)
 	code, out, errs := runWith(t, f, "-C", ws, "-w", "feat", "db", "dump")
 	if code != 0 {
 		t.Fatalf("db dump: exit %d: %s", code, errs)

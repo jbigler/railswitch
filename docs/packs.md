@@ -314,7 +314,7 @@ there is no shared add-on package (user, 2026-10-27).
 | `entrypoint`, `command`, `firewall` | its entrypoint file, command and firewall profile(s) |
 | `[gives]`, `[deps_env]`, `[agent_gives]`, `[env]` | env it gives the app, the deps service, agents, and its own service |
 | `[share] gives` | `[gives]` while shared |
-| `[dump]` | `command`, `file`: how `railswitch db dump` dumps it |
+| `[dump]` | `command`, `file`: how `railswitch db dump` dumps it; with `list` (a command printing one database name per line) both run once per name as `{dump.db}`, each to its own file. `postgres@1` dumps every non-template database but `postgres` |
 | `[[volumes]]`, `[[mounts]]`, `[[ports]]`, `[[routes]]`, `[[links]]`, `[unit]` | as named |
 
 ### `tool.toml` and `agent.toml`

@@ -37,7 +37,10 @@ func noTemps(t *testing.T, dir string) {
 func TestDBDump(t *testing.T) {
 	e := setup(t)
 	e.dbRunning("feat")
-	e.f.On([]string{"podman", "exec", "filial-feat-db"}, sys.Result{Stdout: []byte("PGDMP\x00dump")}, nil)
+	// Every database the app created, one file each; a name unsafe as a
+	// file name is skipped with a warning.
+	e.f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\nfilial_queue\n../evil\n")}, nil)
+	e.f.On([]string{"podman", "exec", "filial-feat-db", "pg_dump"}, sys.Result{Stdout: []byte("PGDMP\x00dump")}, nil)
 	e.f.On([]string{"podman", "volume", "export"}, sys.Result{Stdout: []byte("tar bytes")}, nil)
 	if err := os.Chmod(filepath.Join(e.ws, "db-dumps"), 0o700); err != nil {
 		t.Fatal(err)
@@ -47,9 +50,15 @@ func TestDBDump(t *testing.T) {
 		t.Fatal(err)
 	}
 	dumps := filepath.Join(e.ws, "db-dumps")
-	dump, seed := filepath.Join(dumps, "filial_dev.dump"), filepath.Join(dumps, "rustfs_data.tar.gz")
-	if len(paths) != 2 || paths[0] != dump || paths[1] != seed {
+	dump, queue, seed := filepath.Join(dumps, "filial_dev.dump"), filepath.Join(dumps, "filial_queue.dump"), filepath.Join(dumps, "rustfs_data.tar.gz")
+	if len(paths) != 3 || paths[0] != dump || paths[1] != queue || paths[2] != seed {
 		t.Errorf("paths = %v", paths)
+	}
+	if w := e.errOut(); !strings.Contains(w, `database "../evil" skipped`) {
+		t.Errorf("stderr %q; want the unsafe name skipped", w)
+	}
+	if n := count(e.calls(), "podman exec filial-feat-db pg_dump -Fc -U postgres ../evil"); n != 0 {
+		t.Errorf("dumped ../evil")
 	}
 	got, err := os.ReadFile(dump)
 	if err != nil || string(got) != "PGDMP\x00dump" {
@@ -58,7 +67,9 @@ func TestDBDump(t *testing.T) {
 	if fi, err := os.Stat(dump); err != nil || fi.Mode().Perm() != 0o644 {
 		t.Errorf("dump mode: %v, %v", fi, err)
 	}
-	wantInOrder(t, e.calls(), "podman exec filial-feat-db pg_dump -Fc -U postgres filial_dev", "podman volume export filial-feat-")
+	wantInOrder(t, e.calls(), "podman exec filial-feat-db psql -U postgres -Atc SELECT datname",
+		"podman exec filial-feat-db pg_dump -Fc -U postgres filial_dev",
+		"podman exec filial-feat-db pg_dump -Fc -U postgres filial_queue", "podman volume export filial-feat-")
 	exp := find(t, e.calls(), "podman volume export")
 	if len(exp) != 4 || !strings.Contains(exp[3], "rustfs") {
 		t.Errorf("export call = %v", exp)
@@ -79,7 +90,7 @@ func TestDBDump(t *testing.T) {
 		t.Errorf("seed mode: %v, %v", fi, err)
 	}
 	for _, c := range e.f.Cmds {
-		if c.Name == "podman" && len(c.Args) > 0 && c.Args[0] == "exec" && c.Timeout != dumpTimeout {
+		if c.Name == "podman" && len(c.Args) > 2 && c.Args[0] == "exec" && c.Args[2] == "pg_dump" && c.Timeout != dumpTimeout {
 			t.Errorf("pg_dump timeout = %v", c.Timeout)
 		}
 	}

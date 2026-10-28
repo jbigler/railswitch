@@ -532,6 +532,16 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		if d.File != "" && (strings.Contains(d.File, "/") || d.File == "." || d.File == "..") {
 			l.add(file, "dump.file %q must be a bare file name", d.File)
 		}
+		ph := "{" + DumpDB + "}"
+		perDB := strings.Contains(d.File, ph) && slices.ContainsFunc(d.Command, func(a string) bool { return strings.Contains(a, ph) })
+		switch {
+		case d.List != nil && (len(d.List) == 0 || slices.Contains(d.List, "")):
+			l.add(file, "dump.list must be a non-empty list of non-empty arguments")
+		case d.List != nil && !perDB:
+			l.add(file, "dump.command and dump.file must both use %s: dump.list dumps each database it prints to its own file", ph)
+		case d.List == nil && (strings.Contains(d.File, ph) || slices.ContainsFunc(d.Command, func(a string) bool { return strings.Contains(a, ph) })):
+			l.add(file, "%s needs dump.list (the command that prints the database names)", ph)
+		}
 	}
 	l.volumes(file, "volumes", o.Volumes, true)
 	l.mounts(file, dir, o.Mounts)

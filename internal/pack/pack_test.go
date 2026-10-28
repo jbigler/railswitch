@@ -456,15 +456,19 @@ func TestRailsDepsEntrypointExecsArgs(t *testing.T) {
 
 // C3: an option's [dump] decodes; command must be non-empty and file a bare name.
 func TestOptionDump(t *testing.T) {
-	if d := builtins(t).Options[Ref{Name: "postgres", Version: 1}].Dump; d == nil || strings.Join(d.Command, " ") != "pg_dump -Fc -U postgres {db}" || d.File != "{db}.dump" {
+	if d := builtins(t).Options[Ref{Name: "postgres", Version: 1}].Dump; d == nil || d.List == nil || strings.Join(d.Command, " ") != "pg_dump -Fc -U postgres {dump.db}" || d.File != "{dump.db}.dump" {
 		t.Errorf("postgres dump = %+v", d)
 	}
 	for name, dump := range map[string]string{
-		"no command": "file = \"x.dump\"\n",
-		"no file":    "command = [\"d\"]\n",
-		"path":       "command = [\"d\"]\nfile = \"a/x.dump\"\n",
-		"dir":        "command = [\"d\"]\nfile = \"x/\"\n",
-		"dotdot":     "command = [\"d\"]\nfile = \"..\"\n",
+		"list, one file":  "list = [\"l\"]\ncommand = [\"d\", \"{dump.db}\"]\nfile = \"x.dump\"\n",
+		"list, one db":    "list = [\"l\"]\ncommand = [\"d\"]\nfile = \"{dump.db}.dump\"\n",
+		"empty list":      "list = []\ncommand = [\"d\", \"{dump.db}\"]\nfile = \"{dump.db}.dump\"\n",
+		"dump.db no list": "command = [\"d\", \"{dump.db}\"]\nfile = \"{dump.db}.dump\"\n",
+		"no command":      "file = \"x.dump\"\n",
+		"no file":         "command = [\"d\"]\n",
+		"path":            "command = [\"d\"]\nfile = \"a/x.dump\"\n",
+		"dir":             "command = [\"d\"]\nfile = \"x/\"\n",
+		"dotdot":          "command = [\"d\"]\nfile = \"..\"\n",
 	} {
 		fsys := minimal()
 		opt := fsys["options/o/option.toml"]

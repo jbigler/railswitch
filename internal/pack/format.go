@@ -230,10 +230,16 @@ type Option struct {
 // Dump is an option's [dump] table (C3): Command runs in its container
 // through podman exec and writes the dump to stdout, which railswitch db
 // dump stores as <workspace>/db-dumps/<File>. Both expand {db} and {service}.
+// With List, a command printing one database name per line, Command and
+// File run once per name, which they read as {dump.db}.
 type Dump struct {
+	List    []string `toml:"list"`
 	Command []string `toml:"command"`
 	File    string   `toml:"file"` // a bare file name
 }
+
+// DumpDB is the placeholder a [dump] with a list reads each name from.
+const DumpDB = "dump.db"
 
 // Pin is an option's version pin.
 type Pin struct {

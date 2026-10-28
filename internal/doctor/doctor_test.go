@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -33,7 +34,7 @@ func fakeHost() *systest.Fake {
 	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{ExitCode: 1, Stderr: []byte("usage: ssh-keygen -Y verify -f allowed_signers_file\n")}, fmt.Errorf("ssh-keygen: %w (exit 1)", sys.ErrExit))
 	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte(graphRoot + "\n")}, nil)
 	f.On([]string{"systemctl", "--user", "is-enabled", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("enabled\n")}, nil)
-	f.On([]string{"loginctl", "show-user", "--property=Linger", "--value"}, sys.Result{Stdout: []byte("yes\n")}, nil)
+	f.On([]string{"loginctl", "show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value"}, sys.Result{Stdout: []byte("yes\n")}, nil)
 	return f
 }
 
@@ -175,7 +176,7 @@ func TestAllFail(t *testing.T) {
 	f := fakeHost()
 	f.On(podmanVersion, sys.Result{Stdout: []byte("4.9.3\n")}, nil)
 	f.On([]string{"systemctl", "--user", "is-enabled", "railswitch-dashboard.service"}, sys.Result{ExitCode: 1, Stdout: []byte("disabled\n")}, errors.New("exit 1"))
-	f.On([]string{"loginctl", "show-user", "--property=Linger", "--value"}, sys.Result{Stdout: []byte("no\n")}, nil)
+	f.On([]string{"loginctl", "show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value"}, sys.Result{Stdout: []byte("no\n")}, nil)
 	f.On(socketActive, sys.Result{ExitCode: 3, Stdout: []byte("inactive\n")}, errors.New("systemctl: non-zero exit (exit 3)"))
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{ExitCode: 2}, errors.New("gpg: non-zero exit (exit 2)"))
 	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
@@ -515,7 +516,7 @@ func TestDoctorSSHKeygen(t *testing.T) {
 func TestDashboardLingerWarn(t *testing.T) {
 	f := &systest.Fake{}
 	f.On([]string{"systemctl", "--user", "is-enabled", "railswitch-dashboard.service"}, sys.Result{ExitCode: 1, Stdout: []byte("disabled\n")}, errors.New("exit 1"))
-	f.On([]string{"loginctl", "show-user", "--property=Linger", "--value"}, sys.Result{Stdout: []byte("no\n")}, nil)
+	f.On([]string{"loginctl", "show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value"}, sys.Result{Stdout: []byte("no\n")}, nil)
 	for _, c := range []Check{dashboard(context.Background(), f), linger(context.Background(), f)} {
 		if c.OK || !c.Warn || c.Fix == "" || c.Detail == "" {
 			t.Errorf("%+v", c)

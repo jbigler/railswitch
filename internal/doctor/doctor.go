@@ -163,7 +163,8 @@ func dashboard(ctx context.Context, r sys.Runner) Check {
 // and no dashboard runs until the next login (loginctl enable-linger).
 func linger(ctx context.Context, r sys.Runner) Check {
 	c := Check{Name: "user services outlive logout", Warn: true, Fix: "loginctl enable-linger (only needed to keep projects and the dashboard running while you are logged out)"}
-	res, err := r.Run(ctx, sys.Cmd{Name: "loginctl", Args: []string{"show-user", "--property=Linger", "--value"}})
+	// Without a user, show-user reports the manager's properties, not ours.
+	res, err := r.Run(ctx, sys.Cmd{Name: "loginctl", Args: []string{"show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value"}})
 	state := strings.TrimSpace(string(res.Stdout))
 	c.OK = err == nil && state == "yes"
 	switch {

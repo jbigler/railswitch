@@ -95,8 +95,8 @@ When the live stream drops, a red line under the header says so:
 is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch"; the project button (the prefix; opens the
-  switcher); `◆ N need input`; `tasks :`; `settings` (the project's
-  Settings page, below); `logs` (Dozzle at
+  switcher); `◆ N need input`; `tasks :`; `images`, `library` and
+  `settings` (the project's Images, Library and Settings pages, below); `logs` (Dozzle at
   `http://logs.localhost/`); a `notifications` button until the browser
   permission is decided; `⚙` colours. The tab title is `(N) RailSwitch`,
   N counting agents in permission, question or waiting-for-reply across
@@ -193,6 +193,48 @@ offers to reload the file; your text stays in the editor until you do.
 
 Every settings action is a job of the project, so it waits for (and
 blocks) the project's other jobs. Its output shows under the panel.
+
+## Images
+
+`/p/<prefix>/images` (`images` in the header) shows what a worktree
+builds. Every `RUN` line in these Containerfiles runs on this machine
+during the build, outside the firewall.
+
+- **Worktree:** one chip per worktree; the base worktree is shown first
+  (`?wt=<slug>` picks another; an unknown slug is a 404).
+- The project's warnings from `railswitch --json -w <slug> containerfile
+  list`, then the **build chain** in build order: step, kind (`base`,
+  `addon`, `agent-base`, `agent`, or `image` for a tool or an option's
+  image), file, `FROM` images and tag, and Edit.
+- **New addon:** a name (lower-case letters, digits and `-`) runs
+  `railswitch containerfile new <name>` as a project-level job; when it
+  ends ok the editor opens on the new file.
+
+**Editor** (`/p/<prefix>/images/edit/<name>`): the file from `railswitch
+--json containerfile show <name>` in a text area. "Load from file…" reads
+a local file into it, in the browser only (1 MiB at most).
+
+- **Changes from the default (<ref>):** the diff from the built-in default
+  to the file (its eject header left out); "Same as the default." when
+  there is none to show. A notice says when the default changed since the
+  file was ejected. "Reset to default" (after a confirm) runs `railswitch
+  containerfile eject <name> --force` as a job. A file `containerfile new`
+  made has no default and no panel.
+- **Check** posts the text to `POST /p/<prefix>/images/check/<name>`,
+  which runs `railswitch --json containerfile write <name> --if-hash <h>
+  --dry-run` with the text on stdin: every worktree is rendered with it
+  and nothing is written. The panel shows the contract errors, or "Check
+  passed" with each image tag that changes, and "Rebuild and restart:
+  <slugs>" (off) when running worktrees build a changed tag.
+- **Save** is on only when "I've read this file. Every RUN line runs on
+  this machine during the build, outside the firewall." is ticked and the
+  last Check passed for the text as it is now; an edit after Check turns
+  it off again and says so. It runs `railswitch containerfile write
+  <name> --if-hash <h> [--restart]` as a project-level job, the text on
+  its stdin. The server refuses a Save without the acknowledgement (400).
+  When the job ends ok the editor reloads the file. If the file changed
+  on disk since the page read it, nothing is written and the page offers
+  Reload; your text stays until you reload.
 
 ## New project
 
@@ -464,6 +506,10 @@ docs/json.md.
   new worktree.
 - `railswitch [--json] pack ls`: the built-in packs, options (with slot
   and `works_with`) and agent packages, for the new page.
+- `railswitch [--json] -w <slug> containerfile list`, `--json containerfile
+  show <name>`, `containerfile write <name> --if-hash <h> [--dry-run]
+  [--restart]` (text on stdin), `containerfile eject <name> --force`,
+  `containerfile new <name>`: the Images page and its editor.
 - `railswitch dashboard`: prints the login link.
 - `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,
@@ -477,9 +523,9 @@ docs/json.md.
 Server-Sent Events stream. On connect it sends the current fragments
 (`header`, `projects`, `strip`, `banner`, `list`, `detail`, `jobs`);
 afterwards only fragments that changed (a single list row by its own id
-while the order and selection stay), and `: ping` every 15 s. A settings
-page connects with `&view=settings`: it gets no `list` or `detail`, and
-its `jobs` are the project-level ones only. The new page connects when
+while the order and selection stay), and `: ping` every 15 s. A settings,
+images, library or editor page connects with `&view=settings`: it gets no
+`list` or `detail`, and its `jobs` are the project-level ones only. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
 project and that prefix's project-level `jobs`. Each `data:` line is one

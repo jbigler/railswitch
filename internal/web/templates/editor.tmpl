@@ -1,0 +1,60 @@
+{{/* The file editor: a Containerfile (images) or a package file
+(library). Check posts the text to CheckURL and swaps in #check; Save
+needs the acknowledgement (AckText) and, with CheckRequired, a passing
+Check of the text as it is now. */}}
+{{define "editor"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="editor">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="{{.Back}}">← {{.BackText}}</a></div>
+<h1 class="mono ed-file">{{.File}}{{if .Kind}} <span class="chip">{{.Kind}}</span>{{end}}{{if .ReadOnly}} <span class="chip">built in · read-only</span>{{end}}{{if .New}} <span class="chip">new file</span>{{end}}</h1>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{else}}{{if .Notice}}<p class="yellow notice">{{.Notice}}</p>
+{{end}}<form method="post" action="{{.SaveURL}}" id="editor" class="editor" autocomplete="off"{{if .CheckURL}} data-check="{{.CheckURL}}"{{end}}{{if .CheckRequired}} data-check-required{{end}}{{if .AckText}} data-ack-required{{end}}>
+<input type="hidden" name="hash" value="{{.Hash}}">
+<textarea name="text" class="mono toml" spellcheck="false" rows="28" aria-label="{{.File}}"{{if .ReadOnly}} readonly{{end}}>
+{{.Text}}</textarea>
+{{if not .ReadOnly}}<div class="ed-tools"><label class="ln dim">Load from file… <input type="file" data-load hidden></label><span class="sp"></span>{{if .CheckURL}}<button type="button" class="ln" data-check-run>Check</button>{{end}}</div>
+{{if .CheckURL}}{{template "check" .Check}}
+{{end}}<div id="ed-conflict" class="red" hidden>Changed on disk since you opened it, so nothing was written. Your text is still here. <a href="{{.URL}}">Reload</a> (drops your text).</div>
+{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
+{{end}}<div class="btns"><a class="ln dim" href="{{.Back}}">Cancel</a><button class="ln main" data-save{{if or .AckText .CheckRequired}} disabled{{end}}>Save</button></div>
+{{end}}</form>
+{{end}}</section>
+<section class="pane">
+{{if .DefaultRef}}<section class="card">
+<h2>Changes from the default ({{.DefaultRef}})</h2>
+{{if .Diff}}<pre class="out mono">{{.Diff}}</pre>
+{{else}}<p class="note">Same as the default.</p>
+{{end}}<form method="post" action="{{.ResetURL}}" data-job="reset" data-confirm="Replace this file with the default from {{.DefaultRef}}? Your changes to it are lost."><button class="ln danger">Reset to default</button></form>
+</section>
+{{end}}{{if .DeleteURL}}<form method="post" action="{{.DeleteURL}}" data-job="delete" data-confirm="Delete {{.File}}?" data-next="{{.Back}}" class="ed-delete">
+<input type="hidden" name="hash" value="{{.Hash}}">
+<button class="ln danger">Delete file</button>
+</form>
+{{end}}{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}
+
+{{define "check"}}<div id="check" class="ed-check"{{if .OK}} data-ok{{end}}>
+{{if not .Done}}<p class="note">Check renders every worktree with this text and writes nothing.</p>
+{{else if .Error}}{{if .Conflict}}<p class="red">Changed on disk since you opened it. <a href="{{.Reload}}">Reload</a> (drops your text).</p>
+{{else}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{else}}{{range .Errors}}<p class="red set-error">{{.}}</p>
+{{end}}{{if .OK}}<p class="green">Check passed{{if .Unused}}. This project doesn't use this package: Save writes the file and nothing else.{{else}}.{{end}}</p>
+{{if .Steps}}<table class="set-table">
+<thead><tr><th>Worktree</th><th>Image</th><th>Tag</th></tr></thead>
+<tbody>
+{{range .Steps}}<tr><td class="mono">{{.Worktree}}</td><td>{{.Name}}</td><td class="mono tag-cell">{{.OldTag}}<br>→ {{.NewTag}}</td></tr>
+{{end}}</tbody>
+</table>
+{{else if not .Unused}}<p class="note">No image changes.</p>
+{{end}}{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> Rebuild and restart: <span class="mono">{{.Restart}}</span></label>
+{{end}}{{end}}{{end}}</div>{{end}}

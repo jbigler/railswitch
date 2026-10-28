@@ -1,0 +1,41 @@
+{{define "images"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="images">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Images</h1>
+<p class="note">The images each worktree builds, in order. Every RUN line in these Containerfiles runs on this machine during the build, outside the firewall.</p>
+<div class="wtpicks"><span class="muted">Worktree</span> {{range .Worktrees}}<a class="wtpick{{if .Current}} cur{{end}}" href="{{.URL}}">{{.Slug}}</a> {{end}}</div>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{if .Warnings}}<div class="warnings">{{range .Warnings}}<p class="yellow">{{.}}</p>
+{{end}}</div>
+{{end}}<section class="card">
+<h2>Build chain</h2>
+<table class="set-table chain">
+<thead><tr><th>Step</th><th>Kind</th><th>File</th><th>From</th><th>Tag</th><th></th></tr></thead>
+<tbody>
+{{range .Steps}}<tr><td>{{.Name}}</td><td><span class="chip">{{.Kind}}</span></td><td class="mono">{{.File}}</td><td class="mono">{{.From}}</td><td class="mono tag-cell">{{.Tag}}</td><td>{{if .EditURL}}<a class="ln" href="{{.EditURL}}">Edit</a>{{end}}</td></tr>
+{{else}}<tr><td colspan="6" class="muted">No images.</td></tr>
+{{end}}</tbody>
+</table>
+</section>
+<section class="card">
+<h2>New addon</h2>
+<form method="post" action="{{.NewURL}}" class="add-row" data-job="new-addon" data-next="/p/{{.Prefix}}/images/edit/">
+<input name="name" placeholder="name" class="mono" autocomplete="off" required pattern="[a-z][a-z0-9\-]{0,30}" aria-label="Addon name">
+<button class="ln">Create</button>
+</form>
+<p class="note">Writes <code>containerfiles/Containerfile.&lt;name&gt;</code> and adds it to <code>[image] addons</code>; the editor opens on it.</p>
+</section>
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

@@ -4,6 +4,8 @@
 {{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}
 <span class="sp"></span>
 {{if .Prefix}}<button type="button" class="hb" data-palette title="Run a task (:)">tasks <kbd>:</kbd></button>
+<a class="hb" href="/p/{{.Prefix}}/images">images</a>
+<a class="hb" href="/p/{{.Prefix}}/library">library</a>
 <a class="hb" href="/p/{{.Prefix}}/settings">settings</a>
 {{end}}
 <a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">logs</a>

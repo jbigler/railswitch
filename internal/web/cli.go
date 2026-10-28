@@ -291,3 +291,70 @@ func readPreview(ctx context.Context, c CLI, ws string, edits []byte) (previewDo
 	}
 	return v, nil
 }
+
+// buildChain is `containerfile list`: a worktree's image builds in order.
+type buildChain struct {
+	Steps    []buildStep `json:"steps"`
+	Warnings []string    `json:"warnings"`
+}
+
+type buildStep struct {
+	Name string   `json:"name"` // base, addon <n>, a tool, agent-base, agent <pkg>, or an option image
+	File string   `json:"file"` // containerfiles/Containerfile.<name>
+	Tag  string   `json:"tag"`
+	From []string `json:"from"`
+}
+
+// containerfileDoc is `containerfile show <name>`: the file, and the
+// built-in default it was ejected from (nil: none).
+type containerfileDoc struct {
+	Name    string `json:"name"`
+	File    string `json:"file"`
+	Kind    string `json:"kind"`
+	Text    string `json:"text"`
+	Hash    string `json:"hash"`
+	Default *struct {
+		Ref string `json:"ref"`
+	} `json:"default"`
+	DefaultChanged bool   `json:"default_changed"`
+	Diff           string `json:"diff"`
+}
+
+// checkDoc is a write's --dry-run (`containerfile write`, `pack file
+// write`); Used is the package write's only.
+type checkDoc struct {
+	Hash    string      `json:"hash"`
+	Used    bool        `json:"used"`
+	Steps   []tagChange `json:"steps"`
+	Restart []string    `json:"restart"`
+	Errors  []string    `json:"errors"`
+}
+
+type tagChange struct {
+	Worktree string `json:"worktree"`
+	Name     string `json:"name"`
+	OldTag   string `json:"old_tag"`
+	NewTag   string `json:"new_tag"`
+}
+
+func readChain(ctx context.Context, c CLI, ws, slug string) (buildChain, error) {
+	return readJSON[buildChain](ctx, c, "-C", ws, "-w", slug, "containerfile", "list")
+}
+
+func readContainerfile(ctx context.Context, c CLI, ws, name string) (containerfileDoc, error) {
+	return readJSON[containerfileDoc](ctx, c, "-C", ws, "containerfile", "show", name)
+}
+
+// readCheck runs a write's --dry-run with text on stdin; args follow
+// --json.
+func readCheck(ctx context.Context, c CLI, text []byte, args ...string) (checkDoc, error) {
+	var v checkDoc
+	out, err := c.RunInput(ctx, text, append([]string{"--json"}, args...)...)
+	if err != nil {
+		return v, err
+	}
+	if err := json.Unmarshal(out, &v); err != nil {
+		return v, fmt.Errorf("%s: %w", strings.Join(args, " "), err)
+	}
+	return v, nil
+}

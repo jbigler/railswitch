@@ -149,6 +149,24 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .apply label.check{display:block;margin:6px 0}
 .diff summary{cursor:pointer;color:var(--blue);margin-top:8px}
 
+/* Images, library, editor */
+.wtpicks{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0}
+.wtpick{padding:1px 8px;border:1px solid var(--border);border-radius:9px;color:var(--text);text-decoration:none;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
+.wtpick.cur{background:var(--sel);font-weight:800;border-color:var(--accent)}
+.tag-cell{overflow-wrap:anywhere}
+.chain td.mono{overflow-wrap:anywhere}
+.ed-file{overflow-wrap:anywhere}
+.ed-tools{display:flex;align-items:center;gap:6px;margin-top:8px}
+.ed-tools label{margin:0}
+.ed-check{margin:8px 0;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2)}
+.ed-check[data-ok]{border-color:var(--green)}
+.ed-check p{margin:4px 0}
+.ed-check .note{padding:0}
+.ed-check label.check{display:block;margin:6px 0}
+.editor label.ack{display:block;margin:10px 0;font-weight:700}
+.notice{margin:6px 0}
+.ed-delete{margin:8px 0}
+
 /* New project */
 .new-form label.field{display:block;margin:8px 0;color:var(--muted)}
 .new-form label.field input{display:block;width:100%;margin-top:3px;color:var(--text)}

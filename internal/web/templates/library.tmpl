@@ -1,0 +1,74 @@
+{{define "library"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="library">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Library</h1>
+<p class="note">The built-in packages and this workspace's own (<code>local:</code>). Built-ins are read-only; start a local copy with New pack or New option.</p>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{range .Groups}}<section class="card">
+<h2>{{.Title}}</h2>
+<ul class="lib-list">
+{{range .Items}}<li{{if .Current}} class="cur"{{end}} data-ref="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Note}} <span class="muted">{{.Note}}</span>{{end}}<span class="sp"></span>{{if .Used}}<span class="chip green">used by this project</span>{{end}}<span class="chip">{{if .Local}}local{{else}}built in{{end}}</span></a></li>
+{{else}}<li class="muted">None.</li>
+{{end}}</ul>
+</section>
+{{end}}{{if not .Error}}<section class="card">
+<h2>New pack</h2>
+<form method="post" action="{{.NewURL}}" class="add-row" data-job="new-package" data-next="{{.EditorBase}}">
+<input type="hidden" name="kind" value="pack">
+<input name="name" placeholder="name" class="mono" autocomplete="off" required pattern="[a-z][a-z0-9\-]*" aria-label="Pack name">
+<select name="from" aria-label="Start from"><option value="">blank</option>{{range .CopyPacks}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+<button class="ln">Create</button>
+</form>
+</section>
+<section class="card">
+<h2>New option</h2>
+<form method="post" action="{{.NewURL}}" class="add-row" data-job="new-package" data-next="{{.EditorBase}}">
+<input type="hidden" name="kind" value="option">
+<input name="name" placeholder="name" class="mono" autocomplete="off" required pattern="[a-z][a-z0-9\-]*" aria-label="Option name">
+<select name="from" aria-label="Start from"><option value="">blank</option>{{range .CopyOptions}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+<select name="slot" aria-label="Slot">{{range .Slots}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+<button class="ln">Create</button>
+</form>
+<p class="note">A copy keeps the built-in's slot; a blank option takes the slot picked here. The manifest opens in the editor.</p>
+</section>
+{{end}}</section>
+<section class="pane">
+{{with .Sel}}<section class="card">
+<h2><span class="mono">{{.Ref}}</span> <span class="chip">{{if .Local}}local{{else}}built in{{end}}</span></h2>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{with .Doc}}{{if .Kind}}<dl class="kv">
+<dt>Kind</dt><dd>{{.Kind}}</dd>
+{{if .Path}}<dt>Path</dt><dd class="mono">{{.Path}}</dd>
+{{end}}{{with .App}}<dt>App</dt><dd><span class="mono">{{.Service}}</span> · <span class="mono">{{.Server}}</span> on port {{.Port}}</dd>
+<dt>Health</dt><dd class="mono">{{.Health}}</dd>
+{{end}}{{if .Slot}}<dt>Slot</dt><dd>{{.Slot}} · service <span class="mono">{{.Service}}</span></dd>
+{{end}}{{range .Runtimes}}<dt>Runtime</dt><dd><span class="mono">{{.Name}}</span> from <span class="mono">{{range $i, $f := .From}}{{if $i}}, {{end}}{{$f}}{{end}}</span>{{if .Fallback}} · fallback {{.Fallback}}{{end}}</dd>
+{{end}}{{range .Ports}}<dt>Port</dt><dd><span class="mono">{{.Name}}</span> {{.Base}} + worktree ID{{if .Container}} → {{.Container}}{{end}}</dd>
+{{end}}{{with .Pin}}<dt>Pin</dt><dd><span class="mono">{{.Name}}</span> default {{.Default}}</dd>
+{{end}}{{if .Gives}}<dt>Gives</dt><dd class="mono">{{range $i, $g := .Gives}}{{if $i}}, {{end}}{{$g}}{{end}}</dd>
+{{end}}</dl>
+{{if .Readme}}<div class="lbl">README</div><pre class="out readme">{{.Readme}}</pre>
+{{end}}{{end}}{{end}}<div class="lbl">Files</div>
+<table class="set-table">
+<tbody>
+{{range .Files}}<tr><td class="mono">{{.Path}}</td><td class="muted">{{if .Size}}{{.Size}} B{{end}}{{if .Executable}} · executable{{end}}</td><td><a class="ln" href="{{.URL}}">{{if $.Sel.Local}}Edit{{else}}View{{end}}</a></td></tr>
+{{end}}</tbody>
+</table>
+{{if .AddBase}}<form class="add-row" data-add-file data-base="{{.AddBase}}">
+<input name="path" placeholder="entrypoints/name.sh" class="mono" autocomplete="off" required aria-label="New file path">
+<button class="ln">Add file</button>
+</form>
+<p class="note">At the top: <code>Containerfile.&lt;name&gt;</code>, <code>deps.allow</code>, <code>README.md</code>, <code>&lt;name&gt;.sh</code>; or <code>entrypoints/&lt;file&gt;</code>, <code>initdb/&lt;file&gt;</code>.</p>
+{{end}}</section>
+{{end}}{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

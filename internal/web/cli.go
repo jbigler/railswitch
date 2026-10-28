@@ -120,6 +120,7 @@ type projectShow struct {
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
 	AddChoices []string      `json:"add_choices"`
+	Locked     []string      `json:"locked"` // every package ref the project's lock names
 	File       string        `json:"file"`
 }
 
@@ -335,6 +336,50 @@ type tagChange struct {
 	Name     string `json:"name"`
 	OldTag   string `json:"old_tag"`
 	NewTag   string `json:"new_tag"`
+}
+
+// packDoc is `pack show <ref>`: one package, with a local one's files.
+type packDoc struct {
+	Ref    string `json:"ref"`
+	Kind   string `json:"kind"`
+	Source string `json:"source"`
+	Path   string `json:"path"`
+	App    *struct {
+		Service string `json:"service"`
+		Server  string `json:"server"`
+		Port    int    `json:"port"`
+		Health  string `json:"health"`
+	} `json:"app"`
+	Slot     string `json:"slot"`
+	Service  string `json:"service"`
+	Runtimes []struct {
+		Name     string   `json:"name"`
+		From     []string `json:"from"`
+		Fallback string   `json:"fallback"`
+	} `json:"runtimes"`
+	Ports []struct {
+		Name      string `json:"name"`
+		Base      int    `json:"base"`
+		Container int    `json:"container"`
+	} `json:"ports"`
+	Pin *struct {
+		Name    string `json:"name"`
+		Default string `json:"default"`
+	} `json:"pin"`
+	Gives  []string `json:"gives"`
+	Readme string   `json:"readme"`
+	Files  []struct {
+		Path       string `json:"path"`
+		Size       int64  `json:"size"`
+		Executable bool   `json:"executable"`
+	} `json:"files"`
+}
+
+// packFileDoc is `pack file show <ref> <path>`.
+type packFileDoc struct {
+	Path string `json:"path"`
+	Text string `json:"text"`
+	Hash string `json:"hash"`
 }
 
 func readChain(ctx context.Context, c CLI, ws, slug string) (buildChain, error) {

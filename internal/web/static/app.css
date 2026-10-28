@@ -166,6 +166,12 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .editor label.ack{display:block;margin:10px 0;font-weight:700}
 .notice{margin:6px 0}
 .ed-delete{margin:8px 0}
+.lib-list{list-style:none;margin:0;padding:0}
+.lib-list li a{display:flex;gap:8px;align-items:center;padding:3px 6px;border-radius:4px;color:var(--text);text-decoration:none}
+.lib-list li a:hover,.lib-list li.cur a{background:var(--sel)}
+.lib-list li.cur a{font-weight:800}
+.readme{white-space:pre-wrap;max-height:40vh}
+.add-row select{padding:3px 6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px;font:inherit}
 
 /* New project */
 .new-form label.field{display:block;margin:8px 0;color:var(--muted)}

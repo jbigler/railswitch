@@ -236,6 +236,52 @@ a local file into it, in the browser only (1 MiB at most).
   on disk since the page read it, nothing is written and the page offers
   Reload; your text stays until you reload.
 
+## Library
+
+`/p/<prefix>/library` (`library` in the header) lists the packages from
+`railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
+each `built in` or `local` (the workspace's `packs/<name>/` and
+`options/<name>/`). "used by this project" marks the refs the project uses:
+its options' refs and the `locked` refs of `railswitch --json project
+show`.
+
+- Picking one (`?ref=<ref>`; an unknown ref is a 404) shows its
+  `railswitch --json pack show <ref>`: kind, path, app, slot, runtimes,
+  ports, pin, the env it gives, its README, and its files. A local
+  package's files open in the editor (Edit); a built-in's open read-only
+  (View). A package without a file list offers its manifest.
+- **Add file** (a local package) opens the editor on a new, empty file
+  at the path typed: a top-level `Containerfile.<name>`, `deps.allow`,
+  `README.md` or `<name>.sh`, or `entrypoints/<file>` or `initdb/<file>`.
+- **New pack** and **New option**: a name, and either "blank" or a
+  built-in to copy. A copy runs `railswitch pack eject <ref> --as <name>`;
+  a blank pack `railswitch pack new <name>`; a blank option `railswitch
+  pack new --option <slot> <name>` with the slot picked. When the job
+  ends ok the new package's manifest opens in the editor.
+
+**Package file editor** (`/p/<prefix>/library/<ref>/<path>`): the file
+from `railswitch --json pack file show <ref> <path>` in the same editor as
+the Images page, without the default panel.
+
+- A built-in's file is read-only: no Save, Check or Delete, and the
+  server refuses a write to it (422).
+- Save needs "I've read this file. A package's RUN lines run on this
+  machine during the build, outside the firewall, and its scripts run in
+  the project's containers." for every file but `README.md`. It runs
+  `railswitch pack file write <ref> <path> --if-hash <h> [--restart]` as a
+  project-level job, the text on its stdin; a new file goes with
+  `--if-hash ""` (the file must not exist yet).
+- Check (`railswitch --json pack file write … --dry-run`, the text on
+  stdin) and "Rebuild and restart" are offered only for a package the
+  project uses, and there Save also needs a passing Check, as on the
+  Images page.
+- **Delete file** (after a confirm; not for the manifest, nor a file not
+  saved yet) runs `railswitch pack file rm <ref> <path> --if-hash <h>` and
+  goes back to the package.
+
+The page refuses a ref or path of the wrong shape (404) before anything
+runs; the CLI checks the exact list of files a package may have.
+
 ## New project
 
 `/new` creates a project. Open it from the switcher ("New project…", the
@@ -510,6 +556,11 @@ docs/json.md.
   show <name>`, `containerfile write <name> --if-hash <h> [--dry-run]
   [--restart]` (text on stdin), `containerfile eject <name> --force`,
   `containerfile new <name>`: the Images page and its editor.
+- `railswitch [--json] pack ls`, `--json pack show <ref>`, `--json pack file
+  show <ref> <path>`, `pack file write <ref> <path> --if-hash <h>
+  [--dry-run] [--restart]` (text on stdin), `pack file rm <ref> <path>
+  --if-hash <h>`, `pack eject <ref> --as <name>`, `pack new <name>`, `pack
+  new --option <slot> <name>`: the Library and its editor.
 - `railswitch dashboard`: prints the login link.
 - `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,

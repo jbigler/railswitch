@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile, images, editor or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -719,7 +719,7 @@ function startEditor() {
   ready();
 }
 
-// Job forms of the images and editor pages: an optional
+// Job forms of the images, library and editor pages: an optional
 // confirm, then the job; when it ends ok the page goes on to the file it
 // made (data-next) or reloads.
 
@@ -728,15 +728,22 @@ function jobNext(f) {
   switch (f.dataset.job) {
     case "new-addon":
       return f.dataset.next + v("name");
+    case "new-package":
+      return f.dataset.next + "local:" + v("name") + "@1/" + (v("kind") === "option" ? "option.toml" : "pack.toml");
     case "delete":
       return f.dataset.next;
   }
   return "";
 }
 
-if (view === "images" || view === "editor") {
+if (view === "images" || view === "library" || view === "editor") {
   document.addEventListener("submit", (e) => {
     const f = e.target;
+    if (f.matches("form[data-add-file]")) {
+      e.preventDefault();
+      location.href = f.dataset.base + f.elements.path.value.trim() + "?new=1";
+      return;
+    }
     if (!f.matches("form[data-job]")) return;
     e.preventDefault();
     if (f.dataset.confirm && !confirm(f.dataset.confirm)) return;

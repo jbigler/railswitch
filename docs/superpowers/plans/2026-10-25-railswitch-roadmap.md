@@ -125,7 +125,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 5 Local packs | detailed (`2026-10-27-railswitch-stage-5.md`) | A Phoenix app runs end to end from a pack the user wrote (`local:phoenix@1`), with no framework knowledge added to core |
 | 6a Dashboard | detailed (`2026-10-27-railswitch-stage-6a.md`) | The dashboard shows status, PRs and agents for every worktree, runs up/stop/restart, worktree add/remove and tasks through the CLI, and starts with the first `up` (docs/stage6a-acceptance.md) |
 | 6b Project settings | detailed (`2026-10-28-railswitch-stage-6b.md`) | Stack slots, options, extra services, env, links and secrets (values on stdin) editable from the browser, through the CLI, with each change's data impact shown first; the rest in a raw `project.toml` editor (docs/stage6b-acceptance.md) |
-| 6c New project | detailed (`2026-10-28-railswitch-stage-6c.md`) | Repo, detection, options, review, create from the browser |
+| 6c New project | detailed (`2026-10-28-railswitch-stage-6c.md`) | Repo, detection, options, review, create from the browser (docs/stage6c-acceptance.md) |
 | 6d Packs and Containerfiles | later | Library, "New pack" form, Containerfile editor with the read-it acknowledgement |
 | 7 Library and trust | later | Library repos, signing and signers, update review, Install review |
 

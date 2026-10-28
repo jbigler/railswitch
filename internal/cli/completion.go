@@ -47,7 +47,7 @@ var completionSubs = map[string][]string{
 	"project":          {"detect", "init", "ls", "new", "rm", "show", "write"},
 	"settings":         {"apply", "preview"},
 	"secret":           {"add", "ls", "rm", "set"},
-	"signer":           {"add", "ls", "rm"},
+	"signer":           {"add", "ls", "revoke", "rm"},
 	"task":             {"ls"},
 	"wt":               {"add", "ls", "rm"},
 }

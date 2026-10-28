@@ -35,13 +35,18 @@ func TestSignersSection(t *testing.T) {
 	}
 	body := w.Body.String()
 	contains(t, "machine page", body,
-		`<h3 class="mono">github.com/acme/lib</h3>`, fpA, "2026-10-28", "jeff@laptop",
+		`<h3 class="mono">github.com/acme/lib</h3>`, fpA, "2026-10-28", `<span class="mono">ssh-ed25519</span>`,
 		`Revoked: <span class="mono">`+fpB, `<h3 class="mono">example.org/empty</h3>`, "No trusted keys.",
 		`action="/machine/signers/rm"`, `data-confirm="Distrust `, `action="/machine/signers/add"`,
+		`action="/machine/signers/revoke"`, `data-job="signer-revoke"`, `>Revoke</button>`,
+		`data-confirm="Revoke `+fpA+` for github.com/acme/lib? It is never trusted again for this library. This can't be undone from the CLI."`,
 		`<textarea name="key"`,
 	)
 	if strings.Contains(body, "AAAAC3NzaC1lZDI1NTE5AAAAIExample") {
 		t.Error("key material shown")
+	}
+	if strings.Contains(body, "jeff@laptop") {
+		t.Error("a key comment shown; signers.toml keeps none")
 	}
 	noCSPViolation(t, "machine", body)
 
@@ -84,6 +89,20 @@ func TestSignerRmJob(t *testing.T) {
 	}
 }
 
+func TestSignerRevokeJob(t *testing.T) {
+	f := signersFixture(t)
+	w := f.do(req("POST", "/machine/signers/revoke", form("library", "github.com/acme/lib", "fingerprint", fpA)))
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if got, want := f.run.wait(t, 1)[0], []string{testExe, "signer", "revoke", "github.com/acme/lib", fpA}; !slices.Equal(got, want) {
+		t.Errorf("argv %q, want %q", got, want)
+	}
+	if len(f.run.Stdins()[0]) != 0 {
+		t.Error("stdin on revoke")
+	}
+}
+
 func TestSignersGuard(t *testing.T) {
 	f := signersFixture(t)
 	for _, c := range []struct {
@@ -92,6 +111,7 @@ func TestSignersGuard(t *testing.T) {
 	}{
 		{"add", "/machine/signers/add", []string{"library", "a/b", "key", keyA}},
 		{"rm", "/machine/signers/rm", []string{"library", "a/b", "fingerprint", fpA}},
+		{"revoke", "/machine/signers/revoke", []string{"library", "a/b", "fingerprint", fpA}},
 	} {
 		noCookie := req("POST", c.path, form(c.v...))
 		noCookie.Header.Del("Cookie")
@@ -118,7 +138,7 @@ func TestSignersGuard(t *testing.T) {
 func TestSignersHostile(t *testing.T) {
 	f := newFixture(t)
 	f.cli.set("--json signer ls", `{"libraries":[{"id":"a/<script>alert(1)</script>","last_serial":1,
- "keys":[{"key":"ssh-ed25519 AAAA <script>x</script>","fingerprint":"SHA256:<script>y</script>","added":"<b>"}],
+ "keys":[{"key":"<script>x</script> AAAA","fingerprint":"SHA256:<script>y</script>","added":"<b>"}],
  "revoked":[{"fingerprint":"<img src=x>"}]}]}`)
 	body := f.do(req("GET", "/machine", nil)).Body.String()
 	for _, bad := range []string{"<script>alert", "<script>x", "<script>y", "<img src=x>", "<b>"} {
@@ -139,6 +159,8 @@ func TestSignerFormRefused(t *testing.T) {
 		{"short fingerprint", "/machine/signers/rm", []string{"library", "a/b", "fingerprint", "SHA256:abc"}},
 		{"flag fingerprint", "/machine/signers/rm", []string{"library", "a/b", "fingerprint", "--force"}},
 		{"bad library rm", "/machine/signers/rm", []string{"library", "../x", "fingerprint", fpA}},
+		{"short fingerprint revoke", "/machine/signers/revoke", []string{"library", "a/b", "fingerprint", "SHA256:abc"}},
+		{"bad library revoke", "/machine/signers/revoke", []string{"library", "-x", "fingerprint", fpA}},
 		{"dotdot library", "/machine/signers/add", []string{"library", "a/../b", "key", keyA}},
 		{"flag library", "/machine/signers/add", []string{"library", "-x", "key", keyA}},
 		{"upper library", "/machine/signers/add", []string{"library", "Acme", "key", keyA}},

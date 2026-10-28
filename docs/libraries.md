@@ -158,7 +158,8 @@ When a user verifies an index with this entry and the result is
 `trusted`, railswitch moves that fingerprint from their trusted keys to
 their revoked list for this library. From then on, an index signed by that
 key is `revoked`, and `signer add` refuses the key. A user can't undo a
-revocation from the CLI.
+revocation from the CLI. A user can also revoke a key themselves with
+`signer revoke` (see [Managing trust](#managing-trust)).
 
 Revocation stops installs and updates from that library by that key.
 Projects that already use its packages keep running: `stack.lock` pins
@@ -237,7 +238,17 @@ the old key. A first trust, for a library with no entry in
 ```sh
 railswitch signer ls
 railswitch signer rm example.org/acme/stack-library SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU
+railswitch signer revoke example.org/acme/stack-library SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU
 ```
+
+- `signer rm` distrusts a key. Its signatures stop verifying, and you can
+  trust it again later with `signer add` or `library trust`.
+- `signer revoke` revokes a key. It moves the fingerprint to the
+  library's revoked list, and the key is never trusted again for that
+  library: `signer add`, `library trust` and rotations refuse it, and an
+  index it signs is `revoked`. You can't undo it from the CLI. Use it
+  when a key is lost or compromised. You can revoke a fingerprint that
+  you don't trust yet.
 
 Trust lives in `~/.config/railswitch/signers.toml` (mode 0600, under
 `XDG_CONFIG_HOME` when it is set). Each command that changes it holds an
@@ -249,8 +260,8 @@ verified as trusted, and `last_index`, the sha256 of that index's
 library's entry stays if it has revocations or a `last_serial`. So you
 can't use `signer rm` and then `signer add` to accept an older index.
 
-The dashboard's machine page lists the same trust, and can add a key or
-distrust one (docs/dashboard.md).
+The dashboard's machine page lists the same trust, and can add, distrust
+or revoke a key (docs/dashboard.md).
 
 ## Verdicts
 

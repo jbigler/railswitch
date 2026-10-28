@@ -19,10 +19,12 @@ import (
 
 const signerUsage = `usage: railswitch signer ls
        railswitch signer add <library> <public-key-file|->
-       railswitch signer rm <library> <fingerprint>`
+       railswitch signer rm <library> <fingerprint>
+       railswitch signer revoke <library> <fingerprint>`
 
-// railswitch signer ls|add|rm: the keys trusted per library (D100), in
-// signers.toml.
+// railswitch signer ls|add|rm|revoke: the keys trusted per library (D100),
+// in signers.toml. rm distrusts a key, which signer add can trust again;
+// revoke never lets it be trusted again from the CLI.
 func cmdSigner(_ context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr("%s", signerUsage)
@@ -34,6 +36,8 @@ func cmdSigner(_ context.Context, e *env, args []string) int {
 		return signerAdd(e, args[1:])
 	case "rm":
 		return signerRm(e, args[1:])
+	case "revoke":
+		return signerRevoke(e, args[1:])
 	}
 	return e.usageErr("%s", signerUsage)
 }
@@ -210,5 +214,24 @@ func signerRm(e *env, args []string) int {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "distrusted %s for %s\n", safefile.Printable(pos[1]), safefile.Printable(pos[0]))
+	return 0
+}
+
+func signerRevoke(e *env, args []string) int {
+	fs := e.flags("signer revoke")
+	pos, code, ok := parseArgs(e, fs, args, 2, signerUsage)
+	if !ok {
+		return code
+	}
+	err := updateTrust(func(t *signing.Trust) (bool, error) {
+		if err := t.Revoke(pos[0], pos[1]); err != nil {
+			return false, errors.New(safefile.Printable(err.Error()))
+		}
+		return true, nil
+	})
+	if err != nil {
+		return e.fail(err)
+	}
+	fmt.Fprintf(e.stdout, "revoked %s for %s: it is never trusted again for this library (this can't be undone from the CLI)\n", pos[1], pos[0])
 	return 0
 }

@@ -322,16 +322,22 @@ accepted until the update is accepted.
 `/machine` (the header's "machine" link; no project needed) has a
 **Signers** section: the SSH keys trusted to sign each package library,
 from `railswitch --json signer ls`. Each library lists its trusted keys
-(fingerprint, key type and comment, added date; never the key material)
-and its revoked fingerprints. Library ids, comments and fingerprints are
-escaped like any other text.
+(fingerprint, key type, added date; never the key material, and no
+comment: `signers.toml` keeps none) and its revoked fingerprints. Library
+ids, key types and fingerprints are escaped like any other text.
 
 - **Distrust** asks for confirmation in the browser, then posts the
   library and fingerprint to `/machine/signers/rm`, which runs
   `railswitch signer rm <library> <fingerprint>` as a job. The server
   answers 400, no job, for a library id that doesn't match
   `[a-z0-9][a-z0-9./_-]{0,199}` (or holds `..`) or a fingerprint that
-  isn't `SHA256:` and 43 base64 characters.
+  isn't `SHA256:` and 43 base64 characters. A distrusted key can be
+  trusted again.
+- **Revoke** asks for confirmation (the key is never trusted again for
+  the library, and that can't be undone from the CLI), then posts to
+  `/machine/signers/revoke`, which runs
+  `railswitch signer revoke <library> <fingerprint>` as a job. Same 400
+  checks as Distrust.
 - **Add key** posts a library id and one pasted public key line to
   `/machine/signers/add`, which runs `railswitch signer add <library> -`
   with the key as the job's stdin, never argv. A key over 16 KiB, with
@@ -575,8 +581,9 @@ The commands the dashboard reads and runs. Their `--json` output is in
 docs/json.md.
 
 - `railswitch --json signer ls` (machine): each library's trusted keys and
-  revoked fingerprints. `signer add <library> -` (key on stdin) and
-  `signer rm <library> <fingerprint>` run as jobs.
+  revoked fingerprints. `signer add <library> -` (key on stdin),
+  `signer rm <library> <fingerprint>` and
+  `signer revoke <library> <fingerprint>` run as jobs.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.

@@ -11,8 +11,9 @@ import (
 
 // The machine page's Signers section (Stage 7b): the SSH keys trusted to
 // sign each package library, from `signer ls`. Distrust runs `signer rm
-// <library> <fingerprint>`; Add key runs `signer add <library> -` with
-// the pasted key on stdin, never argv. Both are machine-level jobs, keyed
+// <library> <fingerprint>`, Revoke `signer revoke <library> <fingerprint>`;
+// Add key runs `signer add <library> -` with the pasted key on stdin,
+// never argv. Both are machine-level jobs, keyed
 // by machineKey, which is no valid project prefix.
 
 // machineKey is the job key of machine-level jobs.
@@ -59,6 +60,7 @@ type machineView struct {
 	Libraries []signerLibView
 	AddURL    string
 	RmURL     string
+	RevokeURL string
 }
 
 type signerLibView struct {
@@ -68,21 +70,10 @@ type signerLibView struct {
 	Revoked []string
 }
 
+// signerKeyView is one trusted key: its type, never the key material.
+// signers.toml keeps no comment.
 type signerKeyView struct {
-	Fingerprint, Added, Kind, Comment string
-}
-
-// keyParts is a public key line's type and comment; the key material
-// itself is not shown.
-func keyParts(line string) (kind, comment string) {
-	f := strings.Fields(line)
-	if len(f) > 0 {
-		kind = f[0]
-	}
-	if len(f) > 2 {
-		comment = strings.Join(f[2:], " ")
-	}
-	return kind, comment
+	Fingerprint, Added, Kind string
 }
 
 func (s *Server) machinePage(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +84,7 @@ func (s *Server) machinePage(w http.ResponseWriter, r *http.Request) {
 	v := machineView{
 		Title: "Machine · RailSwitch", Prefix: machineKey,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
-		AddURL: "/machine/signers/add", RmURL: "/machine/signers/rm",
+		AddURL: "/machine/signers/add", RmURL: "/machine/signers/rm", RevokeURL: "/machine/signers/revoke",
 	}
 	doc, err := readJSON[signerDoc](r.Context(), s.c.CLI, "signer", "ls")
 	if err != nil {
@@ -104,8 +95,8 @@ func (s *Server) machinePage(w http.ResponseWriter, r *http.Request) {
 	for _, l := range doc.Libraries {
 		lv := signerLibView{ID: l.ID, Serial: l.LastSerial}
 		for _, k := range l.Keys {
-			kind, comment := keyParts(k.Key)
-			lv.Keys = append(lv.Keys, signerKeyView{Fingerprint: k.Fingerprint, Added: k.Added, Kind: kind, Comment: comment})
+			kind, _, _ := strings.Cut(k.Key, " ")
+			lv.Keys = append(lv.Keys, signerKeyView{Fingerprint: k.Fingerprint, Added: k.Added, Kind: kind})
 		}
 		for _, x := range l.Revoked {
 			lv.Revoked = append(lv.Revoked, x.Fingerprint)
@@ -119,8 +110,16 @@ func validLibraryID(id string) bool {
 	return signerLibRe.MatchString(id) && !strings.Contains(id, "..")
 }
 
-// signerRm runs `signer rm <library> <fingerprint>`.
-func (s *Server) signerRm(w http.ResponseWriter, r *http.Request) {
+// signerRm runs `signer rm <library> <fingerprint>`: distrust.
+func (s *Server) signerRm(w http.ResponseWriter, r *http.Request) { s.signerFpJob(w, r, "rm") }
+
+// signerRevoke runs `signer revoke <library> <fingerprint>`.
+func (s *Server) signerRevoke(w http.ResponseWriter, r *http.Request) {
+	s.signerFpJob(w, r, "revoke")
+}
+
+// signerFpJob runs `signer <verb> <library> <fingerprint>` from the form.
+func (s *Server) signerFpJob(w http.ResponseWriter, r *http.Request, verb string) {
 	lib, fp := r.PostFormValue("library"), r.PostFormValue("fingerprint")
 	if !validLibraryID(lib) {
 		http.Error(w, "not a library id", http.StatusBadRequest)
@@ -131,8 +130,8 @@ func (s *Server) signerRm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.start(w, r, jobs.Spec{
-		Project: machineKey, Label: "signer rm " + lib, Dir: s.c.Home,
-		Argv: []string{s.c.Exe, "signer", "rm", lib, fp},
+		Project: machineKey, Label: "signer " + verb + " " + lib, Dir: s.c.Home,
+		Argv: []string{s.c.Exe, "signer", verb, lib, fp},
 	}, nil, "/machine")
 }
 

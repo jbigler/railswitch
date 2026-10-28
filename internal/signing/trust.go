@@ -216,6 +216,25 @@ func (t *Trust) Remove(lib, fp string) error {
 	return nil
 }
 
+// Revoke moves fp to lib's revoked list, from its keys if it is one: it is
+// never trusted again for lib, by Add, library trust or a rotation. A
+// fingerprint not trusted yet can be revoked ahead.
+func (t *Trust) Revoke(lib, fp string) error {
+	if err := CheckLibrary(lib); err != nil {
+		return err
+	}
+	if !fingerprintRe.MatchString(fp) {
+		return fmt.Errorf("%q is not a SHA256: fingerprint", fp)
+	}
+	l := t.Library(lib)
+	if l == nil {
+		l = &Library{ID: lib}
+		t.Libraries = append(t.Libraries, l)
+	}
+	l.revoke(fp)
+	return nil
+}
+
 // key is the trusted key with fingerprint fp, or nil. A revoked one is
 // never trusted, even if a hand edit left it among the keys.
 func (l *Library) key(fp string) *Key {

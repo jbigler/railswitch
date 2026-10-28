@@ -266,7 +266,7 @@ config directory. No workspace needed. Libraries are in the file's order.
 | `libraries[].id` | string | The library's id, as its `library.toml` names it. |
 | `libraries[].last_serial` | number | The highest serial verified as trusted. An index with a lower serial, or another index at this serial (`signers.toml`'s `last_index` holds the sha256 of the verified one), is `rolled-back`. `0` before the first trusted verify. |
 | `libraries[].keys[]` | array | The keys trusted for this library only: `key` (`<type> <base64>`, no comment), `fingerprint` (`SHA256:…`, as `ssh-keygen -lf` prints it), `added` (the day it was trusted, `YYYY-MM-DD`). |
-| `libraries[].revoked[]` | array | Fingerprints never trusted again for this library: `fingerprint`. `signer add` refuses them. |
+| `libraries[].revoked[]` | array | Fingerprints never trusted again for this library: `fingerprint`. Added by `signer revoke` or a trusted index's `[[revoke]]`; `signer add`, `library trust` and rotations refuse them. |
 
 An entry stays after `signer rm` removes its last key when it has
 revocations or a `last_serial`. So `signer rm` then `signer add` can't undo

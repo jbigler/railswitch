@@ -125,10 +125,16 @@ to revoked).
   revoked, last_serial.
 - `signer add <library> <public-key-file|->`: trusts a key for a library;
   prints its fingerprint; refuses a revoked one and a malformed key.
-- `signer rm <library> <fingerprint>`: distrusts it. An entry with no keys
-  left is removed only when it also has no revocations and no
-  `last_serial`; otherwise it stays, so `rm` then `add` can't undo a
-  revocation or accept an older index.
+- `signer rm <library> <fingerprint>`: distrusts it; `signer add` or
+  `library trust` can trust it again. An entry with no keys left is
+  removed only when it also has no revocations and no `last_serial`;
+  otherwise it stays, so `rm` then `add` can't undo a revocation or
+  accept an older index.
+- `signer revoke <library> <fingerprint>`: revokes it: moves it from the
+  keys to the revoked list (a fingerprint not trusted yet can be revoked
+  ahead). A revoked key is never trusted again for that library: `signer
+  add`, `library trust` (with or without `--new-signer`) and rotations
+  refuse it, and an index it signs is `revoked`. No command undoes it.
 - `library verify <dir> [--json]`: the Result; exit 0 when `trusted`, 1
   otherwise (the JSON is printed either way).
 - `library trust <dir> --fingerprint <fp> [--rotation | --new-signer]`:
@@ -150,7 +156,7 @@ to revoked).
 
 ## Revocation's effect (D102)
 
-Revoking (locally with `signer rm` or by an index's `[[revoke]]`) stops
+Revoking (locally with `signer revoke` or by an index's `[[revoke]]`) stops
 installs and updates from that library by that key. Projects already using
 its packages keep running (pinned by hash, reviewed at install).
 `overview --json` gains `signer_warnings: []` (always empty in 7b; 7c fills
@@ -159,8 +165,9 @@ it when library packages can be installed).
 ## Page
 
 The machine page gains a Signers section from `signer ls --json`: each
-library, its keys (fingerprint, added), its revoked fingerprints; Distrust
-(confirm; job `signer rm <library> <fp>`); Add key (library id, the public
+library, its keys (fingerprint, key type, added), its revoked fingerprints;
+Distrust (confirm; job `signer rm <library> <fp>`); Revoke (confirm, saying
+it can't be undone from the CLI; job `signer revoke <library> <fp>`); Add key (library id, the public
 key pasted: job `signer add <library> -` with the key on stdin). "Trust
 this key" and "Confirm rotation" come with 7c's library pages.
 
@@ -171,7 +178,7 @@ this key" and "Confirm rotation" come with 7c's library pages.
 - `ssh-keygen` missing: an error naming it (doctor gains a check:
   `ssh-keygen -Y` support).
 - Concurrent writes of `signers.toml`: every load, verify and save
-  (`library verify`, `library trust`, `signer add`/`rm`) runs
+  (`library verify`, `library trust`, `signer add`/`rm`/`revoke`) runs
   under an exclusive flock on the sibling `signers.toml.lock` (0600),
   through `signing.UpdateTrust`, the only writer; so no writer drops
   another's revocation or lowers `last_serial`. The file is replaced

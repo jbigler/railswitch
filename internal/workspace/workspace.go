@@ -209,6 +209,20 @@ func (w *Workspace) WithFile(rel string, data []byte) *Workspace {
 	return &c
 }
 
+// WithPackageFile is w with rel, a file of a workspace-local pack or option
+// ("packs/<name>/…", "options/<name>/…"), set to data (nil: removed) in
+// memory (pack.Catalog.WithFile), with the stack resolved again and a lock
+// of it as WithProject's, so the change loads and renders unwritten.
+func (w *Workspace) WithPackageFile(rel string, data []byte) (*Workspace, error) {
+	cat, err := w.Catalog.WithFile(rel, data)
+	if err != nil {
+		return nil, err
+	}
+	c := *w
+	c.Catalog = cat
+	return c.WithProject(w.Project)
+}
+
 // Hash is the content hash of a project.toml: "sha256:<hex>".
 func Hash(data []byte) string {
 	sum := sha256.Sum256(data)

@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"testing/fstest"
 
 	"github.com/BurntSushi/toml"
 
@@ -29,6 +31,67 @@ type Catalog struct {
 	Tools   map[string]*Tool
 	Agents  map[Ref]*Agent
 	Root    string // the workspace local refs read from; "" for none
+
+	// overlay holds WithFile's packages, by package directory
+	// ("options/<name>"): read from memory instead of Root.
+	overlay map[string]fs.FS
+}
+
+// WithFile is a copy of c whose local package holding rel, a
+// workspace-relative slash path "packs/<name>/<file>" or
+// "options/<name>/<file>", is read from memory with rel set to data (nil:
+// removed), so a change loads and renders before it is written. The
+// package's files are read from disk once, now; the copy loads every local
+// package again.
+func (c *Catalog) WithFile(rel string, data []byte) (*Catalog, error) {
+	top, rest, _ := strings.Cut(rel, "/")
+	name, file, _ := strings.Cut(rest, "/")
+	if c.Root == "" || (top != "packs" && top != "options") || name == "" || !fs.ValidPath(rel) || file == "" {
+		return nil, fmt.Errorf("%s is not a file of a workspace-local pack or option", rel)
+	}
+	dir := top + "/" + name
+	mem := fstest.MapFS{}
+	err := fs.WalkDir(os.DirFS(c.Root), dir, func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case d.IsDir():
+			return nil
+		case !d.Type().IsRegular():
+			return fmt.Errorf("%s: not a regular file", p)
+		}
+		b, err := fs.ReadFile(os.DirFS(c.Root), p)
+		if err != nil {
+			return err
+		}
+		mem[p] = &fstest.MapFile{Data: b, Mode: 0o644}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if data == nil {
+		delete(mem, rel)
+	} else {
+		mem[rel] = &fstest.MapFile{Data: data, Mode: 0o644}
+	}
+	n := &Catalog{Packs: builtinOnly(c.Packs), Options: builtinOnly(c.Options), Tools: c.Tools, Agents: builtinOnly(c.Agents), Root: c.Root, overlay: maps.Clone(c.overlay)}
+	if n.overlay == nil {
+		n.overlay = map[string]fs.FS{}
+	}
+	n.overlay[dir] = mem
+	return n, nil
+}
+
+// builtinOnly is m without its local packages.
+func builtinOnly[T any](m map[Ref]T) map[Ref]T {
+	out := map[Ref]T{}
+	for r, v := range m {
+		if !r.Local {
+			out[r] = v
+		}
+	}
+	return out
 }
 
 // LoadBuiltins loads the packages embedded in railswitch.
@@ -134,7 +197,11 @@ func (c *Catalog) local(r Ref, top string) (*loader, string, error) {
 	if !fi.IsDir() {
 		return nil, "", fmt.Errorf("%s: %s is not a directory", r, filepath.Join(c.Root, top, r.Name))
 	}
-	return &loader{fsys: os.DirFS(c.Root), bases: map[int]string{}, names: map[string]string{}}, dir, nil
+	fsys, ok := c.overlay[dir]
+	if !ok {
+		fsys = os.DirFS(c.Root)
+	}
+	return &loader{fsys: fsys, bases: map[int]string{}, names: map[string]string{}}, dir, nil
 }
 
 // version checks a local package's version against the ref that names it.

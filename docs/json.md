@@ -144,6 +144,51 @@ exists, else an option under `options/<name>/`).
 | `pin` | object or null | An option's version pin: `name`, `default`. |
 | `gives` | array of strings | The env names an option gives the app, sorted. |
 | `readme` | string | The package's `README.md` (its app-side changes); `""` when it has none. |
+| `files` | array | A local package's regular files, sorted by `path`: `path` (slash-separated, relative to the package), `size` (bytes), `executable`. Symlinks are not listed. `[]` for a built-in. |
+
+## `pack file show <ref> <path>`
+
+One file of a local package (read as a hostile file: regular, at most
+1 MiB, no symlinked `entrypoints/` or `initdb/`), or of a built-in pack or
+option (read-only). Without `--json` it prints the file.
+
+```json
+{"path": "entrypoints/entrypoint-app.sh", "text": "#!/bin/sh\n…", "hash": "sha256:7c1e…"}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `path` | string | As given. |
+| `text` | string | The file. |
+| `hash` | string | `sha256:<hex>` of its bytes: `pack file write` and `pack file rm` take it as `--if-hash`. |
+
+## `pack file write <ref> <path> --if-hash <h> --dry-run`
+
+What writing stdin (at most 1 MiB) to a file of the local package `<ref>`
+would change. `--if-hash ""` adds a new file (refused when it exists).
+`<path>` must be one of the package format's files (D93,
+`docs/packs.md`); a symlinked package directory, `entrypoints/`, `initdb/`
+or file is refused. These refusals and a hash mismatch exit 1. The package
+must still load with the new text; when the project's stack uses it, every
+registered worktree is also rendered with it in memory. A load or render
+failure exits 0 with `errors`.
+
+```json
+{"hash": "sha256:51d0…", "used": true,
+ "steps": [], "restart": ["master"], "errors": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hash` | string | `sha256:<hex>` of the new text. |
+| `used` | bool | The project's stack uses the package: the real write also writes `stack.lock` and renders, restoring the file and `stack.lock` when either fails. |
+| `steps` | array | As `containerfile write --dry-run`: each worktree's build step whose tag changes (a package's own Containerfiles build only once ejected, so usually empty). Empty when not `used`. |
+| `restart` | array of strings | The running worktrees whose stamped units or mounted package assets change (an entrypoint edit changes only an asset). Empty when not `used`. |
+| `errors` | array of strings | Why the package does not load or the project does not render, one line each. |
+
+Without `--dry-run` the write is atomic; a `.sh` file is written 0755,
+others 0644. `pack file rm <ref> <path> --if-hash <h>` removes a file the
+same way (never the manifest), with no `--dry-run`.
 
 ## `pack ls`
 

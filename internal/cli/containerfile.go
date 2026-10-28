@@ -240,20 +240,30 @@ func cmdContainerfile(ctx context.Context, e *env, args []string) int {
 // parseNamed parses args holding one name, with fset's flags before or
 // after it; ok false means exit with code.
 func parseNamed(e *env, fset *flag.FlagSet, args []string, usage string) (name string, code int, ok bool) {
-	if code, ok := parse(fset, args); !ok {
+	a, code, ok := parseArgs(e, fset, args, 1, usage)
+	if !ok {
 		return "", code, false
 	}
-	if fset.NArg() == 0 {
-		return "", e.usageErr("%s", usage), false
+	return a[0], 0, true
+}
+
+// parseArgs parses args holding n positional arguments, with fset's flags
+// before, between or after them; ok false means exit with code.
+func parseArgs(e *env, fset *flag.FlagSet, args []string, n int, usage string) (pos []string, code int, ok bool) {
+	for {
+		if code, ok := parse(fset, args); !ok {
+			return nil, code, false
+		}
+		if fset.NArg() == 0 {
+			break
+		}
+		pos = append(pos, fset.Arg(0))
+		args = fset.Args()[1:]
 	}
-	name = fset.Arg(0)
-	if code, ok := parse(fset, fset.Args()[1:]); !ok {
-		return "", code, false
+	if len(pos) != n {
+		return nil, e.usageErr("%s", usage), false
 	}
-	if fset.NArg() != 0 {
-		return "", e.usageErr("%s", usage), false
-	}
-	return name, 0, true
+	return pos, 0, true
 }
 
 // buildStep is one element of `containerfile list --json` steps.

@@ -243,26 +243,16 @@ func (e *env) commit(ctx context.Context, root string, changes []fileChange, loc
 	}()
 	var wrote []string
 	for _, c := range changes {
-		path := filepath.Join(root, filepath.FromSlash(c.Rel))
-		restore, err := keep(root, path)
+		restore, err := keep(root, filepath.Join(root, filepath.FromSlash(c.Rel)))
 		if err != nil {
 			return err
 		}
 		undo = append(undo, restore)
-		if c.Data == nil {
-			if err := os.Remove(path); err != nil {
-				return err
-			}
-			wrote = append(wrote, "removed "+path)
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		line, err := applyChange(root, c)
+		if err != nil {
 			return err
 		}
-		if err := tomlfile.WriteAtomic(path, c.Data, c.Mode); err != nil {
-			return err
-		}
-		wrote = append(wrote, "wrote "+path)
+		wrote = append(wrote, line)
 	}
 	if lock {
 		lockPath := filepath.Join(root, "stack.lock")
@@ -289,6 +279,18 @@ func (e *env) commit(ctx context.Context, root string, changes []fileChange, loc
 	}
 	e.printRendered(d)
 	return nil
+}
+
+// applyChange writes or removes c under root, atomically, and says which.
+func applyChange(root string, c fileChange) (string, error) {
+	path := filepath.Join(root, filepath.FromSlash(c.Rel))
+	if c.Data == nil {
+		return "removed " + path, os.Remove(path)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	return "wrote " + path, tomlfile.WriteAtomic(path, c.Data, c.Mode)
 }
 
 // keep records path as it is now and returns what puts it back: its bytes

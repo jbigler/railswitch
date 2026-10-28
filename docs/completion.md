@@ -37,7 +37,7 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - `hooks`: its subcommands `check`, `backup` and `restore`, and `restore`'s flag `--force`.
 - `agent`: its subcommands `add`, `ls` and `stop` together with the agents `project.toml` declares (`[agents.<name>]`), and its flag `--new-term`; `agent stop`: the agents. `agent add`: flags `--use` and `--run`.
 - `containerfile show|eject|write`: the stack's built-in Containerfile names (`show` and `write` also the workspace's own `containerfiles/Containerfile.<name>`); `write`'s flags `--if-hash`, `--dry-run` and `--restart`.
-- `pack`: its subcommands `eject`, `new` and `show`; `pack eject|show`: the built-in packs and options (`rails@1`, `postgres@1`, …); `pack eject`'s flag `--as`.
+- `pack`: its subcommands `eject`, `file`, `ls`, `new` and `show`; `pack eject|show`: the built-in packs and options (`rails@1`, `postgres@1`, …); `pack eject`'s flag `--as`; `pack new`'s flags `--dir` and `--option`; `pack file`: `show`, `write` (flags `--if-hash`, `--dry-run`, `--restart`) and `rm` (flag `--if-hash`).
 - `project rm`: every registered project prefix.
 - `project new --agent` takes `name=ref` or `none`; the flag itself completes, its value does not.
 - `pr`: its subcommand `ls`. `task`: its subcommand `ls` together with the tasks `task ls` lists (the pack's `[tasks]` with `project.toml`'s over them), and its flag `--new-term`. `wt add`: flags `--name` and `--up`.

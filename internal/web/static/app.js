@@ -22,7 +22,7 @@ function connect() {
   if (es) es.close();
   clearTimeout(retry);
   // The new page has a prefix only once Create starts its job.
-  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" ? "new" : view ? "settings" : "" });
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" || view === "machine" ? "new" : view ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -744,7 +744,7 @@ function jobNext(f) {
   return "";
 }
 
-if (view === "images" || view === "library" || view === "editor") {
+if (view === "images" || view === "library" || view === "editor" || view === "machine") {
   document.addEventListener("submit", (e) => {
     const f = e.target;
     if (f.matches("form[data-add-file]")) {

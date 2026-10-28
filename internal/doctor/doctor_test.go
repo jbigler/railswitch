@@ -30,6 +30,7 @@ var (
 // fakeHost answers podman info (render's graph root) and nothing else.
 func fakeHost() *systest.Fake {
 	f := &systest.Fake{}
+	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{ExitCode: 1, Stderr: []byte("usage: ssh-keygen -Y verify -f allowed_signers_file\n")}, fmt.Errorf("ssh-keygen: %w (exit 1)", sys.ErrExit))
 	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte(graphRoot + "\n")}, nil)
 	return f
 }
@@ -135,7 +136,7 @@ func names(cs []Check) []string {
 
 var hostChecks = []string{
 	"podman >= 5.0", "quadlet generator", "podman.socket active", "unprivileged port 80",
-	"nft", "nsenter", "getent", "jq", "curl", "machine subnet free", "networks isolated",
+	"nft", "nsenter", "getent", "jq", "curl", "ssh-keygen -Y", "machine subnet free", "networks isolated",
 }
 
 func TestAllOK(t *testing.T) {
@@ -175,6 +176,7 @@ func TestAllFail(t *testing.T) {
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{ExitCode: 2}, errors.New("gpg: non-zero exit (exit 2)"))
 	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
 	inspect(f, "filial_proxy", `"mtu": "1400"`)
+	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{}, fmt.Errorf("ssh-keygen: %w", exec.ErrNotFound))
 	h := host(t, "1024", false)
 
 	got := h.Run(context.Background(), f, ws)
@@ -471,5 +473,35 @@ func TestDoctorWarnLevel(t *testing.T) {
 	c = byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["git-guard"]
 	if c.OK || !c.Warn || !strings.Contains(c.Detail, "hook-missing-backup "+hook) || c.Fix != "railswitch hooks check" {
 		t.Errorf("unbacked-up hook: %+v", c)
+	}
+}
+
+// TestDoctorSSHKeygen: ssh-keygen with -Y verify passes; a missing or an
+// older ssh-keygen is a warning (libraries can't be verified), never a
+// failure.
+func TestDoctorSSHKeygen(t *testing.T) {
+	real := &systest.Fake{Passthrough: []string{"ssh-keygen"}}
+	if c := sshKeygen(context.Background(), real); !c.OK || c.Warn {
+		t.Errorf("real ssh-keygen: %+v", c)
+	}
+	for name, tc := range map[string]struct {
+		res sys.Result
+		err error
+	}{
+		"missing": {sys.Result{}, fmt.Errorf("ssh-keygen: %w", exec.ErrNotFound)},
+		"old":     {sys.Result{ExitCode: 1, Stderr: []byte("ssh-keygen: illegal option -- Y\nusage: ssh-keygen [-q] [-b bits]\n")}, fmt.Errorf("ssh-keygen: %w (exit 1)", sys.ErrExit)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &systest.Fake{}
+			f.On([]string{"ssh-keygen", "-Y"}, tc.res, tc.err)
+			c := sshKeygen(context.Background(), f)
+			if c.OK || !c.Warn || c.Fix == "" || c.Name != "ssh-keygen -Y" {
+				t.Errorf("%s: %+v", name, c)
+			}
+		})
+	}
+	ws := workspaceAt(t, true)
+	if _, ok := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["ssh-keygen -Y"]; !ok {
+		t.Error("doctor does not run the ssh-keygen -Y check")
 	}
 }

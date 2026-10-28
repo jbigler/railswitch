@@ -1,0 +1,41 @@
+{{define "machine"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="machine">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<h1>Machine</h1>
+<section class="card">
+<h2>Signers</h2>
+<p class="note">The SSH keys trusted to sign each package library. A library's index is trusted only when a key listed here signed it. Distrust removes a key, which you can trust again. Revoke means it is never trusted again for that library.</p>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{range .Libraries}}{{$lib := .ID}}<h3 class="mono">{{.ID}}</h3>
+<table class="set-table">
+<thead><tr><th>Fingerprint</th><th>Key</th><th>Added</th><th></th></tr></thead>
+<tbody>
+{{range .Keys}}<tr><td class="mono">{{.Fingerprint}}</td><td><span class="mono">{{.Kind}}</span></td><td>{{.Added}}</td><td><div class="btns"><form method="post" action="{{$.RmURL}}" data-job="signer-rm" data-confirm="Distrust {{.Fingerprint}} for {{$lib}}? Its signatures stop verifying. You can trust it again later."><input type="hidden" name="library" value="{{$lib}}"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button class="ln danger">Distrust</button></form><form method="post" action="{{$.RevokeURL}}" data-job="signer-revoke" data-confirm="Revoke {{.Fingerprint}} for {{$lib}}? It is never trusted again for this library. This can't be undone from the CLI."><input type="hidden" name="library" value="{{$lib}}"><input type="hidden" name="fingerprint" value="{{.Fingerprint}}"><button class="ln danger">Revoke</button></form></div></td></tr>
+{{else}}<tr><td colspan="4" class="muted">No trusted keys.</td></tr>
+{{end}}</tbody>
+</table>
+{{if .Revoked}}<p class="note">Revoked: {{range .Revoked}}<span class="mono">{{.}}</span> {{end}}</p>
+{{end}}{{else}}{{if not .Error}}<p class="muted">No libraries have trusted keys.</p>
+{{end}}{{end}}</section>
+<section class="card">
+<h2>Add key</h2>
+<form method="post" action="{{.AddURL}}" class="new-form" data-job="signer-add">
+<label class="field">Library <input name="library" class="mono" required autocomplete="off" spellcheck="false" maxlength="200" pattern="[a-z0-9][a-z0-9._/\-]*" placeholder="github.com/acme/lib"></label>
+<label class="field">Public key <textarea name="key" class="mono" rows="3" required spellcheck="false" maxlength="16384" placeholder="ssh-ed25519 AAAA… comment"></textarea></label>
+<div class="btns"><button class="ln main">Trust this key</button></div>
+</form>
+<p class="note">Paste one public key line. It is sent to <code>signer add</code> on stdin.</p>
+</section>
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

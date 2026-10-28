@@ -355,6 +355,9 @@ func TestOverviewReviewPending(t *testing.T) {
 	if !strings.Contains(e.out.String(), `"review_pending":false`) {
 		t.Errorf("accepted lock: %s", e.out)
 	}
+	if !strings.Contains(e.out.String(), `"signer_warnings":[]`) {
+		t.Errorf("signer_warnings not []: %s", e.out)
+	}
 	e.out.Reset()
 	e.l.WS.Lock.Options["redis"] = config.LockEntry{Version: "1", Source: "built in", SHA256: strings.Repeat("0", 64)}
 	if err := e.l.PrintOverview(ctx, true); err != nil {

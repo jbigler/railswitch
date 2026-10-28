@@ -6,6 +6,7 @@
 package doctor
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -73,7 +74,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
+	out = append(out, sshKeygen(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
 	}
@@ -176,6 +177,25 @@ func (h Host) port() Check {
 	}
 	c.Detail = "net.ipv4.ip_unprivileged_port_start = " + v
 	c.OK = n <= 80
+	return c
+}
+
+// sshKeygen checks that ssh-keygen signs and verifies (-Y, OpenSSH 8.2+),
+// which library verify and sign need. ssh-keygen -Y with no operation
+// prints the usage, which lists -Y verify only where it exists. A warning:
+// nothing else needs it.
+func sshKeygen(ctx context.Context, r sys.Runner) Check {
+	c := Check{Name: "ssh-keygen -Y", Warn: true, Fix: "install OpenSSH 8.2 or newer (ssh-keygen -Y verifies a library's signature)"}
+	res, err := r.Run(ctx, sys.Cmd{Name: "ssh-keygen", Args: []string{"-Y"}})
+	if err != nil && !errors.Is(err, sys.ErrExit) {
+		c.Detail = err.Error()
+		return c
+	}
+	if !bytes.Contains(res.Stderr, []byte("ssh-keygen -Y verify")) {
+		c.Detail = "ssh-keygen has no -Y verify"
+		return c
+	}
+	c.OK, c.Warn, c.Detail = true, false, "ssh-keygen -Y verify is supported"
 	return c
 }
 

@@ -153,8 +153,9 @@ func signerAdd(e *env, args []string) int {
 	}
 	var fp string
 	err = updateTrust(func(t *signing.Trust) (bool, error) {
-		fp, err = t.Add(lib, key)
-		return true, err
+		var aerr error
+		fp, aerr = t.Add(lib, key)
+		return true, aerr
 	})
 	if err != nil {
 		return e.fail(err)

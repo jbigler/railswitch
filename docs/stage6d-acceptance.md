@@ -36,6 +36,7 @@ through `pack file write`, `options/valkey/` removed.
 | Review: a save whose restart failed said "not written" | exit 3; the editor reloads with "Saved. The rebuild and restart failed" | `381d3b5` |
 | Review: a copied package opened at `@1` whatever the built-in's version | the copied version | `381d3b5` |
 | Reset to default left a running worktree marked up to date | `eject` and `new` render a locked project | `2cca7bb` |
+| Second review: a render failing after eject/new's write exited 1 though the file was written; `pack show` and `pack file` looked in `packs/`, `options/`, `agents/` in different orders; `?restart=failed` outlived a later save | a warning with exit 0; one lookup (`localPackage`); the query dropped on success | `97b962c` |
 
 ## Known limits
 

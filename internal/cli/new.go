@@ -264,6 +264,14 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		return nil, fmt.Errorf("base branch %q: %w", base, err)
 	}
 	p.Project.BaseBranch = base
+	if tpl != nil {
+		personal := personalContainerfiles(cat, st)
+		for _, n := range slices.Sorted(maps.Keys(tpl.Containerfiles)) {
+			if personal[n] {
+				return nil, fmt.Errorf("template %s holds Containerfile.%s, the editor's or an agent's image: a template never brings one (D112)", a.template, n)
+			}
+		}
+	}
 	if err := newPathsFree(ws, slug, st, tpl); err != nil {
 		return nil, err
 	}

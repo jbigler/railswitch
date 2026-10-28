@@ -132,7 +132,11 @@ func importReview(in *template.Incoming, d machine.Dirs) (*templateImportDoc, er
 // library this machine hasn't added.
 func importWarnings(t *template.Template, d machine.Dirs) []string {
 	out := []string{}
-	c, _ := libraries.Load(libraries.Path(d))
+	c, err := libraries.Load(libraries.Path(d))
+	if err != nil {
+		out = append(out, fmt.Sprintf("the libraries it uses can't be checked: %v", err))
+		c = nil
+	}
 	for _, ref := range t.Packages() {
 		r, err := pack.ParseRef(ref)
 		switch {

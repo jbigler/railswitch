@@ -135,3 +135,35 @@ func TestTemplateImportWarnsLibrary(t *testing.T) {
 		t.Errorf("warnings = %q", doc.Warnings)
 	}
 }
+
+// The editor's and the agents' Containerfiles stay out of a template even
+// when edited (D112), and a template holding one is refused by project
+// new before the clone.
+func TestTemplatePersonalContainerfiles(t *testing.T) {
+	ws, dirs := lockedWS(t)
+	for _, n := range []string{"nvim", "agent-base", "claude"} {
+		p := filepath.Join(ws, "containerfiles", "Containerfile."+n)
+		writeFile(t, p, readFile(t, p)+editedRun)
+	}
+	mustRun(t, "-C", ws, "lock")
+	dir := filialTemplate(t, ws, dirs)
+	if ents, err := os.ReadDir(filepath.Join(dir, "containerfiles")); err == nil {
+		for _, e := range ents {
+			t.Errorf("the template kept %s", e.Name())
+		}
+	}
+
+	cf := filepath.Join(dir, "containerfiles")
+	if err := os.MkdirAll(cf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(cf, "Containerfile.claude"), "FROM scratch\n")
+	code, _, errs := runIn(t, "project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", "https://h.example/o/r.git", "--prefix", "shop", "--branch", "main", "--template", "filial-stack@1")
+	if code != 1 || !strings.Contains(errs, "Containerfile.claude, the editor's or an agent's image") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+	writeFile(t, filepath.Join(cf, "Containerfile.agent-base"), "FROM scratch\n")
+	if code, _, errs := runIn(t, "template", "show", "filial-stack@1"); code != 1 || !strings.Contains(errs, "agent-base: the agents' image is not part of a template") {
+		t.Errorf("agent-base: exit %d: %s", code, errs)
+	}
+}

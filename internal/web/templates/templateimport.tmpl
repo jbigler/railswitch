@@ -4,7 +4,7 @@ flagged. */}}
 {{define "templateimport"}}<!doctype html>
 <html lang="en">
 {{template "head" .}}
-<body data-prefix="{{.Prefix}}" data-view="review">
+<body data-prefix="{{.Prefix}}" data-view="import">
 {{template "top" .}}
 <main class="grid settings">
 <section class="left set-left">
@@ -16,7 +16,7 @@ flagged. */}}
 {{else if eq .Status "same"}}<p class="green">This machine already has <span class="mono">{{.Ref}}</span>, byte for byte: nothing to import.</p>
 {{else}}<p>{{if eq .Status "update"}}<span class="mono">{{.Ref}}</span> replaces <span class="mono">{{.Replaces}}</span>: the diff is from the version on this machine.{{else}}<span class="mono">{{.Ref}}</span> is new on this machine: every file is shown as added.{{end}}</p>
 {{range .Warnings}}<p class="yellow notice">{{.}}</p>
-{{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.ImportURL}}" id="accept" class="editor" data-job="template-import" data-next="/machine"{{if .AckText}} data-ack-required{{end}}>
+{{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.ImportURL}}" id="accept" class="editor" data-job="import" data-next="/machine"{{if .AckText}} data-ack-required{{end}}>
 <input type="hidden" name="dir" value="{{.Dir}}">
 <input type="hidden" name="hash" value="{{.Hash}}">
 {{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>

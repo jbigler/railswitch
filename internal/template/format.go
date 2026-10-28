@@ -171,7 +171,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 	}
 	var personal struct{ Tools, Agents any }
 	if _, err := toml.Decode(string(data.Data), &personal); err == nil && (personal.Tools != nil || personal.Agents != nil) {
-		return nil, fmt.Errorf("%s: [tools] and [agents] are not part of a template: the editor and the agents are each person's choice (project new --tool, --agent)", StackFile)
+		return nil, fmt.Errorf("%s: [tools] and [agents] are not part of a template: the editor and the agents are each person's choice (project new --tool, --agent); a template saved before D112 has them: export it again", StackFile)
 	}
 	var f stackFile
 	if err := tomlfile.Decode(data.Data, SchemaVersion, &f); err != nil {
@@ -237,6 +237,9 @@ func Decode(fsys fs.FS) (*Template, error) {
 		t.Secrets = append(t.Secrets, s.Name)
 	}
 	slices.Sort(t.Secrets)
+	if _, ok := t.Containerfiles["agent-base"]; ok {
+		bad("%s/Containerfile.agent-base: the agents' image is not part of a template (D112)", cfDir)
+	}
 	for i, a := range t.Lines.Image.Addons {
 		n, ok := strings.CutPrefix(a, cfDir+"/Containerfile.")
 		if _, have := t.Containerfiles[n]; !ok || !have {

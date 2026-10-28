@@ -21,7 +21,11 @@ rails-pg.stack/
 Nothing else is allowed: no other file, no other directory, no symlink,
 no file over 1 MiB. `stack.toml` is read strictly: a key it doesn't
 define (`[project]`, `[worktrees]`, `[share]`, `[secrets]`, a secret
-`value`) is refused, and `[tools]` or `[agents]` is refused by name.
+`value`) is refused, and `[tools]` or `[agents]` is refused by name, as
+is `containerfiles/Containerfile.agent-base`. A template saved before
+D112 has `[agents]` (export added the default agent) and no longer
+reads: export the project again, after removing
+`~/.config/railswitch/templates/<name>.stack/`.
 
 ```toml
 schema = 1
@@ -104,9 +108,13 @@ Export makes:
   (`containerfile show --json` `diff`), and each user addon.
 
 It leaves out each person's own lines (D112): `[tools.nvim]`, each
-`[agents.<n>]`, `[firewall] allow.agent`, a `[services.<id>]` of the
-editor or an agent (`nvim`, `agent`, `agent-<n>`), and those services in
-each secret's `services`; a secret only they receive is dropped.
+`[agents.<n>]`, `[firewall] allow.agent`, a `[services.<id>]` or
+`[[routes]]` entry of the editor or an agent (`nvim`, `agent`,
+`agent-<n>`), and those services in each secret's `services`; a secret
+only they receive is dropped. The editor's and the agents'
+Containerfiles (each tool's, `agent-base`, each agent's) are never kept,
+even when edited, and `project new` refuses a template that holds one
+(before the clone).
 
 It prints what it dropped (`from`, `[project]` keys, `[worktrees.<slug>]`,
 `[share]`, `[template]`, and the lines above), what it asks, the secrets it declares and the
@@ -119,7 +127,9 @@ made from what was accepted.
 
 `railswitch template export --to <dir>` writes the template as a folder
 you can hand to someone: zip it, put it on a share, or commit it
-anywhere. On their machine:
+anywhere. Unpack it as it was: the import refuses any other file, so a
+zip carrying `__MACOSX/` or `.DS_Store` must be unpacked without them.
+On their machine:
 
 - `railswitch template import <dir> [--json]` (D113) reviews it: every
   file as a diff against the version of that name on this machine (all
@@ -128,7 +138,8 @@ anywhere. On their machine:
   own copy) and each library this machine hasn't added. Nothing is
   saved. The folder is hostile input: only the template files above,
   regular files ≤ 1 MiB each, at most 64, no symlink (the folder itself
-  included); anything else refuses before a file is read.
+  included); any other entry refuses the import, and such an entry is
+  never opened.
 - `railswitch template import <dir> --accept <sha256>` saves it in the
   store, once the folder still has the hash its review printed. A
   template new to this machine, or a higher version than the one there,

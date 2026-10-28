@@ -146,8 +146,9 @@ func TestExportDropsProjectLines(t *testing.T) {
 			t.Errorf("stack.toml holds %q:\n%s", s, stack)
 		}
 	}
-	want := []string{"from", "[project] name", "[project] prefix", "[project] repo", "[project] base_branch", "[worktrees.feat]", "[worktrees.postgres-trial]",
-		"[tools.nvim]", "[agents.claude]", "[agents.probe]",
+	want := []string{"from (project-only)", "[project] name (project-only)", "[project] prefix (project-only)", "[project] repo (project-only)",
+		"[project] base_branch (project-only)", "[worktrees.feat] (project-only)", "[worktrees.postgres-trial] (project-only)",
+		"[tools.nvim] (each person's own)", "[agents.claude] (each person's own)", "[agents.probe] (each person's own)",
 		"[secrets.github_token] (only the editor or agents receive it)", "[secrets.probe_key] (only the editor or agents receive it)"}
 	if !slices.Equal(dropped, want) {
 		t.Errorf("dropped = %q; want %q", dropped, want)
@@ -183,7 +184,7 @@ func TestExportDropsPersonal(t *testing.T) {
 	if _, ok := tp.Lines.Firewall.Allow["agent"]; ok || len(tp.Lines.Firewall.Allow["deps"]) != 1 {
 		t.Errorf("allow = %+v", tp.Lines.Firewall.Allow)
 	}
-	for _, d := range []string{"[firewall] allow.agent", "[services.agent-claude]"} {
+	for _, d := range []string{"[firewall] allow.agent (each person's own)", "[services.agent-claude] (each person's own)"} {
 		if !slices.Contains(dropped, d) {
 			t.Errorf("dropped %q lacks %q", dropped, d)
 		}
@@ -261,5 +262,18 @@ func TestApplyAnswers(t *testing.T) {
 	}
 	if _, err := Apply(tp, map[string]string{"versions.redis": "7"}); err == nil || !strings.Contains(err.Error(), "asks no such question") {
 		t.Errorf("an unasked key: %v", err)
+	}
+}
+
+// A route to the editor is dropped with it.
+func TestExportDropsPersonalRoute(t *testing.T) {
+	p := filial(t)
+	p.Routes = []config.Route{{Name: "lsp", Service: "nvim", Port: 9000}, {Name: "vite", Service: "rails", Port: 3036}}
+	tp, dropped, err := Export(p, nil, "filial-stack", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tp.Lines.Routes) != 1 || tp.Lines.Routes[0].Name != "vite" || !slices.Contains(dropped, "[[routes]] lsp (each person's own)") {
+		t.Errorf("routes = %+v, dropped %q", tp.Lines.Routes, dropped)
 	}
 }

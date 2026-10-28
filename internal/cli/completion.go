@@ -67,6 +67,7 @@ var completionFlags = map[string][]string{
 	"down":                   {"--yes"},
 	"exec":                   {"--fresh"},
 	"hooks restore":          {"--force"},
+	"lock":                   {"--accept=", "--restart", "--review"},
 	"logs":                   {"-f"},
 	"nvim reset-config":      {"--yes"},
 	"pack eject":             {"--as="},

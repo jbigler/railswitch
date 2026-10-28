@@ -97,7 +97,7 @@ func packEject(e *env, args []string) int {
 	if err := copyPackage(dir, files, manifest, name); err != nil {
 		return e.fail(fmt.Errorf("pack eject: %w", err))
 	}
-	fmt.Fprintf(e.stdout, "wrote %s/%s/: use it with %s, then railswitch lock\n", top, name, use)
+	fmt.Fprintf(e.stdout, "wrote %s/%s/: use it with %s, then railswitch lock --review and --accept\n", top, name, use)
 	return 0
 }
 

@@ -349,7 +349,7 @@ func TestUnitsStaleLockFix(t *testing.T) {
 	ws := workspaceAt(t, true)
 	ws.Lock.Options = nil
 	c := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["units current"]
-	if c.OK || c.Fix != "railswitch lock" || !strings.Contains(c.Detail, "stack.lock is out of date") {
+	if c.OK || c.Fix != "railswitch lock --review" || !strings.Contains(c.Detail, "stack.lock is out of date") {
 		t.Errorf("units current with a stale lock = %+v", c)
 	}
 }

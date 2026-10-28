@@ -417,7 +417,7 @@ func TestPackNewOption(t *testing.T) {
 	}
 	// It is usable as the slot's option: the stack resolves and renders.
 	editProject(t, ws, `cache    = "redis@1"`, `cache    = "local:kv@1"`)
-	mustRun(t, "-C", ws, "lock")
+	acceptLock(t, ws)
 	mustRun(t, "-C", ws, "render")
 	if code, _, _ := runIn(t, "-C", ws, "pack", "new", "--option", "nope", "kv2"); code != 2 {
 		t.Errorf("unknown slot: exit %d; want 2", code)

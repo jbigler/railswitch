@@ -70,16 +70,56 @@ the built-ins:
 its version, its source (`built in (railswitch <version>)` or `local`) and
 the sha256 of its directory (D14: each regular file's path, length and
 bytes, in sorted path order; a symlink or other special file is an error
-naming it). `render` and `up` refuse a lock that no longer matches:
+naming it). Every lock write also stores a copy of each package it pins
+in `~/.local/share/railswitch/locked/<sha256>/` (D96), outside every
+workspace; a copy is checked against its hash on every read, and one that
+no longer matches counts as missing.
+
+### Updates wait for review (D97)
+
+A package whose content changes under the ref the lock pins (a railswitch
+upgrade changes a built-in; a local package edited in a text editor: an
+edit, an added or removed file) is not accepted unseen. Until it is
+reviewed the project keeps running the stored copy of what the lock
+accepted, in `render`, `up` and every dry run, and `overview --json`
+reports `review_pending`. Without a stored copy (a lock written before
+7a), or for a ref that changed (a package added, removed or at another
+version in `project.toml`, or a slot switched between a built-in and a
+local copy of it, even a byte-identical one), `render` and `up` refuse:
 
 ```
-railswitch: stack.lock is out of date for local:phoenix@1: run railswitch lock
+railswitch: stack.lock is out of date for local:phoenix@1: an update is waiting for review: railswitch lock --review
 ```
 
-Any change to a local package (an edit, an added or removed file) is such a
-change, so package edits are reviewed and committed like any other. So is
-switching a slot between a built-in and a local copy of it, even a
-byte-identical one. `railswitch project new --pack local:<name>@<N>` (and
+- `railswitch lock --review [--json]` shows every changed file as a diff,
+  risky lines flagged (the checks below), and the hash of the exact
+  `stack.lock` an accept writes ([JSON](json.md#lock---review)).
+- `railswitch lock --accept <hash> [--restart]` recomputes the review,
+  refuses another hash ("the update changed since it was reviewed"), then
+  locks, stores and renders, all or none; `--restart` restarts the running
+  worktrees the update changes (exit 3: written, restart failed).
+- `railswitch lock` writes the lock when there is none or nothing to
+  review; otherwise it prints the review and exits 1 naming the accept
+  command.
+- Other writes never accept a waiting update: `settings apply`, `project
+  write`, `agent add` and Containerfile writes keep a waiting package's
+  entry (and refuse when it has no stored copy); `pack file write` accepts
+  only the package it edits, reviewed in the editor.
+
+The checks flag, and everything else is shown as a diff only (it runs
+inside a firewalled container):
+
+| Check | Flagged |
+|---|---|
+| `firewall` | a host added to `deps.allow` or an agent's `allow`; an option's or tool's `firewall` profiles changed |
+| `runs-here` | an added or changed `Containerfile.*` line piping `curl`/`wget` into a shell or interpreter, `ADD http(s)://`, `--security=insecure`, `--network=host` (commented lines too); a manifest that does not load |
+| `image` | a `Containerfile.*` `FROM` line added or changed; an option's `[image] pull` or a pack's `[image] file` added or changed |
+| `host-mount` | a `[[mounts]]` entry added or changed whose source is an absolute path or a placeholder |
+| `port` | a `[[ports]]` entry added, or its `base`, `container` or `share` changed |
+| `privilege` | a `[unit] add_capability` added; a top-level `.sh` of a package with `add_capability` changed |
+
+Manifests are compared field by field, so reordering or reformatting one
+flags nothing. `railswitch project new --pack local:<name>@<N>` (and
 `--option <slot>=local:<name>@<N>`) works when the package is already in
 the workspace directory before `project new` runs.
 
@@ -220,7 +260,8 @@ lint    = "bin/rubocop"   # a project task
 - `railswitch pack eject <ref> [--as <name>]` copies a built-in pack or
   option into `packs/<name>/` (or `options/<name>/`), the manifest's `name`
   set to `<name>` (default: the built-in's). The project keeps the built-in
-  until its ref says `local:<name>@<N>`; then `railswitch lock`. An existing
+  until its ref says `local:<name>@<N>`; then `railswitch lock --review` and
+  `railswitch lock --accept <hash>`. An existing
   directory is never overwritten: a local package is yours to edit.
 - `railswitch pack new <name>` writes `packs/<name>/` with a `pack.toml`
   listing every field (commented), a `Containerfile.base`, an

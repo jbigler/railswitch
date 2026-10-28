@@ -493,6 +493,10 @@ The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,
 never saved. Without `--json`, the dry run prints the same content as text.
 
+`project new --up` (without `--dry-run`) exits 3 when the project was
+created and registered but `up` failed: stderr says so and names the
+command to retry. Exit 1 means the project was not created.
+
 ## `doctor`
 
 The host checks (among them whether another podman network uses the

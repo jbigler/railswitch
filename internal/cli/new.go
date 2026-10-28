@@ -63,7 +63,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	branch := fset.String("branch", "", "the `base` branch (default: the remote's HEAD branch)")
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
-	up := fset.Bool("up", false, "run up in the base worktree once it is created")
+	up := fset.Bool("up", false, "run up in the base worktree once it is created (exit 3: created, up failed)")
 	var opts, tools, agentFlags stringList
 	fset.Var(&opts, "option", "fill an option slot: `slot=ref` or slot=none (repeatable)")
 	fset.Var(&tools, "tool", "enable a developer `tool`: nvim (repeatable)")
@@ -114,14 +114,21 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	e.dir, e.slug = filepath.Join(ws, slug), slug
 	l, slug, code := e.lifecycle(ctx, "up")
-	if code != 0 {
-		return code
+	if code == 0 {
+		if err := l.Up(ctx, slug); err != nil {
+			code = e.fail(err)
+		}
 	}
-	if err := l.Up(ctx, slug); err != nil {
-		return e.fail(err)
+	if code != 0 {
+		fmt.Fprintf(e.stderr, "railswitch: project %s was created in %s, but up failed; fix the cause and run: cd %s && railswitch up\n", *prefix, ws, shellQuote(filepath.Join(ws, slug)))
+		return exitCreatedUpFailed
 	}
 	return 0
 }
+
+// exitCreatedUpFailed is project new --up's exit code when the project was
+// created and registered but up failed (docs/json.md).
+const exitCreatedUpFailed = 3
 
 // newArgs are project new's flags, parsed.
 type newArgs struct {

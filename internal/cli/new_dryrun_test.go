@@ -236,6 +236,16 @@ func TestNewUp(t *testing.T) {
 		t.Errorf("started %v, stdout:\n%s", started(f), out)
 	}
 
+	// A created project whose up fails exits 3 and says it was created.
+	f = gitHost()
+	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
+	f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
+	ws = filepath.Join(t.TempDir(), "cart")
+	code, out, errs = runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "cart", "--agent", "none", "--up")
+	if code != 3 || !strings.Contains(out, "created workspace") || !strings.Contains(errs, "project cart was created in "+ws+", but up failed") {
+		t.Errorf("new --up with a failing up: exit %d\n%s%s; want exit 3 and the project named as created", code, out, errs)
+	}
+
 	// A create whose render fails (no podman) starts nothing.
 	failing := &systest.Fake{Passthrough: []string{"git"}}
 	code, _, _ = runWith(t, failing, "project", "new", filepath.Join(t.TempDir(), "two"), "--repo", bareRepo(t, "main"), "--prefix", "two", "--agent", "none", "--up")

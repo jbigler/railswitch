@@ -10,6 +10,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
 const projectStore = "railswitch.project";
+const noticeStore = "railswitch.notice";
 
 // Events.
 
@@ -524,7 +525,7 @@ function jobEnded(id) {
   const el = document.getElementById("job-" + id);
   if (!done || !el || el.dataset.state === "running") return;
   watched.delete(id);
-  done(el.dataset.state, el.hasAttribute("data-conflict"));
+  done(el.dataset.state, el.hasAttribute("data-conflict"), el.dataset.exit);
 }
 
 function applied(state, conflict) {
@@ -814,9 +815,27 @@ function startNew() {
     body.dataset.prefix = p;
     connect();
     btn.disabled = true;
-    const started = await startJob(f.action, data, (state) => {
+    const started = await startJob(f.action, data, async (state, _conflict, exit) => {
+      const page = "/p/" + encodeURIComponent(p);
       if (state === "ok") {
-        location.href = "/p/" + encodeURIComponent(p);
+        location.href = page;
+        return;
+      }
+      // Exit 3: created, but up failed. The registry has the last word.
+      let registered = exit === "3";
+      try {
+        const r = await fetch("/new/registered?prefix=" + encodeURIComponent(p), { credentials: "same-origin" });
+        if (r.ok) registered = (await r.json()).registered;
+      } catch {
+        // the exit code decides
+      }
+      if (registered) {
+        try {
+          sessionStorage.setItem(noticeStore, "Project " + p + " was created, but up failed. Its output is in the project new job below.");
+        } catch {
+          // no notice kept
+        }
+        location.href = page;
         return;
       }
       toast("project new " + state + ". The form keeps your values; the job's output says what was left and how to remove it.", true);
@@ -831,6 +850,15 @@ function startNew() {
 // Start: the remembered project and sort, then the stream.
 
 (function start() {
+  try {
+    const notice = sessionStorage.getItem(noticeStore);
+    if (notice) {
+      sessionStorage.removeItem(noticeStore);
+      toast(notice, true);
+    }
+  } catch {
+    // no notice kept
+  }
   if (view === "new") {
     afterSwap("header");
     startNew();

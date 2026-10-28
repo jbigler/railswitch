@@ -376,3 +376,49 @@ func TestNewStreamFollowsCreate(t *testing.T) {
 		t.Errorf("the new project's page: %d %s", w.Code, w.Body)
 	}
 }
+
+// TestNewCreateUpFailed: a create job that ends failed carries its exit
+// code, and /new/registered says from a fresh project ls whether the
+// project was created anyway (project new --up exits 3 when only up
+// failed), so the page opens the project instead of keeping the form.
+func TestNewCreateUpFailed(t *testing.T) {
+	f := newProjectFixture(t)
+	f.run.exit = 3
+	v := stepOne()
+	v.Set("up", "1")
+	f.do(req("POST", "/new/create", v))
+	f.endedIn(t, "masto")
+	sub := f.s.subscribe("masto", "", parseSort("name"), "new")
+	defer f.s.unsubscribe(sub)
+	sawExit := false
+	for drained := false; !drained; {
+		select {
+		case ev := <-sub.ch:
+			sawExit = sawExit || ev.ID == "jobs" && strings.Contains(ev.HTML, `data-state="failed" data-exit="3"`)
+		default:
+			drained = true
+		}
+	}
+	if !sawExit {
+		t.Error(`jobs fragment lacks data-state="failed" data-exit="3"`)
+	}
+
+	registered := func() string {
+		t.Helper()
+		w := f.do(req("GET", "/new/registered?prefix=masto", nil))
+		if w.Code != 200 {
+			t.Fatalf("/new/registered: %d %s", w.Code, w.Body)
+		}
+		return strings.TrimSpace(w.Body.String())
+	}
+	if got := registered(); got != `{"registered":false}` {
+		t.Errorf("before registration: %s", got)
+	}
+	f.cli.set("--json project ls", `[{"prefix":"masto","workspace":"/home/u/workspace/masto","worktrees":1,"workspace_missing":false}]`)
+	if got := registered(); got != `{"registered":true}` {
+		t.Errorf("after registration: %s", got)
+	}
+	if w := f.do(req("GET", "/new/registered?prefix=-x", nil)); w.Code != http.StatusBadRequest {
+		t.Errorf("bad prefix: %d", w.Code)
+	}
+}

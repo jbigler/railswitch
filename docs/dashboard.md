@@ -250,8 +250,12 @@ until you press Create project.
   directory; a second create of that prefix is refused while the first
   runs. Every value is its own argv entry: a repository URL with spaces
   or `;` is passed as typed. When the job ends ok the page opens
-  `/p/<prefix>`. When it fails, the form keeps its values and the job's
-  output below says what was left and the command that removes it.
+  `/p/<prefix>`. When it fails, the page asks `GET /new/registered?prefix=<p>`
+  (a fresh `project ls`) whether the project exists; if it does (exit 3:
+  created, but `up` failed), the page opens `/p/<prefix>` and says that
+  `up` failed, with its output in the project's jobs. Otherwise the form
+  keeps its values and the job's output below says what was left and the
+  command that removes it.
 
 The page refuses (400, nothing run) a repository, branch, name, prefix,
 folder or pack that starts with `-` or holds a line break, a prefix that

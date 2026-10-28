@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -332,4 +333,26 @@ func (s *Server) newCreate(w http.ResponseWriter, r *http.Request) {
 		argv = append(argv, "--up")
 	}
 	s.start(w, r, jobs.Spec{Project: f.Prefix, Label: "project new " + f.Prefix, Dir: s.c.Home, Argv: argv}, nil, "/new")
+}
+
+// newRegistered answers whether prefix is registered now, from a fresh
+// `project ls`: after a failed create job the page opens the project when
+// project new got that far (its --up failed) and keeps the form when not.
+func (s *Server) newRegistered(w http.ResponseWriter, r *http.Request) {
+	prefix := r.URL.Query().Get("prefix")
+	if err := naming.ValidPrefix(prefix); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := s.loadProjects(r.Context()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.mu.Lock()
+	_, ok := s.state[prefix]
+	s.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(struct {
+		Registered bool `json:"registered"`
+	}{ok})
 }

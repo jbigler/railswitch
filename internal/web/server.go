@@ -98,6 +98,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /new/detect", s.newDetect)
 	m.HandleFunc("POST /new/review", s.newReview)
 	m.HandleFunc("POST /new/create", s.newCreate)
+	m.HandleFunc("GET /new/registered", s.newRegistered)
 	s.mux = m
 	return s
 }

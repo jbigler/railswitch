@@ -112,6 +112,10 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D88 | Reading a repo for detection | `project detect <repo> [--branch] [--pack] --json`: a shallow, blobless clone with no working tree into a temp dir that is always removed; only the files the rules name are read, from the object store (`ls-tree`, `cat-file`), regular files ≤ 1 MiB; no hooks or LFS | User, 2026-10-28 (option B): nothing left behind, fast on big repos, `project new` stays the one command that creates a workspace |
 | D89 | Create from the page | `project new --dry-run --json` returns the exact `project.toml` a real run writes and an in-memory render summary (routes, containers, app env names); `project new --up` starts the base worktree after creating. A failed create deletes nothing | Review shows what will be written, from the code that writes it |
 | D90 | Stage 6c scope | `/new`: repo, branch, name, prefix, folder; detected pack and options with evidence; Add service; tools and agents; review; Create as a job. The Environment and Images pages, templates, Adopt and secret values during create are out | User, 2026-10-28 |
+| D91 | Editing build files from the page | Domain commands: `containerfile show --json` (default, ejected header, `default_changed`, diff) and `containerfile write <name>`; `pack file show\|write\|rm <ref> <path>`; writes take stdin, `--if-hash`, `--dry-run` (changed tags, restart list, errors) and `--restart`; a used package's write locks and renders, restoring on failure | User, 2026-10-28 (approach 1): each check sits with the code that knows its domain |
+| D92 | New packages from the page | A copy of a built-in (`pack eject --as`) or a commented skeleton (`pack new`, `pack new --option <slot>`), then edited as files; no structured `pack.toml` form | User, 2026-10-28 (option A): one editor for every file kind; the format documented once |
+| D93 | Package file paths | Only the format's files: the manifest, `Containerfile.<name>`, `deps.allow`, `README.md`, top-level `<name>.sh`, `entrypoints/<file>`, `initdb/<file>`; symlinks refused; `.sh` written 0755 | A page can't write outside a package or through a link |
+| D94 | Stage 6d scope | Images (build chain, New addon), the Containerfile editor (diff, Reset, Check, the read-it acknowledgement, "Rebuild and restart" off by default), the Library (built-in and local packages, local files editable, New pack/option). Out: "Add an option" registry dialog, version pins, templates, package diffs | User, 2026-10-28 (scope B, restart option B) |
 
 ## Stages
 
@@ -126,7 +130,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 6a Dashboard | detailed (`2026-10-27-railswitch-stage-6a.md`) | The dashboard shows status, PRs and agents for every worktree, runs up/stop/restart, worktree add/remove and tasks through the CLI, and starts with the first `up` (docs/stage6a-acceptance.md) |
 | 6b Project settings | detailed (`2026-10-28-railswitch-stage-6b.md`) | Stack slots, options, extra services, env, links and secrets (values on stdin) editable from the browser, through the CLI, with each change's data impact shown first; the rest in a raw `project.toml` editor (docs/stage6b-acceptance.md) |
 | 6c New project | detailed (`2026-10-28-railswitch-stage-6c.md`) | Repo, detection, options, review, create from the browser (docs/stage6c-acceptance.md) |
-| 6d Packs and Containerfiles | later | Library, "New pack" form, Containerfile editor with the read-it acknowledgement |
+| 6d Packs and Containerfiles | detailed (`2026-10-28-railswitch-stage-6d.md`) | Containerfiles and local packages edited from the browser with the read-it acknowledgement; new packs and options from a copy or a skeleton (docs/stage6d-acceptance.md) |
 | 7 Library and trust | later | Library repos, signing and signers, update review, Install review |
 
 ### Stage 3 — Machine layer

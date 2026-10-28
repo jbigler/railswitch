@@ -109,8 +109,14 @@ func (s *Server) Handler() http.Handler { return s.guard(s.mux) }
 // Lookups: a prefix and a slug from a request are used only when the
 // latest project ls and overview have them.
 
+// unknownReloadEvery is how old the project list must be before a request
+// for a prefix it lacks reads it again: a page for a prefix that doesn't
+// exist must not run project ls on every request.
+const unknownReloadEvery = 5 * time.Second
+
 // project is prefix's project ls row, reading project ls when it never
-// has been, or when it lacks prefix (a project just created).
+// has been, or when it lacks prefix (a project just created) and was read
+// unknownReloadEvery or longer ago.
 func (s *Server) project(ctx context.Context, prefix string) (projectRow, bool, error) {
 	lookup := func() (projectRow, bool, bool) {
 		s.mu.Lock()
@@ -118,10 +124,11 @@ func (s *Server) project(ctx context.Context, prefix string) (projectRow, bool, 
 		if p := s.state[prefix]; p != nil {
 			return p.row, true, s.projectsLoaded
 		}
-		return projectRow{}, false, s.projectsLoaded
+		fresh := s.projectsLoaded && (prefix == "" || s.c.Now().Sub(s.projectsAt) < unknownReloadEvery)
+		return projectRow{}, false, fresh
 	}
-	row, ok, loaded := lookup()
-	if ok || (loaded && prefix == "") {
+	row, ok, fresh := lookup()
+	if ok || fresh {
 		return row, ok, nil
 	}
 	if err := s.loadProjects(ctx); err != nil {

@@ -817,10 +817,8 @@ function startNew() {
     btn.disabled = true;
     const started = await startJob(f.action, data, async (state, _conflict, exit) => {
       const page = "/p/" + encodeURIComponent(p);
-      if (state === "ok") {
-        location.href = page;
-        return;
-      }
+      // Asking also reloads the dashboard's project list, so the page opens
+      // even when the list was read moments before the project existed.
       // Exit 3: created, but up failed. The registry has the last word.
       let registered = exit === "3";
       try {
@@ -828,6 +826,10 @@ function startNew() {
         if (r.ok) registered = (await r.json()).registered;
       } catch {
         // the exit code decides
+      }
+      if (state === "ok") {
+        location.href = page;
+        return;
       }
       if (registered) {
         try {

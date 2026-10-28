@@ -388,6 +388,8 @@ Every action is a job (below).
 - Polling: `railswitch --json overview` every 2 s for a project with a page open,
   every 10 s for the others (so their waiting agents reach the strip);
   `railswitch --json pr ls` every 60 s for a project with a page open.
+  A request for a prefix the project list lacks reads `project ls` again
+  only when the list is 5 s old or older; until then it is a 404.
 
 ## Colours
 

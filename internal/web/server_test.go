@@ -257,3 +257,32 @@ func TestEventsStream(t *testing.T) {
 		t.Errorf("events for unknown project: %d", w.Code)
 	}
 }
+
+// TestUnknownPrefixReloadLimited: requests for a prefix project ls lacks
+// read it again at most once per 5 s; /new/registered always reads it, so
+// a project created moments after a read still opens.
+func TestUnknownPrefixReloadLimited(t *testing.T) {
+	f := newFixture(t)
+	const ls = "--json project ls"
+	f.do(req("GET", "/p/nope", nil))
+	n := f.cli.count(ls)
+	for range 5 {
+		if w := f.do(req("GET", "/p/nope", nil)); w.Code != http.StatusNotFound {
+			t.Fatalf("/p/nope: %d", w.Code)
+		}
+	}
+	if got := f.cli.count(ls); got != n {
+		t.Errorf("5 more requests within 5 s ran project ls %d more times; want 0", got-n)
+	}
+	f.clock.Add(5 * time.Second)
+	f.do(req("GET", "/p/nope", nil))
+	if got := f.cli.count(ls); got != n+1 {
+		t.Errorf("after 5 s: project ls ran %d more times; want 1", got-n)
+	}
+	f.cli.set(ls, `[{"prefix":"nope","workspace":"/ws/nope","worktrees":1,"workspace_missing":false}]`)
+	f.cli.set("--json -C /ws/nope overview", `{"prefix":"nope","workspace":"/ws/nope","worktrees":[]}`)
+	f.do(req("GET", "/new/registered?prefix=nope", nil))
+	if w := f.do(req("GET", "/p/nope", nil)); w.Code != 200 {
+		t.Errorf("/p/nope after /new/registered: %d", w.Code)
+	}
+}

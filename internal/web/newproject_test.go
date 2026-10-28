@@ -372,6 +372,8 @@ func TestNewStreamFollowsCreate(t *testing.T) {
 
 	f.cli.set("--json project ls", `[{"prefix":"masto","workspace":"/home/u/workspace/masto","worktrees":1,"workspace_missing":false}]`)
 	f.cli.set("--json -C /home/u/workspace/masto overview", `{"prefix":"masto","workspace":"/home/u/workspace/masto","worktrees":[]}`)
+	// The page asks /new/registered before it opens the project.
+	f.do(req("GET", "/new/registered?prefix=masto", nil))
 	if w := f.do(req("GET", "/p/masto", nil)); w.Code != 200 {
 		t.Errorf("the new project's page: %d %s", w.Code, w.Body)
 	}

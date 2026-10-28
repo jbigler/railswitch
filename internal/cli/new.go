@@ -203,7 +203,39 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		return nil, fmt.Errorf("base branch %q: %w", base, err)
 	}
 	p.Project.BaseBranch = base
+	if err := newPathsFree(ws, slug, st); err != nil {
+		return nil, err
+	}
 	return &newPlan{ws: ws, slug: slug, p: p, cat: cat, st: st, dirs: dirs, reg: reg}, nil
+}
+
+// newPathsFree refuses a workspace dir that is not a directory, and each
+// path project new creates in ws that already exists: the clone's dir,
+// the files it writes and each Containerfile it ejects. Dry and real run
+// refuse here, before the clone, with the same message.
+func newPathsFree(ws, slug string, st *pack.Stack) error {
+	switch fi, err := os.Stat(ws); {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil
+	case err != nil:
+		return err
+	case !fi.IsDir():
+		return fmt.Errorf("%s is not a directory", ws)
+	}
+	rels := []string{slug, ".gitignore", "mise.local.toml", "stack.lock"}
+	for _, n := range ejectNames(st) {
+		rels = append(rels, workspaceFile(n))
+	}
+	for _, rel := range rels {
+		p := filepath.Join(ws, filepath.FromSlash(rel))
+		switch _, err := os.Lstat(p); {
+		case err == nil:
+			return fmt.Errorf("%s already exists, and project new creates it: remove it or pick another folder", p)
+		case !errors.Is(err, fs.ErrNotExist):
+			return err
+		}
+	}
+	return nil
 }
 
 // createWorkspace is new after the clone: everything up to the render.

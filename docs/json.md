@@ -447,7 +447,10 @@ before git runs.
 
 What `project new` with the same flags would create (D89). The dry run makes
 every check the real run makes and refuses with the same message (exit 1):
-an existing `project.toml`, a bad name, a prefix in use, a bad branch, an
+an existing `project.toml`, a path the run would create that is already
+there (the base worktree's dir, `.gitignore`, `mise.local.toml`,
+`stack.lock`, each ejected `containerfiles/Containerfile.<name>`), a
+workspace path that is not a directory, a bad name, a prefix in use, a bad branch, an
 unknown ref, an option the pack can't use, an env clash, a render error. It
 writes nothing: no clone, no workspace dir, no registry entry, no units, and
 no podman or systemctl call. Without `--branch` it reads the remote's HEAD

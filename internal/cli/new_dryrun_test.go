@@ -256,3 +256,41 @@ func TestNewUp(t *testing.T) {
 		t.Error("up ran after a failed create")
 	}
 }
+
+// TestNewRefusesExistingPaths: a path project new would create that is
+// already in the folder is refused by the dry run and by the real run,
+// with one message and before anything is cloned.
+func TestNewRefusesExistingPaths(t *testing.T) {
+	newEnv(t)
+	repo := bareRepo(t, "main")
+	for _, rel := range []string{"main", ".gitignore", "mise.local.toml", "stack.lock", "containerfiles/Containerfile.base", "containerfiles/Containerfile.agent-base"} {
+		ws := filepath.Join(t.TempDir(), "shop")
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(ws, filepath.FromSlash(rel))), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(ws, filepath.FromSlash(rel)), "mine\n")
+		want := filepath.Join(ws, filepath.FromSlash(rel)) + " already exists"
+		var msgs []string
+		for _, dry := range []bool{true, false} {
+			args := []string{"project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"}
+			if dry {
+				args = append(args, "--dry-run")
+			}
+			f := gitHost()
+			code, _, errs := runWith(t, f, args...)
+			if code != 1 || !strings.Contains(errs, want) {
+				t.Errorf("%s (dry run %v): exit %d, stderr %q; want %q", rel, dry, code, errs, want)
+			}
+			if slices.ContainsFunc(f.Calls, func(c []string) bool { return c[0] == "git" && slices.Contains(c, "clone") }) {
+				t.Errorf("%s (dry run %v): cloned before refusing", rel, dry)
+			}
+			msgs = append(msgs, errs)
+		}
+		if msgs[0] != msgs[1] {
+			t.Errorf("%s: dry run says %q, real run %q", rel, msgs[0], msgs[1])
+		}
+		if got := dirFiles(t, ws); len(got) != 1 {
+			t.Errorf("%s: the folder now holds %v", rel, slices.Sorted(maps.Keys(got)))
+		}
+	}
+}

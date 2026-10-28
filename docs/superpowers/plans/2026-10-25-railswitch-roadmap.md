@@ -108,6 +108,10 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D84 | Settings commands | `settings preview --json` and `settings apply --if-hash <h> [--restart]` take a JSON edit list on stdin (`option`, `env.set`, `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`) and apply it all or none, keeping every other byte of `project.toml`; `project show --json` is the page's read; `project write --if-hash <h>` replaces the whole file. A failed `lock`/`render` after the write restores the old file | User, 2026-10-28 (approach 2): one all-or-nothing Apply, and the preview comes from the code that writes |
 | D85 | Apply and running worktrees | Apply restarts nothing unless `--restart`, which restarts the affected running worktrees one at a time; `overview` marks a worktree `stale` while a running container's unit hash differs from its rendered unit | User, 2026-10-28 (option B) |
 | D86 | Job stdin | A dashboard job may carry a stdin payload (an edit list, a secret value): held in memory, written to the child's stdin, never logged | Secrets on stdin only (D33) |
+| D87 | Detection rules | Packages carry them: a pack's `[detect] files` (all must exist), an option's `[[detect]] file`, `match` (RE2 per line), `evidence`; core runs them and never names a framework | User, 2026-10-28 (option A) |
+| D88 | Reading a repo for detection | `project detect <repo> [--branch] [--pack] --json`: a shallow, blobless, sparse fetch of only the files the rules name into a temp dir that is always removed; files read through `safefile`; no hooks or LFS | User, 2026-10-28 (option B): nothing left behind, fast on big repos, `project new` stays the one command that creates a workspace |
+| D89 | Create from the page | `project new --dry-run --json` returns the exact `project.toml` a real run writes and an in-memory render summary (routes, containers, app env names); `project new --up` starts the base worktree after creating. A failed create deletes nothing | Review shows what will be written, from the code that writes it |
+| D90 | Stage 6c scope | `/new`: repo, branch, name, prefix, folder; detected pack and options with evidence; Add service; tools and agents; review; Create as a job. The Environment and Images pages, templates, Adopt and secret values during create are out | User, 2026-10-28 |
 
 ## Stages
 
@@ -121,7 +125,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 5 Local packs | detailed (`2026-10-27-railswitch-stage-5.md`) | A Phoenix app runs end to end from a pack the user wrote (`local:phoenix@1`), with no framework knowledge added to core |
 | 6a Dashboard | detailed (`2026-10-27-railswitch-stage-6a.md`) | The dashboard shows status, PRs and agents for every worktree, runs up/stop/restart, worktree add/remove and tasks through the CLI, and starts with the first `up` (docs/stage6a-acceptance.md) |
 | 6b Project settings | detailed (`2026-10-28-railswitch-stage-6b.md`) | Stack slots, options, extra services, env, links and secrets (values on stdin) editable from the browser, through the CLI, with each change's data impact shown first; the rest in a raw `project.toml` editor (docs/stage6b-acceptance.md) |
-| 6c New project | later | Repo, detection, options, review, create from the browser |
+| 6c New project | detailed (`2026-10-28-railswitch-stage-6c.md`) | Repo, detection, options, review, create from the browser |
 | 6d Packs and Containerfiles | later | Library, "New pack" form, Containerfile editor with the read-it acknowledgement |
 | 7 Library and trust | later | Library repos, signing and signers, update review, Install review |
 

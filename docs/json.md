@@ -379,6 +379,40 @@ What the settings page reads: the project's choices, env and links.
 refuses on a hash mismatch, parse, validation or resolve error (exit 1,
 file untouched), else writes, locks and renders as `settings apply` does.
 
+## `project detect <repo> [--branch <b>] [--pack <ref>]`
+
+What the new-project page reads (D88): the pack and options a repository's
+files suggest, each with its evidence. railswitch checks out only the
+files the built-in packages' detection rules name (`docs/packs.md`), in a
+shallow sparse clone with no hooks, no LFS and no prompts, into a temp dir
+under `$XDG_RUNTIME_DIR` that it always removes. A path that is a symlink,
+is under one, or is over 1 MiB counts as absent. A git failure exits 1
+with git's error; a repository or branch starting with `-` is refused
+before git runs.
+
+```json
+{"branch": "main",
+ "pack": {"ref": "rails@1", "evidence": ["Gemfile", "config/application.rb"], "others": []},
+ "options": [
+   {"key": "database", "ref": "postgres@1", "source": "repo", "evidence": "Gemfile: pg", "others": []},
+   {"key": "mail", "ref": "none", "source": "default", "evidence": "", "others": []}
+ ]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `branch` | string | `--branch`, else the remote's HEAD branch. |
+| `pack` | object or null | `null` when no pack's `[detect] files` are all in the repository (and no `--pack`). |
+| `pack.ref` | string | `--pack`, else the first pack by ref whose files all exist. |
+| `pack.evidence` | string[] | The pack's detect files the repository has. |
+| `pack.others` | string[] | The other packs whose files all exist. |
+| `options[]` | array | One per slot, `config.Slots` order; empty when `pack` is `null`. |
+| `options[].key` | string | The slot. |
+| `options[].ref` | string | Among the slot's options that work with the pack and have a matching rule: the pack's `[defaults]` choice if it matched, else the first by ref. With no match, the pack's default (`none` when it has none). |
+| `options[].source` | string | `repo` (a rule matched) or `default`. |
+| `options[].evidence` | string | The matching rule's `evidence`; `""` for `default`. |
+| `options[].others` | string[] | The other matching options of the slot. |
+
 ## `doctor`
 
 The host checks (among them whether another podman network uses the

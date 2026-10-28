@@ -129,11 +129,16 @@ func profiles(p []string) string {
 }
 
 var (
-	// pipeRe is a download piped into an interpreter, sudo or a path allowed.
-	pipeRe = regexp.MustCompile(`\b(curl|wget)\b.*\|\s*(sudo\s+(-\S+\s+)*)?(\S*/)?(sh|bash|zsh|dash|python|python3|perl|ruby|node)\b`)
-	addRe  = regexp.MustCompile(`(?i)^\s*ADD\s+(--\S+\s+)*https?://`)
-	unsafe = regexp.MustCompile(`--security=insecure|--network=host`)
-	fromRe = regexp.MustCompile(`(?i)^\s*FROM\s`)
+	// pipeRe is a download piped into an interpreter, through sudo or env
+	// or by path allowed; substRe a download run by process or command
+	// substitution.
+	pipeRe  = regexp.MustCompile(`(?i)\b(curl|wget)\b.*\|\s*(sudo\s+(-\S+\s+)*)?(env\s+(-\S+\s+)*)?(\S*/)?(sh|bash|zsh|dash|ash|ksh|fish|python|python3|perl|ruby|node|php)\b`)
+	substRe = regexp.MustCompile("(?i)(<\\(|\\$\\(|`)\\s*(\\S*/)?(curl|wget)\\b")
+	addRe   = regexp.MustCompile(`(?i)^\s*ADD\s+(--\S+\s+)*https?://`)
+	unsafe  = regexp.MustCompile(`--security=insecure|--network=host`)
+	fromRe  = regexp.MustCompile(`(?i)^\s*FROM\s`)
+	// heredocRe is a heredoc's start (<<EOF, <<-"EOF"); group 1 the word that ends it.
+	heredocRe = regexp.MustCompile(`<<-?\s*["']?([A-Za-z_][A-Za-z0-9_]*)`)
 )
 
 // lineFlags are the flagged lines file p adds: in a Containerfile, what it
@@ -144,12 +149,18 @@ func lineFlags(p, old, new string) []Flag {
 	var out []Flag
 	switch {
 	case strings.HasPrefix(path.Base(p), "Containerfile"):
-		for _, n := range textdiff.Added(old, new) {
-			l := lines[n-1]
-			if pipeRe.MatchString(l) || addRe.MatchString(l) || unsafe.MatchString(l) {
+		added := textdiff.Added(old, new)
+		for _, in := range instructions(lines) {
+			// An instruction is judged whole, at its first added line.
+			i := slices.IndexFunc(added, func(n int) bool { return n >= in.first && n <= in.last })
+			if i < 0 {
+				continue
+			}
+			n := added[i]
+			if pipeRe.MatchString(in.text) || substRe.MatchString(in.text) || addRe.MatchString(in.text) || unsafe.MatchString(in.text) {
 				out = append(out, Flag{Check: CheckRunsHere, Line: n, Text: text(n)})
 			}
-			if fromRe.MatchString(l) {
+			if fromRe.MatchString(in.text) {
 				out = append(out, Flag{Check: CheckImage, Line: n, Text: text(n)})
 			}
 		}
@@ -164,6 +175,49 @@ func lineFlags(p, old, new string) []Flag {
 				out = append(out, Flag{Check: CheckFirewall, Line: i + 1, Text: text(i + 1)})
 			}
 		}
+	}
+	return out
+}
+
+// instruction is one logical Containerfile instruction: lines first to
+// last (1-based), joined into text with continuations and heredoc bodies.
+type instruction struct {
+	first, last int
+	text        string
+}
+
+// instructions splits a Containerfile's lines into instructions: a line
+// ending in \ continues, and a heredoc runs to the line of its word (or the end).
+// Any line counts, a comment too: a doubt joins more, never less.
+func instructions(lines []string) []instruction {
+	var out []instruction
+	for i := 0; i < len(lines); {
+		in := instruction{first: i + 1}
+		var parts, ends []string
+		for i < len(lines) {
+			l := strings.TrimRight(lines[i], "\r\n")
+			i++
+			if len(ends) > 0 {
+				parts = append(parts, l)
+				if strings.TrimSpace(l) == ends[0] {
+					ends = ends[1:]
+				}
+				if len(ends) == 0 {
+					break
+				}
+				continue
+			}
+			for _, m := range heredocRe.FindAllStringSubmatch(l, -1) {
+				ends = append(ends, m[1])
+			}
+			body, cont := strings.CutSuffix(strings.TrimRight(l, " \t"), `\`)
+			parts = append(parts, body)
+			if !cont && len(ends) == 0 {
+				break
+			}
+		}
+		in.last, in.text = i, strings.Join(parts, " ")
+		out = append(out, in)
 	}
 	return out
 }

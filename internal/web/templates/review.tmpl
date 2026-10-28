@@ -19,7 +19,7 @@ highlighted; Accept needs the acknowledgement when anything is flagged. */}}
 {{if eq .Status "first"}}<p class="yellow notice">No stored copy of what was accepted before: every file is shown as added.</p>
 {{end}}{{range .Files}}<details class="rv-file"{{if .Flags}} open{{end}}><summary><span class="mono">{{.Path}}</span> <span class="chip">{{.Status}}</span>{{if .Flags}} <span class="red">{{.Flags}} flagged</span>{{end}}</summary>
 {{if .Notes}}<ul class="rv-notes">{{range .Notes}}<li><span class="chip">{{.Check}}</span> {{if .Line}}line {{.Line}}: {{end}}{{.Text}}</li>{{end}}</ul>
-{{end}}{{if .Binary}}<p class="note">No diff: a binary file.</p>
+{{end}}{{if .Empty}}<p class="note">No diff: an empty file.</p>
 {{else}}<pre class="out mono rv-diff">{{range .Lines}}<span class="dl {{.Class}}{{if .Check}} flagged{{end}}"{{if .Check}} title="flagged: {{.Check}}"{{end}}>{{.Text}}</span>{{end}}</pre>
 {{end}}</details>
 {{end}}</section>

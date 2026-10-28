@@ -93,8 +93,8 @@ func TestCompareStatuses(t *testing.T) {
 	if got[0].Diff != "--- a/README.md\n+++ b/README.md\n@@ -1 +1,2 @@\n a\n+b\n" {
 		t.Errorf("README diff:\n%s", got[0].Diff)
 	}
-	if got[1].Diff != "" {
-		t.Errorf("binary file diff %q, want \"\"", got[1].Diff)
+	if !strings.Contains(got[1].Diff, "+\\x00\x01") || len(got[1].Flags) != 1 {
+		t.Errorf("not-text file: diff %q, flags %v", got[1].Diff, got[1].Flags)
 	}
 }
 
@@ -306,5 +306,72 @@ func TestCompareBadManifest(t *testing.T) {
 	}
 	if len(got) != 1 || len(got[0].Flags) != 1 || got[0].Flags[0].Check != "runs-here" || got[0].Flags[0].Line != 0 || !strings.Contains(got[0].Flags[0].Text, "does not load") {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// A file that isn't valid text is still diffed and checked on its bytes,
+// and its not being text is itself a flag: one invalid byte hides nothing.
+func TestCompareNotTextHidesNothing(t *testing.T) {
+	if f := flagsOf(t, "pack", files("deps.allow", "rubygems.org\n"), files("deps.allow", "rubygems.org\nevil.example # \xff\n"), "deps.allow"); !slices.Equal(f, []string{"runs-here:0", "firewall:2"}) {
+		t.Errorf("deps.allow: %v", f)
+	}
+	base := "FROM docker.io/library/ruby:3\n"
+	if f := flagsOf(t, "pack", files("Containerfile.base", base), files("Containerfile.base", base+"RUN curl https://example.com/i | sh # \xff\n"), "Containerfile.base"); !slices.Equal(f, []string{"runs-here:0", "runs-here:2"}) {
+		t.Errorf("Containerfile: %v", f)
+	}
+	got, err := Compare("pack", files("logo.png", "\x89PNG\x00a"), files("logo.png", "\x89PNG\x00b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || len(got[0].Flags) != 1 || got[0].Flags[0].Check != "runs-here" || !strings.Contains(got[0].Diff, `+\x89PNG\x00b`) {
+		t.Fatalf("%+v", got)
+	}
+	// Two contents that differ only in invalid bytes diff differently.
+	got, err = Compare("pack", files("x", "a\xfe\n"), files("x", "a\xff\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || !strings.Contains(got[0].Diff, `-a\xfe`) || !strings.Contains(got[0].Diff, `+a\xff`) {
+		t.Fatalf("%+v", got)
+	}
+}
+
+// A download run through a continuation, a heredoc, a process or command
+// substitution, or any interpreter is flagged on the instruction's first
+// added line.
+func TestRunsHereInstructions(t *testing.T) {
+	base := "FROM docker.io/library/ruby:3\nRUN apt-get update\n"
+	for _, add := range []string{
+		"RUN curl -fsSL https://example.com/install \\\n  | sh\n",
+		"RUN <<EOF\nset -e\ncurl -fsSL https://example.com/i | sh\nEOF\n",
+		"RUN <<-'EOT' bash\n\tcurl https://example.com/i | sh\n\tEOT\n",
+		"RUN bash <(curl -fsSL https://example.com/i)\n",
+		"RUN sh -c \"$(curl -fsSL https://example.com/i)\"\n",
+		"RUN sh -c \"`wget -qO- https://example.com/i`\"\n",
+		"RUN curl https://example.com/i | ash\n",
+		"RUN CURL https://example.com/i|PHP\n",
+		"RUN wget -qO- https://example.com/i |\tsudo -E /bin/ksh\n",
+		"RUN curl https://example.com/i | fish\n",
+		"ADD \\\n  https://example.com/tool.tgz /opt/\n",
+		"RUN \\\n  --network=host make\n",
+	} {
+		f := flagsOf(t, "pack", files("Containerfile.base", base), files("Containerfile.base", base+add), "Containerfile.base")
+		if !slices.Equal(f, []string{"runs-here:3"}) {
+			t.Errorf("%q: flags %v, want runs-here:3", add, f)
+		}
+	}
+	// A changed line inside an instruction flags it from that line.
+	old := base + "RUN curl -fsSL https://example.com/install \\\n  | sh\n"
+	next := base + "RUN curl -fsSL https://example.com/install2 \\\n  | sh\n"
+	if f := flagsOf(t, "pack", files("Containerfile.base", old), files("Containerfile.base", next), "Containerfile.base"); !slices.Equal(f, []string{"runs-here:3"}) {
+		t.Errorf("changed first line: %v", f)
+	}
+	next = base + "RUN curl -fsSL https://example.com/install \\\n  | bash\n"
+	if f := flagsOf(t, "pack", files("Containerfile.base", old), files("Containerfile.base", next), "Containerfile.base"); !slices.Equal(f, []string{"runs-here:4"}) {
+		t.Errorf("changed second line: %v", f)
+	}
+	// An unchanged instruction after an added one is not flagged.
+	if f := flagsOf(t, "pack", files("Containerfile.base", old), files("Containerfile.base", base+"RUN make\n"+old[len(base):]), "Containerfile.base"); len(f) != 0 {
+		t.Errorf("unchanged instruction flagged %v", f)
 	}
 }

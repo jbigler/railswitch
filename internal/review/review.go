@@ -6,9 +6,11 @@ package review
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
 	"maps"
 	"slices"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/jbigler/railswitch/internal/textdiff"
@@ -25,7 +27,7 @@ const (
 type File struct {
 	Path   string `json:"path"`
 	Status string `json:"status"` // Added, Removed or Changed
-	Diff   string `json:"diff"`   // unified, 3 lines of context; "" for a binary file
+	Diff   string `json:"diff"`   // unified, 3 lines of context; a NUL or invalid UTF-8 byte as \xNN
 	Flags  []Flag `json:"flags"`  // never nil
 }
 
@@ -87,16 +89,18 @@ func Compare(kind string, old, new fs.FS) ([]File, error) {
 		case !inNew:
 			f.Status, bName = Removed, "/dev/null"
 		}
-		binary := isBinary(x) || isBinary(y)
-		if !binary {
-			f.Diff = textdiff.Unified(aName, bName, string(x), string(y))
-		}
+		// Every file is diffed and checked as text: a byte that isn't
+		// text hides nothing, and is itself flagged.
+		xs, ys := textOf(x), textOf(y)
+		f.Diff = textdiff.Unified(aName, bName, xs, ys)
 		if inNew {
-			switch {
-			case p == manifest:
+			if !isText(x) || !isText(y) {
+				f.Flags = append(f.Flags, Flag{Check: CheckRunsHere, Text: p + `: not text (a NUL or invalid UTF-8 byte, shown as \xNN)`})
+			}
+			if p == manifest {
 				f.Flags = append(f.Flags, manifestFlags(before, after)...)
-			case !binary:
-				f.Flags = append(f.Flags, lineFlags(p, string(x), string(y))...)
+			} else {
+				f.Flags = append(f.Flags, lineFlags(p, xs, ys)...)
 			}
 			f.Flags = append(f.Flags, scriptFlags(p, caps)...)
 		}
@@ -122,6 +126,24 @@ func readAll(fsys fs.FS) (map[string][]byte, error) {
 	return out, err
 }
 
-func isBinary(b []byte) bool {
-	return bytes.IndexByte(b, 0) >= 0 || !utf8.Valid(b)
+func isText(b []byte) bool {
+	return bytes.IndexByte(b, 0) < 0 && utf8.Valid(b)
+}
+
+// textOf is b as text, each NUL or invalid UTF-8 byte written \xNN.
+func textOf(b []byte) string {
+	if isText(b) {
+		return string(b)
+	}
+	var out strings.Builder
+	for len(b) > 0 {
+		r, n := utf8.DecodeRune(b)
+		if r == 0 || r == utf8.RuneError && n == 1 {
+			fmt.Fprintf(&out, `\x%02x`, b[0])
+		} else {
+			out.Write(b[:n])
+		}
+		b = b[n:]
+	}
+	return out.String()
 }

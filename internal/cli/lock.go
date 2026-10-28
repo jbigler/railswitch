@@ -217,7 +217,7 @@ func printReview(w io.Writer, doc *reviewDoc) {
 				fmt.Fprintf(w, "  ! %s%s: %s\n", fl.Check, where, safefile.Printable(fl.Text))
 			}
 			if f.Diff == "" {
-				fmt.Fprintln(w, "    (binary)")
+				fmt.Fprintln(w, "    (empty)")
 			}
 			for _, line := range strings.SplitAfter(f.Diff, "\n") {
 				if line != "" {

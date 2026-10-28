@@ -101,7 +101,9 @@ of service rows and stays as it is).
     stored copy of the old content: compared against nothing).
   - `files`: every file that differs (unchanged files omitted); `status`
     `added`, `removed`, `changed`; `diff` a unified diff (3 lines of
-    context), `""` for a binary file; `flags` as in the checks.
+    context); every file is diffed and checked as text, a NUL or invalid
+    UTF-8 byte shown as `\xNN` (and itself a `runs-here` flag), so one
+    stray byte hides nothing; `flags` as in the checks.
   - `also_locked_in`: other registered projects whose `stack.lock` pins
     the same ref at the new sha.
   - `hash`: `workspace.Hash` of the exact `stack.lock` bytes the accept
@@ -129,7 +131,7 @@ manifest flag, which is listed above the diff).
 | Check | Where | Flagged |
 |---|---|---|
 | `firewall` | `deps.allow` (a host per line, `#` comments); `agent.toml` `allow`; option and tool `firewall` profiles | a host added; a profile changed |
-| `runs-here` | `Containerfile.*`, added or changed lines | `curl` or `wget` piped (`\|`) into `sh`, `bash`, `zsh`, `dash`, `python`, `python3`, `perl`, `ruby` or `node`; `ADD http://` or `https://`; `--security=insecure`, `--network=host` |
+| `runs-here` | `Containerfile.*`, added or changed instructions (continuations and heredoc bodies joined; flagged at the first changed line); any file that is not text | `curl` or `wget` piped (`\|`) into `sh`, `bash`, `zsh`, `dash`, `ash`, `ksh`, `fish`, `python`, `python3`, `perl`, `ruby`, `node` or `php` (any case or spacing), or run by `<(`, `$(` or backticks; `ADD http://` or `https://`; `--security=insecure`, `--network=host`; a NUL or invalid UTF-8 byte |
 | `image` | `Containerfile.*` `FROM`; option `[image] pull`; pack `[image]` file | a `FROM` ref or `pull` added or changed |
 | `host-mount` | manifest `[[mounts]]` | an added or changed mount whose source is an absolute path or a placeholder (`{…}`); a package file source is not flagged |
 | `port` | manifest `[[ports]]` | a port added, or its `base`, `container` or `share` changed |

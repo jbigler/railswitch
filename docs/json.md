@@ -410,7 +410,7 @@ of a `changed` package is the store's copy of what the lock accepted.
 | `packages[].also_locked_in` | array | Prefixes of other registered projects whose `stack.lock` already pins this ref at `to`; `[]` when none. |
 | `packages[].files` | array | Every file that differs, by path (unchanged files left out). |
 | `files[].status` | string | `added`, `removed` or `changed`. |
-| `files[].diff` | string | Unified diff, 3 lines of context (`--- a/<path>`/`+++ b/<path>`, `/dev/null` for an added or removed side); `""` for a binary file (a NUL byte or invalid UTF-8). |
+| `files[].diff` | string | Unified diff, 3 lines of context (`--- a/<path>`/`+++ b/<path>`, `/dev/null` for an added or removed side). Every file is diffed as text: a NUL or invalid UTF-8 byte is shown as `\xNN` (and the file carries a `runs-here` flag); `""` only for an empty file added or removed. |
 | `files[].flags` | array | `{check, line, text}`, `[]` when none. `check` is one of `firewall`, `runs-here`, `image`, `host-mount`, `port`, `privilege`. `line` is the 1-based line in the new file (map it through the hunks' `+N,M` ranges); `0` for a manifest field flag (listed above the diff) or a file-level flag. A removed file has no flags. `text` is the flagged line as `+ <line>`, or a sentence for a line-0 flag. |
 | `restart` | array | Running worktrees whose units or mounted package assets the accept changes (as in [`settings preview`](#settings-preview)); `[]` when none or nothing to review. |
 

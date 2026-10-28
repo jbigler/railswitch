@@ -37,7 +37,7 @@ type reviewPackage struct {
 type reviewFile struct {
 	Path   string       `json:"path"`
 	Status string       `json:"status"`
-	Diff   string       `json:"diff"` // "": a binary file
+	Diff   string       `json:"diff"` // "": an empty file added or removed
 	Flags  []reviewFlag `json:"flags"`
 }
 
@@ -73,9 +73,9 @@ type reviewPkgView struct {
 type reviewFileView struct {
 	Path, Status string
 	Flags        int
-	Notes        []reviewFlag // flags no diff line shows: manifest flags, a binary file's
+	Notes        []reviewFlag // flags no diff line shows: manifest and file-level flags, an empty file's
 	Lines        []diffLine
-	Binary       bool
+	Empty        bool
 }
 
 // diffLine is one line of a unified diff: Class meta, hunk, add, del or
@@ -163,8 +163,8 @@ func reviewPackages(doc reviewDoc) []reviewPkgView {
 			From: shortSHA(p.From), To: shortSHA(p.To), Also: strings.Join(p.AlsoLockedIn, ", "),
 		}
 		for _, f := range p.Files {
-			fv := reviewFileView{Path: f.Path, Status: f.Status, Flags: len(f.Flags), Binary: f.Diff == ""}
-			if fv.Binary {
+			fv := reviewFileView{Path: f.Path, Status: f.Status, Flags: len(f.Flags), Empty: f.Diff == ""}
+			if fv.Empty {
 				fv.Notes = f.Flags
 			} else {
 				fv.Lines, fv.Notes = diffLines(f.Diff, f.Flags)

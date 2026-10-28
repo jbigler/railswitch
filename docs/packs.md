@@ -112,7 +112,7 @@ inside a firewalled container):
 | Check | Flagged |
 |---|---|
 | `firewall` | a host added to `deps.allow` or an agent's `allow`; an option's or tool's `firewall` profiles changed |
-| `runs-here` | an added or changed `Containerfile.*` line piping `curl`/`wget` into a shell or interpreter, `ADD http(s)://`, `--security=insecure`, `--network=host` (commented lines too); a manifest that does not load |
+| `runs-here` | an added or changed `Containerfile.*` instruction (continuation lines and heredoc bodies joined, flagged at its first changed line; commented lines too) that pipes `curl`/`wget` into a shell or interpreter (`sh`, `bash`, `zsh`, `dash`, `ash`, `ksh`, `fish`, `python`, `python3`, `perl`, `ruby`, `node`, `php`; any case or spacing, through `sudo`/`env` or a path), runs one through `<(`, `$(` or backticks, `ADD http(s)://`, `--security=insecure`, `--network=host`; a manifest that does not load; any file that is not text (a NUL or invalid UTF-8 byte: it is still diffed and checked, the byte shown as `\xNN`) |
 | `image` | a `Containerfile.*` `FROM` line added or changed; an option's `[image] pull` or a pack's `[image] file` added or changed |
 | `host-mount` | a `[[mounts]]` entry added or changed whose source is an absolute path or a placeholder |
 | `port` | a `[[ports]]` entry added, or its `base`, `container` or `share` changed |

@@ -93,8 +93,8 @@ func TestReviewPage(t *testing.T) {
 		`<span class="dl add flagged" title="flagged: firewall">&#43;objects.githubusercontent.com</span>`,
 		`<span class="dl ctx"> github.com</span>`,
 		`<li><span class="chip">port</span> port debug: base 33000 → 34000</li>`,
-		// a flag on a file with no diff (binary) is listed, not lost
-		`<li><span class="chip">image</span> line 9: pull docker.io/kv:7</li>`, "No diff: a binary file.",
+		// a flag on a file with no diff (empty) is listed, not lost
+		`<li><span class="chip">image</span> line 9: pull docker.io/kv:7</li>`, "No diff: an empty file.",
 		`action="/p/ftest/review/accept"`, `name="hash" value="`+testHash+`"`,
 		`data-ack-required`, `<input type="checkbox" name="ack" value="1"> I&#39;ve read the 3 flagged items`,
 		`name="restart" value="1"`, `<span class="mono">main, b</span>`,

@@ -91,7 +91,9 @@ func optionRefs(cat *pack.Catalog, root string) []optionRef {
 func newestBuiltins[V any](m map[pack.Ref]V) []pack.Ref {
 	best := map[string]pack.Ref{}
 	for r := range m {
-		if b, ok := best[r.Name]; !r.Local && (!ok || r.Version > b.Version) {
+		// A loaded catalog also holds the project's local and library
+		// packages: never a built-in.
+		if b, ok := best[r.Name]; !r.Local && r.Library == "" && (!ok || r.Version > b.Version) {
 			best[r.Name] = r
 		}
 	}
@@ -102,10 +104,11 @@ func newestBuiltins[V any](m map[pack.Ref]V) []pack.Ref {
 	return out
 }
 
-// packChoices are the packs whose app service is st's: the newest
+// packChoices are the packs whose app service is st's and that p's other
+// lines resolve with (an option's works_with, among others): the newest
 // built-in of each name, the workspace's local packs and the libraries'
 // (those that load), sorted, with st's own always among them.
-func packChoices(cat *pack.Catalog, root string, st *pack.Stack) []string {
+func packChoices(cat *pack.Catalog, root string, p *config.Project, st *pack.Stack) []string {
 	refs := newestBuiltins(cat.Packs)
 	for _, m := range localManifests(root, "packs", "pack.toml") {
 		refs = append(refs, m.ref)
@@ -118,7 +121,15 @@ func packChoices(cat *pack.Catalog, root string, st *pack.Stack) []string {
 	}
 	out := []string{st.PackRef.String()}
 	for _, r := range refs {
-		if pk, err := cat.Pack(r); err == nil && pk != nil && pk.App.Service == st.Pack.App.Service && !slices.Contains(out, r.String()) {
+		if slices.Contains(out, r.String()) {
+			continue
+		}
+		if pk, err := cat.Pack(r); err != nil || pk == nil || pk.App.Service != st.Pack.App.Service {
+			continue
+		}
+		q := *p
+		q.Stack.Pack = r.String()
+		if _, err := cat.Resolve(&q); err == nil {
 			out = append(out, r.String())
 		}
 	}
@@ -176,7 +187,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 		Prefix: p.Project.Prefix, Name: p.Project.Name, Repo: p.Project.Repo, BaseBranch: p.Project.BaseBranch,
 		Hash: workspace.Hash(data), File: string(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
 	}
-	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, st)}
+	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)
 	d.AddChoices = []string{}
 	for _, o := range opts {

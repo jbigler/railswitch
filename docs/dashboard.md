@@ -149,7 +149,8 @@ shows what each one does before anything is written.
   hostname.
 - **Stack and options:** first the pack (D115), when `project show`'s
   `pack.choices` offers another (a local copy, a library's, another
-  version: each with the same app service); then one row per slot and
+  version: each with the same app service, and only one the project's
+  options work with); then one row per slot and
   extra `[options]` key with its current package. "Change" opens its choices (the current one tagged
   `current`); picking another stages it and the row shows `→ <new>`.
   Picking the current one again unstages it. "Add service" (a key and an

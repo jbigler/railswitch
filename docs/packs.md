@@ -129,7 +129,12 @@ work with (`works_with = ["rails"]`), so a renamed pack loses them.
 
 To start a teammate's new project on it: create the project from the
 built-in (or from a template), import the package, then pick it in
-Settings (a pack or an option), or for an agent run `agent add`. A template that names a `local:` package
+Settings (a pack or an option), or for an agent run `agent add`. A
+project builds its app image from its own ejected `Containerfile.base`,
+not the pack's: if the shared pack changed its `Containerfile.base`,
+reset the project's copy to the new default after switching (the Images
+page's Reset to default, or `railswitch containerfile eject base
+--force`). A template that names a `local:` package
 can't start a project on a machine without it.
 
 ## Locking

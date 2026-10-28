@@ -61,7 +61,7 @@ if [ -f package.json ]; then
   if ! command -v "$tool" >/dev/null 2>&1; then
     case "$tool" in
     bun) fix='pin it in .bun-version or package.json "packageManager": "bun@<version>", then railswitch build (an older ejected containerfiles/Containerfile.base needs railswitch containerfile eject base --force)' ;;
-    *) fix='set package.json "packageManager": "'"$tool"'@<version>" and use a Node that ships corepack (24 or older)' ;;
+    *) fix='set package.json "packageManager": "'"$tool"'@<version>" (an ejected containerfiles/Containerfile.base without corepack on Node 25 or later needs railswitch containerfile eject base --force)' ;;
     esac
     echo "deps: $lock needs $tool, which is not in the image: $fix" >&2
     exit 1

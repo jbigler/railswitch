@@ -226,7 +226,9 @@ lockfile names, first match in this order (D69):
   at the version `package.json` `"packageManager"` names (yarn 1 without
   one). Corepack never writes `packageManager` into `package.json`
   (`COREPACK_ENABLE_AUTO_PIN=0`). Node 25 and later no longer ship
-  corepack: such an app fails naming the fix.
+  corepack, so the image installs it from npm there. A project whose
+  ejected `containerfiles/Containerfile.base` predates this fails naming
+  the fix: `railswitch containerfile eject base --force`.
 - The install is skipped when nothing changed since the last one: a stamp
   in `node_modules/` records the Node and tool versions and the lockfile.
 

@@ -8,8 +8,8 @@ Wants=railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.
 After=mini-master-deps.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=mini.unit-hash=1639c392fb3d
-Image=localhost/mini/base:ruby3.3.6-node22.11.0-4a0e883e
+Label=mini.unit-hash=09b0a8716b79
+Image=localhost/mini/base:ruby3.3.6-node22.11.0-39fced4e
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails
 Network=mini-proxy.network

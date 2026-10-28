@@ -493,6 +493,7 @@ no document.
   "sha256": "1b924e2a…",
   "status": "update",
   "replaces": {"ref": "local:filial-rails@1", "sha256": "df728e1a…"},
+  "compared_with": "",
   "used": true,
   "hash": "1b924e2a…",
   "flags": 1,
@@ -509,6 +510,7 @@ no document.
 | `sha256`, `hash` | string | The content hash of what `--accept` writes (the manifest's name line set): what `--accept` takes. |
 | `status` | string | `new` (no local package of that name), `update` (other content), `same` (byte for byte). |
 | `replaces` | object or null | The local package there now: `ref` (its manifest's version), `sha256`; `null` for `new`. |
+| `compared_with` | string | For `new`: the built-in its files are shown against (the one of its kind with the most identical files, a manifest's name line aside); `""` for none, or when it replaces a local package. |
 | `used` | boolean | The project's stack names `ref`. |
 | `flags` | number | The flags over every file. |
 | `packages` | array | One entry, as in `lock --review`: status `added`, `changed` or `unchanged`. |

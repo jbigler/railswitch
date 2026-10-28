@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -93,12 +94,15 @@ type packImportDoc struct {
 	SHA256   string          `json:"sha256"`
 	Status   string          `json:"status"` // new, update, same
 	Replaces *importReplaces `json:"replaces"`
-	Used     bool            `json:"used"`
-	Hash     string          `json:"hash"`
-	Flags    int             `json:"flags"`
-	Packages []importPackage `json:"packages"`
-	Restart  []string        `json:"restart"`
-	Warnings []string        `json:"warnings"`
+	// ComparedWith is the built-in a new package is shown against: the
+	// one of its kind sharing the most identical files; "" for none.
+	ComparedWith string          `json:"compared_with"`
+	Used         bool            `json:"used"`
+	Hash         string          `json:"hash"`
+	Flags        int             `json:"flags"`
+	Packages     []importPackage `json:"packages"`
+	Restart      []string        `json:"restart"`
+	Warnings     []string        `json:"warnings"`
 }
 
 // incomingPackage is a package folder as pack import would write it.
@@ -113,6 +117,8 @@ type incomingPackage struct {
 	oldSHA              string
 	status              string
 	used                bool
+	base                fs.FS // a new package's closest built-in; nil: none
+	baseRef             pack.Ref
 }
 
 // railswitch pack import <dir> [--as <name>] [--accept <sha256>]
@@ -160,6 +166,9 @@ func packImport(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(fmt.Errorf("%s does not load: %w", dir, err))
 	}
+	if in.old == nil {
+		in.baseRef, in.base = closestBuiltin(in.kind, in.files)
+	}
 	var change *settings.Change
 	if in.used && in.status != importSame {
 		from, err := workspace.Load(ctx, root, "")
@@ -205,6 +214,9 @@ func packImport(ctx context.Context, e *env, args []string) int {
 		return 0
 	case importNew:
 		head = fmt.Sprintf("%s %s (sha256 %s): new, as %s/", doc.Kind, ref, doc.SHA256, in.dir)
+		if doc.ComparedWith != "" {
+			head += "; shown as its changes from the built-in " + doc.ComparedWith
+		}
 	default:
 		head = fmt.Sprintf("%s %s (sha256 %s): replaces %s/ (%s)", doc.Kind, ref, doc.SHA256, in.dir, safefile.Printable(doc.Replaces.Ref))
 	}
@@ -364,9 +376,12 @@ func packImportReview(in *incomingPackage, change *settings.Change) (*packImport
 	ref := in.ref.String()
 	doc := &packImportDoc{Ref: ref, Kind: in.kind, SHA256: in.sha, Status: in.status, Used: in.used, Hash: in.sha, Restart: []string{}, Warnings: []string{}}
 	pkg := importPackage{Ref: ref, Kind: in.kind, To: in.sha, AlsoLockedIn: []string{}, Status: review.Added}
+	against := in.old
 	if in.old != nil {
 		doc.Replaces = &importReplaces{Ref: in.oldRef.String(), SHA256: in.oldSHA}
 		pkg.From, pkg.Status = in.oldSHA, review.Changed
+	} else if in.base != nil {
+		doc.ComparedWith, against = in.baseRef.String(), in.base
 	}
 	if in.status == importSame {
 		pkg.Status = "unchanged"
@@ -374,7 +389,7 @@ func packImportReview(in *incomingPackage, change *settings.Change) (*packImport
 	if change != nil {
 		doc.Restart = append(doc.Restart, change.Restart...)
 	}
-	files, err := review.Compare(in.kind, in.old, in.files)
+	files, err := review.Compare(in.kind, against, in.files)
 	if err != nil {
 		return nil, err
 	}
@@ -384,6 +399,52 @@ func packImportReview(in *incomingPackage, change *settings.Change) (*packImport
 	}
 	doc.Packages = []importPackage{pkg}
 	return doc, nil
+}
+
+// closestBuiltin is the built-in package of kind sharing the most
+// identical files with files (a manifest's name line aside), at least
+// one; a new package's review is its diff from it.
+func closestBuiltin(kind string, files fstest.MapFS) (pack.Ref, fs.FS) {
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		return pack.Ref{}, nil
+	}
+	cands := map[pack.Ref]fs.FS{}
+	switch kind {
+	case pack.KindPack:
+		for r, p := range cat.Packs {
+			cands[r] = p.Files
+		}
+	case pack.KindOption:
+		for r, o := range cat.Options {
+			cands[r] = o.Files
+		}
+	case pack.KindAgent:
+		for r, a := range cat.Agents {
+			cands[r] = a.Files
+		}
+	}
+	var best pack.Ref
+	var bestFS fs.FS
+	most := 0
+	for _, r := range slices.SortedFunc(maps.Keys(cands), func(a, b pack.Ref) int { return strings.Compare(a.String(), b.String()) }) {
+		n := 0
+		for p, f := range files {
+			data, err := fs.ReadFile(cands[r], p)
+			if err == nil && unnamed(data) == unnamed(f.Data) {
+				n++
+			}
+		}
+		if n > most {
+			best, bestFS, most = r, cands[r], n
+		}
+	}
+	return best, bestFS
+}
+
+// unnamed is data with its manifest name line blanked.
+func unnamed(data []byte) string {
+	return manifestNameRe.ReplaceAllString(string(data), "")
 }
 
 // writeImported writes in's files as root/<top>/<name>/. A package the
@@ -400,7 +461,7 @@ func (e *env) writeImported(ctx context.Context, root string, in *incomingPackag
 		if err := writeFolder(filepath.Join(root, filepath.FromSlash(in.dir)), in.files); err != nil {
 			return e.fail(err)
 		}
-		fmt.Fprintf(e.stdout, "wrote %s/ (%s): use it in Settings or project.toml\n", in.dir, in.ref)
+		fmt.Fprintf(e.stdout, "wrote %s/ (%s): %s\n", in.dir, in.ref, useHint(in.kind, in.ref))
 		return 0
 	}
 	var changes []fileChange
@@ -422,6 +483,17 @@ func (e *env) writeImported(ctx context.Context, root string, in *incomingPackag
 		fmt.Fprintf(e.stdout, "wrote %s/ (%s), locked and rendered\n", in.dir, in.ref)
 	}
 	return code
+}
+
+// useHint says where a project starts using the local package ref of kind.
+func useHint(kind string, ref pack.Ref) string {
+	switch kind {
+	case pack.KindPack:
+		return fmt.Sprintf("use it with [stack] pack = %q in project.toml (the Settings page's project.toml editor)", ref)
+	case pack.KindOption:
+		return "pick it for its slot in Settings"
+	}
+	return fmt.Sprintf("use it with railswitch agent add <name> --use %s", ref)
 }
 
 func sortedPaths(m fstest.MapFS) []string {

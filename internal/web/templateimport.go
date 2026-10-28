@@ -25,10 +25,11 @@ var importHashRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // the template's status and warnings.
 type importDoc struct {
 	reviewDoc
-	Ref      string   `json:"ref"`
-	Status   string   `json:"status"` // new, update, same, older
-	Warnings []string `json:"warnings"`
-	Replaces *struct {
+	Ref          string   `json:"ref"`
+	Status       string   `json:"status"` // new, update, same, older
+	Warnings     []string `json:"warnings"`
+	ComparedWith string   `json:"compared_with"` // pack import: the built-in a new package is shown against
+	Replaces     *struct {
 		Ref string `json:"ref"`
 	} `json:"replaces"`
 }
@@ -43,6 +44,7 @@ type importView struct {
 
 	Back, BackText, Heading, Intro    string
 	Dir, Ref, Status, Replaces, Error string
+	ComparedWith                      string
 	Hash, AckText, As, Restart        string
 	Warnings                          []string
 	Packages                          []reviewPkgView
@@ -55,7 +57,7 @@ func (v *importView) fill(doc importDoc, err error) {
 		v.Error = err.Error()
 		return
 	}
-	v.Ref, v.Status, v.Warnings = doc.Ref, doc.Status, doc.Warnings
+	v.Ref, v.Status, v.Warnings, v.ComparedWith = doc.Ref, doc.Status, doc.Warnings, doc.ComparedWith
 	if doc.Replaces != nil {
 		v.Replaces = doc.Replaces.Ref
 	}

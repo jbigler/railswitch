@@ -90,8 +90,10 @@ the built-ins:
 
 ### Sharing a package (D114)
 
-Make a package your own (`pack eject rails@1 --as filial-rails`, then
-edit it), then hand it to someone as a folder:
+Make a package your own (`pack eject rails@1`, then edit
+`packs/rails/`), then hand it to someone as a folder. Keep a pack's name
+(`local:rails@1`, not `--as filial-rails`): options name the packs they
+work with (`works_with = ["rails"]`), so a renamed pack loses them.
 
 - `railswitch pack export <ref> --to <dir>`, in a workspace: the package
   as this project runs it (a locked one's accepted copy) as a new folder
@@ -100,7 +102,9 @@ edit it), then hand it to someone as a folder:
   workspace: reviews the folder as `local:<name>@<N>` (name: `--as`, else
   the manifest's; the manifest's `name` line is set to it; `N`: its
   `version`). Every file is a diff from the workspace's local package of
-  that name (all added when there is none), flagged by the review checks;
+  that name; a new one is shown as its changes from the closest built-in
+  of its kind (the most identical files, a manifest's name line aside;
+  `compared_with`), else every file added; flagged by the review checks;
   for a package the project uses, the worktrees it restarts. Nothing is
   written. The folder is hostile input: exactly one manifest
   (`pack.toml`, `option.toml` or `agent.toml`, which sets the kind), only
@@ -120,8 +124,9 @@ edit it), then hand it to someone as a folder:
   folder over it (shown as the diff from yours).
 
 To start a teammate's new project on it: create the project from the
-built-in (or from a template), import the package, then pick
-`local:<name>@<N>` in Settings. A template that names a `local:` package
+built-in (or from a template), import the package, then use it: an option
+in Settings, a pack as `[stack] pack = "local:rails@1"` in `project.toml`
+(the Settings page's project.toml editor), an agent with `agent add`. A template that names a `local:` package
 can't start a project on a machine without it.
 
 ## Locking

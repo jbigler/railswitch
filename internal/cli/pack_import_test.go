@@ -32,9 +32,14 @@ func TestPackImportUnused(t *testing.T) {
 	mustRun(t, "-C", ws, "pack", "export", "redis@1", "--to", folder)
 	lock := readFile(t, filepath.Join(ws, "stack.lock"))
 
+	writeFile(t, filepath.Join(folder, "README.md"), "# ours\n")
 	code, doc, errs := packImportJSON(t, fakeHost(), ws, folder, "--as", "myredis")
 	if code != 0 || doc.Status != "new" || doc.Ref != "local:myredis@1" || doc.Kind != "option" || doc.Used || doc.Replaces != nil {
 		t.Fatalf("new: exit %d %+v %s", code, doc, errs)
+	}
+	// A new package is shown as its changes from the closest built-in.
+	if doc.ComparedWith != "redis@1" || len(doc.Packages[0].Files) != 2 {
+		t.Errorf("compared with %q: %+v", doc.ComparedWith, doc.Packages[0].Files)
 	}
 	dir := filepath.Join(ws, "options", "myredis")
 	if _, err := os.Lstat(dir); err == nil {
@@ -54,13 +59,13 @@ func TestPackImportUnused(t *testing.T) {
 		t.Errorf("same: %+v", doc)
 	}
 
-	writeFile(t, filepath.Join(folder, "README.md"), "# ours\n")
+	writeFile(t, filepath.Join(folder, "README.md"), "# ours, again\n")
 	code, doc, _ = packImportJSON(t, fakeHost(), ws, folder, "--as", "myredis")
-	if code != 0 || doc.Status != "update" || doc.Replaces == nil || doc.Replaces.Ref != "local:myredis@1" || len(doc.Packages[0].Files) != 1 || doc.Packages[0].Files[0].Path != "README.md" {
+	if code != 0 || doc.Status != "update" || doc.ComparedWith != "" || doc.Replaces == nil || doc.Replaces.Ref != "local:myredis@1" || len(doc.Packages[0].Files) != 1 || doc.Packages[0].Files[0].Path != "README.md" {
 		t.Fatalf("update: exit %d %+v", code, doc)
 	}
 	mustRun(t, "-C", ws, "pack", "import", folder, "--as", "myredis", "--accept", doc.SHA256)
-	if readFile(t, filepath.Join(dir, "README.md")) != "# ours\n" {
+	if readFile(t, filepath.Join(dir, "README.md")) != "# ours, again\n" {
 		t.Error("the update was not written")
 	}
 }

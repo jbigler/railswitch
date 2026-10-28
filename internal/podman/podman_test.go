@@ -339,7 +339,7 @@ func TestUnitState(t *testing.T) {
 	if err != nil || st != (UnitState{Load: "loaded", NeedReload: true, Active: "active"}) {
 		t.Fatalf("got %+v %v", st, err)
 	}
-	wantCalls(t, f, []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState", "a.service"})
+	wantCalls(t, f, []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart", "a.service"})
 }
 
 func TestPullOnly(t *testing.T) {

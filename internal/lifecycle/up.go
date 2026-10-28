@@ -225,6 +225,17 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		if st.Load != "loaded" || st.NeedReload {
 			reload = true
 		}
+		// systemd never flags a changed Quadlet file (NeedDaemonReload
+		// stays no): the loaded service's own hash, against the file's.
+		if ctr := strings.TrimSuffix(u, ".service"); !reload && slices.Contains(names.Containers, ctr) {
+			if loaded := unithash.FromExec(st.ExecStart, key); loaded != "" {
+				want, err := l.renderedHash(ctr+".container", key)
+				if err != nil {
+					return err
+				}
+				reload = loaded != want
+			}
+		}
 		if st.Active != "active" {
 			continue
 		}

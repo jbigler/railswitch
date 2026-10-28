@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"strings"
 )
 
 // Key is the label key for a project prefix ("railswitch" for the
@@ -75,4 +76,18 @@ func Read(unit []byte, key string) string {
 		}
 	}
 	return ""
+}
+
+// FromExec is the key label's value in a loaded service's ExecStart (the
+// `--label <key>=<hash>` Quadlet generated from the unit); "" when absent.
+func FromExec(exec, key string) string {
+	_, rest, ok := strings.Cut(exec, key+"=")
+	if !ok {
+		return ""
+	}
+	end := strings.IndexFunc(rest, func(r rune) bool { return !strings.ContainsRune("0123456789abcdef", r) })
+	if end < 0 {
+		end = len(rest)
+	}
+	return rest[:end]
 }

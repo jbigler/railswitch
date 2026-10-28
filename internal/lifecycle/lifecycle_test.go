@@ -44,7 +44,7 @@ type tenv struct {
 // units makes every unit-state query report stdout; unit, if given,
 // narrows it to that unit.
 func (e *tenv) units(stdout string, unit ...string) {
-	e.f.On(append([]string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState"}, unit...), sys.Result{Stdout: []byte(stdout)}, nil)
+	e.f.On(append([]string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart"}, unit...), sys.Result{Stdout: []byte(stdout)}, nil)
 }
 
 // missing makes calls with argv prefix exit 1 ("does not exist").
@@ -770,7 +770,7 @@ func TestUpReloadsUnloadedUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantInOrder(t, e.calls(),
-		"systemctl --user show -p LoadState,NeedDaemonReload,ActiveState filial-feat-rails.service",
+		"systemctl --user show -p LoadState,NeedDaemonReload,ActiveState,ExecStart filial-feat-rails.service",
 		"systemctl --user daemon-reload",
 		"systemctl --user start filial-feat-rails.service")
 	if n := count(e.calls(), "podman pull"); n != 0 {
@@ -1404,7 +1404,7 @@ func TestUpRestartsStaleDashboard(t *testing.T) {
 // start time is garbage, or whose restart fails is a warning; up goes on
 // to start the worktree.
 func TestUpDashboardNeverBlocks(t *testing.T) {
-	stateCmd := []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState", machine.DashboardService}
+	stateCmd := []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart", machine.DashboardService}
 	startCmd := []string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", machine.DashboardService}
 	restartCmd := []string{"systemctl", "--user", "restart", machine.DashboardService}
 	failed := fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit)
@@ -1465,6 +1465,45 @@ func TestUpShowsProgress(t *testing.T) {
 	for _, c := range e.f.Cmds {
 		if len(c.Args) > 0 && c.Args[0] == "build" && (c.Stdout == nil || c.Stderr == nil) {
 			t.Errorf("podman build output is captured, not streamed: %q", c.Args)
+		}
+	}
+}
+
+// A unit file rendered earlier (settings apply, render) and not yet loaded:
+// systemd reports NeedDaemonReload=no for a Quadlet file, so the loaded
+// service's own unit hash (in its ExecStart) tells up to reload.
+func TestUpReloadsUnitLoadedFromOlderFile(t *testing.T) {
+	e := setup(t)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	for _, stale := range []bool{true, false} {
+		e.reset()
+		e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n")
+		entries, err := os.ReadDir(e.l.WS.Dirs.Quadlet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, en := range entries {
+			ctr, ok := strings.CutSuffix(en.Name(), ".container")
+			if !ok || !strings.HasPrefix(ctr, "filial-feat-") {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, en.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := unithash.Read(data, unithash.Key("filial"))
+			if stale && ctr == "filial-feat-db" {
+				h = "000000000000"
+			}
+			e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\nExecStart={ path=/usr/bin/podman ; argv[]=/usr/bin/podman run --label filial.unit-hash="+h+" x ; }\n", ctr+".service")
+		}
+		if err := e.l.Up(ctx, "feat"); err != nil {
+			t.Fatal(err)
+		}
+		if n := count(e.calls(), "systemctl --user daemon-reload"); (n == 1) != stale {
+			t.Errorf("stale=%v: %d daemon-reloads:\n%s", stale, n, dump(e.calls()))
 		}
 	}
 }

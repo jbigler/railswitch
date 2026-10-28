@@ -33,17 +33,21 @@ project from one). Each has its own design, plan and PR.
 package content hash (`pack.ContentHash`), outside every workspace, so no
 container can reach it.
 
-- `Put(files fs.FS) (sha string, err error)`: copies every regular file
-  (a symlink or other entry refuses, as `ContentHash`) to a temp dir beside
-  the target, then renames it into place; an existing `<sha>` dir is left as
-  it is. Dirs 0755, files 0644, `.sh` 0755.
+- `Put(files fs.FS) (sha string, err error)`: reads every regular file
+  once into memory (a symlink or other entry refuses, as `ContentHash`),
+  hashes those bytes, copies them to a temp dir beside the target, then
+  renames it into place; an existing `<sha>` dir is left as it is when
+  `Get` accepts it and replaced when it doesn't. Dirs 0755, files 0644,
+  `.sh` 0755.
 - `Get(sha string) (fs.FS, error)`: reads the copy into memory
   (`fstest.MapFS`; regular files only, each ≤ 1 MiB, at most 256 files),
   recomputes its hash; missing, unreadable or mismatched is `ErrMissing`.
 - Every `stack.lock` write stores its packages: `workspace.Lock` and
   `WithProject`'s callers that commit (`commit` in `internal/cli/settings.go`,
   `project new`) call `Put` for each pack, option and agent the new lock pins.
-  A `Put` failure fails the write (and `commit` restores).
+  A `Put` failure fails the write (and `commit` restores), and so does a
+  `Put` whose sha differs from the entry the lock would write (the package
+  changed while it was being locked).
 
 Nothing removes copies (they are small; garbage collection is out of 7a).
 

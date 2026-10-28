@@ -66,9 +66,15 @@ func TestStoreTampered(t *testing.T) {
 	if _, err := s.Get(sha); !errors.Is(err, ErrMissing) {
 		t.Fatalf("Get of an altered copy: %v, want ErrMissing", err)
 	}
-	// A second Put leaves an existing dir as it is, so the copy stays missing.
+	// A second Put replaces a copy that no longer holds its content.
 	if _, err := s.Put(pkg()); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := s.Get(sha); err != nil {
+		t.Fatalf("Get after a Put over the altered copy: %v", err)
+	}
+	if entries, err := os.ReadDir(s.Dir); err != nil || len(entries) != 1 {
+		t.Fatalf("store holds %v (%v), want only %s", entries, err, sha)
 	}
 	if err := os.Symlink("pack.toml", filepath.Join(s.Dir, sha, "link")); err != nil {
 		t.Fatal(err)

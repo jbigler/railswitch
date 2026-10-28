@@ -37,21 +37,29 @@ func Dir(d machine.Dirs) string { return filepath.Join(d.Data, "locked") }
 // Store is the store at Dir.
 type Store struct{ Dir string }
 
-// Put stores files under their content hash and returns it. An existing
-// copy is left as it is. Files are copied to a temp dir beside the target,
-// then renamed into place: dirs 0755, files 0644, .sh 0755.
+// Put stores files under their content hash and returns it: the hash of
+// the bytes it read, once, so a file changing meanwhile can't be stored
+// under another content's name. A copy already there that Get accepts is
+// left as it is; one it doesn't is replaced. Files are copied to a temp
+// dir beside the target, then renamed into place: dirs 0755, files 0644,
+// .sh 0755.
 func (s Store) Put(files fs.FS) (string, error) {
-	sha, err := pack.ContentHash(files) // refuses a symlink or other entry
+	mem, err := Read(files)
 	if err != nil {
 		return "", err
 	}
-	mem, err := Read(files)
+	sha, err := pack.ContentHash(mem)
 	if err != nil {
 		return "", err
 	}
 	target := filepath.Join(s.Dir, sha)
 	if _, err := os.Lstat(target); err == nil {
-		return sha, nil
+		if _, err := s.Get(sha); err == nil {
+			return sha, nil
+		}
+		if err := os.RemoveAll(target); err != nil {
+			return "", err
+		}
 	}
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return "", err
@@ -77,7 +85,7 @@ func (s Store) Put(files fs.FS) (string, error) {
 		}
 	}
 	if err := os.Rename(tmp, target); err != nil {
-		if _, serr := os.Lstat(target); serr == nil { // stored meanwhile
+		if _, serr := s.Get(sha); serr == nil { // stored meanwhile
 			return sha, nil
 		}
 		return "", err
@@ -129,8 +137,11 @@ func (s Store) Get(sha string) (fs.FS, error) {
 func Read(files fs.FS) (fstest.MapFS, error) {
 	mem := fstest.MapFS{}
 	err := fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		switch {
+		case err != nil || d.IsDir():
 			return err
+		case !d.Type().IsRegular():
+			return fmt.Errorf("%s: not a regular file (%s)", p, d.Type())
 		}
 		if len(mem) == maxFiles {
 			return fmt.Errorf("a package of more than %d files can't be stored", maxFiles)

@@ -185,19 +185,31 @@ func Lock(_ context.Context, root string, accept Accept) error {
 	if err != nil {
 		return err
 	}
+	return pl.write(accept.IfHash)
+}
+
+// write stores pl's packages and writes its stack.lock, refusing bytes
+// that don't hash to ifHash (when set) and a package whose content changed
+// since pl hashed it (an edit meanwhile: what was stored is not what the
+// lock would pin).
+func (pl *lockPlan) write(ifHash string) error {
 	data, err := pl.lock.Encode()
 	if err != nil {
 		return err
 	}
-	if accept.IfHash != "" && Hash(data) != accept.IfHash {
+	if ifHash != "" && Hash(data) != ifHash {
 		return ErrReviewChanged
 	}
 	for _, sp := range pl.put {
-		if _, err := pl.store.Put(sp.files); err != nil {
+		sha, err := pl.store.Put(sp.files)
+		if err != nil {
 			return fmt.Errorf("store %s %s: %w", sp.kind, sp.ref, err)
 		}
+		if sha != table(pl.lock, sp.kind)[sp.key].SHA256 {
+			return fmt.Errorf("%s %s changed while it was being locked: lock again", sp.kind, sp.ref)
+		}
 	}
-	return pl.lock.Write(filepath.Join(root, lockFile))
+	return pl.lock.Write(filepath.Join(pl.root, lockFile))
 }
 
 // lockPlan is a lock write worked out: the lock it writes, the packages

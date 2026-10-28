@@ -369,6 +369,24 @@ func TestLockStores(t *testing.T) {
 	}
 }
 
+// A local package edited between hashing and storing: the write refuses
+// rather than pin one content and store another.
+func TestLockEditedMeanwhile(t *testing.T) {
+	root := projectRoot(t)
+	localRails(t, root)
+	pl, err := plan(root, Accept{All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendTo(t, filepath.Join(root, "packs", "rails", "deps.allow"), "meanwhile.example\n")
+	if err := pl.write(""); err == nil || !strings.Contains(err.Error(), "changed while it was being locked") {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "stack.lock")); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("stack.lock written: %v", err)
+	}
+}
+
 func TestReview(t *testing.T) {
 	ctx := context.Background()
 	root := projectRoot(t)

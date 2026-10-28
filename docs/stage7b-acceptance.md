@@ -19,6 +19,15 @@ left it empty. The library was a local folder with one pack, `demo@1`
 | `[[revoke]]` key 1 in an index signed by key 2: `trusted`, `signer ls` lists key 1 as revoked | PASS |
 | A later index signed by key 1: `revoked`; `signer add` of key 1: refused ("is revoked") | PASS |
 
+## After the review fixes (same flow, fixed build)
+
+| Check | Result |
+|---|---|
+| `library index --serial 1` at current serial 1: refused ("each index gets a new, higher serial") | PASS |
+| An index signed by a third key with no vouch, on a library that already trusts key 1: `unknown-signer`, `known_library: true`, packages `signed: false`; `library trust` refused without `--new-signer` | PASS |
+| `library rotate` bumps the serial (3); `rotation`, then `trusted` after `--rotation` | PASS |
+| `signer revoke` of key 1: listed as revoked; `signer add` of it refused; `signers.toml` and `signers.toml.lock` 0600 | PASS |
+
 ## Machine page
 
 | Check | Result |

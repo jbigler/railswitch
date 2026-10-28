@@ -139,6 +139,13 @@ Nothing is applied: the user edits Settings or the Images page. `overview
 - Export in a project with a stale lock or a pending review: refused (a
   template is made from what was accepted).
 
+## Known limits
+
+- The machine store keeps one version per name, the latest export: a
+  project made from an older local version is told by `template check`
+  that its version is gone, not shown an update. Updates come from
+  libraries, which keep each published version's content by hash.
+
 ## Testing
 
 - Format: strict decode; project-only lines refused in `stack.toml`;

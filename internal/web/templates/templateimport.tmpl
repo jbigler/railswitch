@@ -15,7 +15,8 @@ acknowledgement when anything is flagged. */}}
 {{end}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{else if eq .Status "same"}}<p class="green"><span class="mono">{{.Ref}}</span> is here already, byte for byte: nothing to import.</p>
 {{else}}<p>{{if eq .Status "update"}}<span class="mono">{{.Ref}}</span> replaces <span class="mono">{{.Replaces}}</span>: the diff is from the copy here.{{else if .ComparedWith}}<span class="mono">{{.Ref}}</span> is new here, shown as its changes from the built-in <span class="mono">{{.ComparedWith}}</span>: the files it shares unchanged are not listed.{{else}}<span class="mono">{{.Ref}}</span> is new here: every file is shown as added.{{end}}</p>
-{{range .Warnings}}<p class="yellow notice">{{.}}</p>
+{{range .Bundles}}<p class="note">{{.}}: the files it shares unchanged are not listed.</p>
+{{end}}{{range .Warnings}}<p class="yellow notice">{{.}}</p>
 {{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.ImportURL}}" id="accept" class="editor" data-job="import" data-next="{{.Back}}"{{if .AckText}} data-ack-required{{end}}>
 <input type="hidden" name="dir" value="{{.Dir}}">
 <input type="hidden" name="hash" value="{{.Hash}}">

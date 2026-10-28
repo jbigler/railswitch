@@ -1,9 +1,11 @@
 package web
 
 import (
+	"maps"
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -29,7 +31,9 @@ type importDoc struct {
 	Status       string   `json:"status"` // new, update, same, older
 	Warnings     []string `json:"warnings"`
 	ComparedWith string   `json:"compared_with"` // pack import: the built-in a new package is shown against
-	Replaces     *struct {
+	// template import: by bundle directory, the built-in it is shown against
+	BundlesComparedWith map[string]string `json:"bundles_compared_with"`
+	Replaces            *struct {
 		Ref string `json:"ref"`
 	} `json:"replaces"`
 }
@@ -45,6 +49,7 @@ type importView struct {
 	Back, BackText, Heading, Intro    string
 	Dir, Ref, Status, Replaces, Error string
 	ComparedWith                      string
+	Bundles                           []string // "packs/rails/ … rails@1" notes
 	Hash, AckText, As, Restart        string
 	Warnings                          []string
 	Packages                          []reviewPkgView
@@ -58,6 +63,9 @@ func (v *importView) fill(doc importDoc, err error) {
 		return
 	}
 	v.Ref, v.Status, v.Warnings, v.ComparedWith = doc.Ref, doc.Status, doc.Warnings, doc.ComparedWith
+	for _, d := range slices.Sorted(maps.Keys(doc.BundlesComparedWith)) {
+		v.Bundles = append(v.Bundles, d+"/ is shown as its changes from the built-in "+doc.BundlesComparedWith[d])
+	}
 	if doc.Replaces != nil {
 		v.Replaces = doc.Replaces.Ref
 	}

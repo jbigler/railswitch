@@ -140,7 +140,9 @@ On their machine:
 
 - `railswitch template import <dir> [--json]` (D113) reviews it: every
   file as a diff against the version of that name on this machine (all
-  added when there is none), flagged by the review checks (a bundled
+  added when there is none; a bundled package new here is shown as its
+  changes from its closest built-in, `bundles_compared_with`), flagged
+  by the review checks (a bundled
   package's files by the package checks: its manifest's images, ports
   and capabilities too), with warnings for each library this machine
   hasn't added. Nothing is saved. The folder is hostile input: only the

@@ -477,7 +477,8 @@ template, plus its status. Nothing is saved. Exit 0, except `older`
 | `flags` | number | The flags over every file. |
 | `packages` | array | One entry, kind `template`: status `added` (new), `changed` or `unchanged` (`same`, no files); `files` as in `lock --review`. |
 | `restart` | array | Always `[]`. |
-| `warnings` | array of strings | Each `local:` package it uses, and each library ref whose alias this machine hasn't added. |
+| `warnings` | array of strings | Each library ref whose alias this machine hasn't added. |
+| `bundles_compared_with` | object | By bundled package directory (`packs/rails`), the built-in that package is shown against when the stored version doesn't have it (its closest: the most identical files, a manifest's name line aside); `{}` for none. |
 
 ## `pack import <dir>`
 

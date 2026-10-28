@@ -88,3 +88,22 @@ func lockReviewHash(t *testing.T, ws string) string {
 	}
 	return doc.Hash
 }
+
+// Importing a template folder with a bundled pack new here shows the pack
+// as its changes from the closest built-in.
+func TestTemplateImportBundled(t *testing.T) {
+	newEnv(t)
+	dir := filepath.Join(t.TempDir(), "rails-own")
+	bundledRails(t, dir)
+	code, doc, errs := importJSON(t, dir)
+	if code != 0 || doc.BundlesComparedWith["packs/rails"] != "rails@1" {
+		t.Fatalf("exit %d %+v %s", code, doc, errs)
+	}
+	var paths []string
+	for _, f := range doc.Packages[0].Files {
+		paths = append(paths, f.Path)
+	}
+	if strings.Join(paths, " ") != "packs/rails/deps.allow stack.toml" || doc.Flags == 0 {
+		t.Errorf("files %q, flags %d", paths, doc.Flags)
+	}
+}

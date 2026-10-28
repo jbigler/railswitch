@@ -628,6 +628,11 @@ if (view.startsWith("settings")) {
         data.set("text", f.elements.text.value); // as typed: FormData would send CRLF
         $("#file-conflict").hidden = true;
         startJob(f.action, data, fileSaved);
+      } else if (f.dataset.job.startsWith("template-")) {
+        startJob(f.action, data, (state) => {
+          if (state === "ok") location.reload();
+          else toast("It did not finish: " + state + ". The output is below.", true);
+        });
       } else {
         f.reset(); // the value leaves the page at once
         startJob(f.action, data, secretDone);
@@ -803,7 +808,8 @@ if (view === "review") {
 
 // New project: Read the repository posts repo and branch (with the
 // picked pack, when one is picked) to /new/detect and swaps in the Stack
-// card; Next: review posts the whole form to /new/review and swaps in
+// card; Start from a template swaps in that template's questions instead
+// (and Read waits until no template is picked); Next: review posts the whole form to /new/review and swaps in
 // step 2; Create starts project new as a job of the new prefix and
 // follows it on that prefix's stream. Any change after a review marks it
 // stale and turns Create off until the next review.
@@ -817,8 +823,9 @@ function startNew() {
   const autoDir = () => (el.prefix.value.trim() ? body.dataset.home + "/workspace/" + el.prefix.value.trim() : "");
 
   function ready() {
-    $("[data-detect]", form).disabled = !el.repo.value.trim();
-    $("[data-review]", form).disabled = !($("#new-stack").dataset.pack && el.prefix.value.trim() && el.dir.value.trim());
+    const stack = $("#new-stack").dataset;
+    $("[data-detect]", form).disabled = !el.repo.value.trim() || !!el.template.value;
+    $("[data-review]", form).disabled = !((stack.pack || stack.template) && el.prefix.value.trim() && el.dir.value.trim());
     const add = $("[data-add-extra]", form);
     if (add) add.disabled = !$(".extra-key", form).value.trim();
   }
@@ -855,6 +862,28 @@ function startNew() {
     } else {
       err.textContent = text;
       err.hidden = false;
+    }
+    stale();
+    ready();
+  }
+
+  // The template's own tools and agents stand unless one is ticked here.
+  async function pickTemplate() {
+    const ref = el.template.value;
+    let r = null;
+    try {
+      r = await fetch("/new/template", { method: "POST", body: new URLSearchParams({ template: ref }), credentials: "same-origin" });
+    } catch {
+      // shown below
+    }
+    const text = r ? (await r.text()).trim() : "The dashboard is not reachable.";
+    if (r && r.ok) {
+      swap("new-stack", text);
+      extras = [];
+      if (ref) $$("input[name=tool], input[name=agent]", form).forEach((c) => (c.checked = false));
+      warnings();
+    } else {
+      toast(text, true);
     }
     stale();
     ready();
@@ -919,6 +948,7 @@ function startNew() {
   form.addEventListener("change", (e) => {
     const t = e.target;
     if (t.matches("[data-repick]")) return detect(true);
+    if (t.matches("[data-template]")) return pickTemplate();
     const row = t.closest(".slot");
     if (row && t.type === "radio") slotChanged(row);
     if (!t.classList.contains("extra-key") && !t.classList.contains("extra-ref")) changed();

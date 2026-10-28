@@ -10,7 +10,7 @@
 <p class="note">Changes are staged, not applied. The panel on the right shows what each one does to data and to running worktrees before anything happens.</p>
 {{if .Error}}<p class="red set-error">project.toml: {{.Error}}</p>
 <p><a class="ln" href="{{.FileURL}}">Edit project.toml</a></p>
-{{else}}{{with .Project}}<section class="card">
+{{else}}{{template "settings-template" .Template}}{{with .Project}}<section class="card">
 <h2>Project</h2>
 <dl class="kv">
 <dt>Name</dt><dd>{{.Name}}</dd>
@@ -97,6 +97,16 @@
 <p class="note">A value goes to podman on stdin and is never shown again. Running containers get a new value when they restart.</p>
 </section>
 
+<section class="card">
+<h2>Save as template</h2>
+<form method="post" action="{{.Template.ExportURL}}" class="add-row" data-job="template-export">
+<input name="name" placeholder="name" class="mono" autocomplete="off" spellcheck="false" required pattern="[a-z][a-z0-9\-]*" aria-label="Template name">
+<input name="version" type="number" min="1" step="1" value="1" class="mono" required aria-label="Template version">
+<button class="ln">Save as template</button>
+</form>
+<p class="note">Writes <span class="mono">~/.config/railswitch/templates/&lt;name&gt;.stack/</span> for every project on this machine: the stack, options, pins, env and secret names as questions with this project's values as defaults, and the Containerfiles you edited. The project's name, prefix and repository stay out; so do secret values. A version already saved is refused: save a higher one.</p>
+</section>
+
 <p class="set-file"><a class="ln" href="{{.FileURL}}">Edit project.toml</a> <span class="muted">for services, routes, tasks, firewall, agents, image, tools and versions</span></p>
 {{end}}</section>
 <section class="pane">
@@ -108,3 +118,17 @@
 </body>
 </html>
 {{end}}
+
+{{/* settings-template is the notice of a template that changed since
+the project was made from it; Accept records its new version. */}}
+{{define "settings-template"}}{{if .Update}}<section class="card tpl-notice" id="template">
+<h2>Template changed</h2>
+<p>The template <span class="mono">{{.Ref}}</span> changed since this project was made from it{{if .Since}} (<span class="mono">{{.Since}}</span>){{end}}. Nothing is applied: change what you want here or on the Images page. <code>railswitch template check</code> in the workspace shows the diff.</p>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{else}}<form method="post" action="{{.AcceptURL}}" class="btns start" data-job="template-accept">
+<input type="hidden" name="sha256" value="{{.SHA256}}">
+<button class="ln main">Accept</button>
+</form>
+<p class="note">Accept records the template's version now (<span class="mono">{{.SHA256}}</span>): the notice goes away until it changes again.</p>
+{{end}}</section>
+{{end}}{{end}}

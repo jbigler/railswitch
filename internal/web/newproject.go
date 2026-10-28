@@ -25,7 +25,9 @@ type newForm struct {
 	Repo, Branch, Name, Prefix, Dir, Pack string
 	Options                               []string // key=ref: the slots (from opt-<key>), then the extra services
 	Nvim                                  bool
-	Agents                                []string // name=ref; none ticked is --agent none
+	Agents                                []string // name=ref; none ticked is --agent none, unless from a template
+	Template                              string   // a template ref; "": none
+	Answers                               []string // key=value, the template's questions in its order
 }
 
 // badValue: a value the CLI could read as a flag, or one holding a line
@@ -47,7 +49,7 @@ func pair(what, v string) error {
 // folder and pack, which reading the repository does not.
 func parseNewForm(r *http.Request, home string, full bool) (newForm, error) {
 	v := func(n string) string { return strings.TrimSpace(r.PostFormValue(n)) }
-	f := newForm{Repo: v("repo"), Branch: v("branch"), Name: v("name"), Prefix: v("prefix"), Dir: v("dir"), Pack: v("pack")}
+	f := newForm{Repo: v("repo"), Branch: v("branch"), Name: v("name"), Prefix: v("prefix"), Dir: v("dir"), Pack: v("pack"), Template: v("template")}
 	if f.Repo == "" {
 		return f, errors.New("a repository is required")
 	}
@@ -65,6 +67,9 @@ func parseNewForm(r *http.Request, home string, full bool) (newForm, error) {
 	if f.Pack != "" && badName(f.Pack) {
 		return f, errors.New("bad pack ref")
 	}
+	if f.Template != "" && !validTemplateRef(f.Template) {
+		return f, errors.New("bad template ref")
+	}
 	if !full {
 		return f, nil
 	}
@@ -78,8 +83,8 @@ func parseNewForm(r *http.Request, home string, full bool) (newForm, error) {
 		return f, errors.New("workspace folder: an absolute path, or one under ~/")
 	}
 	f.Dir = filepath.Clean(f.Dir)
-	if f.Pack == "" {
-		return f, errors.New("read the repository or pick a pack first")
+	if f.Pack == "" && f.Template == "" {
+		return f, errors.New("read the repository, pick a pack or start from a template first")
 	}
 	var slots []string
 	for k := range r.PostForm {
@@ -112,6 +117,29 @@ func parseNewForm(r *http.Request, home string, full bool) (newForm, error) {
 	return f, nil
 }
 
+// parseNew is the full form (review, create) with a template's answers
+// read against its questions, as `template show` has them now.
+func (s *Server) parseNew(r *http.Request) (newForm, error) {
+	f, err := parseNewForm(r, s.c.Home, true)
+	if err != nil {
+		return f, err
+	}
+	if f.Template == "" {
+		for k := range r.PostForm {
+			if strings.HasPrefix(k, "answer-") {
+				return f, errors.New("an answer without a template")
+			}
+		}
+		return f, nil
+	}
+	t, err := readTemplate(r.Context(), s.c.CLI, f.Template)
+	if err != nil {
+		return f, err
+	}
+	f.Answers, err = templateAnswers(r, t)
+	return f, err
+}
+
 // args is the project new command line, without the program.
 func (f newForm) args() []string {
 	a := []string{"project", "new", f.Dir, "--repo", f.Repo, "--prefix", f.Prefix}
@@ -121,14 +149,22 @@ func (f newForm) args() []string {
 	if f.Branch != "" {
 		a = append(a, "--branch", f.Branch)
 	}
-	a = append(a, "--pack", f.Pack)
+	if f.Template != "" {
+		a = append(a, "--template", f.Template)
+		for _, an := range f.Answers {
+			a = append(a, "--answer", an)
+		}
+	}
+	if f.Pack != "" {
+		a = append(a, "--pack", f.Pack)
+	}
 	for _, o := range f.Options {
 		a = append(a, "--option", o)
 	}
 	if f.Nvim {
 		a = append(a, "--tool", "nvim")
 	}
-	if len(f.Agents) == 0 {
+	if len(f.Agents) == 0 && f.Template == "" {
 		return append(a, "--agent", "none")
 	}
 	for _, ag := range f.Agents {
@@ -147,11 +183,13 @@ type newView struct {
 	Banner        bannerView
 	Jobs          jobsView
 
-	Home        string
-	Agents      []agentChoice
-	AgentsError string
-	Stack       newStackView
-	Review      newReviewView
+	Home           string
+	Templates      []templateRow
+	TemplatesError string
+	Agents         []agentChoice
+	AgentsError    string
+	Stack          newStackView
+	Review         newReviewView
 }
 
 type agentChoice struct {
@@ -267,6 +305,11 @@ func (s *Server) newPage(w http.ResponseWriter, r *http.Request) {
 		Title: "New project · RailSwitch", Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner,
 		Home: s.c.Home, Review: newReviewView{Empty: true},
 	}
+	if ls, err := readTemplates(r.Context(), s.c.CLI); err != nil {
+		v.TemplatesError = err.Error()
+	} else {
+		v.Templates = templateItems(ls)
+	}
 	cat, err := readCatalog(r.Context(), s.c.CLI)
 	if err != nil {
 		v.AgentsError = err.Error()
@@ -308,7 +351,7 @@ func (s *Server) newDetect(w http.ResponseWriter, r *http.Request) {
 // newReview is step 2: the dry run of the posted form, its refusal at the
 // top when it has one.
 func (s *Server) newReview(w http.ResponseWriter, r *http.Request) {
-	f, err := parseNewForm(r, s.c.Home, true)
+	f, err := s.parseNew(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -328,7 +371,7 @@ func (s *Server) newReview(w http.ResponseWriter, r *http.Request) {
 // busy while the first runs. A form that names an Install review has it
 // read again by the dry run: the same hash and, with flags, the tick.
 func (s *Server) newCreate(w http.ResponseWriter, r *http.Request) {
-	f, err := parseNewForm(r, s.c.Home, true)
+	f, err := s.parseNew(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

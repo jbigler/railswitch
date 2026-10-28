@@ -33,6 +33,8 @@ type overview struct {
 	Workspace      string          `json:"workspace"`
 	ReviewPending  bool            `json:"review_pending"` // a package update waits for lock --review
 	SignerWarnings []signerWarning `json:"signer_warnings"`
+	Template       *templateStamp  `json:"template"`        // the template the project was made from; nil: none
+	TemplateUpdate bool            `json:"template_update"` // that template changed since
 	Worktrees      []worktree      `json:"worktrees"`
 }
 
@@ -245,6 +247,11 @@ type dryRunDoc struct {
 	Warnings []string   `json:"warnings"`
 	Steps    []string   `json:"steps"`
 	Install  *reviewDoc `json:"install"` // the library packages it installs; nil: none
+	Template *struct {
+		Ref    string        `json:"ref"`
+		SHA256 string        `json:"sha256"`
+		Ask    []templateAsk `json:"ask"`
+	} `json:"template"` // nil: not from a template
 }
 
 // libraryDoc is `library ls`: the machine's package libraries.

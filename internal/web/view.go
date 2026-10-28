@@ -374,10 +374,15 @@ type stripItem struct{ Text, URL string }
 // bannerView is the project's banner: Review links the review page while
 // a package update waits; Signers are its signer warnings.
 type bannerView struct {
-	Lines   []string
-	Review  string
-	Signers []string
+	Lines    []string
+	Review   string
+	Signers  []string
+	Template *bannerTemplate
 }
+
+// bannerTemplate is the notice of a changed template: Settings has its
+// Accept.
+type bannerTemplate struct{ Ref, URL string }
 
 func signerWarningText(sw signerWarning) string {
 	return "The signer of " + sw.Ref + " (" + sw.Library + ") is no longer trusted. The project keeps running what it has; replace it or re-check the library."

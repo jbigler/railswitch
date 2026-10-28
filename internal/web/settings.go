@@ -81,6 +81,7 @@ type settingsView struct {
 	SecretsError string
 	Services     []string // for a new secret
 	Staged       stagedView
+	Template     settingsTemplate
 
 	PreviewURL, SecretURL, FileURL string
 }
@@ -241,6 +242,7 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v.Project = show
+	v.Template = s.settingsTemplate(r.Context(), p)
 	for _, o := range show.Options {
 		ov := optionView{Key: o.Key, Ref: o.Ref, Slot: o.Slot}
 		for _, c := range o.Choices {

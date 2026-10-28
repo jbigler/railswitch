@@ -87,8 +87,11 @@ func packEject(e *env, args []string) int {
 	} else if o := cat.Options[ref]; o != nil {
 		top, manifest, files = "options", "option.toml", o.Files
 		use = fmt.Sprintf("[options] %s = %q", o.Slot, fmt.Sprintf("local:%s@%d", name, ref.Version))
+	} else if a := cat.Agents[ref]; a != nil {
+		top, manifest, files = "agents", "agent.toml", a.Files
+		use = fmt.Sprintf("[agents.<name>] use = %q", fmt.Sprintf("local:%s@%d", name, ref.Version))
 	} else {
-		return e.fail(fmt.Errorf("pack eject: no built-in pack or option %s (packs: %s; options: %s)", ref, refNames(cat.Packs), refNames(cat.Options)))
+		return e.fail(fmt.Errorf("pack eject: no built-in pack, option or agent %s (packs: %s; options: %s; agents: %s)", ref, refNames(cat.Packs), refNames(cat.Options), refNames(cat.Agents)))
 	}
 	dir := filepath.Join(root, top, name)
 	if err := copyPackage(dir, files, manifest, name); err != nil {
@@ -486,23 +489,38 @@ func packShow(e *env, args []string) int {
 	return 0
 }
 
-// showDoc loads ref as a pack or, failing that, an option. A local ref is a
-// pack when the workspace has packs/<name>/.
+// showDoc loads ref as a pack, an agent or, failing that, an option. A
+// local ref is a pack when the workspace has packs/<name>/, an agent when
+// it has agents/<name>/.
 func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
 	doc := &packDoc{Ref: ref.String(), Source: "built in", Runtimes: []runtimeDoc{}, Ports: []portDoc{}, Gives: []string{}, Files: []packFileEntry{}}
-	isPack := cat.Packs[ref] != nil
+	kind := "option"
+	switch {
+	case cat.Packs[ref] != nil:
+		kind = "pack"
+	case cat.Agents[ref] != nil:
+		kind = "agent"
+	}
 	if ref.Local {
 		doc.Source = "local"
-		doc.Path = filepath.Join(cat.Root, "packs", ref.Name)
-		if _, err := os.Stat(doc.Path); err == nil {
-			isPack = true
-		} else {
-			doc.Path = filepath.Join(cat.Root, "options", ref.Name)
+		kind = "option"
+		doc.Path = filepath.Join(cat.Root, "options", ref.Name)
+		for _, k := range []struct{ top, kind string }{{"packs", "pack"}, {"agents", "agent"}} {
+			if dir := filepath.Join(cat.Root, k.top, ref.Name); dirExists(dir) {
+				kind, doc.Path = k.kind, dir
+				break
+			}
 		}
 	}
 	var files fs.FS
 	var ports []pack.Port
-	if isPack {
+	if kind == "agent" {
+		a, err := cat.Agent(ref)
+		if err != nil {
+			return nil, err
+		}
+		doc.Kind, files = "agent", a.Files
+	} else if kind == "pack" {
 		p, err := cat.Pack(ref)
 		if err != nil {
 			return nil, err
@@ -681,4 +699,11 @@ func packLs(e *env, args []string) int {
 		return e.fail(err)
 	}
 	return 0
+}
+
+// dirExists reports whether dir is a directory (a symlink to one counts:
+// the load that follows refuses what it must).
+func dirExists(dir string) bool {
+	fi, err := os.Stat(dir)
+	return err == nil && fi.IsDir()
 }

@@ -330,3 +330,16 @@ func TestImagesNameRefused(t *testing.T) {
 		t.Errorf("jobs for a bad name: %q", got)
 	}
 }
+
+// A save whose --restart failed (exit 3) comes back with ?restart=failed:
+// the editor says the file was written.
+func TestEditorRestartFailedNotice(t *testing.T) {
+	f := imagesFixture(t)
+	const notice = "Saved. The rebuild and restart failed"
+	if body := f.do(req("GET", "/p/ftest/images/edit/pg-client", nil)).Body.String(); strings.Contains(body, notice) {
+		t.Error("notice without the query")
+	}
+	contains(t, "images editor", f.do(req("GET", "/p/ftest/images/edit/pg-client?restart=failed", nil)).Body.String(), notice)
+	f.cli.set("--json -C /ws/ftest pack file show local:kv2@1 entrypoints/kv.sh", `{"path":"entrypoints/kv.sh","text":"x\n","hash":"`+testHash+`"}`)
+	contains(t, "library editor", f.do(req("GET", "/p/ftest/library/local:kv2@1/entrypoints/kv.sh?restart=failed", nil)).Body.String(), notice)
+}

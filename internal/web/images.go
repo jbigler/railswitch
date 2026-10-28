@@ -214,6 +214,7 @@ func (s *Server) imagesEditor(w http.ResponseWriter, r *http.Request) {
 			v.Notice = "The default (" + doc.Default.Ref + ") changed since it was ejected. Compare it below, or reset to it."
 		}
 	}
+	restartNotice(r, &v)
 	s.html(w, http.StatusOK, "editor", v)
 }
 
@@ -321,4 +322,12 @@ func (s *Server) imagesNew(w http.ResponseWriter, r *http.Request) {
 		Project: p.Prefix, Label: "containerfile new " + name, Dir: p.Workspace,
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "containerfile", "new", name},
 	}, nil, imagesURL(p.Prefix))
+}
+
+// restartNotice is the editor's notice after a save whose --restart failed
+// (exit 3, ?restart=failed): the file was written; the job below says why.
+func restartNotice(r *http.Request, v *editorView) {
+	if r.URL.Query().Get("restart") == "failed" {
+		v.Notice = "Saved. The rebuild and restart failed: the job's output is below."
+	}
 }

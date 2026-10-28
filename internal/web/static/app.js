@@ -687,8 +687,9 @@ function startEditor() {
     edited(); // typed while it ran
   }
 
-  function saved(state, conflict) {
+  function saved(state, conflict, exit) {
     if (state === "ok") location.reload();
+    else if (exit === "3") location.assign(location.pathname + "?restart=failed"); // written; restart failed
     else if (conflict) $("#ed-conflict").hidden = false;
     else toast("The file was not written. The output is below.", true);
   }
@@ -723,13 +724,20 @@ function startEditor() {
 // confirm, then the job; when it ends ok the page goes on to the file it
 // made (data-next) or reloads.
 
+// copiedVersion is the version a new package gets: the copied built-in's
+// (pack eject keeps it), 1 for a blank one.
+function copiedVersion(from) {
+  const m = /@(\d+)$/.exec(from);
+  return m ? m[1] : "1";
+}
+
 function jobNext(f) {
   const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : "");
   switch (f.dataset.job) {
     case "new-addon":
       return f.dataset.next + v("name");
     case "new-package":
-      return f.dataset.next + "local:" + v("name") + "@1/" + (v("kind") === "option" ? "option.toml" : "pack.toml");
+      return f.dataset.next + "local:" + v("name") + "@" + copiedVersion(v("from")) + "/" + (v("kind") === "option" ? "option.toml" : "pack.toml");
     case "delete":
       return f.dataset.next;
   }

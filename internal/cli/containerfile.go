@@ -510,7 +510,7 @@ func containerfileWrite(ctx context.Context, e *env, args []string) int {
 	if workspace.Hash(cur) != *hash {
 		return e.fail(fmt.Errorf("%s changed on disk since you opened it", rel))
 	}
-	ch, err := se.Compare(se.WS.WithFile(rel, text))
+	ch, err := se.Compare(se.WS, se.WS.WithFile(rel, text))
 	w := judgedWrite{hash: workspace.Hash(text), change: ch, err: err}
 	if *dry {
 		return e.printJudged(w)

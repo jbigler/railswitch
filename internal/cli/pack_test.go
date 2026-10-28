@@ -86,7 +86,7 @@ func TestPackEjectRefusesExisting(t *testing.T) {
 	}
 	for args, want := range map[string]string{
 		"local:rails@1":       "local:rails@1 is already local",
-		"nope@1":              "no built-in pack or option nope@1",
+		"nope@1":              "no built-in pack, option or agent nope@1",
 		"rails@1 --as Rails!": `--as "Rails!" must match`,
 	} {
 		code, _, errs := runIn(t, append([]string{"-C", ws, "pack", "eject"}, strings.Fields(args)...)...)

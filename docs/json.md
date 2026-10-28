@@ -113,7 +113,8 @@ refusals exit 1. A new text that does not render exits 0 with `errors`.
 Without `--dry-run` the write is atomic and, after it, every worktree is
 rendered; a failed render puts the file back. It prints each new tag and,
 with `--restart`, restarts the `restart` worktrees (stop, then `up`),
-stopping at the first failure.
+stopping at the first failure. A failed restart exits 3: the file is
+written (as is `pack file write`'s).
 
 ## `pack show <ref>`
 

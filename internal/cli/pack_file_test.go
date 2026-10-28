@@ -435,3 +435,82 @@ func mustRunStdin(t *testing.T, f *systest.Fake, stdin string, args ...string) s
 	}
 	return out
 }
+
+// A ref whose version is not the package's is refused before any write:
+// local:rails@2 would otherwise skip the lock of local:rails@1.
+func TestPackFileWrongVersion(t *testing.T) {
+	ws, dir := localRails(t)
+	file := filepath.Join(dir, "pack.toml")
+	before := readFile(t, file)
+	next := strings.Replace(before, "version = 1", "version = 2", 1)
+	code, _, errs := runStdin(t, unitsFake(), next, "-C", ws, "pack", "file", "write", "local:rails@2", "pack.toml", "--if-hash", workspace.Hash([]byte(before)))
+	if code != 1 || !strings.Contains(errs, "local:rails@1") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if readFile(t, file) != before {
+		t.Error("written")
+	}
+	if code, _, errs := runIn(t, "-C", ws, "pack", "file", "show", "local:rails@2", "pack.toml"); code != 1 || !strings.Contains(errs, "local:rails@1") {
+		t.Errorf("show: exit %d: %s", code, errs)
+	}
+}
+
+// A used package broken on disk is repaired by a write: the current
+// project not resolving doesn't stop the judgement of the fixed text.
+func TestPackFileRepairBroken(t *testing.T) {
+	ws, dir := localRails(t)
+	file := filepath.Join(dir, "pack.toml")
+	good := readFile(t, file)
+	broken := good + "\nbogus_key = 1\n"
+	if err := os.WriteFile(file, []byte(broken), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := workspace.Hash([]byte(broken))
+	code, out, errs := runStdin(t, unitsFake(), good, "--json", "-C", ws, "pack", "file", "write", "local:rails@1", "pack.toml", "--if-hash", h, "--dry-run")
+	if code != 0 {
+		t.Fatalf("dry run exit %d: %s", code, errs)
+	}
+	var d struct {
+		Used   bool
+		Errors []string
+	}
+	if err := json.Unmarshal([]byte(out), &d); err != nil || !d.Used || len(d.Errors) != 0 {
+		t.Fatalf("dry run %+v (%v): %s", d, err, out)
+	}
+	if code, _, errs := runStdin(t, unitsFake(), good, "-C", ws, "pack", "file", "write", "local:rails@1", "pack.toml", "--if-hash", h); code != 0 {
+		t.Fatalf("write exit %d: %s", code, errs)
+	}
+	if out := mustRun(t, "-C", ws, "render", "--check"); out != "" {
+		t.Errorf("render --check after the repair:\n%s", out)
+	}
+}
+
+// Agent packages are in the Library too: a built-in's show and files, and
+// a local one's files edited like a pack's.
+func TestPackFileAgent(t *testing.T) {
+	ws, _ := lockedWS(t)
+	var d struct {
+		Kind  string
+		Files []struct{ Path string }
+	}
+	out := mustRun(t, "-C", ws, "--json", "pack", "show", "claude@1")
+	if err := json.Unmarshal([]byte(out), &d); err != nil || d.Kind != "agent" || !slices.ContainsFunc(d.Files, func(f struct{ Path string }) bool { return f.Path == "agent.toml" }) {
+		t.Fatalf("show %+v (%v): %s", d, err, out)
+	}
+	if out := mustRun(t, "-C", ws, "pack", "file", "show", "claude@1", "agent.toml"); !strings.Contains(out, "name = ") {
+		t.Errorf("built-in agent file:\n%s", out)
+	}
+	mustRun(t, "-C", ws, "pack", "eject", "claude@1", "--as", "bot")
+	dir := filepath.Join(ws, "agents", "bot")
+	md := filepath.Join(dir, "CLAUDE.md")
+	before := readFile(t, md)
+	if code, _, errs := runStdin(t, unitsFake(), before+"more\n", "-C", ws, "pack", "file", "write", "local:bot@1", "CLAUDE.md", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+		t.Fatalf("write exit %d: %s", code, errs)
+	}
+	if readFile(t, md) != before+"more\n" {
+		t.Error("not written")
+	}
+	if code, _, errs := runStdin(t, unitsFake(), "x", "-C", ws, "pack", "file", "write", "local:bot@1", "initdb/x.sh", "--if-hash", ""); code != 1 || !strings.Contains(errs, "not a package file") {
+		t.Errorf("initdb/ in an agent: exit %d: %s", code, errs)
+	}
+}

@@ -78,7 +78,18 @@ func absDir(dir string) (string, error) {
 // when set (-w), else the first path element of startDir below the root.
 // stack.lock must exist (an error wrapping config.ErrNoLock otherwise); it
 // may be out of date (see CheckLock), so teardown and diagnosis still work.
-func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
+func Load(ctx context.Context, startDir, slug string) (*Workspace, error) {
+	return load(startDir, slug, nil)
+}
+
+// LoadEdited is Load of the workspace at root, with cat (a LoadCatalog of
+// root with edits in memory, Catalog.WithFile) as its catalog: the project
+// as an edit would leave it, written nowhere.
+func LoadEdited(_ context.Context, root string, cat *pack.Catalog) (*Workspace, error) {
+	return load(root, "", cat)
+}
+
+func load(startDir, slug string, cat *pack.Catalog) (*Workspace, error) {
 	root, err := Root(startDir)
 	if err != nil {
 		return nil, err
@@ -94,9 +105,10 @@ func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	cat, err := pack.LoadCatalog(root)
-	if err != nil {
-		return nil, err
+	if cat == nil {
+		if cat, err = pack.LoadCatalog(root); err != nil {
+			return nil, err
+		}
 	}
 	st, err := cat.Resolve(p)
 	if err != nil {
@@ -207,20 +219,6 @@ func (w *Workspace) WithFile(rel string, data []byte) *Workspace {
 	}
 	c.overlay[rel] = data
 	return &c
-}
-
-// WithPackageFile is w with rel, a file of a workspace-local pack or option
-// ("packs/<name>/…", "options/<name>/…"), set to data (nil: removed) in
-// memory (pack.Catalog.WithFile), with the stack resolved again and a lock
-// of it as WithProject's, so the change loads and renders unwritten.
-func (w *Workspace) WithPackageFile(rel string, data []byte) (*Workspace, error) {
-	cat, err := w.Catalog.WithFile(rel, data)
-	if err != nil {
-		return nil, err
-	}
-	c := *w
-	c.Catalog = cat
-	return c.WithProject(w.Project)
 }
 
 // Hash is the content hash of a project.toml: "sha256:<hex>".

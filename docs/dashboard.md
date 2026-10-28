@@ -232,7 +232,9 @@ a local file into it, in the browser only (1 MiB at most).
   it off again and says so. It runs `railswitch containerfile write
   <name> --if-hash <h> [--restart]` as a project-level job, the text on
   its stdin. The server refuses a Save without the acknowledgement (400).
-  When the job ends ok the editor reloads the file. If the file changed
+  When the job ends ok the editor reloads the file; when only its
+  restart failed (exit 3) it reloads with "Saved. The rebuild and restart
+  failed" above the job's output. If the file changed
   on disk since the page read it, nothing is written and the page offers
   Reload; your text stays until you reload.
 

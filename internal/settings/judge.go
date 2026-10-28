@@ -254,7 +254,7 @@ func envReasons(cur, next *rendered) []string {
 // does not render: then every unit differs.
 func (e Env) restart(cur, next *rendered) []string {
 	out := []string{}
-	prefix, app := next.m.Prefix, e.WS.Project.Stack.App
+	prefix, app := next.m.Prefix, next.ws.Project.Stack.App
 	services := next.m.Services
 	if cur.m != nil {
 		services = append(slices.Clone(cur.m.Services), services...)
@@ -296,18 +296,21 @@ type Change struct {
 	Restart []string    `json:"restart"`
 }
 
-// Compare judges next, e.WS with files changed in memory (WithFile),
-// against e.WS. The error is next's: it does not render. A current project
-// that does not render (a broken file being fixed) has no builds, and each
-// of its running worktrees restarts.
-func (e Env) Compare(next *workspace.Workspace) (*Change, error) {
+// Compare judges next, the project with files changed in memory
+// (WithFile, LoadEdited), against cur. The error is next's: it does not
+// render. A current project that does not load (cur nil) or render (a
+// broken file being fixed) has no builds, and each of next's running
+// worktrees restarts.
+func (e Env) Compare(cur, next *workspace.Workspace) (*Change, error) {
 	to, err := e.render(next)
 	if err != nil {
 		return nil, err
 	}
-	from, err := e.render(e.WS)
-	if err != nil {
-		from = &rendered{ws: e.WS}
+	from := &rendered{ws: cur}
+	if cur != nil {
+		if r, err := e.render(cur); err == nil {
+			from = r
+		}
 	}
 	c := &Change{Steps: []TagChange{}, Restart: e.restart(from, to)}
 	for i, in := range to.ins {

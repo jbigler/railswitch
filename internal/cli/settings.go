@@ -74,13 +74,20 @@ func (e *env) settingsEnv(ctx context.Context) (settings.Env, []byte, error) {
 	if err != nil {
 		return settings.Env{}, nil, err
 	}
+	se, err := e.envFor(ctx, w)
+	return se, data, err
+}
+
+// envFor is w ready to judge changes: the machine's registry and host, and
+// which of its worktrees' apps run (one systemctl show).
+func (e *env) envFor(ctx context.Context, w *workspace.Workspace) (settings.Env, error) {
 	host, err := workspace.ReadHost(ctx, e.run)
 	if err != nil {
-		return settings.Env{}, nil, err
+		return settings.Env{}, err
 	}
 	reg, err := machine.Read(w.Dirs.Data)
 	if err != nil {
-		return settings.Env{}, nil, err
+		return settings.Env{}, err
 	}
 	prefix := w.Project.Project.Prefix
 	var units []string
@@ -89,10 +96,10 @@ func (e *env) settingsEnv(ctx context.Context) (settings.Env, []byte, error) {
 	}
 	props, err := podman.Systemd{R: e.run}.ShowMany(ctx, units, "ActiveState")
 	if err != nil {
-		return settings.Env{}, nil, err
+		return settings.Env{}, err
 	}
 	running := func(unit string) bool { return props[unit]["ActiveState"] == "active" }
-	return settings.Env{WS: w, Reg: reg, Host: host, Running: running}, data, nil
+	return settings.Env{WS: w, Reg: reg, Host: host, Running: running}, nil
 }
 
 // railswitch settings preview: judge an edit list, write nothing.
@@ -393,8 +400,12 @@ func (e *env) commitJudged(ctx context.Context, root string, w judgedWrite, chan
 			fmt.Fprintf(e.stdout, "%s %s %s\n", s.Worktree, s.Name, s.NewTag)
 		}
 	}
-	if restart {
-		return e.restartAll(ctx, w.change.Restart)
+	if restart && e.restartAll(ctx, w.change.Restart) != 0 {
+		return exitWrittenNotRestarted
 	}
 	return 0
 }
+
+// exitWrittenNotRestarted is a write's exit code when the file was saved but
+// --restart failed, so the page can tell a kept save from a refused one.
+const exitWrittenNotRestarted = 3

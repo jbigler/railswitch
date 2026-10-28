@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,6 +15,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/BurntSushi/toml"
+
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/settings"
@@ -50,7 +54,15 @@ var packFileNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 func packFilePath(rel, manifest string) error {
 	top, file, nested := strings.Cut(rel, "/")
 	ok := false
-	if nested {
+	if manifest == "agent.toml" {
+		// An agent's package also holds the files its mounts name
+		// (agent.toml mounts), at the top: any plain name.
+		if nested {
+			ok = top == "entrypoints" && packFileNameRe.MatchString(file)
+		} else {
+			ok = packFileNameRe.MatchString(top)
+		}
+	} else if nested {
 		ok = (top == "entrypoints" || top == "initdb") && packFileNameRe.MatchString(file)
 	} else {
 		cf, isCF := strings.CutPrefix(top, "Containerfile.")
@@ -65,6 +77,9 @@ func packFilePath(rel, manifest string) error {
 		}
 	}
 	if !ok {
+		if manifest == "agent.toml" {
+			return fmt.Errorf("%q is not a package file: an agent's are a <file> at the top or entrypoints/<file>", rel)
+		}
 		return fmt.Errorf("%q is not a package file: the manifest (%s), Containerfile.<name>, deps.allow, README.md or <name>.sh at the top, or entrypoints/<file> or initdb/<file>", rel, manifest)
 	}
 	return nil
@@ -87,22 +102,38 @@ func realDir(root, rel string) error {
 
 // localPackage is the workspace-relative directory and the manifest of
 // the local package ref: packs/<name>/ when it exists, else
-// options/<name>/. A symlinked directory is refused.
+// options/<name>/, else agents/<name>/. A symlinked directory is refused,
+// and so is a ref whose version is not the one its manifest declares (a
+// manifest that doesn't parse is not checked: a write may be fixing it).
 func localPackage(root string, ref pack.Ref) (dir, manifest string, err error) {
-	for _, k := range []struct{ top, manifest string }{{"packs", "pack.toml"}, {"options", "option.toml"}} {
+	for _, k := range []struct{ top, manifest string }{{"packs", "pack.toml"}, {"options", "option.toml"}, {"agents", "agent.toml"}} {
 		dir := k.top + "/" + ref.Name
 		err := realDir(root, k.top)
 		if err == nil {
 			err = realDir(root, dir)
 		}
 		if err == nil {
-			return dir, k.manifest, nil
+			return dir, k.manifest, checkVersion(root, dir, k.manifest, ref)
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return "", "", err
 		}
 	}
-	return "", "", fmt.Errorf("%s: no packs/%s/ or options/%s/ in %s", ref, ref.Name, ref.Name, root)
+	return "", "", fmt.Errorf("%s: no packs/%s/, options/%s/ or agents/%s/ in %s", ref, ref.Name, ref.Name, ref.Name, root)
+}
+
+// checkVersion refuses ref when dir's manifest declares another version.
+func checkVersion(root, dir, manifest string, ref pack.Ref) error {
+	data, exists, err := readPackFile(root, dir, manifest)
+	if err != nil || !exists {
+		return err
+	}
+	var m struct{ Version int }
+	if _, err := toml.Decode(string(data), &m); err != nil || m.Version < 1 || m.Version == ref.Version {
+		return nil
+	}
+	have := pack.Ref{Name: ref.Name, Version: m.Version, Local: true}
+	return fmt.Errorf("%s/%s is %s, not %s", dir, manifest, have, ref)
 }
 
 // readPackFile reads rel of the package dir (localPackage) as a hostile
@@ -172,8 +203,10 @@ func packFileShow(e *env, args []string) int {
 			files = p.Files
 		} else if o := cat.Options[ref]; o != nil {
 			files = o.Files
+		} else if a := cat.Agents[ref]; a != nil {
+			files = a.Files
 		} else {
-			return e.fail(fmt.Errorf("no built-in pack or option %s (packs: %s; options: %s)", ref, refNames(cat.Packs), refNames(cat.Options)))
+			return e.fail(fmt.Errorf("no built-in pack, option or agent %s (packs: %s; options: %s; agents: %s)", ref, refNames(cat.Packs), refNames(cat.Options), refNames(cat.Agents)))
 		}
 		if data, err = fs.ReadFile(files, rel); err != nil {
 			return e.fail(fmt.Errorf("%s: %w", ref, err))
@@ -273,31 +306,39 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 		return e.fail(fmt.Errorf("%s changed on disk since you opened it", wrel))
 	}
 
-	_, cat, st, err := projectStack(root)
+	p, err := config.Load(filepath.Join(root, "project.toml"))
 	if err != nil {
 		return e.fail(err)
 	}
-	used := st.PackRef == ref || slices.ContainsFunc(st.Options, func(ch *pack.Chosen) bool { return ch.Ref == ref })
+	used := usesRef(p, ref)
+	cat, err := pack.LoadCatalog(root)
+	if err != nil {
+		return e.fail(err)
+	}
 	w := judgedWrite{hash: workspace.Hash(data), used: &used}
 	next, err := cat.WithFile(wrel, data)
 	if err != nil {
 		return e.fail(err)
 	}
-	if manifest == "pack.toml" {
+	switch manifest {
+	case "pack.toml":
 		_, w.err = next.Pack(ref)
-	} else {
+	case "option.toml":
 		_, w.err = next.Option(ref)
+	default:
+		_, w.err = next.Agent(ref)
 	}
-	var se settings.Env
-	if used {
-		if se, _, err = e.settingsEnv(ctx); err != nil {
-			return e.fail(err)
-		}
-		if w.err == nil {
-			var ws *workspace.Workspace
-			if ws, w.err = se.WS.WithPackageFile(wrel, data); w.err == nil {
-				w.change, w.err = se.Compare(ws)
+	if used && w.err == nil {
+		// The current project may not load (the write may be its fix): the
+		// change is judged from the project as it would be.
+		var to *workspace.Workspace
+		if to, w.err = workspace.LoadEdited(ctx, root, next); w.err == nil {
+			var se settings.Env
+			if se, err = e.envFor(ctx, to); err != nil {
+				return e.fail(err)
 			}
+			from, _ := workspace.Load(ctx, root, "")
+			w.change, w.err = se.Compare(from, to)
 		}
 	}
 	if dry {
@@ -309,7 +350,7 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 	}
 	change := fileChange{Rel: wrel, Data: data, Mode: mode}
 	if used {
-		return e.commitJudged(ctx, se.WS.Root, w, []fileChange{change}, true, restart)
+		return e.commitJudged(ctx, root, w, []fileChange{change}, true, restart)
 	}
 	if w.err != nil {
 		return e.fail(w.err)
@@ -320,6 +361,22 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 	}
 	fmt.Fprintln(e.stdout, line)
 	return 0
+}
+
+// usesRef reports whether p's stack names ref: its pack, an option or an
+// agent's package. It reads project.toml only, so a package that doesn't
+// load is still known to be used.
+func usesRef(p *config.Project, ref pack.Ref) bool {
+	r := ref.String()
+	if p.Stack.Pack == r || slices.Contains(slices.Collect(maps.Values(p.Options)), r) {
+		return true
+	}
+	for _, a := range p.Agents {
+		if a.Use == r {
+			return true
+		}
+	}
+	return false
 }
 
 // packFileEntry is one of `pack show --json` files.

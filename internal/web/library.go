@@ -250,6 +250,7 @@ func (s *Server) libraryEditor(w http.ResponseWriter, r *http.Request) {
 			v.DeleteURL = act("rm")
 		}
 	}
+	restartNotice(r, &v)
 	s.html(w, http.StatusOK, "editor", v)
 }
 

@@ -46,8 +46,8 @@ type Catalog struct {
 func (c *Catalog) WithFile(rel string, data []byte) (*Catalog, error) {
 	top, rest, _ := strings.Cut(rel, "/")
 	name, file, _ := strings.Cut(rest, "/")
-	if c.Root == "" || (top != "packs" && top != "options") || name == "" || !fs.ValidPath(rel) || file == "" {
-		return nil, fmt.Errorf("%s is not a file of a workspace-local pack or option", rel)
+	if c.Root == "" || (top != "packs" && top != "options" && top != "agents") || name == "" || !fs.ValidPath(rel) || file == "" {
+		return nil, fmt.Errorf("%s is not a file of a workspace-local pack, option or agent", rel)
 	}
 	dir := top + "/" + name
 	mem := fstest.MapFS{}

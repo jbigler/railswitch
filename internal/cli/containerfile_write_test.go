@@ -284,7 +284,7 @@ func TestContainerfileWriteRestart(t *testing.T) {
 		"Id=filial-master-rails.service\nActiveState=active\n\nId=filial-feat-rails.service\nActiveState=active\n")}, nil)
 	next := before + "# one more line\n"
 	code, _, errs := runStdin(t, f, next, "-C", ws, "containerfile", "write", "pg-client", "--restart", "--if-hash", workspace.Hash([]byte(before)))
-	if code != 1 || !strings.Contains(errs, "restart master:") || strings.Contains(errs, "restart feat") {
+	if code != 3 || !strings.Contains(errs, "restart master:") || strings.Contains(errs, "restart feat") {
 		t.Fatalf("exit %d: %s", code, errs)
 	}
 	if readFile(t, file) != next {

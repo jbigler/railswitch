@@ -64,6 +64,20 @@ Nothing removes copies (they are small; garbage collection is out of 7a).
   hand edit of `project.toml` does that): `CheckLock` fails as now, same
   hint.
 
+The replacement happens in the catalog, before anything else reads the
+stack, so every in-memory render (`settings preview`, `containerfile
+write --dry-run`, `pack file write --dry-run`) sees the accepted content
+too.
+
+**Other writes never accept a waiting update.** `workspace.Lock(ctx,
+root, accept)` takes what it may accept: `lock --accept` passes every
+package, `pack file write` only the package it edits (reviewed in the
+editor), every other caller (`settings apply`, `project write`, `agent
+add`, `project new`) none. A package not accepted keeps its current lock
+entry when that entry's content is usable from the store; a ref that is
+new to the lock (an option added in Settings) is locked as resolved, and
+stored.
+
 `status --json` and `overview --json` gain `review_pending: bool` per
 project.
 

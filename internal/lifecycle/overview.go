@@ -47,6 +47,9 @@ type Overview struct {
 	Worktrees []OverviewWorktree `json:"worktrees"` // registry order (ID)
 	// ReviewPending: a package update waits for review (lock --review), D97.
 	ReviewPending bool `json:"review_pending"`
+	// SignerWarnings: library packages whose signer is revoked or no
+	// longer trusted (D102); always empty until libraries install (7c).
+	SignerWarnings []string `json:"signer_warnings"`
 }
 
 // stackRoles are the roles of the long-running services that make a stack.
@@ -114,7 +117,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending()}
+	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: []string{}}
 	for _, w := range wts {
 		in, err := m.Instance(w)
 		if err != nil {

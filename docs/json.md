@@ -242,6 +242,77 @@ does not read a secret's value back from podman.
 | `driver_differs` | boolean | The value is stored with another driver than `config.toml` configures; `railswitch secret set <name>` re-creates it under the configured one. |
 | `git_signing` | boolean | The value is an SSH commit signing key (`git_signing = true`, D61): its services sign commits and tags with it. |
 
+## `signer ls`
+
+The signers trusted per library (D100), from `signers.toml` in the machine
+config directory. No workspace needed. Libraries are in the file's order.
+`libraries` is `[]` when none is trusted, and no array is ever `null`.
+
+```json
+{
+  "libraries": [
+    {
+      "id": "example.org/acme/stack-library",
+      "last_serial": 7,
+      "keys": [{"key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI…", "fingerprint": "SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU", "added": "2026-10-28"}],
+      "revoked": [{"fingerprint": "SHA256:CX0ZgmTfq/8FQtQpmhqQvuOlkCvpUriJAz+IO6VEXIo"}]
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `libraries[].id` | string | The library's id, as its `library.toml` names it. |
+| `libraries[].last_serial` | number | The highest serial verified as trusted. An index with a lower serial is `rolled-back`. `0` before the first trusted verify. |
+| `libraries[].keys[]` | array | The keys trusted for this library only: `key` (`<type> <base64>`, no comment), `fingerprint` (`SHA256:…`, as `ssh-keygen -lf` prints it), `added` (the day it was trusted, `YYYY-MM-DD`). |
+| `libraries[].revoked[]` | array | Fingerprints never trusted again for this library: `fingerprint`. `signer add` refuses them. |
+
+An entry stays after `signer rm` removes its last key when it has
+revocations or a `last_serial`. So `signer rm` then `signer add` can't undo
+a revocation or accept an older index.
+
+## `library verify <dir>`
+
+The verdict on the library folder `<dir>` (D99): its signed index
+`library.toml`, its signature `library.toml.sig`, and each package
+directory under `packs/`, `options/` and `agents/`. It exits 0 only when
+`status` is `trusted`, and prints the JSON whatever the status. A trusted
+verify saves `signers.toml`: the library's `last_serial`, and the index's
+`[[revoke]]` fingerprints moved from its keys to its revoked list. An
+error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
+
+```json
+{
+  "status": "rotation",
+  "library": "example.org/acme/stack-library",
+  "serial": 8,
+  "fingerprint": "SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU",
+  "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI…",
+  "new_fingerprint": "SHA256:FMVaaJrORVs5Xx60M485oK5AtUTpvWqQapBKMLidPeA",
+  "new_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI…",
+  "packages": [
+    {"ref": "django@1", "kind": "pack", "dir": "packs/django", "signed": true},
+    {"ref": "", "kind": "option", "dir": "options/broken", "signed": false, "reason": "not in library.toml"}
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `status` | string | `trusted`: signed by a key trusted for this library, serial not below `last_serial`. `unknown-signer`: validly signed by a key not trusted for it. `rotation`: signed by a new key that a trusted key vouches for in `[[rotate]]`, not yet confirmed. `rolled-back`: trusted or a rotation, but the serial is below `last_serial`. `revoked`: signed by a key revoked for it. `bad-signature`: the index or signature is malformed, or the signature does not cover the index. |
+| `reason` | string | Why, for `bad-signature` and `rolled-back`; absent otherwise. It is text from the library, which the text form prints with control characters replaced. |
+| `library` | string | The index's `library`; `""` when the index doesn't parse. |
+| `serial` | number | The index's `serial`; `0` when the index doesn't parse. |
+| `fingerprint`, `key` | string | The signing key; for a `rotation`, the trusted key that vouches for the new one. Absent when the signature doesn't parse. |
+| `new_fingerprint`, `new_key` | string | A `rotation`'s new key, which signed the index; absent otherwise. |
+| `packages[]` | array | Each package the index lists, then each package directory it doesn't. `[]` when the index or the signature doesn't parse. |
+| `packages[].ref` | string | The package's ref; `""` for an unlisted directory that doesn't load. |
+| `packages[].kind` | string | `pack`, `option` or `agent`. |
+| `packages[].dir` | string | Its directory in the library, `<kind>s/<name>`. |
+| `packages[].signed` | boolean | The index lists it and its content hash (`pack.ContentHash`, the hash `stack.lock` pins) matches. It counts only when `status` is `trusted`. |
+| `packages[].reason` | string | Why it is not signed: the directory doesn't load, declares another ref, its content differs, or the index doesn't list it. Absent when signed. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1
@@ -348,6 +419,7 @@ row.
   "prefix": "filial",
   "workspace": "/home/u/workspace/filial",
   "review_pending": false,
+  "signer_warnings": [],
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
@@ -368,6 +440,7 @@ row.
 | `prefix` | string | The project's prefix. |
 | `workspace` | string | Its workspace directory as registered. |
 | `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
+| `signer_warnings` | array of strings | Library packages this project runs whose signer was revoked or is no longer trusted (D102). Always `[]` until library packages can be installed (Stage 7c). |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
@@ -671,6 +744,9 @@ such an entry, and reports any hook in `.git/modules/**/hooks/` and any
 symlink or file where `.git/worktrees`, `.git/modules` or a directory under
 them should be (`not-a-dir`); a finding
 is a warning (`warn` true), and `railswitch hooks check` lists them.
+`ssh-keygen -Y` checks that `ssh-keygen` supports `-Y verify` (OpenSSH 8.2
+or newer), which `library verify` and `library sign` need; a failure is a
+warning, since nothing else needs it.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.
 
@@ -685,9 +761,9 @@ code, and the text output shows it as `warn`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
-| `warn` | boolean | A failed check is only a warning (`git-guard`): it doesn't change the exit code. `false` for a passed check. |
+| `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a missing `stack.lock`, `railswitch lock --review` for a stale one); `""` for a passed check. |
 

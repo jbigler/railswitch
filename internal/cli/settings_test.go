@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -298,5 +299,29 @@ func TestProjectWrite(t *testing.T) {
 	}
 	if readFile(t, path) != next || !strings.Contains(out, "wrote "+path) {
 		t.Errorf("project.toml:\n%s\nout: %s", readFile(t, path), out)
+	}
+}
+
+// With no stack.lock before, a failed project write leaves none: a lock of
+// the refused file would describe a project that was never written.
+func TestProjectWriteNoLockLeftOnFailure(t *testing.T) {
+	ws, _ := lockedWS(t)
+	mustRun(t, "-C", ws, "render")
+	path, lock := filepath.Join(ws, "project.toml"), filepath.Join(ws, "stack.lock")
+	before := readFile(t, path)
+	if err := os.Remove(lock); err != nil {
+		t.Fatal(err)
+	}
+	f := unitsFake()
+	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{}, os.ErrPermission)
+	code, _, errs := runStdin(t, f, before+"# edited\n", "-C", ws, "project", "write", "--if-hash", workspace.Hash([]byte(before)))
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if readFile(t, path) != before {
+		t.Error("project.toml not restored")
+	}
+	if _, err := os.Stat(lock); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("stack.lock left behind: %v", err)
 	}
 }

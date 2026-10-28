@@ -205,8 +205,8 @@ func (e *env) restartAll(ctx context.Context, slugs []string) int {
 }
 
 // commitProject replaces root's project.toml (old) with next, then locks
-// and renders. On any failure it writes old and the old stack.lock back, so
-// the workspace is as it was; the units a failed render already wrote are
+// and renders. On any failure it writes old and the old stack.lock back (or
+// removes the new one when there was none), so the workspace is as it was; the units a failed render already wrote are
 // not touched.
 func (e *env) commitProject(ctx context.Context, root string, old, next []byte) (err error) {
 	path := filepath.Join(root, "project.toml")
@@ -229,6 +229,8 @@ func (e *env) commitProject(ctx context.Context, root string, old, next []byte) 
 		rerr := tomlfile.WriteAtomic(path, old, fi.Mode().Perm())
 		if lockErr == nil {
 			rerr = errors.Join(rerr, tomlfile.WriteAtomic(lockPath, oldLock, 0o644))
+		} else if rmErr := os.Remove(lockPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+			rerr = errors.Join(rerr, rmErr) // no lock before: none after
 		}
 		if rerr != nil {
 			err = errors.Join(err, fmt.Errorf("restoring project.toml: %w", rerr))

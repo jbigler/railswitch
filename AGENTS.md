@@ -29,6 +29,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 - `project detect <repo> [--branch <b>] [--pack <ref>]` (D88): `internal/detect`; a shallow blobless sparse clone of only the paths the built-ins' rules name (`detect.Paths`), git with `core.hooksPath=/dev/null`, `protocol.ext.allow=never`, `GIT_LFS_SKIP_SMUDGE=1`, no prompt, 2 min per call; temp dir under `$XDG_RUNTIME_DIR` always removed; a symlinked file or parent, or a file over 1 MiB, is absent.
 - `pack ls` (built-ins newest per name, then the workspace's `local:` ones; for the new-project pickers).
 - Packages: `[detect] files` (pack, all must exist), `[[detect]] file/match/evidence` (option, any rule); paths are `[A-Za-z0-9._+-/]` only (passed as `/<path>` no-cone sparse patterns). Framework knowledge stays in the rules (D87).
+- `project new --dry-run` (`--json`: `project_toml`, the base worktree's routes/containers/env names, warnings, steps; D89): `planNew` (every check, read-only registry) and `writeProject` (project.toml, ejects, secrets) are shared with the real run; the dry run writes into a temp dir it removes and renders in memory on an unsaved registry entry, with no clone, podman or systemctl. `project new --up`: `up` in the base worktree after a successful create.
 
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.

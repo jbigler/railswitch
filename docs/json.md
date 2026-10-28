@@ -436,6 +436,56 @@ before git runs.
 | `options[].evidence` | string | The matching rule's `evidence`; `""` for `default`. |
 | `options[].others` | string[] | The other matching options of the slot. |
 
+## `project new --dry-run`
+
+What `project new` with the same flags would create (D89). The dry run makes
+every check the real run makes and refuses with the same message (exit 1):
+an existing `project.toml`, a bad name, a prefix in use, a bad branch, an
+unknown ref, an option the pack can't use, an env clash, a render error. It
+writes nothing: no clone, no workspace dir, no registry entry, no units, and
+no podman or systemctl call. Without `--branch` it reads the remote's HEAD
+branch (`git ls-remote`).
+
+```json
+{
+  "project_toml": "schema = 1\n\n[project]\nname = \"shop\"\nprefix = \"shop\"\n…",
+  "worktree": {
+    "slug": "main",
+    "routes": [{"host": "main.shop.localhost", "service": "rails"}],
+    "containers": [
+      {"name": "shop-main-rails", "role": "app"},
+      {"name": "shop-main-deps", "role": "deps"},
+      {"name": "shop-main-db", "role": "data"},
+      {"name": "shop-main-cache", "role": "data"},
+      {"name": "shop-main-agent-claude", "role": "agent"}
+    ],
+    "env": ["APP_PORT", "BINDING", "DATABASE_URL", "PGDATABASE", "…", "REDIS_URL", "WORKTREE_SLUG"]
+  },
+  "warnings": [],
+  "steps": [
+    "Clone https://github.com/acme/shop (main) into /home/me/shop/main",
+    "Write project.toml and stack.lock, generate local passwords",
+    "Eject 4 Containerfiles",
+    "Register, lock and render",
+    "Start main (up)"
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `project_toml` | string | The bytes the real run writes to `project.toml`, with `[image]` and the declared secrets. |
+| `worktree.slug` | string | The base worktree: the base branch, sanitized. |
+| `worktree.routes[]` | array | Each Traefik route of the base worktree: its host and the routed service's id. |
+| `worktree.containers[]` | array | Every service of the stack in model order, as its container name and role (`app`, `deps`, `worker`, `data`, `tool`, `agent`). An on-demand agent is listed too. |
+| `worktree.env` | string[] | The app service's env names, sorted. No values: a real run generates the passwords. |
+| `warnings` | string[] | The render's warnings. |
+| `steps` | string[] | What the real run does, in order. The last step is there only with `--up`. |
+
+The summary comes from a render in memory: the base worktree is the only
+worktree, on a registry entry with the next free subnet and worktree ID,
+never saved. Without `--json`, the dry run prints the same content as text.
+
 ## `doctor`
 
 The host checks (among them whether another podman network uses the

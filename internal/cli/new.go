@@ -27,7 +27,7 @@ import (
 	"github.com/jbigler/railswitch/internal/worktree"
 )
 
-const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim] [--agent name=ref]... | [--agent none]"
+const newUsage = "usage: railswitch project new <dir> --repo <url> --prefix <p> [--dry-run] [--up] [--name <n>] [--branch <base>] [--pack rails@1] [--option slot=ref]... [--tool nvim] [--agent name=ref]... | [--agent none]"
 
 const (
 	gitCloneTimeout  = 10 * time.Minute // checks out the app's tree
@@ -52,7 +52,9 @@ const workspaceGitignore = `/*
 
 // railswitch project new: clone the app repo into a new workspace (its own git
 // repo, D38), write project.toml, eject every default Containerfile the
-// stack builds, generate the local passwords, lock, register and render.
+// stack builds, generate the local passwords, lock, register and render;
+// with --up, then up in the base worktree. --dry-run makes the same checks
+// and writes nothing (D89).
 func cmdNew(ctx context.Context, e *env, args []string) int {
 	fset := e.flags("project new")
 	repo := fset.String("repo", "", "the app's git `url`")
@@ -60,6 +62,8 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	name := fset.String("name", "", "the project `name` (default: the dir's name)")
 	branch := fset.String("branch", "", "the `base` branch (default: the remote's HEAD branch)")
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
+	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
+	up := fset.Bool("up", false, "run up in the base worktree once it is created")
 	var opts, tools, agentFlags stringList
 	fset.Var(&opts, "option", "fill an option slot: `slot=ref` or slot=none (repeatable)")
 	fset.Var(&tools, "tool", "enable a developer `tool`: nvim (repeatable)")
@@ -82,98 +86,137 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.usageErr("new: %v\n%s", err, newUsage)
 	}
-	ws, err := filepath.Abs(dir)
+	pl, err := planNew(ctx, e.run, newArgs{dir: dir, repo: *repo, prefix: *prefix, name: *name, branch: *branch, packRef: *packRef, opts: opts, nvim: nvim, agents: agents})
 	if err != nil {
 		return e.fail(err)
 	}
-	if *name == "" {
-		*name = filepath.Base(ws)
-	}
-	switch _, err := os.Lstat(filepath.Join(ws, "project.toml")); {
-	case err == nil:
-		return e.fail(fmt.Errorf("%s already exists: run railswitch project init there to join that project", filepath.Join(ws, "project.toml")))
-	case !errors.Is(err, fs.ErrNotExist):
-		return e.fail(err)
+	if *dryRun {
+		return e.newDryRun(pl, *up)
 	}
 
-	cat, err := pack.LoadCatalog(ws)
-	if err != nil {
-		return e.fail(err)
-	}
-	if agentFlags == nil {
-		if ref, ok := cat.DefaultAgent(); ok {
-			agents = map[string]string{ref.Name: ref.String()}
-		}
-	}
-	p, st, err := newProject(cat, *packRef, *name, *prefix, *repo, opts, nvim, agents)
-	if err != nil {
-		return e.fail(err)
-	}
-	dirs, err := machine.DefaultDirs()
-	if err != nil {
-		return e.fail(err)
-	}
-	if err := prefixFree(dirs, *prefix); err != nil {
-		return e.fail(err)
-	}
-	base := *branch
-	if base == "" {
-		if base, err = remoteHead(ctx, e.run, *repo); err != nil {
-			return e.fail(err)
-		}
-	}
-	if err := gitArg("--branch", base); err != nil {
-		return e.fail(err)
-	}
-	slug, err := naming.Sanitize(base)
-	if err != nil {
-		return e.fail(fmt.Errorf("base branch %q: %w", base, err))
-	}
-	p.Project.BaseBranch = base
-
+	ws, slug := pl.ws, pl.slug
 	before, err := entries(ws)
 	if err != nil {
 		return e.fail(err)
 	}
-	if err := clone(ctx, e.run, *repo, base, filepath.Join(ws, slug)); err != nil {
+	if err := clone(ctx, e.run, *repo, pl.p.Project.BaseBranch, filepath.Join(ws, slug)); err != nil {
 		return e.fail(err)
 	}
-	secrets, id, err := e.createWorkspace(ctx, dirs, ws, slug, p, cat, st)
+	secrets, id, err := e.createWorkspace(ctx, pl)
 	if err != nil {
 		return e.failLeft("project new", err, ws, before)
 	}
 	fmt.Fprintf(e.stdout, "created workspace %s: project %s, base worktree %s (ID %d)\n", ws, *prefix, slug, id)
 	fmt.Fprintf(e.stdout, "the workspace is a git repo: commit project.toml, stack.lock and containerfiles/ (git -C %s add -A && git -C %s commit)\n", shellQuote(ws), shellQuote(ws))
 	e.printNext(ws, slug, secrets)
+	if !*up {
+		return 0
+	}
+	e.dir, e.slug = filepath.Join(ws, slug), slug
+	l, slug, code := e.lifecycle(ctx, "up")
+	if code != 0 {
+		return code
+	}
+	if err := l.Up(ctx, slug); err != nil {
+		return e.fail(err)
+	}
 	return 0
+}
+
+// newArgs are project new's flags, parsed.
+type newArgs struct {
+	dir, repo, prefix, name, branch, packRef string
+	opts                                     []string
+	nvim                                     *config.NvimTool
+	agents                                   map[string]string // nil: the catalog's default agent
+}
+
+// newPlan is a project new that passed every check: what the real run
+// creates and the dry run shows.
+type newPlan struct {
+	ws, slug string
+	p        *config.Project // base_branch set; writeProject adds [image] and the secrets
+	cat      *pack.Catalog
+	st       *pack.Stack
+	dirs     machine.Dirs
+	reg      *machine.Registry // read without the lock, never saved
+}
+
+// planNew makes every check project new makes before it clones, in order,
+// and writes nothing. The base branch, when not given, is the remote's HEAD.
+func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
+	ws, err := filepath.Abs(a.dir)
+	if err != nil {
+		return nil, err
+	}
+	if a.name == "" {
+		a.name = filepath.Base(ws)
+	}
+	switch _, err := os.Lstat(filepath.Join(ws, "project.toml")); {
+	case err == nil:
+		return nil, fmt.Errorf("%s already exists: run railswitch project init there to join that project", filepath.Join(ws, "project.toml"))
+	case !errors.Is(err, fs.ErrNotExist):
+		return nil, err
+	}
+	cat, err := pack.LoadCatalog(ws)
+	if err != nil {
+		return nil, err
+	}
+	if a.agents == nil {
+		if ref, ok := cat.DefaultAgent(); ok {
+			a.agents = map[string]string{ref.Name: ref.String()}
+		}
+	}
+	p, st, err := newProject(cat, a.packRef, a.name, a.prefix, a.repo, a.opts, a.nvim, a.agents)
+	if err != nil {
+		return nil, err
+	}
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return nil, err
+	}
+	reg, err := readRegistry(dirs)
+	if err != nil {
+		return nil, err
+	}
+	if pe, ok := reg.Project(a.prefix); ok {
+		return nil, prefixTaken(a.prefix, pe.Workspace)
+	}
+	base := a.branch
+	if base == "" {
+		if base, err = remoteHead(ctx, r, a.repo); err != nil {
+			return nil, err
+		}
+	}
+	if err := gitArg("--branch", base); err != nil {
+		return nil, err
+	}
+	slug, err := naming.Sanitize(base)
+	if err != nil {
+		return nil, fmt.Errorf("base branch %q: %w", base, err)
+	}
+	p.Project.BaseBranch = base
+	return &newPlan{ws: ws, slug: slug, p: p, cat: cat, st: st, dirs: dirs, reg: reg}, nil
 }
 
 // createWorkspace is new after the clone: everything up to the render.
 // It returns the declared secrets (all unset) and the base worktree's ID.
-func (e *env) createWorkspace(ctx context.Context, dirs machine.Dirs, ws, slug string, p *config.Project, cat *pack.Catalog, st *pack.Stack) ([]string, int, error) {
+func (e *env) createWorkspace(ctx context.Context, pl *newPlan) ([]string, int, error) {
+	ws := pl.ws
 	if _, err := e.run.Run(ctx, sys.Cmd{Name: "git", Args: []string{"init", ws}}); err != nil {
 		return nil, 0, fmt.Errorf("git init %s: %w", ws, err)
 	}
 	if err := createFile(filepath.Join(ws, ".gitignore"), []byte(workspaceGitignore), 0o644); err != nil {
 		return nil, 0, err
 	}
-	if err := prepare(ws, slug, st); err != nil {
+	if err := prepare(ws, pl.slug, pl.st); err != nil {
 		return nil, 0, err
 	}
-	proj := filepath.Join(ws, "project.toml")
-	if err := createFile(proj, projectTOML(p), 0o644); err != nil {
-		return nil, 0, err
-	}
-	for _, n := range ejectNames(st) {
-		if err := Eject(ws, cat, st, n, false); err != nil {
-			return nil, 0, fmt.Errorf("eject %s: %w", n, err)
-		}
-	}
-	secrets, err := addNewSecrets(proj, p, st)
+	secrets, err := writeProject(ws, pl)
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := writeGenerated(ws, st); err != nil {
+	if err := writeGenerated(ws, pl.st, randomValue); err != nil {
 		return nil, 0, err
 	}
 	if err := workspace.Lock(ctx, ws); err != nil {
@@ -183,8 +226,25 @@ func (e *env) createWorkspace(ctx context.Context, dirs machine.Dirs, ws, slug s
 	if err != nil {
 		return nil, 0, err
 	}
-	id, err := e.registerAndRender(ctx, dirs, w, slug)
+	id, err := e.registerAndRender(ctx, pl.dirs, w, pl.slug)
 	return secrets, id, err
+}
+
+// writeProject writes pl's project.toml into dir, ejects the stack's default
+// Containerfiles there (which sets [image]) and declares the secrets
+// (addNewSecrets), returning their names. The real run writes into the
+// workspace, the dry run into a temp dir: one path, the same bytes.
+func writeProject(dir string, pl *newPlan) ([]string, error) {
+	proj := filepath.Join(dir, "project.toml")
+	if err := createFile(proj, projectTOML(pl.p), 0o644); err != nil {
+		return nil, err
+	}
+	for _, n := range ejectNames(pl.st) {
+		if err := Eject(dir, pl.cat, pl.st, n, false); err != nil {
+			return nil, fmt.Errorf("eject %s: %w", n, err)
+		}
+	}
+	return addNewSecrets(proj, pl.p, pl.st)
 }
 
 // railswitch project init: join a project from a clone of its workspace repo (D38).
@@ -232,7 +292,7 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 	}
 	err = prepare(root, slug, w.Stack)
 	if err == nil {
-		err = writeGenerated(root, w.Stack)
+		err = writeGenerated(root, w.Stack, randomValue)
 	}
 	id := 0
 	if err == nil {
@@ -536,15 +596,25 @@ func ejectNames(st *pack.Stack) []string {
 
 // prefixFree refuses a prefix registered on this machine.
 func prefixFree(dirs machine.Dirs, prefix string) error {
-	reg, err := machine.Open(dirs.Data)
+	reg, err := readRegistry(dirs)
 	if err != nil {
 		return err
 	}
-	defer reg.Close()
 	if pe, ok := reg.Project(prefix); ok {
 		return prefixTaken(prefix, pe.Workspace)
 	}
 	return nil
+}
+
+// readRegistry reads the machine registry without the lock and without
+// creating it (none yet: empty). registerAndRender checks the prefix again
+// under the lock.
+func readRegistry(dirs machine.Dirs) (*machine.Registry, error) {
+	reg, err := machine.Read(dirs.Data)
+	if errors.Is(err, fs.ErrNotExist) {
+		return &machine.Registry{Schema: machine.SchemaVersion}, nil
+	}
+	return reg, err
 }
 
 func prefixTaken(prefix, ws string) error {
@@ -619,10 +689,10 @@ func prepare(ws, slug string, st *pack.Stack) error {
 	return worktree.PrecreateVolumes(filepath.Join(ws, slug), worktree.VolumeDirs(st.Pack))
 }
 
-// writeGenerated writes <ws>/mise.local.toml (0600) with a fresh random
-// value for each generated name of the chosen options (D17). The values
-// are never printed.
-func writeGenerated(ws string, st *pack.Stack) error {
+// writeGenerated writes <ws>/mise.local.toml (0600) with a value from value
+// for each generated name of the chosen options (D17). The values are never
+// printed.
+func writeGenerated(ws string, st *pack.Stack, value func() string) error {
 	var names []string
 	for _, ch := range st.Options {
 		names = append(names, ch.Option.Generated...)
@@ -631,11 +701,16 @@ func writeGenerated(ws string, st *pack.Stack) error {
 	var b strings.Builder
 	b.WriteString("# Local values railswitch generated for the services (D17). Never commit this file.\n[env]\n")
 	for _, n := range slices.Compact(names) {
-		buf := make([]byte, 16)
-		rand.Read(buf)
-		fmt.Fprintf(&b, "%s = %s\n", n, config.QuoteString(hex.EncodeToString(buf)))
+		fmt.Fprintf(&b, "%s = %s\n", n, config.QuoteString(value()))
 	}
 	return createFile(filepath.Join(ws, "mise.local.toml"), []byte(b.String()), 0o600)
+}
+
+// randomValue is a fresh local password: 32 hex digits.
+func randomValue() string {
+	buf := make([]byte, 16)
+	rand.Read(buf)
+	return hex.EncodeToString(buf)
 }
 
 // createFile writes a new file; an existing one is refused.

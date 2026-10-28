@@ -71,7 +71,7 @@ var completionFlags = map[string][]string{
 	"pack new":               {"--dir="},
 	"project detect":         {"--branch=", "--pack="},
 	"project rm":             {"--purge", "--yes"},
-	"project new":            {"--agent=", "--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
+	"project new":            {"--agent=", "--branch=", "--dry-run", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool=", "--up"},
 	"project write":          {"--if-hash="},
 	"render":                 {"--check"},
 	"secret add":             {"--env=", "--git-signing", "--machine", "--service="},

@@ -317,18 +317,18 @@ build` in `railswitch exec --fresh`, 1 min 20 s; `/` serves the built app).
 
 | Gap | Generic feature | Commit |
 |-----|-----------------|--------|
-| Node 25+ has no corepack: a yarn 4 app (Mastodon, Node 26) had no yarn | rails base image installs corepack from npm | `5f8b37c` |
-| `FROM …:${V%%-otp-*}` pre-pulled `…:-otp-28-slim` | FROM/ARG expansion with buildah's modifiers; an unknown form is an error | `563f0cd` |
-| `up` on a running stack reran deps twice; under Phoenix, mix touched `compile.lock` and the code reloader refused every request | with the app active, services start with `--job-mode=ignore-requirements` | `e1ad53f` |
-| `pack new` needed a project, `project new --pack local:` needed the pack | `pack new --dir <workspace>` | `326a63b` |
-| `MB_DB_CONNECTION_URI = "{env.DATABASE_URL}"` silently dropped | `{env.X}` holding a generated value expands in env only | `f78df40` |
-| Dashboard "PRs unavailable: mise ERROR" (mise-shimmed `gh` refused the workspace's `mise.local.toml`); `pr ls` HTTP 504 on busy repos | `gh` runs in `/`; one `--head=<branch>` query per worktree branch | `bfe6078` |
-| Metabase pins `java = "temurin-25.0.3+9.0.LTS"` (mise); `.java-version` was no source | Java values lose their distribution and `+build` | `83bd86f` |
-| `db dump` wrote `{db}.dump` only: a second database of the server was lost on a round trip | `[dump] list`; `postgres@1` dumps every database | `5c332d3` |
-| ClickHouse beside Postgres had no slot (D3) | any other `[options]` key adds a service of that name (D81) | `57478ae` |
-| Moving ClickHouse to `analytics` left the old `storage` container running on its volume; the new one exited 76 | render stops a container whose unit it removes | `0415ce6` |
-| Metabase never creates its database (`mb_dev does not exist`); a dump of a database `POSTGRES_DB` made aborted the restore | `postgres@1` sets `POSTGRES_DB = "{db}"`; restore-dump.sh restores into an existing database | `3025d73`, `15754f9` |
-| `stop` on Mastodon SIGKILLed everything after 10 s and left the unit `failed` (exit 137): its `bin/dev` runs foreman as a child of PID 1 `sh` | the rails app entrypoint passes a stop to the container's process group and exits 0 | `51485bf` |
+| Node 25+ has no corepack: a yarn 4 app (Mastodon, Node 26) had no yarn | rails base image installs corepack from npm | `8f51191` |
+| `FROM …:${V%%-otp-*}` pre-pulled `…:-otp-28-slim` | FROM/ARG expansion with buildah's modifiers; an unknown form is an error | `c64c267` |
+| `up` on a running stack reran deps twice; under Phoenix, mix touched `compile.lock` and the code reloader refused every request | with the app active, services start with `--job-mode=ignore-requirements` | `3c86317` |
+| `pack new` needed a project, `project new --pack local:` needed the pack | `pack new --dir <workspace>` | `4d1590c` |
+| `MB_DB_CONNECTION_URI = "{env.DATABASE_URL}"` silently dropped | `{env.X}` holding a generated value expands in env only | `9bbcaf8` |
+| Dashboard "PRs unavailable: mise ERROR" (mise-shimmed `gh` refused the workspace's `mise.local.toml`); `pr ls` HTTP 504 on busy repos | `gh` runs in `/`; one `--head=<branch>` query per worktree branch | `593399a` |
+| Metabase pins `java = "temurin-25.0.3+9.0.LTS"` (mise); `.java-version` was no source | Java values lose their distribution and `+build` | `ae68b01` |
+| `db dump` wrote `{db}.dump` only: a second database of the server was lost on a round trip | `[dump] list`; `postgres@1` dumps every database | `5f64059` |
+| ClickHouse beside Postgres had no slot (D3) | any other `[options]` key adds a service of that name (D81) | `9251f61` |
+| Moving ClickHouse to `analytics` left the old `storage` container running on its volume; the new one exited 76 | render stops a container whose unit it removes | `3c32b98` |
+| Metabase never creates its database (`mb_dev does not exist`); a dump of a database `POSTGRES_DB` made aborted the restore | `postgres@1` sets `POSTGRES_DB = "{db}"`; restore-dump.sh restores into an existing database | `e3a3d3a`, `2a8c9f8` |
+| `stop` on Mastodon SIGKILLed everything after 10 s and left the unit `failed` (exit 137): its `bin/dev` runs foreman as a child of PID 1 `sh` | the rails app entrypoint passes a stop to the container's process group and exits 0 | `943bb0f` |
 
 Open: `internal/term` does not know `xdg-terminal-exec`, the session's
 `TERMINAL` on Omarchy; with several terminals installed it would not pick

@@ -131,7 +131,16 @@ type selfCLI struct {
 // Run returns the command's stdout; a failure is its last stderr line
 // without the "railswitch: " prefix (the page shows it).
 func (c selfCLI) Run(ctx context.Context, args ...string) ([]byte, error) {
-	res, err := c.r.Run(ctx, sys.Cmd{Name: c.exe, Args: args, Timeout: cliTimeout})
+	return c.RunInput(ctx, nil, args...)
+}
+
+// RunInput is Run with stdin on the command's standard input (nil: none).
+func (c selfCLI) RunInput(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
+	cmd := sys.Cmd{Name: c.exe, Args: args, Timeout: cliTimeout}
+	if stdin != nil {
+		cmd.Stdin = bytes.NewReader(stdin)
+	}
+	res, err := c.r.Run(ctx, cmd)
 	if err == nil {
 		return res.Stdout, nil
 	}

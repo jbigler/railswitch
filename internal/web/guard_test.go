@@ -31,10 +31,15 @@ type fakeCLI struct {
 	out    map[string]string
 	errs   map[string]error
 	calls  [][]string
+	stdins [][]byte // per call; nil for Run
 	during func(key string)
 }
 
-func (f *fakeCLI) Run(_ context.Context, args ...string) ([]byte, error) {
+func (f *fakeCLI) Run(ctx context.Context, args ...string) ([]byte, error) {
+	return f.RunInput(ctx, nil, args...)
+}
+
+func (f *fakeCLI) RunInput(_ context.Context, stdin []byte, args ...string) ([]byte, error) {
 	key := strings.Join(args, " ")
 	f.mu.Lock()
 	during := f.during
@@ -45,6 +50,7 @@ func (f *fakeCLI) Run(_ context.Context, args ...string) ([]byte, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, slices.Clone(args))
+	f.stdins = append(f.stdins, slices.Clone(stdin))
 	if err := f.errs[key]; err != nil {
 		return nil, err
 	}

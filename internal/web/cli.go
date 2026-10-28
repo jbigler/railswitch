@@ -13,6 +13,9 @@ import (
 // the page sees.
 type CLI interface {
 	Run(ctx context.Context, args ...string) ([]byte, error)
+	// RunInput is Run with stdin written to the command (D86: settings
+	// edits and secret values travel only this way, never in argv).
+	RunInput(ctx context.Context, stdin []byte, args ...string) ([]byte, error)
 }
 
 // The JSON documents of the read commands, as docs/json.md has them; only

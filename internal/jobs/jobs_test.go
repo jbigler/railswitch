@@ -1,8 +1,12 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,14 +24,21 @@ var wantScope = []string{"systemd-run", "--user", "--scope", "--collect", "--qui
 // scopeRunner records every argv and runs it for real without the
 // systemd-run prefix (no systemd in tests).
 type scopeRunner struct {
-	mu    sync.Mutex
-	calls [][]string
+	mu     sync.Mutex
+	calls  [][]string
+	stdins [][]byte // nil when the call had no stdin
 }
 
 func (s *scopeRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
 	full := append([]string{c.Name}, c.Args...)
+	var in []byte
+	if c.Stdin != nil {
+		in, _ = io.ReadAll(c.Stdin)
+		c.Stdin = bytes.NewReader(in)
+	}
 	s.mu.Lock()
 	s.calls = append(s.calls, full)
+	s.stdins = append(s.stdins, in)
 	s.mu.Unlock()
 	if len(full) <= len(wantScope) || !slices.Equal(full[:len(wantScope)], wantScope) {
 		return sys.Result{}, errors.New("not wrapped in a scope")
@@ -414,5 +425,53 @@ func TestSnapshotLinesCopied(t *testing.T) {
 	j.Lines[0] = "changed"
 	if again, _ := find(h, "p", j.ID); again.Lines[0] != "a" {
 		t.Errorf("hub lines changed through a snapshot: %q", again.Lines)
+	}
+}
+
+// TestStartInputStdin: the payload reaches the child's stdin and appears
+// nowhere else a reader of the hub can look; Start still gives /dev/null.
+func TestStartInputStdin(t *testing.T) {
+	h, r, dir := newHub(t)
+	payload := []byte("s3cret\n'$(x)\n")
+	snap, err := h.StartInput(context.Background(), sh("p", "", `n=$(wc -c); echo "read $n bytes"`), payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := fmt.Sprintf("%+v", snap); strings.Contains(v, "s3cret") {
+		t.Errorf("start snapshot leaks: %s", v)
+	}
+	done := waitDone(t, h, snap)
+	if done.State != StateOK || !slices.Contains(done.Lines, fmt.Sprintf("read %d bytes", len(payload))) {
+		t.Fatalf("job %+v", done)
+	}
+	r.mu.Lock()
+	got := r.stdins[0]
+	r.mu.Unlock()
+	if !bytes.Equal(got, payload) {
+		t.Errorf("stdin %q, want %q", got, payload)
+	}
+	js, err := json.Marshal(done)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log, err := os.ReadFile(filepath.Join(dir, done.ID+".log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, view := range map[string]string{"%+v": fmt.Sprintf("%+v", done), "json": string(js), "log": string(log)} {
+		if strings.Contains(view, "s3cret") {
+			t.Errorf("%s leaks the payload: %s", name, view)
+		}
+	}
+
+	plain, err := h.Start(context.Background(), sh("p", "", "true"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitDone(t, h, plain)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stdins[1] != nil {
+		t.Errorf("Start stdin %q, want none", r.stdins[1])
 	}
 }

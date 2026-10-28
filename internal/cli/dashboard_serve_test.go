@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,6 +75,22 @@ func TestSelfCLI(t *testing.T) {
 	}
 	if f.Cmds[0].Timeout <= 0 || f.Cmds[0].Stdin != nil {
 		t.Errorf("cmd %+v", f.Cmds[0])
+	}
+}
+
+// TestSelfCLIInput: stdin reaches the command's stdin and is not in argv.
+func TestSelfCLIInput(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"/bin/rs", "secret", "set", "tok"}, sys.Result{}, nil)
+	c := selfCLI{r: f, exe: "/bin/rs"}
+	if _, err := c.RunInput(context.Background(), []byte("v4lue\n"), "secret", "set", "tok"); err != nil {
+		t.Fatal(err)
+	}
+	if string(f.Stdins[0]) != "v4lue\n" {
+		t.Errorf("stdin %q", f.Stdins[0])
+	}
+	if strings.Contains(strings.Join(f.Cmds[0].Args, " "), "v4lue") {
+		t.Errorf("argv %v", f.Cmds[0].Args)
 	}
 }
 

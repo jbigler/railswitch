@@ -4,9 +4,11 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -85,6 +87,7 @@ type job struct {
 	log       string
 	cancel    context.CancelFunc
 	cancelled bool
+	stdin     []byte // the child's stdin (D86); never in snap, log or events
 }
 
 // Hub runs jobs and keeps the last KeepJobs of them.
@@ -125,6 +128,13 @@ func New(r sys.Runner, logDir string, env func(context.Context) []string) (*Hub,
 // worktree runs, or of the same project when either job is project-level.
 // The job outlives ctx; only Cancel ends it early.
 func (h *Hub) Start(ctx context.Context, s Spec) (Snapshot, error) {
+	return h.StartInput(ctx, s, nil)
+}
+
+// StartInput is Start with stdin written to the child's standard input
+// (D86: secret values, settings edits). The hub holds the bytes only until
+// the child starts; they are not in Spec, Snapshot, events or the log.
+func (h *Hub) StartInput(ctx context.Context, s Spec, stdin []byte) (Snapshot, error) {
 	if len(s.Argv) == 0 {
 		return Snapshot{}, errors.New("jobs: empty argv")
 	}
@@ -152,6 +162,7 @@ func (h *Hub) Start(ctx context.Context, s Spec) (Snapshot, error) {
 		snap:   Snapshot{ID: id, Spec: s, State: StateRunning, Started: started},
 		log:    path,
 		cancel: cancel,
+		stdin:  slices.Clone(stdin),
 	}
 	h.jobs = append(h.jobs, j)
 	h.prune()
@@ -234,12 +245,17 @@ func (h *Hub) run(ctx context.Context, j *job, t *logTail, env []string) {
 		h.follow(j, t, exited)
 	}()
 	s := j.snap.Spec // immutable after Start
+	var in io.Reader // nil = /dev/null
+	if j.stdin != nil {
+		in = bytes.NewReader(j.stdin)
+		j.stdin = nil // only run touches it
+	}
 	res, err := h.r.Run(ctx, sys.Cmd{
 		Name:      scope[0],
 		Args:      append(slices.Clone(scope[1:]), s.Argv...),
 		Dir:       s.Dir,
 		Env:       env,
-		Stdin:     nil, // /dev/null
+		Stdin:     in,
 		Stdout:    t.w, // the same *os.File for both: written directly,
 		Stderr:    t.w, // no pipe through the dashboard
 		Timeout:   sys.NoTimeout,

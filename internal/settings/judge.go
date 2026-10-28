@@ -131,7 +131,7 @@ func (e Env) judge(prev *rendered, text string) (EditResult, *rendered) {
 		return blocked(err)
 	}
 	env := envReasons(prev, next)
-	r := EditResult{Impact: ImpactNone, Reasons: append(data, env...)}
+	r := EditResult{Impact: ImpactNone, Reasons: append(append([]string{}, data...), env...)}
 	switch {
 	case len(data) > 0:
 		r.Impact = ImpactData

@@ -227,8 +227,8 @@ func TestPreviewCacheVolume(t *testing.T) {
 func TestPreviewLinkNone(t *testing.T) {
 	e := filialEnv(t, nil)
 	p := preview(t, e, Edit{Op: "link.add", Label: "Flipper", URL: "{worktree.host}/flipper"})
-	if r := p.Edits[0]; r.Impact != ImpactNone || len(r.Reasons) != 0 {
-		t.Fatalf("result = %+v", r)
+	if r := p.Edits[0]; r.Impact != ImpactNone || r.Reasons == nil || len(r.Reasons) != 0 {
+		t.Fatalf("result = %+v; want none with an empty, non-null reason list", r)
 	}
 	if len(p.Restart) != 0 {
 		t.Errorf("Restart = %v", p.Restart)

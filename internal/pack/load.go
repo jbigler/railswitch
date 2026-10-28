@@ -235,13 +235,16 @@ func (l *loader) tool(dir string) (*Tool, error) {
 
 // Package kinds, as stack.lock's tables and WithPackage name them. A tool
 // (KindTool, by name) and the agent base image (KindBase, AgentBaseRef)
-// are built in only, and carry no version (D107).
+// are built in only, and carry no version (D107). A template
+// (KindTemplate, D108) is no catalog package: a library's index lists it
+// and LibraryTree reads it.
 const (
-	KindPack   = "pack"
-	KindOption = "option"
-	KindAgent  = "agent"
-	KindTool   = "tool"
-	KindBase   = "base"
+	KindPack     = "pack"
+	KindOption   = "option"
+	KindAgent    = "agent"
+	KindTool     = "tool"
+	KindBase     = "base"
+	KindTemplate = "template"
 )
 
 // AgentBaseRef names the agent base image's files (Catalog.AgentBase) as

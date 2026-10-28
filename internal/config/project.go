@@ -45,6 +45,15 @@ type Project struct {
 	Firewall  Firewall                    `toml:"firewall"`
 	Image     ImageConfig                 `toml:"image"`
 	Agents    map[string]Agent            `toml:"agents"` // agent name → its package and settings
+	Template  *TemplateRef                `toml:"template"`
+}
+
+// TemplateRef is the [template] table: the template project new started
+// the project from and the content hash it was accepted at (D111).
+// Nothing else reads it: a template is never applied again.
+type TemplateRef struct {
+	Ref    string `toml:"ref"`    // "<name>@N" (this machine's) or "<alias>:<name>@N"
+	SHA256 string `toml:"sha256"` // its content hash (pack.ContentHash)
 }
 
 // ImageConfig is the workspace's base image chain (D31).
@@ -426,8 +435,17 @@ func (p *Project) Validate() error {
 		}
 	}
 
+	if t := p.Template; t != nil {
+		v.ref("template.ref", t.Ref, false)
+		if !sha256Re.MatchString(t.SHA256) {
+			v.add("template.sha256", "%q is not 64 lowercase hex digits", t.SHA256)
+		}
+	}
+
 	return errors.Join(v.errs...)
 }
+
+var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type validator struct{ errs []error }
 

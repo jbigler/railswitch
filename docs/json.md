@@ -358,6 +358,92 @@ order, each with its last fetch. `libraries` is `[]` when there are none.
 | `packages` | number | The packages the current copy's index lists; `0` without one. |
 | `pending` | object or null | A fetch waiting for `library trust <alias>`: `status` `unknown-signer` or `rotation`; `fingerprint` the signer (for a rotation, the trusted key that vouches for the new one); `new_fingerprint` a rotation's new key, else `""`; `known_library` as in `library verify` (trust needs `--new-signer`). `null` when none waits. |
 
+## `template ls`
+
+The templates a new project can start from (D109, docs/templates.md):
+this machine's store, then each library's in `libraries.toml` order. A
+template that doesn't read is left out (its reason on stderr).
+`templates` is `[]` when there are none.
+
+```json
+{
+  "templates": [
+    {
+      "ref": "acme:rails-pg@3",
+      "name": "rails-pg",
+      "version": 3,
+      "description": "Rails with PostgreSQL and Redis",
+      "source": "library acme",
+      "packages": ["rails@1", "postgres@1", "acme:redis@1"]
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref` | string | `<name>@N` on this machine, `<alias>:<name>@N` from a library. |
+| `name`, `version` | string, number | From its `stack.toml`. |
+| `description` | string | One line; `""` for none. |
+| `source` | string | `machine` or `library <alias>`. |
+| `packages` | array of strings | The package refs its lines use: the pack, each option (slot order, then extra services; `none` left out), each agent's. |
+
+## `template show <ref>`
+
+One template, as `template ls` resolves it.
+
+```json
+{
+  "ref": "rails-pg@1",
+  "sha256": "3f0c…",
+  "stack_toml": "schema = 1\nname = \"rails-pg\"\n…",
+  "ask": [{"key": "options.cache", "prompt": "Cache", "default": "redis@1"}],
+  "secrets": ["rails_master_key"],
+  "containerfiles": ["pg-client"],
+  "readme": "",
+  "files": [{"path": "stack.toml", "text": "…"}]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sha256` | string | The template's content hash (`pack.ContentHash`, lowercase hex, no prefix), as `[template] sha256` records it. |
+| `stack_toml` | string | Its `stack.toml`. |
+| `ask` | array | Its questions in order: `key` (`options.<key>`, `versions.<name>` or `env.<NAME>`), `prompt`, `default`. |
+| `secrets` | array of strings | The secrets it declares (names; never a value). |
+| `containerfiles` | array of strings | The `<name>` of each `containerfiles/Containerfile.<name>` it holds, sorted. |
+| `readme` | string | Its `README.md`; `""` for none. |
+| `files` | array | Every file, by path: `path`, `text`. |
+
+## `template check`
+
+The project's template (-C) against what `[template]` records (D111).
+A project with no `[template]` is refused (exit 1). Exit 0 otherwise,
+whether or not the template changed. Nothing is applied: `template check
+--accept <current>` only writes `current` to `[template] sha256` (and
+stores that content as the next diff's base); another hash is refused.
+
+```json
+{
+  "ref": "acme:rails-pg@1",
+  "sha256": "df728e1a…",
+  "current": "1b924e2a…",
+  "update": true,
+  "error": "",
+  "files": [
+    {"path": "containerfiles/Containerfile.pg-client", "status": "changed", "diff": "--- a/…", "flags": [{"check": "runs-here", "line": 40, "text": "+ RUN curl … | sh"}]}
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref`, `sha256` | string | As `[template]` records them. |
+| `current` | string | The content hash `ref` resolves to now; `""` when it doesn't resolve. |
+| `update` | boolean | `current` is not `""` and differs from `sha256`. |
+| `error` | string | Why `ref` doesn't resolve (gone from the store or the library, or no longer matching its signed index); `""` when it does. |
+| `files` | array | With `update`: every file that differs from the stored accepted copy to the current one, as in [`lock --review`](#lock---review) (`path`, `status`, `diff`, `flags`); a missing accepted copy shows every file `added`. `[]` without an update. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1
@@ -486,6 +572,8 @@ row.
 | `workspace` | string | Its workspace directory as registered. |
 | `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
 | `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
+| `template` | object or null | The template the project started from, as `project.toml` `[template]` records it: `ref`, `sha256` (lowercase hex, no prefix). `null` when it records none. |
+| `template_update` | boolean | `template.ref` resolves to content with another hash than `template.sha256` (a library fetch changed it, D111). [`template check`](#template-check) shows the diff; nothing is applied. `false` without a template or when the ref doesn't resolve. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
@@ -748,7 +836,12 @@ branch (`git ls-remote`).
     "Register, lock and render",
     "Start main (up)"
   ],
-  "install": null
+  "install": null,
+  "template": {
+    "ref": "rails-pg@1",
+    "sha256": "8ef3eafac52875f5c98c2d13eeb7b18d27d559c8de7cfacafdb37d9dad969e9d",
+    "ask": [{"key": "env.TZ", "prompt": "Time zone", "default": "UTC", "answer": "Asia/Bangkok"}]
+  }
 }
 ```
 
@@ -761,7 +854,8 @@ branch (`git ls-remote`).
 | `worktree.env` | string[] | The app service's env names, sorted. No values: a real run generates the passwords. |
 | `warnings` | string[] | The render's warnings. |
 | `steps` | string[] | What the real run does, in order. The last step is there only with `--up`. |
-| `install` | object or null | The Install review of the library packages the project uses, as `settings preview`'s `install`; `null` when it uses none. The real run then needs `project new … --accept-install <install.hash>`, checked before the clone and again by the lock. |
+| `install` | object or null | The Install review of the library packages the project uses, as `settings preview`'s `install`, and of a library template (a package of kind `template`, every file added and flagged); `null` when it uses neither. Its `hash` covers the template's ref and content hash too. The real run then needs `project new … --accept-install <install.hash>`, checked before the clone and again by the lock. |
+| `template` | object or null | With `--template`: `ref`, `sha256` (its content hash, lowercase hex, no prefix, as `[template] sha256` records it) and each question in order: `key`, `prompt`, `default`, `answer` (the value the project gets: the `--answer` given, `""` included, else the default). `null` without `--template`. |
 
 The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,

@@ -457,23 +457,7 @@ func AddSecret(path, name string, s Secret) error {
 		if !secretNameRe.MatchString(name) {
 			return "", fmt.Errorf("secret name %q must match %s", name, secretNameRe)
 		}
-		var b strings.Builder
-		if len(s.Services) > 0 {
-			elems := make([]string, len(s.Services))
-			for i, id := range s.Services {
-				elems[i] = QuoteString(id)
-			}
-			b.WriteString("services = [" + strings.Join(elems, ", ") + "]\n")
-		}
-		for _, kv := range [][2]string{{"env", s.Env}, {"scope", s.Scope}, {"git_host", s.GitHost}, {"git_user", s.GitUser}} {
-			if kv[1] != "" {
-				b.WriteString(kv[0] + " = " + QuoteString(kv[1]) + "\n")
-			}
-		}
-		if s.GitSigning {
-			b.WriteString("git_signing = true\n")
-		}
-		return d.appendTable([]string{"secrets", name}, b.String()), nil
+		return d.appendTable([]string{"secrets", name}, SecretTOML(s)), nil
 	})
 }
 
@@ -558,6 +542,23 @@ func SetEnv(data, name, value string) (string, error) {
 		return d.setValue(s, QuoteString(value)), nil
 	}
 	return d.insertKey(table, keyTOML(name), QuoteString(value)), nil
+}
+
+// SetTemplateSHA sets [template] sha256 to sha (template check --accept,
+// D111); a project.toml with no [template] ref is an error.
+func SetTemplateSHA(data, sha string) (string, error) {
+	d, err := parseEdit(data, "template", false, false)
+	if err != nil {
+		return "", err
+	}
+	table := []string{"template"}
+	if d.find(table, "ref") == nil {
+		return "", errors.New("project.toml: [template] has no ref")
+	}
+	if s := d.find(table, "sha256"); s != nil {
+		return d.setValue(s, QuoteString(sha)), nil
+	}
+	return d.insertKey(table, "sha256", QuoteString(sha)), nil
 }
 
 // UnsetEnv removes the project [env] name; an absent name is an error.

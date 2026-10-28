@@ -381,8 +381,30 @@ func TestFetchRefusesSubmodule(t *testing.T) {
 	})
 }
 
+// A template (D109) is fetched with its files: stack.toml, README.md and
+// containerfiles/Containerfile.<name>, and counted as signed.
+func TestFetchTemplate(t *testing.T) {
+	f := newFixture(t)
+	k := newKey(t)
+	f.trust(t, k)
+	write(t, filepath.Join(f.src, "templates/rails-pg/stack.toml"), "schema = 1\nname = \"rails-pg\"\nversion = 1\n\n[stack]\npack = \"rails@1\"\napp = \"rails\"\n")
+	write(t, filepath.Join(f.src, "templates/rails-pg/README.md"), "Rails\n")
+	write(t, filepath.Join(f.src, "templates/rails-pg/containerfiles/Containerfile.pg-client"), "FROM x\n")
+	f.publish(t, k, 1)
+	res := f.mustFetch(t, signing.StatusTrusted)
+	if res.Packages != 2 {
+		t.Errorf("signed packages = %d; want 2 (the pack and the template)", res.Packages)
+	}
+	for _, p := range []string{"stack.toml", "README.md", "containerfiles/Containerfile.pg-client"} {
+		if !exists(filepath.Join(CurrentDir(f.d, "acme"), "templates/rails-pg", p)) {
+			t.Errorf("templates/rails-pg/%s was not fetched", p)
+		}
+	}
+}
+
 func TestFetchRefusesPath(t *testing.T) {
-	for _, p := range []string{"packs/rails/.hidden", "packs/rails/deep/x/y", "packs/Rails/pack.toml", "options/x/entrypoints/a/b", "packs/top-file"} {
+	for _, p := range []string{"packs/rails/.hidden", "packs/rails/deep/x/y", "packs/Rails/pack.toml", "options/x/entrypoints/a/b", "packs/top-file",
+		"templates/x/notes.txt", "templates/x/containerfiles/Dockerfile", "templates/x/entrypoints/a.sh", "templates/X/stack.toml"} {
 		t.Run(p, func(t *testing.T) {
 			refused(t, "not a", func(f *fixture) { write(t, filepath.Join(f.src, p), "x\n") })
 		})

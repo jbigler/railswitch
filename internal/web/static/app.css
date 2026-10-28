@@ -190,6 +190,8 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 
 /* Review update */
 .rv-banner a{font-weight:700}
+.tpl-banner a{font-weight:700}
+.tpl-notice{border-color:var(--yellow)}
 .rv-file{margin:6px 0;border-top:1px solid var(--sel);padding-top:4px}
 .rv-file summary{cursor:pointer;padding:2px 0}
 .rv-notes{margin:6px 0;padding-left:18px}

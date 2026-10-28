@@ -49,6 +49,7 @@ var completionSubs = map[string][]string{
 	"secret":           {"add", "ls", "rm", "set"},
 	"signer":           {"add", "ls", "revoke", "rm"},
 	"task":             {"ls"},
+	"template":         {"check", "export", "ls", "show"},
 	"wt":               {"add", "ls", "rm"},
 }
 
@@ -83,13 +84,15 @@ var completionFlags = map[string][]string{
 	"pack new":               {"--dir=", "--option="},
 	"project detect":         {"--branch=", "--pack="},
 	"project rm":             {"--purge", "--yes"},
-	"project new":            {"--accept-install=", "--agent=", "--branch=", "--dry-run", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool=", "--up"},
+	"project new":            {"--accept-install=", "--agent=", "--answer=", "--branch=", "--dry-run", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--template=", "--tool=", "--up"},
 	"project write":          {"--if-hash="},
 	"render":                 {"--check"},
 	"secret add":             {"--env=", "--git-signing", "--machine", "--service="},
 	"secret set":             {"--restart"},
 	"settings apply":         {"--accept-install=", "--if-hash=", "--restart"},
 	"task":                   {"--new-term"},
+	"template check":         {"--accept="},
+	"template export":        {"--description=", "--name=", "--to=", "--version="},
 	"wt add":                 {"--name=", "--up"},
 	"wt rm":                  {"--force"},
 }

@@ -16,7 +16,7 @@
 {{else}}<li class="muted">None.</li>
 {{end}}</ul>
 </section>
-{{end}}{{if not .Error}}<section class="card">
+{{end}}{{template "lib-templates" .}}{{if not .Error}}<section class="card">
 <h2>New pack</h2>
 <form method="post" action="{{.NewURL}}" class="add-row" data-job="new-package" data-next="{{.EditorBase}}">
 <input type="hidden" name="kind" value="pack">
@@ -66,12 +66,52 @@
 </form>
 <p class="note">At the top: <code>Containerfile.&lt;name&gt;</code>, <code>deps.allow</code>, <code>README.md</code>, <code>&lt;name&gt;.sh</code>; or <code>entrypoints/&lt;file&gt;</code>, <code>initdb/&lt;file&gt;</code>.</p>
 {{end}}</section>
-{{end}}{{template "jobs" .Jobs}}
+{{end}}{{with .TemplateSel}}{{template "lib-template" .}}{{end}}{{template "jobs" .Jobs}}
 </section>
 </main>
 {{template "common-dialogs" .}}
 </body>
 </html>
+{{end}}
+
+{{/* lib-templates is the Templates section: `template ls`, this
+machine's templates and the libraries'. */}}
+{{define "lib-templates"}}<section class="card" id="templates">
+<h2>Templates</h2>
+<p class="note">A template is a pack, its options and your overrides, ready to start a project from (New project). Save a project as one in its Settings.</p>
+{{if .TemplatesError}}<p class="red set-error">Templates unavailable: {{.TemplatesError}}</p>
+{{end}}<ul class="lib-list">
+{{range .Templates}}<li{{if .Current}} class="cur"{{end}} data-template="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Description}} <span class="muted">{{.Description}}</span>{{end}}<span class="sp"></span><span class="chip">{{.Source}}</span></a></li>
+{{else}}{{if not .TemplatesError}}<li class="muted">None.</li>
+{{end}}{{end}}</ul>
+</section>
+{{end}}
+
+{{/* lib-template is one template's `template show`: its lines,
+questions and files. */}}
+{{define "lib-template"}}<section class="card" id="template-detail">
+<h2><span class="mono">{{.Row.Ref}}</span> <span class="chip">{{.Row.Source}}</span></h2>
+{{if .Row.Description}}<p>{{.Row.Description}}</p>
+{{end}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{else}}{{with .Doc}}<dl class="kv">
+<dt>Name</dt><dd class="mono">{{$.Row.Name}} · version {{$.Row.Version}}</dd>
+<dt>Packages</dt><dd class="mono">{{range $i, $p := $.Row.Packages}}{{if $i}}, {{end}}{{$p}}{{else}}<span class="muted">none</span>{{end}}</dd>
+<dt>Content</dt><dd class="mono">{{.SHA256}}</dd>
+<dt>Secrets</dt><dd class="mono">{{range $i, $s := .Secrets}}{{if $i}}, {{end}}{{$s}}{{else}}<span class="muted">none</span>{{end}}</dd>
+<dt>Containerfiles</dt><dd class="mono">{{range $i, $c := .Containerfiles}}{{if $i}}, {{end}}{{$c}}{{else}}<span class="muted">none: the packages' defaults</span>{{end}}</dd>
+</dl>
+<div class="lbl">Questions</div>
+<table class="set-table">
+<thead><tr><th>Asks</th><th>Sets</th><th>Default</th></tr></thead>
+<tbody>
+{{range .Ask}}<tr class="ask"><td>{{.Prompt}}</td><td class="mono">{{.Key}}</td><td class="mono">{{.Default}}</td></tr>
+{{else}}<tr><td colspan="3" class="muted">No questions: a project gets the template's lines as they are.</td></tr>
+{{end}}</tbody>
+</table>
+<div class="lbl">stack.toml</div>
+<pre class="out mono toml-view">{{.StackTOML}}</pre>
+{{if .Readme}}<div class="lbl">README</div><pre class="out readme">{{.Readme}}</pre>
+{{end}}{{end}}{{end}}</section>
 {{end}}
 
 {{define "lib-source"}}{{if .Local}}local{{else if .Library}}library {{.Library}}{{else}}built in{{end}}{{end}}

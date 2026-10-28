@@ -163,7 +163,7 @@ func previewInstall(ctx context.Context, root string, p *settings.Preview) *revi
 	if err != nil || next.Validate() != nil {
 		return nil
 	}
-	doc, _, err := installReview(ctx, root, next, nil)
+	doc, _, err := installReview(ctx, root, next, nil, nil)
 	if err != nil {
 		return nil
 	}

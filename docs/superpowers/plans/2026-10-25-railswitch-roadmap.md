@@ -129,6 +129,10 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D105 | Library refs | `<alias>:<name>@N`, resolved only from a verified checkout whose files still hash to the signed index | Own judgement |
 | D106 | Install through the review | A library ref new to the lock is a 7a review (`added`), accepted by its hash (`settings apply --accept-install`, `project new --accept-install`, `lock --accept`) after a re-verify against today's trust | HANDOFF §3.11: nothing from a library is installed until reviewed |
 | D107 | Tools and the agent base locked | The nvim tool and the agent base image are locked, stored and reviewed like packages | The 7a known limit |
+| D108 | Template format | `<name>.stack/`: `stack.toml` (the project's lines minus project-only ones, `[[ask]]` questions, secret names), edited Containerfiles only, README; never secret values | HANDOFF §3.9; own judgement on the details |
+| D109 | Where templates live | `~/.config/railswitch/templates/<name>.stack/` (ref `<name>@N`) or a library's `templates/<name>/`, signed in its index (ref `<alias>:<name>@N`) | Own judgement: no built-in templates, so a bare ref is the machine's |
+| D110 | Export and start | `template export`; `project new --template <ref> --answer k=v`; a library template is part of the install review | HANDOFF §3.9 |
+| D111 | Template updates | A project records `[template] ref, sha256`; `template check` shows the diff and records an accept; nothing is applied | HANDOFF §3.9: updates appear as a diff, only applied by the user |
 
 ## Stages
 
@@ -147,7 +151,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 7a Update review | detailed (`2026-10-28-railswitch-stage-7a.md`) | A package change (a railswitch upgrade, a local edit outside the dashboard) is shown as per-file diffs with flagged items and accepted only after review; the project runs what it last accepted meanwhile (docs/stage7a-acceptance.md) |
 | 7b Signers | detailed (`2026-10-28-railswitch-stage-7b.md`) | Signer trust, rotation and revocation |
 | 7c Library repositories | detailed (`2026-10-29-railswitch-stage-7c.md`) | Library repos; install and update through 7a's review; Install review |
-| 7d Templates | later | Export a project as `<name>.stack/`; start a project from one |
+| 7d Templates | detailed (`2026-10-29-railswitch-stage-7d.md`) | Export a project as `<name>.stack/`; start a project from one |
 
 ### Stage 3 — Machine layer
 

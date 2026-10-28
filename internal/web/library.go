@@ -53,6 +53,10 @@ type libraryView struct {
 	Groups []libGroup
 	Sel    *libDetail
 
+	Templates      []libTemplateItem
+	TemplatesError string
+	TemplateSel    *libTemplateDetail
+
 	Libraries                           []libRepoView
 	LibrariesError                      string
 	LibAddURL, LibFetchURL, LibTrustURL string
@@ -134,6 +138,9 @@ func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) {
 		v.LibrariesError = err.Error()
 	} else {
 		v.Libraries = newLibRepos(libs)
+	}
+	if !s.libraryTemplates(ctx, w, r, &v) {
+		return
 	}
 	cat, err := readJSON[catalogDoc](ctx, s.c.CLI, "-C", p.Workspace, "pack", "ls")
 	if err != nil {

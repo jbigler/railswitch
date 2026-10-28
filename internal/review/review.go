@@ -50,7 +50,7 @@ const (
 )
 
 // Compare is every file that differs from old to new, a package of kind
-// ("pack", "option", "tool", "agent" or "base", the agent base image), sorted by path, each with its
+// ("pack", "option", "tool", "agent", "base", the agent base image, or "template"), sorted by path, each with its
 // flags. A nil old is an empty package: every file is added; a nil new
 // removes every file.
 func Compare(kind string, old, new fs.FS) ([]File, error) {
@@ -97,9 +97,12 @@ func Compare(kind string, old, new fs.FS) ([]File, error) {
 			if !isText(x) || !isText(y) {
 				f.Flags = append(f.Flags, Flag{Check: CheckRunsHere, Text: p + `: not text (a NUL or invalid UTF-8 byte, shown as \xNN)`})
 			}
-			if p == manifest {
+			switch {
+			case kind == "template" && p == templateManifest:
+				f.Flags = append(f.Flags, templateFlags(x, y)...)
+			case p == manifest:
 				f.Flags = append(f.Flags, manifestFlags(before, after)...)
-			} else {
+			default:
 				f.Flags = append(f.Flags, lineFlags(p, xs, ys)...)
 			}
 			f.Flags = append(f.Flags, scriptFlags(p, caps)...)

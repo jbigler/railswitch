@@ -180,6 +180,29 @@ type Accept struct {
 	// Run runs ssh-keygen when the write accepts a library package: its
 	// library's checkout is verified again against today's trust first.
 	Run sys.Runner
+	// Template is the library template project new starts from (D110),
+	// reviewed with the packages it installs: IfHash is ReviewHash of the
+	// lock and it, and its library is verified again.
+	Template *Template
+}
+
+// Template is a library template in an Install review: reviewed and
+// accepted with the packages, never locked (project.toml's [template]
+// records it).
+type Template struct {
+	Ref    pack.Ref // a library ref
+	SHA256 string   // its content hash
+	Signer string   // the fingerprint its checkout was fetched under
+	Files  fs.FS
+}
+
+// ReviewHash is the hash of an Install review: of its stack.lock bytes,
+// and of the template it reviews (nil: none) by ref and content hash.
+func ReviewHash(lock []byte, t *Template) string {
+	if t == nil {
+		return Hash(lock)
+	}
+	return Hash(append(append([]byte(nil), lock...), fmt.Sprintf("\n# template %s %s\n", t.Ref, t.SHA256)...))
 }
 
 // accepts reports whether a accepts sp's content: installed (install,
@@ -255,10 +278,10 @@ func (pl *lockPlan) write(ctx context.Context, accept Accept) error {
 	if err != nil {
 		return err
 	}
-	if accept.IfHash != "" && Hash(data) != accept.IfHash {
+	if accept.IfHash != "" && ReviewHash(data, accept.Template) != accept.IfHash {
 		return ErrReviewChanged
 	}
-	if err := pl.reverify(ctx, accept.Run); err != nil {
+	if err := pl.reverify(ctx, accept.Run, accept.Template); err != nil {
 		return err
 	}
 	for _, sp := range pl.put {
@@ -370,12 +393,12 @@ const installHint = "railswitch settings preview shows the install review; accep
 // whose signer was distrusted or revoked since its fetch can't be
 // installed or updated. Each accepted package must still be signed, by the
 // key its fetch recorded.
-func (pl *lockPlan) reverify(ctx context.Context, run sys.Runner) error {
-	if len(pl.verify) == 0 {
+func (pl *lockPlan) reverify(ctx context.Context, run sys.Runner, tpl *Template) error {
+	if len(pl.verify) == 0 && tpl == nil {
 		return nil
 	}
 	if run == nil {
-		return fmt.Errorf("accepting %s needs its library verified again: no runner", pl.verify[0].ref)
+		return errors.New("accepting a library package needs its library verified again: no runner")
 	}
 	trust, err := signing.LoadTrust(filepath.Join(pl.dirs.Config, signing.TrustFile))
 	if err != nil {
@@ -407,6 +430,37 @@ func (pl *lockPlan) reverify(ctx context.Context, run sys.Runner) error {
 		}) {
 			return fmt.Errorf("%s is no longer signed by library %s: fetch it again", sp.ref, alias)
 		}
+	}
+	if tpl == nil {
+		return nil
+	}
+	return verifyTemplate(ctx, run, pl.cat.Libraries, trust, tpl)
+}
+
+// verifyTemplate verifies tpl's library checkout again against trust: its
+// signer trusted, the one it was read under, and the template signed.
+func verifyTemplate(ctx context.Context, run sys.Runner, libs pack.Libraries, trust *signing.Trust, tpl *Template) error {
+	alias := tpl.Ref.Library
+	if libs == nil {
+		return fmt.Errorf("%s: library templates need the machine's libraries", tpl.Ref)
+	}
+	co, err := libs.Checkout(alias)
+	if err != nil {
+		return err
+	}
+	res, err := signing.Verify(ctx, run, co.Dir, trust)
+	if err != nil {
+		return fmt.Errorf("verify library %s: %w", alias, err)
+	}
+	switch {
+	case res.Status != signing.StatusTrusted:
+		return fmt.Errorf("the signer of %s is no longer trusted (%s): template %s can't be used", alias, res.Status, tpl.Ref)
+	case res.Fingerprint != tpl.Signer:
+		return fmt.Errorf("library %s is signed by %s now, not by %s as fetched: fetch it again", alias, res.Fingerprint, tpl.Signer)
+	case !slices.ContainsFunc(res.Packages, func(p signing.PackageResult) bool {
+		return p.Signed && p.Kind == pack.KindTemplate && p.Ref == tpl.Ref.Bare().String()
+	}):
+		return fmt.Errorf("template %s is no longer signed by library %s: fetch it again", tpl.Ref, alias)
 	}
 	return nil
 }
@@ -519,6 +573,9 @@ type Plan struct {
 	Next     *Workspace // the accepted project: as resolved, under the new lock
 	// Install are the library refs an Install review accepts.
 	Install []pack.Ref
+	// Template is the library template an Install review shows (a change
+	// of kind template); nil for none.
+	Template *Template
 }
 
 // Review is the review of an accept against root's current stack.lock
@@ -597,8 +654,10 @@ func Review(_ context.Context, root string) (*Plan, error) {
 // library packages new to the lock, each added and compared against
 // nothing, and the exact stack.lock the write that accepts just them
 // (Accept.Install) leaves, whose Hash is the review's. nil when p installs
-// no library package.
-func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalog) (*Plan, error) {
+// no library package. A library template tpl (nil: none) is shown too, as
+// added, and the review's hash covers it (ReviewHash): a project new from
+// it has a review even when it installs no package.
+func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalog, tpl *Template) (*Plan, error) {
 	pl, err := plan(root, p, cat, Accept{All: true})
 	if err != nil {
 		return nil, err
@@ -620,7 +679,10 @@ func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalo
 		refs = append(refs, sp.ref)
 		changes = append(changes, Change{Ref: sp.ref, Kind: sp.kind, Status: StatusAdded, To: e.SHA256, New: sp.files})
 	}
-	if len(refs) == 0 {
+	if tpl != nil {
+		changes = append(changes, Change{Ref: tpl.Ref, Kind: pack.KindTemplate, Status: StatusAdded, To: tpl.SHA256, New: tpl.Files})
+	}
+	if len(refs) == 0 && tpl == nil {
 		return nil, nil
 	}
 	ipl, err := plan(root, pl.p, pl.cat, Accept{Install: refs})
@@ -632,7 +694,7 @@ func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalo
 		return nil, err
 	}
 	next := &Workspace{Root: root, Project: ipl.p, Catalog: ipl.cat, Stack: ipl.st, Lock: ipl.lock, Dirs: ipl.dirs}
-	return &Plan{Lock: data, Packages: changes, Next: next, Install: refs}, nil
+	return &Plan{Lock: data, Packages: changes, Next: next, Install: refs, Template: tpl}, nil
 }
 
 // lockedRef is the ref a lock entry pins: packs and options are keyed by

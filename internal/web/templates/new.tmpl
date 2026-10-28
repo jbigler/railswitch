@@ -18,7 +18,13 @@
 <span class="hint">Lowercase letters and digits, 2–16, starting with a letter; it names every container, volume and hostname. Must be unused on this machine.</span></label>
 <label class="field">Workspace folder <input name="dir" class="mono" required autocomplete="off" spellcheck="false" placeholder="{{.Home}}/workspace/&lt;prefix&gt;">
 <span class="hint">Default <span class="mono">~/workspace/&lt;prefix&gt;</span>; the base worktree is cloned inside it.</span></label>
-<div class="btns start"><button type="button" class="ln main" data-detect disabled>Read the repository</button></div>
+<label class="field">Start from a template <select name="template" data-template>
+<option value="">None: read the repository</option>
+{{range .Templates}}<option value="{{.Ref}}">{{.Ref}}{{if .Description}} · {{.Description}}{{end}}</option>
+{{end}}</select>
+<span class="hint">A template brings its pack, options and overrides and asks its questions; you can still change them in Settings later.</span></label>
+{{if .TemplatesError}}<p class="red">Templates unavailable: {{.TemplatesError}}</p>
+{{end}}<div class="btns start"><button type="button" class="ln main" data-detect disabled>Read the repository</button></div>
 </section>
 {{template "newstack" .Stack}}
 <section class="card">
@@ -27,7 +33,7 @@
 {{range .Agents}}<label class="check"><input type="checkbox" name="agent" value="{{.Name}}={{.Ref}}"{{if .Default}} checked{{end}}> Agent <span class="mono">{{.Name}}</span> <span class="muted mono">{{.Ref}}</span></label>
 {{else}}{{if not .AgentsError}}<p class="muted">No agent packages.</p>
 {{end}}{{end}}{{if .AgentsError}}<p class="red">Agents unavailable: {{.AgentsError}}</p>
-{{end}}<p class="note">With no agent ticked the project gets none.</p>
+{{end}}<p class="note">With no agent ticked the project gets none; from a template, the template's.</p>
 </section>
 <div id="new-warnings" class="warnings" hidden></div>
 <div class="btns"><button class="ln main" data-review disabled>Next: review</button></div>
@@ -64,12 +70,31 @@
 <p class="note">Any other key runs an option as one more service, named after the key (a second database, ClickHouse beside Postgres).</p>
 {{end}}{{end}}</section>{{end}}
 
+{{/* newtemplate is the Stack card for a picked template: one field per
+question, prefilled with its default. */}}
+{{define "newtemplate"}}<section id="new-stack" class="card" data-pack="" data-template="{{.Row.Ref}}">
+<h2>Stack</h2>
+<div class="pack-row"><b>Template</b> <span class="mono">{{.Row.Ref}}</span> <span class="chip">{{.Row.Source}}</span>{{if .Row.Packages}} <span class="muted mono">· {{range $i, $p := .Row.Packages}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{end}}</div>
+{{if .Row.Description}}<p class="note">{{.Row.Description}}</p>
+{{end}}{{range .Fields}}<label class="field">{{if .Prompt}}{{.Prompt}}{{else}}{{.Key}}{{end}} <span class="muted mono">{{.Key}}</span>
+<input name="{{.Name}}" value="{{.Default}}" class="mono" autocomplete="off" spellcheck="false" data-ask="{{.Key}}">
+<span class="hint">Default <span class="mono">{{.Default}}</span></span></label>
+{{else}}<p class="muted">This template asks nothing.</p>
+{{end}}{{with .Doc.Containerfiles}}<p class="note">Its Containerfiles replace the packages' defaults: <span class="mono">{{range $i, $c := .}}{{if $i}}, {{end}}{{$c}}{{end}}</span>.</p>
+{{end}}<p class="note">Next: review shows the project.toml these answers give. A tool ticked below is added to the template's; agents ticked below replace the template's agents (leave them unticked to keep its own).</p>
+</section>{{end}}
+
 {{define "newreview"}}<section id="new-review" class="card review">
 <h2>2 · Review and create</h2>
 {{if .Empty}}<p class="note">Fill in step 1 and press Next: review. This side then shows the project.toml that will be written and what each worktree gets; nothing is created before Create project.</p>
 {{else}}{{if .Error}}<p class="red set-error refusal">{{.Error}}</p>
 {{end}}<p class="yellow" data-stale hidden>Step 1 changed since this review. Press Next: review again.</p>
-{{if not .Error}}{{with .Doc}}<div class="lbl">Each worktree gets</div>
+{{if not .Error}}{{with .Doc}}{{with .Template}}<div class="lbl">From the template</div>
+<dl class="kv">
+<dt>Template</dt><dd><span class="mono">{{.Ref}}</span> <span class="muted mono">{{.SHA256}}</span></dd>
+{{range .Ask}}<dt>{{if .Prompt}}{{.Prompt}}{{else}}{{.Key}}{{end}}</dt><dd><span class="mono">{{.Answer}}</span> <span class="muted">· <span class="mono">{{.Key}}</span>{{if ne .Answer .Default}} · default <span class="mono">{{.Default}}</span>{{end}}</span></dd>
+{{end}}</dl>
+{{end}}<div class="lbl">Each worktree gets</div>
 <dl class="kv">
 <dt>Routes</dt><dd>{{range .Worktree.Routes}}<div><span class="mono">{{.Host}}</span> <span class="muted">→ {{.Service}}</span></div>{{else}}<span class="muted">none</span>{{end}}</dd>
 <dt>Containers</dt><dd>{{range .Worktree.Containers}}<div><span class="mono">{{.Name}}</span> <span class="muted">{{.Role}}</span></div>{{else}}<span class="muted">none</span>{{end}}</dd>

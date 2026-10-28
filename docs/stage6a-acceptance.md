@@ -264,17 +264,54 @@ approved, #6808 merged).
 - Not run: 5, 7–11, 14. They need the resources above or a desktop session.
 - Cosmetic: the page has no favicon (Chromium's `/favicon.ico` gets 404).
 
+**2026-10-28, host run, continued (80 GB disk, 8 GB RAM): every section but
+7 PASS.** All three apps run end to end: Metabase's backend
+(`/api/health` ok, 202 tables in its Postgres) and its frontend (`bun run
+build` in `railswitch exec --fresh`, 1 min 20 s; `/` serves the built app).
+
+- 5 PASS on Mastodon (`[[links]]` Admin and PgHero, `hide_links =
+  ["Routes"]`): App, Admin, PgHero, Mailer previews, Sidekiq, then Logs
+  (`quiet`); every link opens a new tab; on a stopped worktree each but
+  Logs is `dim`; `"Rotues"` fails render with the documented message.
+- 8 PASS on Metabase: stop, up, restart each end `ok` with live output and
+  the stack column follows; a second click while a job runs shows `busy:
+  …`; Cancel on a running `up` ends it `cancelled` with no `railswitch up`
+  left. A stop first ended the unit `failed`, for two reasons, both fixed
+  (gap log): Mastodon's `bin/dev` and the JVM's exit 143.
+- 9 PASS on Mastodon (`s6a-check`): the `wt add s6a-check` job brings the
+  row up; the dirty remove dialog names the uncommitted changes and a bare
+  Remove is refused until "Discard changes" and the typed name; the
+  selected row's removal moves the address bar to `/p/masto/main`, a reload
+  works, and `/p/masto/s6a-check?sort=pr` lands on `/p/masto/main?sort=pr`
+  (the project page selects the base worktree). A worktree added on the CLI
+  shows up within the 10 s idle poll.
+- 10 PASS: `:` opens the palette; `test` runs as a job and ends `ok`
+  (Mastodon is RSpec: 0 runs); Shift+Enter on `console` opens foot running
+  `bin/rails console` in the app. `TERMINAL=xdg-terminal-exec` (Omarchy) is
+  not a terminal `internal/term` knows, so the fallback list chose foot,
+  here the only one installed.
+- 11 PASS: `solar` and an `accent` override survive a dashboard restart
+  (`/theme.css`); a near-white `text` warns `contrast 1.0:1` and saves;
+  Reset keeps `solar` and drops both overrides. Restored to `flexoki`.
+- 14 PASS: `Logged out — run railswitch dashboard for a new link` after a
+  new token, gone with the new link; `Disconnected — retrying` while the
+  dashboard is stopped, gone after its start.
+- Refresh PRs: POST `/p/plaus/prs/refresh` answers 202; the rows keep
+  their PRs.
+- Not run: 7 needs an agent with a real token (claude@1) and a desktop
+  notification. 3's visual comparison with the mock-ups is for the user.
+
 ## Done checklist (roadmap, Stage 6a)
 
-- [ ] one page per project (`/p/<prefix>`, `/p/<prefix>/<slug>`), list and detail;
-- [ ] each row: name, branch, PR (number, checks, state, review), stack, agent;
-- [ ] the selected worktree: name, branch, PR line, Links first, services, agent message, actions, jobs;
-- [ ] links: App, `[[links]]`, stack links, then PR and Logs; `hide_links`;
-- [ ] sorting by name, running, PR, agent;
+- [x] one page per project (`/p/<prefix>`, `/p/<prefix>/<slug>`), list and detail;
+- [x] each row: name, branch, PR (number, checks, state, review), stack, agent;
+- [x] the selected worktree: name, branch, PR line, Links first, services, agent message, actions, jobs;
+- [x] links: App, `[[links]]`, stack links, then PR and Logs; `hide_links`;
+- [x] sorting by name, running, PR, agent;
 - [ ] waiting agents in other projects visible (strip, header count); browser notifications;
-- [ ] up, stop, restart, new worktree (up after adding), remove (dirty needs the typed name), task palette, Refresh PRs;
-- [ ] light and dark following the system, Flexoki by default, the colour editor;
-- [ ] the dashboard starts with the first worktree `up`.
+- [x] up, stop, restart, new worktree (up after adding), remove (dirty needs the typed name), task palette, Refresh PRs;
+- [x] light and dark following the system, Flexoki by default, the colour editor;
+- [x] the dashboard starts with the first worktree `up`.
 
 ## Gap log
 
@@ -286,10 +323,16 @@ approved, #6808 merged).
 | `pack new` needed a project, `project new --pack local:` needed the pack | `pack new --dir <workspace>` | `326a63b` |
 | `MB_DB_CONNECTION_URI = "{env.DATABASE_URL}"` silently dropped | `{env.X}` holding a generated value expands in env only | `f78df40` |
 | Dashboard "PRs unavailable: mise ERROR" (mise-shimmed `gh` refused the workspace's `mise.local.toml`); `pr ls` HTTP 504 on busy repos | `gh` runs in `/`; one `--head=<branch>` query per worktree branch | `bfe6078` |
+| Metabase pins `java = "temurin-25.0.3+9.0.LTS"` (mise); `.java-version` was no source | Java values lose their distribution and `+build` | `83bd86f` |
+| `db dump` wrote `{db}.dump` only: a second database of the server was lost on a round trip | `[dump] list`; `postgres@1` dumps every database | `5c332d3` |
+| ClickHouse beside Postgres had no slot (D3) | any other `[options]` key adds a service of that name (D81) | `57478ae` |
+| Moving ClickHouse to `analytics` left the old `storage` container running on its volume; the new one exited 76 | render stops a container whose unit it removes | `0415ce6` |
+| Metabase never creates its database (`mb_dev does not exist`); a dump of a database `POSTGRES_DB` made aborted the restore | `postgres@1` sets `POSTGRES_DB = "{db}"`; restore-dump.sh restores into an existing database | `3025d73`, `15754f9` |
+| `stop` on Mastodon SIGKILLed everything after 10 s and left the unit `failed` (exit 137): its `bin/dev` runs foreman as a child of PID 1 `sh` | the rails app entrypoint passes a stop to the container's process group and exits 0 | `51485bf` |
 
-Open, needing a decision: a second datastore (ClickHouse) has no slot (D3)
-and sits in `storage`; `.java-version` is no version source, and mise's
-`temurin-25.0.3+9.0.LTS` fails version validation.
+Open: `internal/term` does not know `xdg-terminal-exec`, the session's
+`TERMINAL` on Omarchy; with several terminals installed it would not pick
+the user's default.
 
 Settings only, in the projects' own files: Mastodon `[env] BIND`,
 `LOCAL_DOMAIN`, `STREAMING_API_BASE_URL`, `[services.rails] health =
@@ -297,4 +340,7 @@ Settings only, in the projects' own files: Mastodon `[env] BIND`,
 `CLICKHOUSE_DATABASE_URL`, `[firewall.allow] deps = download.db-ip.com`
 for `mix download_country_database`, and three lines removed from the
 worktree's tracked `config/.env.dev` (Envy overwrites the environment
-with it); Metabase `MB_*` env, `/api/health`, two Maven hosts.
+with it); Metabase `MB_*` env, `/api/health`, two Maven hosts. In the
+local packs (the user's own, like a user would write): phoenix strips an
+asdf `-otp-NN` suffix in `FROM`; clojure declares `success_exit_status =
+143` (a JVM's clean stop).

@@ -598,7 +598,13 @@ func RemoveLink(data, label string) (string, error) {
 	}
 	for _, b := range d.linkBlocks() {
 		if b.label == label {
-			return d.data[:b.start] + d.data[b.end:], nil
+			start, rest := b.start, d.data[b.end:]
+			// The blank line AddLink put before the table goes with it,
+			// unless it is all that separates its neighbours.
+			if strings.HasSuffix(d.data[:start], "\n\n") && (rest == "" || strings.HasPrefix(rest, "\n")) {
+				start--
+			}
+			return d.data[:start] + rest, nil
 		}
 	}
 	return "", fmt.Errorf("project.toml: no link %q", label)

@@ -529,7 +529,7 @@ func TestEditQuotesValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != edited+"\n" { // the blank line AddLink put before its table stays
+	if got != edited {
 		t.Errorf("add then remove a quoted link:\n%s", got)
 	}
 	got, err = HideLink(edited, label)
@@ -538,5 +538,26 @@ func TestEditQuotesValues(t *testing.T) {
 	}
 	if got, err = ShowLink(got, label); err != nil || got != edited {
 		t.Errorf("hide then show a quoted label is not the identity: %v", err)
+	}
+}
+
+// A link added then removed leaves the file as it was: the blank line
+// AddLink puts before its table goes with it.
+func TestAddThenRemoveLinkRoundTrips(t *testing.T) {
+	for _, data := range []string{
+		"schema = 1\n\n[image]\nbase = \"containerfiles/Containerfile.base\"\n",
+		"schema = 1\n\n[[links]]\nlabel = \"A\"\nurl = \"http://a\"\n\n[env]\nX = \"1\"\n",
+	} {
+		added, err := AddLink(data, "Flipper", "{worktree.host}/flipper")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := RemoveLink(added, "Flipper")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != data {
+			t.Errorf("add then remove:\n%q\nwant\n%q", got, data)
+		}
 	}
 }

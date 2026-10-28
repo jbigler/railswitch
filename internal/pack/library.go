@@ -14,7 +14,7 @@ import (
 )
 
 // kindDirs is each package kind's top-level directory in a catalog.
-var kindDirs = map[string]string{KindPack: "packs", KindOption: "options", KindAgent: "agents"}
+var kindDirs = map[string]string{KindPack: "packs", KindOption: "options", KindAgent: "agents", KindTool: "tools", KindBase: "agentbase"}
 
 // Libraries finds the library checkouts of this machine (D103–D105).
 type Libraries interface {

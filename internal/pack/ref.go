@@ -45,9 +45,13 @@ func ParseRef(s string) (Ref, error) {
 	return Ref{Name: m[1], Version: v, Local: local, Library: alias}, nil
 }
 
-// String returns "name@N", "local:name@N" or "<alias>:name@N".
+// String returns "name@N", "local:name@N" or "<alias>:name@N"; "name" for
+// an unversioned built-in (a tool, the agent base image).
 func (r Ref) String() string {
 	s := fmt.Sprintf("%s@%d", r.Name, r.Version)
+	if r.Version == 0 {
+		s = r.Name
+	}
 	switch {
 	case r.Local:
 		return config.LocalPrefix + s

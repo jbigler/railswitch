@@ -479,7 +479,7 @@ of a `changed` package is the store's copy of what the lock accepted.
 | `flags` | number | Every flag of every file, summed; Accept needs "I've read the N flagged items" when it is above 0. |
 | `packages` | array | One per package the accept changes; `[]` when there is nothing to review. |
 | `packages[].ref` | string | `name@N`, `local:name@N` or `<alias>:name@N`. |
-| `packages[].kind` | string | `pack`, `option` or `agent`. |
+| `packages[].kind` | string | `pack`, `option`, `agent`, `tool` (the nvim tool when `[tools.nvim]` is set, ref `nvim`) or `base` (the agent base image when the project has agents, ref `agent-base`) (D107). |
 | `packages[].status` | string | A library package new to the lock is `added` with every file shown and flagged (an Install review, D106); `changed` (same ref, new content; also a ref back in the lock whose content differs from the entry `stack.lock` remembers in `[[removed]]`); `first` (changed, no stored copy of what was accepted: compared against nothing, every file `added`); `added` (a ref new to the lock); `removed` (a ref the lock drops; a version or locality change is a `removed` and an `added`). |
 | `packages[].from`, `to` | string | The content hash locked now and the one the accept locks (lowercase hex); `""` for none (`added`: no `from`, `removed`: no `to`). |
 | `packages[].also_locked_in` | array | Prefixes of other registered projects whose `stack.lock` already pins this ref at `to`; `[]` when none. |

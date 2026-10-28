@@ -243,14 +243,22 @@ func lockTable(l *config.Lock, kind string) map[string]config.LockEntry {
 		return l.Packs
 	case pack.KindOption:
 		return l.Options
+	case pack.KindTool:
+		return l.Tools
+	case pack.KindBase:
+		return l.Base
 	}
 	return l.Agents
 }
 
-// lockKey is how stack.lock keys r: agents by ref, the rest by name.
+// lockKey is how stack.lock keys r: agents by ref, the agent base image
+// as "agent", the rest by name.
 func lockKey(kind string, r pack.Ref) string {
-	if kind == pack.KindAgent {
+	switch kind {
+	case pack.KindAgent:
 		return r.String()
+	case pack.KindBase:
+		return "agent"
 	}
 	return r.Name
 }

@@ -182,3 +182,43 @@ func TestEjectReadsAccepted(t *testing.T) {
 		t.Errorf("pack eject copied:\n%s", got)
 	}
 }
+
+// D107: the agent base image is locked; while an update of it waits, an
+// eject (and containerfile show's default) reads the accepted copy.
+func TestEjectAgentBaseAccepted(t *testing.T) {
+	ws, _ := lockedWS(t)
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, err := fs.ReadFile(cat.AgentBase, pack.AgentBaseFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted := append(def, "# accepted\n"...)
+	sha, err := testStore(t).Put(fstest.MapFS{pack.AgentBaseFile: {Data: accepted}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := readLock(t, ws)
+	e, ok := l.Base["agent"]
+	if !ok {
+		t.Fatalf("stack.lock has no [base.agent]: %+v", l.Base)
+	}
+	e.SHA256 = sha
+	l.Base["agent"] = e
+	if err := l.Write(filepath.Join(ws, "stack.lock")); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "containerfile", "eject", "agent-base", "--force")
+	if got, want := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.agent-base")), ejected("agent-base", pack.AgentBaseFile, accepted); got != want {
+		t.Errorf("containerfile eject wrote:\n%s\nwant:\n%s", got, want)
+	}
+	var doc cfShowDoc
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "containerfile", "show", "agent-base")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Default == nil || doc.Default.Text != string(accepted) {
+		t.Errorf("containerfile show default: %+v", doc.Default)
+	}
+}

@@ -102,6 +102,17 @@ no longer matches counts as missing. Loading a project also stores, best effort,
 that still matches its lock entry but has no copy yet (a lock written
 before the store), so its next update is reviewed as a diff.
 
+The nvim tool (when `[tools.nvim]` is set) and the agent base image (when
+the project has agents) are locked too (D107): `[tool.nvim]` and
+`[base.agent]`, with a source and a sha256 but no version. They are
+stored, run from the store and reviewed like packages (`kind` `tool` and
+`base` in `lock --review`, refs `nvim` and `agent-base`), so a railswitch
+upgrade that changes the built-in nvim tool or the agent base image waits
+for review, and `containerfile eject nvim` or `agent-base` (and
+`containerfile show`'s default) copies the accepted text. A `stack.lock`
+written before 7c has neither entry: the project shows a pending review,
+both listed as `added`, until `railswitch lock --accept <hash>`.
+
 ### Updates wait for review (D97)
 
 A package whose content changes under the ref the lock pins (a railswitch

@@ -357,7 +357,7 @@ func TestLockStores(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := lockOf(t, root)
-	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents} {
+	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents, l.Tools, l.Base} {
 		for k, e := range tbl {
 			if _, err := testStore(t).Get(e.SHA256); err != nil {
 				t.Errorf("%s not stored: %v", k, err)
@@ -385,7 +385,7 @@ func TestLoadBackfillsStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := lockOf(t, root)
-	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents} {
+	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents, l.Tools, l.Base} {
 		for k, e := range tbl {
 			if _, err := testStore(t).Get(e.SHA256); err != nil {
 				t.Errorf("%s not stored by Load: %v", k, err)

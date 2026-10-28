@@ -31,7 +31,10 @@ type Catalog struct {
 	Options map[Ref]*Option
 	Tools   map[string]*Tool
 	Agents  map[Ref]*Agent
-	Root    string // the workspace local refs read from; "" for none
+	// AgentBase is the agent base image's directory (AgentBaseFile);
+	// nil when the catalog has none.
+	AgentBase fs.FS
+	Root      string // the workspace local refs read from; "" for none
 	// Libraries finds the verified checkouts library refs read from; nil
 	// for none (a library ref then doesn't resolve).
 	Libraries Libraries
@@ -79,7 +82,7 @@ func (c *Catalog) WithFile(rel string, data []byte) (*Catalog, error) {
 	} else {
 		mem[rel] = &fstest.MapFile{Data: data, Mode: 0o644}
 	}
-	n := &Catalog{Packs: builtinOnly(c.Packs), Options: builtinOnly(c.Options), Tools: c.Tools, Agents: builtinOnly(c.Agents), Root: c.Root, Libraries: c.Libraries, overlay: maps.Clone(c.overlay)}
+	n := &Catalog{Packs: builtinOnly(c.Packs), Options: builtinOnly(c.Options), Tools: c.Tools, Agents: builtinOnly(c.Agents), AgentBase: c.AgentBase, Root: c.Root, Libraries: c.Libraries, overlay: maps.Clone(c.overlay)}
 	if n.overlay == nil {
 		n.overlay = map[string]fs.FS{}
 	}
@@ -217,23 +220,50 @@ func (l *loader) agent(dir string, r Ref) (*Agent, error) {
 	return &a, errors.Join(l.errs...)
 }
 
-// Package kinds, as stack.lock's tables and WithPackage name them.
+// tool loads the tool at dir, its manifest checked.
+func (l *loader) tool(dir string) (*Tool, error) {
+	var t Tool
+	if l.decode(dir, "tool.toml", &t) {
+		t.Files = l.sub(dir)
+		if t.Service == "" {
+			t.Service = t.Name
+		}
+		l.checkTool(dir, &t)
+	}
+	return &t, errors.Join(l.errs...)
+}
+
+// Package kinds, as stack.lock's tables and WithPackage name them. A tool
+// (KindTool, by name) and the agent base image (KindBase, AgentBaseRef)
+// are built in only, and carry no version (D107).
 const (
 	KindPack   = "pack"
 	KindOption = "option"
 	KindAgent  = "agent"
+	KindTool   = "tool"
+	KindBase   = "base"
 )
 
+// AgentBaseRef names the agent base image's files (Catalog.AgentBase) as
+// a package: kind KindBase.
+var AgentBaseRef = Ref{Name: "agent-base"}
+
+// AgentBaseFile is the agent base image's Containerfile in AgentBase.
+const AgentBaseFile = "Containerfile.agent-base"
+
 // WithPackage is a copy of c with files, loaded and checked as the package
-// of kind (KindPack, KindOption or KindAgent) at r, in place of the one r
-// names: a built-in's, a local or a library package's accepted content
-// (D97).
+// of kind at r, in place of the one r names: a built-in's, a local or a
+// library package's accepted content (D97); for KindTool the tool r.Name,
+// for KindBase the agent base image.
 func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS) (*Catalog, error) {
 	top := kindDirs[kind]
 	if top == "" {
 		return nil, fmt.Errorf("%s: unknown package kind %q", r, kind)
 	}
 	dir := top + "/" + r.Name
+	if kind == KindBase {
+		dir = top
+	}
 	mem := fstest.MapFS{}
 	err := fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
 		switch {
@@ -250,19 +280,30 @@ func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS) (*Catalog, error)
 		return nil, fmt.Errorf("%s: %w", r, err)
 	}
 	l := &loader{fsys: mem, bases: map[int]string{}, names: map[string]string{}}
-	n := &Catalog{Packs: maps.Clone(c.Packs), Options: maps.Clone(c.Options), Tools: c.Tools, Agents: maps.Clone(c.Agents), Root: c.Root, Libraries: c.Libraries, overlay: c.overlay}
+	n := &Catalog{Packs: maps.Clone(c.Packs), Options: maps.Clone(c.Options), Tools: maps.Clone(c.Tools), Agents: maps.Clone(c.Agents), AgentBase: c.AgentBase, Root: c.Root, Libraries: c.Libraries, overlay: c.overlay}
 	switch kind {
 	case KindPack:
 		n.Packs[r], err = l.pack(dir, r)
 	case KindOption:
 		n.Options[r], err = l.option(dir, r)
-	default:
+	case KindAgent:
 		n.Agents[r], err = l.agent(dir, r)
+	case KindTool:
+		var t *Tool
+		if t, err = l.tool(dir); err == nil && t.Name != r.Name {
+			err = fmt.Errorf("%s/tool.toml: name %q is not %s", dir, t.Name, r.Name)
+		}
+		n.Tools[r.Name] = t
+	case KindBase:
+		if _, err = fs.Stat(mem, dir+"/"+AgentBaseFile); err == nil {
+			n.AgentBase = l.sub(dir)
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", r, err)
 	}
 	return n, nil
+
 }
 
 // local is a loader over the workspace and the package directory of the
@@ -347,6 +388,9 @@ func Load(fsys fs.FS) (*Catalog, error) {
 		if l.checkAgent(dir, &a) {
 			c.Agents[Ref{Name: a.Name, Version: a.Version}] = &a
 		}
+	}
+	if fi, err := fs.Stat(fsys, kindDirs[KindBase]); err == nil && fi.IsDir() {
+		c.AgentBase = l.sub(kindDirs[KindBase])
 	}
 	var defaults []string
 	for r, a := range c.Agents {

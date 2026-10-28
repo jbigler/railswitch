@@ -29,9 +29,11 @@ type Lock struct {
 	Schema     int                  `toml:"schema"` // 1 (D39)
 	Packs      map[string]LockEntry `toml:"pack"`   // key = name
 	Options    map[string]LockEntry `toml:"option"`
-	Agents     map[string]LockEntry `toml:"agent"`      // key = ref string: "myagent@1", "local:probe@1"
-	Images     []LockImage          `toml:"image"`      // pulled service images (D15)
-	BaseImages []LockImage          `toml:"base_image"` // FROM images of built steps, by first pull (D36)
+	Agents     map[string]LockEntry `toml:"agent"`          // key = ref string: "myagent@1", "local:probe@1"
+	Tools      map[string]LockEntry `toml:"tool,omitempty"` // key = tool name: "nvim" (D107)
+	Base       map[string]LockEntry `toml:"base,omitempty"` // key "agent": the agent base image (D107)
+	Images     []LockImage          `toml:"image"`          // pulled service images (D15)
+	BaseImages []LockImage          `toml:"base_image"`     // FROM images of built steps, by first pull (D36)
 	// Removed are the entries lock writes dropped, most recent first, at
 	// most MaxRemoved: a ref that comes back is locked at what was
 	// accepted, not at content nobody reviewed (D97).

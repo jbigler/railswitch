@@ -107,6 +107,12 @@ func projectPackages(p *config.Project) []stackPkg {
 			out = append(out, stackPkg{kind: pack.KindAgent, key: r.String(), ref: r})
 		}
 	}
+	if p.Tools.Nvim != nil {
+		out = append(out, stackPkg{kind: pack.KindTool, key: "nvim", ref: pack.Ref{Name: "nvim"}})
+	}
+	if len(p.Agents) > 0 {
+		out = append(out, stackPkg{kind: pack.KindBase, key: baseKey, ref: pack.AgentBaseRef})
+	}
 	return out
 }
 
@@ -126,6 +132,13 @@ func catalogFiles(cat *pack.Catalog, kind string, r pack.Ref) (fs.FS, error) {
 			return nil, err
 		}
 		return o.Files, err
+	case pack.KindTool:
+		if t := cat.Tools[r.Name]; t != nil {
+			return t.Files, nil
+		}
+		return nil, nil
+	case pack.KindBase:
+		return cat.AgentBase, nil
 	}
 	a, err := cat.Agent(r)
 	if a == nil {
@@ -298,7 +311,7 @@ func plan(root string, p *config.Project, cat *pack.Catalog, accept Accept) (*lo
 		pl.old = old
 	}
 	l := *old
-	l.Packs, l.Options, l.Agents = nil, nil, nil
+	l.Packs, l.Options, l.Agents, l.Tools, l.Base = nil, nil, nil, nil, nil
 	for _, sp := range stackPackages(st) {
 		e, err := sp.entry()
 		if err != nil {
@@ -423,7 +436,7 @@ func dropped(old, l *config.Lock) []config.LockRemoved {
 			out = append(out, r)
 		}
 	}
-	for _, kind := range []string{pack.KindPack, pack.KindOption, pack.KindAgent} {
+	for _, kind := range lockKinds {
 		t := table(old, kind)
 		for _, key := range slices.Sorted(maps.Keys(t)) {
 			e := t[key]
@@ -519,7 +532,7 @@ func Review(_ context.Context, root string) (*Plan, error) {
 			changes = append(changes, Change{Ref: sp.ref, Kind: sp.kind, Status: StatusAdded, To: e.SHA256, New: sp.files})
 		}
 	}
-	for _, kind := range []string{pack.KindPack, pack.KindOption, pack.KindAgent} {
+	for _, kind := range lockKinds {
 		t := table(old, kind)
 		for _, key := range slices.Sorted(maps.Keys(t)) {
 			if !want[kind+" "+key] {
@@ -578,8 +591,13 @@ func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalo
 // name, agents by ref. A library package's alias is the one libs knows its
 // library by; none is an error.
 func lockedRef(kind, key string, e config.LockEntry, libs pack.Libraries) (pack.Ref, error) {
-	if kind == pack.KindAgent {
+	switch kind {
+	case pack.KindAgent:
 		return pack.ParseRef(key)
+	case pack.KindTool:
+		return pack.Ref{Name: key}, nil
+	case pack.KindBase:
+		return pack.AgentBaseRef, nil
 	}
 	v, err := strconv.Atoi(e.Version)
 	if err != nil {

@@ -180,7 +180,7 @@ func (w *Workspace) WithProject(p *config.Project) (*Workspace, error) {
 		return nil, err
 	}
 	l := *w.Lock
-	l.Packs, l.Options, l.Agents = want.Packs, want.Options, want.Agents
+	l.Packs, l.Options, l.Agents, l.Tools, l.Base = want.Packs, want.Options, want.Agents, want.Tools, want.Base
 	c := *w
 	c.Project, c.Stack, c.Lock = p, st, &l
 	return &c, nil
@@ -208,7 +208,7 @@ func Hash(data []byte) string {
 // options are keyed by name, agents by ref string ("local:probe@1"); a
 // workspace-local package's source is "local" (D43).
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
-	l := &config.Lock{Packs: map[string]config.LockEntry{}, Options: map[string]config.LockEntry{}, Agents: map[string]config.LockEntry{}}
+	l := &config.Lock{}
 	for _, sp := range stackPackages(st) {
 		e, err := sp.entry()
 		if err != nil {
@@ -227,7 +227,24 @@ type stackPkg struct {
 	origin    *pack.LibraryOrigin // a library package's; nil otherwise
 }
 
-// stackPackages are st's pack, options and agent packages, one per key.
+// lockKinds are stack.lock's package tables, in the order reviews list
+// them.
+var lockKinds = []string{pack.KindPack, pack.KindOption, pack.KindAgent, pack.KindTool, pack.KindBase}
+
+// baseKey is the agent base image's key in [base] (D107).
+const baseKey = "agent"
+
+// refVersion is r's version as a lock entry writes it: "" for an
+// unversioned tool or the agent base image.
+func refVersion(r pack.Ref) string {
+	if r.Version == 0 {
+		return ""
+	}
+	return strconv.Itoa(r.Version)
+}
+
+// stackPackages are st's pack, options and agent packages, its tools and,
+// with agents, the agent base image (D107), one per key.
 func stackPackages(st *pack.Stack) []stackPkg {
 	out := []stackPkg{{pack.KindPack, st.Pack.Name, st.PackRef, st.Pack.Files, st.Pack.Origin}}
 	for _, ch := range st.Options {
@@ -240,13 +257,19 @@ func stackPackages(st *pack.Stack) []stackPkg {
 			out = append(out, stackPkg{pack.KindAgent, key, a.Ref, a.Agent.Files, a.Agent.Origin})
 		}
 	}
+	for _, t := range st.Tools {
+		out = append(out, stackPkg{pack.KindTool, t.Name, pack.Ref{Name: t.Name}, t.Files, nil})
+	}
+	if st.AgentBase != nil {
+		out = append(out, stackPkg{pack.KindBase, baseKey, pack.AgentBaseRef, st.AgentBase, nil})
+	}
 	return out
 }
 
 // entry is sp's lock entry, its content hashed. A library package's
 // records its library, commit and signer (D105).
 func (sp stackPkg) entry() (config.LockEntry, error) {
-	e := config.LockEntry{Version: strconv.Itoa(sp.ref.Version), Source: "built in (railswitch " + buildinfo.Version + ")"}
+	e := config.LockEntry{Version: refVersion(sp.ref), Source: "built in (railswitch " + buildinfo.Version + ")"}
 	switch {
 	case sp.ref.Local:
 		e.Source = localSource
@@ -266,7 +289,7 @@ func (sp stackPkg) entry() (config.LockEntry, error) {
 
 // table is l's table of kind, made when nil.
 func table(l *config.Lock, kind string) map[string]config.LockEntry {
-	t := map[string]*map[string]config.LockEntry{pack.KindPack: &l.Packs, pack.KindOption: &l.Options, pack.KindAgent: &l.Agents}[kind]
+	t := map[string]*map[string]config.LockEntry{pack.KindPack: &l.Packs, pack.KindOption: &l.Options, pack.KindAgent: &l.Agents, pack.KindTool: &l.Tools, pack.KindBase: &l.Base}[kind]
 	if *t == nil {
 		*t = map[string]config.LockEntry{}
 	}
@@ -276,7 +299,7 @@ func table(l *config.Lock, kind string) map[string]config.LockEntry {
 // Pins reports whether e locks ref r: its version and where it comes from
 // (built in, local or a library).
 func Pins(e config.LockEntry, r pack.Ref) bool {
-	return e.Version == strconv.Itoa(r.Version) && sourceKind(e.Source) == refKind(r)
+	return e.Version == refVersion(r) && sourceKind(e.Source) == refKind(r)
 }
 
 // localSource is a workspace-local package's lock source; librarySource
@@ -366,6 +389,8 @@ func (w *Workspace) CheckLock() error {
 	cmp(have.Packs, want.Packs, versioned)
 	cmp(have.Options, want.Options, versioned)
 	cmp(have.Agents, want.Agents, func(key string, _ config.LockEntry) string { return key })
+	cmp(have.Tools, want.Tools, func(key string, _ config.LockEntry) string { return "tool " + key })
+	cmp(have.Base, want.Base, func(string, config.LockEntry) string { return pack.AgentBaseRef.String() })
 	if len(stale) > 0 {
 		return fmt.Errorf("%w for %s: %s", ErrStaleLock, strings.Join(stale, ", "), reviewHint)
 	}

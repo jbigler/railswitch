@@ -66,7 +66,7 @@ func projects(t *testing.T, prefixes ...string) (machine.Dirs, map[string]string
 			t.Fatal(err)
 		}
 		reg.Close()
-		if err := workspace.Lock(ctx, ws); err != nil {
+		if err := workspace.Lock(ctx, ws, workspace.Accept{All: true}); err != nil {
 			t.Fatal(err)
 		}
 		w, err := workspace.Load(ctx, ws, "")

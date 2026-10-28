@@ -119,18 +119,12 @@ func (c *Catalog) Pack(r Ref) (*Pack, error) {
 	if err != nil {
 		return nil, err
 	}
-	var p Pack
-	if l.decode(dir, "pack.toml", &p) {
-		p.Files = l.sub(dir)
-		if l.checkPack(dir, &p) {
-			l.version(dir+"/pack.toml", p.Version, r)
-		}
-	}
-	if err := errors.Join(l.errs...); err != nil {
+	p, err := l.pack(dir, r)
+	if err != nil {
 		return nil, err
 	}
-	c.Packs[r] = &p
-	return &p, nil
+	c.Packs[r] = p
+	return p, nil
 }
 
 // Option is the option r names, as Pack.
@@ -142,18 +136,12 @@ func (c *Catalog) Option(r Ref) (*Option, error) {
 	if err != nil {
 		return nil, err
 	}
-	var o Option
-	if l.decode(dir, "option.toml", &o) {
-		o.Files = l.sub(dir)
-		if l.checkOption(dir, &o) {
-			l.version(dir+"/option.toml", o.Version, r)
-		}
-	}
-	if err := errors.Join(l.errs...); err != nil {
+	o, err := l.option(dir, r)
+	if err != nil {
 		return nil, err
 	}
-	c.Options[r] = &o
-	return &o, nil
+	c.Options[r] = o
+	return o, nil
 }
 
 // Agent is the agent package r names, as Pack.
@@ -165,6 +153,39 @@ func (c *Catalog) Agent(r Ref) (*Agent, error) {
 	if err != nil {
 		return nil, err
 	}
+	a, err := l.agent(dir, r)
+	if err != nil {
+		return nil, err
+	}
+	c.Agents[r] = a
+	return a, nil
+}
+
+// pack, option and agent load the one package of their kind at dir as r:
+// its manifest checked, its version r's.
+func (l *loader) pack(dir string, r Ref) (*Pack, error) {
+	var p Pack
+	if l.decode(dir, "pack.toml", &p) {
+		p.Files = l.sub(dir)
+		if l.checkPack(dir, &p) {
+			l.version(dir+"/pack.toml", p.Version, r)
+		}
+	}
+	return &p, errors.Join(l.errs...)
+}
+
+func (l *loader) option(dir string, r Ref) (*Option, error) {
+	var o Option
+	if l.decode(dir, "option.toml", &o) {
+		o.Files = l.sub(dir)
+		if l.checkOption(dir, &o) {
+			l.version(dir+"/option.toml", o.Version, r)
+		}
+	}
+	return &o, errors.Join(l.errs...)
+}
+
+func (l *loader) agent(dir string, r Ref) (*Agent, error) {
 	var a Agent
 	if l.decode(dir, "agent.toml", &a) {
 		a.Files = l.sub(dir)
@@ -172,11 +193,54 @@ func (c *Catalog) Agent(r Ref) (*Agent, error) {
 			l.version(dir+"/agent.toml", a.Version, r)
 		}
 	}
-	if err := errors.Join(l.errs...); err != nil {
-		return nil, err
+	return &a, errors.Join(l.errs...)
+}
+
+// Package kinds, as stack.lock's tables and WithPackage name them.
+const (
+	KindPack   = "pack"
+	KindOption = "option"
+	KindAgent  = "agent"
+)
+
+// WithPackage is a copy of c with files, loaded and checked as the package
+// of kind (KindPack, KindOption or KindAgent) at r, in place of the one r
+// names: a built-in's or a local package's accepted content (D97).
+func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS) (*Catalog, error) {
+	top := map[string]string{KindPack: "packs", KindOption: "options", KindAgent: "agents"}[kind]
+	if top == "" {
+		return nil, fmt.Errorf("%s: unknown package kind %q", r, kind)
 	}
-	c.Agents[r] = &a
-	return &a, nil
+	dir := top + "/" + r.Name
+	mem := fstest.MapFS{}
+	err := fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
+		switch {
+		case err != nil || d.IsDir():
+			return err
+		case !d.Type().IsRegular():
+			return fmt.Errorf("%s: not a regular file", p)
+		}
+		b, err := fs.ReadFile(files, p)
+		mem[dir+"/"+p] = &fstest.MapFile{Data: b, Mode: 0o644}
+		return err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", r, err)
+	}
+	l := &loader{fsys: mem, bases: map[int]string{}, names: map[string]string{}}
+	n := &Catalog{Packs: maps.Clone(c.Packs), Options: maps.Clone(c.Options), Tools: c.Tools, Agents: maps.Clone(c.Agents), Root: c.Root, overlay: c.overlay}
+	switch kind {
+	case KindPack:
+		n.Packs[r], err = l.pack(dir, r)
+	case KindOption:
+		n.Options[r], err = l.option(dir, r)
+	default:
+		n.Agents[r], err = l.agent(dir, r)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", r, err)
+	}
+	return n, nil
 }
 
 // local is a loader over the workspace and the package directory of the

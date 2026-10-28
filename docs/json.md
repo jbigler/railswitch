@@ -347,6 +347,7 @@ row.
 {
   "prefix": "filial",
   "workspace": "/home/u/workspace/filial",
+  "review_pending": false,
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
@@ -366,6 +367,7 @@ row.
 |---|---|---|
 | `prefix` | string | The project's prefix. |
 | `workspace` | string | Its workspace directory as registered. |
+| `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |

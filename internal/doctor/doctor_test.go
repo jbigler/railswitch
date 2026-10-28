@@ -91,7 +91,7 @@ func workspaceAt(t *testing.T, render bool) *workspace.Workspace {
 	}
 	reg.Close()
 	ctx := context.Background()
-	if err := workspace.Lock(ctx, root); err != nil {
+	if err := workspace.Lock(ctx, root, workspace.Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	ws, err := workspace.Load(ctx, root, "")

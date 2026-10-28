@@ -93,7 +93,7 @@ func cmdAgentAdd(ctx context.Context, e *env, args []string) int {
 	for _, x := range plan.extend {
 		fmt.Fprintf(e.stdout, "secret %s now goes to %s too\n", x.Name, chosen.Service)
 	}
-	if err := workspace.Lock(ctx, root); err != nil {
+	if err := workspace.Lock(ctx, root, workspace.Accept{}); err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))

@@ -74,7 +74,7 @@ func cmdLock(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	if err := workspace.Lock(ctx, root); err != nil {
+	if err := workspace.Lock(ctx, root, workspace.Accept{All: true}); err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))

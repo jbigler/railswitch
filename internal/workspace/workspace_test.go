@@ -52,7 +52,7 @@ func projectRoot(t *testing.T) string {
 
 func TestLockWithoutExistingLock(t *testing.T) {
 	root := projectRoot(t)
-	if err := Lock(context.Background(), root); err != nil {
+	if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	l, err := config.ReadLock(filepath.Join(root, "stack.lock"))
@@ -92,7 +92,7 @@ func TestLockKeepsImageDigests(t *testing.T) {
 	if err := old.Write(path); err != nil {
 		t.Fatal(err)
 	}
-	if err := Lock(context.Background(), root); err != nil {
+	if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	l, err := config.ReadLock(path)
@@ -110,7 +110,7 @@ func TestLockKeepsImageDigests(t *testing.T) {
 func TestLoadFindsRootAndSlug(t *testing.T) {
 	root := projectRoot(t)
 	ctx := context.Background()
-	if err := Lock(ctx, root); err != nil {
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []struct{ start, slug, want string }{
@@ -150,7 +150,7 @@ func TestLoadNoLock(t *testing.T) {
 func TestStaleLock(t *testing.T) {
 	root := projectRoot(t)
 	ctx := context.Background()
-	if err := Lock(ctx, root); err != nil {
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(root, "stack.lock")
@@ -168,13 +168,13 @@ func TestStaleLock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load on a stale lock: %v", err)
 	}
-	if err := w.CheckLock(); err == nil || !strings.Contains(err.Error(), "stack.lock is out of date for redis@1: run railswitch lock") {
+	if err := w.CheckLock(); err == nil || !strings.Contains(err.Error(), "stack.lock is out of date for redis@1: an update is waiting for review: railswitch lock --review") {
 		t.Errorf("CheckLock: %v", err)
 	}
-	if _, err := w.Render(ctx, &systest.Fake{}, true); err == nil || !strings.Contains(err.Error(), "run railswitch lock") {
+	if _, err := w.Render(ctx, &systest.Fake{}, true); err == nil || !strings.Contains(err.Error(), "railswitch lock --review") {
 		t.Errorf("Render: %v", err)
 	}
-	if err := Lock(ctx, root); err != nil {
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	if w, err = Load(ctx, root, ""); err != nil || w.CheckLock() != nil {
@@ -234,7 +234,7 @@ func TestLockAgents(t *testing.T) {
 
 	root := projectRoot(t)
 	ctx := context.Background()
-	if err := Lock(ctx, root); err != nil {
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	w, err := Load(ctx, root, "")
@@ -251,9 +251,28 @@ func TestLockAgents(t *testing.T) {
 	if w, err = Load(ctx, root, ""); err != nil {
 		t.Fatal(err)
 	}
+	if err := w.CheckLock(); err != nil || !slices.Equal(w.Pending, []pack.Ref{{Name: "probe", Version: 1, Local: true}}) {
+		t.Errorf("after edit: CheckLock %v, Pending %v; want the accepted copy running", err, w.Pending)
+	}
+	dropStore(t)
+	if w, err = Load(ctx, root, ""); err != nil {
+		t.Fatal(err)
+	}
 	err = w.CheckLock()
 	if !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "for local:probe@1:") {
-		t.Errorf("CheckLock after edit: %v", err)
+		t.Errorf("CheckLock after edit, no stored copy: %v", err)
+	}
+}
+
+// dropStore removes the machine's store of accepted packages.
+func dropStore(t *testing.T) {
+	t.Helper()
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(dirs.Data, "locked")); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -320,7 +339,7 @@ func checkLock(t *testing.T, root string) error {
 func TestLockLocalPack(t *testing.T) {
 	root := projectRoot(t)
 	localRails(t, root)
-	if err := Lock(context.Background(), root); err != nil {
+	if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	l, err := config.ReadLock(filepath.Join(root, "stack.lock"))
@@ -339,7 +358,8 @@ func TestLockLocalPack(t *testing.T) {
 	}
 }
 
-// Review Focus 1: any change to a locked local package makes the lock stale.
+// Review Focus 1: any change to a locked local package runs the accepted
+// copy; without one the lock is stale.
 func TestCheckLockLocalPackEdits(t *testing.T) {
 	edits := map[string]func(dir string) error{
 		"edit pack.toml": func(dir string) error {
@@ -360,12 +380,16 @@ func TestCheckLockLocalPackEdits(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := projectRoot(t)
 			localRails(t, root)
-			if err := Lock(context.Background(), root); err != nil {
+			if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 				t.Fatal(err)
 			}
 			if err := edit(filepath.Join(root, "packs", "rails")); err != nil {
 				t.Fatal(err)
 			}
+			if err := checkLock(t, root); err != nil {
+				t.Errorf("CheckLock with the accepted copy = %v", err)
+			}
+			dropStore(t)
 			err := checkLock(t, root)
 			if !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "local:rails@1") {
 				t.Errorf("CheckLock = %v; want stale naming local:rails@1", err)
@@ -374,12 +398,13 @@ func TestCheckLockLocalPackEdits(t *testing.T) {
 	}
 	root := projectRoot(t)
 	localRails(t, root)
-	if err := Lock(context.Background(), root); err != nil {
+	if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("pack.toml", filepath.Join(root, "packs", "rails", "link")); err != nil {
 		t.Fatal(err)
 	}
+	dropStore(t)
 	if err := checkLock(t, root); err == nil || !strings.Contains(err.Error(), "link") || !strings.Contains(err.Error(), "not a regular file") {
 		t.Errorf("CheckLock with a symlink = %v", err)
 	}
@@ -388,14 +413,14 @@ func TestCheckLockLocalPackEdits(t *testing.T) {
 // Review Focus 2: a byte-identical local copy is still a different package.
 func TestCheckLockBuiltinToLocal(t *testing.T) {
 	root := projectRoot(t)
-	if err := Lock(context.Background(), root); err != nil {
+	if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	localRails(t, root)
 	if err := checkLock(t, root); !errors.Is(err, ErrStaleLock) || !strings.Contains(err.Error(), "local:rails@1") {
 		t.Fatalf("CheckLock after switching to the local copy = %v", err)
 	}
-	if err := Lock(context.Background(), root); err != nil {
+	if err := Lock(context.Background(), root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := checkLock(t, root); err != nil {
@@ -420,7 +445,7 @@ func dashboardWS(t *testing.T) (*Workspace, *systest.Fake, machine.Dirs) {
 	if err := os.MkdirAll(filepath.Join(root, "master", ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := Lock(ctx, root); err != nil {
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	dirs, err := machine.DefaultDirs()

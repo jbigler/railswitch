@@ -145,7 +145,7 @@ func TestDBDumpNoOption(t *testing.T) {
 	if err := os.WriteFile(p, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := workspace.Lock(ctx, e.ws); err != nil {
+	if err := workspace.Lock(ctx, e.ws, workspace.Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	if e.l.WS, err = workspace.Load(ctx, e.ws, ""); err != nil {

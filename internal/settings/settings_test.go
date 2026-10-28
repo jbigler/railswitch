@@ -48,7 +48,7 @@ func filialEnv(t *testing.T, prepare func(ws string)) Env {
 	}
 	reg.Close()
 	ctx := context.Background()
-	if err := workspace.Lock(ctx, ws); err != nil {
+	if err := workspace.Lock(ctx, ws, workspace.Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	w, err := workspace.Load(ctx, ws, "")

@@ -89,7 +89,7 @@ func setup(t *testing.T, slugs ...string) *tenv {
 		t.Fatal(err)
 	}
 	reg.Close()
-	if err := workspace.Lock(ctx, ws); err != nil {
+	if err := workspace.Lock(ctx, ws, workspace.Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	w, err := workspace.Load(ctx, ws, "")

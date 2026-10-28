@@ -28,7 +28,7 @@ func (e *tenv) editProject(t *testing.T, edit func(string) string) {
 	if err := os.WriteFile(path, []byte(edit(string(data))), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := workspace.Lock(ctx, e.ws); err != nil {
+	if err := workspace.Lock(ctx, e.ws, workspace.Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	w, err := workspace.Load(ctx, e.ws, "")

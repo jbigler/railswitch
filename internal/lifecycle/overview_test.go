@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/unithash"
@@ -342,5 +343,24 @@ func TestOverviewStale(t *testing.T) {
 				t.Errorf("%d podman calls; want 1:\n%s", n, dump(e.calls()))
 			}
 		})
+	}
+}
+
+// review_pending says whether a package update waits for review.
+func TestOverviewReviewPending(t *testing.T) {
+	e, _ := overviewEnv(t, func(string, string) string { return "inactive/dead" })
+	if err := e.l.PrintOverview(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(e.out.String(), `"review_pending":false`) {
+		t.Errorf("accepted lock: %s", e.out)
+	}
+	e.out.Reset()
+	e.l.WS.Lock.Options["redis"] = config.LockEntry{Version: "1", Source: "built in", SHA256: strings.Repeat("0", 64)}
+	if err := e.l.PrintOverview(ctx, true); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(e.out.String(), `"review_pending":true`) {
+		t.Errorf("waiting update: %s", e.out)
 	}
 }

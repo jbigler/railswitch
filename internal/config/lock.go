@@ -76,13 +76,23 @@ func ReadLock(path string) (*Lock, error) {
 // with it, under its header. Map keys and image entries are sorted, so the
 // same lock always gives the same bytes.
 func (l *Lock) Write(path string) error {
+	data, err := l.Encode()
+	if err != nil {
+		return err
+	}
+	return tomlfile.WriteAtomic(path, data, 0o644)
+}
+
+// Encode stamps the lock with LockSchemaVersion and returns the bytes Write
+// writes.
+func (l *Lock) Encode() ([]byte, error) {
 	l.Schema = LockSchemaVersion
 	var buf bytes.Buffer
 	buf.WriteString(lockHeader)
 	if err := toml.NewEncoder(&buf).Encode(l); err != nil {
-		return err
+		return nil, err
 	}
-	return tomlfile.WriteAtomic(path, buf.Bytes(), 0o644)
+	return buf.Bytes(), nil
 }
 
 // Digest returns the recorded digest of a pulled service image, or "".

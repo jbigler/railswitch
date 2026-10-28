@@ -45,6 +45,9 @@ type Workspace struct {
 	Lock    *config.Lock
 	Dirs    machine.Dirs
 	Slug    string // current worktree, "" at the root
+	// Pending are the packages whose content changed under an unchanged
+	// ref and that run from the store's accepted copy (D97), sorted.
+	Pending []pack.Ref
 
 	overlay map[string][]byte // WithFile's files, by workspace-relative path (nil: removed)
 }
@@ -78,18 +81,21 @@ func absDir(dir string) (string, error) {
 // when set (-w), else the first path element of startDir below the root.
 // stack.lock must exist (an error wrapping config.ErrNoLock otherwise); it
 // may be out of date (see CheckLock), so teardown and diagnosis still work.
+// A package whose content changed under the ref stack.lock pins runs the
+// store's copy of what the lock accepted (Pending).
 func Load(ctx context.Context, startDir, slug string) (*Workspace, error) {
-	return load(startDir, slug, nil)
+	return load(startDir, slug, nil, nil)
 }
 
 // LoadEdited is Load of the workspace at root, with cat (a LoadCatalog of
 // root with edits in memory, Catalog.WithFile) as its catalog: the project
-// as an edit would leave it, written nowhere.
-func LoadEdited(_ context.Context, root string, cat *pack.Catalog) (*Workspace, error) {
-	return load(root, "", cat)
+// as an edit of package edited would leave it, written nowhere. edited
+// keeps its edited content; any other package runs what the lock accepted.
+func LoadEdited(_ context.Context, root string, cat *pack.Catalog, edited pack.Ref) (*Workspace, error) {
+	return load(root, "", cat, []pack.Ref{edited})
 }
 
-func load(startDir, slug string, cat *pack.Catalog) (*Workspace, error) {
+func load(startDir, slug string, cat *pack.Catalog, keep []pack.Ref) (*Workspace, error) {
 	root, err := Root(startDir)
 	if err != nil {
 		return nil, err
@@ -110,10 +116,6 @@ func load(startDir, slug string, cat *pack.Catalog) (*Workspace, error) {
 			return nil, err
 		}
 	}
-	st, err := cat.Resolve(p)
-	if err != nil {
-		return nil, err
-	}
 	lock, err := config.ReadLock(filepath.Join(root, lockFile))
 	if err != nil {
 		if errors.Is(err, config.ErrNoLock) {
@@ -125,7 +127,14 @@ func load(startDir, slug string, cat *pack.Catalog) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Workspace{Root: root, Project: p, Catalog: cat, Stack: st, Lock: lock, Dirs: dirs, Slug: slug}, nil
+	// The swap comes before Resolve: an update that no longer resolves
+	// (or a local package broken in an editor) still runs what was accepted.
+	cat, pending := runAccepted(cat, p, lock, store(dirs), keep)
+	st, err := cat.Resolve(p)
+	if err != nil {
+		return nil, err
+	}
+	return &Workspace{Root: root, Project: p, Catalog: cat, Stack: st, Lock: lock, Dirs: dirs, Slug: slug, Pending: pending}, nil
 }
 
 // slugAt is the worktree startDir is in: its first path element below root,
@@ -156,38 +165,6 @@ func loadProject(root string) (*config.Project, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return p, nil
-}
-
-// Lock loads and validates root's project.toml, resolves its stack and
-// writes <root>/stack.lock: every pack and option with its content hash,
-// keeping the image digests of an existing lock. It needs no existing lock.
-func Lock(_ context.Context, root string) error {
-	p, err := loadProject(root)
-	if err != nil {
-		return err
-	}
-	cat, err := pack.LoadCatalog(root)
-	if err != nil {
-		return err
-	}
-	st, err := cat.Resolve(p)
-	if err != nil {
-		return err
-	}
-	want, err := lockEntries(st)
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(root, lockFile)
-	l, err := config.ReadLock(path)
-	if errors.Is(err, config.ErrNoLock) {
-		l, err = &config.Lock{}, nil
-	}
-	if err != nil {
-		return err
-	}
-	l.Packs, l.Options, l.Agents = want.Packs, want.Options, want.Agents
-	return l.Write(path)
 }
 
 // WithProject is w with project p in place of its own: p's stack, and a
@@ -231,40 +208,65 @@ func Hash(data []byte) string {
 // options are keyed by name, agents by ref string ("local:probe@1"); a
 // workspace-local package's source is "local" (D43).
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
-	builtinSrc := "built in (railswitch " + buildinfo.Version + ")"
-	entry := func(r pack.Ref, files fs.FS) (config.LockEntry, error) {
-		src := builtinSrc
-		if r.Local {
-			src = localSource
-		}
-		sum, err := pack.ContentHash(files)
-		return config.LockEntry{Version: strconv.Itoa(r.Version), Source: src, SHA256: sum}, err
-	}
 	l := &config.Lock{Packs: map[string]config.LockEntry{}, Options: map[string]config.LockEntry{}, Agents: map[string]config.LockEntry{}}
-	e, err := entry(st.PackRef, st.Pack.Files)
-	if err != nil {
-		return nil, fmt.Errorf("pack %s: %w", st.PackRef, err)
-	}
-	l.Packs[st.Pack.Name] = e
-	for _, ch := range st.Options {
-		e, err := entry(ch.Ref, ch.Option.Files)
+	for _, sp := range stackPackages(st) {
+		e, err := sp.entry()
 		if err != nil {
-			return nil, fmt.Errorf("option %s: %w", ch.Ref, err)
+			return nil, err
 		}
-		l.Options[ch.Option.Name] = e
-	}
-	for _, a := range st.Agents {
-		key := a.Ref.String()
-		if _, ok := l.Agents[key]; ok {
-			continue
-		}
-		e, err := entry(a.Ref, a.Agent.Files)
-		if err != nil {
-			return nil, fmt.Errorf("agent %s: %w", key, err)
-		}
-		l.Agents[key] = e
+		table(l, sp.kind)[sp.key] = e
 	}
 	return l, nil
+}
+
+// stackPkg is one package of a resolved stack, as stack.lock keys it.
+type stackPkg struct {
+	kind, key string // pack.KindPack etc.; the lock table's key
+	ref       pack.Ref
+	files     fs.FS
+}
+
+// stackPackages are st's pack, options and agent packages, one per key.
+func stackPackages(st *pack.Stack) []stackPkg {
+	out := []stackPkg{{pack.KindPack, st.Pack.Name, st.PackRef, st.Pack.Files}}
+	for _, ch := range st.Options {
+		out = append(out, stackPkg{pack.KindOption, ch.Option.Name, ch.Ref, ch.Option.Files})
+	}
+	seen := map[string]bool{}
+	for _, a := range st.Agents {
+		if key := a.Ref.String(); !seen[key] {
+			seen[key] = true
+			out = append(out, stackPkg{pack.KindAgent, key, a.Ref, a.Agent.Files})
+		}
+	}
+	return out
+}
+
+// entry is sp's lock entry, its content hashed.
+func (sp stackPkg) entry() (config.LockEntry, error) {
+	src := "built in (railswitch " + buildinfo.Version + ")"
+	if sp.ref.Local {
+		src = localSource
+	}
+	sum, err := pack.ContentHash(sp.files)
+	if err != nil {
+		return config.LockEntry{}, fmt.Errorf("%s %s: %w", sp.kind, sp.ref, err)
+	}
+	return config.LockEntry{Version: strconv.Itoa(sp.ref.Version), Source: src, SHA256: sum}, nil
+}
+
+// table is l's table of kind, made when nil.
+func table(l *config.Lock, kind string) map[string]config.LockEntry {
+	t := map[string]*map[string]config.LockEntry{pack.KindPack: &l.Packs, pack.KindOption: &l.Options, pack.KindAgent: &l.Agents}[kind]
+	if *t == nil {
+		*t = map[string]config.LockEntry{}
+	}
+	return *t
+}
+
+// pins reports whether e locks ref r: its version and locality.
+func pins(e config.LockEntry, r pack.Ref) bool {
+	return e.Version == strconv.Itoa(r.Version) && (e.Source == localSource) == r.Local
 }
 
 // localSource is a workspace-local package's lock source.
@@ -313,7 +315,7 @@ func (w *Workspace) CheckLock() error {
 	cmp(have.Options, want.Options, versioned)
 	cmp(have.Agents, want.Agents, func(key string, _ config.LockEntry) string { return key })
 	if len(stale) > 0 {
-		return fmt.Errorf("%w for %s: run railswitch lock", ErrStaleLock, strings.Join(stale, ", "))
+		return fmt.Errorf("%w for %s: %s", ErrStaleLock, strings.Join(stale, ", "), reviewHint)
 	}
 	return nil
 }

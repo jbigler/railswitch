@@ -515,7 +515,7 @@ func containerfileWrite(ctx context.Context, e *env, args []string) int {
 	if *dry {
 		return e.printJudged(w)
 	}
-	return e.commitJudged(ctx, se.WS.Root, w, []fileChange{{Rel: rel, Data: text, Mode: 0o644}}, false, *restart)
+	return e.commitJudged(ctx, se.WS.Root, w, []fileChange{{Rel: rel, Data: text, Mode: 0o644}}, nil, *restart)
 }
 
 // railswitch containerfile eject <name> [--force]: see Eject.

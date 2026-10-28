@@ -218,7 +218,7 @@ func (e *env) commitProject(ctx context.Context, root string, next []byte) error
 	if err != nil {
 		return err
 	}
-	return e.commit(ctx, root, []fileChange{{Rel: "project.toml", Data: next, Mode: fi.Mode().Perm()}}, true)
+	return e.commit(ctx, root, []fileChange{{Rel: "project.toml", Data: next, Mode: fi.Mode().Perm()}}, &workspace.Accept{})
 }
 
 // fileChange is one file commit writes: Data at Rel (workspace-relative,
@@ -229,12 +229,13 @@ type fileChange struct {
 	Mode os.FileMode
 }
 
-// commit writes changes under root, then with lock writes stack.lock, then
-// renders. On any failure it puts back every file it changed, stack.lock
+// commit writes changes under root, then with lock (non-nil) writes
+// stack.lock accepting what it says (workspace.Lock, which stores every
+// package it pins), then renders. On any failure it puts back every file it changed, stack.lock
 // included (bytes and mode; a file that did not exist is removed, with the
 // directories made for it), so the workspace is as it was; the units a
 // failed render already wrote are not touched.
-func (e *env) commit(ctx context.Context, root string, changes []fileChange, lock bool) (err error) {
+func (e *env) commit(ctx context.Context, root string, changes []fileChange, lock *workspace.Accept) (err error) {
 	var undo []func() error
 	defer func() {
 		if err == nil {
@@ -261,14 +262,14 @@ func (e *env) commit(ctx context.Context, root string, changes []fileChange, loc
 		}
 		wrote = append(wrote, line)
 	}
-	if lock {
+	if lock != nil {
 		lockPath := filepath.Join(root, "stack.lock")
 		restore, err := keep(root, lockPath)
 		if err != nil {
 			return err
 		}
 		undo = append(undo, restore)
-		if err := workspace.Lock(ctx, root); err != nil {
+		if err := workspace.Lock(ctx, root, *lock); err != nil {
 			return err
 		}
 		wrote = append(wrote, "wrote "+lockPath)
@@ -388,7 +389,7 @@ func (e *env) printJudged(w judgedWrite) int {
 
 // commitJudged commits changes (commit) when w renders, prints each new
 // tag, and with restart restarts w's running worktrees (restartAll).
-func (e *env) commitJudged(ctx context.Context, root string, w judgedWrite, changes []fileChange, lock, restart bool) int {
+func (e *env) commitJudged(ctx context.Context, root string, w judgedWrite, changes []fileChange, lock *workspace.Accept, restart bool) int {
 	if w.err != nil {
 		return e.fail(w.err)
 	}

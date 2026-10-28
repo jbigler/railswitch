@@ -259,7 +259,7 @@ func TestRenderStaleLock(t *testing.T) {
 	}
 	for _, args := range [][]string{{"render"}, {"render", "--check"}} {
 		code, _, errs := runIn(t, append([]string{"-C", ws}, args...)...)
-		if code != 1 || !strings.Contains(errs, "stack.lock is out of date for redis@1: run railswitch lock") {
+		if code != 1 || !strings.Contains(errs, "stack.lock is out of date for redis@1: an update is waiting for review: railswitch lock --review") {
 			t.Errorf("%v: exit %d, stderr %q", args, code, errs)
 		}
 	}

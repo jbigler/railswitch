@@ -18,11 +18,15 @@ exactly what the page sees (docs/json.md).
   `$XDG_CONFIG_HOME/systemd/user/railswitch-dashboard.service`. Every
   render rewrites it; its `ExecStart` is the `railswitch` that rendered
   (symlinks resolved) with `dashboard serve`.
-- It has no `[Install]` section. Every app unit `Wants=` it, so the first
-  `up` on the machine starts it. It keeps running after the last worktree
-  stops (so its up buttons stay reachable) until you log out or run
-  `systemctl --user stop railswitch-dashboard.service`. The next `up`
-  starts it again.
+- `railswitch dashboard` (D118) prints the login link, writes the unit and,
+  unless it is already enabled and running, runs `systemctl --user enable
+  --now railswitch-dashboard.service`: it starts now and at every login
+  (`[Install] WantedBy=default.target`), on a machine with no project yet
+  and after a reboot. Every app unit also `Wants=` it, so `up` starts it
+  too. It keeps running after the last worktree stops (so its up buttons
+  stay reachable) until you log out, unless linger is on (`loginctl
+  enable-linger`; `doctor` warns when it is off), or you run `systemctl
+  --user stop railswitch-dashboard.service`.
 - A dashboard that fails to start never fails `up`: `up` prints a warning
   and carries on. Nor does a unit file render can't write (or railswitch's
   own path it can't find): `warning: railswitch-dashboard.service: <why>`.

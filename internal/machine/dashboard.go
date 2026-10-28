@@ -26,7 +26,9 @@ const (
 const dashboardMarker = "# railswitch: machine unit, rewritten by railswitch"
 
 // DashboardUnit is the dashboard's unit running exe (absolute, symlinks
-// resolved) as `dashboard serve`. No [Install]: every app unit Wants= it.
+// resolved) as `dashboard serve`. Every app unit Wants= it; `railswitch
+// dashboard` enables it (WantedBy=default.target), so it runs at login
+// with no project started, after a reboot too.
 // No NoNewPrivileges=: it would break rootless podman's setuid newuidmap in
 // the commands the dashboard runs.
 func DashboardUnit(exe string) []byte {
@@ -37,7 +39,10 @@ func DashboardUnit(exe string) []byte {
 		"[Service]\n" +
 		"ExecStart=" + execPath(exe) + " dashboard serve\n" +
 		"Restart=always\n" +
-		"RestartSec=2\n")
+		"RestartSec=2\n" +
+		"\n" +
+		"[Install]\n" +
+		"WantedBy=default.target\n")
 }
 
 // execPath is p as the first word of ExecStart=: % and $ doubled so

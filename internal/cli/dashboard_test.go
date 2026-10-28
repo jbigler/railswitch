@@ -28,39 +28,53 @@ func dashEnv(t *testing.T) machine.Dirs {
 }
 
 // TestDashboardPrintsLogin: `railswitch dashboard` prints the login link
-// with the token file's token, and how to start the unit when it isn't
-// active.
+// with the token file's token, writes the dashboard's unit and, unless it
+// is already enabled and running, enables and starts it.
 func TestDashboardPrintsLogin(t *testing.T) {
 	d := dashEnv(t)
-	for _, active := range []string{"active", "inactive"} {
+	for _, state := range []string{"active enabled", "inactive disabled", "active disabled"} {
+		active, file, _ := strings.Cut(state, " ")
 		f := &systest.Fake{}
-		f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=" + active + "\n")}, nil)
+		f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,UnitFileState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=" + active + "\nUnitFileState=" + file + "\n")}, nil)
+		f.On([]string{"systemctl", "--user"}, sys.Result{}, nil)
 		code, out, errs := runWith(t, f, "dashboard")
 		if code != 0 {
-			t.Fatalf("%s: exit %d\n%s%s", active, code, out, errs)
+			t.Fatalf("%s: exit %d\n%s%s", state, code, out, errs)
 		}
 		tok, err := os.ReadFile(filepath.Join(d.Data, "dashboard", "token"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		want := "http://railswitch.localhost:7700/login?token=" + strings.TrimSpace(string(tok)) + "\n"
-		if active == "inactive" {
-			want += "start it: systemctl --user start railswitch-dashboard.service\n"
+		enabled := slices.ContainsFunc(f.Calls, func(c []string) bool {
+			return slices.Equal(c, []string{"systemctl", "--user", "enable", "--now", "railswitch-dashboard.service"})
+		})
+		if state != "active enabled" {
+			want += "started the dashboard; it starts at every login from now on\n"
+			if !enabled {
+				t.Errorf("%s: not enabled: %q", state, f.Calls)
+			}
+		} else if enabled {
+			t.Errorf("%s: enabled again", state)
 		}
 		if out != want {
-			t.Errorf("%s: output %q; want %q", active, out, want)
+			t.Errorf("%s: output %q; want %q", state, out, want)
+		}
+		unit, err := os.ReadFile(filepath.Join(d.SystemdUser, "railswitch-dashboard.service"))
+		if err != nil || !strings.Contains(string(unit), "WantedBy=default.target") {
+			t.Errorf("%s: unit %q %v", state, unit, err)
 		}
 	}
 }
 
 // TestDashboardLoginSystemctlFails: the link is printed even when
-// systemctl can't tell the unit's state; the failure goes to stderr.
+// systemctl fails; the failure goes to stderr.
 func TestDashboardLoginSystemctlFails(t *testing.T) {
 	dashEnv(t)
 	f := &systest.Fake{}
 	f.On([]string{"systemctl"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
 	code, out, errs := runWith(t, f, "dashboard")
-	if code != 0 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "start it") || !strings.Contains(errs, "dashboard state unknown") {
+	if code != 0 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "started") || !strings.Contains(errs, "railswitch: dashboard") {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errs)
 	}
 }

@@ -126,6 +126,10 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .add-row{display:flex;gap:6px;margin-top:8px}
 .add-row input{flex:1;min-width:0}
 .secret-form{display:flex;gap:6px;align-items:center}
+.secret-form input:not([type=checkbox]){min-width:0;width:10em}
+.secret-form button{white-space:nowrap}
+.set-table tr.secret td.mono{overflow-wrap:anywhere}
+.set-table tr.secret td:first-child{white-space:nowrap}
 .add-secret form{display:block}
 .add-secret label{display:block;margin:6px 0}
 .add-secret label.check{display:inline-block;margin-right:12px}

@@ -334,7 +334,7 @@ func TestLockAcceptOnly(t *testing.T) {
 	sha := acceptVariant(t, root, pack.KindOption, "redis", addFile)
 	appendTo(t, filepath.Join(root, "packs", "rails", "deps.allow"), "edited.example\n")
 	rails := pack.Ref{Name: "rails", Version: 1, Local: true}
-	if err := Lock(ctx, root, Accept{Edit: &FileEdit{Ref: rails, Path: "deps.allow"}}); err != nil {
+	if err := Lock(ctx, root, Accept{Edit: &FileEdit{Kind: pack.KindPack, Ref: rails, Path: "deps.allow"}}); err != nil {
 		t.Fatal(err)
 	}
 	l := lockOf(t, root)

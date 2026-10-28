@@ -199,6 +199,15 @@ manifest flag, which is listed above the diff).
   stay (content-addressed, harmless).
 - Two accepts at once: refused busy (one project job).
 
+## Known limits
+
+- The nvim tool and the agent base image (`agentbase`) are not in
+  `stack.lock`: an upgrade changes them unreviewed (7c brings them in).
+- The `runs-here` check catches the plain forms (a download piped or
+  substituted into an interpreter, `ADD <url>`, isolation off); a download
+  saved to a file and run later, or a quoted interpreter, is not flagged.
+  The diff is what the review is: the flags point at the obvious lines.
+
 ## Testing
 
 - `lockstore`: round trip; tampered copy is missing; a second `Put` is a

@@ -191,6 +191,21 @@ func lineFlags(p, old, new string) []Flag {
 				out = append(out, Flag{Check: CheckImage, Line: n, Text: text(n)})
 			}
 		}
+		// Each added line on its own too: however lines join, a FROM, an
+		// ADD of a URL or a download piped to a shell on a line (a
+		// commented one too: a doubt flags) is flagged.
+		for _, n := range added {
+			l := strings.TrimRight(lines[n-1], "\r\n")
+			comment := strings.HasPrefix(strings.TrimSpace(l), "#")
+			if (fromRe.MatchString(l) || addRe.MatchString(l) || comment && (pipeRe.MatchString(l) || substRe.MatchString(l))) && !slices.ContainsFunc(out, func(f Flag) bool { return f.Line == n }) {
+				check := CheckRunsHere
+				if fromRe.MatchString(l) {
+					check = CheckImage
+				}
+				out = append(out, Flag{Check: check, Line: n, Text: text(n)})
+			}
+		}
+		slices.SortStableFunc(out, func(a, b Flag) int { return a.Line - b.Line })
 	case p == "deps.allow":
 		had := map[string]bool{}
 		for _, l := range strings.Split(old, "\n") {
@@ -214,8 +229,10 @@ type instruction struct {
 }
 
 // instructions splits a Containerfile's lines into instructions: a line
-// ending in \ continues, and a heredoc runs to the line of its word (or the end).
-// Any line counts, a comment too: a doubt joins more, never less.
+// ending in \ continues, and a heredoc runs to the line of its word (or the
+// end). A comment line outside a heredoc is its own empty instruction, or
+// skipped inside a continuation, as the build reads it: it never joins
+// the next line or opens a heredoc.
 func instructions(lines []string) []instruction {
 	var out []instruction
 	for i := 0; i < len(lines); {
@@ -230,6 +247,13 @@ func instructions(lines []string) []instruction {
 					ends = ends[1:]
 				}
 				if len(ends) == 0 {
+					break
+				}
+				continue
+			}
+			if strings.HasPrefix(strings.TrimSpace(l), "#") {
+				if len(parts) == 0 {
+					parts = append(parts, l)
 					break
 				}
 				continue

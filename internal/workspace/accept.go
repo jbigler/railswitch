@@ -33,8 +33,8 @@ func store(d machine.Dirs) lockstore.Store { return lockstore.Store{Dir: locksto
 func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lockstore.Store, keep []pack.Ref) (*pack.Catalog, []pack.Ref) {
 	var pending []pack.Ref
 	for _, x := range projectPackages(p) {
-		e, ok := table(lock, x.kind)[x.key]
-		if slices.Contains(keep, x.ref) || slices.Contains(pending, x.ref) || !ok || !pins(e, x.ref) {
+		e, ok := lockedEntry(lock, x.kind, x.key, x.ref)
+		if slices.Contains(keep, x.ref) || slices.Contains(pending, x.ref) || !ok {
 			continue
 		}
 		if files, err := catalogFiles(cat, x.kind, x.ref); err == nil && files != nil {
@@ -147,16 +147,20 @@ type Accept struct {
 	IfHash string
 }
 
-// FileEdit is one file of package Ref, by its package-relative slash path.
+// FileEdit is one file of the package of Kind at Ref, by its
+// package-relative slash path.
 type FileEdit struct {
+	Kind string
 	Ref  pack.Ref
 	Path string
 }
 
-// onlyEdited refuses files, the resolved content of a package stack.lock
-// pins at sha, unless putting edit's file back to the store's copy of sha
-// gives exactly sha: nothing else of the package changed unreviewed.
-func onlyEdited(s lockstore.Store, sha string, files fs.FS, edit FileEdit) error {
+// onlyEdited refuses files, the resolved content (hashing to next) of a
+// package stack.lock pins at sha, unless putting edit's file back to the
+// store's copy of sha gives exactly sha: nothing else of the package
+// changed unreviewed. The bytes judged must hash to next, so a file changed
+// after the lock hashed it is refused too.
+func onlyEdited(s lockstore.Store, sha, next string, files fs.FS, edit FileEdit) error {
 	refuse := fmt.Errorf("other files of %s changed since it was accepted: review them first (railswitch lock --review)", edit.Ref)
 	stored, err := s.Get(sha)
 	if err != nil {
@@ -165,6 +169,9 @@ func onlyEdited(s lockstore.Store, sha string, files fs.FS, edit FileEdit) error
 	mem, err := lockstore.Read(files)
 	if err != nil {
 		return err
+	}
+	if sum, err := pack.ContentHash(mem); err != nil || sum != next {
+		return refuse
 	}
 	if data, err := fs.ReadFile(stored, edit.Path); err == nil {
 		mem[edit.Path] = &fstest.MapFile{Data: data}
@@ -268,8 +275,8 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 			return nil, err
 		}
 		if o, ok := lockedAt(old, sp); ok && o.SHA256 != e.SHA256 && !accept.All {
-			if accept.Edit != nil && accept.Edit.Ref == sp.ref {
-				if err := onlyEdited(pl.store, o.SHA256, sp.files, *accept.Edit); err != nil {
+			if accept.Edit != nil && accept.Edit.Kind == sp.kind && accept.Edit.Ref == sp.ref {
+				if err := onlyEdited(pl.store, o.SHA256, e.SHA256, sp.files, *accept.Edit); err != nil {
 					return nil, err
 				}
 			} else {
@@ -293,12 +300,20 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 // lockedAt is what old accepted for sp's ref: its table's entry, or the
 // entry a write dropped (Removed) when the ref left the lock since.
 func lockedAt(old *config.Lock, sp stackPkg) (config.LockEntry, bool) {
-	if o, ok := table(old, sp.kind)[sp.key]; ok && pins(o, sp.ref) {
+	return lockedEntry(old, sp.kind, sp.key, sp.ref)
+}
+
+// lockedEntry is what lock accepted for ref r of kind under key: its
+// table's entry, or the entry a write dropped (Removed). Load, ejects and
+// Lock all ask it, so a ref back from Removed runs and ejects its accepted
+// copy, as Lock keeps it.
+func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref) (config.LockEntry, bool) {
+	if o, ok := table(lock, kind)[key]; ok && pins(o, r) {
 		return o, true
 	}
-	for _, r := range old.Removed {
-		if r.Kind == sp.kind && r.Key == sp.key && pins(r.Entry(), sp.ref) {
-			return r.Entry(), true
+	for _, rm := range lock.Removed {
+		if rm.Kind == kind && rm.Key == key && pins(rm.Entry(), r) {
+			return rm.Entry(), true
 		}
 	}
 	return config.LockEntry{}, false

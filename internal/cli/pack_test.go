@@ -10,6 +10,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 // D70: pack eject copies a built-in pack whole; switching the stack to the
@@ -48,7 +49,7 @@ func TestPackEjectRails(t *testing.T) {
 	}
 
 	editProject(t, ws, `pack = "rails@1"`, `pack = "local:rails@1"`)
-	mustRun(t, "-C", ws, "lock")
+	acceptLock(t, ws)
 	mustRun(t, "-C", ws, "render")
 	l, err := config.ReadLock(filepath.Join(ws, "stack.lock"))
 	if err != nil {
@@ -70,7 +71,9 @@ func TestPackEjectAs(t *testing.T) {
 		t.Errorf("option.toml:\n%.400s", got)
 	}
 	editProject(t, ws, `database = "postgres@1"`, `database = "local:pg@1"`)
-	mustRun(t, "-C", ws, "lock")
+	if err := workspace.Lock(t.Context(), ws, workspace.Accept{All: true}); err != nil { // the copy needs a db_scheme entry to render
+		t.Fatal(err)
+	}
 	if l, err := config.ReadLock(filepath.Join(ws, "stack.lock")); err != nil || l.Options["pg"].Source != "local" {
 		t.Errorf("lock option pg = %+v, %v", l.Options["pg"], err)
 	}

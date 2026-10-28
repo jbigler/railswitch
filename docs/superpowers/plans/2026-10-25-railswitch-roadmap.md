@@ -116,6 +116,10 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D92 | New packages from the page | A copy of a built-in (`pack eject --as`) or a commented skeleton (`pack new`, `pack new --option <slot>`), then edited as files; no structured `pack.toml` form | User, 2026-10-28 (option A): one editor for every file kind; the format documented once |
 | D93 | Package file paths | Only the format's files: the manifest, `Containerfile.<name>`, `deps.allow`, `README.md`, top-level `<name>.sh`, `entrypoints/<file>`, `initdb/<file>`; symlinks refused; `.sh` written 0755 | A page can't write outside a package or through a link |
 | D94 | Stage 6d scope | Images (build chain, New addon), the Containerfile editor (diff, Reset, Check, the read-it acknowledgement, "Rebuild and restart" off by default), the Library (built-in and local packages, local files editable, New pack/option). Out: "Add an option" registry dialog, version pins, templates, package diffs | User, 2026-10-28 (scope B, restart option B) |
+| D95 | Stage 7 split | Four parts, each with its own design and plan: 7a update review, 7b signers (trust, rotation, revocation), 7c library repositories (installed and updated through 7a's review, signed per 7b), 7d templates | User, 2026-10-28: the review is needed now (every upgrade re-locked unseen) and needs no network or signing |
+| D96 | Accepted package store | Every `stack.lock` write copies each package it pins to `<data>/locked/<sha256>/` (machine-wide, outside every workspace); a read recomputes the hash, a mismatch is missing | User, 2026-10-28: diffs need the old content; no container can reach the store |
+| D97 | Run what was accepted | A package whose content changed under an unchanged ref runs from the store until reviewed; `lock --review [--json]`, `lock --accept <hash>` (the hash of the lock it writes), plain `lock` refuses an unreviewed change; per project, noting other projects locking the same content | User, 2026-10-28: an upgrade never stops `up`; one project's lock changes only from its own review |
+| D98 | Update checks | Flagged: firewall hosts and profiles, download-and-run and isolation-off build lines, images, host mounts, ports, capabilities (and scripts of a package that adds one); the rest shown as diffs; Accept needs "I've read the N flagged items" when N > 0 | HANDOFF §3.11 "What it can do"; no framework or registry list in core |
 
 ## Stages
 
@@ -131,7 +135,10 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 6b Project settings | detailed (`2026-10-28-railswitch-stage-6b.md`) | Stack slots, options, extra services, env, links and secrets (values on stdin) editable from the browser, through the CLI, with each change's data impact shown first; the rest in a raw `project.toml` editor (docs/stage6b-acceptance.md) |
 | 6c New project | detailed (`2026-10-28-railswitch-stage-6c.md`) | Repo, detection, options, review, create from the browser (docs/stage6c-acceptance.md) |
 | 6d Packs and Containerfiles | detailed (`2026-10-28-railswitch-stage-6d.md`) | Containerfiles and local packages edited from the browser with the read-it acknowledgement; new packs and options from a copy or a skeleton (docs/stage6d-acceptance.md) |
-| 7 Library and trust | later | Library repos, signing and signers, update review, Install review |
+| 7a Update review | detailed (`2026-10-28-railswitch-stage-7a.md`) | A package change (a railswitch upgrade, a local edit outside the dashboard) is shown as per-file diffs with flagged items and accepted only after review; the project runs what it last accepted meanwhile (docs/stage7a-acceptance.md) |
+| 7b Signers | later | Signer trust, rotation and revocation |
+| 7c Library repositories | later | Library repos; install and update through 7a's review; Install review |
+| 7d Templates | later | Export a project as `<name>.stack/`; start a project from one |
 
 ### Stage 3 — Machine layer
 

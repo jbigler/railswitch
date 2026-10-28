@@ -5,6 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/lockstore"
+	"github.com/jbigler/railswitch/internal/pack"
 )
 
 // noAgentWS is lockedWS without agents: no [agents.*], no agent secrets
@@ -92,6 +96,51 @@ func TestAgentAdd(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+// TestAgentAddLockRefused: the lock refusing (an update waits with no
+// stored copy) leaves project.toml as it was.
+func TestAgentAddLockRefused(t *testing.T) {
+	ws := noAgentWS(t)
+	pendingOption(t, ws, "postgres", addFile)
+	dropStore(t)
+	before := snapshot(t, ws)
+	if code, _, errs := runIn(t, "-C", ws, "agent", "add", "claude"); code != 1 || !strings.Contains(errs, "waiting for review") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	sameFiles(t, before, snapshot(t, ws))
+}
+
+// TestAgentAddEjectsAccepted: an agent coming back to the lock is locked
+// at what was accepted, and its Containerfile is ejected from that copy.
+func TestAgentAddEjectsAccepted(t *testing.T) {
+	ws := noAgentWS(t)
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mem, err := lockstore.Read(cat.Agents[pack.Ref{Name: "claude", Version: 1}].Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted := append(mem["Containerfile.claude"].Data, "# accepted\n"...)
+	mem["Containerfile.claude"].Data = accepted
+	sha, err := testStore(t).Put(mem)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := readLock(t, ws)
+	l.Removed = []config.LockRemoved{{Kind: pack.KindAgent, Key: "claude@1", Version: "1", Source: "built in", SHA256: sha}}
+	if err := l.Write(filepath.Join(ws, "stack.lock")); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "agent", "add", "claude")
+	if got := readLock(t, ws).Agents["claude@1"].SHA256; got != sha {
+		t.Errorf("claude@1 locked at %s, want the accepted %s", got, sha)
+	}
+	if got := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.claude")); !strings.HasSuffix(got, "\n# accepted\n") {
+		t.Errorf("Containerfile.claude ejected from the update:\n%s", got)
 	}
 }
 

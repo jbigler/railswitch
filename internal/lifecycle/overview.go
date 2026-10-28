@@ -45,6 +45,8 @@ type Overview struct {
 	Prefix    string             `json:"prefix"`
 	Workspace string             `json:"workspace"`
 	Worktrees []OverviewWorktree `json:"worktrees"` // registry order (ID)
+	// ReviewPending: a package update waits for review (lock --review), D97.
+	ReviewPending bool `json:"review_pending"`
 }
 
 // stackRoles are the roles of the long-running services that make a stack.
@@ -112,7 +114,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}}
+	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending()}
 	for _, w := range wts {
 		in, err := m.Instance(w)
 		if err != nil {

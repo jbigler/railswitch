@@ -347,6 +347,7 @@ row.
 {
   "prefix": "filial",
   "workspace": "/home/u/workspace/filial",
+  "review_pending": false,
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
@@ -366,6 +367,7 @@ row.
 |---|---|---|
 | `prefix` | string | The project's prefix. |
 | `workspace` | string | Its workspace directory as registered. |
+| `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
@@ -376,6 +378,41 @@ row.
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
 | `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
 | `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
+
+## `lock --review`
+
+The review of what `lock --accept` would write against the current
+`stack.lock` (D97): every package whose lock entry would change, each
+changed file as a diff, risky changes flagged (the checks in
+[packs.md](packs.md#updates-wait-for-review-d97)). It writes nothing.
+Package content is resolved as on disk, never from the store; the old side
+of a `changed` package is the store's copy of what the lock accepted.
+
+```json
+{"hash": "sha256:2c07…", "flags": 1,
+ "packages": [{"ref": "rails@1", "kind": "pack", "status": "changed",
+   "from": "e5aa…", "to": "462d…", "also_locked_in": ["maybe"],
+   "files": [{"path": "deps.allow", "status": "changed",
+     "diff": "--- a/deps.allow\n+++ b/deps.allow\n@@ -1,3 +1,4 @@\n…",
+     "flags": [{"check": "firewall", "line": 4, "text": "+ objects.githubusercontent.com"}]}]}],
+ "restart": ["main"]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hash` | string | `sha256:<hex>` of the exact `stack.lock` bytes the accept writes; `lock --accept` takes it and refuses any other. |
+| `flags` | number | Every flag of every file, summed; Accept needs "I've read the N flagged items" when it is above 0. |
+| `packages` | array | One per package the accept changes; `[]` when there is nothing to review. |
+| `packages[].ref` | string | `name@N` or `local:name@N`. |
+| `packages[].kind` | string | `pack`, `option` or `agent`. |
+| `packages[].status` | string | `changed` (same ref, new content; also a ref back in the lock whose content differs from the entry `stack.lock` remembers in `[[removed]]`); `first` (changed, no stored copy of what was accepted: compared against nothing, every file `added`); `added` (a ref new to the lock); `removed` (a ref the lock drops; a version or locality change is a `removed` and an `added`). |
+| `packages[].from`, `to` | string | The content hash locked now and the one the accept locks (lowercase hex); `""` for none (`added`: no `from`, `removed`: no `to`). |
+| `packages[].also_locked_in` | array | Prefixes of other registered projects whose `stack.lock` already pins this ref at `to`; `[]` when none. |
+| `packages[].files` | array | Every file that differs, by path (unchanged files left out). |
+| `files[].status` | string | `added`, `removed` or `changed`. |
+| `files[].diff` | string | Unified diff, 3 lines of context (`--- a/<path>`/`+++ b/<path>`, `/dev/null` for an added or removed side). Every file is diffed as text: a NUL or invalid UTF-8 byte is shown as `\xNN` (and the file carries a `runs-here` flag); `""` only for an empty file added or removed. |
+| `files[].flags` | array | `{check, line, text}`, `[]` when none. `check` is one of `firewall`, `runs-here`, `image`, `host-mount`, `port`, `privilege`. `line` is the 1-based line in the new file (map it through the hunks' `+N,M` ranges); `0` for a manifest field flag (listed above the diff) or a file-level flag. A removed file has no flags. `text` is the flagged line as `+ <line>`, or a sentence for a line-0 flag. |
+| `restart` | array | Running worktrees whose units or mounted package assets the accept changes (as in [`settings preview`](#settings-preview)); `[]` when none or nothing to review. |
 
 ## `pr ls`
 
@@ -652,7 +689,7 @@ code, and the text output shows it as `warn`.
 | `ok` | boolean | The check passed. |
 | `warn` | boolean | A failed check is only a warning (`git-guard`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
-| `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a stale or missing `stack.lock`); `""` for a passed check. |
+| `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a missing `stack.lock`, `railswitch lock --review` for a stale one); `""` for a passed check. |
 
 ## `machine`
 

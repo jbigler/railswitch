@@ -79,24 +79,44 @@ func cmdAgentAdd(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 
-	if err := config.AddAgent(proj, name, a); err != nil {
-		return e.fail(err)
-	}
-	fmt.Fprintf(e.stdout, "added [agents.%s] use = %q to %s\n", name, a.Use, proj)
-	secrets, err := plan.write(proj)
+	restore, err := keep(root, proj)
 	if err != nil {
 		return e.fail(err)
 	}
+	// project.toml goes back unless it is locked.
+	failed := func(err error) int {
+		if rerr := restore(); rerr != nil {
+			err = errors.Join(err, fmt.Errorf("restoring %s: %w", proj, rerr))
+		}
+		return e.fail(err)
+	}
+	if err := config.AddAgent(proj, name, a); err != nil {
+		return failed(err)
+	}
+	secrets, err := plan.write(proj)
+	if err != nil {
+		return failed(err)
+	}
+	if err := workspace.Lock(ctx, root, workspace.Accept{}); err != nil {
+		return failed(err)
+	}
+	fmt.Fprintf(e.stdout, "added [agents.%s] use = %q to %s\n", name, a.Use, proj)
 	for _, s := range secrets {
 		fmt.Fprintf(e.stdout, "declared secret %s\n", s)
 	}
 	for _, x := range plan.extend {
 		fmt.Fprintf(e.stdout, "secret %s now goes to %s too\n", x.Name, chosen.Service)
 	}
-	if err := workspace.Lock(ctx, root); err != nil {
+	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))
+	// The ejects copy what the lock accepted (an agent the lock remembers
+	// is locked at that copy, not at its current content).
+	w, err := workspace.Load(ctx, root, "")
+	if err != nil {
 		return e.fail(err)
 	}
-	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))
+	cat, st = w.Catalog, w.Stack
+	i = slices.IndexFunc(st.Agents, func(c *pack.ChosenAgent) bool { return c.Name == name })
+	chosen = st.Agents[i]
 	for _, n := range []string{"agent-base", cfName(chosen.Agent.Image.File)} {
 		rel := workspaceFile(n)
 		if _, err := os.Stat(filepath.Join(root, rel)); err == nil {

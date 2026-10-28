@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -59,26 +58,6 @@ func parse(fs *flag.FlagSet, args []string) (code int, ok bool) {
 	default:
 		return 2, false
 	}
-}
-
-// railswitch lock: resolve the stack and write stack.lock.
-func cmdLock(ctx context.Context, e *env, args []string) int {
-	fs := e.flags("lock")
-	if code, ok := parse(fs, args); !ok {
-		return code
-	}
-	if fs.NArg() != 0 {
-		return e.usageErr("lock takes no arguments")
-	}
-	root, err := workspace.Root(e.dir)
-	if err != nil {
-		return e.fail(err)
-	}
-	if err := workspace.Lock(ctx, root); err != nil {
-		return e.fail(err)
-	}
-	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))
-	return 0
 }
 
 // railswitch render [--check]: write every unit, env file and asset; with

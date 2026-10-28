@@ -22,7 +22,7 @@ import (
 	builtinfs "github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
-	"github.com/jbigler/railswitch/internal/settings"
+	"github.com/jbigler/railswitch/internal/textdiff"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -197,9 +197,10 @@ func undoCreate(root, rel string, created bool, err error) error {
 	return err
 }
 
-// projectStack loads root's project.toml and resolves its stack. It needs
-// no stack.lock and does not Validate: eject is how a project lacking
-// [image] base gets one.
+// projectStack loads root's project.toml and resolves its stack, on the
+// packages stack.lock accepted (workspace.Accepted) when there is one. It
+// needs no stack.lock and does not Validate: eject is how a project
+// lacking [image] base gets one.
 func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, error) {
 	p, err := config.Load(filepath.Join(root, "project.toml"))
 	if err != nil {
@@ -207,6 +208,9 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	}
 	cat, err := pack.LoadCatalog(root)
 	if err != nil {
+		return nil, nil, nil, err
+	}
+	if cat, err = workspace.Accepted(root, p, cat); err != nil {
 		return nil, nil, nil, err
 	}
 	st, err := cat.Resolve(p)
@@ -411,7 +415,7 @@ func cfShowJSON(root, name string) (*cfShowDoc, error) {
 		doc.Kind = kindNames[b.kind]
 		doc.Default = &cfDefault{Ref: b.ref, Text: string(def)}
 		doc.DefaultChanged = doc.Ejected != nil && fmt.Sprintf("%x", sha256.Sum256(def)) != doc.Ejected.SHA256
-		doc.Diff = settings.UnifiedDiff("default", rel, string(def), body)
+		doc.Diff = textdiff.Unified("default", rel, string(def), body)
 	}
 	return doc, nil
 }
@@ -515,7 +519,7 @@ func containerfileWrite(ctx context.Context, e *env, args []string) int {
 	if *dry {
 		return e.printJudged(w)
 	}
-	return e.commitJudged(ctx, se.WS.Root, w, []fileChange{{Rel: rel, Data: text, Mode: 0o644}}, false, *restart)
+	return e.commitJudged(ctx, se.WS.Root, w, []fileChange{{Rel: rel, Data: text, Mode: 0o644}}, nil, *restart)
 }
 
 // railswitch containerfile eject <name> [--force]: see Eject.

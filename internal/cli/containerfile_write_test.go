@@ -321,7 +321,7 @@ func TestCommitRestoresNewLock(t *testing.T) {
 	err := e.commit(context.Background(), ws, []fileChange{
 		{Rel: "project.toml", Data: []byte(before + "# edited\n"), Mode: 0o644},
 		{Rel: "notes/new.txt", Data: []byte("x"), Mode: 0o644},
-	}, true)
+	}, &workspace.Accept{})
 	if err == nil || !strings.Contains(err.Error(), "podman info") {
 		t.Fatalf("err = %v", err)
 	}
@@ -372,6 +372,7 @@ func TestEjectForceRenderFailsWarns(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("edited by hand\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	dropStore(t)
 	file, before := pgClient(t, ws)
 	if err := os.WriteFile(file, []byte(before+"# mine\n"), 0o644); err != nil {
 		t.Fatal(err)

@@ -48,7 +48,7 @@ func filialEnv(t *testing.T, prepare func(ws string)) Env {
 	}
 	reg.Close()
 	ctx := context.Background()
-	if err := workspace.Lock(ctx, ws); err != nil {
+	if err := workspace.Lock(ctx, ws, workspace.Accept{All: true}); err != nil {
 		t.Fatal(err)
 	}
 	w, err := workspace.Load(ctx, ws, "")
@@ -307,22 +307,5 @@ func TestParseEditsStrict(t *testing.T) {
 		if _, err := ParseEdits(strings.NewReader(in)); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want %q", in, err, want)
 		}
-	}
-}
-
-func TestUnifiedDiff(t *testing.T) {
-	a := "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n"
-	b := "1\nTWO\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n"
-	want := "--- project.toml\n+++ project.toml\n" +
-		"@@ -1,5 +1,5 @@\n 1\n-2\n+TWO\n 3\n 4\n 5\n" +
-		"@@ -10,3 +10,4 @@\n 10\n 11\n 12\n+13\n"
-	if got := UnifiedDiff("project.toml", "project.toml", a, b); got != want {
-		t.Errorf("UnifiedDiff =\n%s\nwant\n%s", got, want)
-	}
-	if got := UnifiedDiff("project.toml", "project.toml", a, a); got != "" {
-		t.Errorf("same text: %q", got)
-	}
-	if got := UnifiedDiff("project.toml", "project.toml", "x", "y"); got != "--- project.toml\n+++ project.toml\n@@ -1 +1 @@\n-x\n\\ No newline at end of file\n+y\n\\ No newline at end of file\n" {
-		t.Errorf("no final newline:\n%s", got)
 	}
 }

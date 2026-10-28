@@ -258,7 +258,7 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan) ([]string, int, 
 	if err := writeGenerated(ws, pl.st, randomValue); err != nil {
 		return nil, 0, err
 	}
-	if err := workspace.Lock(ctx, ws); err != nil {
+	if err := workspace.Lock(ctx, ws, workspace.Accept{}); err != nil {
 		return nil, 0, err
 	}
 	w, err := workspace.Load(ctx, ws, "")

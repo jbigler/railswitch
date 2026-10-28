@@ -1,0 +1,40 @@
+{{/* The review of a package update waiting under stack.lock: each
+package's changed files as diffs, flagged files open and flagged lines
+highlighted; Accept needs the acknowledgement when anything is flagged. */}}
+{{define "review"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="review">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Review update</h1>
+<p class="note">A package this project uses changed under its <code>stack.lock</code>. The project keeps running what was accepted before until you accept this.</p>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{else if not .Packages}}<p class="green">Nothing is waiting for review.</p>
+{{else}}{{range .Packages}}<section class="card rv-pkg">
+<h2><span class="mono">{{.Ref}}</span> <span class="chip">{{.Kind}}</span> <span class="chip">{{.Status}}</span></h2>
+<p class="note">{{if .From}}<span class="mono">{{.From}}</span>{{else}}nothing{{end}} → {{if .To}}<span class="mono">{{.To}}</span>{{else}}removed{{end}}{{if .Also}} · Also locked in: {{.Also}}{{end}}</p>
+{{if eq .Status "first"}}<p class="yellow notice">No stored copy of what was accepted before: every file is shown as added.</p>
+{{end}}{{range .Files}}<details class="rv-file"{{if .Flags}} open{{end}}><summary><span class="mono">{{.Path}}</span> <span class="chip">{{.Status}}</span>{{if .Flags}} <span class="red">{{.Flags}} flagged</span>{{end}}</summary>
+{{if .Notes}}<ul class="rv-notes">{{range .Notes}}<li><span class="chip">{{.Check}}</span> {{if .Line}}line {{.Line}}: {{end}}{{.Text}}</li>{{end}}</ul>
+{{end}}{{if .Empty}}<p class="note">No diff: an empty file.</p>
+{{else}}<pre class="out mono rv-diff">{{range .Lines}}<span class="dl {{.Class}}{{if .Check}} flagged{{end}}"{{if .Check}} title="flagged: {{.Check}}"{{end}}>{{.Text}}</span>{{end}}</pre>
+{{end}}</details>
+{{end}}</section>
+{{end}}<form method="post" action="{{.AcceptURL}}" id="accept" class="editor" data-job="accept" data-next="/p/{{.Prefix}}"{{if .AckText}} data-ack-required{{end}}>
+<input type="hidden" name="hash" value="{{.Hash}}">
+{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
+{{end}}{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> Restart after accepting: <span class="mono">{{.Restart}}</span></label>
+{{end}}<div class="btns"><a class="ln dim" href="/p/{{.Prefix}}">Cancel</a><button class="ln main" data-accept{{if .AckText}} disabled{{end}}>Accept</button></div>
+</form>
+{{end}}</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

@@ -101,6 +101,11 @@ is no longer accepted. What the page shows meanwhile may be stale.
   permission is decided; `⚙` colours. The tab title is `(N) RailSwitch`,
   N counting agents in permission, question or waiting-for-reply across
   all projects.
+- **Banner** (under the header): a project's read errors ("Status
+  unavailable", "PRs unavailable") and, while `overview`'s
+  `review_pending` is true, "Package update waiting for review. Review
+  update" (the Review update page, below). The switcher marks such a
+  project `update`.
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
@@ -283,6 +288,34 @@ the Images page, without the default panel.
 
 The page refuses a ref or path of the wrong shape (404) before anything
 runs; the CLI checks the exact list of files a package may have.
+
+## Review update
+
+`/p/<prefix>/review` (the banner's "Review update") shows a package
+update waiting under `stack.lock` (a railswitch upgrade changed a
+built-in, or a local package was edited outside the dashboard), from
+`railswitch --json lock --review`. The project keeps running what it last
+accepted until the update is accepted.
+
+- One card per package: ref, kind, status (`changed`, `added`, `removed`,
+  `first`), the old and new content hash (12 characters), and "Also
+  locked in" the other projects that lock the same content. `first` says
+  there is no stored copy of the old content: every file shows as added.
+- Each changed file is a `<details>` with its status and flag count: a
+  file with flags is open, the rest collapsed. Its unified diff marks
+  each flagged line (the flag's line in the new file) in red, with the
+  check's name as its title. Flags no diff line shows (a manifest flag,
+  line 0, or a binary file's) are listed above the diff.
+- **Accept** needs "I've read the N flagged items" ticked when N > 0, and
+  offers "Restart after accepting" with the review's `restart`
+  worktrees. It posts only the review's hash, the tick and the restart
+  box, never file text. The server reads `lock --review` again and
+  refuses (400, no job) a hash that no longer matches ("the update
+  changed since you opened this page"), a missing tick while anything is
+  flagged, or an empty review. Then it runs `railswitch lock --accept
+  <hash> [--restart]` as a project-level job. When the job ends ok the
+  page goes to the project page. When it exits 3 (accepted, restart
+  failed) the page goes there too, with a notice.
 
 ## New project
 
@@ -563,6 +596,9 @@ docs/json.md.
   [--dry-run] [--restart]` (text on stdin), `pack file rm <ref> <path>
   --if-hash <h>`, `pack eject <ref> --as <name>`, `pack new <name>`, `pack
   new --option <slot> <name>`: the Library and its editor.
+- `railswitch [--json] lock --review`, `lock --accept <hash>
+  [--restart]`: the Review update page; `overview`'s `review_pending`
+  shows its banner.
 - `railswitch dashboard`: prints the login link.
 - `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,
@@ -577,7 +613,7 @@ Server-Sent Events stream. On connect it sends the current fragments
 (`header`, `projects`, `strip`, `banner`, `list`, `detail`, `jobs`);
 afterwards only fragments that changed (a single list row by its own id
 while the order and selection stay), and `: ping` every 15 s. A settings,
-images, library or editor page connects with `&view=settings`: it gets no
+images, library, editor or review page connects with `&view=settings`: it gets no
 `list` or `detail`, and its `jobs` are the project-level ones only. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no

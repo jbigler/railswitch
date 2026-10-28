@@ -215,14 +215,14 @@ func gitGuard(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check 
 }
 
 // units checks that render would change nothing. A stale stack.lock is fixed
-// by railswitch lock, anything else by railswitch render.
+// by reviewing and accepting it (railswitch lock --review), anything else by railswitch render.
 func units(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check {
 	c := Check{Name: "units current", Fix: "railswitch render"}
 	d, err := ws.Render(ctx, r, true)
 	if err != nil {
 		c.Detail = err.Error()
 		if errors.Is(err, workspace.ErrStaleLock) {
-			c.Fix = "railswitch lock"
+			c.Fix = "railswitch lock --review"
 		}
 		return c
 	}

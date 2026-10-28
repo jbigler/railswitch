@@ -279,6 +279,37 @@ func TestPackFileWriteUsed(t *testing.T) {
 	}
 }
 
+// TestPackFileWriteAcceptsOnlyItsFile: a used package with another file
+// edited in a text editor since the lock is not accepted by a write of
+// one file; an earlier editor edit of the written file itself is.
+func TestPackFileWriteAcceptsOnlyItsFile(t *testing.T) {
+	ws, dir := localRails(t)
+	lockPath := filepath.Join(ws, "stack.lock")
+	file := filepath.Join(dir, "entrypoints", "entrypoint-app.sh")
+	before := readFile(t, file)
+	if err := os.WriteFile(file, []byte(before+"# from an editor\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	edited := readFile(t, file)
+	code, _, errs := runStdin(t, unitsFake(), before+"# mine\n", "-C", ws, "pack", "file", "write", "local:rails@1", "entrypoints/entrypoint-app.sh", "--if-hash", workspace.Hash([]byte(edited)))
+	if code != 0 {
+		t.Fatalf("the written file's own editor edit: exit %d: %s", code, errs)
+	}
+
+	allow := filepath.Join(dir, "deps.allow")
+	if err := os.WriteFile(allow, []byte(readFile(t, allow)+"evil.example\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lockBefore, cur := readFile(t, lockPath), readFile(t, file)
+	code, _, errs = runStdin(t, unitsFake(), cur+"# again\n", "-C", ws, "pack", "file", "write", "local:rails@1", "entrypoints/entrypoint-app.sh", "--if-hash", workspace.Hash([]byte(cur)))
+	if code != 1 || !strings.Contains(errs, "other files of local:rails@1 changed since it was accepted: review them first (railswitch lock --review)") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if readFile(t, lockPath) != lockBefore || readFile(t, file) != cur {
+		t.Error("the refused write left stack.lock or the file changed")
+	}
+}
+
 // TestPackFileWriteRestores: the render fails after stack.lock was
 // rewritten; the package file, project.toml and stack.lock are as before.
 func TestPackFileWriteRestores(t *testing.T) {
@@ -417,7 +448,7 @@ func TestPackNewOption(t *testing.T) {
 	}
 	// It is usable as the slot's option: the stack resolves and renders.
 	editProject(t, ws, `cache    = "redis@1"`, `cache    = "local:kv@1"`)
-	mustRun(t, "-C", ws, "lock")
+	acceptLock(t, ws)
 	mustRun(t, "-C", ws, "render")
 	if code, _, _ := runIn(t, "-C", ws, "pack", "new", "--option", "nope", "kv2"); code != 2 {
 		t.Errorf("unknown slot: exit %d; want 2", code)

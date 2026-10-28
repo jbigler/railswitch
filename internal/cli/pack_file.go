@@ -332,7 +332,7 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 		// The current project may not load (the write may be its fix): the
 		// change is judged from the project as it would be.
 		var to *workspace.Workspace
-		if to, w.err = workspace.LoadEdited(ctx, root, next); w.err == nil {
+		if to, w.err = workspace.LoadEdited(ctx, root, next, ref); w.err == nil {
 			var se settings.Env
 			if se, err = e.envFor(ctx, to); err != nil {
 				return e.fail(err)
@@ -350,7 +350,7 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 	}
 	change := fileChange{Rel: wrel, Data: data, Mode: mode}
 	if used {
-		return e.commitJudged(ctx, root, w, []fileChange{change}, true, restart)
+		return e.commitJudged(ctx, root, w, []fileChange{change}, &workspace.Accept{Edit: &workspace.FileEdit{Kind: strings.TrimSuffix(manifest, ".toml"), Ref: ref, Path: rel}}, restart)
 	}
 	if w.err != nil {
 		return e.fail(w.err)

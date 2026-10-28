@@ -141,13 +141,21 @@ func judge(ctx context.Context, run sys.Runner, dir string, t *Trust) (*Result, 
 		res.NewFingerprint, res.NewKey = "", ""
 		return res, nil
 	}
-	if (res.Status == StatusTrusted || res.Status == StatusRotation) && idx.Serial < l.LastSerial {
-		res.Status = StatusRolledBack
-		res.Reason = fmt.Sprintf("serial %d is below %d, already verified", idx.Serial, l.LastSerial)
-		return res, nil
+	sum := sha256Hex(data)
+	if res.Status == StatusTrusted || res.Status == StatusRotation {
+		switch {
+		case idx.Serial < l.LastSerial:
+			res.Status = StatusRolledBack
+			res.Reason = fmt.Sprintf("serial %d is below %d, already verified", idx.Serial, l.LastSerial)
+			return res, nil
+		case idx.Serial == l.LastSerial && l.LastIndex != "" && l.LastIndex != sum:
+			res.Status = StatusRolledBack
+			res.Reason = fmt.Sprintf("serial %d was already used by another index", idx.Serial)
+			return res, nil
+		}
 	}
 	if res.Status == StatusTrusted {
-		l.LastSerial = idx.Serial
+		l.LastSerial, l.LastIndex = idx.Serial, sum
 		for _, r := range idx.Revoke {
 			l.revoke(r.Fingerprint)
 		}

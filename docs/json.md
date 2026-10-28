@@ -264,7 +264,7 @@ config directory. No workspace needed. Libraries are in the file's order.
 | Field | Type | Meaning |
 |---|---|---|
 | `libraries[].id` | string | The library's id, as its `library.toml` names it. |
-| `libraries[].last_serial` | number | The highest serial verified as trusted. An index with a lower serial is `rolled-back`. `0` before the first trusted verify. |
+| `libraries[].last_serial` | number | The highest serial verified as trusted. An index with a lower serial, or another index at this serial (`signers.toml`'s `last_index` holds the sha256 of the verified one), is `rolled-back`. `0` before the first trusted verify. |
 | `libraries[].keys[]` | array | The keys trusted for this library only: `key` (`<type> <base64>`, no comment), `fingerprint` (`SHA256:…`, as `ssh-keygen -lf` prints it), `added` (the day it was trusted, `YYYY-MM-DD`). |
 | `libraries[].revoked[]` | array | Fingerprints never trusted again for this library: `fingerprint`. `signer add` refuses them. |
 
@@ -278,7 +278,7 @@ The verdict on the library folder `<dir>` (D99): its signed index
 `library.toml`, its signature `library.toml.sig`, and each package
 directory under `packs/`, `options/` and `agents/`. It exits 0 only when
 `status` is `trusted`, and prints the JSON whatever the status. A trusted
-verify saves `signers.toml`: the library's `last_serial`, and the index's
+verify saves `signers.toml`: the library's `last_serial` and `last_index`, and the index's
 `[[revoke]]` fingerprints moved from its keys to its revoked list. An
 error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
 
@@ -300,7 +300,7 @@ error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `status` | string | `trusted`: signed by a key trusted for this library, serial not below `last_serial`. `unknown-signer`: validly signed by a key not trusted for it. `rotation`: signed by a new key that a trusted key vouches for in `[[rotate]]`, not yet confirmed. `rolled-back`: trusted or a rotation, but the serial is below `last_serial`. `revoked`: signed by a key revoked for it. `bad-signature`: the index or signature is malformed, or the signature does not cover the index. |
+| `status` | string | `trusted`: signed by a key trusted for this library, serial not below `last_serial`. `unknown-signer`: validly signed by a key not trusted for it. `rotation`: signed by a new key that a trusted key vouches for in `[[rotate]]`, not yet confirmed. `rolled-back`: trusted or a rotation, but the serial is below `last_serial`, or equal to it with another `library.toml`. `revoked`: signed by a key revoked for it. `bad-signature`: the index or signature is malformed, or the signature does not cover the index. |
 | `reason` | string | Why, for `bad-signature` and `rolled-back`; absent otherwise. It is text from the library, which the text form prints with control characters replaced. |
 | `library` | string | The index's `library`; `""` when the index doesn't parse. |
 | `serial` | number | The index's `serial`; `0` when the index doesn't parse. |

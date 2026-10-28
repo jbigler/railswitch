@@ -2,6 +2,8 @@ package signing
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -91,6 +93,11 @@ var kindTop = map[string]string{pack.KindPack: "packs", pack.KindOption: "option
 var kinds = []string{pack.KindPack, pack.KindOption, pack.KindAgent}
 
 var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+func sha256Hex(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
 
 // ParseIndex decodes library.toml strictly and checks every field.
 func ParseIndex(data []byte) (*Index, error) {

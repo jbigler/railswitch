@@ -64,7 +64,7 @@ serial = 7
 | Field | Meaning |
 |---|---|
 | `library` | The library's id: `[a-z0-9][a-z0-9./_-]{0,199}`, no `..`. It is inside the signed bytes, so an index can't be passed off as another library's. |
-| `serial` | 1 to 2^53. Each published index must have a serial at least as high as the last one. A user who has verified serial 7 refuses serial 6 (`rolled-back`). |
+| `serial` | 1 to 2^53. Each published index gets a new serial, higher than the last. A user who has verified serial 7 refuses serial 6, and a serial-7 index other than the one they verified (`rolled-back`). |
 | `[[package]]` | One per package: `ref` (`<name>@<N>`, no `local:`, each ref once), `kind` (`pack`, `option` or `agent`), `sha256`. |
 | `[[rotate]]` | An old key vouches for a new one. See [Rotating the signing key](#rotating-the-signing-key). |
 | `[[revoke]]` | A key never trusted again for this library. See [Revoking a key](#revoking-a-key). |
@@ -87,8 +87,8 @@ You don't write `library.toml` by hand. `library index` writes it.
 
    The serial is the existing index's serial plus 1, or 1 for a new
    index. Pass `--serial <n>` to choose it. `library index` refuses a
-   serial below the current one and an id other than the current
-   index's. It keeps the current `[[rotate]]` and `[[revoke]]` entries. A
+   serial that is not above the current one, and an id other than the
+   current index's. It keeps the current `[[rotate]]` and `[[revoke]]` entries. A
    package that doesn't load is an error, and nothing is written.
 
 3. Sign the index:
@@ -131,13 +131,12 @@ trust the old key confirm the new one once.
 
    This signs the message `railswitch-rotate\n<library>\n<new key>\n` with
    the old key in the namespace `railswitch-rotate`, and adds a
-   `[[rotate]]` entry to `library.toml`. Running it again for the same two
-   keys replaces the entry.
+   `[[rotate]]` entry to `library.toml` at the next serial. Running it
+   again for the same two keys replaces the entry, again at a new serial.
 
-3. Index and sign with the new key:
+3. Sign with the new key. If packages changed, run `library index` first.
 
    ```sh
-   railswitch library index ./stack-library --library example.org/acme/stack-library
    railswitch library sign ./stack-library --key ~/.ssh/acme-library-2
    ```
 
@@ -226,8 +225,9 @@ railswitch signer rm example.org/acme/stack-library SHA256:Ays0teoPOjVM/BphiuEfs
 
 Trust lives in `~/.config/railswitch/signers.toml` (mode 0600, under
 `XDG_CONFIG_HOME` when it is set). For each library, it holds the trusted
-keys, the revoked fingerprints and `last_serial`, the highest serial
-verified as trusted. When `signer rm` removes a library's last key, the
+keys, the revoked fingerprints, `last_serial`, the highest serial
+verified as trusted, and `last_index`, the sha256 of that index's
+`library.toml`. When `signer rm` removes a library's last key, the
 library's entry stays if it has revocations or a `last_serial`. So you
 can't use `signer rm` and then `signer add` to accept an older index.
 
@@ -238,10 +238,10 @@ distrust one (docs/dashboard.md).
 
 | Status | Meaning | Next step |
 |---|---|---|
-| `trusted` | Signed by a key you trust for this library, and the serial is not below `last_serial`. | None. |
+| `trusted` | Signed by a key you trust for this library. The serial is above `last_serial`, or equal to it for the same index. | None. |
 | `unknown-signer` | Validly signed by a key you don't trust for this library. | Check the fingerprint, then `library trust`. |
 | `rotation` | Signed by a new key that a trusted key vouches for. | Check the new fingerprint, then `library trust --rotation`. |
-| `rolled-back` | Older than an index you have already verified. | Get the current index from the publisher. |
+| `rolled-back` | Older than an index you have already verified, or another index at the serial you verified. | Get the current index from the publisher. |
 | `revoked` | Signed by a key revoked for this library. | Ask the publisher. |
 | `bad-signature` | The index or the signature is malformed, or the signature does not cover the index. | Get an intact copy. |
 

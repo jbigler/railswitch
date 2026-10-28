@@ -104,9 +104,12 @@ func TestLibraryIndexSignVerify(t *testing.T) {
 	if doc := lsSigners(t); doc.Libraries[0].LastSerial != 2 {
 		t.Errorf("last_serial = %d, want 2", doc.Libraries[0].LastSerial)
 	}
-	if code, _, errs := runSSH(t, "", "library", "index", dir, "--library", testLib, "--serial", "1"); code != 1 || !strings.Contains(errs, "below") {
-		t.Errorf("index --serial below the current one: exit %d, %s", code, errs)
+	for _, n := range []string{"1", "2"} {
+		if code, _, errs := runSSH(t, "", "library", "index", dir, "--library", testLib, "--serial", n); code != 1 || !strings.Contains(errs, "above the current 2") {
+			t.Errorf("index --serial %s, the current one 2: exit %d, %s", n, code, errs)
+		}
 	}
+	mustOK(t, "", "library", "index", dir, "--library", testLib, "--serial", "3")
 	if code, _, errs := runSSH(t, "", "library", "index", dir, "--library", "github.com/other/lib"); code != 1 {
 		t.Errorf("index for another library over an existing one: exit %d, %s", code, errs)
 	}
@@ -218,8 +221,8 @@ func TestLibraryTrustRotation(t *testing.T) {
 		t.Errorf("after the rotation is confirmed: exit %d %+v", code, res)
 	}
 	doc := lsSigners(t)
-	if n := len(doc.Libraries[0].Keys); n != 2 || doc.Libraries[0].LastSerial != 2 {
-		t.Errorf("keys = %d (want old and new), last_serial %d (want 2)", n, doc.Libraries[0].LastSerial)
+	if n := len(doc.Libraries[0].Keys); n != 2 || doc.Libraries[0].LastSerial != 3 { // rotate wrote 2, index 3
+		t.Errorf("keys = %d (want old and new), last_serial %d (want 3)", n, doc.Libraries[0].LastSerial)
 	}
 }
 
@@ -235,6 +238,10 @@ func TestLibraryRotate(t *testing.T) {
 	}
 	if len(idx.Rotate) != 1 || idx.Rotate[0].From != old.fp || idx.Rotate[0].To != next.pub || !strings.HasPrefix(idx.Rotate[0].Signature, "-----BEGIN SSH SIGNATURE-----") {
 		t.Fatalf("rotate entries = %+v, want one from the old key to the new", idx.Rotate)
+	}
+	// Each rotate writes a new index, so a new serial: 1, then 2, then 3.
+	if idx.Serial != 3 {
+		t.Errorf("serial = %d after two rotates of serial 1; want 3", idx.Serial)
 	}
 	// The rotation's signature is the old key's, namespace railswitch-rotate.
 	allowed := filepath.Join(t.TempDir(), "allowed")

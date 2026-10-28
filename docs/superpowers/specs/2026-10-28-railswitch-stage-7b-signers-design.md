@@ -59,6 +59,7 @@ schema = 1
 [[library]]
 id = "github.com/acme/stack-library"
 last_serial = 7
+last_index = "<sha256 of serial 7's library.toml>"
 [[library.key]]
 key = "ssh-ed25519 AAAA… "
 fingerprint = "SHA256:…"
@@ -105,7 +106,9 @@ fingerprint = "SHA256:…"
    gives none; the fingerprint is read from the signature blob in Go: the
    SSHSIG armour's public key field).
 5. Signed by a revoked fingerprint (the library's revoked list) →
-   `revoked`. `serial` < `last_serial` → `rolled-back`.
+   `revoked`. `serial` < `last_serial`, or `serial` = `last_serial` with
+   a `library.toml` whose sha256 is not `last_index` → `rolled-back`
+   ("serial N was already used by another index").
 6. Each `[[package]]`: the directory `<kind>s/<name>/` loads (`pack.Load`
    over just that dir) and its `ContentHash` equals `sha256` → `signed`;
    else not. A package directory the index doesn't list is `signed: false`.
@@ -113,7 +116,7 @@ fingerprint = "SHA256:…"
    the reason `the index is not trusted`.
 
 `Result{Status, Reason, Library, Serial, Fingerprint, Key, NewFingerprint, NewKey, Packages []PackageResult{Ref, Kind, Dir, Signed, Reason}}` (`Key`/`NewKey` the keys `library trust` adds; `Reason` text from the library is printed through `safefile.Printable`). Status `trusted` records
-`last_serial` and applies `[[revoke]]` (moves those fingerprints from keys
+`last_serial` and `last_index` and applies `[[revoke]]` (moves those fingerprints from keys
 to revoked).
 
 ## CLI (D101)
@@ -133,12 +136,13 @@ to revoked).
   `<fp>`; adds the key (a rotation keeps the old key; a later index's
   `[[revoke]]` retires it).
 - Publisher: `library index <dir> --library <id> [--serial <n>]` writes
-  `library.toml` from the packages in `<dir>` (serial: given, else the
-  existing one + 1, else 1; keeps `[[rotate]]`/`[[revoke]]` already there);
+  `library.toml` from the packages in `<dir>` (serial: given and above
+  the existing one, else the existing one + 1, else 1; keeps
+  `[[rotate]]`/`[[revoke]]` already there);
   `library sign <dir> --key <private-key-file>` runs `ssh-keygen -Y sign`
   (no timeout: it may prompt for a passphrase on the terminal);
   `library rotate <dir> --old-key <file> --new <pubkey-file>` adds a signed
-  `[[rotate]]`.
+  `[[rotate]]` and bumps the serial (a serial names one index).
 
 ## Revocation's effect (D102)
 

@@ -24,11 +24,13 @@ type Trust struct {
 	Libraries []*Library `toml:"library,omitempty"`
 }
 
-// Library is one library's trust: its keys, its revoked fingerprints and
-// the highest serial verified so far.
+// Library is one library's trust: its keys, its revoked fingerprints, the
+// highest serial verified so far and the sha256 of that serial's
+// library.toml (a serial names one index).
 type Library struct {
 	ID         string       `toml:"id"`
 	LastSerial int64        `toml:"last_serial"`
+	LastIndex  string       `toml:"last_index,omitempty"`
 	Keys       []Key        `toml:"key,omitempty"`
 	Revoked    []Revocation `toml:"revoked,omitempty"`
 }
@@ -106,6 +108,9 @@ func (t *Trust) check() error {
 			case fp != k.Fingerprint:
 				errs = append(errs, fmt.Errorf("library %s: key %s has fingerprint %s, the file says %s", l.ID, k.Key, fp, k.Fingerprint))
 			}
+		}
+		if l.LastIndex != "" && !sha256Re.MatchString(l.LastIndex) {
+			errs = append(errs, fmt.Errorf("library %s: last_index %q is not 64 lowercase hex digits", l.ID, l.LastIndex))
 		}
 		for _, r := range l.Revoked {
 			if !fingerprintRe.MatchString(r.Fingerprint) {

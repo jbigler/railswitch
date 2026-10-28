@@ -230,8 +230,8 @@ func libraryIndex(e *env, args []string) int {
 		n = keep.Serial + 1
 	case n == 0:
 		n = 1
-	case keep != nil && n < keep.Serial:
-		return e.fail(fmt.Errorf("library index: serial %d is below the current %d; a serial never goes down", n, keep.Serial))
+	case keep != nil && n <= keep.Serial:
+		return e.fail(fmt.Errorf("library index: serial %d is not above the current %d; each index gets a new, higher serial", n, keep.Serial))
 	}
 	idx, err := signing.BuildIndex(dir, *lib, n, keep)
 	if err != nil {
@@ -311,6 +311,7 @@ func libraryRotate(ctx context.Context, e *env, args []string) int {
 	if !replaced {
 		idx.Rotate = append(idx.Rotate, rot)
 	}
+	idx.Serial++ // a new index: a serial names one
 	out := idx.Encode()
 	if _, err := signing.ParseIndex(out); err != nil {
 		return e.fail(err)
@@ -318,8 +319,8 @@ func libraryRotate(ctx context.Context, e *env, args []string) int {
 	if err := tomlfile.WriteAtomic(filepath.Join(dir, signing.IndexFile), out, 0o644); err != nil {
 		return e.fail(err)
 	}
-	fmt.Fprintf(e.stdout, "added a rotation from %s to %s to %s; sign it with the new key: railswitch library sign %s --key <new-private-key-file>\n",
-		from, toFP, signing.IndexFile, safefile.Printable(dir))
+	fmt.Fprintf(e.stdout, "added a rotation from %s to %s to %s, serial %d; sign it with the new key: railswitch library sign %s --key <new-private-key-file>\n",
+		from, toFP, signing.IndexFile, idx.Serial, safefile.Printable(dir))
 	return 0
 }
 

@@ -183,6 +183,36 @@ func TestPackagesUnsignedUnlessTrusted(t *testing.T) {
 	wantUnsigned(res)
 }
 
+// Review L5: a serial names one index. Another index at the last verified
+// serial is rolled-back; the same index again is trusted.
+func TestVerifySameSerialOtherIndex(t *testing.T) {
+	k, next := keygen(t, "ed25519"), keygen(t, "ed25519")
+	dir := newLibrary(t)
+	tr := trust(t, libA, k)
+	publish(t, dir, libA, 5, k, nil)
+	wantStatus(t, verify(t, dir, tr), StatusTrusted)
+	first, _ := os.ReadFile(filepath.Join(dir, IndexFile))
+	if got := tr.Library(libA).LastIndex; got != sha256Hex(first) {
+		t.Errorf("last_index = %q; want the sha256 of library.toml", got)
+	}
+
+	publish(t, dir, libA, 5, k, func(idx *Index) { idx.Revoke = []Revocation{{next.fp}} })
+	res := verify(t, dir, tr)
+	wantStatus(t, res, StatusRolledBack)
+	if res.Reason != "serial 5 was already used by another index" {
+		t.Errorf("reason = %q", res.Reason)
+	}
+	if l := tr.Library(libA); len(l.Revoked) != 0 || l.LastIndex != sha256Hex(first) {
+		t.Errorf("a rolled-back index changed trust: %+v", l)
+	}
+
+	publish(t, dir, libA, 5, next, func(idx *Index) { idx.Rotate = []Rotation{rotation(t, libA, k, next)} })
+	wantStatus(t, verify(t, dir, tr), StatusRolledBack)
+
+	publish(t, dir, libA, 5, k, nil)
+	wantStatus(t, verify(t, dir, tr), StatusTrusted)
+}
+
 // signers.toml holds each key exactly as Add writes it: no comment, no
 // control characters, canonical base64.
 func TestLoadTrustKeyCanonical(t *testing.T) {

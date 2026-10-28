@@ -110,8 +110,10 @@ stored, run from the store and reviewed like packages (`kind` `tool` and
 upgrade that changes the built-in nvim tool or the agent base image waits
 for review, and `containerfile eject nvim` or `agent-base` (and
 `containerfile show`'s default) copies the accepted text. A `stack.lock`
-written before 7c has neither entry: the project shows a pending review,
-both listed as `added`, until `railswitch lock --accept <hash>`.
+written before 7c has neither entry: they ran built in and unlocked
+before, so they keep running as built in (no pending review, `up` works)
+and the next lock write (`railswitch lock`, a Settings save) adds them as
+resolved. From then on a change to them waits for review.
 
 ### Updates wait for review (D97)
 

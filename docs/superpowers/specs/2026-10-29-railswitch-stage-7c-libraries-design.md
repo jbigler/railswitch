@@ -112,7 +112,9 @@ the first time:
 set) and `[base.agent]` (the agent base image's files) entries, hashed,
 stored and run from the store like packages; `stackPackages` and the
 review include them (`kind` `tool`, `base`). Built-ins only (no library
-tools in 7c).
+tools in 7c). A lock without these entries (written before 7c) is not
+stale: they ran built in and unlocked before, keep running as resolved,
+and the next lock write adds them, so an upgrade never stops `up`.
 
 ## Revocation's effect, filled (D102)
 

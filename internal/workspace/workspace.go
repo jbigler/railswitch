@@ -363,10 +363,17 @@ func (w *Workspace) CheckLock() error {
 	var stale []string
 	// label names an entry in the error: [local:]name@version for packs and
 	// options, the key itself for agents (already a ref string).
-	cmp := func(have, want map[string]config.LockEntry, label func(string, config.LockEntry) string) {
+	// adopt: an entry the lock lacks is not stale. The nvim tool and the
+	// agent base ran built in and unlocked before D107; until a lock write
+	// adds them (as resolved) they run as resolved, so an upgrade never
+	// stops up.
+	cmp := func(have, want map[string]config.LockEntry, label func(string, config.LockEntry) string, adopt ...bool) {
 		for _, name := range sortedKeys(want) {
 			h, ok := have[name]
 			x := want[name]
+			if !ok && len(adopt) > 0 {
+				continue
+			}
 			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || sourceKind(h.Source) != sourceKind(x.Source) {
 				stale = append(stale, label(name, x))
 			}
@@ -389,8 +396,8 @@ func (w *Workspace) CheckLock() error {
 	cmp(have.Packs, want.Packs, versioned)
 	cmp(have.Options, want.Options, versioned)
 	cmp(have.Agents, want.Agents, func(key string, _ config.LockEntry) string { return key })
-	cmp(have.Tools, want.Tools, func(key string, _ config.LockEntry) string { return "tool " + key })
-	cmp(have.Base, want.Base, func(string, config.LockEntry) string { return pack.AgentBaseRef.String() })
+	cmp(have.Tools, want.Tools, func(key string, _ config.LockEntry) string { return "tool " + key }, true)
+	cmp(have.Base, want.Base, func(string, config.LockEntry) string { return pack.AgentBaseRef.String() }, true)
 	if len(stale) > 0 {
 		return fmt.Errorf("%w for %s: %s", ErrStaleLock, strings.Join(stale, ", "), reviewHint)
 	}

@@ -522,6 +522,9 @@ func Review(_ context.Context, root string) (*Plan, error) {
 		prev, had := lockedAt(old, sp)
 		switch {
 		case inTable && prev.SHA256 == e.SHA256:
+		case !had && (sp.kind == pack.KindTool || sp.kind == pack.KindBase):
+			// Built in and run unlocked before D107: adopted as resolved
+			// by the next lock write, not reviewed (CheckLock agrees).
 		case had && prev.SHA256 != e.SHA256:
 			c := Change{Ref: sp.ref, Kind: sp.kind, Status: StatusChanged, From: prev.SHA256, To: e.SHA256, Old: stored(prev.SHA256), New: sp.files}
 			if c.Old == nil {

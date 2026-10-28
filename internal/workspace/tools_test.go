@@ -45,13 +45,28 @@ func TestLockTools(t *testing.T) {
 	if err := checkLock(t, root); err != nil {
 		t.Fatalf("CheckLock = %v", err)
 	}
-	// A lock from before 7c (no tool or base entries) is out of date.
+	// A lock from before 7c (no tool or base entries) still runs: the
+	// built-ins are adopted, not reviewed, and the next lock write adds them.
 	delete(l.Tools, "nvim")
+	delete(l.Base, "agent")
 	if err := l.Write(root + "/stack.lock"); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkLock(t, root); err == nil {
-		t.Fatal("CheckLock accepts a lock without tool.nvim")
+	if err := checkLock(t, root); err != nil {
+		t.Fatalf("CheckLock refuses a lock from before 7c: %v", err)
+	}
+	plan, err := Review(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Packages) != 0 {
+		t.Errorf("review of a lock from before 7c lists %v, want nothing", plan.Packages)
+	}
+	if err := Lock(context.Background(), root, Accept{}); err != nil {
+		t.Fatal(err)
+	}
+	if l := lockOf(t, root); l.Tools["nvim"].SHA256 == "" || l.Base["agent"].SHA256 == "" {
+		t.Errorf("the next lock write didn't add them: tools %v base %v", l.Tools, l.Base)
 	}
 }
 

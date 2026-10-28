@@ -22,6 +22,7 @@
 #   SELF_FIREWALLED  comma list of the service ids that run their own
 #                    in-container firewall (firewall = "self": no hook)
 set -euo pipefail
+umask 077 # state files: only this user (as hook.sh)
 
 : "${FIREWALL_DIR:?FIREWALL_DIR unset (run through railswitch fw)}"
 : "${PREFIX:?PREFIX unset (run through railswitch fw)}"

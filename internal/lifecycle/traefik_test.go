@@ -121,7 +121,7 @@ func TestUpNoTraefikRestartOnNewProject(t *testing.T) {
 		"systemctl --user daemon-reload",
 		"systemctl --user start filial-proxy-network.service",
 		"podman network connect --ip "+machine.TraefikIP(other.Subnet)+" other_proxy railswitch-traefik",
-		"systemctl --user start filial-feat-rails.service")
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 	if n := count(calls, "podman network disconnect"); n != 0 {
 		t.Errorf("disconnected:\n%s", dump(calls))
 	}

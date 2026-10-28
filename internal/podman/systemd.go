@@ -48,6 +48,13 @@ func (s Systemd) Start(ctx context.Context, units ...string) error {
 	return s.units(ctx, s.startTimeout(), "start", units)
 }
 
+// StartOnly runs `systemctl --user start --job-mode=ignore-requirements
+// <units…>`: the units start without pulling in their Requires= (an
+// exited oneshot among them would run again).
+func (s Systemd) StartOnly(ctx context.Context, units ...string) error {
+	return s.units(ctx, s.startTimeout(), "start", append([]string{"--job-mode=ignore-requirements"}, units...))
+}
+
 // Stop runs `systemctl --user stop <units…>`.
 func (s Systemd) Stop(ctx context.Context, units ...string) error {
 	return s.units(ctx, 0, "stop", units)

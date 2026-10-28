@@ -211,6 +211,8 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	var restartTraefik, restartDozzle, restartDashboard bool
 	var restart []string // active units of this worktree running an older unit
 	key := unithash.Key(m.Prefix)
+	app := unitOf(m, slug, m.Services[0].ID)
+	var appActive bool
 	for _, u := range append(names.Units, traefikService, dozzleService, machine.DashboardService) {
 		st, err := sd.UnitState(ctx, u)
 		if err != nil && u == machine.DashboardService { // never blocks a worktree's up
@@ -226,6 +228,7 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		if st.Active != "active" {
 			continue
 		}
+		appActive = appActive || u == app
 		ctr := strings.TrimSuffix(u, ".service")
 		switch {
 		case u == traefikService:
@@ -297,18 +300,28 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	// app's Requires=: started by name, one would rerun on every up. The
 	// others start in a second call, so one that fails (a tool's port taken)
 	// leaves the app up with a warning, as its Wants= would (D23).
-	app := unitOf(m, slug, m.Services[0].ID)
+	//
+	// A start job still pulls in its unit's Requires= when the unit is
+	// already active, and deps (a oneshot) is inactive once it has run: on
+	// a running stack, starting the app or the worker would run deps again
+	// under the live app (a dev server that watches its build then refuses
+	// to reload). So with the app active, every service starts by name
+	// without its requirements, and deps runs only on an app (re)start.
+	start := sd.Start
+	if appActive {
+		start = sd.StartOnly
+	}
 	var others []string
 	for _, s := range m.Services[1:] {
 		if s.Role != render.RoleAgent && !s.Oneshot {
 			others = append(others, unitOf(m, slug, s.ID))
 		}
 	}
-	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m), ", "), "started "+slug)
-	err = sd.Start(ctx, app)
+	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m, appActive), ", "), "started "+slug)
+	err = start(ctx, app)
 	var othersErr error
 	if err == nil && len(others) > 0 {
-		othersErr = sd.Start(ctx, others...)
+		othersErr = start(ctx, others...)
 	}
 	done(err)
 	if err != nil {
@@ -321,12 +334,12 @@ func (l *L) Up(ctx context.Context, slug string) error {
 }
 
 // startedServices are the service IDs up starts, the app last: every
-// service but agents (D62). Deps run through the app's Requires= only when
-// the app is not already active.
-func startedServices(m *render.Model) []string {
+// service but agents (D62), and deps only when the app is not already
+// active (deps runs through the app's Requires=).
+func startedServices(m *render.Model, appActive bool) []string {
 	var ids []string
 	for _, s := range m.Services[1:] {
-		if s.Role != render.RoleAgent {
+		if s.Role != render.RoleAgent && !(appActive && s.Oneshot) {
 			ids = append(ids, s.ID)
 		}
 	}

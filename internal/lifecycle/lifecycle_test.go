@@ -360,7 +360,21 @@ func TestUpSecondRunNoPull(t *testing.T) {
 	if n := count(calls, "systemctl --user daemon-reload") + count(calls, "systemctl --user restart"); n != 0 {
 		t.Errorf("second Up reloaded:\n%s", dump(calls))
 	}
-	find(t, calls, "systemctl --user start filial-feat-rails.service")
+	// The app is active: its services start without their Requires=, so
+	// deps (a oneshot) never runs again under the live app.
+	wantInOrder(t, calls,
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service",
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-db.service ",
+	)
+	if n := count(calls, "systemctl --user start filial-feat-"); n != 0 {
+		t.Errorf("second Up started a unit with its requirements:\n%s", dump(calls))
+	}
+	if n := count(calls, "systemctl --user start --job-mode=ignore-requirements filial-feat-deps"); n != 0 {
+		t.Errorf("second Up started deps:\n%s", dump(calls))
+	}
+	if got := e.out.String(); !strings.Contains(got, "starting feat: db, cache, storage, browser, nvim, rails") {
+		t.Errorf("second Up output %q names deps", got)
+	}
 }
 
 func TestUpBuildFailsNoStart(t *testing.T) {
@@ -1035,7 +1049,7 @@ func TestUpStaleLabelRestarted(t *testing.T) {
 	}
 	wantInOrder(t, e.calls(),
 		"systemctl --user restart filial-feat-db.service",
-		"systemctl --user start filial-feat-rails.service")
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 	calls := e.calls()
 	if n := count(calls, "systemctl --user restart filial-feat-cache") + count(calls, "systemctl --user restart railswitch-traefik") + count(calls, "systemctl --user daemon-reload"); n != 0 {
 		t.Fatalf("restarted an inactive unit or traefik, or reloaded:\n%s", dump(calls))
@@ -1057,7 +1071,7 @@ func TestUpTraefikStaleLabelRestarted(t *testing.T) {
 	}
 	wantInOrder(t, e.calls(),
 		"systemctl --user restart railswitch-traefik.service",
-		"systemctl --user start filial-feat-rails.service")
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 	if n := count(e.calls(), "systemctl --user restart filial-"); n != 0 {
 		t.Fatalf("restarted a current unit:\n%s", dump(e.calls()))
 	}
@@ -1077,7 +1091,7 @@ func TestUpStaleReloadedAndRestarted(t *testing.T) {
 	wantInOrder(t, e.calls(),
 		"systemctl --user daemon-reload",
 		"systemctl --user restart filial-feat-db.service",
-		"systemctl --user start filial-feat-rails.service")
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 }
 
 // TestPinBasesDigestRef: a FROM pinned by digest is pulled as is when
@@ -1341,7 +1355,7 @@ func TestUpDozzleStaleLabelRestarted(t *testing.T) {
 	}
 	wantInOrder(t, e.calls(),
 		"systemctl --user restart railswitch-dozzle.service",
-		"systemctl --user start filial-feat-rails.service")
+		"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 	if n := count(e.calls(), "systemctl --user restart filial-") + count(e.calls(), "systemctl --user restart railswitch-traefik"); n != 0 {
 		t.Fatalf("restarted a current unit:\n%s", dump(e.calls()))
 	}
@@ -1377,7 +1391,7 @@ func TestUpRestartsStaleDashboard(t *testing.T) {
 			if c.restart {
 				wantInOrder(t, e.calls(),
 					"systemctl --user restart railswitch-dashboard.service",
-					"systemctl --user start filial-feat-rails.service")
+					"systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 			}
 			if want := map[bool]int{true: 1, false: 0}[c.restart]; n != want {
 				t.Errorf("dashboard restarts %d; want %d:\n%s", n, want, dump(e.calls()))
@@ -1419,9 +1433,9 @@ func TestUpDashboardNeverBlocks(t *testing.T) {
 			if w := e.errOut(); !strings.Contains(w, c.warn) {
 				t.Errorf("stderr %q; want %q", w, c.warn)
 			}
-			wantInOrder(t, e.calls(), "systemctl --user start filial-feat-rails.service")
+			wantInOrder(t, e.calls(), "systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 			if c.name == "restart fails" {
-				wantInOrder(t, e.calls(), joined(restartCmd), "systemctl --user start filial-feat-rails.service")
+				wantInOrder(t, e.calls(), joined(restartCmd), "systemctl --user start --job-mode=ignore-requirements filial-feat-rails.service")
 			}
 		})
 	}

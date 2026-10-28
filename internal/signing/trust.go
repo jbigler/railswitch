@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"syscall"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -121,13 +122,44 @@ func (t *Trust) check() error {
 	return errors.Join(errs...)
 }
 
-// Save writes t to path atomically, 0600.
-func (t *Trust) Save(path string) error {
-	var b bytes.Buffer
-	if err := toml.NewEncoder(&b).Encode(t); err != nil {
+// UpdateTrust loads signers.toml at path, lets fn change it and saves it
+// when fn returns save, all under an exclusive flock on path+".lock"
+// (0600): two writers that each loaded, changed and saved would otherwise
+// drop one's change, a revocation or a higher last_serial. The only way
+// to write signers.toml. fn's error is returned and nothing is saved.
+func UpdateTrust(path string, fn func(*Trust) (save bool, err error)) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	f, err := os.OpenFile(path+".lock", os.O_RDWR|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	defer f.Close() // releases the flock
+	for {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
+		if err != syscall.EINTR {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("lock %s: %w", path, err)
+	}
+	t, err := LoadTrust(path)
+	if err != nil {
+		return err
+	}
+	save, err := fn(t)
+	if err != nil || !save {
+		return err
+	}
+	return t.save(path)
+}
+
+// save writes t to path atomically, 0600.
+func (t *Trust) save(path string) error {
+	var b bytes.Buffer
+	if err := toml.NewEncoder(&b).Encode(t); err != nil {
 		return err
 	}
 	return tomlfile.WriteAtomic(path, b.Bytes(), 0o600)

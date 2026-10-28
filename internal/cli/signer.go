@@ -47,14 +47,14 @@ func trustPath() (string, error) {
 	return filepath.Join(dirs.Config, signing.TrustFile), nil
 }
 
-// loadTrust is signers.toml and its path.
-func loadTrust() (*signing.Trust, string, error) {
+// updateTrust is signing.UpdateTrust on signers.toml: fn runs under its
+// lock, and t is saved when fn returns save.
+func updateTrust(fn func(t *signing.Trust) (save bool, err error)) error {
 	path, err := trustPath()
 	if err != nil {
-		return nil, "", err
+		return err
 	}
-	t, err := signing.LoadTrust(path)
-	return t, path, err
+	return signing.UpdateTrust(path, fn)
 }
 
 // signerDoc is `signer ls --json` (docs/json.md).
@@ -99,7 +99,11 @@ func signerLs(e *env, args []string) int {
 	if _, code, ok := parseArgs(e, fs, args, 0, signerUsage); !ok {
 		return code
 	}
-	t, _, err := loadTrust()
+	path, err := trustPath()
+	if err != nil {
+		return e.fail(err)
+	}
+	t, err := signing.LoadTrust(path) // a read: writes replace the file atomically
 	if err != nil {
 		return e.fail(err)
 	}
@@ -143,15 +147,12 @@ func signerAdd(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	t, path, err := loadTrust()
+	var fp string
+	err = updateTrust(func(t *signing.Trust) (bool, error) {
+		fp, err = t.Add(lib, key)
+		return true, err
+	})
 	if err != nil {
-		return e.fail(err)
-	}
-	fp, err := t.Add(lib, key)
-	if err != nil {
-		return e.fail(err)
-	}
-	if err := t.Save(path); err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "trusted %s for %s\n", fp, lib)
@@ -199,14 +200,13 @@ func signerRm(e *env, args []string) int {
 	if !ok {
 		return code
 	}
-	t, path, err := loadTrust()
+	err := updateTrust(func(t *signing.Trust) (bool, error) {
+		if err := t.Remove(pos[0], pos[1]); err != nil {
+			return false, errors.New(safefile.Printable(err.Error()))
+		}
+		return true, nil
+	})
 	if err != nil {
-		return e.fail(err)
-	}
-	if err := t.Remove(pos[0], pos[1]); err != nil {
-		return e.fail(errors.New(safefile.Printable(err.Error())))
-	}
-	if err := t.Save(path); err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "distrusted %s for %s\n", safefile.Printable(pos[1]), safefile.Printable(pos[0]))

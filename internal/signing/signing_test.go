@@ -454,15 +454,19 @@ func TestTrustFileMode(t *testing.T) {
 	if err != nil || len(tr.Libraries) != 0 {
 		t.Fatalf("LoadTrust(missing) = %+v, %v", tr, err)
 	}
-	if _, err := tr.Add(libA, k.pub+" a comment"); err != nil {
+	err = UpdateTrust(path, func(u *Trust) (bool, error) {
+		_, err := u.Add(libA, k.pub+" a comment")
+		tr = u
+		return true, err
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tr.Save(path); err != nil {
-		t.Fatal(err)
-	}
-	fi, err := os.Stat(path)
-	if err != nil || fi.Mode().Perm() != 0o600 {
-		t.Fatalf("mode = %v, %v; want 0600", fi.Mode().Perm(), err)
+	for _, p := range []string{path, path + ".lock"} {
+		fi, err := os.Stat(p)
+		if err != nil || fi.Mode().Perm() != 0o600 {
+			t.Fatalf("%s: mode = %v, %v; want 0600", p, fi.Mode().Perm(), err)
+		}
 	}
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "schema = 1") || !strings.Contains(string(data), "added = "+today().Format("2006-01-02")+"\n") || strings.Contains(string(data), "comment") {

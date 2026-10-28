@@ -240,7 +240,9 @@ railswitch signer rm example.org/acme/stack-library SHA256:Ays0teoPOjVM/BphiuEfs
 ```
 
 Trust lives in `~/.config/railswitch/signers.toml` (mode 0600, under
-`XDG_CONFIG_HOME` when it is set). For each library, it holds the trusted
+`XDG_CONFIG_HOME` when it is set). Each command that changes it holds an
+exclusive lock on `signers.toml.lock` from reading the file to writing
+it, so two commands run at once never lose each other's changes. For each library, it holds the trusted
 keys, the revoked fingerprints, `last_serial`, the highest serial
 verified as trusted, and `last_index`, the sha256 of that index's
 `library.toml`. When `signer rm` removes a library's last key, the

@@ -52,7 +52,7 @@ fingerprint = "SHA256:<fingerprint>"
 
 ## Trust (D100)
 
-`~/.config/railswitch/signers.toml` (`schema = 1`, 0600, atomic writes):
+`~/.config/railswitch/signers.toml` (`schema = 1`, 0600, atomic writes under a flock on `signers.toml.lock`):
 
 ```toml
 schema = 1
@@ -170,8 +170,12 @@ this key" and "Confirm rotation" come with 7c's library pages.
   reason; never `trusted`.
 - `ssh-keygen` missing: an error naming it (doctor gains a check:
   `ssh-keygen -Y` support).
-- Concurrent writes of `signers.toml`: atomic replace; last writer wins
-  (one user, rare).
+- Concurrent writes of `signers.toml`: every load, verify and save
+  (`library verify`, `library trust`, `signer add`/`rm`) runs
+  under an exclusive flock on the sibling `signers.toml.lock` (0600),
+  through `signing.UpdateTrust`, the only writer; so no writer drops
+  another's revocation or lowers `last_serial`. The file is replaced
+  atomically, so `signer ls` reads without the lock.
 
 ## Testing
 

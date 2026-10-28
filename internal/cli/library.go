@@ -50,18 +50,20 @@ func libraryVerify(ctx context.Context, e *env, args []string) int {
 	if !ok {
 		return code
 	}
-	t, path, err := loadTrust()
-	if err != nil {
-		return e.fail(err)
-	}
-	res, err := signing.Verify(ctx, e.run, dir, t)
-	if err != nil {
-		return e.fail(err)
-	}
-	if res.Status == signing.StatusTrusted {
-		if err := t.Save(path); err != nil {
-			return e.fail(err)
+	var (
+		t   *signing.Trust
+		res *signing.Result
+	)
+	err := updateTrust(func(tr *signing.Trust) (bool, error) {
+		r, err := signing.Verify(ctx, e.run, dir, tr)
+		if err != nil {
+			return false, err
 		}
+		t, res = tr, r
+		return r.Status == signing.StatusTrusted, nil // the serial and revocations Verify recorded
+	})
+	if err != nil {
+		return e.fail(err)
 	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(res); err != nil {
@@ -150,45 +152,43 @@ func libraryTrust(ctx context.Context, e *env, args []string) int {
 	if *rotation && *newSigner {
 		return e.usageErr("library trust: --rotation and --new-signer don't go together")
 	}
-	t, path, err := loadTrust()
-	if err != nil {
-		return e.fail(err)
-	}
-	res, err := signing.Verify(ctx, e.run, dir, t)
-	if err != nil {
-		return e.fail(err)
-	}
-	var key string
-	switch {
-	case res.Status == signing.StatusTrusted && res.Fingerprint == *fp:
-		if err := t.Save(path); err != nil { // the serial Verify recorded
-			return e.fail(err)
+	var res, again *signing.Result
+	var added string
+	err := updateTrust(func(t *signing.Trust) (bool, error) {
+		var err error
+		res, err = signing.Verify(ctx, e.run, dir, t)
+		if err != nil {
+			return false, err
 		}
+		var key string
+		switch {
+		case res.Status == signing.StatusTrusted && res.Fingerprint == *fp:
+			return true, nil // the serial Verify recorded
+		case res.Status == signing.StatusUnknownSigner && !*rotation && res.Fingerprint == *fp:
+			if res.KnownLibrary && !*newSigner {
+				return false, fmt.Errorf("library trust: %s; %s signed this index and no trusted key vouched for it. "+
+					"Ask the publisher through another channel; to trust it anyway, pass --new-signer", knownTrust(t, res.Library), *fp)
+			}
+			key = res.Key
+		case res.Status == signing.StatusRotation && *rotation && res.NewFingerprint == *fp:
+			key = res.NewKey
+		default:
+			return false, trustRefusal(res, *fp, *rotation)
+		}
+		if added, err = t.Add(res.Library, key); err != nil {
+			return false, err
+		}
+		// Verify again with the key trusted, so this index's serial and
+		// revocations are recorded at once.
+		again, err = signing.Verify(ctx, e.run, dir, t)
+		return err == nil, err
+	})
+	if err != nil {
+		return e.fail(err)
+	}
+	if again == nil {
 		fmt.Fprintf(e.stdout, "%s is already trusted for %s\n", *fp, res.Library)
 		return 0
-	case res.Status == signing.StatusUnknownSigner && !*rotation && res.Fingerprint == *fp:
-		if res.KnownLibrary && !*newSigner {
-			return e.fail(fmt.Errorf("library trust: %s; %s signed this index and no trusted key vouched for it. "+
-				"Ask the publisher through another channel; to trust it anyway, pass --new-signer", knownTrust(t, res.Library), *fp))
-		}
-		key = res.Key
-	case res.Status == signing.StatusRotation && *rotation && res.NewFingerprint == *fp:
-		key = res.NewKey
-	default:
-		return e.fail(trustRefusal(res, *fp, *rotation))
-	}
-	added, err := t.Add(res.Library, key)
-	if err != nil {
-		return e.fail(err)
-	}
-	// Verify again with the key trusted, so this index's serial and
-	// revocations are recorded at once.
-	again, err := signing.Verify(ctx, e.run, dir, t)
-	if err != nil {
-		return e.fail(err)
-	}
-	if err := t.Save(path); err != nil {
-		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "trusted %s for %s\n", added, res.Library)
 	if again.Status != signing.StatusTrusted {

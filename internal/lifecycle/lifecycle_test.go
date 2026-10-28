@@ -704,7 +704,7 @@ func TestExecRunningUsesExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := find(t, e.calls(), "podman exec")
-	if joined(c) != "podman exec -t -i -w /app filial-feat-rails bin/rails console" {
+	if !slices.Equal(c, append([]string{"podman", "exec", "-t", "-i", "--preserve-fds", "1", "-w", "/app", "filial-feat-rails"}, hangup([]string{"bin/rails", "console"})...)) {
 		t.Fatalf("argv %q", c)
 	}
 	if count(e.calls(), "podman --hooks-dir") != 0 {

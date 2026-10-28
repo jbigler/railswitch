@@ -61,8 +61,8 @@ func (l *L) Nvim(ctx context.Context, slug string) error {
 	if l.TTY {
 		args = append(args, "-t")
 	}
-	args = append(args, ctr, "nvim", "--remote-ui", "--server", "127.0.0.1:"+strconv.Itoa(port.Container))
-	err = l.interactive(ctx, sys.NoTimeout, "podman", args)
+	args = append(append(args, "--preserve-fds", "1", ctr), hangup([]string{"nvim", "--remote-ui", "--server", "127.0.0.1:" + strconv.Itoa(port.Container)})...)
+	err = l.inContainer(ctx, args)
 	l.nvimHook(ctx, "nvim-detach", server)
 	return err
 }

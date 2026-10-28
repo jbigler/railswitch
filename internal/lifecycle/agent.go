@@ -92,7 +92,7 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		if err != nil {
 			return err
 		}
-		return l.interactive(ctx, sys.NoTimeout, "podman", args)
+		return l.inContainer(ctx, args)
 	}
 	sd := l.systemd()
 	unit := ctr + ".service"

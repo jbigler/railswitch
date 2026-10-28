@@ -50,6 +50,8 @@ type Cmd struct {
 	// untimed; cancellation sends SIGTERM to the group, then SIGKILL to
 	// the group after KillGrace.
 	KillGrace time.Duration
+	// ExtraFiles are the child's fds 3 onward.
+	ExtraFiles []*os.File
 }
 
 // Result is the outcome of a command.
@@ -95,6 +97,7 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	cmd.Dir = c.Dir
 	cmd.Env = c.Env
 	cmd.Stdin = c.Stdin
+	cmd.ExtraFiles = c.ExtraFiles
 	var stdout, stderr bytes.Buffer
 	var tail tailBuffer // the caller's Stderr, kept for the exit error
 	cmd.Stdout = c.Stdout

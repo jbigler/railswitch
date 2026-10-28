@@ -294,6 +294,13 @@ there is no shared add-on package (user, 2026-10-27).
   failed one. As PID 1 a shell ignores SIGTERM: an entrypoint that ends in
   `exec "$@"` relies on the command handling it itself, which a `bin/dev`
   that runs foreman as a child does not. `rails@1`'s entrypoint does this.
+- The image has a POSIX `sh`. `exec`, `task`, `deps`, an on-demand agent
+  and nvim's in-container client run their command under a `sh` wrapper
+  that watches a pipe railswitch holds (`--preserve-fds 1`). When
+  railswitch ends (a closed terminal window, a cancelled job), the wrapper
+  sends the command's process group SIGHUP, then SIGKILL after 3 s: podman
+  would leave an exec session or a `run` running. Transient containers
+  run with `--init` so that SIGHUP reaches a command that would be PID 1.
 - The dev server listens on `0.0.0.0` (a pack sets the env its framework
   reads, or its `README.md` says what the app must change).
 

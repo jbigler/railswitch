@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -34,8 +35,8 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 			if l.TTY {
 				args = append(args, "-t")
 			}
-			args = append(append(args, "-i", "-w", "/app", ctr), argv...)
-			return l.interactive(ctx, sys.NoTimeout, "podman", args)
+			args = append(append(args, "-i", "--preserve-fds", "1", "-w", "/app", ctr), hangup(argv)...)
+			return l.inContainer(ctx, args)
 		}
 	}
 	envFile := filepath.Join(m.Inputs.Workspace, ".railswitch", "env", slug, app.ID+".env")
@@ -43,7 +44,32 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 	if err != nil {
 		return err
 	}
-	return l.interactive(ctx, sys.NoTimeout, "podman", args)
+	return l.inContainer(ctx, args)
+}
+
+// hangupScript runs "$@" beside a watcher on fd 3, the read end of a pipe
+// railswitch holds open (inContainer). podman ends neither an exec session
+// nor a run when its client dies (a closed terminal window), so when
+// railswitch exits, however it ends, the watcher hangs up the command's
+// process group as a closed terminal would, and kills what ignores that.
+const hangupScript = `(trap '' HUP; read -r _ <&3; kill -HUP 0; sleep 3; kill -KILL 0) </dev/null >/dev/null 2>&1 & exec 3<&-; exec "$@"`
+
+// hangup is argv under hangupScript; the podman command around it passes
+// --preserve-fds 1 and runs through inContainer.
+func hangup(argv []string) []string {
+	return append([]string{"sh", "-c", hangupScript, "sh"}, argv...)
+}
+
+// inContainer is interactive for a podman exec or run of hangup's argv: it
+// holds the pipe whose read end is the container's fd 3 until podman exits.
+func (l *L) inContainer(ctx context.Context, args []string) error {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	defer w.Close()
+	return l.interactive(ctx, sys.NoTimeout, "podman", args, r)
 }
 
 // ExitError is the non-zero exit code of an interactive command (exec,
@@ -52,11 +78,11 @@ type ExitError struct{ Code int }
 
 func (e *ExitError) Error() string { return "exit status " + strconv.Itoa(e.Code) }
 
-// interactive runs program name (podman, or the host's nvim) with args and
-// the caller's stdin, stdout and stderr. A non-zero exit is an *ExitError
-// carrying the command's exit code.
-func (l *L) interactive(ctx context.Context, timeout time.Duration, name string, args []string) error {
-	res, err := l.R.Run(ctx, sys.Cmd{Name: name, Args: args, Stdin: l.In, Stdout: l.Out, Stderr: l.Err, Timeout: timeout})
+// interactive runs program name (podman, or the host's nvim) with args,
+// the caller's stdin, stdout and stderr, and extra as fds 3 onward. A
+// non-zero exit is an *ExitError carrying the command's exit code.
+func (l *L) interactive(ctx context.Context, timeout time.Duration, name string, args []string, extra ...*os.File) error {
+	res, err := l.R.Run(ctx, sys.Cmd{Name: name, Args: args, Stdin: l.In, Stdout: l.Out, Stderr: l.Err, Timeout: timeout, ExtraFiles: extra})
 	if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
 		return &ExitError{Code: res.ExitCode}
 	}
@@ -74,8 +100,8 @@ type runOpts struct {
 	Name string
 	// Entrypoint overrides the image's entrypoint; "" keeps it.
 	Entrypoint string
-	// Unit adds the unit's --shm-size and --init (an on-demand agent's run
-	// stands in for its unit).
+	// Unit adds the unit's --shm-size (an on-demand agent's run stands in
+	// for its unit).
 	Unit bool
 }
 
@@ -105,7 +131,8 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 			return nil, err
 		}
 	}
-	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i"}
+	// --init: a command as PID 1 would ignore hangupScript's SIGHUP.
+	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i", "--init", "--preserve-fds", "1"}
 	if l.TTY {
 		args = append(args, "-t")
 	}
@@ -137,9 +164,6 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	if opts.Unit && s.Unit.ShmSize != "" {
 		args = append(args, "--shm-size", s.Unit.ShmSize)
 	}
-	if opts.Unit && s.Unit.RunInit {
-		args = append(args, "--init")
-	}
 	if n := in.CPUs(s); n != "" {
 		args = append(args, "--cpus", n)
 	}
@@ -154,5 +178,5 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 		args = append(args, "-w", s.Workdir)
 	}
 	args = append(args, image)
-	return append(args, argv...), nil
+	return append(args, hangup(argv)...), nil
 }

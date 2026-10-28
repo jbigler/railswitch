@@ -45,7 +45,7 @@ func TestNvimCommand(t *testing.T) {
 		t.Fatalf("nvim: exit %d: %s", code, errs)
 	}
 	all := fakeCalls(f.Calls)
-	i, j := strings.Index(all, hook+"\n"), strings.Index(all, "podman exec -i filial-feat-nvim nvim --remote-ui --server 127.0.0.1:7777\n")
+	i, j := strings.Index(all, hook+"\n"), strings.Index(all, " sh nvim --remote-ui --server 127.0.0.1:7777\n")
 	if i < 0 || j < i {
 		t.Errorf("want the hook, then podman exec nvim; calls:\n%s", all)
 	}

@@ -69,9 +69,10 @@ func TestTaskCLIArgv(t *testing.T) {
 	if code != 3 {
 		t.Fatalf("exit %d: %s; want the task's 3", code, errs)
 	}
-	want := []string{"podman", "exec", "-i", "-w", "/app", "filial-feat-rails", "sh", "-c", `bin/rails test "$@"`, "test", "-v", "a b"}
-	if got := f.Calls[len(f.Calls)-1]; !slices.Equal(got, want) {
-		t.Errorf("argv %q; want %q", got, want)
+	head := []string{"podman", "exec", "-i", "--preserve-fds", "1", "-w", "/app", "filial-feat-rails", "sh", "-c"}
+	want := []string{"sh", "-c", `bin/rails test "$@"`, "test", "-v", "a b"}
+	if got := f.Calls[len(f.Calls)-1]; len(got) < len(head)+len(want) || !slices.Equal(got[:len(head)], head) || !slices.Equal(got[len(got)-len(want):], want) {
+		t.Errorf("argv %q; want %q, the hang-up wrapper, then %q", got, head, want)
 	}
 	// A -- after the name is dropped.
 	if code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "task", "test", "--", "-x"); code != 3 {

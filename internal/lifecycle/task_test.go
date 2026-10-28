@@ -15,7 +15,7 @@ func TestTaskArgv(t *testing.T) {
 	if err := e.l.Task(ctx, "feat", "test", []string{"a", "b"}); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"podman", "exec", "-i", "-w", "/app", "filial-feat-rails", "sh", "-c", `bin/rails test "$@"`, "test", "a", "b"}
+	want := append([]string{"podman", "exec", "-i", "--preserve-fds", "1", "-w", "/app", "filial-feat-rails"}, hangup([]string{"sh", "-c", `bin/rails test "$@"`, "test", "a", "b"})...)
 	calls := e.calls()
 	if got := calls[len(calls)-1]; !slices.Equal(got, want) {
 		t.Errorf("argv %q; want %q", got, want)

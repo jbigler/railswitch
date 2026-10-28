@@ -67,7 +67,7 @@ func TestAgentOnDemandArgv(t *testing.T) {
 	j := " " + joined(c) + " "
 	ip := machine.TraefikIP(0)
 	for _, want := range []string{
-		"--rm", "-i",
+		"--rm", "-i", "--init", "--preserve-fds 1",
 		"--name filial-feat-agent-claude",
 		"--entrypoint /usr/local/bin/entrypoint-claude.sh",
 		"--network filial-feat-dev",
@@ -81,8 +81,8 @@ func TestAgentOnDemandArgv(t *testing.T) {
 			t.Errorf("argv lacks %q:\n%s", want, j)
 		}
 	}
-	if !strings.HasPrefix(c[len(c)-2], "localhost/filial/agent-claude:") || c[len(c)-1] != "--version" {
-		t.Errorf("argv does not end with the claude image and --version: %q", c[len(c)-2:])
+	if tail := hangup([]string{"--version"}); !strings.HasPrefix(c[len(c)-len(tail)-1], "localhost/filial/agent-claude:") || !slices.Equal(c[len(c)-len(tail):], tail) {
+		t.Errorf("argv does not end with the claude image and --version: %q", c[len(c)-len(tail)-1:])
 	}
 	// An agent's cap is its role's: the service agent's unit shows it.
 	probe, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-agent-probe.container"))

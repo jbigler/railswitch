@@ -87,8 +87,8 @@ func TestNvimAttachArgv(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := e.calls()
-	wantInOrder(t, calls, "systemctl --user start "+nvimUnit, "podman exec -i -t filial-feat-nvim nvim --remote-ui --server 127.0.0.1:7777")
-	if last := joined(calls[len(calls)-1]); last != "podman exec -i -t filial-feat-nvim nvim --remote-ui --server 127.0.0.1:7777" {
+	wantInOrder(t, calls, "systemctl --user start "+nvimUnit, "podman exec -i -t --preserve-fds 1 filial-feat-nvim sh -c "+hangupScript+" sh nvim --remote-ui --server 127.0.0.1:7777")
+	if last := joined(calls[len(calls)-1]); last != "podman exec -i -t --preserve-fds 1 filial-feat-nvim sh -c "+hangupScript+" sh nvim --remote-ui --server 127.0.0.1:7777" {
 		t.Errorf("last call %q", last)
 	}
 }
@@ -239,7 +239,7 @@ func TestNvimWaitsForServer(t *testing.T) {
 	if n := count(calls, probe); n != 3 {
 		t.Errorf("%d probes; want 3", n)
 	}
-	wantInOrder(t, calls, probe, probe, probe, "podman exec -i filial-feat-nvim nvim --remote-ui")
+	wantInOrder(t, calls, probe, probe, probe, "podman exec -i --preserve-fds 1 filial-feat-nvim sh -c "+hangupScript+" sh nvim --remote-ui")
 
 	e.reset()
 	pr.n, pr.calls = 0, 0

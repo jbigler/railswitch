@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/jbigler/railswitch/internal/render"
-	"github.com/jbigler/railswitch/internal/sys"
 )
 
 // Deps runs argv in a transient container of worktree slug's deps service
@@ -50,5 +49,5 @@ func (l *L) Deps(ctx context.Context, slug string, argv []string) error {
 	if err != nil {
 		return err
 	}
-	return l.interactive(ctx, sys.NoTimeout, "podman", args)
+	return l.inContainer(ctx, args)
 }

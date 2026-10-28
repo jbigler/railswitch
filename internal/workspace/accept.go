@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -38,6 +39,12 @@ func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lock
 		}
 		if files, err := catalogFiles(cat, x.kind, x.ref); err == nil && files != nil {
 			if sum, err := pack.ContentHash(files); err == nil && sum == e.SHA256 {
+				// A lock from before the store has no copies: store what
+				// it still runs, best effort, so a later update can be
+				// reviewed against it.
+				if _, err := os.Lstat(filepath.Join(s.Dir, sum)); errors.Is(err, fs.ErrNotExist) {
+					_, _ = s.Put(files)
+				}
 				continue
 			}
 		}

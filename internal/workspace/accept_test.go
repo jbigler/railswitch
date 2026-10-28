@@ -369,6 +369,31 @@ func TestLockStores(t *testing.T) {
 	}
 }
 
+// A lock from before the store (no copies): Load stores each package whose
+// content still matches its entry, so a later update has something to be
+// reviewed against.
+func TestLoadBackfillsStore(t *testing.T) {
+	ctx := context.Background()
+	root := projectRoot(t)
+	if err := Lock(ctx, root, Accept{All: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(testStore(t).Dir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(ctx, root, ""); err != nil {
+		t.Fatal(err)
+	}
+	l := lockOf(t, root)
+	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents} {
+		for k, e := range tbl {
+			if _, err := testStore(t).Get(e.SHA256); err != nil {
+				t.Errorf("%s not stored by Load: %v", k, err)
+			}
+		}
+	}
+}
+
 // A local package edited between hashing and storing: the write refuses
 // rather than pin one content and store another.
 func TestLockEditedMeanwhile(t *testing.T) {

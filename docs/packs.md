@@ -73,7 +73,9 @@ bytes, in sorted path order; a symlink or other special file is an error
 naming it). Every lock write also stores a copy of each package it pins
 in `~/.local/share/railswitch/locked/<sha256>/` (D96), outside every
 workspace; a copy is checked against its hash on every read, and one that
-no longer matches counts as missing.
+no longer matches counts as missing. Loading a project also stores, best effort, any package
+that still matches its lock entry but has no copy yet (a lock written
+before the store), so its next update is reviewed as a diff.
 
 ### Updates wait for review (D97)
 

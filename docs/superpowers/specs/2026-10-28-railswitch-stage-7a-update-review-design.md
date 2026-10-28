@@ -49,6 +49,12 @@ container can reach it.
   `Put` whose sha differs from the entry the lock would write (the package
   changed while it was being locked).
 
+A lock written before the store has no copies: `workspace.load` stores
+(best effort, a failure ignored) each package whose content still matches
+its lock entry and whose sha the store lacks, so a pre-7a project's later
+update is reviewed against what it ran (`changed`), not against nothing
+(`first`).
+
 Nothing removes copies (they are small; garbage collection is out of 7a).
 
 ## Running on accepted content (D97)

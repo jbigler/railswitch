@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -57,8 +59,28 @@ type Template struct {
 	// Containerfiles are containerfiles/Containerfile.<name>, by name:
 	// only those edited from their default, and user addons.
 	Containerfiles map[string][]byte
-	Readme         []byte
-	Files          fs.FS // every file, as decoded: what its content hash covers
+	// Bundled are the local packages its lines name (D116), by ref:
+	// packs/<name>/ for a local: pack, options/<name>/ for each local:
+	// option; a new project gets them as its own.
+	Bundled map[pack.Ref]Bundle
+	Readme  []byte
+	Files   fs.FS // every file, as decoded: what its content hash covers
+}
+
+// Bundle is one bundled package: its kind (pack.KindPack, KindOption),
+// its directory in the template and the workspace (packs/<name>) and its
+// files, relative to that directory.
+type Bundle struct {
+	Kind  string
+	Dir   string
+	Files fs.FS
+}
+
+// bundleTops are the template directories that hold bundled packages,
+// with the kind and manifest of each.
+var bundleTops = map[string]struct{ kind, manifest string }{
+	"packs":   {pack.KindPack, "pack.toml"},
+	"options": {pack.KindOption, "option.toml"},
 }
 
 // Ref is t's ref on this machine: "<name>@<version>".
@@ -116,7 +138,9 @@ var (
 const maxVersion = 999999999
 
 // CheckPath refuses rel, a slash path in a template directory, unless it
-// is stack.toml, README.md or containerfiles/Containerfile.<name>.
+// is stack.toml, README.md, containerfiles/Containerfile.<name>, or a
+// package file of a bundled package: packs/<name>/<file> or
+// options/<name>/<file> (pack.CheckFilePath).
 func CheckPath(rel string) error {
 	if rel == StackFile || rel == ReadmeFile {
 		return nil
@@ -124,7 +148,29 @@ func CheckPath(rel string) error {
 	if n, ok := strings.CutPrefix(rel, cfDir+"/Containerfile."); ok && cfNameRe.MatchString(n) {
 		return nil
 	}
-	return fmt.Errorf("%q is not a template file: %s, %s or %s/Containerfile.<name>", rel, StackFile, ReadmeFile, cfDir)
+	top, rest, _ := strings.Cut(rel, "/")
+	name, file, ok := strings.Cut(rest, "/")
+	if b, isBundle := bundleTops[top]; isBundle && ok && pack.ValidName(name) {
+		if err := pack.CheckFilePath(file, b.manifest); err != nil {
+			return fmt.Errorf("%s/%s/: %w", top, name, err)
+		}
+		return nil
+	}
+	return fmt.Errorf("%q is not a template file: %s, %s, %s/Containerfile.<name>, or packs/<name>/ or options/<name>/ with a package's files", rel, StackFile, ReadmeFile, cfDir)
+}
+
+// isTemplateDir reports whether p, a directory in a template, may hold
+// template files.
+func isTemplateDir(p string) bool {
+	top, rest, _ := strings.Cut(p, "/")
+	if p == "." || p == cfDir {
+		return true
+	}
+	if _, ok := bundleTops[top]; !ok {
+		return false
+	}
+	name, sub, nested := strings.Cut(rest, "/")
+	return rest == "" || pack.ValidName(name) && (!nested || sub == "entrypoints" || sub == "initdb")
 }
 
 // ReadDir reads the template directory dir into memory: regular files
@@ -145,8 +191,8 @@ func Decode(fsys fs.FS) (*Template, error) {
 		case err != nil:
 			return err
 		case d.IsDir():
-			if p != "." && p != cfDir {
-				return fmt.Errorf("%s/ is not a template directory: only %s/", p, cfDir)
+			if !isTemplateDir(p) {
+				return fmt.Errorf("%s/ is not a template directory: only %s/, packs/<name>/ and options/<name>/", p, cfDir)
 			}
 			return nil
 		case !d.Type().IsRegular():
@@ -179,7 +225,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 	}
 	t := &Template{
 		Schema: f.Schema, Name: f.Name, Version: f.Version, Description: f.Description,
-		Ask: f.Ask, Secrets: []string{}, Containerfiles: map[string][]byte{}, Files: mem,
+		Ask: f.Ask, Secrets: []string{}, Containerfiles: map[string][]byte{}, Bundled: map[pack.Ref]Bundle{}, Files: mem,
 		Lines: &config.Project{
 			Schema: config.SchemaVersion, Stack: f.Stack, Options: f.Options, Versions: f.Versions, Env: f.Env,
 			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, Routes: f.Routes,
@@ -246,6 +292,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 			bad("%s: image.addons[%d]: %q is no file of the template (%s/Containerfile.<name>)", StackFile, i, a, cfDir)
 		}
 	}
+	errs = append(errs, t.bundle(mem)...)
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
@@ -257,6 +304,72 @@ func Decode(fsys fs.FS) (*Template, error) {
 		return nil, fmt.Errorf("%s: %w", StackFile, err)
 	}
 	return t, nil
+}
+
+// bundle fills t.Bundled from mem's packs/<name>/ and options/<name>/:
+// each must be a local: ref its lines name, at the version its manifest
+// declares, under its own name; each local: pack or option its lines name
+// must be bundled. A local: agent never is (agents are each person's).
+func (t *Template) bundle(mem fstest.MapFS) []error {
+	var errs []error
+	dirs := map[string]fstest.MapFS{}
+	for p, f := range mem {
+		top, rest, _ := strings.Cut(p, "/")
+		name, file, ok := strings.Cut(rest, "/")
+		if _, isBundle := bundleTops[top]; !isBundle || !ok {
+			continue
+		}
+		d := top + "/" + name
+		if dirs[d] == nil {
+			dirs[d] = fstest.MapFS{}
+		}
+		dirs[d][file] = f
+	}
+	want := map[string]pack.Ref{} // dir → the local ref the lines name
+	add := func(top, where, ref string) {
+		r, err := pack.ParseRef(ref)
+		if err != nil || !r.Local {
+			return
+		}
+		d := top + "/" + r.Name
+		if _, dup := want[d]; dup {
+			return
+		}
+		want[d] = r
+		if dirs[d] == nil {
+			errs = append(errs, fmt.Errorf("%s names %s: the template has no %s/ (template export bundles it)", where, ref, d))
+		}
+	}
+	add("packs", "[stack] pack", t.Lines.Stack.Pack)
+	for _, k := range pack.OptionKeys(t.Lines.Options) {
+		add("options", "options."+k, t.Lines.Options[k])
+	}
+	for _, d := range slices.Sorted(maps.Keys(dirs)) {
+		r, ok := want[d]
+		if !ok {
+			errs = append(errs, fmt.Errorf("%s/: no line of the template names local:%s", d, path.Base(d)))
+			continue
+		}
+		top, _, _ := strings.Cut(d, "/")
+		b := bundleTops[top]
+		var m struct {
+			Name    string
+			Version int
+		}
+		data, err := fs.ReadFile(dirs[d], b.manifest)
+		if err == nil {
+			_, err = toml.Decode(string(data), &m)
+		}
+		switch {
+		case err != nil:
+			errs = append(errs, fmt.Errorf("%s/%s: %v", d, b.manifest, err))
+		case m.Name != r.Name || m.Version != r.Version:
+			errs = append(errs, fmt.Errorf("%s/%s declares %s@%d, not %s", d, b.manifest, m.Name, m.Version, r))
+		default:
+			t.Bundled[r] = Bundle{Kind: b.kind, Dir: d, Files: dirs[d]}
+		}
+	}
+	return errs
 }
 
 // checkLines validates p, a template's lines, as the project.toml project

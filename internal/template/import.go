@@ -23,9 +23,12 @@ const (
 	ImportOlder  = "older"  // not above the store's version, other content: refused
 )
 
-// maxImportFiles bounds a folder's files: a template has stack.toml, a
-// README and its Containerfiles.
-const maxImportFiles = 64
+// A folder's bounds: a template has stack.toml, a README, its
+// Containerfiles and its bundled packages.
+const (
+	maxImportFiles = 512
+	maxImportBytes = 16 << 20
+)
 
 // Incoming is a template folder someone handed over, judged against this
 // machine's store: Stored is the store's template of its name (nil: none).
@@ -107,6 +110,7 @@ func readFolder(dir string) (fs.FS, error) {
 		return nil, fmt.Errorf("%s is not a template folder", dir)
 	}
 	mem := fstest.MapFS{}
+	total := 0
 	err = filepath.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -118,8 +122,8 @@ func readFolder(dir string) (fs.FS, error) {
 		rel = filepath.ToSlash(rel)
 		switch {
 		case e.IsDir():
-			if rel != "." && rel != cfDir {
-				return fmt.Errorf("%s/ is not a template directory: only %s/", rel, cfDir)
+			if !isTemplateDir(rel) {
+				return fmt.Errorf("%s/ is not a template directory: only %s/, packs/<name>/ and options/<name>/", rel, cfDir)
 			}
 			return nil
 		case !e.Type().IsRegular():
@@ -134,6 +138,9 @@ func readFolder(dir string) (fs.FS, error) {
 		data, err := safefile.Read(p, safefile.Limit)
 		if err != nil {
 			return err
+		}
+		if total += len(data); total > maxImportBytes {
+			return fmt.Errorf("more than %d MiB in all: not a template", maxImportBytes>>20)
 		}
 		mem[rel] = &fstest.MapFile{Data: data, Mode: 0o644}
 		return nil

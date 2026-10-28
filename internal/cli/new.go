@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/netip"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -233,6 +234,14 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		if tpl, lines, libTemplate, err = newTemplate(dirs, a.template, a.answers); err != nil {
 			return nil, err
 		}
+		// Its bundled packages (D116) are the new workspace's own: the
+		// stack resolves with them before anything is written.
+		for _, r := range slices.SortedFunc(maps.Keys(tpl.Bundled), func(x, y pack.Ref) int { return strings.Compare(x.String(), y.String()) }) {
+			b := tpl.Bundled[r]
+			if cat, err = cat.WithPackage(b.Kind, r, b.Files, nil); err != nil {
+				return nil, fmt.Errorf("template %s: %s/: %w", a.template, b.Dir, err)
+			}
+		}
 	}
 	if a.agents == nil {
 		if ref, ok := cat.DefaultAgent(); ok {
@@ -350,6 +359,9 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template) error
 		for _, n := range slices.Sorted(maps.Keys(tpl.Containerfiles)) {
 			rels = append(rels, workspaceFile(n))
 		}
+		for _, b := range tpl.Bundled {
+			rels = append(rels, b.Dir)
+		}
 	}
 	for _, rel := range rels {
 		p := filepath.Join(ws, filepath.FromSlash(rel))
@@ -405,6 +417,13 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace
 // declared secret. The real run writes into the workspace, the dry run into
 // a temp dir: one path, the same bytes.
 func writeProject(dir string, pl *newPlan) ([]string, error) {
+	if pl.tpl != nil {
+		for _, b := range pl.tpl.Bundled {
+			if err := writeBundle(filepath.Join(dir, filepath.FromSlash(b.Dir)), b.Files); err != nil {
+				return nil, fmt.Errorf("%s: %w", b.Dir, err)
+			}
+		}
+	}
 	proj := filepath.Join(dir, "project.toml")
 	if err := createFile(proj, projectTOML(pl.p), 0o644); err != nil {
 		return nil, err
@@ -434,6 +453,25 @@ func writeProject(dir string, pl *newPlan) ([]string, error) {
 	}
 	names, err := addNewSecrets(proj, pl.p, pl.st)
 	return append(declared, names...), err
+}
+
+// writeBundle writes a template's bundled package files under dir, which
+// newPathsFree found absent; scripts (.sh) are executable.
+func writeBundle(dir string, files fs.FS) error {
+	return fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(files, p)
+		if err != nil {
+			return err
+		}
+		mode := os.FileMode(0o644)
+		if path.Ext(p) == ".sh" {
+			mode = 0o755
+		}
+		return writePackageFile(filepath.Join(dir, filepath.FromSlash(p)), data, mode)
+	})
 }
 
 // storeTemplate stores pl's template in the store beside the packages

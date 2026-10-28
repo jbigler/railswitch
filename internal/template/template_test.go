@@ -1,6 +1,7 @@
 package template
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/pack"
 )
 
 const filialProject = "../../testdata/fixtures/filial/project.toml"
@@ -136,7 +138,7 @@ func TestTemplateRefusesSymlink(t *testing.T) {
 
 func TestExportDropsProjectLines(t *testing.T) {
 	p := filial(t)
-	tp, dropped, err := Export(p, map[string][]byte{}, "filial-stack", 1)
+	tp, dropped, err := Export(p, map[string][]byte{}, nil, "filial-stack", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +173,7 @@ func TestExportDropsPersonal(t *testing.T) {
 	p.Secrets = map[string]config.Secret{"shared": {Services: []string{"rails", "agent-claude", "nvim"}}}
 	p.Services = map[string]config.ServiceOverride{"agent-claude": {Memory: "2g"}, "rails": {Memory: "1g"}}
 	p.Firewall.Allow = map[string][]string{"agent": {"api.example"}, "deps": {"github.com"}}
-	tp, dropped, err := Export(p, nil, "filial-stack", 1)
+	tp, dropped, err := Export(p, nil, nil, "filial-stack", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +207,7 @@ func TestDecodeRefusesPersonal(t *testing.T) {
 }
 
 func TestExportQuestions(t *testing.T) {
-	tp, _, err := Export(filial(t), nil, "filial-stack", 1)
+	tp, _, err := Export(filial(t), nil, nil, "filial-stack", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,11 +271,42 @@ func TestApplyAnswers(t *testing.T) {
 func TestExportDropsPersonalRoute(t *testing.T) {
 	p := filial(t)
 	p.Routes = []config.Route{{Name: "lsp", Service: "nvim", Port: 9000}, {Name: "vite", Service: "rails", Port: 3036}}
-	tp, dropped, err := Export(p, nil, "filial-stack", 1)
+	tp, dropped, err := Export(p, nil, nil, "filial-stack", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(tp.Lines.Routes) != 1 || tp.Lines.Routes[0].Name != "vite" || !slices.Contains(dropped, "[[routes]] lsp (each person's own)") {
 		t.Errorf("routes = %+v, dropped %q", tp.Lines.Routes, dropped)
+	}
+}
+
+// A bundled package must be one the lines name, at the version its
+// manifest declares; a local: ref the lines name must be bundled; only
+// package files are allowed in it.
+func TestDecodeBundled(t *testing.T) {
+	stack := "schema = 1\nname = \"x\"\nversion = 1\n[stack]\npack = \"local:rails@1\"\napp = \"rails\"\n"
+	manifest := "name = \"rails\"\nversion = 1\n"
+	cases := map[string]fstest.MapFS{
+		"missing":  {StackFile: {Data: []byte(stack)}},
+		"unnamed":  {StackFile: {Data: []byte(stack)}, "packs/rails/pack.toml": {Data: []byte(manifest)}, "options/kv/option.toml": {Data: []byte("name = \"kv\"\nversion = 1\n")}},
+		"version":  {StackFile: {Data: []byte(stack)}, "packs/rails/pack.toml": {Data: []byte("name = \"rails\"\nversion = 2\n")}},
+		"bad file": {StackFile: {Data: []byte(stack)}, "packs/rails/pack.toml": {Data: []byte(manifest)}, "packs/rails/run.exe": {Data: []byte("x")}},
+		"deep dir": {StackFile: {Data: []byte(stack)}, "packs/rails/pack.toml": {Data: []byte(manifest)}, "packs/rails/a/b/c.sh": {Data: []byte("x")}},
+	}
+	for name, files := range cases {
+		if _, err := Decode(files); err == nil {
+			t.Errorf("%s: decoded", name)
+		}
+	}
+	tp, err := Decode(fstest.MapFS{StackFile: {Data: []byte(stack)}, "packs/rails/pack.toml": {Data: []byte(manifest)}, "packs/rails/entrypoints/e.sh": {Data: []byte("#!/bin/sh\n")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, ok := tp.Bundled[pack.Ref{Local: true, Name: "rails", Version: 1}]
+	if !ok || b.Kind != pack.KindPack || b.Dir != "packs/rails" {
+		t.Fatalf("bundled = %+v", tp.Bundled)
+	}
+	if _, err := fs.ReadFile(b.Files, "entrypoints/e.sh"); err != nil {
+		t.Error(err)
 	}
 }

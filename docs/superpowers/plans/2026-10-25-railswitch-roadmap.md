@@ -137,6 +137,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D113 | Import a template folder | `template import <dir>` reviews a folder from `export --to` (hostile: template files only, ≤ 64, no symlink) as a diff from the stored version, flagged; `--accept <sha256>` saves it in the store (new, or a higher version; other content at the same version refused); the Machine page does the same | User, 2026-10-29: share a template without a library or signing key; no update channel, so no signature (the import is reviewed once) |
 | D114 | Share a package as a folder | `pack export <ref> --to <dir>` writes the package as the project runs it; `pack import <dir> [--as <name>]` reviews it in a workspace as `local:<name>@N` (diff from the local package there, flagged) and `--accept <sha256>` writes it (a used package through `commit`, locked at exactly the reviewed content: `Accept.Import`); dashboard Library page Import and Export | User, 2026-10-29: share a customized pack (a Filial rails) that a teammate then customizes locally, as a new package or an update of one |
 | D115 | Pick the pack in Settings | Settings edit op `pack` (`ref`) sets `[stack] pack` (`config.SetPack`); `project show` `pack.choices`: built-in, local and library packs with the current app service; the Settings page's first row | Host run 2026-10-29: switching to an imported pack needed the raw project.toml editor |
+| D116 | Templates bundle their local packages (amends D108) | A template holds `packs/<name>/` and `options/<name>/`: every `local:` pack and option its lines name, at the version they name (export bundles the accepted copy); `project new --template` resolves with them and writes them as the new workspace's own; a review checks each bundled package as its kind | User, 2026-10-29: a teammate's new project starts on the team's customized pack without a separate import |
 
 ## Stages
 
@@ -159,6 +160,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 8a Sharing templates | bounded, no plan file (D112, D113) | Templates without the editor or agents; `template import` of a folder |
 | 8b Sharing packages | bounded, no plan file (D114) | `pack export`, `pack import` of a folder |
 | 8c Pack picker | bounded, no plan file (D115) | Settings switches the pack |
+| 8d Templates bundle packages | bounded, no plan file (D116) | A template carries its `local:` pack and options |
 
 ### Stage 3 — Machine layer
 

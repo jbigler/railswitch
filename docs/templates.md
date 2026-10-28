@@ -15,11 +15,17 @@ them your editor config or your agents.
 rails-pg.stack/
   stack.toml
   containerfiles/Containerfile.pg-client   only files edited from their default, and user addons
+  packs/rails/…                            the local: pack its lines name, if any (D116)
+  options/<name>/…                         each local: option its lines name
   README.md                                optional
 ```
 
 Nothing else is allowed: no other file, no other directory, no symlink,
-no file over 1 MiB. `stack.toml` is read strictly: a key it doesn't
+no file over 1 MiB. A bundled package holds only package files (the
+paths `pack file write` accepts) and must be one the lines name as
+`local:<name>@N`, with that name and version in its manifest; every
+`local:` pack and option the lines name must be bundled. Agents are never
+bundled: a template has none. `stack.toml` is read strictly: a key it doesn't
 define (`[project]`, `[worktrees]`, `[share]`, `[secrets]`, a secret
 `value`) is refused, and `[tools]` or `[agents]` is refused by name, as
 is `containerfiles/Containerfile.agent-base`. A template saved before
@@ -118,8 +124,9 @@ even when edited, and `project new` refuses a template that holds one
 
 It prints what it dropped (`from`, `[project]` keys, `[worktrees.<slug>]`,
 `[share]`, `[template]`, and the lines above), what it asks, the secrets it declares and the
-Containerfiles it keeps, and warns about each `local:` package the
-template uses (a new project needs its own copy). Export refuses while
+Containerfiles it keeps, and the local packages it bundles: the
+project's `local:` pack and options, as the project runs them (a locked
+one's accepted copy). Export refuses while
 `stack.lock` is out of date or an update waits for review: a template is
 made from what was accepted.
 
@@ -133,11 +140,12 @@ On their machine:
 
 - `railswitch template import <dir> [--json]` (D113) reviews it: every
   file as a diff against the version of that name on this machine (all
-  added when there is none), flagged by the review checks, with
-  warnings for each `local:` package it uses (the new project needs its
-  own copy) and each library this machine hasn't added. Nothing is
-  saved. The folder is hostile input: only the template files above,
-  regular files ≤ 1 MiB each, at most 64, no symlink (the folder itself
+  added when there is none), flagged by the review checks (a bundled
+  package's files by the package checks: its manifest's images, ports
+  and capabilities too), with warnings for each library this machine
+  hasn't added. Nothing is saved. The folder is hostile input: only the
+  template files above, regular files ≤ 1 MiB each, at most 512 and
+  16 MiB in all, no symlink (the folder itself
   included); any other entry refuses the import, and such an entry is
   never opened.
 - `railswitch template import <dir> --accept <sha256>` saves it in the
@@ -175,8 +183,10 @@ railswitch project new ~/src/shop --repo <url> --prefix shop \
 5. `[template] ref` and `sha256`: where the project came from.
 
 Then the usual `project new` path runs: every check before the clone (an
-option answer the pack can't use is refused there), the clone, the
-ejects, then the template's Containerfiles written over the ejected ones,
+option answer the pack can't use is refused there; the stack resolves
+with the bundled packages), the clone, the bundled packages written as
+the new workspace's own `packs/<name>/` and `options/<name>/` (locked
+as `local:`, yours to edit from then on), the ejects, then the template's Containerfiles written over the ejected ones,
 its user addons appended to `[image] addons`, and its `[[secret]]`
 declarations as `[secrets.<name>]`. `--dry-run` shows it all, with
 `template` (each question and its answer) in `--json` (docs/json.md).

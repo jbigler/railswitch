@@ -128,8 +128,8 @@ func importReview(in *template.Incoming, d machine.Dirs) (*templateImportDoc, er
 }
 
 // importWarnings name the packages t uses that this machine can't give a
-// new project as they are: a workspace's own local: package, and a
-// library this machine hasn't added.
+// new project as they are: a library's, when this machine hasn't added
+// it (a local: one is bundled, D116).
 func importWarnings(t *template.Template, d machine.Dirs) []string {
 	out := []string{}
 	c, err := libraries.Load(libraries.Path(d))
@@ -142,8 +142,6 @@ func importWarnings(t *template.Template, d machine.Dirs) []string {
 		switch {
 		case err != nil:
 			continue
-		case r.Local:
-			out = append(out, fmt.Sprintf("%s is a workspace-local package: a new project needs its own copy in packs/, options/ or agents/", ref))
 		case r.Library != "" && (c == nil || c.Library(r.Library) == nil):
 			out = append(out, fmt.Sprintf("%s comes from the library %s, which this machine hasn't added (railswitch library add <url> --alias %s)", ref, r.Library, r.Library))
 		}

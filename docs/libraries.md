@@ -235,6 +235,83 @@ the old key. A first trust, for a library with no entry in
 `signers.toml`, needs no `--new-signer`. Trusting the signer of an index
 that then verifies as rolled back trusts nothing.
 
+## Adding a library repository
+
+A library you install from is a git repository, added to the machine
+under an alias (D103). The alias prefixes the library's refs:
+`acme:django@1` is the package `django@1` of the library added as `acme`.
+
+1. Add the repository:
+
+   ```sh
+   railswitch library add https://github.com/acme/stack-library --alias acme
+   ```
+
+   The alias matches `[a-z][a-z0-9-]{0,19}` and is not `local`. Pass
+   `--branch <branch>` to fetch a branch other than the remote's default.
+   The URL is an https, ssh, git or file URL, or a local path. `library add`
+   records the library in `~/.config/railswitch/libraries.toml` and fetches
+   it. If the fetch fails before it reaches a verdict (a wrong URL, a
+   refused file), the library is not added.
+
+2. The first fetch of a library reports `unknown-signer` and the signing
+   key's fingerprint, unless you already trust the key. Check the
+   fingerprint with the publisher, then trust it by the alias:
+
+   ```sh
+   railswitch library trust acme --fingerprint SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU
+   ```
+
+   This verifies the waiting fetch again, trusts the key and makes the
+   fetch the library's current copy, as `library trust <dir>` does for a
+   folder (`--rotation` and `--new-signer` too). To trust a folder whose
+   name is an alias, write it as `./<name>`.
+
+3. Fetch updates later:
+
+   ```sh
+   railswitch library fetch acme     # or: library fetch (every library)
+   railswitch library ls             # --json: docs/json.md
+   ```
+
+`library rm acme` removes the library and its copy. It refuses while a
+registered project's `project.toml` names a ref of it (`acme:…`), and names
+those projects.
+
+### What a fetch does
+
+A library repository is hostile input (D104). A fetch:
+
+- clones only the branch's last commit, with no file contents and no
+  working tree, into a temporary directory under `$XDG_RUNTIME_DIR` that
+  is always removed. No hook, LFS filter or prompt runs, and git may use
+  only the https, ssh, git and file transports. The whole fetch has a
+  5 minute deadline.
+- reads the tree of `library.toml`, `library.toml.sig`, `packs/`,
+  `options/` and `agents/`, and refuses the whole fetch when any of them
+  holds a symlink or a submodule, or a path that is not a package file
+  (`<kind>s/<name>/<file>`, where `<file>` is one the package format
+  allows: docs/packs.md), or more than 2,000 files, a file over 1 MiB, or
+  over 64 MiB in all. Other files in the repository are never fetched.
+- writes those files (0644, `.sh` 0755) into a staging directory and
+  verifies it against your trust, then acts on the verdict:
+
+| Verdict | Effect |
+|---|---|
+| `trusted` | The fetch becomes the library's current copy. The library's id is recorded the first time; later fetches must have the same id. |
+| `unknown-signer`, `rotation` | The fetch waits for `library trust <alias>`. The current copy, if any, stays. |
+| `rolled-back`, `revoked`, `bad-signature` | The fetch is dropped. The current copy stays. |
+
+A refused fetch, or one that fails (network, deadline), changes nothing.
+`library add` and `library fetch` exit 0 for `trusted`, `unknown-signer`
+and `rotation`, and 1 for any other verdict or a failure.
+
+Each library has a directory in `~/.local/share/railswitch/libraries/<alias>/`:
+`current/` (the verified copy that projects install from), `pending/` (a
+fetch that waits for trust) and `fetch.toml` (current's id, commit,
+serial and signer, and the last fetch's status, time and reason). The
+current copy is out of every container's reach.
+
 ## Managing trust
 
 ```sh

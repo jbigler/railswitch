@@ -315,6 +315,46 @@ error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
 | `packages[].signed` | boolean | `status` is `trusted`, the index lists the package, and its content hash (`pack.ContentHash`, the hash `stack.lock` pins) matches. Always `false` for any other status. |
 | `packages[].reason` | string | Why it is not signed: the index is not trusted (`"the index is not trusted"`), the directory doesn't load, declares another ref, its content differs, or the index doesn't list it. Absent when signed. |
 
+## `library ls`
+
+The library repositories on the machine (D103), in `libraries.toml`
+order, each with its last fetch. `libraries` is `[]` when there are none.
+
+```json
+{
+  "libraries": [
+    {
+      "alias": "acme",
+      "url": "https://github.com/acme/stack-library",
+      "branch": "",
+      "id": "github.com/acme/stack-library",
+      "status": "rotation",
+      "serial": 7,
+      "commit": "4f1c2a9e0b7d6c5a4b3e2f1d0c9b8a7f6e5d4c3b",
+      "fetched": "2026-10-29T14:03:11Z",
+      "packages": 3,
+      "pending": {
+        "fingerprint": "SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU",
+        "new_fingerprint": "SHA256:FMVaaJrORVs5Xx60M485oK5AtUTpvWqQapBKMLidPeA",
+        "status": "rotation",
+        "known_library": true
+      }
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `alias` | string | The ref prefix: `<alias>:<name>@N`. |
+| `url`, `branch` | string | As added; `branch` `""` is the remote's default. |
+| `id` | string | The library id of the first verified index; `""` until a fetch is trusted. |
+| `status` | string | The last fetch's verdict (a `library verify` status); `""` when it was never fetched. |
+| `serial`, `commit` | number, string | The current copy's index serial and git commit; `0` and `""` when there is no current copy. |
+| `fetched` | string | When the last fetch reached its verdict, RFC 3339 UTC; `""` when never. |
+| `packages` | number | The packages the current copy's index lists; `0` without one. |
+| `pending` | object or null | A fetch waiting for `library trust <alias>`: `status` `unknown-signer` or `rotation`; `fingerprint` the signer (for a rotation, the trusted key that vouches for the new one); `new_fingerprint` a rotation's new key, else `""`; `known_library` as in `library verify` (trust needs `--new-signer`). `null` when none waits. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1

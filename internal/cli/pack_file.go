@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -40,49 +39,6 @@ func cmdPackFile(ctx context.Context, e *env, args []string) int {
 		return packFileRm(ctx, e, args[1:])
 	}
 	return e.usageErr("pack file: unknown subcommand %q\n%s", args[0], packFileUsage)
-}
-
-// packFileNameRe is a file name in entrypoints/ or initdb/, and the <name>
-// of Containerfile.<name> and <name>.sh (D93).
-var packFileNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
-
-// packFilePath checks rel, a slash path in a local package whose manifest
-// is manifest, against the package format's files (D93): at the top the
-// manifest, Containerfile.<name>, deps.allow, README.md and <name>.sh; in
-// entrypoints/ and initdb/ any <file>. Nothing else, so no "..", no
-// hidden file and no deeper directory.
-func packFilePath(rel, manifest string) error {
-	top, file, nested := strings.Cut(rel, "/")
-	ok := false
-	if manifest == "agent.toml" {
-		// An agent's package also holds the files its mounts name
-		// (agent.toml mounts), at the top: any plain name.
-		if nested {
-			ok = top == "entrypoints" && packFileNameRe.MatchString(file)
-		} else {
-			ok = packFileNameRe.MatchString(top)
-		}
-	} else if nested {
-		ok = (top == "entrypoints" || top == "initdb") && packFileNameRe.MatchString(file)
-	} else {
-		cf, isCF := strings.CutPrefix(top, "Containerfile.")
-		stem, isSh := strings.CutSuffix(top, ".sh")
-		switch {
-		case top == manifest, top == "deps.allow", top == "README.md":
-			ok = true
-		case isCF:
-			ok = packFileNameRe.MatchString(cf)
-		case isSh:
-			ok = packFileNameRe.MatchString(stem)
-		}
-	}
-	if !ok {
-		if manifest == "agent.toml" {
-			return fmt.Errorf("%q is not a package file: an agent's are a <file> at the top or entrypoints/<file>", rel)
-		}
-		return fmt.Errorf("%q is not a package file: the manifest (%s), Containerfile.<name>, deps.allow, README.md or <name>.sh at the top, or entrypoints/<file> or initdb/<file>", rel, manifest)
-	}
-	return nil
 }
 
 // realDir refuses rel under root unless it is a directory, not a symlink;
@@ -288,7 +244,7 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 	if err != nil {
 		return e.fail(err)
 	}
-	if err := packFilePath(rel, manifest); err != nil {
+	if err := pack.CheckFilePath(rel, manifest); err != nil {
 		return e.fail(err)
 	}
 	if data == nil && rel == manifest {

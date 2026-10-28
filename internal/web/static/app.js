@@ -429,6 +429,7 @@ function startSettings() {
 // target is what an edit changes; a later edit of the same target
 // replaces the earlier one.
 function target(e) {
+  if (e.op === "pack") return "pack";
   if (e.op === "option") return "option " + e.key;
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
@@ -460,7 +461,7 @@ function stagedFor(t) {
 
 function syncLeft() {
   $$(".opt").forEach((row) => {
-    const e = stagedFor("option " + row.dataset.key);
+    const e = stagedFor(row.hasAttribute("data-pack") ? "pack" : "option " + row.dataset.key);
     const ref = e ? e.ref : row.dataset.ref;
     $$("input[type=radio]", row).forEach((r) => (r.checked = r.value === ref));
     row.classList.toggle("staged", !!e);
@@ -585,6 +586,7 @@ if (view.startsWith("settings")) {
   document.addEventListener("change", (e) => {
     const t = e.target;
     const opt = t.closest(".opt");
+    if (opt && t.type === "radio" && opt.hasAttribute("data-pack")) return stage({ op: "pack", ref: t.value }, t.value === opt.dataset.ref);
     if (opt && t.type === "radio") return stage({ op: "option", key: opt.dataset.key, ref: t.value }, t.value === opt.dataset.ref);
     if (t.classList.contains("env-value")) {
       const row = t.closest("tr");

@@ -527,7 +527,7 @@ func manifestNameIs(line []byte, name string) bool {
 func useHint(kind string, ref pack.Ref) string {
 	switch kind {
 	case pack.KindPack:
-		return fmt.Sprintf("use it with [stack] pack = %q in project.toml (the Settings page's project.toml editor)", ref)
+		return fmt.Sprintf("pick it for the pack in Settings ([stack] pack = %q)", ref)
 	case pack.KindOption:
 		return "pick it for its slot in Settings"
 	}

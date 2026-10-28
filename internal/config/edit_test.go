@@ -561,3 +561,14 @@ func TestAddThenRemoveLinkRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+func TestSetPack(t *testing.T) {
+	in := "schema = 1\n\n[stack]\npack = \"rails@1\"   # the pack\napp = \"rails\"\n"
+	out, err := SetPack(in, "local:rails@1")
+	if err != nil || out != "schema = 1\n\n[stack]\npack = \"local:rails@1\"   # the pack\napp = \"rails\"\n" {
+		t.Errorf("%q %v", out, err)
+	}
+	if _, err := SetPack("schema = 1\n", "x@1"); err == nil {
+		t.Error("no [stack] pack: no error")
+	}
+}

@@ -128,12 +128,19 @@ type projectShow struct {
 	Repo       string        `json:"repo"`
 	BaseBranch string        `json:"base_branch"`
 	Hash       string        `json:"hash"`
+	Pack       packRow       `json:"pack"`
 	Options    []optionRow   `json:"options"`
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
 	AddChoices []string      `json:"add_choices"`
 	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`
+}
+
+// packRow is the stack's pack and the packs with its app service.
+type packRow struct {
+	Ref     string   `json:"ref"`
+	Choices []string `json:"choices"`
 }
 
 type optionRow struct {

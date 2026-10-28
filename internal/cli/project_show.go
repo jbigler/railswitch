@@ -25,11 +25,19 @@ type projectDoc struct {
 	BaseBranch string      `json:"base_branch"`
 	Hash       string      `json:"hash"`
 	File       string      `json:"file"` // the raw editor's text
+	Pack       packRow     `json:"pack"`
 	Options    []optionRow `json:"options"`
 	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
 	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
 	Env        []envPair   `json:"env"`
 	Links      []linkRow   `json:"links"`
+}
+
+// packRow is the stack's pack and the packs Settings offers instead: each
+// with the same app service, so [stack] app stays valid.
+type packRow struct {
+	Ref     string   `json:"ref"`
+	Choices []string `json:"choices"`
 }
 
 type optionRow struct {
@@ -83,7 +91,9 @@ func optionRefs(cat *pack.Catalog, root string) []optionRef {
 func newestBuiltins[V any](m map[pack.Ref]V) []pack.Ref {
 	best := map[string]pack.Ref{}
 	for r := range m {
-		if b, ok := best[r.Name]; !r.Local && (!ok || r.Version > b.Version) {
+		// A loaded catalog also holds the project's local and library
+		// packages: never a built-in.
+		if b, ok := best[r.Name]; !r.Local && r.Library == "" && (!ok || r.Version > b.Version) {
 			best[r.Name] = r
 		}
 	}
@@ -91,6 +101,39 @@ func newestBuiltins[V any](m map[pack.Ref]V) []pack.Ref {
 	for _, name := range slices.Sorted(maps.Keys(best)) {
 		out = append(out, best[name])
 	}
+	return out
+}
+
+// packChoices are the packs whose app service is st's and that p's other
+// lines resolve with (an option's works_with, among others): the newest
+// built-in of each name, the workspace's local packs and the libraries'
+// (those that load), sorted, with st's own always among them.
+func packChoices(cat *pack.Catalog, root string, p *config.Project, st *pack.Stack) []string {
+	refs := newestBuiltins(cat.Packs)
+	for _, m := range localManifests(root, "packs", "pack.toml") {
+		refs = append(refs, m.ref)
+	}
+	libs, _ := libraryPackages(cat) // a broken libraries.toml offers none
+	for _, lp := range libs {
+		if lp.kind == pack.KindPack {
+			refs = append(refs, lp.ref)
+		}
+	}
+	out := []string{st.PackRef.String()}
+	for _, r := range refs {
+		if slices.Contains(out, r.String()) {
+			continue
+		}
+		if pk, err := cat.Pack(r); err != nil || pk == nil || pk.App.Service != st.Pack.App.Service {
+			continue
+		}
+		q := *p
+		q.Stack.Pack = r.String()
+		if _, err := cat.Resolve(&q); err == nil {
+			out = append(out, r.String())
+		}
+	}
+	slices.Sort(out)
 	return out
 }
 
@@ -144,6 +187,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 		Prefix: p.Project.Prefix, Name: p.Project.Name, Repo: p.Project.Repo, BaseBranch: p.Project.BaseBranch,
 		Hash: workspace.Hash(data), File: string(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
 	}
+	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)
 	d.AddChoices = []string{}
 	for _, o := range opts {

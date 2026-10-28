@@ -21,7 +21,11 @@
 
 <section class="card">
 <h2>Stack and options</h2>
-{{range .Options}}<div class="opt" data-key="{{.Key}}" data-ref="{{.Ref}}">
+{{with .Pack}}<div class="opt" data-pack data-key="pack" data-ref="{{.Ref}}">
+<div class="opt-hd"><b>pack</b> <span class="mono opt-cur">{{.Ref}}</span> <span class="mono opt-new" hidden></span><span class="sp"></span><button type="button" class="ln dim" data-change>Change</button></div>
+<div class="choices" hidden>{{range .Choices}}<label class="choice"><input type="radio" name="stack-pack" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
+</div>
+{{end}}{{range .Options}}<div class="opt" data-key="{{.Key}}" data-ref="{{.Ref}}">
 <div class="opt-hd"><b>{{.Key}}</b>{{if not .Slot}} <span class="muted">extra</span>{{end}} <span class="mono opt-cur">{{.Ref}}</span> <span class="mono opt-new" hidden></span><span class="sp"></span><button type="button" class="ln dim" data-change>Change</button></div>
 <div class="choices" hidden>{{$k := .Key}}{{range .Choices}}<label class="choice"><input type="radio" name="opt-{{$k}}" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
 </div>

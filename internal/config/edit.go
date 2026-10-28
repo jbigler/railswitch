@@ -531,6 +531,20 @@ func SetOption(data, key, ref string, slot bool) (string, error) {
 	return d.insertKey(table, keyTOML(key), QuoteString(ref)), nil
 }
 
+// SetPack sets [stack] pack to ref; [stack] app stays (Settings offers
+// only packs with the same app service).
+func SetPack(data, ref string) (string, error) {
+	d, err := parseEdit(data, "stack", false, false)
+	if err != nil {
+		return "", err
+	}
+	s := d.find([]string{"stack"}, "pack")
+	if s == nil {
+		return "", errors.New("project.toml has no [stack] pack")
+	}
+	return d.setValue(s, QuoteString(ref)), nil
+}
+
 // SetEnv sets the project [env] name to value.
 func SetEnv(data, name, value string) (string, error) {
 	d, err := parseEdit(data, "env", false, false)

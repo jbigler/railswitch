@@ -32,7 +32,7 @@ type edit struct {
 	URL   string `json:"url,omitempty"`
 }
 
-var editOps = []string{"option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show"}
+var editOps = []string{"pack", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -75,6 +75,7 @@ type settingsView struct {
 
 	Error        string // project show failed: the page has nothing to edit
 	Project      projectShow
+	Pack         *optionView // the stack's pack, when it has another choice
 	Options      []optionView
 	Links        []linkRowView
 	Secrets      []secretView
@@ -184,6 +185,8 @@ func newStaged(applyURL string, show projectShow, edits []edit, doc previewDoc, 
 // show where it has one.
 func editTitle(show projectShow, e edit) string {
 	switch e.Op {
+	case "pack":
+		return fmt.Sprintf("Pack: %s → %s", show.Pack.Ref, e.Ref)
 	case "option":
 		old := "none"
 		if i := slices.IndexFunc(show.Options, func(o optionRow) bool { return o.Key == e.Key }); i >= 0 {
@@ -243,6 +246,13 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Project = show
 	v.Template = s.settingsTemplate(r.Context(), p)
+	if len(show.Pack.Choices) > 1 {
+		pv := optionView{Key: "pack", Ref: show.Pack.Ref, Slot: true}
+		for _, c := range show.Pack.Choices {
+			pv.Choices = append(pv.Choices, choiceView{Ref: c, Current: c == show.Pack.Ref})
+		}
+		v.Pack = &pv
+	}
 	for _, o := range show.Options {
 		ov := optionView{Key: o.Key, Ref: o.Ref, Slot: o.Slot}
 		for _, c := range o.Choices {

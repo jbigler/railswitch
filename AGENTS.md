@@ -27,6 +27,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 
 ## CLI (Stage 6c additions)
 - `project detect <repo> [--branch <b>] [--pack <ref>]` (D88): `internal/detect`; a shallow blobless sparse clone of only the paths the built-ins' rules name (`detect.Paths`), git with `core.hooksPath=/dev/null`, `protocol.ext.allow=never`, `GIT_LFS_SKIP_SMUDGE=1`, no prompt, 2 min per call; temp dir under `$XDG_RUNTIME_DIR` always removed; a symlinked file or parent, or a file over 1 MiB, is absent.
+- `pack ls` (built-ins newest per name, then the workspace's `local:` ones; for the new-project pickers).
 - Packages: `[detect] files` (pack, all must exist), `[[detect]] file/match/evidence` (option, any rule); paths are `[A-Za-z0-9._+-/]` only (passed as `/<path>` no-cone sparse patterns). Framework knowledge stays in the rules (D87).
 
 ## Global constraints
@@ -36,7 +37,7 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 - Dependencies: stdlib + `github.com/BurntSushi/toml` only. No-echo prompt uses `syscall` TCGETS/TCSETS.
 - Hardening (D34): every container has `NoNewPrivileges=true`, `Memory=`, `PidsLimit=`; app/deps/worker/tool/agent also `DropCapability=all`; browser keeps `AddCapability=NET_ADMIN`/`NET_RAW`, no `DropCapability`.
 - Schema (D39): `project.toml`, `stack.lock`, `registry.toml`, `config.toml`, `dashboard.toml` carry `schema = 1`; a higher schema is refused ("written by a newer railswitch").
-- `--json` (D40): every read command (`env`, `status`, `overview`, `wt ls`, `project ls`, `secret ls`, `containerfile list`, `pack show`, `doctor`, `machine`, `agent ls`, `pr ls`, `task ls`, `dashboard colors`, `settings preview`, `project show`, `project detect`) prints one JSON document; schemas in `docs/json.md`.
+- `--json` (D40): every read command (`env`, `status`, `overview`, `wt ls`, `project ls`, `secret ls`, `containerfile list`, `pack show`, `pack ls`, `doctor`, `machine`, `agent ls`, `pr ls`, `task ls`, `dashboard colors`, `settings preview`, `project show`, `project detect`) prints one JSON document; schemas in `docs/json.md`.
 - Unit tests need no podman, systemd, gh or network (`git`, `bash` allowed; use `internal/sys/systest` Fake).
 - Ports publish only on `127.0.0.1:<host>:<ctr>`.
 - Remove objects by exact name, never `--filter`/regex. Never `git worktree prune`.

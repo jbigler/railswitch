@@ -40,7 +40,7 @@ var completionSubs = map[string][]string{
 	"fw":               {"allow", "show"},
 	"hooks":            {"backup", "check", "restore"},
 	"nvim":             {"reset-config", "update"},
-	"pack":             {"eject", "new", "show"},
+	"pack":             {"eject", "ls", "new", "show"},
 	"pr":               {"ls"},
 	"project":          {"detect", "init", "ls", "new", "rm", "show", "write"},
 	"settings":         {"apply", "preview"},

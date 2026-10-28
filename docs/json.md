@@ -90,6 +90,29 @@ exists, else an option under `options/<name>/`).
 | `gives` | array of strings | The env names an option gives the app, sorted. |
 | `readme` | string | The package's `README.md` (its app-side changes); `""` when it has none. |
 
+## `pack ls`
+
+Every pack and option, for the new-project page's pickers: each built-in
+name at its newest version, then, when run in a workspace (`-C <ws>`), its
+local packages (`packs/<name>/`, `options/<name>/`) as `local:<name>@N`.
+Each list is sorted by ref.
+
+```json
+{"packs": [{"ref": "rails@1", "name": "rails"}],
+ "options": [{"ref": "postgres@1", "name": "postgres", "slot": "database", "works_with": ["*"]}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `packs[].ref`, `options[].ref` | string | `name@N` or `local:name@N`. |
+| `packs[].name`, `options[].name` | string | The package name. |
+| `options[].slot` | string | The option's slot. |
+| `options[].works_with` | string[] | Pack names it works with, or `["*"]`. |
+
+A local package is read leniently: one that doesn't load yet is listed
+when its manifest has a `version` (choosing it shows the load error); one
+without is left out.
+
 ## `secret ls`
 
 The project's declared secrets (`project.toml [secrets]`), sorted by name.

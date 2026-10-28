@@ -198,3 +198,53 @@ func TestPackShowJSONPinKeys(t *testing.T) {
 		t.Errorf("pin = %v; want {\"name\": \"postgres\", \"default\": \"16\"}", doc["pin"])
 	}
 }
+
+// docs/json.md `pack ls`: built-ins at their newest version, then the
+// workspace's local packages, sorted by ref; slices never null.
+func TestPackLsJSON(t *testing.T) {
+	newEnv(t)
+	out := mustRun(t, "-C", t.TempDir(), "--json", "pack", "ls")
+	want := `{"packs":[{"ref":"rails@1","name":"rails"}],"options":[` +
+		`{"ref":"playwright@1","name":"playwright","slot":"browser","works_with":["*"]},` +
+		`{"ref":"postgres@1","name":"postgres","slot":"database","works_with":["*"]},` +
+		`{"ref":"redis@1","name":"redis","slot":"cache","works_with":["*"]},` +
+		`{"ref":"rustfs@1","name":"rustfs","slot":"storage","works_with":["*"]},` +
+		`{"ref":"sidekiq@1","name":"sidekiq","slot":"jobs","works_with":["rails","hanami"]}]}` + "\n"
+	if out != want {
+		t.Errorf("pack ls =\n%s\nwant\n%s", out, want)
+	}
+
+	ws, _ := filialWS(t)
+	mustRun(t, "-C", ws, "pack", "eject", "postgres@1", "--as", "mydb")
+	mustRun(t, "-C", ws, "pack", "eject", "rails@1", "--as", "web")
+	pt := filepath.Join(ws, "packs", "web", "pack.toml")
+	writeFile(t, pt, readFile(t, pt)+"\nunknown_key = 1\n") // listed though it doesn't load: choosing it shows the error
+	if code, _, _ := runIn(t, "-C", ws, "pack", "show", "local:web@1"); code != 1 {
+		t.Fatalf("pack show of the broken pack: exit %d; want 1", code)
+	}
+	var doc struct {
+		Packs []struct {
+			Ref, Name string
+		} `json:"packs"`
+		Options []struct {
+			Ref, Name, Slot string
+			WorksWith       []string `json:"works_with"`
+		} `json:"options"`
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "pack", "ls")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	var refs []string
+	for _, p := range doc.Packs {
+		refs = append(refs, p.Ref)
+	}
+	if strings.Join(refs, " ") != "local:web@1 rails@1" || doc.Packs[0].Name != "web" {
+		t.Errorf("packs = %+v", doc.Packs)
+	}
+	if o := doc.Options[0]; o.Ref != "local:mydb@1" || o.Name != "mydb" || o.Slot != "database" || strings.Join(o.WorksWith, ",") != "*" {
+		t.Errorf("options[0] = %+v", o)
+	}
+	if out := mustRun(t, "-C", ws, "pack", "ls"); !strings.Contains(out, "local:mydb@1") || !strings.Contains(out, "rails@1") {
+		t.Errorf("text:\n%s", out)
+	}
+}

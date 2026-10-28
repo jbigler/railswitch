@@ -233,6 +233,9 @@ lint    = "bin/rubocop"   # a project task
   runtimes and their sources, ports, pin, gives) and its `README.md`;
   `--json` prints one document (`docs/json.md`). Built-ins need no
   workspace.
+- `railswitch pack ls` lists every pack and option: each built-in at its
+  newest version and, in a workspace, its local packages (a local package
+  that doesn't load yet is listed if its manifest has a `version`).
 
 ## README.md
 

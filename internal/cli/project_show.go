@@ -60,32 +60,57 @@ type optionRef struct {
 // newest version, then each workspace-local one (options/<name>/) at the
 // version its option.toml declares, sorted by name.
 func optionRefs(cat *pack.Catalog, root string) []optionRef {
-	best := map[string]optionRef{}
-	for r, o := range cat.Options {
-		if r.Local {
-			continue
-		}
-		if b, ok := best[r.Name]; !ok || r.Version > b.ref.Version {
-			best[r.Name] = optionRef{r, o.Slot}
+	var out []optionRef
+	for _, r := range newestBuiltins(cat.Options) {
+		out = append(out, optionRef{r, cat.Options[r].Slot})
+	}
+	for _, m := range localManifests(root, "options", "option.toml") {
+		out = append(out, optionRef{m.ref, m.Slot})
+	}
+	return out
+}
+
+// newestBuiltins is each built-in name of m at its newest version, sorted
+// by name.
+func newestBuiltins[V any](m map[pack.Ref]V) []pack.Ref {
+	best := map[string]pack.Ref{}
+	for r := range m {
+		if b, ok := best[r.Name]; !r.Local && (!ok || r.Version > b.Version) {
+			best[r.Name] = r
 		}
 	}
-	var out []optionRef
+	out := []pack.Ref{}
 	for _, name := range slices.Sorted(maps.Keys(best)) {
 		out = append(out, best[name])
 	}
-	ents, _ := os.ReadDir(filepath.Join(root, "options"))
+	return out
+}
+
+// localManifest is what a listing reads of a workspace-local package.
+type localManifest struct {
+	ref       pack.Ref
+	Version   int
+	Slot      string
+	WorksWith []string `toml:"works_with"`
+}
+
+// localManifests reads root/<top>/<name>/<file> for each package dir,
+// sorted by name. Decoding is lenient so that a package that doesn't load
+// yet is still offered (choosing it shows its error); one with no usable
+// version is skipped.
+func localManifests(root, top, file string) []localManifest {
+	var out []localManifest
+	ents, _ := os.ReadDir(filepath.Join(root, top))
 	for _, ent := range ents {
 		if !ent.IsDir() {
 			continue
 		}
-		var o struct {
-			Version int
-			Slot    string
-		}
-		if _, err := toml.DecodeFile(filepath.Join(root, "options", ent.Name(), "option.toml"), &o); err != nil || o.Version < 1 {
+		var m localManifest
+		if _, err := toml.DecodeFile(filepath.Join(root, top, ent.Name(), file), &m); err != nil || m.Version < 1 {
 			continue
 		}
-		out = append(out, optionRef{pack.Ref{Name: ent.Name(), Version: o.Version, Local: true}, o.Slot})
+		m.ref = pack.Ref{Name: ent.Name(), Version: m.Version, Local: true}
+		out = append(out, m)
 	}
 	return out
 }

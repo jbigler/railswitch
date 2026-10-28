@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -24,9 +25,9 @@ var packNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 // manifestNameRe is a manifest's top-level name line.
 var manifestNameRe = regexp.MustCompile(`(?m)^name\s*=\s*"[^"]*"`)
 
-// railswitch pack eject|new|show (D43, D70).
+// railswitch pack eject|new|show|ls (D43, D70).
 func cmdPack(_ context.Context, e *env, args []string) int {
-	const usage = "usage: railswitch pack eject <ref> [--as <name>] | new <name> | show <ref>"
+	const usage = "usage: railswitch pack eject <ref> [--as <name>] | new <name> | show <ref> | ls"
 	if len(args) == 0 {
 		return e.usageErr(usage)
 	}
@@ -37,6 +38,8 @@ func cmdPack(_ context.Context, e *env, args []string) int {
 		return packNew(e, args[1:])
 	case "show":
 		return packShow(e, args[1:])
+	case "ls":
+		return packLs(e, args[1:])
 	}
 	return e.usageErr("pack: unknown subcommand %q\n%s", args[0], usage)
 }
@@ -466,4 +469,76 @@ func packRefCandidates(context.Context, string) []string {
 		return nil
 	}
 	return slices.Concat(strings.Split(refNames(cat.Packs), ", "), strings.Split(refNames(cat.Options), ", "))
+}
+
+// packLsDoc is `pack ls --json` (docs/json.md).
+type packLsDoc struct {
+	Packs   []packLsPack   `json:"packs"`
+	Options []packLsOption `json:"options"`
+}
+
+type packLsPack struct {
+	Ref  string `json:"ref"`
+	Name string `json:"name"`
+}
+
+type packLsOption struct {
+	Ref       string   `json:"ref"`
+	Name      string   `json:"name"`
+	Slot      string   `json:"slot"`
+	WorksWith []string `json:"works_with"`
+}
+
+// railswitch pack ls: every pack and option a new or current project can
+// use, for the dashboard's pickers. In a workspace its local packages too.
+func packLs(e *env, args []string) int {
+	fset := e.flags("pack ls")
+	if code, ok := parse(fset, args); !ok {
+		return code
+	}
+	if fset.NArg() != 0 {
+		return e.usageErr("usage: railswitch pack ls")
+	}
+	root, err := workspace.Root(e.dir)
+	if err != nil {
+		root = "" // built-ins only
+	}
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		return e.fail(err)
+	}
+	doc := packLsDoc{Packs: []packLsPack{}, Options: []packLsOption{}}
+	for _, r := range newestBuiltins(cat.Packs) {
+		doc.Packs = append(doc.Packs, packLsPack{r.String(), r.Name})
+	}
+	for _, m := range localManifests(root, "packs", "pack.toml") {
+		doc.Packs = append(doc.Packs, packLsPack{m.ref.String(), m.ref.Name})
+	}
+	for _, r := range newestBuiltins(cat.Options) {
+		o := cat.Options[r]
+		doc.Options = append(doc.Options, packLsOption{r.String(), r.Name, o.Slot, slices.Clone(o.WorksWith)})
+	}
+	for _, m := range localManifests(root, "options", "option.toml") {
+		doc.Options = append(doc.Options, packLsOption{m.ref.String(), m.ref.Name, m.Slot, append([]string{}, m.WorksWith...)})
+	}
+	slices.SortFunc(doc.Packs, func(a, b packLsPack) int { return strings.Compare(a.Ref, b.Ref) })
+	slices.SortFunc(doc.Options, func(a, b packLsOption) int { return strings.Compare(a.Ref, b.Ref) })
+	if e.json {
+		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
+	tw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(tw, "REF\tKIND\tSLOT\tWORKS WITH\t")
+	for _, p := range doc.Packs {
+		fmt.Fprintf(tw, "%s\tpack\t\t\t\n", p.Ref)
+	}
+	for _, o := range doc.Options {
+		fmt.Fprintf(tw, "%s\toption\t%s\t%s\t\n", o.Ref, o.Slot, strings.Join(o.WorksWith, ", "))
+	}
+	if err := tw.Flush(); err != nil {
+		return e.fail(err)
+	}
+	return 0
 }

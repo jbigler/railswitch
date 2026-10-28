@@ -36,8 +36,32 @@ at its first start (`POSTGRES_DB`), for apps that never create their own;
 ## Refs
 
 A ref is `<name>@<N>` for a package built into railswitch (`rails@1`,
-`postgres@1`, `claude@1`) or `local:<name>@<N>` for one the project
-supplies. Names are lowercase (`[a-z][a-z0-9-]*`); `N` is a positive integer.
+`postgres@1`, `claude@1`), `local:<name>@<N>` for one the project
+supplies, or `<alias>:<name>@<N>` for one a library repository publishes
+(D105; [Library packages](#library-packages)). Names are lowercase
+(`[a-z][a-z0-9-]*`); `N` is a positive integer; an alias is
+`[a-z][a-z0-9-]{0,19}` and never `local`. Every place a ref goes takes all
+three, except `from`, which takes no `local:` ref.
+
+## Library packages
+
+A library ref `acme:django@1` reads `packs/django/` (or `options/`,
+`agents/`) of the library with alias `acme`, from its verified checkout
+`~/.local/share/railswitch/libraries/acme/current/` (docs/libraries.md).
+The package loads only when the checkout's signed `library.toml` lists
+`django@1` of that kind with the sha256 the directory hashes to now: a file
+changed, added, removed or replaced by a symlink after the fetch, by
+anything, leaves the ref unresolved ("no longer matches its signed index:
+fetch it again"). A library that was never fetched, or whose fetch is
+still waiting for "Trust this key", resolves nothing. Loading reads the
+files into memory once and hashes what it loads; it runs no `ssh-keygen`
+(the checkout was verified when it was fetched, and lives outside every
+container's reach).
+
+`acme:redis@1` and the built-in `redis@1` are different refs, even byte for
+byte. A library package is locked with `source = "library <id>"`, the
+`commit` it was fetched at and `signer`, the fingerprint of the key that
+signed its index.
 
 ## Local packages
 
@@ -67,7 +91,8 @@ the built-ins:
 ## Locking
 
 `railswitch lock` writes `stack.lock`: every package the project uses with
-its version, its source (`built in (railswitch <version>)` or `local`) and
+its version, its source (`built in (railswitch <version>)`, `local`, or
+`library <id>` with its `commit` and `signer`) and
 the sha256 of its directory (D14: each regular file's path, length and
 bytes, in sorted path order; a symlink or other special file is an error
 naming it). Every lock write also stores a copy of each package it pins
@@ -76,6 +101,17 @@ workspace; a copy is checked against its hash on every read, and one that
 no longer matches counts as missing. Loading a project also stores, best effort, any package
 that still matches its lock entry but has no copy yet (a lock written
 before the store), so its next update is reviewed as a diff.
+
+The nvim tool (when `[tools.nvim]` is set) and the agent base image (when
+the project has agents) are locked too (D107): `[tool.nvim]` and
+`[base.agent]`, with a source and a sha256 but no version. They are
+stored, run from the store and reviewed like packages (`kind` `tool` and
+`base` in `lock --review`, refs `nvim` and `agent-base`), so a railswitch
+upgrade that changes the built-in nvim tool or the agent base image waits
+for review, and `containerfile eject nvim` or `agent-base` (and
+`containerfile show`'s default) copies the accepted text. A `stack.lock`
+written before 7c has neither entry: the project shows a pending review,
+both listed as `added`, until `railswitch lock --accept <hash>`.
 
 ### Updates wait for review (D97)
 

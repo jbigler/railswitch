@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -14,6 +15,7 @@ import (
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/signing"
 	"github.com/jbigler/railswitch/internal/unithash"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -47,9 +49,19 @@ type Overview struct {
 	Worktrees []OverviewWorktree `json:"worktrees"` // registry order (ID)
 	// ReviewPending: a package update waits for review (lock --review), D97.
 	ReviewPending bool `json:"review_pending"`
-	// SignerWarnings: library packages whose signer is revoked or no
-	// longer trusted (D102); always empty until libraries install (7c).
-	SignerWarnings []string `json:"signer_warnings"`
+	// SignerWarnings: locked library packages whose signer is distrusted
+	// or revoked for their library (D102); never nil.
+	SignerWarnings []workspace.SignerWarning `json:"signer_warnings"`
+}
+
+// trust is the machine's signers.toml; nil, which trusts no signer, when it
+// can't be read, so a broken trust store warns rather than hides.
+func (l *L) trust() *signing.Trust {
+	t, err := signing.LoadTrust(filepath.Join(l.WS.Dirs.Config, signing.TrustFile))
+	if err != nil {
+		return nil
+	}
+	return t
 }
 
 // stackRoles are the roles of the long-running services that make a stack.
@@ -117,7 +129,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: []string{}}
+	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust())}
 	for _, w := range wts {
 		in, err := m.Instance(w)
 		if err != nil {

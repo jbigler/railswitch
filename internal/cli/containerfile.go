@@ -19,7 +19,6 @@ import (
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
-	builtinfs "github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/textdiff"
@@ -43,9 +42,6 @@ const (
 	kindAgentBase                     // the agent base image, found by filename
 	kindAgent                         // an agent package's image, found by filename
 )
-
-// agentBaseFile is the agent base image's built-in Containerfile in builtinfs.FS.
-const agentBaseFile = "agentbase/Containerfile.agent-base"
 
 // builtin is a built-in default Containerfile.
 type builtin struct {
@@ -82,8 +78,8 @@ func stackBuiltins(st *pack.Stack) map[string]builtin {
 	for _, t := range st.Tools {
 		out[cfName(t.Image.File)] = builtin{ref: t.Name, files: t.Files, file: t.Image.File, kind: kindTool}
 	}
-	if len(st.Agents) > 0 {
-		out["agent-base"] = builtin{ref: "agent-base", files: builtinfs.FS, file: agentBaseFile, kind: kindAgentBase}
+	if st.AgentBase != nil {
+		out["agent-base"] = builtin{ref: "agent-base", files: st.AgentBase, file: pack.AgentBaseFile, kind: kindAgentBase}
 	}
 	for _, a := range st.Agents {
 		out[cfName(a.Agent.Image.File)] = builtin{ref: a.Ref.String(), files: a.Agent.Files, file: a.Agent.Image.File, kind: kindAgent}
@@ -206,7 +202,7 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := workspace.LoadCatalog(root)
 	if err != nil {
 		return nil, nil, nil, err
 	}

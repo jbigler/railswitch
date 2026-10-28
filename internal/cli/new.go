@@ -63,6 +63,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	branch := fset.String("branch", "", "the `base` branch (default: the remote's HEAD branch)")
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
+	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
 	up := fset.Bool("up", false, "run up in the base worktree once it is created (exit 3: created, up failed)")
 	var opts, tools, agentFlags stringList
 	fset.Var(&opts, "option", "fill an option slot: `slot=ref` or slot=none (repeatable)")
@@ -91,7 +92,23 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	if *dryRun {
-		return e.newDryRun(pl, *up)
+		return e.newDryRun(ctx, pl, *up)
+	}
+	// Judged before the clone: a library package is installed only through
+	// its review (D106), and the lock checks the hash again.
+	accept := workspace.Accept{}
+	install, refs, err := newInstall(ctx, pl)
+	switch {
+	case err != nil:
+		return e.fail(err)
+	case install == nil && *acceptHash != "":
+		return e.fail(errors.New("--accept-install: the project installs no library package"))
+	case install != nil && *acceptHash == "":
+		return e.fail(fmt.Errorf("installing %s needs review: project new --dry-run shows the install review; accept it with --accept-install <hash>", refList(refs)))
+	case install != nil && install.Hash != *acceptHash:
+		return e.fail(errInstallChanged)
+	case install != nil:
+		accept = workspace.Accept{Install: refs, IfHash: install.Hash, Run: e.run}
 	}
 
 	ws, slug := pl.ws, pl.slug
@@ -102,7 +119,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	if err := clone(ctx, e.run, *repo, pl.p.Project.BaseBranch, filepath.Join(ws, slug)); err != nil {
 		return e.fail(err)
 	}
-	secrets, id, err := e.createWorkspace(ctx, pl)
+	secrets, id, err := e.createWorkspace(ctx, pl, accept)
 	if err != nil {
 		return e.failLeft("project new", err, ws, before)
 	}
@@ -165,7 +182,7 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 	case !errors.Is(err, fs.ErrNotExist):
 		return nil, err
 	}
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := workspace.LoadCatalog(ws)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +257,7 @@ func newPathsFree(ws, slug string, st *pack.Stack) error {
 
 // createWorkspace is new after the clone: everything up to the render.
 // It returns the declared secrets (all unset) and the base worktree's ID.
-func (e *env) createWorkspace(ctx context.Context, pl *newPlan) ([]string, int, error) {
+func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace.Accept) ([]string, int, error) {
 	ws := pl.ws
 	if _, err := e.run.Run(ctx, sys.Cmd{Name: "git", Args: []string{"init", ws}}); err != nil {
 		return nil, 0, fmt.Errorf("git init %s: %w", ws, err)
@@ -258,7 +275,7 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan) ([]string, int, 
 	if err := writeGenerated(ws, pl.st, randomValue); err != nil {
 		return nil, 0, err
 	}
-	if err := workspace.Lock(ctx, ws, workspace.Accept{}); err != nil {
+	if err := workspace.Lock(ctx, ws, accept); err != nil {
 		return nil, 0, err
 	}
 	w, err := workspace.Load(ctx, ws, "")

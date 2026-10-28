@@ -562,7 +562,7 @@ func TestUnitHashLabel(t *testing.T) {
 // command, run through its entrypoint.
 func TestDepsExecFromInstall(t *testing.T) {
 	ws := testfixture.Workspace(t, fixtureDir)
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := pack.LoadCatalog(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -601,7 +601,7 @@ func TestShareAddHostWorker(t *testing.T) {
 
 func TestUnroutedToolOptionOffProxy(t *testing.T) {
 	ws := testfixture.Workspace(t, fixtureDir)
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := pack.LoadCatalog(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

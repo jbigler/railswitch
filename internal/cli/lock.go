@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"strconv"
+	"slices"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
@@ -60,7 +60,7 @@ func cmdLock(ctx context.Context, e *env, args []string) int {
 		if doc.Hash != *accept {
 			return e.fail(workspace.ErrReviewChanged)
 		}
-		if err := e.commit(ctx, root, nil, &workspace.Accept{All: true, IfHash: *accept}); err != nil {
+		if err := e.commit(ctx, root, nil, &workspace.Accept{All: true, IfHash: *accept, Run: e.run}); err != nil {
 			return e.fail(err)
 		}
 		if *restart && e.restartAll(ctx, doc.Restart) != 0 {
@@ -72,19 +72,22 @@ func cmdLock(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	if len(doc.Packages) > 0 && !doc.firstLock {
+	// A first lock has nothing to review against, except a library
+	// package, which is never locked unseen (D106).
+	if len(doc.Packages) > 0 && (!doc.firstLock || doc.installs()) {
 		printReview(e.stdout, doc)
 		fmt.Fprintf(e.stderr, "railswitch: a package update waits for review; accept with: railswitch lock --accept %s\n", doc.Hash)
 		return 1
 	}
-	if err := workspace.Lock(ctx, root, workspace.Accept{All: true, IfHash: doc.Hash}); err != nil {
+	if err := workspace.Lock(ctx, root, workspace.Accept{All: true, IfHash: doc.Hash, Run: e.run}); err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))
 	return 0
 }
 
-// reviewDoc is `lock --review --json` (docs/json.md).
+// reviewDoc is `lock --review --json` (docs/json.md), and the `install`
+// of `settings preview --json` and `project new --dry-run --json`.
 type reviewDoc struct {
 	Hash     string      `json:"hash"`
 	Flags    int         `json:"flags"`
@@ -102,6 +105,13 @@ type reviewPkg struct {
 	To           string        `json:"to"`
 	AlsoLockedIn []string      `json:"also_locked_in"`
 	Files        []review.File `json:"files"`
+
+	library bool
+}
+
+// installs reports whether doc adds a library package.
+func (doc *reviewDoc) installs() bool {
+	return slices.ContainsFunc(doc.Packages, func(p reviewPkg) bool { return p.library && p.Status == workspace.StatusAdded })
 }
 
 // lockReview is the review of what lock --accept would write for root;
@@ -111,26 +121,12 @@ func (e *env) lockReview(ctx context.Context, root string, restart bool) (*revie
 	if err != nil {
 		return nil, err
 	}
-	doc := &reviewDoc{Hash: workspace.Hash(pl.Lock), Packages: []reviewPkg{}, Restart: []string{}}
+	doc, err := reviewDocOf(pl)
+	if err != nil {
+		return nil, err
+	}
 	cur, loadErr := workspace.Load(ctx, root, "")
 	doc.firstLock = errors.Is(loadErr, config.ErrNoLock)
-	others := otherLocks(pl.Next)
-	for _, c := range pl.Packages {
-		files, err := review.Compare(c.Kind, c.Old, c.New)
-		if err != nil {
-			return nil, fmt.Errorf("%s %s: %w", c.Kind, c.Ref, err)
-		}
-		p := reviewPkg{Ref: c.Ref.String(), Kind: c.Kind, Status: c.Status, From: c.From, To: c.To, AlsoLockedIn: []string{}, Files: files}
-		for _, o := range others {
-			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && e.Version == strconv.Itoa(c.Ref.Version) && (e.Source == "local") == c.Ref.Local {
-				p.AlsoLockedIn = append(p.AlsoLockedIn, o.prefix)
-			}
-		}
-		for _, f := range files {
-			doc.Flags += len(f.Flags)
-		}
-		doc.Packages = append(doc.Packages, p)
-	}
 	if !restart || len(doc.Packages) == 0 || loadErr != nil {
 		return doc, nil
 	}
@@ -147,6 +143,74 @@ func (e *env) lockReview(ctx context.Context, root string, restart bool) (*revie
 	doc.Restart = c.Restart
 	return doc, nil
 }
+
+// reviewOf is pl as a review document, each package compared file by file
+// and flagged; Restart is empty.
+func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
+	doc := &reviewDoc{Hash: workspace.Hash(pl.Lock), Packages: []reviewPkg{}, Restart: []string{}}
+	others := otherLocks(pl.Next)
+	for _, c := range pl.Packages {
+		files, err := review.Compare(c.Kind, c.Old, c.New)
+		if err != nil {
+			return nil, fmt.Errorf("%s %s: %w", c.Kind, c.Ref, err)
+		}
+		p := reviewPkg{Ref: c.Ref.String(), Kind: c.Kind, Status: c.Status, From: c.From, To: c.To, AlsoLockedIn: []string{}, Files: files, library: c.Ref.Library != ""}
+		for _, o := range others {
+			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && workspace.Pins(e, c.Ref) {
+				p.AlsoLockedIn = append(p.AlsoLockedIn, o.prefix)
+			}
+		}
+		for _, f := range files {
+			doc.Flags += len(f.Flags)
+		}
+		doc.Packages = append(doc.Packages, p)
+	}
+	return doc, nil
+}
+
+// installReview is the Install review (D106) of project p (nil: root's
+// project.toml) on cat (nil: root's catalog): nil when it installs no
+// library package.
+func installReview(ctx context.Context, root string, p *config.Project, cat *pack.Catalog) (*reviewDoc, []pack.Ref, error) {
+	pl, err := workspace.Install(ctx, root, p, cat)
+	if err != nil || pl == nil {
+		return nil, nil, err
+	}
+	doc, err := reviewDocOf(pl)
+	return doc, pl.Install, err
+}
+
+// acceptInstall is the Accept of a write that installs what the Install
+// review of p (as installReview) lists, when its hash is hash: none
+// ("") accepts nothing; a hash that differs, or one given for a write that
+// installs nothing, refuses.
+func (e *env) acceptInstall(ctx context.Context, root string, p *config.Project, cat *pack.Catalog, hash string) (*workspace.Accept, error) {
+	if hash == "" {
+		return &workspace.Accept{}, nil
+	}
+	doc, refs, err := installReview(ctx, root, p, cat)
+	if err != nil {
+		return nil, err
+	}
+	if doc == nil {
+		return nil, errors.New("--accept-install: the change installs no library package")
+	}
+	if doc.Hash != hash {
+		return nil, errInstallChanged
+	}
+	return &workspace.Accept{Install: refs, IfHash: hash, Run: e.run}, nil
+}
+
+// refList is refs as "a, b".
+func refList(refs []pack.Ref) string {
+	s := make([]string, len(refs))
+	for i, r := range refs {
+		s[i] = r.String()
+	}
+	return strings.Join(s, ", ")
+}
+
+var errInstallChanged = errors.New("the install changed since it was reviewed: review it again")
 
 type otherLock struct {
 	prefix string
@@ -179,14 +243,22 @@ func lockTable(l *config.Lock, kind string) map[string]config.LockEntry {
 		return l.Packs
 	case pack.KindOption:
 		return l.Options
+	case pack.KindTool:
+		return l.Tools
+	case pack.KindBase:
+		return l.Base
 	}
 	return l.Agents
 }
 
-// lockKey is how stack.lock keys r: agents by ref, the rest by name.
+// lockKey is how stack.lock keys r: agents by ref, the agent base image
+// as "agent", the rest by name.
 func lockKey(kind string, r pack.Ref) string {
-	if kind == pack.KindAgent {
+	switch kind {
+	case pack.KindAgent:
 		return r.String()
+	case pack.KindBase:
+		return "agent"
 	}
 	return r.Name
 }

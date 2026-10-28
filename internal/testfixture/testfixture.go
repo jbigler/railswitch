@@ -33,7 +33,7 @@ func Workspace(t testing.TB, dir string) string {
 	if err := os.Chmod(filepath.Join(ws, "db-dumps"), 0o700); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := pack.LoadCatalog(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

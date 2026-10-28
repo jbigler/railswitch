@@ -31,7 +31,7 @@ func TestLoadAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := c.Agents[Ref{"a", 1, false}]
+	a := c.Agents[Ref{Name: "a", Version: 1, Local: false}]
 	if a == nil || a.Image.File != "Containerfile.a" || !slices.Equal(a.Allow, []string{"x.example"}) {
 		t.Fatalf("Agents = %+v", c.Agents)
 	}
@@ -50,7 +50,7 @@ func TestDefaultAgent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r, ok := c.DefaultAgent(); !ok || r != (Ref{"a", 1, false}) {
+	if r, ok := c.DefaultAgent(); !ok || r != (Ref{Name: "a", Version: 1, Local: false}) {
 		t.Errorf("DefaultAgent = %v, %v", r, ok)
 	}
 	fsys["agents/b/agent.toml"] = &fstest.MapFile{Data: []byte("default = true\n" + strings.ReplaceAll(agentToml, `"a"`, `"b"`))}
@@ -79,17 +79,17 @@ func TestLoadLocalAgents(t *testing.T) {
 	root := t.TempDir()
 	writeLocalAgent(t, root, "probe", "probe")
 	c := localCatalog(t, root)
-	if a, err := c.Agent(Ref{"probe", 1, true}); err != nil || a == nil || a.Name != "probe" {
+	if a, err := c.Agent(Ref{Name: "probe", Version: 1, Local: true}); err != nil || a == nil || a.Name != "probe" {
 		t.Fatalf("Agent = %+v, %v", a, err)
 	}
 
 	bad := t.TempDir()
 	writeLocalAgent(t, bad, "probe", "other")
-	if _, err := localCatalog(t, bad).Agent(Ref{"probe", 1, true}); err == nil || !strings.Contains(err.Error(), "agents/probe/agent.toml") {
+	if _, err := localCatalog(t, bad).Agent(Ref{Name: "probe", Version: 1, Local: true}); err == nil || !strings.Contains(err.Error(), "agents/probe/agent.toml") {
 		t.Errorf("name mismatch: %v", err)
 	}
 
-	if _, err := localCatalog(t, t.TempDir()).Agent(Ref{"probe", 1, true}); err == nil || !strings.Contains(err.Error(), "does not exist") {
+	if _, err := localCatalog(t, t.TempDir()).Agent(Ref{Name: "probe", Version: 1, Local: true}); err == nil || !strings.Contains(err.Error(), "does not exist") {
 		t.Errorf("no agents/: %v", err)
 	}
 }
@@ -107,14 +107,14 @@ func TestAgentAddCapabilityRefused(t *testing.T) {
 	if err := os.WriteFile(p, append(data, "\n[unit]\nadd_capability = [\"NET_ADMIN\"]\n"...), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err = localCatalog(t, root).Agent(Ref{"probe", 1, true})
+	_, err = localCatalog(t, root).Agent(Ref{Name: "probe", Version: 1, Local: true})
 	if err == nil || !strings.Contains(err.Error(), "unit.add_capability") {
 		t.Errorf("err = %v, want unit.add_capability refused", err)
 	}
 }
 
 func TestRefStringLocal(t *testing.T) {
-	if got := (Ref{"probe", 1, true}).String(); got != "local:probe@1" {
+	if got := (Ref{Name: "probe", Version: 1, Local: true}).String(); got != "local:probe@1" {
 		t.Errorf("String = %q", got)
 	}
 }
@@ -152,7 +152,7 @@ func TestResolveAgents(t *testing.T) {
 	if got := st.Agents[1].Allow; !slices.Equal(got, []string{"x.example", "y.example"}) {
 		t.Errorf("zed allow = %v", got)
 	}
-	if st.Agents[0].Ref != (Ref{"a", 1, false}) {
+	if st.Agents[0].Ref != (Ref{Name: "a", Version: 1, Local: false}) {
 		t.Errorf("alpha ref = %v", st.Agents[0].Ref)
 	}
 

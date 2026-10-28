@@ -218,7 +218,8 @@ a local file into it, in the browser only (1 MiB at most).
   to the file (its eject header left out); "Same as the default." when
   there is none to show. A notice says when the default changed since the
   file was ejected. "Reset to default" (after a confirm) runs `railswitch
-  containerfile eject <name> --force` as a job. A file `containerfile new`
+  containerfile eject <name> --force` as a job; it renders, so the
+  running worktrees show "restart to apply". A file `containerfile new`
   made has no default and no panel.
 - **Check** posts the text to `POST /p/<prefix>/images/check/<name>`,
   which runs `railswitch --json containerfile write <name> --if-hash <h>

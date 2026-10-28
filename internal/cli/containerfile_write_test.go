@@ -337,3 +337,30 @@ func TestCommitRestoresNewLock(t *testing.T) {
 		}
 	}
 }
+
+// Reset to default (eject --force) in a rendered workspace renders too, so
+// the worktrees built from the edited file show as behind (stale) at once,
+// as after a write.
+func TestEjectForceRenders(t *testing.T) {
+	ws, _ := lockedWS(t)
+	file, before := pgClient(t, ws)
+	if err := os.WriteFile(file, []byte(before+"# mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "render")
+	mustRun(t, "-C", ws, "containerfile", "eject", "pg-client", "--force")
+	if out := mustRun(t, "-C", ws, "render", "--check"); out != "" {
+		t.Errorf("units not rendered after the reset:\n%s", out)
+	}
+}
+
+// containerfile new in a rendered workspace renders: the new addon is in
+// the units at once.
+func TestContainerfileNewRenders(t *testing.T) {
+	ws, _ := lockedWS(t)
+	mustRun(t, "-C", ws, "render")
+	mustRun(t, "-C", ws, "containerfile", "new", "extras")
+	if out := mustRun(t, "-C", ws, "render", "--check"); out != "" {
+		t.Errorf("units not rendered after containerfile new:\n%s", out)
+	}
+}

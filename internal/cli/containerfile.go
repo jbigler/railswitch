@@ -230,9 +230,9 @@ func cmdContainerfile(ctx context.Context, e *env, args []string) int {
 	case "write":
 		return containerfileWrite(ctx, e, args[1:])
 	case "eject":
-		return containerfileEject(e, args[1:])
+		return containerfileEject(ctx, e, args[1:])
 	case "new":
-		return containerfileNew(e, args[1:])
+		return containerfileNew(ctx, e, args[1:])
 	}
 	return e.usageErr("containerfile: unknown subcommand %q\n%s", args[0], usage)
 }
@@ -519,7 +519,7 @@ func containerfileWrite(ctx context.Context, e *env, args []string) int {
 }
 
 // railswitch containerfile eject <name> [--force]: see Eject.
-func containerfileEject(e *env, args []string) int {
+func containerfileEject(ctx context.Context, e *env, args []string) int {
 	fset := e.flags("containerfile eject")
 	force := fset.Bool("force", false, "replace an existing workspace file with the default")
 	name, code, ok := parseNamed(e, fset, args, "usage: railswitch containerfile eject <name> [--force]")
@@ -538,12 +538,32 @@ func containerfileEject(e *env, args []string) int {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "wrote %s\n", workspaceFile(name))
+	return e.renderLocked(ctx, root)
+}
+
+// renderLocked renders a locked project after a Containerfile change, as
+// containerfile write does, so the worktrees built from the old file show
+// as behind. One with no lock yet (project new ejects before locking)
+// renders when it locks.
+func (e *env) renderLocked(ctx context.Context, root string) int {
+	w, err := workspace.Load(ctx, root, "")
+	if errors.Is(err, config.ErrNoLock) {
+		return 0
+	}
+	if err != nil {
+		return e.fail(err)
+	}
+	d, err := e.render(ctx, w, false)
+	if err != nil {
+		return e.fail(err)
+	}
+	e.printRendered(d)
 	return 0
 }
 
 // railswitch containerfile new <name>: a skeleton addon, appended to
 // [image] addons.
-func containerfileNew(e *env, args []string) int {
+func containerfileNew(ctx context.Context, e *env, args []string) int {
 	fset := e.flags("containerfile new")
 	name, code, ok := parseNamed(e, fset, args, "usage: railswitch containerfile new <name>")
 	if !ok {
@@ -582,5 +602,5 @@ USER appuser
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "wrote %s\n", rel)
-	return 0
+	return e.renderLocked(ctx, root)
 }

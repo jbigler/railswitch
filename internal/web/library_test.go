@@ -35,7 +35,7 @@ func libraryFixture(t *testing.T) *fixture {
 	f.cli.set("--json -C /ws/ftest pack ls", libraryCatalog)
 	// cache is a slot, so local:kv2@1 is not used; the lock also names the
 	// pack and the agent.
-	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"file":`, `"locked":["web@1","kv@1","stats@1","bot@1"],"file":`, 1))
+	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"file":`, `"used":["web@1","kv@1","stats@1","bot@1"],"file":`, 1))
 	f.cli.set("--json -C /ws/ftest pack show local:kv2@1", kv2Show)
 	f.cli.set("--json -C /ws/ftest pack show kv@1", kvShow)
 	f.cli.set("--json -C /ws/ftest pack show web@1", webShow)
@@ -107,7 +107,7 @@ func TestLibraryPage(t *testing.T) {
 	}
 
 	// The editor of a used local file: Check required, the restart list.
-	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"file":`, `"locked":["local:kv2@1"],"file":`, 1))
+	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"file":`, `"used":["local:kv2@1"],"file":`, 1))
 	body = f.do(req("GET", "/p/ftest/library/local:kv2@1/entrypoints/kv.sh", nil)).Body.String()
 	contains(t, "editor", body, `data-view="editor"`, "#!/bin/sh\nexec kv-server\n</textarea>",
 		`data-check="/p/ftest/library/check/local:kv2@1/entrypoints/kv.sh"`, `data-check-required`,
@@ -117,6 +117,11 @@ func TestLibraryPage(t *testing.T) {
 		t.Error("a package file shows the default panel")
 	}
 	noCSPViolation(t, "library editor", body)
+
+	// An unused local package is still checked: its dry run says whether it loads.
+	f.cli.set("--json -C /ws/ftest project show", projectShowJSON)
+	body = f.do(req("GET", "/p/ftest/library/local:kv2@1/entrypoints/kv.sh", nil)).Body.String()
+	contains(t, "unused editor", body, `data-check="/p/ftest/library/check/local:kv2@1/entrypoints/kv.sh"`, `data-check-required`)
 
 	w = f.do(req("POST", "/p/ftest/library/check/local:kv2@1/entrypoints/kv.sh", form("hash", testHash, "text", "x\r\n")))
 	if in, _ := f.cli.stdinOf(libCheckKey); w.Code != 200 || string(in) != "x\n" {

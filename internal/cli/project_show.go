@@ -27,6 +27,7 @@ type projectDoc struct {
 	File       string      `json:"file"` // the raw editor's text
 	Options    []optionRow `json:"options"`
 	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
+	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
 	Env        []envPair   `json:"env"`
 	Links      []linkRow   `json:"links"`
 }
@@ -161,6 +162,15 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	add := func(from string, links []pack.Link) {
 		for _, l := range links {
 			d.Links = append(d.Links, linkRow{l.Label, l.URL, from, slices.Contains(p.HideLinks, l.Label)})
+		}
+	}
+	d.Used = []string{st.PackRef.String()}
+	for _, ch := range st.Options {
+		d.Used = append(d.Used, ch.Ref.String())
+	}
+	for _, a := range st.Agents {
+		if r := a.Ref.String(); !slices.Contains(d.Used, r) {
+			d.Used = append(d.Used, r)
 		}
 	}
 	add("pack "+st.PackRef.String(), st.Pack.Links)

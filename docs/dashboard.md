@@ -241,15 +241,14 @@ a local file into it, in the browser only (1 MiB at most).
 `/p/<prefix>/library` (`library` in the header) lists the packages from
 `railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
 each `built in` or `local` (the workspace's `packs/<name>/` and
-`options/<name>/`). "used by this project" marks the refs the project uses:
-its options' refs and the `locked` refs of `railswitch --json project
-show`.
+`options/<name>/`). "used by this project" marks the refs the project's stack uses
+(`used` of `railswitch --json project show`).
 
 - Picking one (`?ref=<ref>`; an unknown ref is a 404) shows its
   `railswitch --json pack show <ref>`: kind, path, app, slot, runtimes,
   ports, pin, the env it gives, its README, and its files. A local
   package's files open in the editor (Edit); a built-in's open read-only
-  (View). A package without a file list offers its manifest.
+  (View). A package that doesn't load (no file list) offers its manifest.
 - **Add file** (a local package) opens the editor on a new, empty file
   at the path typed: a top-level `Containerfile.<name>`, `deps.allow`,
   `README.md` or `<name>.sh`, or `entrypoints/<file>` or `initdb/<file>`.
@@ -271,10 +270,10 @@ the Images page, without the default panel.
   `railswitch pack file write <ref> <path> --if-hash <h> [--restart]` as a
   project-level job, the text on its stdin; a new file goes with
   `--if-hash ""` (the file must not exist yet).
-- Check (`railswitch --json pack file write … --dry-run`, the text on
-  stdin) and "Rebuild and restart" are offered only for a package the
-  project uses, and there Save also needs a passing Check, as on the
-  Images page.
+- Save also needs a passing Check (`railswitch --json pack file write …
+  --dry-run`, the text on stdin), as on the Images page: for any local
+  package it says whether the package still loads; for one the project
+  uses, also the changed tags and "Rebuild and restart".
 - **Delete file** (after a confirm; not for the manifest, nor a file not
   saved yet) runs `railswitch pack file rm <ref> <path> --if-hash <h>` and
   goes back to the package.

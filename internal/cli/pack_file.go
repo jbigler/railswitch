@@ -329,11 +329,12 @@ type packFileEntry struct {
 	Executable bool   `json:"executable"`
 }
 
-// packFiles are the regular files under dir, a local package's directory,
-// by slash path, sorted; symlinks are not followed or listed.
-func packFiles(dir string) ([]packFileEntry, error) {
+// packFiles are the regular files of a package, by slash path, sorted;
+// symlinks are not followed or listed. A built-in's embedded files have no
+// mode bits: its scripts are the .sh files, executable once ejected.
+func packFiles(files fs.FS, builtin bool) ([]packFileEntry, error) {
 	out := []packFileEntry{}
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || !d.Type().IsRegular() {
 			return err
 		}
@@ -341,11 +342,8 @@ func packFiles(dir string) ([]packFileEntry, error) {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(dir, p)
-		if err != nil {
-			return err
-		}
-		out = append(out, packFileEntry{Path: filepath.ToSlash(rel), Size: fi.Size(), Executable: fi.Mode()&0o111 != 0})
+		exe := fi.Mode()&0o111 != 0 || builtin && strings.HasSuffix(p, ".sh")
+		out = append(out, packFileEntry{Path: p, Size: fi.Size(), Executable: exe})
 		return nil
 	})
 	slices.SortFunc(out, func(a, b packFileEntry) int { return strings.Compare(a.Path, b.Path) })

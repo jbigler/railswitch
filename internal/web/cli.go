@@ -120,7 +120,7 @@ type projectShow struct {
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
 	AddChoices []string      `json:"add_choices"`
-	Locked     []string      `json:"locked"` // every package ref the project's lock names
+	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`
 }
 

@@ -67,8 +67,21 @@ func TestPackShowFiles(t *testing.T) {
 	if want := []string{"Containerfile.pg-client", "initdb/restore-dump.sh", "option.toml"}; !slices.Equal(paths, want) {
 		t.Errorf("files %q; want %q", paths, want)
 	}
-	if out := mustRun(t, "-C", ws, "--json", "pack", "show", "postgres@1"); !strings.Contains(out, `"files":[]`) {
-		t.Errorf("a built-in's files are not []: %s", out)
+	// A built-in's files are listed too, so the page can open them read-only.
+	out = mustRun(t, "-C", ws, "--json", "pack", "show", "postgres@1")
+	d.Files = nil
+	if err := json.Unmarshal([]byte(out), &d); err != nil {
+		t.Fatal(err)
+	}
+	paths = nil
+	for _, f := range d.Files {
+		paths = append(paths, f.Path)
+		if f.Path == "initdb/restore-dump.sh" && !f.Executable {
+			t.Errorf("%s: not executable", f.Path)
+		}
+	}
+	if want := []string{"Containerfile.pg-client", "initdb/restore-dump.sh", "option.toml"}; !slices.Equal(paths, want) {
+		t.Errorf("built-in files %q; want %q", paths, want)
 	}
 }
 

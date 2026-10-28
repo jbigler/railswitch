@@ -85,21 +85,15 @@ func libFileURL(prefix, ref, path string) string {
 	return libraryURL(prefix) + "/" + ref + "/" + path
 }
 
-// usedRefs are the packages the project uses: its options, and every ref
-// its lock names. Without project show, none.
+// usedRefs are the packages the project's stack uses. Without project
+// show, none.
 func usedRefs(ctx context.Context, c CLI, ws string) map[string]bool {
 	used := map[string]bool{}
-	show, err := readProjectShow(ctx, c, ws)
-	if err != nil {
-		return used
+	if show, err := readProjectShow(ctx, c, ws); err == nil {
+		for _, r := range show.Used {
+			used[r] = true
+		}
 	}
-	for _, o := range show.Options {
-		used[o.Ref] = true
-	}
-	for _, r := range show.Locked {
-		used[r] = true
-	}
-	delete(used, "none")
 	return used
 }
 
@@ -251,9 +245,7 @@ func (s *Server) libraryEditor(w http.ResponseWriter, r *http.Request) {
 		if path != "README.md" {
 			v.AckText = packAck
 		}
-		if usedRefs(ctx, s.c.CLI, p.Workspace)[ref] {
-			v.CheckURL, v.CheckRequired = act("check"), true
-		}
+		v.CheckURL, v.CheckRequired = act("check"), true
 		if !add && !isManifest(path) {
 			v.DeleteURL = act("rm")
 		}

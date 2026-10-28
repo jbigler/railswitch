@@ -425,7 +425,7 @@ type packDoc struct {
 	Pin      *pinDoc         `json:"pin"`
 	Gives    []string        `json:"gives"`
 	Readme   string          `json:"readme"`
-	Files    []packFileEntry `json:"files"` // a local package's files; [] for a built-in
+	Files    []packFileEntry `json:"files"` // the package's regular files
 }
 
 type packAppDoc struct {
@@ -536,10 +536,11 @@ func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
 		return nil, err
 	}
 	if ref.Local {
-		var err error
-		if doc.Files, err = packFiles(doc.Path); err != nil {
-			return nil, err
-		}
+		files = os.DirFS(doc.Path)
+	}
+	var err error
+	if doc.Files, err = packFiles(files, !ref.Local); err != nil {
+		return nil, err
 	}
 	return doc, nil
 }

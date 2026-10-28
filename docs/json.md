@@ -144,7 +144,7 @@ exists, else an option under `options/<name>/`).
 | `pin` | object or null | An option's version pin: `name`, `default`. |
 | `gives` | array of strings | The env names an option gives the app, sorted. |
 | `readme` | string | The package's `README.md` (its app-side changes); `""` when it has none. |
-| `files` | array | A local package's regular files, sorted by `path`: `path` (slash-separated, relative to the package), `size` (bytes), `executable`. Symlinks are not listed. `[]` for a built-in. |
+| `files` | array | The package's regular files, sorted by `path`: `path` (slash-separated, relative to the package), `size` (bytes), `executable` (a built-in's `.sh` files, which `pack eject` writes 0755). Symlinks are not listed. |
 
 ## `pack file show <ref> <path>`
 
@@ -478,6 +478,7 @@ What the settings page reads: the project's choices, env and links.
     {"key": "database", "slot": true, "ref": "postgres@1", "choices": ["postgres@1", "local:mariadb@1", "none"]},
     {"key": "jobs", "slot": true, "ref": "none", "choices": ["sidekiq@1", "none"]}
   ],
+  "used": ["rails@1", "postgres@1", "claude@1"],
   "env": [{"name": "TZ", "value": "Asia/Bangkok"}],
   "links": [
     {"label": "Admin", "url": "{worktree.host}/admin", "from": "project", "hidden": false},
@@ -493,6 +494,7 @@ What the settings page reads: the project's choices, env and links.
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
+| `used` | string[] | The stack's refs: the pack, each option, each agent package (once). |
 | `add_choices` | string[] | Every option a new extra key (D81) can take: built-ins at their newest version, then the workspace's `local:<name>@N`. |
 | `options[].slot` | bool | The key is a slot (otherwise an extra service, D81). |
 | `options[].choices` | string[] | For a slot, the built-in options of that slot (newest version per name) then the workspace's `options/<name>/` ones as `local:<name>@N`; for an extra key every option; always ending in `none`. The current ref is always among them. |

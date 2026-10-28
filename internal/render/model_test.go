@@ -283,6 +283,21 @@ func TestExtraOptionService(t *testing.T) {
 	}
 }
 
+// postgres@1 has the image create {db} at first start; a project turns it
+// off with an empty value (the image then falls back to "postgres").
+func TestPostgresCreatesDB(t *testing.T) {
+	_, in := filial(t, nil)
+	if e, ok := envVar(in, "db", "POSTGRES_DB"); !ok || e.Value != "filial_dev" {
+		t.Errorf("db POSTGRES_DB = %q, %v; want filial_dev", e.Value, ok)
+	}
+	_, in = filial(t, func(p *config.Project) {
+		p.Services["db"] = config.ServiceOverride{Env: map[string]string{"POSTGRES_DB": ""}}
+	})
+	if e, _ := envVar(in, "db", "POSTGRES_DB"); e.Value != "" {
+		t.Errorf("db POSTGRES_DB = %q with the opt-out; want empty", e.Value)
+	}
+}
+
 func TestDepsGetsNoSecrets(t *testing.T) {
 	_, in := filial(t, nil)
 	var names []string

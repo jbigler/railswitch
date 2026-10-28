@@ -33,6 +33,11 @@ PGDATABASE = "{db}"
 
 [env]                   # the option's own service
 POSTGRES_PASSWORD = "{generated.DB_PASSWORD}"
+# The image creates {db} at its first start, for apps that never create
+# their own (Django, Laravel, Metabase); Rails 7.1+ db:prepare loads the
+# schema and seeds into it as into a missing one. Turn it off with
+# [services.db.env] POSTGRES_DB = "" (the image then creates only postgres).
+POSTGRES_DB = "{db}"
 PGTZ = "{env.TZ}"
 
 [dump]                  # C3: railswitch db dump writes its stdout to <workspace>/db-dumps/<file>

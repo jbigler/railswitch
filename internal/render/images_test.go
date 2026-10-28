@@ -342,3 +342,48 @@ func TestTagsIncludeFromDigests(t *testing.T) {
 		}
 	}
 }
+
+func TestExpandArgs(t *testing.T) {
+	vars := map[string]string{"E": "1.20.4-otp-28", "J": "temurin-25.0.3+9.0.LTS", "EMPTY": ""}
+	for _, c := range []struct{ in, want string }{
+		{"elixir:${E%%-otp-*}-slim", "elixir:1.20.4-slim"},
+		{"${E%-*}", "1.20.4-otp"},
+		{"${E%%x*}", "1.20.4-otp-28"}, // no match: unchanged
+		{"${J#temurin-}", "25.0.3+9.0.LTS"},
+		{"${J##*-}", "25.0.3+9.0.LTS"},
+		{"${J#*.}", "0.3+9.0.LTS"},
+		{"${J##*.}", "LTS"},
+		{"${EMPTY:-def} ${E:-def}", "def 1.20.4-otp-28"},
+		{"${EMPTY:+set}|${E:+set}", "|set"},
+		{"$E ${MISSING}x", "1.20.4-otp-28 x"},
+	} {
+		got, err := expandArgs(c.in, vars)
+		if err != nil || got != c.want {
+			t.Errorf("expandArgs(%q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
+	}
+	if _, err := expandArgs("${E/otp/x}", vars); err == nil || !strings.Contains(err.Error(), "unsupported expansion") {
+		t.Errorf("${E/otp/x}: error = %v", err)
+	}
+}
+
+func TestFromTrimsAndArgDefaults(t *testing.T) {
+	ws := fixtureWS(t)
+	writeFile(t, filepath.Join(ws, "containerfiles", "Containerfile.base"), `ARG RUBY_VERSION
+ARG V=temurin-25.0.3
+ARG MAJOR=${V#temurin-}
+FROM docker.io/library/eclipse-temurin:${MAJOR%%.*}-jdk AS jdk
+FROM docker.io/library/ruby:${RUBY_VERSION%.*}-slim
+USER appuser
+`)
+	in := mustInstance(t, mustBuild(t, fixtureInputs(t, ws, nil)), "master")
+	want := []string{"docker.io/library/eclipse-temurin:25-jdk", "docker.io/library/ruby:3.3-slim"}
+	if got := in.Builds[0].From; !slices.Equal(got, want) {
+		t.Errorf("From = %v; want %v", got, want)
+	}
+
+	writeFile(t, filepath.Join(ws, "containerfiles", "Containerfile.base"), "ARG V=1\nFROM docker.io/library/ruby:${V/1/2}\nUSER appuser\n")
+	if err := buildErr(fixtureInputs(t, ws, nil)); err == nil || !strings.Contains(err.Error(), "unsupported expansion") || !strings.Contains(err.Error(), "Containerfile.base") {
+		t.Errorf("unsupported: error = %v", err)
+	}
+}

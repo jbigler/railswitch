@@ -8,10 +8,12 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -41,6 +43,7 @@ type containerfile struct {
 	data []byte
 
 	args    map[string]string // ARGs declared before the first FROM → default ("" if none)
+	argList []string          // their names, in file order (a default may use an earlier ARG)
 	baseArg bool              // ARG BASE_IMAGE before the first FROM
 	froms   []fromLine
 	user    string // the last USER
@@ -143,6 +146,9 @@ func parseContainerfile(data []byte) *containerfile {
 			}
 			for _, a := range f[1:] {
 				k, v, _ := strings.Cut(a, "=")
+				if _, ok := cf.args[k]; !ok {
+					cf.argList = append(cf.argList, k)
+				}
 				cf.args[k] = strings.Trim(v, `"'`)
 				if k == "BASE_IMAGE" {
 					cf.baseArg = true
@@ -224,11 +230,16 @@ func (cf *containerfile) checkUser() error {
 // stage names. Each must be fully qualified (D36).
 func (cf *containerfile) fromRefs(args map[string]string, derived bool) ([]string, error) {
 	vars := map[string]string{}
-	for k, def := range cf.args {
-		vars[k] = def
+	for _, k := range cf.argList {
 		if v, ok := args[k]; ok {
 			vars[k] = v
+			continue
 		}
+		v, err := expandArgs(cf.args[k], vars)
+		if err != nil {
+			return nil, fmt.Errorf("%s: ARG %s: %w", cf.rel, k, err)
+		}
+		vars[k] = v
 	}
 	stages := map[string]bool{}
 	var out []string
@@ -238,13 +249,10 @@ func (cf *containerfile) fromRefs(args map[string]string, derived bool) ([]strin
 		case derived && img == "${BASE_IMAGE}":
 		case strings.EqualFold(img, "scratch"), stages[strings.ToLower(img)]:
 		default:
-			ref := os.Expand(img, func(k string) string {
-				name, def, hasDef := strings.Cut(k, ":-")
-				if v := vars[name]; v != "" || !hasDef {
-					return v
-				}
-				return def
-			})
+			ref, err := expandArgs(img, vars)
+			if err != nil {
+				return nil, fmt.Errorf("%s: FROM %s: %w", cf.rel, img, err)
+			}
 			if !qualified(ref) {
 				return nil, fmt.Errorf("%s: FROM %s is not fully qualified: use <registry>/<repo>:<tag> or …@sha256:<digest>; short names resolve per host registries.conf and can't be pinned (D36)", cf.rel, ref)
 			}
@@ -257,6 +265,70 @@ func (cf *containerfile) fromRefs(args map[string]string, derived bool) ([]strin
 		}
 	}
 	return out, nil
+}
+
+// expandArgs expands $NAME and ${NAME…} in s from vars, with the modifiers
+// buildah takes in FROM and ARG: ${N:-word}, ${N:+word}, and the glob trims
+// ${N#pat}, ${N##pat}, ${N%pat}, ${N%%pat}. Any other form is an error, so
+// railswitch never pulls a ref the build would not use.
+func expandArgs(s string, vars map[string]string) (string, error) {
+	var err error
+	out := os.Expand(s, func(k string) string {
+		i := strings.IndexFunc(k, func(r rune) bool { return !(r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)) })
+		if i < 0 {
+			return vars[k]
+		}
+		name, op := k[:i], k[i:]
+		v := vars[name]
+		switch {
+		case strings.HasPrefix(op, ":-"):
+			if v == "" {
+				return op[2:]
+			}
+			return v
+		case strings.HasPrefix(op, ":+"):
+			if v != "" {
+				return op[2:]
+			}
+			return ""
+		case strings.HasPrefix(op, "##"):
+			return trimGlob(v, op[2:], true, true)
+		case strings.HasPrefix(op, "#"):
+			return trimGlob(v, op[1:], true, false)
+		case strings.HasPrefix(op, "%%"):
+			return trimGlob(v, op[2:], false, true)
+		case strings.HasPrefix(op, "%"):
+			return trimGlob(v, op[1:], false, false)
+		}
+		if err == nil {
+			err = fmt.Errorf("${%s}: unsupported expansion (use ${N}, ${N:-word}, ${N:+word}, ${N#pat}, ${N##pat}, ${N%%pat} or ${N%%%%pat})", k)
+		}
+		return ""
+	})
+	return out, err
+}
+
+// trimGlob removes the shortest (or, with longest, the longest) prefix or
+// suffix of v that matches the glob pat; v is unchanged when none does.
+func trimGlob(v, pat string, prefix, longest bool) string {
+	n := len(v)
+	for j := 0; j <= n; j++ {
+		i := j // the cut length, shortest first
+		if longest {
+			i = n - j
+		}
+		part := v[n-i:]
+		if prefix {
+			part = v[:i]
+		}
+		if ok, _ := path.Match(pat, part); ok {
+			if prefix {
+				return v[i:]
+			}
+			return v[:n-i]
+		}
+	}
+	return v
 }
 
 var digestRe = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)

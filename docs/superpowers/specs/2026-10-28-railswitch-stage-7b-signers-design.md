@@ -184,6 +184,16 @@ this key" and "Confirm rotation" come with 7c's library pages.
   another's revocation or lowers `last_serial`. The file is replaced
   atomically, so `signer ls` reads without the lock.
 
+## Known limits
+
+- A fingerprint names a key encoding, not a private key: the holder of a
+  revoked Ed25519 key can present the same point as an `sk-ssh-ed25519`
+  key (any application string), and an RSA key holder can pick another
+  exponent, each with a new fingerprint. That gets no further than a new
+  key would: the signer is unknown, and on a known library (keys,
+  revocations or a verified serial) trusting it needs `--new-signer`
+  behind a warning.
+
 ## Testing
 
 - `signing` with real `ssh-keygen` (allowed in unit tests like git; keys

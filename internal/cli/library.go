@@ -179,9 +179,16 @@ func libraryTrust(ctx context.Context, e *env, args []string) int {
 			return false, err
 		}
 		// Verify again with the key trusted, so this index's serial and
-		// revocations are recorded at once.
-		again, err = signing.Verify(ctx, e.run, dir, t)
-		return err == nil, err
+		// revocations are recorded at once. An index that doesn't verify
+		// then (rolled back) trusts nothing: the key is not saved.
+		if again, err = signing.Verify(ctx, e.run, dir, t); err != nil {
+			return false, err
+		}
+		if again.Status != signing.StatusTrusted {
+			return false, fmt.Errorf("library trust: %s verifies as %s with the key trusted: %s; nothing was trusted",
+				safefile.Printable(dir), again.Status, safefile.Printable(again.Reason))
+		}
+		return true, nil
 	})
 	if err != nil {
 		return e.fail(err)
@@ -191,10 +198,6 @@ func libraryTrust(ctx context.Context, e *env, args []string) int {
 		return 0
 	}
 	fmt.Fprintf(e.stdout, "trusted %s for %s\n", added, res.Library)
-	if again.Status != signing.StatusTrusted {
-		fmt.Fprintf(e.stderr, "railswitch: library trust: the key is trusted, but %s verifies as %s: %s\n", safefile.Printable(dir), again.Status, safefile.Printable(again.Reason))
-		return 1
-	}
 	return 0
 }
 

@@ -49,9 +49,9 @@ type Result struct {
 	// index.
 	NewFingerprint string `json:"new_fingerprint,omitempty"`
 	NewKey         string `json:"new_key,omitempty"`
-	// KnownLibrary: the trust store already holds keys or revocations for
-	// the library, so a signer no trusted key vouches for is not a first
-	// trust.
+	// KnownLibrary: the trust store already holds keys, revocations or a
+	// verified serial for the library, so a signer no trusted key vouches
+	// for is not a first trust.
 	KnownLibrary bool            `json:"known_library"`
 	Packages     []PackageResult `json:"packages"`
 }
@@ -114,7 +114,7 @@ func judge(ctx context.Context, run sys.Runner, dir string, t *Trust) (*Result, 
 		return nil, err
 	}
 	l := t.Library(idx.Library)
-	res.KnownLibrary = l != nil && (len(l.Keys) > 0 || len(l.Revoked) > 0)
+	res.KnownLibrary = l != nil && (len(l.Keys) > 0 || len(l.Revoked) > 0 || l.LastSerial > 0)
 	v := verifier{ctx: ctx, run: run, library: idx.Library}
 	// Every branch has ssh-keygen check the signature against only the
 	// keys that branch accepts.

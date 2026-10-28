@@ -219,7 +219,8 @@ Without `--rotation`, `library trust` refuses a rotation, and with it,
 
 ### A new signer for a library you already trust
 
-If you already trust a key for a library, or have revoked one, an index
+If you already trust a key for a library, have revoked one, or have
+verified an index of it before (its last key since distrusted), an index
 signed by a key that no trusted key vouches for is suspect. A publisher
 who still holds the old key rotates instead. `library verify` warns:
 
@@ -231,7 +232,8 @@ and `--json` reports `"known_library": true`. `library trust` refuses
 the key unless you pass `--new-signer`. Pass it only when the publisher
 confirms the new key through another channel, for example after losing
 the old key. A first trust, for a library with no entry in
-`signers.toml`, needs no `--new-signer`.
+`signers.toml`, needs no `--new-signer`. Trusting the signer of an index
+that then verifies as rolled back trusts nothing.
 
 ## Managing trust
 

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,4 +77,48 @@ func TestLibraryTrustFirst(t *testing.T) {
 		t.Errorf("first verify text: %s", out)
 	}
 	mustOK(t, "", "library", "trust", dir, "--fingerprint", k.fp)
+}
+
+// A library whose entry holds only a verified serial (its last key was
+// distrusted) is known: a new signer needs --new-signer.
+func TestLibraryTrustSerialOnlyKnown(t *testing.T) {
+	path := signersPath(t)
+	k := sshKey(t)
+	writeSigners(t, path, 1)
+	dir := published(t, k)
+	if _, res := verifyJSON(t, dir); !res.KnownLibrary {
+		t.Errorf("serial only: %+v; want known_library", res)
+	}
+	if code, _, errs := runSSH(t, "", "library", "trust", dir, "--fingerprint", k.fp); code != 1 || !strings.Contains(errs, "--new-signer") {
+		t.Errorf("trust, serial only: exit %d %s", code, errs)
+	}
+}
+
+// Trusting the signer of a rolled-back index trusts nothing.
+func TestLibraryTrustRolledBackTrustsNothing(t *testing.T) {
+	path := signersPath(t)
+	k := sshKey(t)
+	body := writeSigners(t, path, 5)
+	dir := published(t, k)
+	code, _, errs := runSSH(t, "", "library", "trust", dir, "--fingerprint", k.fp, "--new-signer")
+	if code != 1 || !strings.Contains(errs, "rolled-back") || !strings.Contains(errs, "nothing was trusted") {
+		t.Errorf("trust of a rolled-back index: exit %d %s", code, errs)
+	}
+	if readFile(t, path) != body {
+		t.Error("the signer of a rolled-back index was saved")
+	}
+}
+
+// writeSigners writes a signers.toml whose testLib entry has no keys and
+// last_serial serial, and returns its text.
+func writeSigners(t *testing.T, path string, serial int) string {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	body := fmt.Sprintf("schema = 1\n[[library]]\nid = %q\nlast_serial = %d\n", testLib, serial)
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return body
 }

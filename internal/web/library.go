@@ -16,8 +16,18 @@ import (
 // Built-in packages are read-only; a local package's files are written by
 // `pack file write|rm` jobs, the text on stdin.
 
-// libRefRe is a package ref: name@N or local:name@N.
-var libRefRe = regexp.MustCompile(`^(?:local:)?[a-z][a-z0-9-]*@[0-9]+$`)
+// libRefRe is a package ref: name@N, local:name@N or a library's
+// <alias>:name@N.
+var libRefRe = regexp.MustCompile(`^(?:[a-z][a-z0-9-]{0,19}:)?[a-z][a-z0-9-]*@[0-9]+$`)
+
+// refLibrary is a library ref's alias, "" for a built-in or local one.
+func refLibrary(ref string) string {
+	alias, _, ok := strings.Cut(ref, ":")
+	if !ok || alias == "local" || strings.Contains(alias, "@") {
+		return ""
+	}
+	return alias
+}
 
 // libPathRe is the shape of a package file path (D93): a file at the top
 // or in entrypoints/ or initdb/. The CLI checks the exact list.
@@ -43,6 +53,10 @@ type libraryView struct {
 	Groups []libGroup
 	Sel    *libDetail
 
+	Libraries                           []libRepoView
+	LibrariesError                      string
+	LibAddURL, LibFetchURL, LibTrustURL string
+
 	NewURL                 string
 	CopyPacks, CopyOptions []string // built-ins a new package can start from
 	Slots                  []string
@@ -56,6 +70,7 @@ type libGroup struct {
 
 type libItem struct {
 	Ref, URL, Note string
+	Library        string // a library package's alias
 	Local, Used    bool
 	Current        bool
 }
@@ -65,6 +80,7 @@ type libDetail struct {
 	Doc       packDoc
 	Error     string
 	Local     bool
+	Library   *libRepoView // a library package's library; nil for the others
 	Files     []libFile
 	AddBase   string // "": no Add file
 }
@@ -104,12 +120,20 @@ func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	s.mu.Lock()
-	pv, jv := s.chrome(p.Prefix)
+	pv, _ := s.chrome(p.Prefix)
+	rows, _ := s.rows(p.Prefix, sortKey{By: "name"}, "")
+	jv := newJobs(s.pageJobs(p.Prefix, true), rows, "")
 	s.mu.Unlock()
 	v := libraryView{
 		Title: "Library · " + p.Prefix, Prefix: p.Prefix,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		NewURL: libraryURL(p.Prefix) + "/new", EditorBase: libraryURL(p.Prefix) + "/",
+		LibAddURL: "/machine/libraries/add", LibFetchURL: "/machine/libraries/fetch", LibTrustURL: "/machine/libraries/trust",
+	}
+	if libs, err := readJSON[libraryDoc](ctx, s.c.CLI, "library", "ls"); err != nil {
+		v.LibrariesError = err.Error()
+	} else {
+		v.Libraries = newLibRepos(libs)
 	}
 	cat, err := readJSON[catalogDoc](ctx, s.c.CLI, "-C", p.Workspace, "pack", "ls")
 	if err != nil {
@@ -120,22 +144,25 @@ func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) {
 	used := usedRefs(ctx, s.c.CLI, p.Workspace)
 	sel := r.URL.Query().Get("ref")
 	selKind := ""
-	item := func(kind, ref, note string) libItem {
+	item := func(kind, ref, library, note string) libItem {
 		if ref == sel {
 			selKind = kind
 		}
-		return libItem{Ref: ref, URL: libRefURL(p.Prefix, ref), Note: note, Local: strings.HasPrefix(ref, "local:"), Used: used[ref], Current: ref == sel}
+		if library == "" {
+			library = refLibrary(ref)
+		}
+		return libItem{Ref: ref, URL: libRefURL(p.Prefix, ref), Note: note, Library: library, Local: strings.HasPrefix(ref, "local:"), Used: used[ref], Current: ref == sel}
 	}
 	packs, options, agents := libGroup{Title: "Packs"}, libGroup{Title: "Options"}, libGroup{Title: "Agents"}
 	for _, x := range cat.Packs {
-		packs.Items = append(packs.Items, item("pack", x.Ref, ""))
-		if !strings.HasPrefix(x.Ref, "local:") {
+		packs.Items = append(packs.Items, item("pack", x.Ref, x.Library, ""))
+		if builtinRef(x.Ref) {
 			v.CopyPacks = append(v.CopyPacks, x.Ref)
 		}
 	}
 	for _, x := range cat.Options {
-		options.Items = append(options.Items, item("option", x.Ref, x.Slot))
-		if !strings.HasPrefix(x.Ref, "local:") {
+		options.Items = append(options.Items, item("option", x.Ref, x.Library, x.Slot))
+		if builtinRef(x.Ref) {
 			v.CopyOptions = append(v.CopyOptions, x.Ref)
 		}
 		if !slices.Contains(v.Slots, x.Slot) {
@@ -143,7 +170,7 @@ func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, x := range cat.Agents {
-		agents.Items = append(agents.Items, item("agent", x.Ref, ""))
+		agents.Items = append(agents.Items, item("agent", x.Ref, x.Library, ""))
 	}
 	slices.Sort(v.Slots)
 	v.Groups = []libGroup{packs, options, agents}
@@ -153,9 +180,18 @@ func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		v.Sel = s.libDetail(ctx, p, sel, selKind)
+		if alias := refLibrary(sel); alias != "" {
+			v.Sel.Library = &libRepoView{Alias: alias}
+			if i := slices.IndexFunc(v.Libraries, func(l libRepoView) bool { return l.Alias == alias }); i >= 0 {
+				v.Sel.Library = &v.Libraries[i]
+			}
+		}
 	}
 	s.html(w, http.StatusOK, "library", v)
 }
+
+// builtinRef: a built-in package's ref, neither local: nor a library's.
+func builtinRef(ref string) bool { return !strings.Contains(ref, ":") }
 
 // libDetail is one package's `pack show` and its files; a package without
 // a file list (a built-in, or one that doesn't load) offers its manifest.
@@ -194,7 +230,11 @@ func libTarget(w http.ResponseWriter, r *http.Request) (ref, path string, ok boo
 func localTarget(w http.ResponseWriter, r *http.Request) (ref, path string, ok bool) {
 	ref, path, ok = libTarget(w, r)
 	if ok && !strings.HasPrefix(ref, "local:") {
-		http.Error(w, "a built-in package is read-only: copy it with New pack or New option", http.StatusUnprocessableEntity)
+		msg := "a built-in package is read-only: copy it with New pack or New option"
+		if refLibrary(ref) != "" {
+			msg = "a library package is read-only: it changes only when its library publishes a new version"
+		}
+		http.Error(w, msg, http.StatusUnprocessableEntity)
 		return "", "", false
 	}
 	return ref, path, ok
@@ -358,7 +398,7 @@ func (s *Server) libraryNew(w http.ResponseWriter, r *http.Request) {
 	var args []string
 	switch {
 	case from != "":
-		if strings.HasPrefix(from, "local:") || !slices.Contains(builtins, from) {
+		if !builtinRef(from) || !slices.Contains(builtins, from) {
 			http.Error(w, "start from a built-in "+kind, http.StatusUnprocessableEntity)
 			return
 		}

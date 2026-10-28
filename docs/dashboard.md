@@ -105,7 +105,9 @@ is no longer accepted. What the page shows meanwhile may be stale.
   unavailable", "PRs unavailable") and, while `overview`'s
   `review_pending` is true, "Package update waiting for review. Review
   update" (the Review update page, below). The switcher marks such a
-  project `update`.
+  project `update`. One line per `overview` `signer_warnings` entry, in
+  red: "The signer of <ref> (<library>) is no longer trusted. The project
+  keeps running what it has; replace it or re-check the library."
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
@@ -176,8 +178,20 @@ shows what each one does before anything is written.
   a time.
 - "Apply N changes" is off while any card is blocked. "See the
   project.toml diff" shows the whole change.
-- Apply runs `railswitch settings apply --if-hash <hash> [--restart]` as
-  a project-level job, the edit list on its stdin. It writes all the
+- **Install review:** when the edits install a library package
+  (`settings preview`'s `install`, a `lock --review` document), the
+  panel shows it under the cards with the Review update page's component
+  (one card per package, every file as a diff from nothing, flagged
+  lines marked). Apply then needs "I've read the N flagged items" ticked
+  when N > 0, and posts the review's hash as `accept_install` with the
+  tick. The server runs the preview again and refuses (400, no job) a
+  hash that no longer matches, an `accept_install` when the edits no
+  longer install anything, or a missing tick; the job then gets
+  `--accept-install <hash>`. Without `--accept-install` the CLI installs
+  no library package, so a form without it needs no second preview.
+- Apply runs `railswitch settings apply --if-hash <hash>
+  [--accept-install <hash>] [--restart]` as a project-level job, the
+  edit list on its stdin. It writes all the
   edits or none. When it ends ok the list is cleared and the page
   reloads. If project.toml changed after the preview (edited by hand,
   say), the job is refused and nothing is written; the page previews the
@@ -248,9 +262,49 @@ a local file into it, in the browser only (1 MiB at most).
 
 `/p/<prefix>/library` (`library` in the header) lists the packages from
 `railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
-each `built in` or `local` (the workspace's `packs/<name>/` and
-`options/<name>/`). "used by this project" marks the refs the project's stack uses
-(`used` of `railswitch --json project show`).
+each `built in`, `local` (the workspace's `packs/<name>/` and
+`options/<name>/`) or `library <alias>` (a library package,
+`<alias>:<name>@N`; from `pack ls`'s `library`, else the ref's prefix).
+"used by this project" marks the refs the project's stack uses
+(`used` of `railswitch --json project show`). A library package is
+read-only like a built-in (View; a write is refused, 422), can't be the
+start of a New pack or New option, and its page says which library it
+comes from, with the library's id and last fetch status.
+
+**Libraries** (first on the page) lists the machine's package libraries
+from `railswitch --json library ls`: alias, status chip (`trusted`
+green; `unknown-signer`, `rotation` yellow; anything else red; "not
+fetched"), repository and branch, library id, and the last fetch (time,
+serial, commit, package count). A failed read shows "Libraries
+unavailable" and the rest of the page.
+
+- **Fetch** posts the alias to `/machine/libraries/fetch`:
+  `railswitch library fetch <alias>`.
+- **Trust this key** (a fetch whose `pending.status` is
+  `unknown-signer`) shows the fingerprint and "check it with the
+  publisher"; after a browser confirm it posts the alias, the
+  fingerprint and `kind=trust` to `/machine/libraries/trust`:
+  `railswitch library trust <alias> --fingerprint <fp>`. When the
+  library already trusts other keys (`known_library`) the box is red,
+  says no trusted key vouched for this one, and needs the second
+  confirmation "The publisher confirmed this new signer through another
+  channel" (`new_signer=1`), which adds `--new-signer`.
+- **Confirm rotation** (`pending.status` `rotation`) shows the trusted
+  key and the new key it vouches for, and posts the new key's
+  fingerprint with `kind=rotation`: `--rotation`.
+- The server reads `library ls` again and refuses (400, no job) a
+  fingerprint or kind that isn't what waits for that alias now, a
+  library with nothing waiting, an unknown alias, and a `known_library`
+  trust without the second confirmation.
+- **Add library** (URL, alias, optional branch) posts to
+  `/machine/libraries/add`: `railswitch library add <url> --alias <a>
+  [--branch <b>]`. The server refuses (400) an empty URL, one over 2 KiB,
+  starting with `-` or holding a line break; an alias that isn't
+  `[a-z][a-z0-9-]{0,19}` or is `local`; a branch with a space or a
+  leading `-`. The CLI checks the URL's transport.
+- All three are machine-level jobs (`~machine`, like the Signers jobs),
+  from your home directory; the Library page shows them in its jobs
+  beside the project's, and reloads when one ends ok.
 
 - Picking one (`?ref=<ref>`; an unknown ref is a 404) shows its
   `railswitch --json pack show <ref>`: kind, path, app, slot, runtimes,
@@ -396,6 +450,12 @@ until you press Create project.
   writes (read-only) and the steps Create runs.
 - Any change to step 1 after a review marks the review stale and turns
   Create project off until you press Next: review again.
+- When the project installs a library package (the dry run's
+  `install`), step 2 shows its Install review, as in Settings, and
+  Create project needs "I've read the N flagged items" when N > 0.
+  Create posts the review's hash as `accept_install`; the server runs the
+  dry run again and refuses (400, no job) another hash or a missing
+  tick, then adds `--accept-install <hash>`.
 - "Start <slug> when it's created" (on) adds `--up`.
 - **Create project** runs the same `project new` command without
   `--dry-run` as a project-level job of the new prefix, from your home
@@ -584,6 +644,14 @@ docs/json.md.
   revoked fingerprints. `signer add <library> -` (key on stdin),
   `signer rm <library> <fingerprint>` and
   `signer revoke <library> <fingerprint>` run as jobs.
+- `railswitch --json library ls` (machine): each library with its last
+  fetch and the fetch waiting on its signer (`pending`). `library add
+  <url> --alias <a> [--branch <b>]`, `library fetch <alias>` and `library
+  trust <alias> --fingerprint <fp> [--rotation | --new-signer]` run as
+  jobs: the Library page's Libraries section.
+- `settings preview`'s and `project new --dry-run`'s `install` (a `lock
+  --review` document, or null) and `--accept-install <hash>`: the Install
+  review. `overview`'s `signer_warnings`: the banner.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
@@ -646,8 +714,10 @@ Server-Sent Events stream. On connect it sends the current fragments
 (`header`, `projects`, `strip`, `banner`, `list`, `detail`, `jobs`);
 afterwards only fragments that changed (a single list row by its own id
 while the order and selection stay), and `: ping` every 15 s. A settings,
-images, library, editor or review page connects with `&view=settings`: it gets no
-`list` or `detail`, and its `jobs` are the project-level ones only. The new page connects when
+images, editor or review page connects with `&view=settings`: it gets no
+`list` or `detail`, and its `jobs` are the project-level ones only. The
+Library page connects with `&view=library`: the same, with the
+machine-level jobs (`~machine`) among its `jobs`. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
 project and that prefix's project-level `jobs`. Each `data:` line is one

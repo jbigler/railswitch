@@ -61,7 +61,8 @@ type subscriber struct {
 	sort        sortKey
 	// view is "" for a project's page; "settings" (a settings page) or
 	// "new" (the new page, prefix the project it creates) get only the
-	// project-level jobs.
+	// project-level jobs; "library" (the Library page) gets them and the
+	// machine-level ones.
 	view    string
 	ch      chan event
 	gone    chan struct{} // closed when the page fell behind
@@ -331,15 +332,11 @@ func (s *Server) jobEvent(ev jobs.Event) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	info := &jobInfo{ID: j.ID, Slug: j.Spec.Slug, Label: j.Spec.Label, State: string(j.State)}
-	var snaps []jobs.Snapshot
 	for sub := range s.subs {
-		if sub.prefix != j.Spec.Project {
+		if sub.prefix != j.Spec.Project && (sub.view != "library" || j.Spec.Project != machineKey) {
 			continue
 		}
-		if snaps == nil {
-			snaps = s.c.Jobs.Jobs(j.Spec.Project, "")
-		}
-		html, err := render("jobs", s.subJobs(sub, snaps))
+		html, err := render("jobs", s.subJobs(sub, s.pageJobs(sub.prefix, sub.view == "library")))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
 			continue
@@ -380,7 +377,7 @@ func (s *Server) push(sub *subscriber) {
 		sub.diff("html", f.id, html, nil)
 	}
 	if sub.view != "" {
-		html, err := render("jobs", s.subJobs(sub, s.c.Jobs.Jobs(sub.prefix, "")))
+		html, err := render("jobs", s.subJobs(sub, s.pageJobs(sub.prefix, sub.view == "library")))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
 			return
@@ -506,6 +503,11 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		}
 		if p.ov != nil && p.ov.ReviewPending {
 			banner.Review = reviewURL(prefix)
+		}
+		if p.ov != nil {
+			for _, sw := range p.ov.SignerWarnings {
+				banner.Signers = append(banner.Signers, signerWarningText(sw))
+			}
 		}
 	}
 	pv := pageView{

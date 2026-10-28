@@ -1,7 +1,8 @@
 // Package term opens a command in a new terminal tab or window (agent
 // --new-term), a port of the old tool's newterm.sh for Linux terminals:
 // a tab in the terminal railswitch runs in, else a window of it, else a
-// window of any terminal found, else the current window. It is the only
+// window of $TERMINAL, the freedesktop default terminal (xdg-terminal-exec)
+// or any terminal found, else the current window. It is the only
 // package that knows terminal emulator names.
 package term
 
@@ -24,8 +25,9 @@ import (
 const tabTimeout = 10 * time.Second
 
 // fallbacks are the terminals tried, in order, for a window when the
-// detected one gives neither a tab nor a window.
-var fallbacks = []string{"kitty", "wezterm", "ghostty", "alacritty", "foot", "konsole", "gnome-terminal", "xfce4-terminal", "terminator", "xterm"}
+// detected one gives neither a tab nor a window. xdg-terminal-exec comes
+// first: it opens the user's default terminal.
+var fallbacks = []string{"xdg-terminal-exec", "kitty", "wezterm", "ghostty", "alacritty", "foot", "konsole", "gnome-terminal", "xfce4-terminal", "terminator", "xterm"}
 
 // envMarks are the environment fingerprints, checked in order.
 var envMarks = []struct{ key, term string }{
@@ -221,6 +223,8 @@ func (l Launcher) tab(ctx context.Context, t, title, dir string, argv []string) 
 func (l Launcher) window(ctx context.Context, t, title, dir string, argv []string) bool {
 	var args []string
 	switch t {
+	case "xdg-terminal-exec":
+		args = append([]string{"--title=" + title, "--dir=" + dir, "--"}, argv...)
 	case "kitty":
 		args = append([]string{"--directory", dir, "--"}, argv...)
 	case "wezterm":

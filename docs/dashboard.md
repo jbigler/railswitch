@@ -300,7 +300,10 @@ docs/json.md.
 - `railswitch task [--new-term] <name> [args…]` (worktree): runs the task
   in the app image as `exec` does, as `sh -c '<command> "$@"' <name>
   <args…>`; stdin and the terminal pass through; the exit code is the
-  task's. `--new-term` opens it in a new terminal window.
+  task's. `--new-term` opens it in a new tab or window of the terminal
+  railswitch runs in; failing that, a window of `$TERMINAL`, then the
+  freedesktop default terminal through `xdg-terminal-exec`, then the first
+  known terminal installed.
 - `railswitch wt add [--name <n>] [--up] <branch>`: `--up` runs `up` in the
   new worktree.
 - `railswitch dashboard`: prints the login link.

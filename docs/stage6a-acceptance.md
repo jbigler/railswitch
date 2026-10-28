@@ -330,9 +330,10 @@ build` in `railswitch exec --fresh`, 1 min 20 s; `/` serves the built app).
 | Metabase never creates its database (`mb_dev does not exist`); a dump of a database `POSTGRES_DB` made aborted the restore | `postgres@1` sets `POSTGRES_DB = "{db}"`; restore-dump.sh restores into an existing database | `e3a3d3a`, `2a8c9f8` |
 | `stop` on Mastodon SIGKILLed everything after 10 s and left the unit `failed` (exit 137): its `bin/dev` runs foreman as a child of PID 1 `sh` | the rails app entrypoint passes a stop to the container's process group and exits 0 | `943bb0f` |
 
-Open: `internal/term` does not know `xdg-terminal-exec`, the session's
-`TERMINAL` on Omarchy; with several terminals installed it would not pick
-the user's default.
+Fixed after the run: `internal/term` opens a window through
+`xdg-terminal-exec` (Omarchy's `TERMINAL`), and tries it before the
+built-in list, so the user's default terminal wins when several are
+installed.
 
 Settings only, in the projects' own files: Mastodon `[env] BIND`,
 `LOCAL_DOMAIN`, `STREAMING_API_BASE_URL`, `[services.rails] health =

@@ -194,3 +194,20 @@ func TestLaunchHereExitCode(t *testing.T) {
 		t.Fatalf("err %v; want *ExitError{3}", err)
 	}
 }
+
+func TestLaunchXdgTerminalExec(t *testing.T) {
+	for name, env := range map[string]map[string]string{
+		"TERMINAL":    {"TERMINAL": "xdg-terminal-exec", "WAYLAND_DISPLAY": "w"},
+		"first found": {"WAYLAND_DISPLAY": "w"},
+	} {
+		f := &systest.Fake{}
+		l := Launcher{R: f, Env: envOf(env), LookPath: lookOnly("kitty", "foot", "xdg-terminal-exec"), ProcRoot: emptyProc(t), Err: &bytes.Buffer{}}
+		if err := l.Launch(context.Background(), "T", "/w", argv); err != nil {
+			t.Fatal(name, err)
+		}
+		want := append([]string{"xdg-terminal-exec", "--title=T", "--dir=/w", "--"}, argv...)
+		if len(f.Calls) != 1 || !slices.Equal(f.Calls[0], want) || !f.Cmds[0].Detach {
+			t.Errorf("%s: calls %q; want %q detached", name, f.Calls, want)
+		}
+	}
+}

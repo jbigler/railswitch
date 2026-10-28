@@ -292,7 +292,8 @@ A library repository is hostile input (D104). A fetch:
   holds a symlink or a submodule, or a path that is not a package file
   (`<kind>s/<name>/<file>`, where `<file>` is one the package format
   allows: docs/packs.md), or more than 2,000 files, a file over 1 MiB, or
-  over 64 MiB in all. Other files in the repository are never fetched.
+  over 64 MiB in all. The tree listing stops at the 2,001st file. Other
+  files in the repository are never fetched (but see Known limits).
 - writes those files (0644, `.sh` 0755) into a staging directory and
   verifies it against your trust, then acts on the verdict:
 
@@ -387,3 +388,13 @@ and local packages are unaffected.
 When the key that signed a locked library package is distrusted or
 revoked, the project keeps running it, and `overview --json` lists it in
 `signer_warnings` (`{ref, library, fingerprint}`, docs/json.md).
+
+## Known limits
+
+- The clone downloads every tree of the branch's last commit before the
+  tree is checked: `--filter=blob:none` leaves out file contents, not
+  directories. A repository with a huge tree is bounded only by the
+  5 minute deadline and the space under `$XDG_RUNTIME_DIR` (a tmpfs on
+  most systems). Git has no client-side size limit for a clone, and
+  `--filter=tree:0` would fetch each directory under `packs/`, `options/`
+  and `agents/` in its own round trip.

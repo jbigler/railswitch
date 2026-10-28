@@ -48,7 +48,8 @@ temp dir under `$XDG_RUNTIME_DIR`, `sys.GitProtocols`, `sys.GitArg`,
   agents`: only mode 100644/100755 blobs count; a symlink (120000) or a
   submodule anywhere under those paths fails the fetch; paths must match
   the package path allowlist (D93) under `<kind>s/<name>/`; at most 2,000
-  files, each ≤ 1 MiB, 64 MiB in all.
+  files (the listing is read through a writer that stops git at the
+  2,001st entry or past 2,000 KiB), each ≤ 1 MiB, 64 MiB in all.
 - Blobs are written (0644, `.sh` 0755) into a staging dir
   `<data>/libraries/<alias>/staging-<rand>/`, then `signing.Verify` runs on
   it with the machine's trust.
@@ -171,6 +172,15 @@ The project keeps running; the dashboard shows the warning on the project.
 - `signer_warnings` after `signer rm`.
 - Web: Libraries section, Add/Fetch/Trust jobs (argv exact), the Install
   review in Settings with the ack, guard.
+
+## Known limits
+
+- The clone downloads every tree of HEAD before `ls-tree` checks it
+  (`--filter=blob:none` filters blobs, not trees): a hostile repository
+  with a huge tree is bounded only by the 5 min deadline and
+  `$XDG_RUNTIME_DIR`'s space. Git has no client-side size limit for a
+  fetch; `--filter=tree:0` would bound it but fetch each tree under the
+  package paths in its own round trip, so it was left out.
 
 Host acceptance, `docs/stage7c-acceptance.md`: a library repository in a
 local bare repo (and pushed to a scratch path): add (unknown signer),

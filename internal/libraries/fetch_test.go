@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -392,6 +393,33 @@ func TestFetchRefusesSize(t *testing.T) {
 	refused(t, "over", func(f *fixture) {
 		write(t, filepath.Join(f.src, "packs/rails/README.md"), strings.Repeat("x", 1<<20+1))
 	})
+}
+
+func TestFetchRefusesFileCount(t *testing.T) {
+	refused(t, "more than 2000", func(f *fixture) {
+		for i := range maxFiles {
+			write(t, filepath.Join(f.src, "packs/rails/initdb", strconv.Itoa(i)+".sql"), "\n")
+		}
+	})
+}
+
+// The tree listing stops git once it holds more entries than a library
+// may have, or more bytes than that many entries need.
+func TestListingCapped(t *testing.T) {
+	ent := []byte("100644 blob 0123456789012345678901234567890123456789\tpacks/rails/README.md\x00")
+	var l listing
+	for i := range maxFiles {
+		if _, err := l.Write(ent); err != nil {
+			t.Fatalf("entry %d: %v", i+1, err)
+		}
+	}
+	if _, err := l.Write(ent); !errors.Is(err, errTooManyFiles) {
+		t.Fatalf("entry %d: %v, want errTooManyFiles", maxFiles+1, err)
+	}
+	var big listing
+	if _, err := big.Write(make([]byte, maxListing+1)); !errors.Is(err, errTooManyFiles) {
+		t.Fatalf("an oversized listing: %v", err)
+	}
 }
 
 func TestFetchTempRemoved(t *testing.T) {

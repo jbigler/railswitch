@@ -33,6 +33,9 @@ const (
 	staleAfter = 15 * time.Minute // far past fetchTimeout
 	maxFiles   = 2000
 	maxTotal   = 64 << 20
+	// maxListing bounds ls-tree's output: maxFiles entries of a mode, an
+	// oid and a path of up to 1 KiB.
+	maxListing = maxFiles * (1 << 10)
 )
 
 // manifests is the manifest of each top directory of a library.
@@ -343,11 +346,15 @@ func clone(ctx context.Context, run sys.Runner, lib *Library, staging string) (s
 	if !commitRe.MatchString(commit) {
 		return "", fmt.Errorf("git rev-parse HEAD: %q", safefile.Printable(commit))
 	}
-	res, err = git(nil, nil, "-C", repo, "ls-tree", "-r", "-z", "HEAD", "--", signing.IndexFile, signing.SigFile, "packs", "options", "agents")
+	var tree listing
+	_, err = git(nil, &tree, "-C", repo, "ls-tree", "-r", "-z", "HEAD", "--", signing.IndexFile, signing.SigFile, "packs", "options", "agents")
+	if tree.over {
+		return "", fmt.Errorf("the library has more than %d files; refused", maxFiles)
+	}
 	if err != nil {
 		return "", fmt.Errorf("git ls-tree: %w", err)
 	}
-	files, err := treeFiles(res.Stdout)
+	files, err := treeFiles(tree.b)
 	if err != nil {
 		return "", err
 	}
@@ -386,7 +393,7 @@ func clone(ctx context.Context, run sys.Runner, lib *Library, staging string) (s
 // treeFiles is the files of `git ls-tree -r -z` output, refusing the tree
 // unless each is a regular file (no symlink, no submodule) at a library
 // path: library.toml, library.toml.sig or <kind>s/<name>/<file> with
-// <file> on the package format's allowlist (D93); at most maxFiles.
+// <file> on the package format's allowlist (D93).
 func treeFiles(out []byte) ([]blob, error) {
 	var files []blob
 	for ent := range bytes.SplitSeq(out, []byte{0}) {
@@ -410,9 +417,6 @@ func treeFiles(out []byte) ([]blob, error) {
 			return nil, fmt.Errorf("%w; refused", err)
 		}
 		files = append(files, blob{string(p), f[2]})
-	}
-	if len(files) > maxFiles {
-		return nil, fmt.Errorf("the library has %d files, more than %d; refused", len(files), maxFiles)
 	}
 	return files, nil
 }
@@ -484,7 +488,29 @@ func writeFile(dir, rel string, data []byte) error {
 	return os.Chmod(p, mode) // past the umask
 }
 
-var errOverLimit = errors.New("blob over safefile.Limit")
+var (
+	errOverLimit    = errors.New("blob over safefile.Limit")
+	errTooManyFiles = errors.New("more files than a library may hold")
+)
+
+// listing keeps `git ls-tree -z` output and fails the write, which stops
+// git, once it holds more than maxFiles entries or maxListing bytes: a
+// hostile tree is refused without listing all of it.
+type listing struct {
+	b    []byte
+	n    int
+	over bool
+}
+
+func (l *listing) Write(p []byte) (int, error) {
+	l.n += bytes.Count(p, []byte{0})
+	if l.n > maxFiles || len(l.b)+len(p) > maxListing {
+		l.over = true
+		return 0, errTooManyFiles
+	}
+	l.b = append(l.b, p...)
+	return len(p), nil
+}
 
 // capped keeps at most safefile.Limit bytes and fails the write past that.
 type capped struct{ b []byte }

@@ -145,3 +145,25 @@ its `stack.toml` and Containerfiles shown and flagged by the review checks
 package. `--accept-install <install.hash>` accepts it with the packages;
 the hash covers its content, so a template changed since the review is
 refused, and accepting it verifies its library again.
+
+## Template updates
+
+A project records the template it came from in `[template]`; nothing
+reads it to change the project. When the ref resolves to other content
+(a library fetch brought a new version of the same `name@N`; an export
+never replaces a version in place), the template has an update:
+
+- `railswitch overview --json` sets `template_update` (and always shows
+  `template`), so the dashboard shows "The template <ref> changed".
+- `railswitch template check [--json]`, in the workspace, shows the diff
+  of every template file from the accepted copy (stored when the project
+  was created) to the current one, flagged by the review checks.
+  Nothing is applied: take what you want through Settings or the
+  Containerfile editor.
+- `railswitch template check --accept <current>` records the new content
+  hash in `[template] sha256`, which clears the notice, and stores the
+  content as the base of the next diff. Only that line of `project.toml`
+  changes. A hash other than the current one is refused.
+
+A ref that no longer resolves (the template left the store or the
+library) is no update: `template check` reports why in `error`.

@@ -415,6 +415,35 @@ One template, as `template ls` resolves it.
 | `readme` | string | Its `README.md`; `""` for none. |
 | `files` | array | Every file, by path: `path`, `text`. |
 
+## `template check`
+
+The project's template (-C) against what `[template]` records (D111).
+A project with no `[template]` is refused (exit 1). Exit 0 otherwise,
+whether or not the template changed. Nothing is applied: `template check
+--accept <current>` only writes `current` to `[template] sha256` (and
+stores that content as the next diff's base); another hash is refused.
+
+```json
+{
+  "ref": "acme:rails-pg@1",
+  "sha256": "df728e1a…",
+  "current": "1b924e2a…",
+  "update": true,
+  "error": "",
+  "files": [
+    {"path": "containerfiles/Containerfile.pg-client", "status": "changed", "diff": "--- a/…", "flags": [{"check": "runs-here", "line": 40, "text": "+ RUN curl … | sh"}]}
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref`, `sha256` | string | As `[template]` records them. |
+| `current` | string | The content hash `ref` resolves to now; `""` when it doesn't resolve. |
+| `update` | boolean | `current` is not `""` and differs from `sha256`. |
+| `error` | string | Why `ref` doesn't resolve (gone from the store or the library, or no longer matching its signed index); `""` when it does. |
+| `files` | array | With `update`: every file that differs from the stored accepted copy to the current one, as in [`lock --review`](#lock---review) (`path`, `status`, `diff`, `flags`); a missing accepted copy shows every file `added`. `[]` without an update. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1
@@ -543,6 +572,8 @@ row.
 | `workspace` | string | Its workspace directory as registered. |
 | `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
 | `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
+| `template` | object or null | The template the project started from, as `project.toml` `[template]` records it: `ref`, `sha256` (lowercase hex, no prefix). `null` when it records none. |
+| `template_update` | boolean | `template.ref` resolves to content with another hash than `template.sha256` (a library fetch changed it, D111). [`template check`](#template-check) shows the diff; nothing is applied. `false` without a template or when the ref doesn't resolve. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |

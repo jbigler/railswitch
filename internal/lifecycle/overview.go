@@ -16,6 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/signing"
+	"github.com/jbigler/railswitch/internal/template"
 	"github.com/jbigler/railswitch/internal/unithash"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -52,6 +53,17 @@ type Overview struct {
 	// SignerWarnings: locked library packages whose signer is distrusted
 	// or revoked for their library (D102); never nil.
 	SignerWarnings []workspace.SignerWarning `json:"signer_warnings"`
+	// Template is the template the project started from, as [template]
+	// records it; nil for none. TemplateUpdate: it resolves to other
+	// content now (template check shows the diff, D111).
+	Template       *OverviewTemplate `json:"template"`
+	TemplateUpdate bool              `json:"template_update"`
+}
+
+// OverviewTemplate is a project's [template].
+type OverviewTemplate struct {
+	Ref    string `json:"ref"`
+	SHA256 string `json:"sha256"`
 }
 
 // trust is the machine's signers.toml; nil, which trusts no signer, when it
@@ -130,6 +142,10 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 		return Overview{}, err
 	}
 	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust())}
+	if rec := l.WS.Project.Template; rec != nil {
+		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
+		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()
+	}
 	for _, w := range wts {
 		in, err := m.Instance(w)
 		if err != nil {

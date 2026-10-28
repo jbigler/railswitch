@@ -544,6 +544,23 @@ func SetEnv(data, name, value string) (string, error) {
 	return d.insertKey(table, keyTOML(name), QuoteString(value)), nil
 }
 
+// SetTemplateSHA sets [template] sha256 to sha (template check --accept,
+// D111); a project.toml with no [template] ref is an error.
+func SetTemplateSHA(data, sha string) (string, error) {
+	d, err := parseEdit(data, "template", false, false)
+	if err != nil {
+		return "", err
+	}
+	table := []string{"template"}
+	if d.find(table, "ref") == nil {
+		return "", errors.New("project.toml: [template] has no ref")
+	}
+	if s := d.find(table, "sha256"); s != nil {
+		return d.setValue(s, QuoteString(sha)), nil
+	}
+	return d.insertKey(table, "sha256", QuoteString(sha)), nil
+}
+
 // UnsetEnv removes the project [env] name; an absent name is an error.
 func UnsetEnv(data, name string) (string, error) {
 	d, err := parseEdit(data, "env", false, false)

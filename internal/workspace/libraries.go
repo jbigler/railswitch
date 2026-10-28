@@ -1,0 +1,84 @@
+package workspace
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+
+	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/libraries"
+	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/signing"
+)
+
+// LoadCatalog is pack.LoadCatalog of root with the machine's library
+// checkouts: the catalog every command resolves a workspace's stack on.
+func LoadCatalog(root string) (*pack.Catalog, error) {
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return nil, err
+	}
+	return pack.LoadCatalog(root, Libraries(dirs))
+}
+
+// Libraries are d's library checkouts, <data>/libraries/<alias>/current/
+// with the fetch record beside it.
+func Libraries(d machine.Dirs) pack.Libraries { return machineLibraries{d} }
+
+type machineLibraries struct{ d machine.Dirs }
+
+// Checkout reads alias's fetch record and its checkout's index. The index
+// is not verified again (no ssh-keygen): the checkout is in the data dir,
+// out of every container's reach, and was verified when it was fetched;
+// the catalog hashes each package it loads against it.
+func (m machineLibraries) Checkout(alias string) (*pack.LibraryCheckout, error) {
+	rec, err := libraries.ReadRecord(m.d, alias)
+	if errors.Is(err, fs.ErrNotExist) || err == nil && rec.Signer == "" {
+		return nil, fmt.Errorf("library %s has no verified checkout on this machine: railswitch library fetch %s", alias, alias)
+	}
+	if err != nil {
+		return nil, err
+	}
+	dir := libraries.CurrentDir(m.d, alias)
+	data, err := safefile.Read(filepath.Join(dir, signing.IndexFile), safefile.Limit)
+	if err != nil {
+		return nil, fmt.Errorf("library %s: %w", alias, err)
+	}
+	idx, err := signing.ParseIndex(data)
+	if err != nil {
+		return nil, fmt.Errorf("library %s: %w", alias, err)
+	}
+	if idx.Library != rec.ID {
+		return nil, fmt.Errorf("library %s: its checkout is of %s, its fetch record of %s", alias, idx.Library, rec.ID)
+	}
+	co := &pack.LibraryCheckout{Dir: dir, ID: rec.ID, Commit: rec.Commit, Signer: rec.Signer}
+	for _, p := range idx.Packages {
+		r, err := pack.ParseRef(p.Ref) // checked by ParseIndex
+		if err != nil {
+			return nil, err
+		}
+		co.Packages = append(co.Packages, pack.LibraryPackage{Kind: p.Kind, Ref: r, SHA256: p.SHA256})
+	}
+	return co, nil
+}
+
+// Alias is the alias whose fetch record names library id.
+func (m machineLibraries) Alias(id string) string {
+	entries, err := os.ReadDir(filepath.Join(m.d.Data, "libraries"))
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if config.ValidAlias(e.Name()) != nil {
+			continue
+		}
+		if rec, err := libraries.ReadRecord(m.d, e.Name()); err == nil && rec.ID == id {
+			return e.Name()
+		}
+	}
+	return ""
+}

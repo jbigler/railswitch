@@ -245,7 +245,7 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 	if err != nil {
 		return nil, err
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := LoadCatalog(root)
 	if err != nil {
 		return nil, err
 	}
@@ -308,11 +308,11 @@ func lockedAt(old *config.Lock, sp stackPkg) (config.LockEntry, bool) {
 // Lock all ask it, so a ref back from Removed runs and ejects its accepted
 // copy, as Lock keeps it.
 func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref) (config.LockEntry, bool) {
-	if o, ok := table(lock, kind)[key]; ok && pins(o, r) {
+	if o, ok := table(lock, kind)[key]; ok && Pins(o, r) {
 		return o, true
 	}
 	for _, rm := range lock.Removed {
-		if rm.Kind == kind && rm.Key == key && pins(rm.Entry(), r) {
+		if rm.Kind == kind && rm.Key == key && Pins(rm.Entry(), r) {
 			return rm.Entry(), true
 		}
 	}
@@ -324,7 +324,7 @@ func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref) (config.LockEn
 // none that l pins again, at most config.MaxRemoved.
 func dropped(old, l *config.Lock) []config.LockRemoved {
 	same := func(a, b config.LockRemoved) bool {
-		return a.Kind == b.Kind && a.Key == b.Key && a.Version == b.Version && (a.Source == localSource) == (b.Source == localSource)
+		return a.Kind == b.Kind && a.Key == b.Key && a.Version == b.Version && sourceKind(a.Source) == sourceKind(b.Source)
 	}
 	var out []config.LockRemoved
 	add := func(r config.LockRemoved) {
@@ -339,7 +339,7 @@ func dropped(old, l *config.Lock) []config.LockRemoved {
 		t := table(old, kind)
 		for _, key := range slices.Sorted(maps.Keys(t)) {
 			e := t[key]
-			add(config.LockRemoved{Kind: kind, Key: key, Version: e.Version, Source: e.Source, SHA256: e.SHA256})
+			add(config.Removed(kind, key, e))
 		}
 	}
 	for _, r := range old.Removed {
@@ -397,7 +397,7 @@ func Review(_ context.Context, root string) (*Plan, error) {
 	}
 	var changes []Change
 	removed := func(kind, key string, o config.LockEntry) {
-		r, err := lockedRef(kind, key, o)
+		r, err := lockedRef(kind, key, o, pl.cat.Libraries)
 		if err != nil {
 			return
 		}
@@ -411,7 +411,7 @@ func Review(_ context.Context, root string) (*Plan, error) {
 			return nil, err
 		}
 		o, ok := table(old, sp.kind)[sp.key]
-		inTable := ok && pins(o, sp.ref)
+		inTable := ok && Pins(o, sp.ref)
 		if ok && !inTable {
 			removed(sp.kind, sp.key, o)
 		}
@@ -442,8 +442,9 @@ func Review(_ context.Context, root string) (*Plan, error) {
 }
 
 // lockedRef is the ref a lock entry pins: packs and options are keyed by
-// name, agents by ref.
-func lockedRef(kind, key string, e config.LockEntry) (pack.Ref, error) {
+// name, agents by ref. A library package's alias is the one libs knows its
+// library by; none is an error.
+func lockedRef(kind, key string, e config.LockEntry, libs pack.Libraries) (pack.Ref, error) {
 	if kind == pack.KindAgent {
 		return pack.ParseRef(key)
 	}
@@ -451,7 +452,16 @@ func lockedRef(kind, key string, e config.LockEntry) (pack.Ref, error) {
 	if err != nil {
 		return pack.Ref{}, err
 	}
-	return pack.Ref{Name: key, Version: v, Local: e.Source == localSource}, nil
+	r := pack.Ref{Name: key, Version: v, Local: e.Source == localSource}
+	if id, ok := LibraryID(e); ok {
+		if libs != nil {
+			r.Library = libs.Alias(id)
+		}
+		if r.Library == "" {
+			return pack.Ref{}, fmt.Errorf("%s %s: no library on this machine has id %s", kind, key, id)
+		}
+	}
+	return r, nil
 }
 
 // ReviewPending reports whether stack.lock leaves an update to review:

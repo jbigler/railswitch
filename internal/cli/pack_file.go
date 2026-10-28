@@ -311,7 +311,7 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 		return e.fail(err)
 	}
 	used := usesRef(p, ref)
-	cat, err := pack.LoadCatalog(root)
+	cat, err := workspace.LoadCatalog(root)
 	if err != nil {
 		return e.fail(err)
 	}

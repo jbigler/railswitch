@@ -477,7 +477,7 @@ func packShow(e *env, args []string) int {
 	if err != nil {
 		root = "" // built-ins only
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := workspace.LoadCatalog(root)
 	if err != nil {
 		return e.fail(err)
 	}

@@ -42,7 +42,7 @@ func minimalFiles(dir string) map[string]string {
 
 func localCatalog(t *testing.T, root string) *Catalog {
 	t.Helper()
-	c, err := LoadCatalog(root)
+	c, err := LoadCatalog(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

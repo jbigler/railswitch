@@ -206,7 +206,7 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := workspace.LoadCatalog(root)
 	if err != nil {
 		return nil, nil, nil, err
 	}

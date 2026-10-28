@@ -112,7 +112,7 @@ func load(startDir, slug string, cat *pack.Catalog, keep []pack.Ref) (*Workspace
 		return nil, err
 	}
 	if cat == nil {
-		if cat, err = pack.LoadCatalog(root); err != nil {
+		if cat, err = LoadCatalog(root); err != nil {
 			return nil, err
 		}
 	}
@@ -224,35 +224,44 @@ type stackPkg struct {
 	kind, key string // pack.KindPack etc.; the lock table's key
 	ref       pack.Ref
 	files     fs.FS
+	origin    *pack.LibraryOrigin // a library package's; nil otherwise
 }
 
 // stackPackages are st's pack, options and agent packages, one per key.
 func stackPackages(st *pack.Stack) []stackPkg {
-	out := []stackPkg{{pack.KindPack, st.Pack.Name, st.PackRef, st.Pack.Files}}
+	out := []stackPkg{{pack.KindPack, st.Pack.Name, st.PackRef, st.Pack.Files, st.Pack.Origin}}
 	for _, ch := range st.Options {
-		out = append(out, stackPkg{pack.KindOption, ch.Option.Name, ch.Ref, ch.Option.Files})
+		out = append(out, stackPkg{pack.KindOption, ch.Option.Name, ch.Ref, ch.Option.Files, ch.Option.Origin})
 	}
 	seen := map[string]bool{}
 	for _, a := range st.Agents {
 		if key := a.Ref.String(); !seen[key] {
 			seen[key] = true
-			out = append(out, stackPkg{pack.KindAgent, key, a.Ref, a.Agent.Files})
+			out = append(out, stackPkg{pack.KindAgent, key, a.Ref, a.Agent.Files, a.Agent.Origin})
 		}
 	}
 	return out
 }
 
-// entry is sp's lock entry, its content hashed.
+// entry is sp's lock entry, its content hashed. A library package's
+// records its library, commit and signer (D105).
 func (sp stackPkg) entry() (config.LockEntry, error) {
-	src := "built in (railswitch " + buildinfo.Version + ")"
-	if sp.ref.Local {
-		src = localSource
+	e := config.LockEntry{Version: strconv.Itoa(sp.ref.Version), Source: "built in (railswitch " + buildinfo.Version + ")"}
+	switch {
+	case sp.ref.Local:
+		e.Source = localSource
+	case sp.ref.Library != "":
+		e.Source = librarySource
+		if o := sp.origin; o != nil {
+			e.Source, e.Commit, e.Signer = librarySource+o.ID, o.Commit, o.Signer
+		}
 	}
 	sum, err := pack.ContentHash(sp.files)
 	if err != nil {
 		return config.LockEntry{}, fmt.Errorf("%s %s: %w", sp.kind, sp.ref, err)
 	}
-	return config.LockEntry{Version: strconv.Itoa(sp.ref.Version), Source: src, SHA256: sum}, nil
+	e.SHA256 = sum
+	return e, nil
 }
 
 // table is l's table of kind, made when nil.
@@ -264,21 +273,61 @@ func table(l *config.Lock, kind string) map[string]config.LockEntry {
 	return *t
 }
 
-// pins reports whether e locks ref r: its version and locality.
-func pins(e config.LockEntry, r pack.Ref) bool {
-	return e.Version == strconv.Itoa(r.Version) && (e.Source == localSource) == r.Local
+// Pins reports whether e locks ref r: its version and where it comes from
+// (built in, local or a library).
+func Pins(e config.LockEntry, r pack.Ref) bool {
+	return e.Version == strconv.Itoa(r.Version) && sourceKind(e.Source) == refKind(r)
 }
 
-// localSource is a workspace-local package's lock source.
-const localSource = "local"
+// localSource is a workspace-local package's lock source; librarySource
+// prefixes a library package's, "library <id>".
+const (
+	localSource   = "local"
+	librarySource = "library "
+)
+
+// Where a package comes from: sourceKind of a lock entry's source, refKind
+// of a ref.
+const (
+	fromBuiltin = "built in"
+	fromLocal   = "local"
+	fromLibrary = "library"
+)
+
+func sourceKind(src string) string {
+	switch {
+	case src == localSource:
+		return fromLocal
+	case strings.HasPrefix(src, librarySource):
+		return fromLibrary
+	}
+	return fromBuiltin
+}
+
+func refKind(r pack.Ref) string {
+	switch {
+	case r.Local:
+		return fromLocal
+	case r.Library != "":
+		return fromLibrary
+	}
+	return fromBuiltin
+}
+
+// LibraryID is the library a lock entry's package comes from; ok is false
+// for a built-in or local one.
+func LibraryID(e config.LockEntry) (id string, ok bool) {
+	return strings.CutPrefix(e.Source, librarySource)
+}
 
 // ErrStaleLock is wrapped by CheckLock's (and so Render's) error when
 // stack.lock differs from the resolved stack.
 var ErrStaleLock = errors.New("stack.lock is out of date")
 
 // CheckLock refuses a stack.lock whose packs, options or agents differ from
-// the resolved stack by version, content hash or locality (a built-in and a
-// local copy of it are different packages, even byte for byte), or that
+// the resolved stack by version, content hash or where it comes from (a
+// built-in, a local and a library copy of it are different packages, even
+// byte for byte), or that
 // lacks or has an extra one: the hash exists to stop unreviewed package
 // content (HANDOFF §3.11). The built-in source text, which carries the
 // railswitch version, is not compared.
@@ -295,7 +344,7 @@ func (w *Workspace) CheckLock() error {
 		for _, name := range sortedKeys(want) {
 			h, ok := have[name]
 			x := want[name]
-			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || (h.Source == localSource) != (x.Source == localSource) {
+			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || sourceKind(h.Source) != sourceKind(x.Source) {
 				stale = append(stale, label(name, x))
 			}
 		}
@@ -306,8 +355,11 @@ func (w *Workspace) CheckLock() error {
 		}
 	}
 	versioned := func(name string, e config.LockEntry) string {
-		if e.Source == localSource {
+		switch sourceKind(e.Source) {
+		case fromLocal:
 			return config.LocalPrefix + name + "@" + e.Version
+		case fromLibrary:
+			return name + "@" + e.Version + " (" + strings.TrimSpace(e.Source) + ")"
 		}
 		return name + "@" + e.Version
 	}

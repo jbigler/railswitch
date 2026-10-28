@@ -210,7 +210,7 @@ func TestEjectOptionAddon(t *testing.T) {
 
 	// A pack of another OS refuses the addon, naming both.
 	removeFile(t, file)
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := pack.LoadCatalog(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestEjectNoWorkspace(t *testing.T) {
 	if err := os.CopyFS(filepath.Join(root, "agents"), os.DirFS(filepath.Join(filialFixture, "agents"))); err != nil {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := pack.LoadCatalog(root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
@@ -122,7 +121,7 @@ func (e *env) lockReview(ctx context.Context, root string, restart bool) (*revie
 		}
 		p := reviewPkg{Ref: c.Ref.String(), Kind: c.Kind, Status: c.Status, From: c.From, To: c.To, AlsoLockedIn: []string{}, Files: files}
 		for _, o := range others {
-			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && e.Version == strconv.Itoa(c.Ref.Version) && (e.Source == "local") == c.Ref.Local {
+			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && workspace.Pins(e, c.Ref) {
 				p.AlsoLockedIn = append(p.AlsoLockedIn, o.prefix)
 			}
 		}

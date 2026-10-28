@@ -165,7 +165,7 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 	case !errors.Is(err, fs.ErrNotExist):
 		return nil, err
 	}
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := workspace.LoadCatalog(ws)
 	if err != nil {
 		return nil, err
 	}

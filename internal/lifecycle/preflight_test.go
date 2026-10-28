@@ -26,7 +26,7 @@ func filialModel(t *testing.T) *render.Model {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := pack.LoadCatalog(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

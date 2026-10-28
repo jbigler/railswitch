@@ -129,8 +129,8 @@ func (idx *Index) check() error {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("package[%d]: %w", i, err))
 			continue
-		case r.Local:
-			errs = append(errs, fmt.Errorf("package[%d]: %s: a library publishes no local: refs", i, p.Ref))
+		case r.Local || r.Library != "":
+			errs = append(errs, fmt.Errorf("package[%d]: %s: a library publishes its packages as name@N, with no local: or library prefix", i, p.Ref))
 			continue
 		}
 		top, ok := kindTop[p.Kind]

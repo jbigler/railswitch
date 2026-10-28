@@ -43,7 +43,7 @@ func cmdAgentAdd(ctx context.Context, e *env, args []string) int {
 	if _, ok := p.Agents[name]; ok {
 		return e.fail(fmt.Errorf("agent %s is already in project.toml ([agents.%s])", name, name))
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := workspace.LoadCatalog(root)
 	if err != nil {
 		return e.fail(err)
 	}

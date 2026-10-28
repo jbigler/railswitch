@@ -39,8 +39,15 @@ for dump_file in "$DUMP_DIR"/*.dump "$DUMP_DIR"/*.sql.gz "$DUMP_DIR"/*.sql; do
     *)         continue ;;
   esac
 
-  echo "restore-dump: Creating database '$db_name'..."
-  createdb "$db_name"
+  # POSTGRES_DB (set for an app that never creates its own database) has
+  # already created one of them.
+  # :'name' quotes the file-derived name; psql expands it only on stdin.
+  if [ "$(echo "SELECT 1 FROM pg_database WHERE datname = :'name'" | psql -At -v name="$db_name")" = 1 ]; then
+    echo "restore-dump: Database '$db_name' exists."
+  else
+    echo "restore-dump: Creating database '$db_name'..."
+    createdb "$db_name"
+  fi
 
   case "$dump_file" in
     *.dump)

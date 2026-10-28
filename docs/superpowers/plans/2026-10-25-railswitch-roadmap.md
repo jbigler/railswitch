@@ -120,6 +120,10 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D96 | Accepted package store | Every `stack.lock` write copies each package it pins to `<data>/locked/<sha256>/` (machine-wide, outside every workspace); a read recomputes the hash, a mismatch is missing | User, 2026-10-28: diffs need the old content; no container can reach the store |
 | D97 | Run what was accepted | A package whose content changed under an unchanged ref runs from the store until reviewed; `lock --review [--json]`, `lock --accept <hash>` (the hash of the lock it writes), plain `lock` refuses an unreviewed change; per project, noting other projects locking the same content | User, 2026-10-28: an upgrade never stops `up`; one project's lock changes only from its own review |
 | D98 | Update checks | Flagged: firewall hosts and profiles, download-and-run and isolation-off build lines, images, host mounts, ports, capabilities (and scripts of a package that adds one); the rest shown as diffs; Accept needs "I've read the N flagged items" when N > 0 | HANDOFF §3.11 "What it can do"; no framework or registry list in core |
+| D99 | Signed library index | A library is signed as one index, `library.toml` (refs and content hashes, serial, rotations, revocations), with an SSH signature (`ssh-keygen -Y`, namespace `railswitch-library`) | User, 2026-10-28: the signature covers the hash `stack.lock` pins; git repos and imported files alike; a rewritten version stops |
+| D100 | Signer trust | Per library, added on purpose (a fingerprint checked with the publisher, or `signer add`), in `~/.config/railswitch/signers.toml` | User, 2026-10-28: a key trusted for one library never signs another |
+| D101 | Rotation, revocation, rollback | Rotation vouched by the old key and confirmed once; revocations in a trusted index apply at once and the CLI can't undo them; the serial never goes down | User, 2026-10-28 |
+| D102 | Revocation's effect | Stops installs and updates from that library; running projects keep their pinned packages, with a warning (7c) | User, 2026-10-28: content is pinned by hash and was reviewed |
 
 ## Stages
 
@@ -136,7 +140,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 6c New project | detailed (`2026-10-28-railswitch-stage-6c.md`) | Repo, detection, options, review, create from the browser (docs/stage6c-acceptance.md) |
 | 6d Packs and Containerfiles | detailed (`2026-10-28-railswitch-stage-6d.md`) | Containerfiles and local packages edited from the browser with the read-it acknowledgement; new packs and options from a copy or a skeleton (docs/stage6d-acceptance.md) |
 | 7a Update review | detailed (`2026-10-28-railswitch-stage-7a.md`) | A package change (a railswitch upgrade, a local edit outside the dashboard) is shown as per-file diffs with flagged items and accepted only after review; the project runs what it last accepted meanwhile (docs/stage7a-acceptance.md) |
-| 7b Signers | later | Signer trust, rotation and revocation |
+| 7b Signers | detailed (`2026-10-28-railswitch-stage-7b.md`) | Signer trust, rotation and revocation |
 | 7c Library repositories | later | Library repos; install and update through 7a's review; Install review |
 | 7d Templates | later | Export a project as `<name>.stack/`; start a project from one |
 

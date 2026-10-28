@@ -278,3 +278,35 @@ or revoke a key (docs/dashboard.md).
 
 `railswitch --json library verify <dir>` prints the verdict as JSON
 (docs/json.md). Only `trusted` exits 0.
+
+## Using library packages in a project
+
+A fetched library's packages are refs `<alias>:<name>@<N>`, in every place
+a ref goes (`[stack] pack`, `[options]`, `[agents.<n>] use`): see
+docs/packs.md (Library packages). A library package is never locked
+without being reviewed, even the first time (D106):
+
+- `railswitch lock --review` lists a library ref new to `stack.lock` as
+  `added`, every file shown and flagged (compared against nothing). Plain
+  `railswitch lock` refuses it, even with no `stack.lock` yet.
+- `settings apply`, `project write`, `agent add` and `project new` refuse a
+  library ref new to the lock ("installing acme:django@1 needs review")
+  and put `project.toml` and `stack.lock` back.
+- `railswitch --json settings preview` reports the Install review as
+  `install`; `settings apply --if-hash <h> --accept-install <install.hash>`
+  accepts exactly those packages, and refuses another hash. `project new
+  --dry-run --json` reports `install` the same way; `project new …
+  --accept-install <hash>` accepts it (checked before the clone).
+- Accepting an install or an update (`lock --accept` too) verifies the
+  library's checkout again against today's `signers.toml`, one
+  `ssh-keygen` call: a signer distrusted or revoked since the fetch can't
+  install or update ("the signer of acme is no longer trusted").
+
+A later fetch that changes a locked package's content leaves the project
+running the accepted copy from the store, with the update waiting in
+`lock --review` (`changed`), as for any package (docs/packs.md). Built-in
+and local packages are unaffected.
+
+When the key that signed a locked library package is distrusted or
+revoked, the project keeps running it, and `overview --json` lists it in
+`signer_warnings` (`{ref, library, fingerprint}`, docs/json.md).

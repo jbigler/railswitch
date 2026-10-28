@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/libraries"
@@ -64,6 +65,49 @@ func (m machineLibraries) Checkout(alias string) (*pack.LibraryCheckout, error) 
 		co.Packages = append(co.Packages, pack.LibraryPackage{Kind: p.Kind, Ref: r, SHA256: p.SHA256})
 	}
 	return co, nil
+}
+
+// SignerWarning is a locked library package whose signer is no longer
+// trusted for its library (D102): distrusted or revoked since it was
+// accepted. The project keeps running it.
+type SignerWarning struct {
+	Ref         string `json:"ref"`
+	Library     string `json:"library"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// SignerWarnings are w's locked library packages whose lock signer t does
+// not trust for their library; never nil. A nil t trusts nothing.
+func (w *Workspace) SignerWarnings(t *signing.Trust) []SignerWarning {
+	out := []SignerWarning{}
+	seen := map[pack.Ref]bool{}
+	for _, x := range projectPackages(w.Project) {
+		if x.ref.Library == "" || seen[x.ref] {
+			continue
+		}
+		seen[x.ref] = true
+		e, ok := lockedEntry(w.Lock, x.kind, x.key, x.ref)
+		if !ok {
+			continue
+		}
+		id, _ := LibraryID(e)
+		if !trusts(t, id, e.Signer) {
+			out = append(out, SignerWarning{Ref: x.ref.String(), Library: id, Fingerprint: e.Signer})
+		}
+	}
+	return out
+}
+
+// trusts reports whether t trusts the key fp for library id.
+func trusts(t *signing.Trust, id, fp string) bool {
+	if t == nil || fp == "" {
+		return false
+	}
+	l := t.Library(id)
+	if l == nil || slices.ContainsFunc(l.Revoked, func(r signing.Revocation) bool { return r.Fingerprint == fp }) {
+		return false
+	}
+	return slices.ContainsFunc(l.Keys, func(k signing.Key) bool { return k.Fingerprint == fp })
 }
 
 // Alias is the alias whose fetch record names library id.

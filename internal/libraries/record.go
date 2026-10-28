@@ -1,66 +1,71 @@
-// Package libraries keeps the library repositories of this machine (D103,
-// D104): libraries.toml, the hardened fetch, and each library's checkout
-// under <data>/libraries/<alias>/.
 package libraries
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/jbigler/railswitch/internal/config"
+	"github.com/BurntSushi/toml"
+
 	"github.com/jbigler/railswitch/internal/machine"
-	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/signing"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
-// RecordSchema is fetch.toml's schema (D39).
-const RecordSchema = 1
+// Schema is the schema of libraries.toml, fetch.toml and pending.toml.
+const Schema = 1
 
-// Record is <data>/libraries/<alias>/fetch.toml: the last fetch of a
-// library and the checkout in current/ beside it.
+// Record is <data>/libraries/<alias>/fetch.toml: ID, Commit, Serial and
+// Signer are current/'s (empty when there is none), Status, Fetched and
+// Reason the last fetch's verdict.
 type Record struct {
 	Schema  int            `toml:"schema"`
-	ID      string         `toml:"id"`      // the library's id
-	Commit  string         `toml:"commit"`  // hex
-	Serial  int64          `toml:"serial"`  // its index's serial
-	Status  signing.Status `toml:"status"`  // the last fetch's verdict
-	Fetched time.Time      `toml:"fetched"` // RFC 3339
-	// Signer is the fingerprint of the key that signed current/'s index;
-	// "" when there is no current/.
-	Signer string `toml:"signer"`
-	Reason string `toml:"reason"`
+	ID      string         `toml:"id"`
+	Commit  string         `toml:"commit"`
+	Serial  int64          `toml:"serial"`
+	Status  signing.Status `toml:"status"`
+	Fetched time.Time      `toml:"fetched"`
+	Signer  string         `toml:"signer"`
+	Reason  string         `toml:"reason"`
 }
 
-// Dir is the alias's directory, <data>/libraries/<alias>. alias must be
-// valid (config.ValidAlias).
+// Dir is the alias's directory in the data dir.
 func Dir(d machine.Dirs, alias string) string {
 	return filepath.Join(d.Data, "libraries", alias)
 }
 
-// CurrentDir is the alias's verified checkout, <data>/libraries/<alias>/current.
+// CurrentDir is the alias's verified checkout.
 func CurrentDir(d machine.Dirs, alias string) string {
 	return filepath.Join(Dir(d, alias), "current")
 }
 
-// ReadRecord reads the alias's fetch.toml strictly. A missing file is an
-// error wrapping fs.ErrNotExist: the library was never fetched.
+func recordPath(d machine.Dirs, alias string) string {
+	return filepath.Join(Dir(d, alias), "fetch.toml")
+}
+
+// ReadRecord is the alias's fetch.toml; a library never fetched is an
+// fs.ErrNotExist error.
 func ReadRecord(d machine.Dirs, alias string) (*Record, error) {
-	if err := config.ValidAlias(alias); err != nil {
-		return nil, err
-	}
-	path := filepath.Join(Dir(d, alias), "fetch.toml")
-	data, err := safefile.Read(path, safefile.Limit)
+	path := recordPath(d, alias)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	var r Record
-	if err := tomlfile.Decode(data, RecordSchema, &r); err != nil {
+	if err := tomlfile.Decode(data, Schema, &r); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	if r.Schema != RecordSchema {
-		return nil, fmt.Errorf("%s: schema = %d, want %d", path, r.Schema, RecordSchema)
-	}
 	return &r, nil
+}
+
+// WriteRecord replaces the alias's fetch.toml.
+func WriteRecord(d machine.Dirs, alias string, r *Record) error {
+	r.Schema = Schema
+	var b bytes.Buffer
+	if err := toml.NewEncoder(&b).Encode(r); err != nil {
+		return err
+	}
+	return tomlfile.WriteAtomic(recordPath(d, alias), b.Bytes(), 0o644)
 }

@@ -1,15 +1,13 @@
 package testfixture
 
 import (
-	"bytes"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/BurntSushi/toml"
 
 	"github.com/jbigler/railswitch/internal/libraries"
 	"github.com/jbigler/railswitch/internal/machine"
@@ -77,7 +75,7 @@ func (l *Lib) Dir() string { return libraries.CurrentDir(l.Dirs, l.Alias) }
 func (l *Lib) Publish(t testing.TB) {
 	t.Helper()
 	l.Serial++
-	l.Commit = string(bytes.Repeat([]byte{byte('a' + l.Serial%6)}, 40))
+	l.Commit = strings.Repeat(string(rune('a'+l.Serial%6)), 40)
 	idx, err := signing.BuildIndex(l.Dir(), l.ID, l.Serial, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -90,12 +88,8 @@ func (l *Lib) Publish(t testing.TB) {
 	if out, err := exec.Command("ssh-keygen", "-Y", "sign", "-f", l.Key.Priv, "-n", signing.NamespaceLibrary, file).CombinedOutput(); err != nil {
 		t.Fatalf("ssh-keygen -Y sign: %v\n%s", err, out)
 	}
-	rec := libraries.Record{Schema: libraries.RecordSchema, ID: l.ID, Commit: l.Commit, Serial: l.Serial, Status: signing.StatusTrusted, Fetched: time.Now().UTC().Truncate(time.Second), Signer: l.Key.Fingerprint}
-	var b bytes.Buffer
-	if err := toml.NewEncoder(&b).Encode(rec); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(libraries.Dir(l.Dirs, l.Alias), "fetch.toml"), b.Bytes(), 0o644); err != nil {
+	rec := libraries.Record{ID: l.ID, Commit: l.Commit, Serial: l.Serial, Status: signing.StatusTrusted, Fetched: time.Now().UTC().Truncate(time.Second), Signer: l.Key.Fingerprint}
+	if err := libraries.WriteRecord(l.Dirs, l.Alias, &rec); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -118,6 +112,17 @@ func (l *Lib) updateTrust(t testing.TB, fn func(*signing.Trust) error) {
 		return true, fn(tr)
 	})
 	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// WriteFile writes data to path, making its directory.
+func WriteFile(t testing.TB, path, data string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }

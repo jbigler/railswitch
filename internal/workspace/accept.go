@@ -17,6 +17,8 @@ import (
 	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/signing"
+	"github.com/jbigler/railswitch/internal/sys"
 )
 
 // reviewHint ends every error about package content stack.lock has not
@@ -133,11 +135,16 @@ func catalogFiles(cat *pack.Catalog, kind string, r pack.Ref) (fs.FS, error) {
 }
 
 // Accept is what a lock write may accept of the packages whose content
-// changed under the ref stack.lock pins (D97): every one (lock --accept),
-// one file of one package (pack file write: the file it writes, reviewed
-// in the editor), or none (every other write).
+// changed under the ref stack.lock pins (D97), and of the library packages
+// new to it (D106): every one (lock --accept), the library packages an
+// Install review listed (settings apply and project new with
+// --accept-install), one file of one package (pack file write: the file it
+// writes, reviewed in the editor), or none (every other write).
 type Accept struct {
 	All bool
+	// Install accepts these library refs when they are new to the lock;
+	// any other library ref new to it refuses the write.
+	Install []pack.Ref
 	// Edit, when set, accepts its package only when the file it names is
 	// the package's one difference from the accepted copy; any other
 	// difference refuses the write.
@@ -145,6 +152,15 @@ type Accept struct {
 	// IfHash, when set, refuses a write whose stack.lock bytes don't hash
 	// (Hash) to it: the review that was accepted.
 	IfHash string
+	// Run runs ssh-keygen when the write accepts a library package: its
+	// library's checkout is verified again against today's trust first.
+	Run sys.Runner
+}
+
+// accepts reports whether a accepts sp's content: new to the lock (had
+// false) or changed under the ref it pins.
+func (a Accept) accepts(sp stackPkg, had bool) bool {
+	return a.All || !had && slices.Contains(a.Install, sp.ref)
 }
 
 // FileEdit is one file of the package of Kind at Ref, by its
@@ -190,29 +206,35 @@ var ErrReviewChanged = errors.New("the update changed since it was reviewed: rev
 // Lock loads and validates root's project.toml, resolves its stack and
 // writes <root>/stack.lock: every pack, option and agent with its content
 // hash, keeping the image digests of an existing lock. A package whose
-// content changed under its locked ref is locked as resolved only when
-// accept accepts it; otherwise its entry stays, and a stored copy that
-// can't run it fails the write. Every package the new lock pins is stored
-// first (lockstore). It needs no existing lock.
-func Lock(_ context.Context, root string, accept Accept) error {
-	pl, err := plan(root, accept)
+// content changed under its locked ref, or a library package new to the
+// lock, is locked as resolved only when accept accepts it; otherwise a
+// changed package's entry stays (a stored copy that can't run it fails the
+// write) and a new library package refuses the write. Each library whose
+// packages it accepts is verified again first (Accept.Run). Every package
+// the new lock pins is stored first (lockstore). It needs no existing lock.
+func Lock(ctx context.Context, root string, accept Accept) error {
+	pl, err := plan(root, nil, nil, accept)
 	if err != nil {
 		return err
 	}
-	return pl.write(accept.IfHash)
+	return pl.write(ctx, accept)
 }
 
 // write stores pl's packages and writes its stack.lock, refusing bytes
-// that don't hash to ifHash (when set) and a package whose content changed
-// since pl hashed it (an edit meanwhile: what was stored is not what the
-// lock would pin).
-func (pl *lockPlan) write(ifHash string) error {
+// that don't hash to accept.IfHash (when set), a library whose checkout no
+// longer verifies (reverify), and a package whose content changed since pl
+// hashed it (an edit meanwhile: what was stored is not what the lock would
+// pin).
+func (pl *lockPlan) write(ctx context.Context, accept Accept) error {
 	data, err := pl.lock.Encode()
 	if err != nil {
 		return err
 	}
-	if ifHash != "" && Hash(data) != ifHash {
+	if accept.IfHash != "" && Hash(data) != accept.IfHash {
 		return ErrReviewChanged
+	}
+	if err := pl.reverify(ctx, accept.Run); err != nil {
+		return err
 	}
 	for _, sp := range pl.put {
 		sha, err := pl.store.Put(sp.files)
@@ -238,16 +260,24 @@ type lockPlan struct {
 	put   []stackPkg
 	dirs  machine.Dirs
 	store lockstore.Store
+	// verify are the library packages the write accepts: new to the lock
+	// or changed under it.
+	verify []stackPkg
 }
 
-func plan(root string, accept Accept) (*lockPlan, error) {
-	p, err := loadProject(root)
-	if err != nil {
-		return nil, err
+// plan works out the lock write of project p (nil: root's project.toml)
+// on catalog cat (nil: root's, LoadCatalog) against root's stack.lock.
+func plan(root string, p *config.Project, cat *pack.Catalog, accept Accept) (*lockPlan, error) {
+	var err error
+	if p == nil {
+		if p, err = loadProject(root); err != nil {
+			return nil, err
+		}
 	}
-	cat, err := LoadCatalog(root)
-	if err != nil {
-		return nil, err
+	if cat == nil {
+		if cat, err = LoadCatalog(root); err != nil {
+			return nil, err
+		}
 	}
 	st, err := cat.Resolve(p)
 	if err != nil {
@@ -274,20 +304,28 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 		if err != nil {
 			return nil, err
 		}
-		if o, ok := lockedAt(old, sp); ok && o.SHA256 != e.SHA256 && !accept.All {
+		o, had := lockedAt(old, sp)
+		switch {
+		case !had && sp.ref.Library != "" && !accept.accepts(sp, had):
+			// A library package is never locked unseen, even the first
+			// time (D106).
+			return nil, fmt.Errorf("installing %s needs review: %s", sp.ref, installHint)
+		case had && o.SHA256 != e.SHA256 && !accept.accepts(sp, had):
 			if accept.Edit != nil && accept.Edit.Kind == sp.kind && accept.Edit.Ref == sp.ref {
 				if err := onlyEdited(pl.store, o.SHA256, e.SHA256, sp.files, *accept.Edit); err != nil {
 					return nil, err
 				}
-			} else {
-				// The accepted copy keeps the project running; without
-				// one, locking the update would accept it unseen.
-				if _, err := accepted(cat, pl.store, sp.kind, sp.ref, o.SHA256); err != nil {
-					return nil, fmt.Errorf("%s %s: %s", sp.kind, sp.ref, reviewHint)
-				}
-				table(&l, sp.kind)[sp.key] = o
-				continue
+				break
 			}
+			// The accepted copy keeps the project running; without one,
+			// locking the update would accept it unseen.
+			if _, err := accepted(cat, pl.store, sp.kind, sp.ref, o.SHA256); err != nil {
+				return nil, fmt.Errorf("%s %s: %s", sp.kind, sp.ref, reviewHint)
+			}
+			table(&l, sp.kind)[sp.key] = o
+			continue
+		case sp.ref.Library != "" && (!had || o.SHA256 != e.SHA256):
+			pl.verify = append(pl.verify, sp)
 		}
 		table(&l, sp.kind)[sp.key] = e
 		pl.put = append(pl.put, sp)
@@ -295,6 +333,56 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 	l.Removed = dropped(old, &l)
 	pl.lock = &l
 	return pl, nil
+}
+
+// installHint ends the error of a write that would install a library
+// package unreviewed.
+const installHint = "railswitch settings preview shows the install review; accept it with settings apply --accept-install <hash> (or railswitch lock --review, then lock --accept <hash>)"
+
+// reverify verifies again, against today's trust, the checkout of every
+// library pl accepts a package of (one ssh-keygen call each): a library
+// whose signer was distrusted or revoked since its fetch can't be
+// installed or updated. Each accepted package must still be signed, by the
+// key its fetch recorded.
+func (pl *lockPlan) reverify(ctx context.Context, run sys.Runner) error {
+	if len(pl.verify) == 0 {
+		return nil
+	}
+	if run == nil {
+		return fmt.Errorf("accepting %s needs its library verified again: no runner", pl.verify[0].ref)
+	}
+	trust, err := signing.LoadTrust(filepath.Join(pl.dirs.Config, signing.TrustFile))
+	if err != nil {
+		return err
+	}
+	results := map[string]*signing.Result{}
+	for _, sp := range pl.verify {
+		alias := sp.ref.Library
+		res, ok := results[alias]
+		if !ok {
+			co, err := pl.cat.Libraries.Checkout(alias)
+			if err != nil {
+				return err
+			}
+			if res, err = signing.Verify(ctx, run, co.Dir, trust); err != nil {
+				return fmt.Errorf("verify library %s: %w", alias, err)
+			}
+			results[alias] = res
+		}
+		if res.Status != signing.StatusTrusted {
+			return fmt.Errorf("the signer of %s is no longer trusted (%s): %s can't be installed or updated", alias, res.Status, sp.ref)
+		}
+		e := table(pl.lock, sp.kind)[sp.key]
+		if res.Fingerprint != e.Signer {
+			return fmt.Errorf("library %s is signed by %s now, not by %s as fetched: fetch it again", alias, res.Fingerprint, e.Signer)
+		}
+		if !slices.ContainsFunc(res.Packages, func(p signing.PackageResult) bool {
+			return p.Signed && p.Kind == sp.kind && p.Ref == sp.ref.Bare().String()
+		}) {
+			return fmt.Errorf("%s is no longer signed by library %s: fetch it again", sp.ref, alias)
+		}
+	}
+	return nil
 }
 
 // lockedAt is what old accepted for sp's ref: its table's entry, or the
@@ -371,12 +459,14 @@ type Plan struct {
 	Lock     []byte
 	Packages []Change
 	Next     *Workspace // the accepted project: as resolved, under the new lock
+	// Install are the library refs an Install review accepts.
+	Install []pack.Ref
 }
 
 // Review is the review of an accept against root's current stack.lock
 // (none: every package added), resolved without any accepted copy.
 func Review(_ context.Context, root string) (*Plan, error) {
-	pl, err := plan(root, Accept{All: true})
+	pl, err := plan(root, nil, nil, Accept{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -439,6 +529,49 @@ func Review(_ context.Context, root string) (*Plan, error) {
 	}
 	next := &Workspace{Root: root, Project: pl.p, Catalog: pl.cat, Stack: pl.st, Lock: pl.lock, Dirs: pl.dirs}
 	return &Plan{Lock: data, Packages: changes, Next: next}, nil
+}
+
+// Install is the install review of project p (nil: root's project.toml)
+// on catalog cat (nil: root's) against root's stack.lock (D106): the
+// library packages new to the lock, each added and compared against
+// nothing, and the exact stack.lock the write that accepts just them
+// (Accept.Install) leaves, whose Hash is the review's. nil when p installs
+// no library package.
+func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalog) (*Plan, error) {
+	pl, err := plan(root, p, cat, Accept{All: true})
+	if err != nil {
+		return nil, err
+	}
+	old := pl.old
+	if old == nil {
+		old = &config.Lock{}
+	}
+	var refs []pack.Ref
+	var changes []Change
+	for _, sp := range stackPackages(pl.st) {
+		if _, had := lockedAt(old, sp); had || sp.ref.Library == "" {
+			continue
+		}
+		e, err := sp.entry()
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, sp.ref)
+		changes = append(changes, Change{Ref: sp.ref, Kind: sp.kind, Status: StatusAdded, To: e.SHA256, New: sp.files})
+	}
+	if len(refs) == 0 {
+		return nil, nil
+	}
+	ipl, err := plan(root, pl.p, pl.cat, Accept{Install: refs})
+	if err != nil {
+		return nil, err
+	}
+	data, err := ipl.lock.Encode()
+	if err != nil {
+		return nil, err
+	}
+	next := &Workspace{Root: root, Project: ipl.p, Catalog: ipl.cat, Stack: ipl.st, Lock: ipl.lock, Dirs: ipl.dirs}
+	return &Plan{Lock: data, Packages: changes, Next: next, Install: refs}, nil
 }
 
 // lockedRef is the ref a lock entry pins: packs and options are keyed by

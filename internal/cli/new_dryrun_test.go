@@ -26,7 +26,7 @@ func dryRun(t *testing.T, f *systest.Fake, args ...string) newDryRunDoc {
 	if code != 0 {
 		t.Fatalf("new --dry-run %v: exit %d\nstdout: %s\nstderr: %s", args, code, out, errs)
 	}
-	if strings.Contains(out, "null") {
+	if strings.Contains(strings.Replace(out, `"install":null`, "", 1), ":null") {
 		t.Errorf("a JSON slice is null:\n%s", out)
 	}
 	var doc newDryRunDoc

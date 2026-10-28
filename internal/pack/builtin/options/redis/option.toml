@@ -23,3 +23,8 @@ REDIS_URL = "redis://{service}:6379/1"
 [unit]
 # No persistence; reachable on the worktree's dev network only, never published.
 exec = ["redis-server", "--loglevel", "warning", "--save", "", "--appendonly", "no"]
+
+[[detect]]                    # D87: a Gemfile line naming the gem; a commented one does not count
+file = "Gemfile"
+match = '''^\s*gem\s+['"]redis['"]'''
+evidence = "Gemfile: redis"

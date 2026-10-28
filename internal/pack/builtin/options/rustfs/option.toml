@@ -65,3 +65,8 @@ root_redirect = "/rustfs/console/index.html"
 [[links]]
 label = "Storage console"
 url = "s3-ui.{worktree.host}"
+
+[[detect]]                    # D87: a Gemfile line naming the gem; a commented one does not count
+file = "Gemfile"
+match = '''^\s*gem\s+['"]aws-sdk-s3['"]'''
+evidence = "Gemfile: aws-sdk-s3"

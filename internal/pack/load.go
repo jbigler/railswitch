@@ -459,6 +459,9 @@ func (l *loader) checkPack(dir string, p *Pack) bool {
 		}
 	}
 	l.links(file, p.Links)
+	for i, f := range p.Detect.Files {
+		l.detectPath(file, fmt.Sprintf("detect.files[%d]", i), f)
+	}
 	for _, name := range sortedKeys(p.Tasks) {
 		if slices.Contains(config.ReservedTasks, name) {
 			l.add(file, "tasks.%s: %q is a railswitch task subcommand, not a task name", name, name)
@@ -563,7 +566,34 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		}
 	}
 	l.links(file, o.Links)
+	for i := range o.Detect {
+		d := &o.Detect[i]
+		f := fmt.Sprintf("detect[%d]", i)
+		l.detectPath(file, f+".file", d.File)
+		re, err := regexp.Compile(d.Match)
+		switch {
+		case d.Match == "":
+			l.add(file, "%s.match is required", f)
+		case err != nil:
+			l.add(file, "%s.match: %v", f, err)
+		default:
+			d.re = re
+		}
+	}
 	return ok && len(l.errs) == n
+}
+
+// detectPathRe is a detect path: project detect passes "/"+path to git
+// sparse-checkout as a no-cone pattern, so it must hold no pattern syntax
+// (glob, negation, comment, escape) or space.
+var detectPathRe = regexp.MustCompile(`^[A-Za-z0-9._+-]+(/[A-Za-z0-9._+-]+)*$`)
+
+// detectPath checks a detect rule's repository path: relative, clean,
+// inside the repository.
+func (l *loader) detectPath(file, field, p string) {
+	if !fs.ValidPath(p) || p == "." || !detectPathRe.MatchString(p) {
+		l.add(file, "%s: %q is not a clean relative path inside the repository (letters, digits, . _ + - and /)", field, p)
+	}
 }
 
 func (l *loader) mounts(file, dir string, ms []Mount) {

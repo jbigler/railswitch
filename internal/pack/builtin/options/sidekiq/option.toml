@@ -12,3 +12,8 @@ use = "app"                   # runs the app's base image
 [[links]]
 label = "Sidekiq"
 url = "{worktree.host}/sidekiq"
+
+[[detect]]                    # D87: a Gemfile line naming the gem; a commented one does not count
+file = "Gemfile"
+match = '''^\s*gem\s+['"]sidekiq['"]'''
+evidence = "Gemfile: sidekiq"

@@ -102,3 +102,8 @@ exec = [
   "-c", "parallel_setup_cost=0",
   "-c", "parallel_tuple_cost=0",
 ]
+
+[[detect]]                    # D87: a Gemfile line naming the gem; a commented one does not count
+file = "Gemfile"
+match = '''^\s*gem\s+['"]pg['"]'''
+evidence = "Gemfile: pg"

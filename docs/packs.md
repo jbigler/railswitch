@@ -330,6 +330,7 @@ there is no shared add-on package (user, 2026-10-27).
 | `[defaults] <slot> = "<ref>"` | the options `project new` picks |
 | `[tasks]`, `[[links]]` | named commands and worktree links |
 | `[unit]` | `exec`, `memory`, `pids_limit`, `shm_size`, `run_init`, `tty`, `success_exit_status` |
+| `[detect] files` | `project detect` suggests the pack for a repository that has every one of these files (D87); no files: never suggested |
 
 ### `option.toml`
 
@@ -348,6 +349,35 @@ there is no shared add-on package (user, 2026-10-27).
 | `[dump]` | `command`, `file`: how `railswitch db dump` dumps it; with `list` (a command printing one database name per line) both run once per name as `{dump.db}`, each to its own file. `postgres@1` dumps every non-template database but `postgres` |
 | `[[volumes]]` | `name`, `mount`, `chown`, `seed`, `data` |
 | `[[mounts]]`, `[[ports]]`, `[[routes]]`, `[[links]]`, `[unit]` | as named |
+| `[[detect]]` | `file`, `match`, `evidence`: `project detect` suggests the option when a line of `file` matches `match` (RE2, unanchored: start it with `^\s*` so a commented line doesn't count); any rule is enough; `evidence` is what the page shows (default `<file>: <match>`) |
+
+### Detection rules
+
+Rules belong to the packages (D87); core only runs them. A rule path
+(`[detect] files`, `[[detect]] file`) is a clean relative path inside the
+repository made of letters, digits, `.`, `_`, `+`, `-` and `/`: no `..`, no
+leading `/`, no glob. `project detect` checks out only these paths. A path
+that is a symlink, has a symlinked parent, or is over 1 MiB counts as
+absent. `match` must compile. Load refuses a rule that breaks either.
+
+| Package | Rule |
+|---|---|
+| `rails@1` | `Gemfile` and `config/application.rb` |
+| `postgres@1` | `Gemfile`: `gem "pg"` |
+| `redis@1` | `Gemfile`: `gem "redis"` |
+| `rustfs@1` | `Gemfile`: `gem "aws-sdk-s3"` |
+| `sidekiq@1` | `Gemfile`: `gem "sidekiq"` |
+| `playwright@1` | `Gemfile`: `gem "capybara-playwright-driver"`, or a gem whose name starts with `playwright` |
+
+```toml
+[detect]                                     # pack.toml
+files = ["Gemfile", "config/application.rb"]
+
+[[detect]]                                   # option.toml
+file = "Gemfile"
+match = '''^\s*gem\s+['"]pg['"]'''
+evidence = "Gemfile: pg"
+```
 
 Every volume table (`[[caches]]`, `[[worktree_volumes]]`, an option's
 `[[volumes]]`, a tool's or agent's `[[shared]]`) takes `data = "persistent" |

@@ -3,6 +3,7 @@ package pack
 import (
 	"fmt"
 	"io/fs"
+	"regexp"
 )
 
 // The Go mirrors of pack.toml, option.toml and tool.toml (D12). Decoding is
@@ -44,8 +45,43 @@ type Pack struct {
 	Tasks    map[string]string `toml:"tasks"`    // task name → command run in the app image
 	Links    []Link            `toml:"links"`    // suggested worktree links (HANDOFF §3.10)
 	Unit     Unit              `toml:"unit"`     // extras for the app unit
+	Detect   PackDetect        `toml:"detect"`   // D87: how project detect recognises a repository
 
 	Files fs.FS `toml:"-"` // the pack's directory
+}
+
+// PackDetect is a pack's [detect] table: the pack fits a repository that
+// has every one of Files. A pack with no Files is never detected.
+type PackDetect struct {
+	Files []string `toml:"files"`
+}
+
+// OptionDetect is one of an option's [[detect]] rules: the option fits a
+// repository where some line of File matches Match (RE2). Any rule
+// matching is enough.
+type OptionDetect struct {
+	File     string `toml:"file"`
+	Match    string `toml:"match"`
+	Evidence string `toml:"evidence"` // what the page shows; default "<file>: <match>"
+
+	re *regexp.Regexp
+}
+
+// Regexp is Match compiled; Load compiled it, so it never fails for a
+// loaded rule.
+func (d OptionDetect) Regexp() *regexp.Regexp {
+	if d.re == nil {
+		return regexp.MustCompile(d.Match)
+	}
+	return d.re
+}
+
+// EvidenceText is Evidence, else "<file>: <match>".
+func (d OptionDetect) EvidenceText() string {
+	if d.Evidence != "" {
+		return d.Evidence
+	}
+	return d.File + ": " + d.Match
 }
 
 // App is the pack's [app] table: the app service.
@@ -230,6 +266,7 @@ type Option struct {
 	Routes     []Route           `toml:"routes"`
 	Links      []Link            `toml:"links"`
 	Unit       Unit              `toml:"unit"`
+	Detect     []OptionDetect    `toml:"detect"` // D87
 
 	Files fs.FS `toml:"-"` // the option's directory
 }

@@ -69,7 +69,7 @@ type PackageResult struct {
 // Verify checks the library folder dir against t. On StatusTrusted it
 // updates t in memory: the library's last serial and the index's
 // revocations; the caller saves it. An error is a failure to check
-// (ssh-keygen missing, no temp dir, an unreadable packs/, options/ or
+// (ssh-keygen missing, no temp dir, an unreadable packs/, options/, templates/ or
 // agents/), never a verdict. A package is Signed only when the index is
 // trusted.
 func Verify(ctx context.Context, run sys.Runner, dir string, t *Trust) (*Result, error) {

@@ -457,23 +457,7 @@ func AddSecret(path, name string, s Secret) error {
 		if !secretNameRe.MatchString(name) {
 			return "", fmt.Errorf("secret name %q must match %s", name, secretNameRe)
 		}
-		var b strings.Builder
-		if len(s.Services) > 0 {
-			elems := make([]string, len(s.Services))
-			for i, id := range s.Services {
-				elems[i] = QuoteString(id)
-			}
-			b.WriteString("services = [" + strings.Join(elems, ", ") + "]\n")
-		}
-		for _, kv := range [][2]string{{"env", s.Env}, {"scope", s.Scope}, {"git_host", s.GitHost}, {"git_user", s.GitUser}} {
-			if kv[1] != "" {
-				b.WriteString(kv[0] + " = " + QuoteString(kv[1]) + "\n")
-			}
-		}
-		if s.GitSigning {
-			b.WriteString("git_signing = true\n")
-		}
-		return d.appendTable([]string{"secrets", name}, b.String()), nil
+		return d.appendTable([]string{"secrets", name}, SecretTOML(s)), nil
 	})
 }
 

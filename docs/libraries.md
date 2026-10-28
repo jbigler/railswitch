@@ -33,9 +33,15 @@ stack-library/
   packs/django/         pack.toml and its files
   options/clickhouse/   option.toml and its files
   agents/aider/         agent.toml and its files
+  templates/rails-pg/   stack.toml, README.md, containerfiles/Containerfile.<name>
 ```
 
-Each package directory must load as a package (docs/packs.md). The index
+Each package directory must load as a package (docs/packs.md). A
+template directory holds only `stack.toml`, `README.md` and
+`containerfiles/Containerfile.<name>`, and its `stack.toml` must decode
+(docs/templates.md); the index lists it as `kind = "template"` with the
+ref its `stack.toml` declares (`name@version`). `railswitch template
+export --to <library>/templates/<name>` writes one. The index
 lists each package's ref, kind and content hash. The content hash is
 `pack.ContentHash`, the hash that `stack.lock` pins, so a library package
 gets the same update review (`lock --review`) as a built-in one.
@@ -288,10 +294,11 @@ A library repository is hostile input (D104). A fetch:
   only the https, ssh, git and file transports. The whole fetch has a
   5 minute deadline.
 - reads the tree of `library.toml`, `library.toml.sig`, `packs/`,
-  `options/` and `agents/`, and refuses the whole fetch when any of them
-  holds a symlink or a submodule, or a path that is not a package file
-  (`<kind>s/<name>/<file>`, where `<file>` is one the package format
-  allows: docs/packs.md), or more than 2,000 files, a file over 1 MiB, or
+  `options/`, `agents/` and `templates/`, and refuses the whole fetch when
+  any of them holds a symlink or a submodule, or a path that is not a
+  package file (`<kind>s/<name>/<file>`, where `<file>` is one the package
+  format allows: docs/packs.md; in `templates/<name>/` only `stack.toml`,
+  `README.md` and `containerfiles/Containerfile.<name>`), or more than 2,000 files, a file over 1 MiB, or
   over 64 MiB in all. The tree listing stops at the 2,001st file. Other
   files in the repository are never fetched (but see Known limits).
 - writes those files (0644, `.sh` 0755) into a staging directory and
@@ -402,6 +409,14 @@ and local packages are unaffected.
 When the key that signed a locked library package is distrusted or
 revoked, the project keeps running it, and `overview --json` lists it in
 `signer_warnings` (`{ref, library, fingerprint}`, docs/json.md).
+
+## Using library templates
+
+A fetched library's templates are refs `<alias>:<name>@<N>`: `railswitch
+template ls` lists them (`source: "library <alias>"`) and `project new
+--template <alias>:<name>@N` starts a project from one. A template is
+read from the verified checkout only, when the index lists it with the
+content hash its directory has now (docs/templates.md).
 
 ## Known limits
 

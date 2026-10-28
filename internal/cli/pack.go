@@ -692,6 +692,8 @@ func libraryPackages(cat *pack.Catalog) ([]libraryPackage, error) {
 				if a, err := cat.Agent(r); err != nil || a == nil {
 					continue
 				}
+			default: // a template: template ls lists it
+				continue
 			}
 			out = append(out, lpk)
 		}

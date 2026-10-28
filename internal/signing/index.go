@@ -18,6 +18,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/template"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
@@ -87,10 +88,10 @@ func RotationMessage(library, to string) []byte {
 	return []byte("railswitch-rotate\n" + library + "\n" + to + "\n")
 }
 
-var kindTop = map[string]string{pack.KindPack: "packs", pack.KindOption: "options", pack.KindAgent: "agents"}
+var kindTop = pack.LibraryDirs
 
 // kinds is the order packages are listed in.
-var kinds = []string{pack.KindPack, pack.KindOption, pack.KindAgent}
+var kinds = []string{pack.KindPack, pack.KindOption, pack.KindAgent, pack.KindTemplate}
 
 var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
@@ -135,7 +136,7 @@ func (idx *Index) check() error {
 		}
 		top, ok := kindTop[p.Kind]
 		if !ok {
-			errs = append(errs, fmt.Errorf("package[%d]: kind %q is not pack, option or agent", i, p.Kind))
+			errs = append(errs, fmt.Errorf("package[%d]: kind %q is not pack, option, agent or template", i, p.Kind))
 			continue
 		}
 		if !sha256Re.MatchString(p.SHA256) {
@@ -209,12 +210,13 @@ func BuildIndex(dir, lib string, serial int64, keep *Index) (*Index, error) {
 	return idx, nil
 }
 
-// pkgDir is one directory under a library's packs/, options/ or agents/.
+// pkgDir is one directory under a library's packs/, options/, agents/ or
+// templates/.
 type pkgDir struct{ kind, name string }
 
 func (d pkgDir) rel() string { return kindTop[d.kind] + "/" + d.name }
 
-// packageDirs lists the entries of dir's packs/, options/ and agents/ in
+// packageDirs lists the entries of dir's packs/, options/, agents/ and templates/ in
 // kind then name order. A top that is missing is empty; one that is a
 // symlink or not a directory is an error.
 func packageDirs(dir string) ([]pkgDir, error) {
@@ -274,6 +276,21 @@ func loadPackage(dir, kind, name string) (pack.Ref, string, error) {
 	if err != nil {
 		return pack.Ref{}, "", err
 	}
+	sub, err := fs.Sub(mem, rel)
+	if err != nil {
+		return pack.Ref{}, "", err
+	}
+	sum, err := pack.ContentHash(sub)
+	if err != nil {
+		return pack.Ref{}, "", fmt.Errorf("%s: %w", rel, err)
+	}
+	if kind == pack.KindTemplate {
+		t, err := template.Decode(sub)
+		if err != nil {
+			return pack.Ref{}, "", fmt.Errorf("%s: %w", rel, err)
+		}
+		return pack.Ref{Name: t.Name, Version: t.Version}, sum, nil
+	}
 	cat, err := pack.Load(mem)
 	if err != nil {
 		return pack.Ref{}, "", err
@@ -295,14 +312,6 @@ func loadPackage(dir, kind, name string) (pack.Ref, string, error) {
 	}
 	if len(refs) != 1 {
 		return pack.Ref{}, "", fmt.Errorf("%s: no %s manifest", rel, kind)
-	}
-	sub, err := fs.Sub(mem, rel)
-	if err != nil {
-		return pack.Ref{}, "", err
-	}
-	sum, err := pack.ContentHash(sub)
-	if err != nil {
-		return pack.Ref{}, "", fmt.Errorf("%s: %w", rel, err)
 	}
 	return refs[0], sum, nil
 }

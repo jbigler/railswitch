@@ -49,6 +49,7 @@ var completionSubs = map[string][]string{
 	"secret":           {"add", "ls", "rm", "set"},
 	"signer":           {"add", "ls", "revoke", "rm"},
 	"task":             {"ls"},
+	"template":         {"export", "ls", "show"},
 	"wt":               {"add", "ls", "rm"},
 }
 
@@ -90,6 +91,7 @@ var completionFlags = map[string][]string{
 	"secret set":             {"--restart"},
 	"settings apply":         {"--accept-install=", "--if-hash=", "--restart"},
 	"task":                   {"--new-term"},
+	"template export":        {"--description=", "--name=", "--to=", "--version="},
 	"wt add":                 {"--name=", "--up"},
 	"wt rm":                  {"--force"},
 }

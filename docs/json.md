@@ -358,6 +358,63 @@ order, each with its last fetch. `libraries` is `[]` when there are none.
 | `packages` | number | The packages the current copy's index lists; `0` without one. |
 | `pending` | object or null | A fetch waiting for `library trust <alias>`: `status` `unknown-signer` or `rotation`; `fingerprint` the signer (for a rotation, the trusted key that vouches for the new one); `new_fingerprint` a rotation's new key, else `""`; `known_library` as in `library verify` (trust needs `--new-signer`). `null` when none waits. |
 
+## `template ls`
+
+The templates a new project can start from (D109, docs/templates.md):
+this machine's store, then each library's in `libraries.toml` order. A
+template that doesn't read is left out (its reason on stderr).
+`templates` is `[]` when there are none.
+
+```json
+{
+  "templates": [
+    {
+      "ref": "acme:rails-pg@3",
+      "name": "rails-pg",
+      "version": 3,
+      "description": "Rails with PostgreSQL and Redis",
+      "source": "library acme",
+      "packages": ["rails@1", "postgres@1", "acme:redis@1"]
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref` | string | `<name>@N` on this machine, `<alias>:<name>@N` from a library. |
+| `name`, `version` | string, number | From its `stack.toml`. |
+| `description` | string | One line; `""` for none. |
+| `source` | string | `machine` or `library <alias>`. |
+| `packages` | array of strings | The package refs its lines use: the pack, each option (slot order, then extra services; `none` left out), each agent's. |
+
+## `template show <ref>`
+
+One template, as `template ls` resolves it.
+
+```json
+{
+  "ref": "rails-pg@1",
+  "sha256": "3f0c…",
+  "stack_toml": "schema = 1\nname = \"rails-pg\"\n…",
+  "ask": [{"key": "options.cache", "prompt": "Cache", "default": "redis@1"}],
+  "secrets": ["rails_master_key"],
+  "containerfiles": ["pg-client"],
+  "readme": "",
+  "files": [{"path": "stack.toml", "text": "…"}]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sha256` | string | The template's content hash (`pack.ContentHash`, lowercase hex, no prefix), as `[template] sha256` records it. |
+| `stack_toml` | string | Its `stack.toml`. |
+| `ask` | array | Its questions in order: `key` (`options.<key>`, `versions.<name>` or `env.<NAME>`), `prompt`, `default`. |
+| `secrets` | array of strings | The secrets it declares (names; never a value). |
+| `containerfiles` | array of strings | The `<name>` of each `containerfiles/Containerfile.<name>` it holds, sorted. |
+| `readme` | string | Its `README.md`; `""` for none. |
+| `files` | array | Every file, by path: `path`, `text`. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1

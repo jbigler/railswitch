@@ -22,6 +22,7 @@ import (
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/signing"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/template"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
@@ -39,7 +40,11 @@ const (
 )
 
 // manifests is the manifest of each top directory of a library.
-var manifests = map[string]string{"packs": "pack.toml", "options": "option.toml", "agents": "agent.toml"}
+var manifests = map[string]string{"packs": "pack.toml", "options": "option.toml", "agents": "agent.toml", templatesDir: template.StackFile}
+
+// templatesDir holds a library's templates (D109): <name>/ each, its files
+// those template.CheckPath allows.
+const templatesDir = "templates"
 
 // TrustUpdate runs fn on signers.toml under its lock and saves it when fn
 // returns save: signing.UpdateTrust on the machine's file.
@@ -347,7 +352,7 @@ func clone(ctx context.Context, run sys.Runner, lib *Library, staging string) (s
 		return "", fmt.Errorf("git rev-parse HEAD: %q", safefile.Printable(commit))
 	}
 	var tree listing
-	_, err = git(nil, &tree, "-C", repo, "ls-tree", "-r", "-z", "HEAD", "--", signing.IndexFile, signing.SigFile, "packs", "options", "agents")
+	_, err = git(nil, &tree, "-C", repo, "ls-tree", "-r", "-z", "HEAD", "--", signing.IndexFile, signing.SigFile, "packs", "options", "agents", templatesDir)
 	if tree.over {
 		return "", fmt.Errorf("the library has more than %d files; refused", maxFiles)
 	}
@@ -392,8 +397,9 @@ func clone(ctx context.Context, run sys.Runner, lib *Library, staging string) (s
 
 // treeFiles is the files of `git ls-tree -r -z` output, refusing the tree
 // unless each is a regular file (no symlink, no submodule) at a library
-// path: library.toml, library.toml.sig or <kind>s/<name>/<file> with
-// <file> on the package format's allowlist (D93).
+// path: library.toml, library.toml.sig, <kind>s/<name>/<file> with
+// <file> on the package format's allowlist (D93), or templates/<name>/
+// with template.CheckPath's files.
 func treeFiles(out []byte) ([]blob, error) {
 	var files []blob
 	for ent := range bytes.SplitSeq(out, []byte{0}) {
@@ -429,7 +435,13 @@ func checkPath(p string) error {
 	name, rel, ok := strings.Cut(rest, "/")
 	manifest := manifests[top]
 	if manifest == "" || !ok || !pack.ValidName(name) {
-		return fmt.Errorf("%q is not a library path: library.toml, library.toml.sig or <packs|options|agents>/<name>/<file>", safefile.Printable(p))
+		return fmt.Errorf("%q is not a library path: library.toml, library.toml.sig or <packs|options|agents|templates>/<name>/<file>", safefile.Printable(p))
+	}
+	if top == templatesDir {
+		if err := template.CheckPath(rel); err != nil {
+			return fmt.Errorf("%s/%s/: %w", top, name, err)
+		}
+		return nil
 	}
 	if err := pack.CheckFilePath(rel, manifest); err != nil {
 		return fmt.Errorf("%s/%s/: %w", top, name, err)

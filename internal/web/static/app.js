@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings or settingsfile
+const view = body.dataset.view || ""; // "", settings, settingsfile or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -20,7 +20,8 @@ let failures = 0;
 function connect() {
   if (es) es.close();
   clearTimeout(retry);
-  const q = new URLSearchParams({ p: prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view.startsWith("settings") ? "settings" : "" });
+  // The new page has a prefix only once Create starts its job.
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view.startsWith("settings") ? "settings" : view });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -504,14 +505,18 @@ async function preview() {
 }
 
 // startJob posts a form that starts a job and calls done when the job
-// ends, as the jobs fragment shows it.
+// ends, as the jobs fragment shows it; false when it didn't start.
 async function startJob(url, data, done) {
   const r = await fetch(url, { method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" } });
-  if (!r.ok) return toast((await r.text()).trim(), true);
+  if (!r.ok) {
+    toast((await r.text()).trim(), true);
+    return false;
+  }
   const j = await r.json();
   toast("Started: " + j.label, false);
   watched.set(j.id, done);
   jobEnded(j.id); // it may have ended before this answer came
+  return true;
 }
 
 function jobEnded(id) {
@@ -555,7 +560,7 @@ function addReady(f) {
   $("button", f).disabled = $$("input[required]", f).some((i) => !i.value.trim());
 }
 
-if (view) {
+if (view.startsWith("settings")) {
   document.addEventListener("click", (e) => {
     const t = e.target;
     const change = t.closest("[data-change]");
@@ -626,9 +631,211 @@ if (view) {
   });
 }
 
+// New project: Read the repository posts repo and branch (with the
+// picked pack, when one is picked) to /new/detect and swaps in the Stack
+// card; Next: review posts the whole form to /new/review and swaps in
+// step 2; Create starts project new as a job of the new prefix and
+// follows it on that prefix's stream. Any change after a review marks it
+// stale and turns Create off until the next review.
+
+function startNew() {
+  const form = $("#new-form");
+  const el = form.elements;
+  let extras = []; // Add service rows, {key, ref}, kept across reads
+  let reviewed = false;
+  let dirAuto = true; // the folder follows the prefix until edited
+  const autoDir = () => (el.prefix.value.trim() ? body.dataset.home + "/workspace/" + el.prefix.value.trim() : "");
+
+  function ready() {
+    $("[data-detect]", form).disabled = !el.repo.value.trim();
+    $("[data-review]", form).disabled = !($("#new-stack").dataset.pack && el.prefix.value.trim() && el.dir.value.trim());
+    const add = $("[data-add-extra]", form);
+    if (add) add.disabled = !$(".extra-key", form).value.trim();
+  }
+
+  function stale() {
+    if (!reviewed) return;
+    const note = $("#new-review [data-stale]");
+    if (note) note.hidden = false;
+    const create = $("#new-review form[data-create] button");
+    if (create) create.disabled = true;
+  }
+
+  async function detect(withPack) {
+    const data = new URLSearchParams({ repo: el.repo.value, branch: el.branch.value });
+    if (withPack && el.pack) data.set("pack", el.pack.value);
+    const err = $("#repo-error");
+    const btn = $("[data-detect]", form);
+    err.hidden = true;
+    btn.disabled = true;
+    btn.textContent = "Reading…";
+    let r = null;
+    try {
+      r = await fetch("/new/detect", { method: "POST", body: data, credentials: "same-origin" });
+    } catch {
+      // shown below
+    }
+    btn.textContent = "Read the repository";
+    const text = r ? (await r.text()).trim() : "The dashboard is not reachable.";
+    if (r && r.ok) {
+      swap("new-stack", text);
+      if (!el.branch.value.trim()) el.branch.value = $("#new-stack").dataset.branch || "";
+      renderExtras();
+      warnings();
+    } else {
+      err.textContent = text;
+      err.hidden = false;
+    }
+    stale();
+    ready();
+  }
+
+  function slotChanged(row) {
+    const checked = $("input[type=radio]:checked", row);
+    const ref = checked ? checked.value : row.dataset.ref;
+    const changed = ref !== row.dataset.ref;
+    row.classList.toggle("staged", changed);
+    const nw = $(".opt-new", row);
+    nw.hidden = !changed;
+    nw.textContent = changed ? "→ " + ref : "";
+    $(".slot-label", row).textContent = changed
+      ? "Changed by you · " + (row.dataset.source === "repo" ? "the repository suggests " : "the pack default is ") + row.dataset.ref
+      : row.dataset.label;
+    warnings();
+  }
+
+  function warnings() {
+    const box = $("#new-warnings");
+    box.replaceChildren();
+    $$(".slot", form).forEach((row) => {
+      const checked = $("input[type=radio]:checked", row);
+      if (row.dataset.source !== "repo" || !checked || checked.value === row.dataset.ref) return;
+      const p = document.createElement("p");
+      p.className = "yellow";
+      p.textContent = `${row.dataset.title}: you picked ${checked.value}, but the repository suggests ${row.dataset.ref}.`;
+      box.append(p);
+    });
+    box.hidden = !box.children.length;
+  }
+
+  function renderExtras() {
+    const box = $("#new-extras");
+    if (!box) return;
+    box.replaceChildren(...extras.map((x, i) => {
+      const row = document.createElement("div");
+      row.className = "opt";
+      row.innerHTML = '<div class="opt-hd"><b></b> <span class="mono"></span> <span class="muted">extra</span><span class="sp"></span><button type="button" class="ln danger" data-extra-remove>Remove</button></div><input type="hidden" name="option">';
+      $("b", row).textContent = x.key;
+      $(".mono", row).textContent = x.ref;
+      $("button", row).dataset.index = i;
+      $("input", row).value = x.key + "=" + x.ref;
+      return row;
+    }));
+  }
+
+  function changed() {
+    stale();
+    ready();
+  }
+
+  form.addEventListener("input", (e) => {
+    const t = e.target;
+    if (t === el.prefix && dirAuto) el.dir.value = autoDir();
+    if (t === el.dir) dirAuto = el.dir.value === "" || el.dir.value === autoDir();
+    if (!t.classList.contains("extra-key")) return changed();
+    ready();
+  });
+
+  form.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.matches("[data-repick]")) return detect(true);
+    const row = t.closest(".slot");
+    if (row && t.type === "radio") slotChanged(row);
+    if (!t.classList.contains("extra-key") && !t.classList.contains("extra-ref")) changed();
+  });
+
+  form.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t.closest("[data-detect]")) return detect(false);
+    const change = t.closest("[data-change]");
+    if (change) {
+      const c = $(".choices", change.closest(".opt"));
+      c.hidden = !c.hidden;
+      return;
+    }
+    if (t.closest("[data-add-extra]")) {
+      const key = $(".extra-key", form).value.trim();
+      const ref = $(".extra-ref", form).value;
+      if (!key || !ref) return;
+      if (extras.some((x) => x.key === key) || $$(".slot", form).some((r) => r.dataset.key === key)) {
+        return toast(key + " is already a service.", true);
+      }
+      extras.push({ key, ref });
+      $(".extra-key", form).value = "";
+      renderExtras();
+      return changed();
+    }
+    const rm = t.closest("[data-extra-remove]");
+    if (rm) {
+      extras.splice(Number(rm.dataset.index), 1);
+      renderExtras();
+      changed();
+    }
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("[data-review]", form);
+    btn.disabled = true;
+    let r = null;
+    try {
+      r = await fetch(form.action, { method: "POST", body: new URLSearchParams(new FormData(form)), credentials: "same-origin" });
+    } catch {
+      // shown below
+    }
+    const text = r ? (await r.text()).trim() : "The dashboard is not reachable.";
+    if (r && r.ok) {
+      swap("new-review", text);
+      reviewed = true;
+    } else {
+      toast(text, true);
+    }
+    ready();
+  });
+
+  document.addEventListener("submit", async (e) => {
+    const f = e.target;
+    if (!f.matches("form[data-create]")) return;
+    e.preventDefault();
+    const btn = $("button", f);
+    const data = new URLSearchParams(new FormData(form));
+    if (f.elements.up && f.elements.up.checked) data.set("up", "1");
+    const p = el.prefix.value.trim();
+    body.dataset.prefix = p;
+    connect();
+    btn.disabled = true;
+    const started = await startJob(f.action, data, (state) => {
+      if (state === "ok") {
+        location.href = "/p/" + encodeURIComponent(p);
+        return;
+      }
+      toast("project new " + state + ". The form keeps your values; the job's output says what was left and how to remove it.", true);
+      btn.disabled = false;
+    });
+    if (!started) btn.disabled = false;
+  });
+
+  ready();
+}
+
 // Start: the remembered project and sort, then the stream.
 
 (function start() {
+  if (view === "new") {
+    afterSwap("header");
+    startNew();
+    return;
+  }
   if (!prefix) return;
   if (view) {
     afterSwap("header");

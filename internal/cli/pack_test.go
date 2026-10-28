@@ -209,7 +209,8 @@ func TestPackLsJSON(t *testing.T) {
 		`{"ref":"postgres@1","name":"postgres","slot":"database","works_with":["*"]},` +
 		`{"ref":"redis@1","name":"redis","slot":"cache","works_with":["*"]},` +
 		`{"ref":"rustfs@1","name":"rustfs","slot":"storage","works_with":["*"]},` +
-		`{"ref":"sidekiq@1","name":"sidekiq","slot":"jobs","works_with":["rails","hanami"]}]}` + "\n"
+		`{"ref":"sidekiq@1","name":"sidekiq","slot":"jobs","works_with":["rails","hanami"]}],` +
+		`"agents":[{"ref":"claude@1","name":"claude","default":true}]}` + "\n"
 	if out != want {
 		t.Errorf("pack ls =\n%s\nwant\n%s", out, want)
 	}

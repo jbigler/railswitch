@@ -149,5 +149,20 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .apply label.check{display:block;margin:6px 0}
 .diff summary{cursor:pointer;color:var(--blue);margin-top:8px}
 
+/* New project */
+.new-form label.field{display:block;margin:8px 0;color:var(--muted)}
+.new-form label.field input{display:block;width:100%;margin-top:3px;color:var(--text)}
+.new-form input:not([type=checkbox]):not([type=radio]),.new-form select{padding:4px 6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px;font:inherit}
+.new-form input:invalid:not(:placeholder-shown){border-color:var(--red)}
+.hint{display:block;font-size:12px;margin-top:2px}
+.btns.start{justify-content:flex-start}
+.new-form label.check{display:block;margin:6px 0}
+.pack-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.slot-label{font-size:12px;overflow-wrap:anywhere}
+.warnings{margin:8px 0}
+.warnings p{margin:4px 0}
+.toml-view{max-height:50vh}
+.proj-new{border-top:1px solid var(--sel);margin-top:4px;padding-top:4px}
+
 .toast{position:fixed;right:16px;bottom:16px;max-width:460px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap}
 .toast.err{color:var(--red);border-color:var(--red)}

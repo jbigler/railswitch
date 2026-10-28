@@ -1,0 +1,87 @@
+{{define "new"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-view="new" data-home="{{.Home}}">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<h1>New project</h1>
+<p class="note">Nothing is created until you press Create project. Reading the repository fetches only the files the packages' detection rules name.</p>
+<form id="new-form" class="new-form" method="post" action="/new/review">
+<section class="card">
+<h2>1 · Stack and options</h2>
+<label class="field">Repository <input name="repo" class="mono" required autocomplete="off" spellcheck="false" placeholder="git@github.com:owner/app.git"></label>
+<p id="repo-error" class="red set-error" hidden></p>
+<label class="field">Base branch <input name="branch" class="mono" autocomplete="off" spellcheck="false" placeholder="the repository's default branch"></label>
+<label class="field">Project name <input name="name" autocomplete="off" placeholder="the folder's name"></label>
+<label class="field">Prefix <input name="prefix" class="mono" required autocomplete="off" spellcheck="false" maxlength="16" pattern="[a-z][a-z0-9]{1,15}">
+<span class="hint">Lowercase letters and digits, 2–16, starting with a letter; it names every container, volume and hostname. Must be unused on this machine.</span></label>
+<label class="field">Workspace folder <input name="dir" class="mono" required autocomplete="off" spellcheck="false" placeholder="{{.Home}}/workspace/&lt;prefix&gt;">
+<span class="hint">Default <span class="mono">~/workspace/&lt;prefix&gt;</span>; the base worktree is cloned inside it.</span></label>
+<div class="btns start"><button type="button" class="ln main" data-detect disabled>Read the repository</button></div>
+</section>
+{{template "newstack" .Stack}}
+<section class="card">
+<h2>Tools and agents</h2>
+<label class="check"><input type="checkbox" name="tool" value="nvim"> Neovim <span class="muted">· a Neovim server in each worktree</span></label>
+{{range .Agents}}<label class="check"><input type="checkbox" name="agent" value="{{.Name}}={{.Ref}}"{{if .Default}} checked{{end}}> Agent <span class="mono">{{.Name}}</span> <span class="muted mono">{{.Ref}}</span></label>
+{{else}}{{if not .AgentsError}}<p class="muted">No agent packages.</p>
+{{end}}{{end}}{{if .AgentsError}}<p class="red">Agents unavailable: {{.AgentsError}}</p>
+{{end}}<p class="note">With no agent ticked the project gets none.</p>
+</section>
+<div id="new-warnings" class="warnings" hidden></div>
+<div class="btns"><button class="ln main" data-review disabled>Next: review</button></div>
+</form>
+</section>
+<section class="pane">
+{{template "newreview" .Review}}
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}
+
+{{define "newstack"}}<section id="new-stack" class="card" data-pack="{{.Pack}}" data-branch="{{.Branch}}">
+<h2>Stack</h2>
+{{if not .Read}}<p class="muted">Read the repository to see the pack and options it suggests.</p>
+{{else}}<div class="pack-row">{{if .Pack}}<b>Pack</b> <span class="mono">{{.Pack}}</span>{{with .Evidence}} <span class="muted">· read from the repository · {{range $i, $e := .}}{{if $i}}, {{end}}{{$e}}{{end}}</span>{{end}}{{else}}<span class="yellow">No pack matched; pick one</span>{{end}}
+<span class="sp"></span><select name="pack" data-repick aria-label="Pack">{{if not .Pack}}<option value="">Pick a pack</option>{{end}}{{range .Packs}}<option value="{{.Ref}}"{{if .Current}} selected{{end}}>{{.Ref}}</option>{{end}}</select></div>
+{{with .Others}}<p class="note">Also matched: <span class="mono">{{range $i, $e := .}}{{if $i}}, {{end}}{{$e}}{{end}}</span></p>
+{{end}}{{if .Pack}}<div class="lbl">Beside the app</div>
+{{range .Slots}}<div class="opt slot" data-key="{{.Key}}" data-ref="{{.Ref}}" data-source="{{.Source}}" data-title="{{.Title}}" data-label="{{.Label}}">
+<div class="opt-hd"><b>{{.Title}}</b> <span class="mono opt-cur">{{.Ref}}</span> <span class="mono opt-new" hidden></span><span class="muted slot-label">{{.Label}}</span><span class="sp"></span><button type="button" class="ln dim" data-change>Change</button></div>
+{{with .Others}}<div class="note">Also in the repository: <span class="mono">{{range $i, $e := .}}{{if $i}}, {{end}}{{$e}}{{end}}</span></div>
+{{end}}<div class="choices" hidden>{{$k := .Key}}{{$tag := "pack default"}}{{if eq .Source "repo"}}{{$tag = "suggested"}}{{end}}{{range .Choices}}<label class="choice"><input type="radio" name="opt-{{$k}}" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">{{$tag}}</span>{{end}}</label>{{end}}</div>
+</div>
+{{end}}<div id="new-extras"></div>
+<div class="add-row" data-add-service>
+<input class="mono extra-key" placeholder="service name" autocomplete="off" aria-label="Service name">
+<select class="extra-ref" aria-label="Option">{{range .AddChoices}}<option value="{{.}}">{{.}}</option>{{end}}</select>
+<button type="button" class="ln" data-add-extra disabled>Add service</button>
+</div>
+<p class="note">Any other key runs an option as one more service, named after the key (a second database, ClickHouse beside Postgres).</p>
+{{end}}{{end}}</section>{{end}}
+
+{{define "newreview"}}<section id="new-review" class="card review">
+<h2>2 · Review and create</h2>
+{{if .Empty}}<p class="note">Fill in step 1 and press Next: review. This side then shows the project.toml that will be written and what each worktree gets; nothing is created before Create project.</p>
+{{else}}{{if .Error}}<p class="red set-error refusal">{{.Error}}</p>
+{{end}}<p class="yellow" data-stale hidden>Step 1 changed since this review. Press Next: review again.</p>
+{{if not .Error}}{{with .Doc}}<div class="lbl">Each worktree gets</div>
+<dl class="kv">
+<dt>Routes</dt><dd>{{range .Worktree.Routes}}<div><span class="mono">{{.Host}}</span> <span class="muted">→ {{.Service}}</span></div>{{else}}<span class="muted">none</span>{{end}}</dd>
+<dt>Containers</dt><dd>{{range .Worktree.Containers}}<div><span class="mono">{{.Name}}</span> <span class="muted">{{.Role}}</span></div>{{else}}<span class="muted">none</span>{{end}}</dd>
+<dt>App env</dt><dd class="mono">{{range $i, $e := .Worktree.Env}}{{if $i}}, {{end}}{{$e}}{{else}}<span class="muted">none</span>{{end}}</dd>
+</dl>
+{{range .Warnings}}<p class="yellow">{{.}}</p>
+{{end}}<div class="lbl">The project.toml it writes</div>
+<pre class="out mono toml-view">{{.ProjectTOML}}</pre>
+<div class="lbl">Create runs</div>
+<ol class="steps">{{range .Steps}}<li>{{.}}</li>{{end}}</ol>
+{{end}}{{end}}<form method="post" action="{{.CreateURL}}" data-create>
+{{if .Doc.Worktree.Slug}}<label class="check"><input type="checkbox" name="up" value="1" checked> Start <span class="mono">{{.Doc.Worktree.Slug}}</span> when it's created</label>
+{{end}}<div class="btns"><button class="ln main"{{if .Error}} disabled{{end}}>Create project</button></div>
+</form>
+{{end}}</section>{{end}}

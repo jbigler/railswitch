@@ -167,6 +167,73 @@ type secretRow struct {
 	Services []string `json:"services"`
 }
 
+// detectDoc is `project detect`: the pack and options a repository
+// suggests, each with its evidence. Pack nil: no pack matched.
+type detectDoc struct {
+	Branch  string        `json:"branch"`
+	Pack    *packMatch    `json:"pack"`
+	Options []optionMatch `json:"options"`
+}
+
+type packMatch struct {
+	Ref      string   `json:"ref"`
+	Evidence []string `json:"evidence"`
+	Others   []string `json:"others"`
+}
+
+type optionMatch struct {
+	Key      string   `json:"key"`
+	Ref      string   `json:"ref"`
+	Source   string   `json:"source"` // repo or default
+	Evidence string   `json:"evidence"`
+	Others   []string `json:"others"`
+}
+
+// catalogDoc is `pack ls`: what a new project chooses from.
+type catalogDoc struct {
+	Packs []struct {
+		Ref  string `json:"ref"`
+		Name string `json:"name"`
+	} `json:"packs"`
+	Options []catalogOption `json:"options"`
+	Agents  []struct {
+		Ref     string `json:"ref"`
+		Name    string `json:"name"`
+		Default bool   `json:"default"`
+	} `json:"agents"`
+}
+
+type catalogOption struct {
+	Ref       string   `json:"ref"`
+	Name      string   `json:"name"`
+	Slot      string   `json:"slot"`
+	WorksWith []string `json:"works_with"`
+}
+
+// dryRunDoc is `project new --dry-run`: the project.toml it would write
+// and what its base worktree would get.
+type dryRunDoc struct {
+	ProjectTOML string `json:"project_toml"`
+	Worktree    struct {
+		Slug   string `json:"slug"`
+		Routes []struct {
+			Host    string `json:"host"`
+			Service string `json:"service"`
+		} `json:"routes"`
+		Containers []struct {
+			Name string `json:"name"`
+			Role string `json:"role"`
+		} `json:"containers"`
+		Env []string `json:"env"`
+	} `json:"worktree"`
+	Warnings []string `json:"warnings"`
+	Steps    []string `json:"steps"`
+}
+
+func readCatalog(ctx context.Context, c CLI) (catalogDoc, error) {
+	return readJSON[catalogDoc](ctx, c, "pack", "ls")
+}
+
 // readJSON runs `railswitch --json <args>` and decodes its document.
 func readJSON[T any](ctx context.Context, c CLI, args ...string) (T, error) {
 	var v T

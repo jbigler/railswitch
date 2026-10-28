@@ -62,7 +62,7 @@ func TestRowChangeEvents(t *testing.T) {
 	for _, sel := range []string{"b", "main"} {
 		f := newFixture(t)
 		ctx := context.Background()
-		sub := f.s.subscribe("ftest", sel, parseSort("name"), false)
+		sub := f.s.subscribe("ftest", sel, parseSort("name"), "")
 		defer f.s.unsubscribe(sub)
 		f.s.pollOnce(ctx)
 		first := drain(sub)
@@ -99,7 +99,7 @@ func TestRowChangeEvents(t *testing.T) {
 func TestOrderChangeSendsList(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "b", parseSort("running"), false)
+	sub := f.s.subscribe("ftest", "b", parseSort("running"), "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	drain(sub)
@@ -123,7 +123,7 @@ func TestOrderChangeSendsList(t *testing.T) {
 func TestNotifications(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("hello", "master", parseSort("name"), false)
+	sub := f.s.subscribe("hello", "master", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	long := strings.Repeat("é", 150) + strings.Repeat("x", 150)
 	steps := []struct {
@@ -183,7 +183,7 @@ func TestNeedCount(t *testing.T) {
 	ctx := context.Background()
 	f.cli.set("--json -C /ws/ftest overview", ftestOverview("jb/b", "up", agentJSON("permission", "rm?", false)))
 	f.cli.set("--json -C /ws/hello overview", helloOverview(agentJSON("question", "which db?", false)))
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), false)
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	evs := drain(sub)
@@ -219,7 +219,7 @@ func TestPRError(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	f.cli.fail("--json -C /ws/ftest pr ls", errors.New("pr ls: gh: not logged in"))
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), false)
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	banners := 0
 	for i := range 3 {
@@ -260,7 +260,7 @@ func TestPRError(t *testing.T) {
 func TestCadence(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "", parseSort("name"), false)
+	sub := f.s.subscribe("ftest", "", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	count := func() (int, int, int, int) {
 		return f.cli.count("--json -C /ws/ftest overview"), f.cli.count("--json -C /ws/hello overview"),
@@ -314,7 +314,7 @@ func TestCadence(t *testing.T) {
 func TestJobEndDuringRead(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), false)
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	f.clock.Add(2 * time.Second)

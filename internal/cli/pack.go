@@ -475,6 +475,13 @@ func packRefCandidates(context.Context, string) []string {
 type packLsDoc struct {
 	Packs   []packLsPack   `json:"packs"`
 	Options []packLsOption `json:"options"`
+	Agents  []packLsAgent  `json:"agents"`
+}
+
+type packLsAgent struct {
+	Ref     string `json:"ref"`
+	Name    string `json:"name"`
+	Default bool   `json:"default"` // the agent a new project gets unless told otherwise
 }
 
 type packLsPack struct {
@@ -507,7 +514,7 @@ func packLs(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	doc := packLsDoc{Packs: []packLsPack{}, Options: []packLsOption{}}
+	doc := packLsDoc{Packs: []packLsPack{}, Options: []packLsOption{}, Agents: []packLsAgent{}}
 	for _, r := range newestBuiltins(cat.Packs) {
 		doc.Packs = append(doc.Packs, packLsPack{r.String(), r.Name})
 	}
@@ -520,6 +527,9 @@ func packLs(e *env, args []string) int {
 	}
 	for _, m := range localManifests(root, "options", "option.toml") {
 		doc.Options = append(doc.Options, packLsOption{m.ref.String(), m.ref.Name, m.Slot, append([]string{}, m.WorksWith...)})
+	}
+	for _, r := range newestBuiltins(cat.Agents) {
+		doc.Agents = append(doc.Agents, packLsAgent{r.String(), r.Name, cat.Agents[r].Default})
 	}
 	slices.SortFunc(doc.Packs, func(a, b packLsPack) int { return strings.Compare(a.Ref, b.Ref) })
 	slices.SortFunc(doc.Options, func(a, b packLsOption) int { return strings.Compare(a.Ref, b.Ref) })
@@ -536,6 +546,13 @@ func packLs(e *env, args []string) int {
 	}
 	for _, o := range doc.Options {
 		fmt.Fprintf(tw, "%s\toption\t%s\t%s\t\n", o.Ref, o.Slot, strings.Join(o.WorksWith, ", "))
+	}
+	for _, a := range doc.Agents {
+		def := ""
+		if a.Default {
+			def = "default"
+		}
+		fmt.Fprintf(tw, "%s\tagent\t\t%s\t\n", a.Ref, def)
 	}
 	if err := tw.Flush(); err != nil {
 		return e.fail(err)

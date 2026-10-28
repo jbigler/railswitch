@@ -9,6 +9,7 @@ form posted without JS. No CSS: /static needs the cookie. */}}
 <body>
 <h1>RailSwitch</h1>
 {{range .Lines}}<p>{{.}}</p>
+{{end}}{{with .Next}}<p><a href="{{.}}">{{$.NextText}}</a></p>
 {{end}}{{with .Back}}<p><a href="{{.}}">Back</a></p>
 {{end}}</body>
 </html>

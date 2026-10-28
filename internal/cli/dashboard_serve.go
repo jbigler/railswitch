@@ -27,8 +27,8 @@ const dashboardServeUsage = "usage: railswitch dashboard serve"
 const exeCheckEvery = 5 * time.Second
 
 // cliTimeout bounds one read the dashboard runs (pr ls waits up to 30 s
-// for gh).
-const cliTimeout = 60 * time.Second
+// for gh, project detect up to 2 min for git).
+const cliTimeout = 150 * time.Second
 
 // railswitch dashboard serve: the dashboard itself (its unit's ExecStart).
 // It listens on machine.DashboardAddr until stopped, or until its
@@ -63,13 +63,17 @@ func dashboardServe(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return e.fail(err)
+	}
 	ln, err := net.Listen("tcp", machine.DashboardAddr)
 	if err != nil {
 		return e.fail(err)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Version: buildinfo.Version, Now: time.Now})
+	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Home: home, Version: buildinfo.Version, Now: time.Now})
 	hs := &http.Server{
 		Addr: machine.DashboardAddr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return ctx }, // ends the event streams

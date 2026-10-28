@@ -99,7 +99,8 @@ Each list is sorted by ref.
 
 ```json
 {"packs": [{"ref": "rails@1", "name": "rails"}],
- "options": [{"ref": "postgres@1", "name": "postgres", "slot": "database", "works_with": ["*"]}]}
+ "options": [{"ref": "postgres@1", "name": "postgres", "slot": "database", "works_with": ["*"]}],
+ "agents": [{"ref": "claude@1", "name": "claude", "default": true}]}
 ```
 
 | Field | Type | Meaning |
@@ -108,6 +109,7 @@ Each list is sorted by ref.
 | `packs[].name`, `options[].name` | string | The package name. |
 | `options[].slot` | string | The option's slot. |
 | `options[].works_with` | string[] | Pack names it works with, or `["*"]`. |
+| `agents[]` | array | Built-in agent packages, newest version per name: `ref`, `name`, `default` (the agent `project new` adds unless `--agent` says otherwise). |
 
 A local package is read leniently: one that doesn't load yet is listed
 when its manifest has a `version` (choosing it shows the load error); one

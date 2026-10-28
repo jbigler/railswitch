@@ -59,12 +59,15 @@ type jobInfo struct {
 type subscriber struct {
 	prefix, sel string
 	sort        sortKey
-	settings    bool // a settings page: its jobs are the project-level ones
-	ch          chan event
-	gone        chan struct{} // closed when the page fell behind
-	dropped     bool
-	sent        map[string]string // fragment id → the HTML last sent
-	listKey     string            // selection and row order of the list last sent
+	// view is "" for a project's page; "settings" (a settings page) or
+	// "new" (the new page, prefix the project it creates) get only the
+	// project-level jobs.
+	view    string
+	ch      chan event
+	gone    chan struct{} // closed when the page fell behind
+	dropped bool
+	sent    map[string]string // fragment id → the HTML last sent
+	listKey string            // selection and row order of the list last sent
 }
 
 // send queues ev; a page that doesn't keep up is dropped (it reconnects
@@ -90,8 +93,8 @@ func (sub *subscriber) diff(typ, id, html string, job *jobInfo) {
 	sub.send(event{Type: typ, ID: id, HTML: html, Job: job})
 }
 
-func (s *Server) subscribe(prefix, sel string, k sortKey, settings bool) *subscriber {
-	sub := &subscriber{prefix: prefix, sel: sel, sort: k, settings: settings, ch: make(chan event, subBuffer), gone: make(chan struct{}), sent: map[string]string{}}
+func (s *Server) subscribe(prefix, sel string, k sortKey, view string) *subscriber {
+	sub := &subscriber{prefix: prefix, sel: sel, sort: k, view: view, ch: make(chan event, subBuffer), gone: make(chan struct{}), sent: map[string]string{}}
 	s.mu.Lock()
 	s.subs[sub] = struct{}{}
 	s.push(sub)
@@ -360,7 +363,11 @@ func (s *Server) publish() {
 // row on its own while the list's order and selection stay, else the
 // whole list. s.mu is held.
 func (s *Server) push(sub *subscriber) {
-	pv := s.pageData(sub.prefix, sub.sel, sub.sort)
+	shown := sub.prefix
+	if sub.view == "new" {
+		shown = "" // the header and switcher of no project
+	}
+	pv := s.pageData(shown, sub.sel, sub.sort)
 	for _, f := range []struct {
 		id   string
 		data any
@@ -372,7 +379,7 @@ func (s *Server) push(sub *subscriber) {
 		}
 		sub.diff("html", f.id, html, nil)
 	}
-	if sub.settings {
+	if sub.view != "" {
 		html, err := render("jobs", s.subJobs(sub, s.c.Jobs.Jobs(sub.prefix, "")))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
@@ -422,11 +429,11 @@ func (s *Server) push(sub *subscriber) {
 }
 
 // subJobs is the jobs fragment of sub's page: the selected worktree's
-// with the project's, or on a settings page the project's alone. s.mu is
-// held.
+// with the project's, or on a settings or new page the project's alone.
+// s.mu is held.
 func (s *Server) subJobs(sub *subscriber, snaps []jobs.Snapshot) jobsView {
 	rows, sel := s.rows(sub.prefix, sub.sort, sub.sel)
-	if sub.settings {
+	if sub.view != "" {
 		sel = ""
 	}
 	return newJobs(snaps, rows, sel)

@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/jbigler/railswitch/internal/jobs"
+	"github.com/jbigler/railswitch/internal/naming"
 )
 
 //go:embed static
@@ -31,6 +32,7 @@ type Config struct {
 	CLI     CLI
 	Jobs    *jobs.Hub
 	Exe     string // for job argv[0]
+	Home    string // the user's home: a new project's default folder, its create job's dir
 	Version string
 	Now     func() time.Time
 }
@@ -92,6 +94,10 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/settings/apply", s.settingsApply)
 	m.HandleFunc("POST /p/{prefix}/settings/secret", s.settingsSecret)
 	m.HandleFunc("POST /p/{prefix}/settings/file", s.settingsFile)
+	m.HandleFunc("GET /new", s.newPage)
+	m.HandleFunc("POST /new/detect", s.newDetect)
+	m.HandleFunc("POST /new/review", s.newReview)
+	m.HandleFunc("POST /new/create", s.newCreate)
 	s.mux = m
 	return s
 }
@@ -103,22 +109,25 @@ func (s *Server) Handler() http.Handler { return s.guard(s.mux) }
 // latest project ls and overview have them.
 
 // project is prefix's project ls row, reading project ls when it never
-// has been.
+// has been, or when it lacks prefix (a project just created).
 func (s *Server) project(ctx context.Context, prefix string) (projectRow, bool, error) {
-	s.mu.Lock()
-	loaded := s.projectsLoaded
-	s.mu.Unlock()
-	if !loaded {
-		if err := s.loadProjects(ctx); err != nil {
-			return projectRow{}, false, err
+	lookup := func() (projectRow, bool, bool) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if p := s.state[prefix]; p != nil {
+			return p.row, true, s.projectsLoaded
 		}
+		return projectRow{}, false, s.projectsLoaded
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if p := s.state[prefix]; p != nil {
-		return p.row, true, nil
+	row, ok, loaded := lookup()
+	if ok || (loaded && prefix == "") {
+		return row, ok, nil
 	}
-	return projectRow{}, false, nil
+	if err := s.loadProjects(ctx); err != nil {
+		return projectRow{}, false, err
+	}
+	row, ok, _ = lookup()
+	return row, ok, nil
 }
 
 // overviewOf is prefix's latest overview, read now when there is none.
@@ -190,7 +199,10 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	if first == "" {
-		s.simple(w, http.StatusOK, "", "No project is registered on this machine yet: create one with railswitch project new.")
+		s.html(w, http.StatusOK, "simple", simpleView{
+			Lines: []string{"No project is registered on this machine yet."},
+			Next:  "/new", NextText: "Create a project",
+		})
 		return
 	}
 	http.Redirect(w, r, "/p/"+first, http.StatusSeeOther)
@@ -224,16 +236,29 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 // at once, then the changes, notifications and job updates.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	p, ok, err := s.project(r.Context(), q.Get("p"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	view := q.Get("view")
+	if view != "settings" && view != "new" {
+		view = ""
 	}
-	if !ok {
-		http.Error(w, "unknown project", http.StatusNotFound)
-		return
+	prefix := q.Get("p")
+	if view == "new" {
+		// The new page follows the create job of a project not registered yet.
+		if err := naming.ValidPrefix(prefix); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		p, ok, err := s.project(r.Context(), prefix)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.Error(w, "unknown project", http.StatusNotFound)
+			return
+		}
+		_, _ = s.overviewOf(r.Context(), p.Prefix, p.Workspace) // its error is the banner
 	}
-	_, _ = s.overviewOf(r.Context(), p.Prefix, p.Workspace) // its error is the banner
 	rc := http.NewResponseController(w)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(http.StatusOK)
@@ -244,7 +269,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if !write([]byte("retry: 2000\n\n")) {
 		return
 	}
-	sub := s.subscribe(p.Prefix, q.Get("w"), parseSort(q.Get("sort")), q.Get("view") == "settings")
+	sub := s.subscribe(prefix, q.Get("w"), parseSort(q.Get("sort")), view)
 	defer s.unsubscribe(sub)
 	ping := time.NewTicker(s.ping)
 	defer ping.Stop()
@@ -576,8 +601,11 @@ func (s *Server) html(w http.ResponseWriter, code int, name string, data any) {
 // simple answers a small page without CSS: refusals, the no-project page,
 // a form posted without the page's script.
 func (s *Server) simple(w http.ResponseWriter, code int, back string, lines ...string) {
-	s.html(w, code, "simple", struct {
-		Lines []string
-		Back  string
-	}{lines, back})
+	s.html(w, code, "simple", simpleView{Lines: lines, Back: back})
+}
+
+type simpleView struct {
+	Lines          []string
+	Back           string
+	Next, NextText string // a link onward
 }

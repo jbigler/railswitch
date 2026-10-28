@@ -194,6 +194,69 @@ offers to reload the file; your text stays in the editor until you do.
 Every settings action is a job of the project, so it waits for (and
 blocks) the project's other jobs. Its output shows under the panel.
 
+## New project
+
+`/new` creates a project. Open it from the switcher ("New project…", the
+last entry) or from `/` when no project is registered. The page has two
+panels: step 1 on the left, step 2 on the right. Nothing is created
+until you press Create project.
+
+**Step 1: Stack and options**
+
+- **Repository**, **Base branch** (empty: the repository's default
+  branch), **Project name** (empty: the folder's name), **Prefix**
+  (lowercase letters and digits, 2–16, starting with a letter, unused on
+  this machine) and **Workspace folder**. The folder starts as
+  `~/workspace/<prefix>` and follows the prefix until you edit it.
+- **Read the repository** runs `railswitch --json project detect <repo>
+  [--branch <b>]` while you wait (it fetches only the files the packages'
+  detection rules name, up to 2 minutes). git's error shows under
+  Repository. An empty Base branch is filled with the branch it read.
+- **Stack:** the pack it matched, with the files that matched, and a
+  picker of every pack (`railswitch --json pack ls`). When no pack
+  matched, the card says "No pack matched; pick one". Picking a pack
+  reads the repository again with `--pack <ref>`, which resets the slots.
+- One row per slot, labelled by where its package comes from: "Read from
+  the repository · <evidence>" or "Pack default". "Change" opens the
+  choices: the options of that slot that work with the pack (`works_with`
+  `*` or the pack's name), and `none`. A changed row shows `→ <new>` and
+  "Changed by you · the repository suggests <ref>" (or "the pack default
+  is <ref>"). "Add service" adds an extra key (D81) with any option that
+  works with the pack.
+- **Tools and agents:** Neovim, and one box per agent package `pack ls`
+  lists; the package with `default = true` starts ticked. With no box
+  ticked the project gets no agent (`--agent none`).
+- A slot changed away from what the repository suggests adds a warning:
+  "<Slot>: you picked <X>, but the repository suggests <Y>."
+- **Next: review** runs the dry run (step 2). It is off until a pack is
+  chosen and the prefix and folder are filled in.
+
+**Step 2: Review and create**
+
+- `railswitch --json project new <dir> --repo <repo> --prefix <p> [--name
+  <n>] [--branch <b>] --pack <ref> --option <key>=<ref>… [--tool nvim]
+  (--agent <name>=<ref>… | --agent none) --dry-run`. A refusal (a prefix in
+  use, an existing `project.toml`, an option that doesn't work with the
+  pack) shows at the top, and Create project is off.
+- Each worktree gets: its routes, its containers with their roles, and
+  the app's env names. Then the render warnings, the `project.toml` it
+  writes (read-only) and the steps Create runs.
+- Any change to step 1 after a review marks the review stale and turns
+  Create project off until you press Next: review again.
+- "Start <slug> when it's created" (on) adds `--up`.
+- **Create project** runs the same `project new` command without
+  `--dry-run` as a project-level job of the new prefix, from your home
+  directory; a second create of that prefix is refused while the first
+  runs. Every value is its own argv entry: a repository URL with spaces
+  or `;` is passed as typed. When the job ends ok the page opens
+  `/p/<prefix>`. When it fails, the form keeps its values and the job's
+  output below says what was left and the command that removes it.
+
+The page refuses (400, nothing run) a repository, branch, name, prefix,
+folder or pack that starts with `-` or holds a line break, a prefix that
+breaks the rule above, and a folder that is neither absolute nor under
+`~/`.
+
 ## Links
 
 The detail's Links section comes first, in this order:
@@ -392,6 +455,8 @@ docs/json.md.
   known terminal installed.
 - `railswitch wt add [--name <n>] [--up] <branch>`: `--up` runs `up` in the
   new worktree.
+- `railswitch [--json] pack ls`: the built-in packs, options (with slot
+  and `works_with`) and agent packages, for the new page.
 - `railswitch dashboard`: prints the login link.
 - `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,
@@ -407,7 +472,10 @@ Server-Sent Events stream. On connect it sends the current fragments
 afterwards only fragments that changed (a single list row by its own id
 while the order and selection stay), and `: ping` every 15 s. A settings
 page connects with `&view=settings`: it gets no `list` or `detail`, and
-its `jobs` are the project-level ones only. Each `data:` line is one
+its `jobs` are the project-level ones only. The new page connects when
+Create starts, with `&view=new` and the new prefix, which need not be
+registered: it gets the `header`, `projects`, `strip` and `banner` of no
+project and that prefix's project-level `jobs`. Each `data:` line is one
 JSON object:
 
 ```json

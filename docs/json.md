@@ -211,9 +211,9 @@ hook writes.
 One project (`-C`): every registered worktree, in registry order (by ID),
 with its stack state, services, agent and links. The dashboard polls it
 every 2 s, so it is cheap: one `systemctl --user show` for every unit of
-the project, at most one `podman ps --format {{.Names}}` (only when the
-project has agents or on-demand services), no health check and no git
-call. The text form is a table `WORKTREE BRANCH STACK AGENT` (the base
+the project, exactly one `podman ps -a --format json` (running
+on-demand services and agents, and each running container's unit-hash
+label), no health check and no git call. The text form is a table `WORKTREE BRANCH STACK AGENT` (the base
 worktree marked `(base)`) with each worktree's links indented under its
 row.
 
@@ -224,7 +224,7 @@ row.
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
-      "stack": "up",
+      "stack": "up", "stale": false,
       "services": [{"service": "rails", "role": "app", "state": "active/running"}],
       "agent": {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
       "links": [
@@ -246,6 +246,7 @@ row.
 | `worktrees[].branch` | string | The branch checked out, read from its git files; `""` when detached, unreadable or the directory is gone (the worktree is still listed). |
 | `worktrees[].base` | boolean | It is the base worktree (`<workspace>/<base_branch>`). |
 | `worktrees[].stack` | string | Over the services with roles `app`, `worker`, `data` (not `deps`, `tool`, `agent`): `failed` if any unit's ActiveState is `failed`, `up` if all are `active`, `stopped` if none is `active` or `activating` (or there are none), else `partial`. |
+| `worktrees[].stale` | boolean | A running container of a stack service (not an on-demand one) was created from an older unit than the one rendered in the Quadlet directory: its `<prefix>.unit-hash` label differs from the unit file's (a missing label counts as different, as in `up`). `up` restarts such a container; the dashboard shows "restart to apply". A container that does not run, or a unit not rendered yet, never makes it `true`. |
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
 | `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
 | `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |

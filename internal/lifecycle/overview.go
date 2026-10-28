@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -12,6 +14,7 @@ import (
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/unithash"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -33,6 +36,7 @@ type OverviewWorktree struct {
 	Services []OverviewService `json:"services"`
 	Agent    *AgentRow         `json:"agent"` // the running agent, else the first not off; nil: none
 	Links    []render.Link     `json:"links"`
+	Stale    bool              `json:"stale"` // a running container was created from an older unit (D85)
 }
 
 // Overview is one project's every worktree, as the dashboard polls it
@@ -77,8 +81,8 @@ func StackState(services []OverviewService) string {
 
 // Overview reports every registered worktree of the project: its stack and
 // service states from one batched `systemctl --user show`, on-demand
-// services and agents running from one `podman ps` (none without either),
-// its agent and links. It runs no git (the model is built without the host
+// services, agents and stale containers (D85) from one `podman ps -a`, its
+// agent and links. It runs no git (the model is built without the host
 // git identity, which nothing here needs) and no health check: the
 // dashboard calls it every 2 s.
 func (l *L) Overview(ctx context.Context) (Overview, error) {
@@ -88,12 +92,9 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	}
 	wts := m.Inputs.Worktrees
 	var units []string
-	needPS := len(m.Inputs.Stack.Agents) > 0
 	for _, w := range wts {
 		for _, s := range m.Services {
-			if s.OnDemand {
-				needPS = true
-			} else {
+			if !s.OnDemand {
 				units = append(units, unitOf(m, w.Slug, s.ID))
 			}
 		}
@@ -102,11 +103,10 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	running := map[string]bool{}
-	if needPS {
-		if running, err = l.podman().RunningNames(ctx); err != nil {
-			return Overview{}, err
-		}
+	key := unithash.Key(m.Prefix)
+	hashes, err := l.podman().Labels(ctx, key) // running containers only
+	if err != nil {
+		return Overview{}, err
 	}
 	base, err := naming.Sanitize(m.Inputs.Project.Project.BaseBranch)
 	if err != nil {
@@ -125,8 +125,20 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 		ow := OverviewWorktree{Slug: w.Slug, ID: w.ID, Branch: w.Branch, Base: w.Slug == base, Services: []OverviewService{}, Links: links}
 		for _, s := range m.Services {
 			st := unitState(props[unitOf(m, w.Slug, s.ID)])
-			if s.OnDemand {
-				st = onDemandState(running[containerOf(m, w.Slug, s.ID)])
+			ctr := containerOf(m, w.Slug, s.ID)
+			have, run := hashes[ctr]
+			switch {
+			case s.OnDemand:
+				st = onDemandState(run)
+			case run:
+				want, err := l.renderedHash(ctr+".container", key)
+				switch {
+				case errors.Is(err, fs.ErrNotExist): // not rendered: nothing to compare
+				case err != nil:
+					return Overview{}, err
+				default:
+					ow.Stale = ow.Stale || have != want
+				}
 			}
 			ow.Services = append(ow.Services, OverviewService{Service: s.ID, Role: s.Role, State: st})
 		}
@@ -137,7 +149,8 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 		}
 		var agents []string // running in this worktree, by exact name (D62)
 		for _, a := range m.Inputs.Stack.Agents {
-			if ctr := containerOf(m, w.Slug, "agent-"+a.Name); running[ctr] && slices.Contains(names.Containers, ctr) {
+			ctr := containerOf(m, w.Slug, "agent-"+a.Name)
+			if _, run := hashes[ctr]; run && slices.Contains(names.Containers, ctr) {
 				agents = append(agents, a.Name)
 			}
 		}

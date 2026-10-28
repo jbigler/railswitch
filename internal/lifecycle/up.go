@@ -463,7 +463,7 @@ func (l *L) dashboardWarning(err error) {
 // staleContainer reports whether container ctr was created from another
 // unit than the rendered unitFile: its key label differs from the file's.
 func (l *L) staleContainer(ctx context.Context, ctr, unitFile, key string) (bool, error) {
-	data, err := os.ReadFile(filepath.Join(l.WS.Dirs.Quadlet, unitFile))
+	want, err := l.renderedHash(unitFile, key)
 	if err != nil {
 		return false, err
 	}
@@ -471,7 +471,16 @@ func (l *L) staleContainer(ctx context.Context, ctr, unitFile, key string) (bool
 	if err != nil {
 		return false, err
 	}
-	return have != unithash.Read(data, key), nil
+	return have != want, nil
+}
+
+// renderedHash is the key label stamped in the rendered unitFile.
+func (l *L) renderedHash(unitFile, key string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(l.WS.Dirs.Quadlet, unitFile))
+	if err != nil {
+		return "", err
+	}
+	return unithash.Read(data, key), nil
 }
 
 // defaultStartSec is systemd's DefaultTimeoutStartSec, for a unit that

@@ -295,18 +295,32 @@ func (p Podman) Running(ctx context.Context, name string) (bool, error) {
 	return s == "true", err
 }
 
-// RunningNames is the set of running containers' names, from one
-// `podman ps --format {{.Names}}`; callers test exact names in it.
-func (p Podman) RunningNames(ctx context.Context) (map[string]bool, error) {
-	r, err := p.run(ctx, 0, "ps", "--format", "{{.Names}}")
+// Labels maps each running container's name to its label key ("" when it
+// has none), from one `podman ps -a --format json`. Callers test exact
+// names in it; a container missing from it is not running.
+func (p Podman) Labels(ctx context.Context, key string) (map[string]string, error) {
+	r, err := p.run(ctx, 0, "ps", "-a", "--format", "json")
 	if err != nil {
 		return nil, err
 	}
-	names := map[string]bool{}
-	for _, n := range strings.Fields(string(r.Stdout)) {
-		names[n] = true
+	var rows []struct {
+		Names  []string          `json:"Names"`
+		State  string            `json:"State"`
+		Labels map[string]string `json:"Labels"`
 	}
-	return names, nil
+	if err := json.Unmarshal(r.Stdout, &rows); err != nil {
+		return nil, fmt.Errorf("podman ps: %w", err)
+	}
+	out := map[string]string{}
+	for _, c := range rows {
+		if c.State != "running" {
+			continue
+		}
+		for _, n := range c.Names {
+			out[n] = c.Labels[key]
+		}
+	}
+	return out, nil
 }
 
 // GraphRoot returns podman's storage graph root.

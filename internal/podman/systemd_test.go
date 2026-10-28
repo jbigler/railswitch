@@ -35,17 +35,29 @@ func TestShowManyNoUnits(t *testing.T) {
 	}
 }
 
-func TestRunningNames(t *testing.T) {
+func TestLabels(t *testing.T) {
 	f := &systest.Fake{}
-	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("p-a-agent-x\np-b-rails\n")}, nil)
-	got, err := Podman{R: f}.RunningNames(ctx)
+	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte(`[
+{"Names":["p-a-rails"],"State":"running","Labels":{"p.unit-hash":"h1"}},
+{"Names":["p-a-db"],"State":"running","Labels":{}},
+{"Names":["p-a-worker"],"State":"exited","Labels":{"p.unit-hash":"h2"}},
+{"Names":["p-b-rails"],"State":"running","Labels":null}]`)}, nil)
+	got, err := Podman{R: f}.Labels(ctx, "p.unit-hash")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := map[string]bool{"p-a-agent-x": true, "p-b-rails": true}; !reflect.DeepEqual(got, want) {
-		t.Errorf("RunningNames = %v; want %v", got, want)
+	if want := map[string]string{"p-a-rails": "h1", "p-a-db": "", "p-b-rails": ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Labels = %v; want %v", got, want)
 	}
-	wantCalls(t, f, []string{"podman", "ps", "--format", "{{.Names}}"})
+	wantCalls(t, f, []string{"podman", "ps", "-a", "--format", "json"})
+}
+
+func TestLabelsBadJSON(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("not json")}, nil)
+	if _, err := (Podman{R: f}).Labels(ctx, "k"); err == nil {
+		t.Error("Labels accepted non-JSON output")
+	}
 }
 
 // TestActiveSince: the exact (us, UTC) ActiveEnterTimestamp; never active

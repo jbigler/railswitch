@@ -10,6 +10,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 func TestStackState(t *testing.T) {
@@ -38,6 +39,16 @@ func TestStackState(t *testing.T) {
 			t.Errorf("%s: StackState = %q; want %q", c.name, got, c.want)
 		}
 	}
+}
+
+// psJSON is `podman ps -a --format json` with each name running and no
+// labels.
+func psJSON(names ...string) string {
+	var rows []string
+	for _, n := range names {
+		rows = append(rows, `{"Names":["`+n+`"],"State":"running","Labels":{}}`)
+	}
+	return "[" + strings.Join(rows, ",") + "]"
 }
 
 // overviewEnv is setup with each worktree's .git/HEAD on branch
@@ -72,6 +83,7 @@ func overviewEnv(t *testing.T, state func(slug, svc string) string) (*tenv, *ren
 		}
 	}
 	e.f.On([]string{"systemctl", "--user", "show"}, sys.Result{Stdout: []byte(out.String())}, nil)
+	e.f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte(psJSON())}, nil)
 	e.reset()
 	return e, m
 }
@@ -145,12 +157,10 @@ func TestOverview(t *testing.T) {
 	if n := count(e.calls(), "systemctl"); n != 1 {
 		t.Errorf("%d systemctl calls; want 1:\n%s", n, dump(e.calls()))
 	}
-	if n := count(e.calls(), "podman"); n > 1 {
-		t.Errorf("%d podman calls; want at most 1:\n%s", n, dump(e.calls()))
+	if n := count(e.calls(), "podman"); n != 1 {
+		t.Errorf("%d podman calls; want 1:\n%s", n, dump(e.calls()))
 	}
-	if n := count(e.calls(), "podman"); n == 1 {
-		find(t, e.calls(), "podman ps --format {{.Names}}")
-	}
+	find(t, e.calls(), "podman ps -a --format json")
 	for _, c := range e.f.Calls {
 		if c[0] == "git" {
 			t.Errorf("git call %q", c)
@@ -166,7 +176,7 @@ func TestOverview(t *testing.T) {
 		t.Fatalf("%v: %s", err, e.out)
 	}
 	wt := doc["worktrees"].([]any)[1].(map[string]any)
-	for _, k := range []string{"slug", "id", "branch", "base", "stack", "services", "agent", "links"} {
+	for _, k := range []string{"slug", "id", "branch", "base", "stack", "services", "agent", "links", "stale"} {
 		if _, ok := wt[k]; !ok {
 			t.Errorf("worktree JSON lacks %q: %v", k, wt)
 		}
@@ -210,24 +220,24 @@ func TestOverviewMissingDir(t *testing.T) {
 func TestOverviewAgentChoice(t *testing.T) {
 	for _, c := range []struct {
 		name        string
-		running     string // podman ps output
+		running     []string // running containers
 		statuses    map[string]string
 		want        string // agent name; "" = nil
 		state       string
 		wantRunning bool
 	}{
-		{"running wins", "filial-feat-agent-probe\nfilial-master-agent-claude\n",
+		{"running wins", []string{"filial-feat-agent-probe", "filial-master-agent-claude"},
 			map[string]string{"claude": `{"v":1,"state":"question","message":"m","ts":1}`}, "probe", "off", true},
-		{"first non-off", "filial-master-agent-claude\n",
+		{"first non-off", []string{"filial-master-agent-claude"},
 			map[string]string{"claude": `{"v":1,"state":"off","message":"","ts":1}`, "probe": `{"v":1,"state":"working","message":"w","ts":2}`}, "probe", "working", false},
-		{"first configured non-off", "",
+		{"first configured non-off", nil,
 			map[string]string{"claude": `{"v":1,"state":"done","message":"ok","ts":1}`, "probe": `{"v":1,"state":"working","message":"w","ts":2}`}, "claude", "done", false},
-		{"none", "filial-feat-agent-claude-x\n",
+		{"none", []string{"filial-feat-agent-claude-x"},
 			map[string]string{"claude": `{"v":2,"state":"working","message":"","ts":1}`}, "", "", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			e, _ := overviewEnv(t, func(string, string) string { return "active/running" })
-			e.f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte(c.running)}, nil)
+			e.f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte(psJSON(c.running...))}, nil)
 			for name, body := range c.statuses {
 				e.status(t, "feat", name, body)
 			}
@@ -248,7 +258,7 @@ func TestOverviewAgentChoice(t *testing.T) {
 
 func TestOverviewOnDemandRunning(t *testing.T) {
 	e, _ := overviewEnv(t, func(string, string) string { return "active/running" })
-	e.f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("filial-feat-agent-claude\n")}, nil)
+	e.f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte(psJSON("filial-feat-agent-claude"))}, nil)
 	ov, err := e.l.Overview(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -284,5 +294,53 @@ func TestOverviewTextPrintable(t *testing.T) {
 	}
 	if !strings.Contains(e.out.String(), `jb/\u001b[31mred`) {
 		t.Errorf("JSON lost the raw branch: %s", e.out)
+	}
+}
+
+func TestOverviewStale(t *testing.T) {
+	e, m := overviewEnv(t, func(string, string) string { return "active/running" })
+	e.render(t)
+	key := unithash.Key(m.Prefix)
+	app := m.Services[0].ID
+	if m.Services[0].OnDemand {
+		t.Fatal("first service is on-demand")
+	}
+	ctr := func(slug string) string { return containerOf(m, slug, app) }
+	data, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, ctr("feat")+".container"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur := unithash.Read(data, key)
+	if cur == "" {
+		t.Fatal("rendered unit has no hash label")
+	}
+	row := func(name, state, hash string) string {
+		return `{"Names":["` + name + `"],"State":"` + state + `","Labels":{"` + key + `":"` + hash + `"}}`
+	}
+	for _, c := range []struct {
+		name         string
+		ps           string
+		master, feat bool
+	}{
+		{"old hash", "[" + row(ctr("feat"), "running", "old") + "]", false, true},
+		{"no label", "[" + row(ctr("master"), "running", "") + "]", true, false},
+		{"matching hash", "[" + row(ctr("feat"), "running", cur) + "]", false, false},
+		{"old hash but not running", "[" + row(ctr("feat"), "exited", "old") + "]", false, false},
+		{"not listed", "[]", false, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e.reset()
+			e.f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte(c.ps)}, nil)
+			ov, err := e.l.Overview(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if a, b := ov.Worktrees[0].Stale, ov.Worktrees[1].Stale; a != c.master || b != c.feat {
+				t.Errorf("stale master=%v feat=%v; want %v %v", a, b, c.master, c.feat)
+			}
+			if n := count(e.calls(), "podman"); n != 1 {
+				t.Errorf("%d podman calls; want 1:\n%s", n, dump(e.calls()))
+			}
+		})
 	}
 }

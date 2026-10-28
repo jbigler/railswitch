@@ -34,6 +34,7 @@ func TestOverviewCLI(t *testing.T) {
 	ws, _ := filialWS(t)
 	mustRun(t, "-C", ws, "lock")
 	f := fakeHost()
+	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("[]")}, nil)
 	code, out, errs := runWith(t, f, "-C", ws, "--json", "overview")
 	if code != 0 {
 		t.Fatalf("overview: exit %d: %s", code, errs)

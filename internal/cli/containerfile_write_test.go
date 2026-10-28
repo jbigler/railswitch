@@ -364,3 +364,23 @@ func TestContainerfileNewRenders(t *testing.T) {
 		t.Errorf("units not rendered after containerfile new:\n%s", out)
 	}
 }
+
+// eject --force writes the default even when the render that follows
+// can't run (a stale lock): it warns and exits 0, since the reset happened.
+func TestEjectForceRenderFailsWarns(t *testing.T) {
+	ws, dir := localRails(t)
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("edited by hand\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file, before := pgClient(t, ws)
+	if err := os.WriteFile(file, []byte(before+"# mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := runIn(t, "-C", ws, "containerfile", "eject", "pg-client", "--force")
+	if code != 0 || !strings.Contains(errs, "warning: ") || !strings.Contains(errs, "not rendered") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if strings.Contains(readFile(t, file), "# mine") {
+		t.Error("not reset")
+	}
+}

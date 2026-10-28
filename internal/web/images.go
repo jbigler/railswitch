@@ -328,6 +328,6 @@ func (s *Server) imagesNew(w http.ResponseWriter, r *http.Request) {
 // (exit 3, ?restart=failed): the file was written; the job below says why.
 func restartNotice(r *http.Request, v *editorView) {
 	if r.URL.Query().Get("restart") == "failed" {
-		v.Notice = "Saved. The rebuild and restart failed: the job's output is below."
+		v.Notice = strings.TrimSpace("Saved. The rebuild and restart failed: the job's output is below. " + v.Notice)
 	}
 }

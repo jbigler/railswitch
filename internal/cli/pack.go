@@ -502,15 +502,13 @@ func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
 		kind = "agent"
 	}
 	if ref.Local {
-		doc.Source = "local"
-		kind = "option"
-		doc.Path = filepath.Join(cat.Root, "options", ref.Name)
-		for _, k := range []struct{ top, kind string }{{"packs", "pack"}, {"agents", "agent"}} {
-			if dir := filepath.Join(cat.Root, k.top, ref.Name); dirExists(dir) {
-				kind, doc.Path = k.kind, dir
-				break
-			}
+		// The directory pack file reads and writes (localPackage).
+		dir, manifest, err := localPackage(cat.Root, ref)
+		if err != nil {
+			return nil, err
 		}
+		doc.Source, doc.Path = "local", filepath.Join(cat.Root, filepath.FromSlash(dir))
+		kind = strings.TrimSuffix(manifest, ".toml")
 	}
 	var files fs.FS
 	var ports []pack.Port
@@ -699,11 +697,4 @@ func packLs(e *env, args []string) int {
 		return e.fail(err)
 	}
 	return 0
-}
-
-// dirExists reports whether dir is a directory (a symlink to one counts:
-// the load that follows refuses what it must).
-func dirExists(dir string) bool {
-	fi, err := os.Stat(dir)
-	return err == nil && fi.IsDir()
 }

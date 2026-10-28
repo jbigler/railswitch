@@ -544,18 +544,20 @@ func containerfileEject(ctx context.Context, e *env, args []string) int {
 // renderLocked renders a locked project after a Containerfile change, as
 // containerfile write does, so the worktrees built from the old file show
 // as behind. One with no lock yet (project new ejects before locking)
-// renders when it locks.
+// renders when it locks. The file is written by then, so a render that
+// can't run (a stale lock, say) is a warning, not a failure.
 func (e *env) renderLocked(ctx context.Context, root string) int {
 	w, err := workspace.Load(ctx, root, "")
 	if errors.Is(err, config.ErrNoLock) {
 		return 0
 	}
-	if err != nil {
-		return e.fail(err)
+	var d *render.Diff
+	if err == nil {
+		d, err = e.render(ctx, w, false)
 	}
-	d, err := e.render(ctx, w, false)
 	if err != nil {
-		return e.fail(err)
+		fmt.Fprintf(e.stderr, "warning: written, but not rendered: %v (then run railswitch render)\n", err)
+		return 0
 	}
 	e.printRendered(d)
 	return 0

@@ -514,3 +514,20 @@ func TestPackFileAgent(t *testing.T) {
 		t.Errorf("initdb/ in an agent: exit %d: %s", code, errs)
 	}
 }
+
+// pack show and pack file agree on which directory a local ref names when
+// two of packs/, options/ and agents/ hold the name.
+func TestPackLocalDirOrder(t *testing.T) {
+	ws, _ := lockedWS(t)
+	mustRun(t, "-C", ws, "pack", "eject", "claude@1", "--as", "x")
+	mustRun(t, "-C", ws, "pack", "eject", "redis@1", "--as", "x")
+	var d struct{ Kind, Path string }
+	out := mustRun(t, "-C", ws, "--json", "pack", "show", "local:x@1")
+	if err := json.Unmarshal([]byte(out), &d); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := runIn(t, "-C", ws, "pack", "file", "show", "local:x@1", map[string]string{"agent": "agent.toml", "option": "option.toml"}[d.Kind])
+	if code != 0 {
+		t.Errorf("show says %s at %s; pack file disagrees: %s", d.Kind, d.Path, errs)
+	}
+}

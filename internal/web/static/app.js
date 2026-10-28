@@ -688,7 +688,7 @@ function startEditor() {
   }
 
   function saved(state, conflict, exit) {
-    if (state === "ok") location.reload();
+    if (state === "ok") location.assign(location.pathname); // drops ?restart=failed
     else if (exit === "3") location.assign(location.pathname + "?restart=failed"); // written; restart failed
     else if (conflict) $("#ed-conflict").hidden = false;
     else toast("The file was not written. The output is below.", true);

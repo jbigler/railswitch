@@ -317,6 +317,29 @@ accepted until the update is accepted.
   page goes to the project page. When it exits 3 (accepted, restart
   failed) the page goes there too, with a notice.
 
+## Machine
+
+`/machine` (the header's "machine" link; no project needed) has a
+**Signers** section: the SSH keys trusted to sign each package library,
+from `railswitch --json signer ls`. Each library lists its trusted keys
+(fingerprint, key type and comment, added date; never the key material)
+and its revoked fingerprints. Library ids, comments and fingerprints are
+escaped like any other text.
+
+- **Distrust** asks for confirmation in the browser, then posts the
+  library and fingerprint to `/machine/signers/rm`, which runs
+  `railswitch signer rm <library> <fingerprint>` as a job. The server
+  answers 400, no job, for a library id that doesn't match
+  `[a-z0-9][a-z0-9./_-]{0,199}` (or holds `..`) or a fingerprint that
+  isn't `SHA256:` and 43 base64 characters.
+- **Add key** posts a library id and one pasted public key line to
+  `/machine/signers/add`, which runs `railswitch signer add <library> -`
+  with the key as the job's stdin, never argv. A key over 16 KiB, with
+  more than one non-empty line or a control character is refused (400).
+- These are machine-level jobs, keyed `~machine` (no valid prefix, so no
+  project's jobs mix in); one runs at a time, and the page shows them
+  below the forms.
+
 ## New project
 
 `/new` creates a project. Open it from the switcher ("New project…", the
@@ -551,6 +574,9 @@ working blue, your turn yellow, idle and off muted.
 The commands the dashboard reads and runs. Their `--json` output is in
 docs/json.md.
 
+- `railswitch --json signer ls` (machine): each library's trusted keys and
+  revoked fingerprints. `signer add <library> -` (key on stdin) and
+  `signer rm <library> <fingerprint>` run as jobs.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.

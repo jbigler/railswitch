@@ -36,6 +36,15 @@
 </form>
 <p class="note">A copy keeps the built-in's slot; a blank option takes the slot picked here. The manifest opens in the editor.</p>
 </section>
+<section class="card" id="import">
+<h2>Import a package</h2>
+<form method="get" action="{{.ImportURL}}" class="new-form">
+<label class="field">Folder <input name="dir" class="mono" required autocomplete="off" spellcheck="false" maxlength="4096" placeholder="/home/you/Downloads/rails"></label>
+<label class="field">As <input name="as" class="mono" autocomplete="off" pattern="[a-z][a-z0-9\-]*" placeholder="its own name"></label>
+<div class="btns"><button class="ln main">Review</button></div>
+</form>
+<p class="note">A folder from <code>pack export</code> or Export below. It becomes this workspace's <code>local:</code> package; you see every file, flagged lines included, before anything is written.</p>
+</section>
 {{end}}</section>
 <section class="pane">
 {{with .Sel}}<section class="card">
@@ -60,6 +69,12 @@
 {{range .Files}}<tr><td class="mono">{{.Path}}</td><td class="muted">{{if .Size}}{{.Size}} B{{end}}{{if .Executable}} · executable{{end}}</td><td><a class="ln" href="{{.URL}}">{{if $.Sel.Local}}Edit{{else}}View{{end}}</a></td></tr>
 {{end}}</tbody>
 </table>
+<form method="post" action="{{$.ExportURL}}" class="add-row" data-job="export">
+<input type="hidden" name="ref" value="{{.Ref}}">
+<input name="to" class="mono" placeholder="/home/you/share/{{.Ref}}" autocomplete="off" spellcheck="false" required maxlength="4096" aria-label="Export to a new folder">
+<button class="ln">Export</button>
+</form>
+<p class="note">Export writes this package, as this project runs it, to a new folder to hand to someone; they import it on their Library page.</p>
 {{if .AddBase}}<form class="add-row" data-add-file data-base="{{.AddBase}}">
 <input name="path" placeholder="entrypoints/name.sh" class="mono" autocomplete="off" required aria-label="New file path">
 <button class="ln">Add file</button>

@@ -174,6 +174,10 @@ type Accept struct {
 	// the package's one difference from the accepted copy; any other
 	// difference refuses the write.
 	Edit *FileEdit
+	// Import, when set, accepts its package when its content hashes to
+	// the one pack import reviewed and wrote (D114); other content
+	// refuses the write.
+	Import *PackageImport
 	// IfHash, when set, refuses a write whose stack.lock bytes don't hash
 	// (Hash) to it: the review that was accepted.
 	IfHash string
@@ -209,6 +213,14 @@ func ReviewHash(lock []byte, t *Template) string {
 // see installs) or changed under the ref the lock pins.
 func (a Accept) accepts(sp stackPkg, install bool) bool {
 	return a.All || install && slices.Contains(a.Install, sp.ref)
+}
+
+// PackageImport is the package of Kind at Ref as a reviewed folder put
+// it: content hashing to SHA256.
+type PackageImport struct {
+	Kind   string
+	Ref    pack.Ref
+	SHA256 string
 }
 
 // FileEdit is one file of the package of Kind at Ref, by its
@@ -360,6 +372,12 @@ func plan(root string, p *config.Project, cat *pack.Catalog, accept Accept) (*lo
 			// time (D106).
 			return nil, fmt.Errorf("installing %s needs review: %s", sp.ref, installHint)
 		case had && !install && o.SHA256 != e.SHA256 && !accept.accepts(sp, false):
+			if im := accept.Import; im != nil && im.Kind == sp.kind && im.Ref == sp.ref {
+				if e.SHA256 != im.SHA256 {
+					return nil, fmt.Errorf("%s changed since its import was reviewed: review it again", sp.ref)
+				}
+				break
+			}
 			if accept.Edit != nil && accept.Edit.Kind == sp.kind && accept.Edit.Ref == sp.ref {
 				if err := onlyEdited(pl.store, o.SHA256, e.SHA256, sp.files, *accept.Edit); err != nil {
 					return nil, err

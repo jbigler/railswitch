@@ -479,6 +479,42 @@ template, plus its status. Nothing is saved. Exit 0, except `older`
 | `restart` | array | Always `[]`. |
 | `warnings` | array of strings | Each `local:` package it uses, and each library ref whose alias this machine hasn't added. |
 
+## `pack import <dir>`
+
+The review of a package folder in the workspace (D114, docs/packs.md):
+the [`lock --review`](#lock---review) document with one package, plus
+its status. Nothing is written. Exit 0; a folder it refuses exits 1 with
+no document.
+
+```json
+{
+  "ref": "local:filial-rails@1",
+  "kind": "pack",
+  "sha256": "1b924e2a…",
+  "status": "update",
+  "replaces": {"ref": "local:filial-rails@1", "sha256": "df728e1a…"},
+  "used": true,
+  "hash": "1b924e2a…",
+  "flags": 1,
+  "packages": [{"ref": "local:filial-rails@1", "kind": "pack", "status": "changed", "from": "df728e1a…", "to": "1b924e2a…", "also_locked_in": [], "files": []}],
+  "restart": ["main"],
+  "warnings": []
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ref` | string | `local:<name>@<version>`: `--as` or the manifest's name, the manifest's version. |
+| `kind` | string | `pack`, `option` or `agent`, from the folder's manifest. |
+| `sha256`, `hash` | string | The content hash of what `--accept` writes (the manifest's name line set): what `--accept` takes. |
+| `status` | string | `new` (no local package of that name), `update` (other content), `same` (byte for byte). |
+| `replaces` | object or null | The local package there now: `ref` (its manifest's version), `sha256`; `null` for `new`. |
+| `used` | boolean | The project's stack names `ref`. |
+| `flags` | number | The flags over every file. |
+| `packages` | array | One entry, as in `lock --review`: status `added`, `changed` or `unchanged`. |
+| `restart` | array of strings | For a used package, the running worktrees the write restarts; else `[]`. |
+| `warnings` | array of strings | Always `[]` for now. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1

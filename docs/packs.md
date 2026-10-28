@@ -88,6 +88,42 @@ the built-ins:
 - `packs/`, `options/` and `agents/` are tracked in the workspace repo (D38),
   so a local package travels with the project.
 
+### Sharing a package (D114)
+
+Make a package your own (`pack eject rails@1 --as filial-rails`, then
+edit it), then hand it to someone as a folder:
+
+- `railswitch pack export <ref> --to <dir>`, in a workspace: the package
+  as this project runs it (a locked one's accepted copy) as a new folder
+  `dir`. Any ref: built in, `local:` or a library's.
+- `railswitch pack import <dir> [--as <name>] [--json]`, in their
+  workspace: reviews the folder as `local:<name>@<N>` (name: `--as`, else
+  the manifest's; the manifest's `name` line is set to it; `N`: its
+  `version`). Every file is a diff from the workspace's local package of
+  that name (all added when there is none), flagged by the review checks;
+  for a package the project uses, the worktrees it restarts. Nothing is
+  written. The folder is hostile input: exactly one manifest
+  (`pack.toml`, `option.toml` or `agent.toml`, which sets the kind), only
+  paths `pack file write` accepts, regular files ≤ 1 MiB, at most 512 and
+  16 MiB in all, no symlink (the folder included); it must load.
+- `--accept <sha256> [--restart]` writes it, once the folder still has
+  the hash its review printed. A package the project doesn't use is
+  written beside the old directory and renamed over it. One it uses is
+  written through the same commit as `pack file write`: every file, the
+  old ones it lacks removed, `stack.lock` locked at exactly the reviewed
+  content, render; any failure puts it all back.
+- Refused: a used package with an update waiting for review (review that
+  first); a folder of another version than the one the project uses
+  (import it `--as` another name, or move the project off it first); a
+  name another kind already has (`options/<name>/` for a pack).
+- From then on it is the workspace's own: edit it, or import a newer
+  folder over it (shown as the diff from yours).
+
+To start a teammate's new project on it: create the project from the
+built-in (or from a template), import the package, then pick
+`local:<name>@<N>` in Settings. A template that names a `local:` package
+can't start a project on a machine without it.
+
 ## Locking
 
 `railswitch lock` writes `stack.lock`: every package the project uses with

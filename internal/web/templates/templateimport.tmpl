@@ -1,6 +1,6 @@
-{{/* The review of a template folder someone handed over (D113), with the
-review component; Import needs the acknowledgement when anything is
-flagged. */}}
+{{/* The review of a folder someone handed over, a template (D113) or a
+package (D114), with the review component; Import needs the
+acknowledgement when anything is flagged. */}}
 {{define "templateimport"}}<!doctype html>
 <html lang="en">
 {{template "head" .}}
@@ -8,19 +8,21 @@ flagged. */}}
 {{template "top" .}}
 <main class="grid settings">
 <section class="left set-left">
-<div class="crumb"><a href="/machine">← Machine</a></div>
-<h1>Import template</h1>
-<p class="note">A template from a folder someone gave you. Read every file before you import it: a new project started from it builds these Containerfiles and gets these firewall, route and secret lines.</p>
+<div class="crumb"><a href="{{.Back}}">← {{.BackText}}</a></div>
+<h1>{{.Heading}}</h1>
+<p class="note">{{.Intro}}</p>
 {{if .Dir}}<p class="note">Folder <span class="mono">{{.Dir}}</span></p>
 {{end}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
-{{else if eq .Status "same"}}<p class="green">This machine already has <span class="mono">{{.Ref}}</span>, byte for byte: nothing to import.</p>
-{{else}}<p>{{if eq .Status "update"}}<span class="mono">{{.Ref}}</span> replaces <span class="mono">{{.Replaces}}</span>: the diff is from the version on this machine.{{else}}<span class="mono">{{.Ref}}</span> is new on this machine: every file is shown as added.{{end}}</p>
+{{else if eq .Status "same"}}<p class="green"><span class="mono">{{.Ref}}</span> is here already, byte for byte: nothing to import.</p>
+{{else}}<p>{{if eq .Status "update"}}<span class="mono">{{.Ref}}</span> replaces <span class="mono">{{.Replaces}}</span>: the diff is from the copy here.{{else}}<span class="mono">{{.Ref}}</span> is new here: every file is shown as added.{{end}}</p>
 {{range .Warnings}}<p class="yellow notice">{{.}}</p>
-{{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.ImportURL}}" id="accept" class="editor" data-job="import" data-next="/machine"{{if .AckText}} data-ack-required{{end}}>
+{{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.ImportURL}}" id="accept" class="editor" data-job="import" data-next="{{.Back}}"{{if .AckText}} data-ack-required{{end}}>
 <input type="hidden" name="dir" value="{{.Dir}}">
 <input type="hidden" name="hash" value="{{.Hash}}">
-{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
-{{end}}<div class="btns"><a class="ln dim" href="/machine">Cancel</a><button class="ln main" data-accept{{if .AckText}} disabled{{end}}>Import</button></div>
+{{if .As}}<input type="hidden" name="as" value="{{.As}}">
+{{end}}{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
+{{end}}{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> Restart after importing: <span class="mono">{{.Restart}}</span></label>
+{{end}}<div class="btns"><a class="ln dim" href="{{.Back}}">Cancel</a><button class="ln main" data-accept{{if .AckText}} disabled{{end}}>Import</button></div>
 </form>
 {{end}}</section>
 <section class="pane">

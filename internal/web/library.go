@@ -49,9 +49,11 @@ type libraryView struct {
 	Banner        bannerView
 	Jobs          jobsView
 
-	Error  string
-	Groups []libGroup
-	Sel    *libDetail
+	Error     string
+	Groups    []libGroup
+	Sel       *libDetail
+	ImportURL string // the review of a package folder (D114)
+	ExportURL string
 
 	Templates      []libTemplateItem
 	TemplatesError string
@@ -132,6 +134,7 @@ func (s *Server) libraryPage(w http.ResponseWriter, r *http.Request) {
 		Title: "Library · " + p.Prefix, Prefix: p.Prefix,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		NewURL: libraryURL(p.Prefix) + "/new", EditorBase: libraryURL(p.Prefix) + "/",
+		ImportURL: libraryURL(p.Prefix) + "/import", ExportURL: libraryURL(p.Prefix) + "/export",
 		LibAddURL: "/machine/libraries/add", LibFetchURL: "/machine/libraries/fetch", LibTrustURL: "/machine/libraries/trust",
 	}
 	if libs, err := readJSON[libraryDoc](ctx, s.c.CLI, "library", "ls"); err != nil {

@@ -246,3 +246,15 @@ func TestLockAcceptRestart(t *testing.T) {
 		t.Errorf("--restart without --accept: exit %d, want 2", code)
 	}
 }
+
+// A file's path comes from the package directory: printed as text, its
+// control characters are spaces.
+func TestPrintReviewHostilePath(t *testing.T) {
+	var b strings.Builder
+	printReview(&b, &reviewDoc{Packages: []reviewPkg{{Ref: "local:x@1", Kind: "pack", Status: "changed", Files: []review.File{
+		{Path: "a\x1b]0;owned\x07.sh", Status: "added", Diff: "+x\n", Flags: []review.Flag{}},
+	}}}})
+	if strings.ContainsAny(b.String(), "\x1b\x07") {
+		t.Errorf("control characters printed: %q", b.String())
+	}
+}

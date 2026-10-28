@@ -199,16 +199,16 @@ func printReview(w io.Writer, doc *reviewDoc) {
 		return
 	}
 	for _, p := range doc.Packages {
-		fmt.Fprintf(w, "%s %s %s", p.Status, p.Kind, p.Ref)
+		fmt.Fprintf(w, "%s %s %s", p.Status, p.Kind, safefile.Printable(p.Ref))
 		if p.From != "" || p.To != "" {
 			fmt.Fprintf(w, " %s -> %s", short(p.From), short(p.To))
 		}
 		fmt.Fprintln(w)
 		if len(p.AlsoLockedIn) > 0 {
-			fmt.Fprintf(w, "  also locked in %s\n", strings.Join(p.AlsoLockedIn, ", "))
+			fmt.Fprintf(w, "  also locked in %s\n", safefile.Printable(strings.Join(p.AlsoLockedIn, ", ")))
 		}
 		for _, f := range p.Files {
-			fmt.Fprintf(w, "  %s %s\n", f.Status, f.Path)
+			fmt.Fprintf(w, "  %s %s\n", f.Status, safefile.Printable(f.Path))
 			for _, fl := range f.Flags {
 				where := ""
 				if fl.Line > 0 {

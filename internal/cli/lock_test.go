@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -220,5 +221,24 @@ func TestEjectAgentBaseAccepted(t *testing.T) {
 	}
 	if doc.Default == nil || doc.Default.Text != string(accepted) {
 		t.Errorf("containerfile show default: %+v", doc.Default)
+	}
+}
+
+// While a built-in's update waits and its accepted copy is gone from the
+// store, an eject refuses: copying the resolved text would hand the
+// unreviewed update to a build.
+func TestEjectRefusesWithoutAcceptedCopy(t *testing.T) {
+	ws, _ := lockedWS(t)
+	pendingOption(t, ws, "postgres", func(m fstest.MapFS) {
+		m["Containerfile.pg-client"].Data = append(m["Containerfile.pg-client"].Data, "# accepted\n"...)
+	})
+	dropStore(t)
+	file := filepath.Join(ws, "containerfiles", "Containerfile.pg-client")
+	before := readFile(t, file)
+	if code, _, errs := run(t, "-C", ws, "containerfile", "eject", "pg-client", "--force"); code == 0 || !strings.Contains(errs, "accepted copy is missing") {
+		t.Errorf("eject without the accepted copy: exit %d: %s", code, errs)
+	}
+	if readFile(t, file) != before {
+		t.Error("the eject wrote the unreviewed text")
 	}
 }

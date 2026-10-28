@@ -32,8 +32,8 @@ func store(d machine.Dirs) lockstore.Store { return lockstore.Store{Dir: locksto
 // content, and the refs replaced, sorted. A package in keep, a ref the
 // lock doesn't pin, or a copy that is missing or doesn't load stays as
 // resolved (CheckLock then refuses it).
-func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lockstore.Store, keep []pack.Ref) (*pack.Catalog, []pack.Ref) {
-	var pending []pack.Ref
+func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lockstore.Store, keep []pack.Ref) (*pack.Catalog, []pack.Ref, []pack.Ref) {
+	var pending, unusable []pack.Ref
 	for _, x := range projectPackages(p) {
 		e, ok := lockedEntry(lock, x.kind, x.key, x.ref, cat.Libraries)
 		if slices.Contains(keep, x.ref) || slices.Contains(pending, x.ref) || !ok {
@@ -52,12 +52,13 @@ func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lock
 		}
 		next, err := accepted(cat, s, x.kind, x.ref, e)
 		if err != nil {
+			unusable = append(unusable, x.ref)
 			continue
 		}
 		cat, pending = next, append(pending, x.ref)
 	}
 	slices.SortFunc(pending, func(a, b pack.Ref) int { return strings.Compare(a.String(), b.String()) })
-	return cat, pending
+	return cat, pending, unusable
 }
 
 // Accepted is cat with each package of p whose content changed under the
@@ -77,7 +78,12 @@ func Accepted(root string, p *config.Project, cat *pack.Catalog) (*pack.Catalog,
 	if err != nil {
 		return nil, err
 	}
-	cat, _ = runAccepted(cat, p, lock, store(dirs), nil)
+	cat, _, unusable := runAccepted(cat, p, lock, store(dirs), nil)
+	if len(unusable) > 0 {
+		// Its content changed and the accepted copy is missing: copying
+		// the resolved text out would hand an unreviewed update to a build.
+		return nil, fmt.Errorf("%s changed since it was accepted and its accepted copy is missing: %s", unusable[0], reviewHint)
+	}
 	return cat, nil
 }
 

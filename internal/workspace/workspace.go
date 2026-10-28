@@ -129,7 +129,7 @@ func load(startDir, slug string, cat *pack.Catalog, keep []pack.Ref) (*Workspace
 	}
 	// The swap comes before Resolve: an update that no longer resolves
 	// (or a local package broken in an editor) still runs what was accepted.
-	cat, pending := runAccepted(cat, p, lock, store(dirs), keep)
+	cat, pending, _ := runAccepted(cat, p, lock, store(dirs), keep)
 	st, err := cat.Resolve(p)
 	if err != nil {
 		return nil, err

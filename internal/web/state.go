@@ -508,6 +508,9 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 			for _, sw := range p.ov.SignerWarnings {
 				banner.Signers = append(banner.Signers, signerWarningText(sw))
 			}
+			if p.ov.TemplateUpdate && p.ov.Template != nil {
+				banner.Template = &bannerTemplate{Ref: p.ov.Template.Ref, URL: settingsURL(prefix) + "#template"}
+			}
 		}
 	}
 	pv := pageView{

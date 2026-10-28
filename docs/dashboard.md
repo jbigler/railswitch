@@ -107,7 +107,11 @@ is no longer accepted. What the page shows meanwhile may be stale.
   update" (the Review update page, below). The switcher marks such a
   project `update`. One line per `overview` `signer_warnings` entry, in
   red: "The signer of <ref> (<library>) is no longer trusted. The project
-  keeps running what it has; replace it or re-check the library."
+  keeps running what it has; replace it or re-check the library." While
+  `overview`'s `template_update` is true: "The template <ref> changed
+  since this project was made from it. See it in Settings" (the
+  Settings page's Template changed notice, below; `<ref>` is
+  `overview`'s `template.ref`).
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
@@ -130,6 +134,16 @@ shows what each one does before anything is written.
 
 **Left column**
 
+- **Template changed** (first, only while `overview`'s `template_update`
+  is true): the template's ref and the recorded hash, and that nothing
+  is applied (`railswitch template check` in the workspace shows the
+  diff). **Accept** posts the template's sha256 as `railswitch --json
+  template show <ref>` reads it when the page opens. The server reads
+  `overview` and `template show` again and refuses (400, no job) a sha
+  that isn't the template's now, or a project with no template change
+  waiting; then it runs `railswitch template check --accept <sha>` as a
+  project-level job. When the job ends ok the page reloads and the
+  notice is gone.
 - **Project:** name, repository, base branch and prefix. Read-only; the
   prefix is fixed because it names every container, volume, network and
   hostname.
@@ -155,6 +169,12 @@ shows what each one does before anything is written.
   runs `railswitch secret add <name> --service <id>… [--env VAR]`. The
   value goes only to the job's stdin; the field clears as soon as you
   press the button. Secrets act at once; they are not staged.
+- **Save as template:** a name (`[a-z][a-z0-9-]*`) and a version (a
+  whole number from 1) run `railswitch template export --name <n>
+  --version <N>` as a project-level job. It writes
+  `~/.config/railswitch/templates/<n>.stack/`; the CLI refuses a version
+  already saved. The server refuses (400, no job) another name or
+  version.
 - **Edit project.toml** opens the raw editor (below), for everything
   else: services, routes, tasks, firewall, agents, image, tools, versions.
 
@@ -320,6 +340,17 @@ unavailable" and the rest of the page.
   pack new --option <slot> <name>` with the slot picked. When the job
   ends ok the new package's manifest opens in the editor.
 
+**Templates** lists `railswitch --json template ls`: ref, description
+and source (`machine`, or `library <alias>`). A row whose ref isn't
+`<name>@N` or `<alias>:<name>@N` is left out. A failed read shows
+"Templates unavailable" and the rest of the page. Picking one
+(`?template=<ref>`; an unlisted ref is a 404) shows its `railswitch
+--json template show <ref>`: name and version, the packages it uses, its
+content hash, secret names, Containerfiles, one row per question (the
+prompt, the `project.toml` path it sets, the default), its `stack.toml`
+and README. A template is read-only here; save one from a project's
+Settings.
+
 **Package file editor** (`/p/<prefix>/library/<ref>/<path>`): the file
 from `railswitch --json pack file show <ref> <path>` in the same editor as
 the Images page, without the default panel.
@@ -414,6 +445,14 @@ until you press Create project.
   (lowercase letters and digits, 2–16, starting with a letter, unused on
   this machine) and **Workspace folder**. The folder starts as
   `~/workspace/<prefix>` and follows the prefix until you edit it.
+- **Start from a template** (above Read the repository) offers the
+  templates of `railswitch --json template ls`. Picking one posts it to
+  `POST /new/template`, which reads `railswitch --json template show
+  <ref>` and answers the Stack card for it: the template, its packages,
+  and one field per question (`answer-<key>`), prefilled with its
+  default; the Containerfiles it brings. Picking a template unticks the
+  Tools and agents boxes (the template's own stand) and turns Read the
+  repository off; picking "None" puts the empty Stack card back.
 - **Read the repository** runs `railswitch --json project detect <repo>
   [--branch <b>]` while you wait (it fetches only the files the packages'
   detection rules name, up to 2 minutes; the dashboard stops a read that
@@ -432,19 +471,30 @@ until you press Create project.
   works with the pack.
 - **Tools and agents:** Neovim, and one box per agent package `pack ls`
   lists; the package with `default = true` starts ticked. With no box
-  ticked the project gets no agent (`--agent none`).
+  ticked the project gets no agent (`--agent none`); from a template it
+  gets the template's (no `--agent` flag), and a ticked box is added on
+  top.
 - A slot changed away from what the repository suggests adds a warning:
   "<Slot>: you picked <X>, but the repository suggests <Y>."
-- **Next: review** runs the dry run (step 2). It is off until a pack is
-  chosen and the prefix and folder are filled in.
+- **Next: review** runs the dry run (step 2). It is off until a pack or
+  template is chosen and the prefix and folder are filled in.
 
 **Step 2: Review and create**
 
 - `railswitch --json project new <dir> --repo <repo> --prefix <p> [--name
   <n>] [--branch <b>] --pack <ref> --option <key>=<ref>… [--tool nvim]
-  (--agent <name>=<ref>… | --agent none) --dry-run`. A refusal (a prefix in
+  (--agent <name>=<ref>… | --agent none) --dry-run`; from a template,
+  `--template <ref> --answer <key>=<value>…` in place of `--pack` and
+  `--option`, one `--answer` argv entry per question in the template's
+  order. The server reads `template show <ref>` first and refuses (400,
+  nothing run) an `answer-<key>` the template doesn't ask, an answer
+  without a template, a value with a line break, and a malformed or
+  `local:` template ref. A refusal (a prefix in
   use, an existing `project.toml`, an option that doesn't work with the
   pack) shows at the top, and Create project is off.
+- From a template (the dry run's `template`): its ref and sha256, and
+  each question with the answer the project gets, its key and, when it
+  differs, the default.
 - Each worktree gets: its routes, its containers with their roles, and
   the app's env names. Then the render warnings, the `project.toml` it
   writes (read-only) and the steps Create runs.
@@ -700,6 +750,14 @@ docs/json.md.
 - `railswitch [--json] lock --review`, `lock --accept <hash>
   [--restart]`: the Review update page; `overview`'s `review_pending`
   shows its banner.
+- `railswitch --json template ls` and `--json template show <ref>`
+  (machine): the Library's Templates and the new page's Start from a
+  template. `project new … --template <ref> --answer <key>=<value>…
+  [--dry-run]` (the dry run's `template`): New project.
+  `template export --name <n> --version <N>` and `template check
+  --accept <sha>` (project) run as jobs: Settings. `overview`'s
+  `template` and `template_update`: the banner and the Template changed
+  notice.
 - `railswitch dashboard`: prints the login link.
 - `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,

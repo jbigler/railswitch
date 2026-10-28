@@ -52,8 +52,8 @@ type Result struct {
 	Packages       []PackageResult `json:"packages"`
 }
 
-// PackageResult is one package directory: Signed when the index lists it
-// and its content hash matches.
+// PackageResult is one package directory: Signed when the index is
+// trusted, lists it, and its content hash matches.
 type PackageResult struct {
 	Ref    string `json:"ref"` // "" when the directory does not load
 	Kind   string `json:"kind"`
@@ -66,8 +66,23 @@ type PackageResult struct {
 // updates t in memory: the library's last serial and the index's
 // revocations; the caller saves it. An error is a failure to check
 // (ssh-keygen missing, no temp dir, an unreadable packs/, options/ or
-// agents/), never a verdict.
+// agents/), never a verdict. A package is Signed only when the index is
+// trusted.
 func Verify(ctx context.Context, run sys.Runner, dir string, t *Trust) (*Result, error) {
+	res, err := judge(ctx, run, dir, t)
+	if err != nil || res.Status == StatusTrusted {
+		return res, err
+	}
+	for i := range res.Packages {
+		if p := &res.Packages[i]; p.Signed {
+			p.Signed, p.Reason = false, "the index is not trusted"
+		}
+	}
+	return res, nil
+}
+
+// judge is Verify's verdict, Packages judged against the index alone.
+func judge(ctx context.Context, run sys.Runner, dir string, t *Trust) (*Result, error) {
 	bad := func(format string, args ...any) (*Result, error) {
 		return &Result{Status: StatusBadSignature, Reason: fmt.Sprintf(format, args...), Packages: []PackageResult{}}, nil
 	}

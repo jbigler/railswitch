@@ -145,6 +145,44 @@ func TestKeyBlobStrict(t *testing.T) {
 	}
 }
 
+// Review L4: a package is signed only when the index is trusted.
+func TestPackagesUnsignedUnlessTrusted(t *testing.T) {
+	good, stranger, next := keygen(t, "ed25519"), keygen(t, "ed25519"), keygen(t, "ed25519")
+	dir := newLibrary(t)
+	tr := trust(t, libA, good)
+	wantUnsigned := func(res *Result) {
+		t.Helper()
+		if len(res.Packages) == 0 {
+			t.Fatalf("%s: no packages", res.Status)
+		}
+		for _, p := range res.Packages {
+			if p.Signed || p.Reason != "the index is not trusted" {
+				t.Errorf("%s: package %+v; want unsigned, the index is not trusted", res.Status, p)
+			}
+		}
+	}
+
+	publish(t, dir, libA, 2, good, nil)
+	other := filepath.Join(t.TempDir(), "other")
+	os.WriteFile(other, []byte("other bytes"), 0o644)
+	signFile(t, good, NamespaceLibrary, other)
+	sig, _ := os.ReadFile(other + ".sig")
+	os.WriteFile(filepath.Join(dir, SigFile), sig, 0o644)
+	res := verify(t, dir, tr)
+	wantStatus(t, res, StatusBadSignature)
+	wantUnsigned(res)
+
+	publish(t, dir, libA, 3, stranger, nil)
+	res = verify(t, dir, tr)
+	wantStatus(t, res, StatusUnknownSigner)
+	wantUnsigned(res)
+
+	publish(t, dir, libA, 3, next, func(idx *Index) { idx.Rotate = []Rotation{rotation(t, libA, good, next)} })
+	res = verify(t, dir, tr)
+	wantStatus(t, res, StatusRotation)
+	wantUnsigned(res)
+}
+
 // signers.toml holds each key exactly as Add writes it: no comment, no
 // control characters, canonical base64.
 func TestLoadTrustKeyCanonical(t *testing.T) {

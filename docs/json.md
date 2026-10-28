@@ -310,8 +310,8 @@ error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
 | `packages[].ref` | string | The package's ref; `""` for an unlisted directory that doesn't load. |
 | `packages[].kind` | string | `pack`, `option` or `agent`. |
 | `packages[].dir` | string | Its directory in the library, `<kind>s/<name>`. |
-| `packages[].signed` | boolean | The index lists it and its content hash (`pack.ContentHash`, the hash `stack.lock` pins) matches. It counts only when `status` is `trusted`. |
-| `packages[].reason` | string | Why it is not signed: the directory doesn't load, declares another ref, its content differs, or the index doesn't list it. Absent when signed. |
+| `packages[].signed` | boolean | `status` is `trusted`, the index lists the package, and its content hash (`pack.ContentHash`, the hash `stack.lock` pins) matches. Always `false` for any other status. |
+| `packages[].reason` | string | Why it is not signed: the index is not trusted (`"the index is not trusted"`), the directory doesn't load, declares another ref, its content differs, or the index doesn't list it. Absent when signed. |
 
 ## `wt ls`
 

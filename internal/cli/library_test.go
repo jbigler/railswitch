@@ -80,7 +80,8 @@ func TestLibraryIndexSignVerify(t *testing.T) {
 	}
 
 	code, out, _ := runSSH(t, "", "library", "verify", dir)
-	if code != 1 || !strings.Contains(out, "unknown-signer") || !strings.Contains(out, k.fp) {
+	if code != 1 || !strings.Contains(out, "unknown-signer") || !strings.Contains(out, k.fp) ||
+		!strings.Contains(out, "not signed") || !strings.Contains(out, "the index is not trusted") {
 		t.Errorf("verify, untrusted: exit %d\n%s", code, out)
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -118,6 +119,9 @@ func TestLibraryVerifyJSON(t *testing.T) {
 	code, res := verifyJSON(t, dir)
 	if code != 1 || res.Status != signing.StatusUnknownSigner || res.Fingerprint != k.fp || res.Key != k.pub || res.Library != testLib || res.Serial != 1 {
 		t.Errorf("unknown signer: exit %d %+v", code, res)
+	}
+	if len(res.Packages) != 1 || res.Packages[0].Signed || res.Packages[0].Reason != "the index is not trusted" {
+		t.Errorf("unknown signer: packages %+v; want not signed", res.Packages)
 	}
 	mustOK(t, "", "signer", "add", testLib, k.priv+".pub")
 	code, res = verifyJSON(t, dir)

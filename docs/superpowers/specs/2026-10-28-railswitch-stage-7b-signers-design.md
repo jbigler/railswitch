@@ -109,6 +109,8 @@ fingerprint = "SHA256:…"
 6. Each `[[package]]`: the directory `<kind>s/<name>/` loads (`pack.Load`
    over just that dir) and its `ContentHash` equals `sha256` → `signed`;
    else not. A package directory the index doesn't list is `signed: false`.
+   Under any status but `trusted`, every package is `signed: false` with
+   the reason `the index is not trusted`.
 
 `Result{Status, Reason, Library, Serial, Fingerprint, Key, NewFingerprint, NewKey, Packages []PackageResult{Ref, Kind, Dir, Signed, Reason}}` (`Key`/`NewKey` the keys `library trust` adds; `Reason` text from the library is printed through `safefile.Printable`). Status `trusted` records
 `last_serial` and applies `[[revoke]]` (moves those fingerprints from keys

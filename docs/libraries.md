@@ -200,7 +200,8 @@ another library's index.
 3. Verify again. A trusted library reports `trusted` and lists each
    package as `signed` or `not signed`. A package is `not signed` when its
    content differs from the index, when it doesn't load, or when the index
-   doesn't list it.
+   doesn't list it. Under any status other than `trusted`, every package
+   is `not signed` (`the index is not trusted`).
 
 ### Confirming a rotation
 

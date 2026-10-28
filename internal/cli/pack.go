@@ -28,9 +28,9 @@ var packNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 // manifestNameRe is a manifest's top-level name line.
 var manifestNameRe = regexp.MustCompile(`(?m)^name\s*=\s*"[^"]*"`)
 
-// railswitch pack eject|new|show|ls|file (D43, D70, D91).
+// railswitch pack eject|new|show|ls|file|export|import (D43, D70, D91, D114).
 func cmdPack(ctx context.Context, e *env, args []string) int {
-	const usage = "usage: railswitch pack eject <ref> [--as <name>] | new [--option <slot>] <name> | show <ref> | ls | file show|write|rm <ref> <path>"
+	const usage = "usage: railswitch pack eject <ref> [--as <name>] | new [--option <slot>] <name> | show <ref> | ls | file show|write|rm <ref> <path> | export <ref> --to <dir> | import <dir> [--as <name>] [--accept <sha256>] [--restart]"
 	if len(args) == 0 {
 		return e.usageErr(usage)
 	}
@@ -45,6 +45,10 @@ func cmdPack(ctx context.Context, e *env, args []string) int {
 		return packShow(e, args[1:])
 	case "ls":
 		return packLs(e, args[1:])
+	case "export":
+		return packExport(e, args[1:])
+	case "import":
+		return packImport(ctx, e, args[1:])
 	}
 	return e.usageErr("pack: unknown subcommand %q\n%s", args[0], usage)
 }

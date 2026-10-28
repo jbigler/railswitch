@@ -291,6 +291,20 @@ read-only like a built-in (View; a write is refused, 422), can't be the
 start of a New pack or New option, and its page says which library it
 comes from, with the library's id and last fetch status.
 
+**Import a package** (D114): a folder field and an optional name (`As`)
+open `/p/<prefix>/library/import?dir=<path>&as=<name>`, which reads
+`railswitch --json -C <workspace> pack import <dir> [--as <name>]` and
+shows the package's status, its files with the review component and,
+for a used package, "Restart after importing". **Import** needs the tick
+when anything is flagged; it posts to `/p/<prefix>/library/import`,
+which reads the review again and refuses (400, no job) a path that isn't
+absolute and clean, a bad name, a hash that isn't the review's now, a
+missing tick or nothing to import; then it runs `railswitch -C
+<workspace> pack import <dir> [--as <name>] --accept <hash> [--restart]`
+as a project job. A selected package's pane has **Export**: a new
+folder's full path, posted to `/p/<prefix>/library/export`, which runs
+`railswitch -C <workspace> pack export <ref> --to <dir>` as a job.
+
 **Libraries** (first on the page) lists the machine's package libraries
 from `railswitch --json library ls`: alias, status chip (`trusted`
 green; `unknown-signer`, `rotation` yellow; anything else red; "not

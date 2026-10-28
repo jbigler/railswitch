@@ -153,18 +153,32 @@ func importWarnings(t *template.Template, d machine.Dirs) []string {
 
 func printImport(e *env, dir string, doc *templateImportDoc) {
 	p := safefile.Printable
+	var head string
 	switch doc.Status {
 	case template.ImportNew:
-		fmt.Fprintf(e.stdout, "template %s (sha256 %s): new on this machine\n", p(doc.Ref), doc.SHA256)
+		head = fmt.Sprintf("template %s (sha256 %s): new on this machine", p(doc.Ref), doc.SHA256)
 	case template.ImportUpdate:
-		fmt.Fprintf(e.stdout, "template %s (sha256 %s): replaces %s\n", p(doc.Ref), doc.SHA256, p(doc.Replaces.Ref))
+		head = fmt.Sprintf("template %s (sha256 %s): replaces %s", p(doc.Ref), doc.SHA256, p(doc.Replaces.Ref))
 	case template.ImportSame:
 		fmt.Fprintf(e.stdout, "template %s is already on this machine: nothing to import\n", p(doc.Ref))
 		return
 	default:
-		fmt.Fprintf(e.stdout, "template %s (sha256 %s)\n", p(doc.Ref), doc.SHA256)
+		head = fmt.Sprintf("template %s (sha256 %s)", p(doc.Ref), doc.SHA256)
 	}
-	for _, f := range doc.Packages[0].Files {
+	next := ""
+	if doc.Status != template.ImportOlder {
+		next = fmt.Sprintf("railswitch template import %s --accept %s", shellQuote(dir), doc.SHA256)
+	}
+	printFolderReview(e, head, doc.Packages[0].Files, doc.Warnings, doc.Flags, next)
+}
+
+// printFolderReview prints an import's review: head, every file with its
+// flags and diff, the warnings, and the command that saves it (next; ""
+// for none).
+func printFolderReview(e *env, head string, files []review.File, warnings []string, flags int, next string) {
+	p := safefile.Printable
+	fmt.Fprintln(e.stdout, head)
+	for _, f := range files {
 		fmt.Fprintf(e.stdout, "\n%s %s\n", f.Status, p(f.Path))
 		for _, fl := range f.Flags {
 			where := ""
@@ -179,10 +193,10 @@ func printImport(e *env, dir string, doc *templateImportDoc) {
 			}
 		}
 	}
-	for _, w := range doc.Warnings {
+	for _, w := range warnings {
 		fmt.Fprintf(e.stdout, "\nwarning: %s\n", p(w))
 	}
-	if doc.Status != template.ImportOlder {
-		fmt.Fprintf(e.stdout, "\n%d flagged; to save it: railswitch template import %s --accept %s\n", doc.Flags, shellQuote(dir), doc.SHA256)
+	if next != "" {
+		fmt.Fprintf(e.stdout, "\n%d flagged; to save it: %s\n", flags, next)
 	}
 }

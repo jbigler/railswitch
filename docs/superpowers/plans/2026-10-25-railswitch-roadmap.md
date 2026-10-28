@@ -135,6 +135,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D111 | Template updates | A project records `[template] ref, sha256`; `template check` shows the diff and records an accept; nothing is applied | HANDOFF §3.9: updates appear as a diff, only applied by the user |
 | D112 | Templates carry no personal choices (amends D108, D110) | A template has no `[tools]` or `[agents]` (refused by name); export drops them, `[firewall] allow.agent`, the editor's and agents' `[services.<id>]`, `[[routes]]`, Containerfiles (each tool's, `agent-base`, each agent's; `project new` refuses a template holding one) and those services in each secret (a secret only they receive is dropped); `project new --template` adds the default agent as without a template | User, 2026-10-29: a template primes a teammate's own dev env; the editor and agents are each person's preference |
 | D113 | Import a template folder | `template import <dir>` reviews a folder from `export --to` (hostile: template files only, ≤ 64, no symlink) as a diff from the stored version, flagged; `--accept <sha256>` saves it in the store (new, or a higher version; other content at the same version refused); the Machine page does the same | User, 2026-10-29: share a template without a library or signing key; no update channel, so no signature (the import is reviewed once) |
+| D114 | Share a package as a folder | `pack export <ref> --to <dir>` writes the package as the project runs it; `pack import <dir> [--as <name>]` reviews it in a workspace as `local:<name>@N` (diff from the local package there, flagged) and `--accept <sha256>` writes it (a used package through `commit`, locked at exactly the reviewed content: `Accept.Import`); dashboard Library page Import and Export | User, 2026-10-29: share a customized pack (a Filial rails) that a teammate then customizes locally, as a new package or an update of one |
 
 ## Stages
 
@@ -155,6 +156,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 7c Library repositories | detailed (`2026-10-29-railswitch-stage-7c.md`) | Library repos; install and update through 7a's review; Install review |
 | 7d Templates | detailed (`2026-10-29-railswitch-stage-7d.md`) | Export a project as `<name>.stack/`; start a project from one |
 | 8a Sharing templates | bounded, no plan file (D112, D113) | Templates without the editor or agents; `template import` of a folder |
+| 8b Sharing packages | bounded, no plan file (D114) | `pack export`, `pack import` of a folder |
 
 ### Stage 3 — Machine layer
 

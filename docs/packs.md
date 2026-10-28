@@ -88,6 +88,51 @@ the built-ins:
 - `packs/`, `options/` and `agents/` are tracked in the workspace repo (D38),
   so a local package travels with the project.
 
+### Sharing a package (D114)
+
+Make a package your own (`pack eject rails@1`, then edit
+`packs/rails/`), then hand it to someone as a folder. Keep a pack's name
+(`local:rails@1`, not `--as filial-rails`): options name the packs they
+work with (`works_with = ["rails"]`), so a renamed pack loses them.
+
+- `railswitch pack export <ref> --to <dir>`, in a workspace: the package
+  as this project runs it (a locked one's accepted copy) as a new folder
+  `dir`, outside the workspace's `packs/`, `options/` and `agents/`. A
+  built-in or `local:` ref, or a library package this project uses and
+  has installed (never one whose content no review accepted).
+- `railswitch pack import <dir> [--as <name>] [--json]`, in their
+  workspace: reviews the folder as `local:<name>@<N>` (name: `--as`, else
+  the manifest's; the manifest's `name` line is set to it; `N`: its
+  `version`). Every file is a diff from the workspace's local package of
+  that name; a new one is shown as its changes from the closest built-in
+  of its kind (the most identical files, a manifest's name line aside;
+  `compared_with`), else every file added; flagged by the review checks;
+  for a package the project uses, the worktrees it restarts. Nothing is
+  written. The folder is hostile input: exactly one manifest
+  (`pack.toml`, `option.toml` or `agent.toml`, which sets the kind), only
+  paths `pack file write` accepts (so no `.git/` or `.DS_Store`: share the
+  package's files only), regular files ≤ 1 MiB, at most 512 and 16 MiB in
+  all, no symlink (the folder included); the manifest's top-level `name`
+  must be one `name = "…"` line before any table; it must load.
+- `--accept <sha256> [--restart]` writes it, once the folder still has
+  the hash its review printed. A package the project doesn't use is
+  written beside the old directory and renamed over it. One it uses is
+  written through the same commit as `pack file write`: every file, the
+  old ones it lacks removed, `stack.lock` locked at exactly the reviewed
+  content, render; any failure puts it all back.
+- Refused: a used package with an update waiting for review (review that
+  first); a folder of another version than the one the project uses
+  (import it `--as` another name, or move the project off it first); a
+  name another kind already has (`options/<name>/` for a pack).
+- From then on it is the workspace's own: edit it, or import a newer
+  folder over it (shown as the diff from yours).
+
+To start a teammate's new project on it: create the project from the
+built-in (or from a template), import the package, then use it: an option
+in Settings, a pack as `[stack] pack = "local:rails@1"` in `project.toml`
+(the Settings page's project.toml editor), an agent with `agent add`. A template that names a `local:` package
+can't start a project on a machine without it.
+
 ## Locking
 
 `railswitch lock` writes `stack.lock`: every package the project uses with

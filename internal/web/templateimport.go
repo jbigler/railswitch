@@ -25,10 +25,11 @@ var importHashRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // the template's status and warnings.
 type importDoc struct {
 	reviewDoc
-	Ref      string   `json:"ref"`
-	Status   string   `json:"status"` // new, update, same, older
-	Warnings []string `json:"warnings"`
-	Replaces *struct {
+	Ref          string   `json:"ref"`
+	Status       string   `json:"status"` // new, update, same, older
+	Warnings     []string `json:"warnings"`
+	ComparedWith string   `json:"compared_with"` // pack import: the built-in a new package is shown against
+	Replaces     *struct {
 		Ref string `json:"ref"`
 	} `json:"replaces"`
 }
@@ -41,11 +42,27 @@ type importView struct {
 	Banner        bannerView
 	Jobs          jobsView
 
+	Back, BackText, Heading, Intro    string
 	Dir, Ref, Status, Replaces, Error string
-	Hash, AckText                     string
+	ComparedWith                      string
+	Hash, AckText, As, Restart        string
 	Warnings                          []string
 	Packages                          []reviewPkgView
 	ImportURL                         string
+}
+
+// fill sets v from an import review read with err.
+func (v *importView) fill(doc importDoc, err error) {
+	if err != nil {
+		v.Error = err.Error()
+		return
+	}
+	v.Ref, v.Status, v.Warnings, v.ComparedWith = doc.Ref, doc.Status, doc.Warnings, doc.ComparedWith
+	if doc.Replaces != nil {
+		v.Replaces = doc.Replaces.Ref
+	}
+	v.Hash, v.AckText, v.Packages = doc.Hash, ackText(doc.Flags), reviewPackages(doc.reviewDoc)
+	v.Restart = strings.Join(doc.Restart, ", ")
 }
 
 // importDir is the posted folder: an absolute, clean path with no
@@ -68,6 +85,8 @@ func (s *Server) templateImportPage(w http.ResponseWriter, r *http.Request) {
 		Title: "Import template · RailSwitch", Prefix: machineKey,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		ImportURL: "/machine/templates/import",
+		Back:      "/machine", BackText: "Machine", Heading: "Import template",
+		Intro: "A template from a folder someone gave you. Read every file before you import it: a new project started from it builds these Containerfiles and gets these firewall, route and secret lines.",
 	}
 	dir, ok := importDir(r.URL.Query().Get("dir"))
 	if !ok {
@@ -76,17 +95,7 @@ func (s *Server) templateImportPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v.Dir = dir
-	doc, err := readJSON[importDoc](r.Context(), s.c.CLI, "template", "import", dir)
-	if err != nil {
-		v.Error = err.Error()
-		s.html(w, http.StatusOK, "templateimport", v)
-		return
-	}
-	v.Ref, v.Status, v.Warnings = doc.Ref, doc.Status, doc.Warnings
-	if doc.Replaces != nil {
-		v.Replaces = doc.Replaces.Ref
-	}
-	v.Hash, v.AckText, v.Packages = doc.Hash, ackText(doc.Flags), reviewPackages(doc.reviewDoc)
+	v.fill(readJSON[importDoc](r.Context(), s.c.CLI, "template", "import", dir))
 	s.html(w, http.StatusOK, "templateimport", v)
 }
 

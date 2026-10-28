@@ -78,6 +78,7 @@ runtime for one worktree.
 | `.ruby-version`, `.nvmrc`, `.node-version`, `.bun-version` | the first line (a leading `v` dropped for Node and bun) |
 | `.tool-versions:<tool>` | the `<tool> <version>` line (asdf) |
 | `mise.toml:<tool>`, `.mise.toml:<tool>` | `[tools] <tool> = "<v>"`, `{ version = "<v>" }` or `["<v>", …]` (first) |
+| `.java-version` | the first line (jenv) |
 | `Gemfile` | `ruby "<v>"` |
 | `Gemfile.lock`, `Gemfile.lock:<gem>` | `RUBY VERSION`, or the resolved version of `<gem>` |
 | `package.json`, `package.json:<engine>` | `engines.node`, or `engines.<engine>` |
@@ -85,6 +86,12 @@ runtime for one worktree.
 | `package-lock.json:<package>` | the installed version of `<package>` |
 | `uv.lock:<package>` | the locked version of `<package>` |
 | `<path>/database.yml[:<env>.database]` | `development.database` (`[db_name]` only) |
+
+A Java version (`.java-version`, `.tool-versions:java`, `mise.toml:java`)
+loses its distribution prefix and its `+<build>` part:
+`temurin-25.0.3+9.0.LTS` is `25.0.3`, `corretto-21.0.2.13.1` is
+`21.0.2.13.1`. Which JDK image or distribution that becomes is the pack's
+Containerfile's choice.
 
 A source is a path relative to the worktree; the file name picks the
 parser, so `config/database.yml` and `.config/mise.toml` work. Loading a

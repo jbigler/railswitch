@@ -31,6 +31,7 @@ var sources = map[string]source{
 	".nvmrc":            {parseNvmrc, noKey},
 	".node-version":     {parseNvmrc, noKey},
 	".bun-version":      {parseNvmrc, noKey},
+	".java-version":     {parseJavaVersion, noKey},
 	".tool-versions":    {parseToolVersions, needKey},
 	"mise.toml":         {parseMiseToml, needKey},
 	".mise.toml":        {parseMiseToml, needKey},
@@ -70,6 +71,35 @@ func parseNvmrc(data []byte, _ string) (string, bool) {
 	return v, v != ""
 }
 
+// javaDist is a Java version's distribution prefix, as jenv
+// ("temurin64-17.0.9"), asdf ("corretto-21.0.2.13.1") and mise
+// ("temurin-25.0.3+9.0.LTS") write it.
+var javaDist = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z][a-z0-9]*)*-([0-9])`)
+
+// javaVersion is v without its distribution prefix and its "+<build>"
+// part: the version number a JDK image's tag carries.
+func javaVersion(v string) string {
+	if m := javaDist.FindStringSubmatchIndex(v); m != nil {
+		v = v[m[4]:]
+	}
+	v, _, _ = strings.Cut(v, "+")
+	return v
+}
+
+func parseJavaVersion(data []byte, _ string) (string, bool) {
+	v := javaVersion(firstLine(data))
+	return v, v != ""
+}
+
+// toolVersion is the value a version manager holds for tool, in the form
+// the other sources give (Java's without its distribution).
+func toolVersion(tool, v string) string {
+	if tool == "java" {
+		return javaVersion(v)
+	}
+	return v
+}
+
 // parseToolVersions reads "<tool> <version>" lines; key names the tool.
 func parseToolVersions(data []byte, key string) (string, bool) {
 	sc := bufio.NewScanner(bytes.NewReader(data))
@@ -78,7 +108,7 @@ func parseToolVersions(data []byte, key string) (string, bool) {
 		line, _, _ := strings.Cut(sc.Text(), "#")
 		f := strings.Fields(line)
 		if len(f) >= 2 && f[0] == key {
-			return f[1], true
+			return toolVersion(key, f[1]), true
 		}
 	}
 	return "", false
@@ -203,19 +233,19 @@ func parseMiseToml(data []byte, key string) (string, bool) {
 	if toml.Unmarshal(data, &m) != nil {
 		return "", false
 	}
+	var s string
 	switch v := m.Tools[key].(type) {
 	case string:
-		return v, v != ""
+		s = v
 	case map[string]any:
-		s, _ := v["version"].(string)
-		return s, s != ""
+		s, _ = v["version"].(string)
 	case []any:
 		if len(v) > 0 {
-			s, _ := v[0].(string)
-			return s, s != ""
+			s, _ = v[0].(string)
 		}
 	}
-	return "", false
+	s = toolVersion(key, s)
+	return s, s != ""
 }
 
 // parseDatabaseYML ports dev-db-name.sh: it reads `database:` from the

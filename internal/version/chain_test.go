@@ -31,6 +31,11 @@ func TestParsers(t *testing.T) {
 		{"mise-array", "mise.toml:elixir", "1.18.4", false},
 		{"dot-mise", ".mise.toml:erlang", "27.3.4", false},
 		{"bun-version", ".bun-version", "1.2.3", false},
+		// Java: the distribution prefix and the +build part go (jenv, asdf, mise).
+		{"java-version", ".java-version", "21.0.2", false},
+		{"java-version-jenv", ".java-version", "17.0.9", false},
+		{"tool-versions-java", ".tool-versions:java", "21.0.2.13.1", false},
+		{"mise-java", "mise.toml:java", "25.0.3", false},
 	}
 	for _, c := range cases {
 		t.Run(c.dir+"/"+c.src, func(t *testing.T) {

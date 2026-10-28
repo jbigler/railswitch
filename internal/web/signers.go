@@ -56,11 +56,13 @@ type machineView struct {
 	Banner        bannerView
 	Jobs          jobsView
 
-	Error     string
-	Libraries []signerLibView
-	AddURL    string
-	RmURL     string
-	RevokeURL string
+	Error          string
+	Templates      []templateRow
+	TemplatesError string
+	Libraries      []signerLibView
+	AddURL         string
+	RmURL          string
+	RevokeURL      string
 }
 
 type signerLibView struct {
@@ -85,6 +87,11 @@ func (s *Server) machinePage(w http.ResponseWriter, r *http.Request) {
 		Title: "Machine · RailSwitch", Prefix: machineKey,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		AddURL: "/machine/signers/add", RmURL: "/machine/signers/rm", RevokeURL: "/machine/signers/revoke",
+	}
+	if ls, err := readTemplates(r.Context(), s.c.CLI); err != nil {
+		v.TemplatesError = err.Error()
+	} else {
+		v.Templates = templateItems(ls)
 	}
 	doc, err := readJSON[signerDoc](r.Context(), s.c.CLI, "signer", "ls")
 	if err != nil {

@@ -131,7 +131,7 @@ func TestTemplateLsShow(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []templateRow{
-		{Ref: "filial-stack@1", Name: "filial-stack", Version: 1, Description: "Rails with everything", Source: "machine", Packages: []string{"rails@1", "postgres@1", "redis@1", "rustfs@1", "playwright@1", "claude@1", "local:probe@1"}},
+		{Ref: "filial-stack@1", Name: "filial-stack", Version: 1, Description: "Rails with everything", Source: "machine", Packages: []string{"rails@1", "postgres@1", "redis@1", "rustfs@1", "playwright@1"}},
 		{Ref: "acme:rails-pg@3", Name: "rails-pg", Version: 3, Description: "", Source: "library acme", Packages: []string{"rails@1", "postgres@1", "acme:redis@1"}},
 	}
 	if len(ls.Templates) != len(want) {
@@ -151,7 +151,7 @@ func TestTemplateLsShow(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &show); err != nil {
 		t.Fatal(err)
 	}
-	if show.Ref != "filial-stack@1" || len(show.SHA256) != 64 || !strings.HasPrefix(show.StackTOML, "schema = 1\nname = \"filial-stack\"") || len(show.Ask) != 10 || !slices.Equal(show.Secrets, []string{"github_token", "probe_key", "twilio_auth_token"}) || len(show.Containerfiles) != 0 {
+	if show.Ref != "filial-stack@1" || len(show.SHA256) != 64 || !strings.HasPrefix(show.StackTOML, "schema = 1\nname = \"filial-stack\"") || len(show.Ask) != 10 || !slices.Equal(show.Secrets, []string{"twilio_auth_token"}) || len(show.Containerfiles) != 0 {
 		t.Errorf("show = %+v", show)
 	}
 	if code, _, errs := runIn(t, "template", "show", "filial-stack@2"); code != 1 || !strings.Contains(errs, "declares filial-stack@1") {

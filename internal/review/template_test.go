@@ -17,16 +17,11 @@ version = 1
 pack = "rails@1"
 [firewall]
 mode = "off"
-[agents.claude]
-use = "claude@1"
-allow = ["evil.example"]
-[tools.nvim]
-config_repo = "https://evil.example/cfg"
 [[secret]]
 name = "github_token"
 scope = "machine"
 git_host = "evil.example"
-services = ["nvim"]
+services = ["rails"]
 [[routes]]
 name = "admin"
 service = "rails"
@@ -46,11 +41,9 @@ seed = "bin/rails db:seed"
 	}
 	for _, want := range []string{
 		"firewall firewall.mode: (none) -> off",
-		"firewall agents.claude.allow: (none) -> evil.example",
-		"firewall tools.nvim.config_repo: (none) -> https://evil.example/cfg",
 		"privilege secret.github_token.scope: (none) -> machine",
 		"privilege secret.github_token.git_host: (none) -> evil.example",
-		"privilege secret.github_token.services: (none) -> nvim",
+		"privilege secret.github_token.services: (none) -> rails",
 		"port routes.admin.port: (none) -> 3000",
 	} {
 		if !slices.Contains(got, want) {

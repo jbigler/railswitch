@@ -12,7 +12,8 @@ import (
 )
 
 // Export is the template name@version of project p: its lines without the
-// project-only ones (returned as dropped, each a line of text), a question
+// project-only ones and each person's own (dropPersonal), all returned as
+// dropped, each a line of text, a question
 // per [options] key, [versions] pin and [env] value (default: p's value),
 // p's secret declarations (never a value: project.toml holds none), and
 // containerfiles, Containerfile.<name> by name: the ones the caller judged
@@ -45,6 +46,7 @@ func Export(p *config.Project, containerfiles map[string][]byte, name string, ve
 
 	lines := *p
 	lines.From, lines.Project, lines.Worktrees, lines.Share, lines.Template = "", config.Meta{}, nil, config.Share{}, nil
+	dropped = append(dropped, dropPersonal(&lines)...)
 	lines.Image = config.ImageConfig{}
 	for _, a := range p.Image.Addons {
 		if n, ok := strings.CutPrefix(a, cfDir+"/Containerfile."); ok && containerfiles[n] != nil {
@@ -63,7 +65,7 @@ func Export(p *config.Project, containerfiles map[string][]byte, name string, ve
 	for _, k := range slices.Sorted(maps.Keys(p.Env)) {
 		t.Ask = append(t.Ask, Ask{Key: "env." + k, Prompt: "Value of " + k, Default: p.Env[k]})
 	}
-	t.Secrets = slices.Sorted(maps.Keys(p.Secrets))
+	t.Secrets = slices.Sorted(maps.Keys(lines.Secrets))
 	t.Containerfiles = containerfiles
 	out, err := t.Build()
 	if err != nil {
@@ -84,4 +86,52 @@ func (t *Template) Build() (*Template, error) {
 		files[ReadmeFile] = &fstest.MapFile{Data: t.Readme, Mode: 0o644}
 	}
 	return Decode(files)
+}
+
+// dropPersonal removes from p, a copy of a project's lines, what each
+// person chooses for themselves (D112): [tools], [agents], [firewall]
+// allow.agent, and the services of the editor and the agents wherever a
+// line names them ([services.<id>], a secret's services; a secret left
+// with none is dropped). It returns what it dropped.
+func dropPersonal(p *config.Project) []string {
+	personal := map[string]bool{"agent": true}
+	var dropped []string
+	if p.Tools.Nvim != nil {
+		dropped = append(dropped, "[tools.nvim]")
+		personal["nvim"] = true
+	}
+	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
+		dropped = append(dropped, "[agents."+n+"]")
+		personal["agent-"+n] = true
+	}
+	p.Tools, p.Agents = config.Tools{}, nil
+	if _, ok := p.Firewall.Allow["agent"]; ok {
+		dropped = append(dropped, "[firewall] allow.agent")
+		p.Firewall.Allow = maps.Clone(p.Firewall.Allow)
+		delete(p.Firewall.Allow, "agent")
+	}
+	if len(p.Services) > 0 {
+		p.Services = maps.Clone(p.Services)
+		for _, id := range slices.Sorted(maps.Keys(p.Services)) {
+			if personal[id] {
+				dropped = append(dropped, "[services."+id+"]")
+				delete(p.Services, id)
+			}
+		}
+	}
+	if len(p.Secrets) > 0 {
+		secrets := map[string]config.Secret{}
+		for _, n := range slices.Sorted(maps.Keys(p.Secrets)) {
+			s := p.Secrets[n]
+			s.Services = slices.DeleteFunc(slices.Clone(s.Services), func(id string) bool { return personal[id] })
+			switch {
+			case len(s.Services) == 0:
+				dropped = append(dropped, "[secrets."+n+"] (only the editor or agents receive it)")
+			default:
+				secrets[n] = s
+			}
+		}
+		p.Secrets = secrets
+	}
+	return dropped
 }

@@ -9,13 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing/fstest"
+
+	"github.com/BurntSushi/toml"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -47,7 +48,8 @@ type Template struct {
 	Version     int
 	Description string
 	// Lines are the project.toml lines a new project starts from: no
-	// [project], [worktrees], [share] or [template]; Secrets are the
+	// [project], [worktrees], [share], [template], [tools] or [agents]
+	// (D112); Secrets are the
 	// declarations of [[secret]]; Image holds only the user addons.
 	Lines   *config.Project
 	Ask     []Ask
@@ -62,17 +64,14 @@ type Template struct {
 // Ref is t's ref on this machine: "<name>@<version>".
 func (t *Template) Ref() string { return fmt.Sprintf("%s@%d", t.Name, t.Version) }
 
-// Packages are the package refs t's lines use: the pack, each option
-// (slot order, then the extra services) and each agent's.
+// Packages are the package refs t's lines use: the pack and each option
+// (slot order, then the extra services).
 func (t *Template) Packages() []string {
 	out := []string{t.Lines.Stack.Pack}
 	for _, k := range pack.OptionKeys(t.Lines.Options) {
 		if v, ok := t.Lines.Options[k]; ok && v != "none" {
 			out = append(out, v)
 		}
-	}
-	for _, n := range slices.Sorted(maps.Keys(t.Lines.Agents)) {
-		out = append(out, t.Lines.Agents[n].Use)
 	}
 	return out
 }
@@ -93,8 +92,6 @@ type stackFile struct {
 	Tasks       map[string]string                 `toml:"tasks"`
 	Links       []config.Link                     `toml:"links"`
 	Routes      []config.Route                    `toml:"routes"`
-	Tools       config.Tools                      `toml:"tools"`
-	Agents      map[string]config.Agent           `toml:"agents"`
 	Firewall    config.Firewall                   `toml:"firewall"`
 	Image       struct {
 		Addons []string `toml:"addons"`
@@ -172,6 +169,10 @@ func Decode(fsys fs.FS) (*Template, error) {
 	if !ok {
 		return nil, fmt.Errorf("no %s", StackFile)
 	}
+	var personal struct{ Tools, Agents any }
+	if _, err := toml.Decode(string(data.Data), &personal); err == nil && (personal.Tools != nil || personal.Agents != nil) {
+		return nil, fmt.Errorf("%s: [tools] and [agents] are not part of a template: the editor and the agents are each person's choice (project new --tool, --agent)", StackFile)
+	}
 	var f stackFile
 	if err := tomlfile.Decode(data.Data, SchemaVersion, &f); err != nil {
 		return nil, fmt.Errorf("%s: %w", StackFile, err)
@@ -182,7 +183,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 		Lines: &config.Project{
 			Schema: config.SchemaVersion, Stack: f.Stack, Options: f.Options, Versions: f.Versions, Env: f.Env,
 			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, Routes: f.Routes,
-			Tools: f.Tools, Agents: f.Agents, Firewall: f.Firewall, Image: config.ImageConfig{Addons: f.Image.Addons},
+			Firewall: f.Firewall, Image: config.ImageConfig{Addons: f.Image.Addons},
 		},
 	}
 	if t.Ask == nil {

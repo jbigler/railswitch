@@ -141,22 +141,65 @@ func TestExportDropsProjectLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	stack := string(tp.Encode())
-	for _, s := range []string{"[project]", "prefix", "base_branch", "git@github.com", "[worktrees", "postgres-trial", "Filial Rails", "from =", "[secrets."} {
+	for _, s := range []string{"[project]", "prefix", "base_branch", "git@github.com", "[worktrees", "postgres-trial", "Filial Rails", "from =", "[secrets.", "[tools", "[agents", "nvim", "agent-"} {
 		if strings.Contains(stack, s) {
 			t.Errorf("stack.toml holds %q:\n%s", s, stack)
 		}
 	}
-	want := []string{"from", "[project] name", "[project] prefix", "[project] repo", "[project] base_branch", "[worktrees.feat]", "[worktrees.postgres-trial]"}
+	want := []string{"from", "[project] name", "[project] prefix", "[project] repo", "[project] base_branch", "[worktrees.feat]", "[worktrees.postgres-trial]",
+		"[tools.nvim]", "[agents.claude]", "[agents.probe]",
+		"[secrets.github_token] (only the editor or agents receive it)", "[secrets.probe_key] (only the editor or agents receive it)"}
 	if !slices.Equal(dropped, want) {
 		t.Errorf("dropped = %q; want %q", dropped, want)
 	}
-	for _, s := range []string{"[services.rails.env]\nHEADLESS_SYSTEM_TESTS = \"0\"", "[agents.probe]\nuse = \"local:probe@1\"\nrun = \"service\"", "allow.deps = [\"github.com\"]", "[[links]]\nlabel = \"Admin\""} {
+	for _, s := range []string{"[services.rails.env]\nHEADLESS_SYSTEM_TESTS = \"0\"", "allow.deps = [\"github.com\"]", "[[links]]\nlabel = \"Admin\""} {
 		if !strings.Contains(stack, s) {
 			t.Errorf("stack.toml lacks %q:\n%s", s, stack)
 		}
 	}
 	if strings.Contains(stack, "[image]") {
 		t.Errorf("an option's addon is in [image] with no template file:\n%s", stack)
+	}
+}
+
+// The editor and the agents are each person's choice (D112): a secret
+// they share with the app keeps only the app, and their overrides and
+// allow.agent are dropped.
+func TestExportDropsPersonal(t *testing.T) {
+	p := filial(t)
+	p.Secrets = map[string]config.Secret{"shared": {Services: []string{"rails", "agent-claude", "nvim"}}}
+	p.Services = map[string]config.ServiceOverride{"agent-claude": {Memory: "2g"}, "rails": {Memory: "1g"}}
+	p.Firewall.Allow = map[string][]string{"agent": {"api.example"}, "deps": {"github.com"}}
+	tp, dropped, err := Export(p, nil, "filial-stack", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := tp.Lines.Secrets["shared"]; !slices.Equal(s.Services, []string{"rails"}) {
+		t.Errorf("shared = %+v", s)
+	}
+	if _, ok := tp.Lines.Services["agent-claude"]; ok || tp.Lines.Services["rails"].Memory != "1g" {
+		t.Errorf("services = %+v", tp.Lines.Services)
+	}
+	if _, ok := tp.Lines.Firewall.Allow["agent"]; ok || len(tp.Lines.Firewall.Allow["deps"]) != 1 {
+		t.Errorf("allow = %+v", tp.Lines.Firewall.Allow)
+	}
+	for _, d := range []string{"[firewall] allow.agent", "[services.agent-claude]"} {
+		if !slices.Contains(dropped, d) {
+			t.Errorf("dropped %q lacks %q", dropped, d)
+		}
+	}
+	if p.Firewall.Allow["agent"] == nil || p.Services["agent-claude"].Memory == "" || len(p.Secrets["shared"].Services) != 3 {
+		t.Error("Export changed the project it read")
+	}
+}
+
+// A stack.toml with [tools] or [agents] is refused by name.
+func TestDecodeRefusesPersonal(t *testing.T) {
+	for _, extra := range []string{"[tools.nvim]\nconfig_repo = \"https://h.example/c\"\n", "[agents.claude]\nuse = \"claude@1\"\n"} {
+		_, err := Decode(fstest.MapFS{StackFile: {Data: []byte("schema = 1\nname = \"x\"\nversion = 1\n[stack]\npack = \"rails@1\"\napp = \"rails\"\n" + extra)}})
+		if err == nil || !strings.Contains(err.Error(), "each person's choice") {
+			t.Errorf("%q: %v", extra, err)
+		}
 	}
 }
 
@@ -177,7 +220,7 @@ func TestExportQuestions(t *testing.T) {
 	if !slices.Equal(keys, want) {
 		t.Errorf("questions = %q; want %q", keys, want)
 	}
-	if !slices.Equal(tp.Secrets, []string{"github_token", "probe_key", "twilio_auth_token"}) {
+	if !slices.Equal(tp.Secrets, []string{"twilio_auth_token"}) {
 		t.Errorf("secrets = %q", tp.Secrets)
 	}
 	if s := tp.Lines.Secrets["twilio_auth_token"]; s.Env != "TWILIO_AUTH_TOKEN" || !slices.Equal(s.Services, []string{"rails"}) {

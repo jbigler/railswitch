@@ -21,9 +21,9 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const templateUsage = "usage: railswitch template ls | show <ref> | export [--name <n>] [--version <N>] [--description <text>] [--to <dir>] | check [--accept <sha256>]"
+const templateUsage = "usage: railswitch template ls | show <ref> | export [--name <n>] [--version <N>] [--description <text>] [--to <dir>] | check [--accept <sha256>] | import <dir> [--accept <sha256>]"
 
-// railswitch template ls|show|export|check (D108–D111).
+// railswitch template ls|show|export|check|import (D108–D111, D113).
 func cmdTemplate(ctx context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr("%s", templateUsage)
@@ -37,6 +37,8 @@ func cmdTemplate(ctx context.Context, e *env, args []string) int {
 		return templateExport(ctx, e, args[1:])
 	case "check":
 		return templateCheck(e, args[1:])
+	case "import":
+		return templateImport(e, args[1:])
 	}
 	return e.usageErr("template: unknown subcommand %q\n%s", args[0], templateUsage)
 }

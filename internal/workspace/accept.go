@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/lockstore"
@@ -105,17 +106,48 @@ func catalogFiles(cat *pack.Catalog, kind string, r pack.Ref) (fs.FS, error) {
 
 // Accept is what a lock write may accept of the packages whose content
 // changed under the ref stack.lock pins (D97): every one (lock --accept),
-// the listed ones (pack file write: the package it edits), or none (every
-// other write). A package new to the lock is always locked as resolved.
+// one file of one package (pack file write: the file it writes, reviewed
+// in the editor), or none (every other write).
 type Accept struct {
-	All  bool
-	Refs []pack.Ref
+	All bool
+	// Edit, when set, accepts its package only when the file it names is
+	// the package's one difference from the accepted copy; any other
+	// difference refuses the write.
+	Edit *FileEdit
 	// IfHash, when set, refuses a write whose stack.lock bytes don't hash
 	// (Hash) to it: the review that was accepted.
 	IfHash string
 }
 
-func (a Accept) accepts(r pack.Ref) bool { return a.All || slices.Contains(a.Refs, r) }
+// FileEdit is one file of package Ref, by its package-relative slash path.
+type FileEdit struct {
+	Ref  pack.Ref
+	Path string
+}
+
+// onlyEdited refuses files, the resolved content of a package stack.lock
+// pins at sha, unless putting edit's file back to the store's copy of sha
+// gives exactly sha: nothing else of the package changed unreviewed.
+func onlyEdited(s lockstore.Store, sha string, files fs.FS, edit FileEdit) error {
+	refuse := fmt.Errorf("other files of %s changed since it was accepted: review them first (railswitch lock --review)", edit.Ref)
+	stored, err := s.Get(sha)
+	if err != nil {
+		return refuse
+	}
+	mem, err := lockstore.Read(files)
+	if err != nil {
+		return err
+	}
+	if data, err := fs.ReadFile(stored, edit.Path); err == nil {
+		mem[edit.Path] = &fstest.MapFile{Data: data}
+	} else {
+		delete(mem, edit.Path)
+	}
+	if sum, err := pack.ContentHash(mem); err != nil || sum != sha {
+		return refuse
+	}
+	return nil
+}
 
 // ErrReviewChanged is Lock's error when Accept.IfHash no longer matches.
 var ErrReviewChanged = errors.New("the update changed since it was reviewed: review it again")
@@ -195,14 +227,20 @@ func plan(root string, accept Accept) (*lockPlan, error) {
 		if err != nil {
 			return nil, err
 		}
-		if o, ok := table(old, sp.kind)[sp.key]; ok && pins(o, sp.ref) && o.SHA256 != e.SHA256 && !accept.accepts(sp.ref) {
-			// The accepted copy keeps the project running; without one,
-			// locking the update would accept it unseen.
-			if _, err := accepted(cat, pl.store, sp.kind, sp.ref, o.SHA256); err != nil {
-				return nil, fmt.Errorf("%s %s: %s", sp.kind, sp.ref, reviewHint)
+		if o, ok := table(old, sp.kind)[sp.key]; ok && pins(o, sp.ref) && o.SHA256 != e.SHA256 && !accept.All {
+			if accept.Edit != nil && accept.Edit.Ref == sp.ref {
+				if err := onlyEdited(pl.store, o.SHA256, sp.files, *accept.Edit); err != nil {
+					return nil, err
+				}
+			} else {
+				// The accepted copy keeps the project running; without
+				// one, locking the update would accept it unseen.
+				if _, err := accepted(cat, pl.store, sp.kind, sp.ref, o.SHA256); err != nil {
+					return nil, fmt.Errorf("%s %s: %s", sp.kind, sp.ref, reviewHint)
+				}
+				table(&l, sp.kind)[sp.key] = o
+				continue
 			}
-			table(&l, sp.kind)[sp.key] = o
-			continue
 		}
 		table(&l, sp.kind)[sp.key] = e
 		pl.put = append(pl.put, sp)

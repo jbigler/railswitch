@@ -104,7 +104,9 @@ railswitch: stack.lock is out of date for local:phoenix@1: an update is waiting 
 - Other writes never accept a waiting update: `settings apply`, `project
   write`, `agent add` and Containerfile writes keep a waiting package's
   entry (and refuse when it has no stored copy); `pack file write` accepts
-  only the package it edits, reviewed in the editor.
+  only the file it writes, reviewed in the editor: when any other file of
+  that package changed since it was accepted, the write refuses ("other
+  files of <ref> changed since it was accepted: review them first").
 
 The checks flag, and everything else is shown as a diff only (it runs
 inside a firewalled container):

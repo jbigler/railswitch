@@ -71,8 +71,11 @@ too.
 
 **Other writes never accept a waiting update.** `workspace.Lock(ctx,
 root, accept)` takes what it may accept: `lock --accept` passes every
-package, `pack file write` only the package it edits (reviewed in the
-editor), every other caller (`settings apply`, `project write`, `agent
+package, `pack file write` only the file it writes (reviewed in the
+editor: the package is locked as resolved only when putting that file back
+to the stored accepted copy hashes to the locked sha, and the write refuses
+otherwise, "other files of <ref> changed since it was accepted: review them
+first (railswitch lock --review)"), every other caller (`settings apply`, `project write`, `agent
 add`, `project new`) none. A package not accepted keeps its current lock
 entry when that entry's content is usable from the store, and the write
 refuses ("an update is waiting for review") when it isn't; a ref that is

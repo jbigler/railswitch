@@ -45,7 +45,7 @@ func (s Store) Put(files fs.FS) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	mem, err := read(files)
+	mem, err := Read(files)
 	if err != nil {
 		return "", err
 	}
@@ -125,8 +125,8 @@ func (s Store) Get(sha string) (fs.FS, error) {
 	return mem, nil
 }
 
-// read is files in memory, within the limits.
-func read(files fs.FS) (fstest.MapFS, error) {
+// Read is files in memory, within the limits, each with its stored mode.
+func Read(files fs.FS) (fstest.MapFS, error) {
 	mem := fstest.MapFS{}
 	err := fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {

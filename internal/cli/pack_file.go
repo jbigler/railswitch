@@ -350,7 +350,7 @@ func packFileChange(ctx context.Context, e *env, refArg, rel, hash string, data 
 	}
 	change := fileChange{Rel: wrel, Data: data, Mode: mode}
 	if used {
-		return e.commitJudged(ctx, root, w, []fileChange{change}, &workspace.Accept{Refs: []pack.Ref{ref}}, restart)
+		return e.commitJudged(ctx, root, w, []fileChange{change}, &workspace.Accept{Edit: &workspace.FileEdit{Ref: ref, Path: rel}}, restart)
 	}
 	if w.err != nil {
 		return e.fail(w.err)

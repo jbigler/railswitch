@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -105,5 +106,22 @@ func TestTemplateImportBundled(t *testing.T) {
 	}
 	if strings.Join(paths, " ") != "packs/rails/deps.allow stack.toml" || doc.Flags == 0 {
 		t.Errorf("files %q, flags %d", paths, doc.Flags)
+	}
+}
+
+// The dry run names the bundle it writes; --pack picking another pack
+// writes no bundle.
+func TestNewTemplateBundleUsedOnly(t *testing.T) {
+	dirs := newEnv(t)
+	bundledRails(t, template.LocalDir(dirs, "rails-own"))
+	repo := bareRepo(t, "main")
+	ws := filepath.Join(t.TempDir(), "shop")
+	doc := dryRun(t, gitHost(), ws, "--repo", repo, "--prefix", "shop", "--branch", "main", "--template", "rails-own@1")
+	if !slices.Contains(doc.Steps, "Write the template's bundled package packs/rails/ as this workspace's own") {
+		t.Errorf("steps %q", doc.Steps)
+	}
+	mustNew(t, ws, "--repo", repo, "--prefix", "shop", "--branch", "main", "--template", "rails-own@1", "--pack", "rails@1")
+	if _, err := os.Lstat(filepath.Join(ws, "packs")); err == nil {
+		t.Error("a bundle the stack doesn't use was written")
 	}
 }

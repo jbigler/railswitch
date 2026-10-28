@@ -33,12 +33,14 @@ stack-library/
   packs/django/         pack.toml and its files
   options/clickhouse/   option.toml and its files
   agents/aider/         agent.toml and its files
-  templates/rails-pg/   stack.toml, README.md, containerfiles/Containerfile.<name>
+  templates/rails-pg/   stack.toml, README.md, containerfiles/Containerfile.<name>, packs/<name>/, options/<name>/
 ```
 
 Each package directory must load as a package (docs/packs.md). A
-template directory holds only `stack.toml`, `README.md` and
-`containerfiles/Containerfile.<name>`, and its `stack.toml` must decode
+template directory holds only `stack.toml`, `README.md`,
+`containerfiles/Containerfile.<name>` and its bundled local packages
+(`packs/<name>/`, `options/<name>/` with package files, D116), and its
+`stack.toml` must decode
 (docs/templates.md); the index lists it as `kind = "template"` with the
 ref its `stack.toml` declares (`name@version`). `railswitch template
 export --to <library>/templates/<name>` writes one. The index
@@ -298,7 +300,8 @@ A library repository is hostile input (D104). A fetch:
   any of them holds a symlink or a submodule, or a path that is not a
   package file (`<kind>s/<name>/<file>`, where `<file>` is one the package
   format allows: docs/packs.md; in `templates/<name>/` only `stack.toml`,
-  `README.md` and `containerfiles/Containerfile.<name>`), or more than 2,000 files, a file over 1 MiB, or
+  `README.md`, `containerfiles/Containerfile.<name>` and package files
+  under `packs/<name>/` or `options/<name>/`), or more than 2,000 files, a file over 1 MiB, or
   over 64 MiB in all. The tree listing stops at the 2,001st file. Other
   files in the repository are never fetched (but see Known limits).
 - writes those files (0644, `.sh` 0755) into a staging directory and

@@ -310,3 +310,17 @@ func TestDecodeBundled(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+// The bundles are checked against the lines with the questions' defaults
+// applied: a default naming a local option needs it bundled, and that
+// bundle is accepted.
+func TestDecodeBundledDefault(t *testing.T) {
+	stack := "schema = 1\nname = \"x\"\nversion = 1\n[stack]\npack = \"rails@1\"\napp = \"rails\"\n[options]\ncache = \"redis@1\"\n[[ask]]\nkey = \"options.cache\"\nprompt = \"Cache\"\ndefault = \"local:kv@1\"\n"
+	if _, err := Decode(fstest.MapFS{StackFile: {Data: []byte(stack)}}); err == nil || !strings.Contains(err.Error(), "no options/kv/") {
+		t.Errorf("unbundled default: %v", err)
+	}
+	tp, err := Decode(fstest.MapFS{StackFile: {Data: []byte(stack)}, "options/kv/option.toml": {Data: []byte("name = \"kv\"\nversion = 1\n")}})
+	if err != nil || len(tp.Bundled) != 1 {
+		t.Errorf("bundled default: %v %+v", err, tp)
+	}
+}

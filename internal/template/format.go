@@ -292,12 +292,14 @@ func Decode(fsys fs.FS) (*Template, error) {
 			bad("%s: image.addons[%d]: %q is no file of the template (%s/Containerfile.<name>)", StackFile, i, a, cfDir)
 		}
 	}
-	errs = append(errs, t.bundle(mem)...)
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
 	p, err := Apply(t, nil)
 	if err != nil {
+		return nil, err
+	}
+	if err := errors.Join(t.bundle(mem, p)...); err != nil {
 		return nil, err
 	}
 	if err := checkLines(p); err != nil {
@@ -307,10 +309,11 @@ func Decode(fsys fs.FS) (*Template, error) {
 }
 
 // bundle fills t.Bundled from mem's packs/<name>/ and options/<name>/:
-// each must be a local: ref its lines name, at the version its manifest
-// declares, under its own name; each local: pack or option its lines name
-// must be bundled. A local: agent never is (agents are each person's).
-func (t *Template) bundle(mem fstest.MapFS) []error {
+// each must be a local: ref its lines or applied (its questions'
+// defaults on them) name, at the version its manifest declares, under
+// its own name; each local: pack or option applied names must be bundled.
+// A local: agent never is (agents are each person's).
+func (t *Template) bundle(mem fstest.MapFS, applied *config.Project) []error {
 	var errs []error
 	dirs := map[string]fstest.MapFS{}
 	for p, f := range mem {
@@ -326,23 +329,25 @@ func (t *Template) bundle(mem fstest.MapFS) []error {
 		dirs[d][file] = f
 	}
 	want := map[string]pack.Ref{} // dir → the local ref the lines name
-	add := func(top, where, ref string) {
+	add := func(top, where, ref string, required bool) {
 		r, err := pack.ParseRef(ref)
 		if err != nil || !r.Local {
 			return
 		}
 		d := top + "/" + r.Name
-		if _, dup := want[d]; dup {
-			return
+		if _, dup := want[d]; !dup {
+			want[d] = r
 		}
-		want[d] = r
-		if dirs[d] == nil {
+		if required && dirs[d] == nil {
 			errs = append(errs, fmt.Errorf("%s names %s: the template has no %s/ (template export bundles it)", where, ref, d))
 		}
 	}
-	add("packs", "[stack] pack", t.Lines.Stack.Pack)
-	for _, k := range pack.OptionKeys(t.Lines.Options) {
-		add("options", "options."+k, t.Lines.Options[k])
+	for _, lines := range []*config.Project{applied, t.Lines} {
+		required := lines == applied
+		add("packs", "[stack] pack", lines.Stack.Pack, required)
+		for _, k := range pack.OptionKeys(lines.Options) {
+			add("options", "options."+k, lines.Options[k], required)
+		}
 	}
 	for _, d := range slices.Sorted(maps.Keys(dirs)) {
 		r, ok := want[d]

@@ -24,8 +24,12 @@ Nothing else is allowed: no other file, no other directory, no symlink,
 no file over 1 MiB. A bundled package holds only package files (the
 paths `pack file write` accepts) and must be one the lines name as
 `local:<name>@N`, with that name and version in its manifest; every
-`local:` pack and option the lines name must be bundled. Agents are never
-bundled: a template has none. `stack.toml` is read strictly: a key it doesn't
+`local:` pack and option the lines name with the questions' defaults
+applied must be bundled (a bundle an answer can pick is allowed too).
+Agents are never bundled: a template has none. A template saved before
+D116 that names a `local:` package has no bundle and no longer reads:
+export the project again. `project new` writes only the bundles the new
+stack uses (an answer or `--pack` may pick another). `stack.toml` is read strictly: a key it doesn't
 define (`[project]`, `[worktrees]`, `[share]`, `[secrets]`, a secret
 `value`) is refused, and `[tools]` or `[agents]` is refused by name, as
 is `containerfiles/Containerfile.agent-base`. A template saved before

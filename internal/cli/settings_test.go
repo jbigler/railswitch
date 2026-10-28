@@ -201,6 +201,7 @@ type projectShowDoc struct {
 	Prefix, Name, Repo, Hash, File string
 	BaseBranch                     string   `json:"base_branch"`
 	AddChoices                     []string `json:"add_choices"`
+	Used                           []string
 	Options                        []struct {
 		Key     string
 		Slot    bool
@@ -249,6 +250,9 @@ service = "db"
 	db := d.Options[0].Choices
 	if !slices.Contains(db, "postgres@1") || !slices.Contains(db, "local:mariadb@1") || db[len(db)-1] != "none" || slices.Contains(db, "redis@1") {
 		t.Errorf("database choices %v", db)
+	}
+	if !slices.Contains(d.Used, "rails@1") || !slices.Contains(d.Used, "postgres@1") || slices.Contains(d.Used, "none") || slices.Contains(d.Used, "local:mariadb@1") {
+		t.Errorf("used %v; want the stack's pack and options only", d.Used)
 	}
 	if len(d.Env) != 1 || d.Env[0].Name != "TZ" || d.Env[0].Value != "Asia/Bangkok" {
 		t.Errorf("env %+v", d.Env)

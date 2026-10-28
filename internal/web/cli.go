@@ -120,6 +120,7 @@ type projectShow struct {
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
 	AddChoices []string      `json:"add_choices"`
+	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`
 }
 
@@ -288,6 +289,117 @@ func readPreview(ctx context.Context, c CLI, ws string, edits []byte) (previewDo
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return v, fmt.Errorf("settings preview: %w", err)
+	}
+	return v, nil
+}
+
+// buildChain is `containerfile list`: a worktree's image builds in order.
+type buildChain struct {
+	Steps    []buildStep `json:"steps"`
+	Warnings []string    `json:"warnings"`
+}
+
+type buildStep struct {
+	Name string   `json:"name"` // base, addon <n>, a tool, agent-base, agent <pkg>, or an option image
+	File string   `json:"file"` // containerfiles/Containerfile.<name>
+	Tag  string   `json:"tag"`
+	From []string `json:"from"`
+}
+
+// containerfileDoc is `containerfile show <name>`: the file, and the
+// built-in default it was ejected from (nil: none).
+type containerfileDoc struct {
+	Name    string `json:"name"`
+	File    string `json:"file"`
+	Kind    string `json:"kind"`
+	Text    string `json:"text"`
+	Hash    string `json:"hash"`
+	Default *struct {
+		Ref string `json:"ref"`
+	} `json:"default"`
+	DefaultChanged bool   `json:"default_changed"`
+	Diff           string `json:"diff"`
+}
+
+// checkDoc is a write's --dry-run (`containerfile write`, `pack file
+// write`); Used is the package write's only.
+type checkDoc struct {
+	Hash    string      `json:"hash"`
+	Used    bool        `json:"used"`
+	Steps   []tagChange `json:"steps"`
+	Restart []string    `json:"restart"`
+	Errors  []string    `json:"errors"`
+}
+
+type tagChange struct {
+	Worktree string `json:"worktree"`
+	Name     string `json:"name"`
+	OldTag   string `json:"old_tag"`
+	NewTag   string `json:"new_tag"`
+}
+
+// packDoc is `pack show <ref>`: one package, with a local one's files.
+type packDoc struct {
+	Ref    string `json:"ref"`
+	Kind   string `json:"kind"`
+	Source string `json:"source"`
+	Path   string `json:"path"`
+	App    *struct {
+		Service string `json:"service"`
+		Server  string `json:"server"`
+		Port    int    `json:"port"`
+		Health  string `json:"health"`
+	} `json:"app"`
+	Slot     string `json:"slot"`
+	Service  string `json:"service"`
+	Runtimes []struct {
+		Name     string   `json:"name"`
+		From     []string `json:"from"`
+		Fallback string   `json:"fallback"`
+	} `json:"runtimes"`
+	Ports []struct {
+		Name      string `json:"name"`
+		Base      int    `json:"base"`
+		Container int    `json:"container"`
+	} `json:"ports"`
+	Pin *struct {
+		Name    string `json:"name"`
+		Default string `json:"default"`
+	} `json:"pin"`
+	Gives  []string `json:"gives"`
+	Readme string   `json:"readme"`
+	Files  []struct {
+		Path       string `json:"path"`
+		Size       int64  `json:"size"`
+		Executable bool   `json:"executable"`
+	} `json:"files"`
+}
+
+// packFileDoc is `pack file show <ref> <path>`.
+type packFileDoc struct {
+	Path string `json:"path"`
+	Text string `json:"text"`
+	Hash string `json:"hash"`
+}
+
+func readChain(ctx context.Context, c CLI, ws, slug string) (buildChain, error) {
+	return readJSON[buildChain](ctx, c, "-C", ws, "-w", slug, "containerfile", "list")
+}
+
+func readContainerfile(ctx context.Context, c CLI, ws, name string) (containerfileDoc, error) {
+	return readJSON[containerfileDoc](ctx, c, "-C", ws, "containerfile", "show", name)
+}
+
+// readCheck runs a write's --dry-run with text on stdin; args follow
+// --json.
+func readCheck(ctx context.Context, c CLI, text []byte, args ...string) (checkDoc, error) {
+	var v checkDoc
+	out, err := c.RunInput(ctx, text, append([]string{"--json"}, args...)...)
+	if err != nil {
+		return v, err
+	}
+	if err := json.Unmarshal(out, &v); err != nil {
+		return v, fmt.Errorf("%s: %w", strings.Join(args, " "), err)
 	}
 	return v, nil
 }

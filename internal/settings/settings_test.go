@@ -316,13 +316,13 @@ func TestUnifiedDiff(t *testing.T) {
 	want := "--- project.toml\n+++ project.toml\n" +
 		"@@ -1,5 +1,5 @@\n 1\n-2\n+TWO\n 3\n 4\n 5\n" +
 		"@@ -10,3 +10,4 @@\n 10\n 11\n 12\n+13\n"
-	if got := unifiedDiff(a, b); got != want {
-		t.Errorf("unifiedDiff =\n%s\nwant\n%s", got, want)
+	if got := UnifiedDiff("project.toml", "project.toml", a, b); got != want {
+		t.Errorf("UnifiedDiff =\n%s\nwant\n%s", got, want)
 	}
-	if got := unifiedDiff(a, a); got != "" {
+	if got := UnifiedDiff("project.toml", "project.toml", a, a); got != "" {
 		t.Errorf("same text: %q", got)
 	}
-	if got := unifiedDiff("x", "y"); got != "--- project.toml\n+++ project.toml\n@@ -1 +1 @@\n-x\n\\ No newline at end of file\n+y\n\\ No newline at end of file\n" {
+	if got := UnifiedDiff("project.toml", "project.toml", "x", "y"); got != "--- project.toml\n+++ project.toml\n@@ -1 +1 @@\n-x\n\\ No newline at end of file\n+y\n\\ No newline at end of file\n" {
 		t.Errorf("no final newline:\n%s", got)
 	}
 }

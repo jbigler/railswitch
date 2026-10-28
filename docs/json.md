@@ -60,6 +60,62 @@ suggested addon that is missing from `[image] addons`.
 | `steps[].from` | array of strings | The file's `FROM` images with build args expanded, without `${BASE_IMAGE}`, `scratch` and stage names (D36). Empty for an addon that only builds on the previous step. |
 | `warnings` | array of strings | Non-fatal findings; empty when there are none. |
 
+## `containerfile show <name>`
+
+The workspace file `containerfiles/Containerfile.<name>` (read as a hostile
+file: regular, at most 1 MiB), the built-in default the project's stack has
+for that name, and the diff between them. A missing file is an error (run
+`containerfile eject` or `containerfile new` first). Without `--json` the
+command prints the file, or the default when there is none.
+
+```json
+{"name": "pg-client", "file": "containerfiles/Containerfile.pg-client",
+ "kind": "addon", "text": "# Ejected from postgres@1 …", "hash": "sha256:9f2c…",
+ "default": {"ref": "postgres@1", "text": "ARG BASE_IMAGE\n…"},
+ "ejected": {"ref": "postgres@1", "sha256": "4be1…"},
+ "default_changed": false,
+ "diff": "--- default\n+++ containerfiles/Containerfile.pg-client\n@@ -5,3 +5,4 @@\n…"}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name`, `file` | string | The name and the workspace-relative file. |
+| `kind` | string | `base`, `addon` (an option's addon), `tool`, `standalone` (an option's own image), `agent-base`, `agent`, or `user` (a `containerfile new` addon: no default). |
+| `text` | string | The file. |
+| `hash` | string | `sha256:<hex>` of the file's bytes: `containerfile write --if-hash` takes it. |
+| `default` | object or null | The built-in default the stack has for `name`: `ref` (its package, `agent-base` or a tool's name) and `text`. `null` when there is none. |
+| `ejected` | object or null | The file's first line read as `containerfile eject`'s header: `ref` and the `sha256` of the default it copied. `null` without one. |
+| `default_changed` | bool | `default` and `ejected` are both present and the default's sha256 is no longer the header's: the default changed since the file was ejected. |
+| `diff` | string | A unified diff (3 lines of context) from the default to the file without its header line; `""` when they are equal or there is no default. |
+
+## `containerfile write <name> --if-hash <h> --dry-run`
+
+What writing stdin (at most 1 MiB) to a Containerfile the project builds
+would change: every registered worktree rendered in memory with the new
+text, so the contract checks (D31, D36) run before anything is written.
+`name` must be a step of the build (`containerfile list`), and the file's
+hash must still be `<h>` ("changed on disk since you opened it"); both
+refusals exit 1. A new text that does not render exits 0 with `errors`.
+
+```json
+{"hash": "sha256:51d0…",
+ "steps": [{"worktree": "master", "name": "addon pg-client", "old_tag": "localhost/filial/base:ruby3.3.6-node22.11.0-ba118cc2", "new_tag": "localhost/filial/base:ruby3.3.6-node22.11.0-0c7e93aa"}],
+ "restart": ["master"], "errors": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hash` | string | `sha256:<hex>` of the new text. |
+| `steps` | array | Each worktree's build step whose tag changes, in build order: `worktree`, `name` (as `containerfile list`), `old_tag`, `new_tag`. A step only one side builds has `""` for the other tag. The steps built on a changed one change too. |
+| `restart` | array of strings | The registered worktrees whose app runs (one `systemctl show`) and whose stamped units change; `--restart` on the real write restarts them in order. |
+| `errors` | array of strings | Why the new text does not render, one line each; empty when it does. |
+
+Without `--dry-run` the write is atomic and, after it, every worktree is
+rendered; a failed render puts the file back. It prints each new tag and,
+with `--restart`, restarts the `restart` worktrees (stop, then `up`),
+stopping at the first failure. A failed restart exits 3: the file is
+written (as is `pack file write`'s).
+
 ## `pack show <ref>`
 
 One pack or option: a built-in (no workspace needed) or a local package of
@@ -89,6 +145,51 @@ exists, else an option under `options/<name>/`).
 | `pin` | object or null | An option's version pin: `name`, `default`. |
 | `gives` | array of strings | The env names an option gives the app, sorted. |
 | `readme` | string | The package's `README.md` (its app-side changes); `""` when it has none. |
+| `files` | array | The package's regular files, sorted by `path`: `path` (slash-separated, relative to the package), `size` (bytes), `executable` (a built-in's `.sh` files, which `pack eject` writes 0755). Symlinks are not listed. |
+
+## `pack file show <ref> <path>`
+
+One file of a local package (read as a hostile file: regular, at most
+1 MiB, no symlinked `entrypoints/` or `initdb/`), or of a built-in pack or
+option (read-only). Without `--json` it prints the file.
+
+```json
+{"path": "entrypoints/entrypoint-app.sh", "text": "#!/bin/sh\n…", "hash": "sha256:7c1e…"}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `path` | string | As given. |
+| `text` | string | The file. |
+| `hash` | string | `sha256:<hex>` of its bytes: `pack file write` and `pack file rm` take it as `--if-hash`. |
+
+## `pack file write <ref> <path> --if-hash <h> --dry-run`
+
+What writing stdin (at most 1 MiB) to a file of the local package `<ref>`
+would change. `--if-hash ""` adds a new file (refused when it exists).
+`<path>` must be one of the package format's files (D93,
+`docs/packs.md`); a symlinked package directory, `entrypoints/`, `initdb/`
+or file is refused. These refusals and a hash mismatch exit 1. The package
+must still load with the new text; when the project's stack uses it, every
+registered worktree is also rendered with it in memory. A load or render
+failure exits 0 with `errors`.
+
+```json
+{"hash": "sha256:51d0…", "used": true,
+ "steps": [], "restart": ["master"], "errors": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hash` | string | `sha256:<hex>` of the new text. |
+| `used` | bool | The project's stack uses the package: the real write also writes `stack.lock` and renders, restoring the file and `stack.lock` when either fails. |
+| `steps` | array | As `containerfile write --dry-run`: each worktree's build step whose tag changes (a package's own Containerfiles build only once ejected, so usually empty). Empty when not `used`. |
+| `restart` | array of strings | The running worktrees whose stamped units or mounted package assets change (an entrypoint edit changes only an asset). Empty when not `used`. |
+| `errors` | array of strings | Why the package does not load or the project does not render, one line each. |
+
+Without `--dry-run` the write is atomic; a `.sh` file is written 0755,
+others 0644. `pack file rm <ref> <path> --if-hash <h>` removes a file the
+same way (never the manifest), with no `--dry-run`.
 
 ## `pack ls`
 
@@ -378,6 +479,7 @@ What the settings page reads: the project's choices, env and links.
     {"key": "database", "slot": true, "ref": "postgres@1", "choices": ["postgres@1", "local:mariadb@1", "none"]},
     {"key": "jobs", "slot": true, "ref": "none", "choices": ["sidekiq@1", "none"]}
   ],
+  "used": ["rails@1", "postgres@1", "claude@1"],
   "env": [{"name": "TZ", "value": "Asia/Bangkok"}],
   "links": [
     {"label": "Admin", "url": "{worktree.host}/admin", "from": "project", "hidden": false},
@@ -393,6 +495,7 @@ What the settings page reads: the project's choices, env and links.
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
+| `used` | string[] | The stack's refs: the pack, each option, each agent package (once). |
 | `add_choices` | string[] | Every option a new extra key (D81) can take: built-ins at their newest version, then the workspace's `local:<name>@N`. |
 | `options[].slot` | bool | The key is a slot (otherwise an extra service, D81). |
 | `options[].choices` | string[] | For a slot, the built-in options of that slot (newest version per name) then the workspace's `options/<name>/` ones as `local:<name>@N`; for an extra key every option; always ending in `none`. The current ref is always among them. |

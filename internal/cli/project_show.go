@@ -27,6 +27,7 @@ type projectDoc struct {
 	File       string      `json:"file"` // the raw editor's text
 	Options    []optionRow `json:"options"`
 	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
+	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
 	Env        []envPair   `json:"env"`
 	Links      []linkRow   `json:"links"`
 }
@@ -163,6 +164,15 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 			d.Links = append(d.Links, linkRow{l.Label, l.URL, from, slices.Contains(p.HideLinks, l.Label)})
 		}
 	}
+	d.Used = []string{st.PackRef.String()}
+	for _, ch := range st.Options {
+		d.Used = append(d.Used, ch.Ref.String())
+	}
+	for _, a := range st.Agents {
+		if r := a.Ref.String(); !slices.Contains(d.Used, r) {
+			d.Used = append(d.Used, r)
+		}
+	}
 	add("pack "+st.PackRef.String(), st.Pack.Links)
 	for _, ch := range st.Options {
 		add("option "+ch.Ref.String(), ch.Option.Links)
@@ -255,7 +265,7 @@ func projectWrite(ctx context.Context, e *env, args []string) int {
 	if _, err := cat.Resolve(p); err != nil {
 		return e.fail(err)
 	}
-	if err := e.commitProject(ctx, root, old, next); err != nil {
+	if err := e.commitProject(ctx, root, next); err != nil {
 		return e.fail(err)
 	}
 	return 0

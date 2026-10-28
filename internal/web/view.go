@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -507,13 +508,13 @@ type jobView struct {
 	Running                                     bool
 	Earlier                                     int // kept lines not shown
 	Dropped                                     bool
-	Conflict                                    bool // refused: project.toml changed since it was read
+	Conflict                                    bool // refused: the file changed since it was read
 	Lines                                       []string
 }
 
-// conflictText is how settings apply and project write refuse a stale
-// --if-hash.
-const conflictText = "changed since"
+// conflictRe is how settings apply, project write, containerfile write
+// and pack file write refuse a stale --if-hash.
+var conflictRe = regexp.MustCompile(`changed (on disk )?since`)
 
 var jobClasses = map[jobs.State]string{jobs.StateRunning: "blue", jobs.StateOK: "green", jobs.StateFailed: "red", jobs.StateCancelled: "muted"}
 
@@ -532,7 +533,7 @@ func newJobs(snaps []jobs.Snapshot, rows []row, slug string) jobsView {
 			Started: j.Started.Local().Format("15:04:05"), Exit: j.Exit,
 			Running: j.State == jobs.StateRunning, CancelURL: "/jobs/" + j.ID + "/cancel",
 			Dropped: j.Dropped, Lines: j.Lines,
-			Conflict: j.State == jobs.StateFailed && slices.ContainsFunc(j.Lines, func(l string) bool { return strings.Contains(l, conflictText) }),
+			Conflict: j.State == jobs.StateFailed && slices.ContainsFunc(j.Lines, func(l string) bool { return conflictRe.MatchString(l) }),
 		}
 		if n := len(j.Lines); n > viewLines {
 			jv.Earlier, jv.Lines = n-viewLines, j.Lines[n-viewLines:]

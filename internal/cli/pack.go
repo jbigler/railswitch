@@ -15,6 +15,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -25,13 +26,15 @@ var packNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 // manifestNameRe is a manifest's top-level name line.
 var manifestNameRe = regexp.MustCompile(`(?m)^name\s*=\s*"[^"]*"`)
 
-// railswitch pack eject|new|show|ls (D43, D70).
-func cmdPack(_ context.Context, e *env, args []string) int {
-	const usage = "usage: railswitch pack eject <ref> [--as <name>] | new <name> | show <ref> | ls"
+// railswitch pack eject|new|show|ls|file (D43, D70, D91).
+func cmdPack(ctx context.Context, e *env, args []string) int {
+	const usage = "usage: railswitch pack eject <ref> [--as <name>] | new [--option <slot>] <name> | show <ref> | ls | file show|write|rm <ref> <path>"
 	if len(args) == 0 {
 		return e.usageErr(usage)
 	}
 	switch args[0] {
+	case "file":
+		return cmdPackFile(ctx, e, args[1:])
 	case "eject":
 		return packEject(e, args[1:])
 	case "new":
@@ -84,8 +87,11 @@ func packEject(e *env, args []string) int {
 	} else if o := cat.Options[ref]; o != nil {
 		top, manifest, files = "options", "option.toml", o.Files
 		use = fmt.Sprintf("[options] %s = %q", o.Slot, fmt.Sprintf("local:%s@%d", name, ref.Version))
+	} else if a := cat.Agents[ref]; a != nil {
+		top, manifest, files = "agents", "agent.toml", a.Files
+		use = fmt.Sprintf("[agents.<name>] use = %q", fmt.Sprintf("local:%s@%d", name, ref.Version))
 	} else {
-		return e.fail(fmt.Errorf("pack eject: no built-in pack or option %s (packs: %s; options: %s)", ref, refNames(cat.Packs), refNames(cat.Options)))
+		return e.fail(fmt.Errorf("pack eject: no built-in pack, option or agent %s (packs: %s; options: %s; agents: %s)", ref, refNames(cat.Packs), refNames(cat.Options), refNames(cat.Agents)))
 	}
 	dir := filepath.Join(root, top, name)
 	if err := copyPackage(dir, files, manifest, name); err != nil {
@@ -146,16 +152,21 @@ func refNames[T any](m map[pack.Ref]T) string {
 	return strings.Join(out, ", ")
 }
 
-// railswitch pack new <name>: a skeleton pack under packs/<name>/.
+// railswitch pack new [--option <slot>] <name>: a skeleton pack under
+// packs/<name>/, or with --option an option under options/<name>/.
 func packNew(e *env, args []string) int {
 	fset := e.flags("pack new")
 	into := fset.String("dir", "", "a workspace `dir` project new has not created yet")
-	name, code, ok := parseNamed(e, fset, args, "usage: railswitch pack new [--dir <workspace>] <name>")
+	slot := fset.String("option", "", "write an option for `slot` under options/<name>/ instead of a pack")
+	name, code, ok := parseNamed(e, fset, args, "usage: railswitch pack new [--dir <workspace>] [--option <slot>] <name>")
 	if !ok {
 		return code
 	}
 	if !packNameRe.MatchString(name) {
 		return e.usageErr("pack new: %q must match %s", name, packNameRe)
+	}
+	if *slot != "" && !slices.Contains(config.Slots, *slot) {
+		return e.usageErr("pack new: --option %q is not a slot (%s)", *slot, strings.Join(config.Slots, ", "))
 	}
 	// A new project's pack comes before its workspace: project new --pack
 	// local:<name>@1 reads it from <dir>/packs/<name>/.
@@ -172,26 +183,38 @@ func packNew(e *env, args []string) int {
 	if _, err := os.Stat(filepath.Join(root, "project.toml")); *into != "" && err == nil {
 		return e.usageErr("pack new: %s is already a workspace: run railswitch -C %s pack new %s", root, root, name)
 	}
-	dir := filepath.Join(root, "packs", name)
-	if _, err := os.Lstat(dir); err == nil {
-		return e.fail(fmt.Errorf("pack new: %s already exists", dir))
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return e.fail(err)
-	}
-	files := []struct {
+	type file struct {
 		rel  string
 		data string
 		mode os.FileMode
-	}{
+	}
+	top, files := "packs", []file{
 		{"pack.toml", strings.ReplaceAll(packSkeleton, "<name>", name), 0o644},
 		{"Containerfile.base", strings.ReplaceAll(baseSkeleton, "<name>", name), 0o644},
 		{"entrypoints/entrypoint-app.sh", appEntrypointSkeleton, 0o755},
 		{"README.md", strings.ReplaceAll(readmeSkeleton, "<name>", name), 0o644},
 	}
+	if *slot != "" {
+		r := strings.NewReplacer("<name>", name, "<slot>", *slot)
+		top, files = "options", []file{
+			{"option.toml", r.Replace(optionSkeleton), 0o644},
+			{"README.md", r.Replace(optionReadmeSkeleton), 0o644},
+		}
+	}
+	dir := filepath.Join(root, top, name)
+	if _, err := os.Lstat(dir); err == nil {
+		return e.fail(fmt.Errorf("pack new: %s already exists", dir))
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return e.fail(err)
+	}
 	for _, f := range files {
 		if err := writePackageFile(filepath.Join(dir, filepath.FromSlash(f.rel)), []byte(f.data), f.mode); err != nil {
 			return e.fail(errors.Join(err, os.RemoveAll(dir)))
 		}
+	}
+	if *slot != "" {
+		fmt.Fprintf(e.stdout, "wrote %s: fill in option.toml (see docs/packs.md), then use it with [options] %s = \"local:%s@1\"\n", dir, *slot, name)
+		return 0
 	}
 	if *into != "" {
 		fmt.Fprintf(e.stdout, "wrote %s: fill in pack.toml (see docs/packs.md), then railswitch project new %s --pack local:%s@1 --repo <url> --prefix <prefix>\n", dir, root, name)
@@ -272,6 +295,101 @@ const packSkeleton = `# Pack <name> (docs/packs.md). Uncomment and fill in; ever
 # memory = "4g"
 `
 
+// optionSkeleton loads as it is: the fields an option must have are set,
+// every other one is listed commented.
+const optionSkeleton = `# Option <name> (docs/packs.md). Fill in; every field is listed.
+name = "<name>"              # must match the directory
+version = 1                  # the N of local:<name>@N
+slot = "<slot>"
+service = "<name>"           # the service id it runs as
+works_with = ["*"]           # pack names it works with, or "*"
+# needs = []                 # slots that must be filled too
+# generated = []             # generated values it uses as {generated.X}
+# entrypoint = "entrypoints/entrypoint-<name>.sh"
+# command = "..."            # the service's command (with image.use = "app")
+# firewall = "..."           # its firewall profile(s)
+
+[image]                      # exactly one of pull, use or build
+pull = "docker.io/library/<name>:latest"
+# use = "app"                # run the app's image
+# build = "Containerfile.<name>"  # a standalone image (D31), with tag and args
+# tag = "{<name>}"
+# args = { }
+
+# [pin]                      # the image version; [versions] <name> overrides it
+# name = "<name>"
+# default = "1"
+
+# [app_addon]                # a Containerfile the app's base chain should add
+# file = "Containerfile.<name>-client"
+# os = "debian"
+
+# [health]
+# cmd = "..."
+# interval = "5s"
+# timeout = "3s"
+# retries = 5
+# start_period = "10s"
+
+# [gives]                    # env it gives the app, worker and tools
+# NAME_URL = "x://{service}:1234"
+
+# [deps_env]                 # env it gives the deps service
+# [agent_gives]              # env it gives every agent
+# [env]                      # its own service's env
+
+# [share]                    # [gives] while the worktree is shared
+# gives = { }
+
+# [dump]                     # how railswitch db dump dumps it
+# command = ["..."]
+# file = "<name>.dump"
+# list = ["..."]             # optional: one database name per line, as {dump.db}
+
+# [[volumes]]
+# name = "data"
+# mount = "/data"
+# chown = true
+# seed = "..."               # a file in db-dumps/
+# data = "persistent"        # or "cache"
+
+# [[mounts]]                 # a relative source is a package file
+# source = "initdb/..."
+# target = "/..."
+
+# [[ports]]                  # published on 127.0.0.1:<base + worktree ID>
+# name = "<name>"
+# env = "<NAME>_PORT"
+# base = 20000
+# container = 1234
+
+# [[routes]]
+# name = "<name>"
+# host = "<name>.{worktree.slug}.{project.prefix}.localhost"
+# port = 1234
+
+# [[links]]
+# label = "..."
+# url = "{worktree.host}/..."
+
+# [unit]
+# memory = "1g"
+
+# [[detect]]                 # project detect suggests it when a line matches
+# file = "..."
+# match = '''^\s*...'''
+# evidence = "..."
+`
+
+const optionReadmeSkeleton = `# <name>
+
+The <slot> option <name>: what it runs, and what it gives the app.
+
+## App-side changes
+
+Changes the app needs to use it (railswitch pack show prints this file).
+`
+
 const baseSkeleton = `# Base image of pack <name>: railswitch builds it (railswitch containerfile list).
 # ARG RUNTIME_VERSION
 FROM docker.io/library/debian:trixie-slim
@@ -298,18 +416,19 @@ Changes the app needs to run under railswitch (railswitch pack show prints this 
 
 // packDoc is railswitch --json pack show (docs/json.md).
 type packDoc struct {
-	Ref      string       `json:"ref"`
-	Kind     string       `json:"kind"`   // "pack" or "option"
-	Source   string       `json:"source"` // "built in" or "local"
-	Path     string       `json:"path"`   // the local package's directory; "" for a built-in
-	App      *packAppDoc  `json:"app,omitempty"`
-	Slot     string       `json:"slot,omitempty"`
-	Service  string       `json:"service,omitempty"`
-	Runtimes []runtimeDoc `json:"runtimes"`
-	Ports    []portDoc    `json:"ports"`
-	Pin      *pinDoc      `json:"pin"`
-	Gives    []string     `json:"gives"`
-	Readme   string       `json:"readme"`
+	Ref      string          `json:"ref"`
+	Kind     string          `json:"kind"`   // "pack" or "option"
+	Source   string          `json:"source"` // "built in" or "local"
+	Path     string          `json:"path"`   // the local package's directory; "" for a built-in
+	App      *packAppDoc     `json:"app,omitempty"`
+	Slot     string          `json:"slot,omitempty"`
+	Service  string          `json:"service,omitempty"`
+	Runtimes []runtimeDoc    `json:"runtimes"`
+	Ports    []portDoc       `json:"ports"`
+	Pin      *pinDoc         `json:"pin"`
+	Gives    []string        `json:"gives"`
+	Readme   string          `json:"readme"`
+	Files    []packFileEntry `json:"files"` // the package's regular files
 }
 
 type packAppDoc struct {
@@ -370,23 +489,36 @@ func packShow(e *env, args []string) int {
 	return 0
 }
 
-// showDoc loads ref as a pack or, failing that, an option. A local ref is a
-// pack when the workspace has packs/<name>/.
+// showDoc loads ref as a pack, an agent or, failing that, an option. A
+// local ref is a pack when the workspace has packs/<name>/, an agent when
+// it has agents/<name>/.
 func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
-	doc := &packDoc{Ref: ref.String(), Source: "built in", Runtimes: []runtimeDoc{}, Ports: []portDoc{}, Gives: []string{}}
-	isPack := cat.Packs[ref] != nil
+	doc := &packDoc{Ref: ref.String(), Source: "built in", Runtimes: []runtimeDoc{}, Ports: []portDoc{}, Gives: []string{}, Files: []packFileEntry{}}
+	kind := "option"
+	switch {
+	case cat.Packs[ref] != nil:
+		kind = "pack"
+	case cat.Agents[ref] != nil:
+		kind = "agent"
+	}
 	if ref.Local {
-		doc.Source = "local"
-		doc.Path = filepath.Join(cat.Root, "packs", ref.Name)
-		if _, err := os.Stat(doc.Path); err == nil {
-			isPack = true
-		} else {
-			doc.Path = filepath.Join(cat.Root, "options", ref.Name)
+		// The directory pack file reads and writes (localPackage).
+		dir, manifest, err := localPackage(cat.Root, ref)
+		if err != nil {
+			return nil, err
 		}
+		doc.Source, doc.Path = "local", filepath.Join(cat.Root, filepath.FromSlash(dir))
+		kind = strings.TrimSuffix(manifest, ".toml")
 	}
 	var files fs.FS
 	var ports []pack.Port
-	if isPack {
+	if kind == "agent" {
+		a, err := cat.Agent(ref)
+		if err != nil {
+			return nil, err
+		}
+		doc.Kind, files = "agent", a.Files
+	} else if kind == "pack" {
 		p, err := cat.Pack(ref)
 		if err != nil {
 			return nil, err
@@ -417,6 +549,13 @@ func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
 	if data, err := fs.ReadFile(files, "README.md"); err == nil {
 		doc.Readme = string(data)
 	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	if ref.Local {
+		files = os.DirFS(doc.Path)
+	}
+	var err error
+	if doc.Files, err = packFiles(files, !ref.Local); err != nil {
 		return nil, err
 	}
 	return doc, nil

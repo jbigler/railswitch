@@ -229,10 +229,32 @@ lint    = "bin/rubocop"   # a project task
   workspace `project new` has not created yet, `pack new --dir <workspace>
   <name>` writes `<workspace>/packs/<name>/`; then `railswitch project new
   <workspace> --pack local:<name>@1 …`.
+- `railswitch pack new --option <slot> <name>` writes `options/<name>/`
+  with an `option.toml` that loads as it is (`name`, `version = 1`, the
+  slot, `service = "<name>"`, `works_with = ["*"]` and a placeholder
+  `[image] pull`; every other field listed, commented) and a `README.md`.
 - `railswitch pack show <ref>` prints a pack's or option's summary (app,
   runtimes and their sources, ports, pin, gives) and its `README.md`;
-  `--json` prints one document (`docs/json.md`). Built-ins need no
-  workspace.
+  `--json` prints one document (`docs/json.md`), with a local package's
+  files. Built-ins need no workspace.
+- `railswitch pack file show <ref> <path>` prints one file of a package,
+  local or built in. `railswitch pack file write <ref> <path> --if-hash <h>
+  [--dry-run] [--restart]` replaces a local package's file with stdin
+  (`--if-hash ""`: adds it), and `railswitch pack file rm <ref> <path>
+  --if-hash <h>` removes one (never the manifest). The hash is the one
+  `pack file show --json` gave; a file changed since is refused. The
+  package must still load with the change. When the project uses the
+  package, the write also locks and renders, and a failure puts the file
+  and `stack.lock` back; `--restart` then restarts the running worktrees
+  the change reaches (D91). These are the dashboard's Library page's
+  commands.
+- The files `pack file write` takes (D93): the manifest (`pack.toml` or
+  `option.toml`), `Containerfile.<name>`, `deps.allow`, `README.md` and
+  `<name>.sh` at the package's top, and `entrypoints/<file>` and
+  `initdb/<file>`, where `<name>` and `<file>` match
+  `[A-Za-z0-9][A-Za-z0-9._-]*`. Anything else, a symlinked file, or a
+  symlinked package directory, `entrypoints/` or `initdb/` is refused.
+  `.sh` files are written 0755, others 0644.
 - `railswitch pack ls` lists every pack and option: each built-in at its
   newest version and, in a workspace, its local packages (a local package
   that doesn't load yet is listed if its manifest has a `version`).

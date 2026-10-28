@@ -12,10 +12,10 @@ type diffOp struct {
 	line string
 }
 
-// unifiedDiff is the unified diff of project.toml from a to b, "" when they
-// are equal. Common leading and trailing lines are trimmed before the LCS,
-// so an edit of a few lines costs little however long the file.
-func unifiedDiff(a, b string) string {
+// UnifiedDiff is the unified diff from a (file aName) to b (bName), "" when
+// they are equal. Common leading and trailing lines are trimmed before the
+// LCS, so an edit of a few lines costs little however long the file.
+func UnifiedDiff(aName, bName, a, b string) string {
 	if a == b {
 		return ""
 	}
@@ -38,7 +38,7 @@ func unifiedDiff(a, b string) string {
 	}
 
 	var out strings.Builder
-	out.WriteString("--- project.toml\n+++ project.toml\n")
+	out.WriteString("--- " + aName + "\n+++ " + bName + "\n")
 	aLine, bLine := 1, 1 // line numbers of ops[i]
 	for i := 0; i < len(ops); {
 		if ops[i].kind == ' ' {

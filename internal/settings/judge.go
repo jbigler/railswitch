@@ -3,6 +3,7 @@ package settings
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -71,18 +72,20 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 		p.Edits = append(p.Edits, r)
 	}
 	p.NewText = text
-	p.Diff = unifiedDiff(string(data), text)
+	p.Diff = UnifiedDiff("project.toml", "project.toml", string(data), text)
 	p.Restart = e.restart(cur, prev)
 	return p, nil
 }
 
-// rendered is one render of the project: its model, its stamped units and
-// each registered worktree's instance (Model.Inputs.Worktrees order).
+// rendered is one render of the project: its model, its stamped units, the
+// package assets it mounts and each registered worktree's instance
+// (Model.Inputs.Worktrees order).
 type rendered struct {
-	ws    *workspace.Workspace
-	m     *render.Model
-	units map[string][]byte
-	ins   []*render.Instance
+	ws     *workspace.Workspace
+	m      *render.Model
+	units  map[string][]byte
+	assets map[string][]byte
+	ins    []*render.Instance
 }
 
 func (e Env) render(ws *workspace.Workspace) (*rendered, error) {
@@ -94,7 +97,10 @@ func (e Env) render(ws *workspace.Workspace) (*rendered, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &rendered{ws: ws, m: m, units: plan.Units}
+	r := &rendered{ws: ws, m: m, units: plan.Units, assets: map[string][]byte{}}
+	for _, a := range m.Assets {
+		r.assets[a.Rel] = a.Data
+	}
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)
 		if err != nil {
@@ -242,29 +248,94 @@ func envReasons(cur, next *rendered) []string {
 }
 
 // restart are the registered worktrees whose app unit runs and any of whose
-// containers' stamped units differ between cur and next.
+// containers' stamped units differ between cur and next, or every running
+// one when a mounted package asset's bytes differ (assets are the
+// project's, not a worktree's). cur.m is nil for a current project that
+// does not render: then every unit differs.
 func (e Env) restart(cur, next *rendered) []string {
 	out := []string{}
-	prefix, app := cur.m.Prefix, cur.ws.Project.Stack.App
+	prefix, app := next.m.Prefix, next.ws.Project.Stack.App
+	services := next.m.Services
+	if cur.m != nil {
+		services = append(slices.Clone(cur.m.Services), services...)
+	}
 	var ids []string
-	for _, s := range append(slices.Clone(cur.m.Services), next.m.Services...) {
+	for _, s := range services {
 		if !slices.Contains(ids, s.ID) {
 			ids = append(ids, s.ID)
 		}
 	}
-	for _, wt := range cur.m.Inputs.Worktrees {
+	assets := !maps.EqualFunc(cur.assets, next.assets, bytes.Equal)
+	for _, wt := range next.m.Inputs.Worktrees {
 		if e.Running == nil || !e.Running(naming.Container(prefix, wt.Slug, app)+".service") {
 			continue
 		}
-		for _, id := range ids {
+		if assets || slices.ContainsFunc(ids, func(id string) bool {
 			unit := naming.Container(prefix, wt.Slug, id) + ".container"
-			if !bytes.Equal(cur.units[unit], next.units[unit]) {
-				out = append(out, wt.Slug)
-				break
-			}
+			return !bytes.Equal(cur.units[unit], next.units[unit])
+		}) {
+			out = append(out, wt.Slug)
 		}
 	}
 	return out
+}
+
+// TagChange is a worktree's build step whose image tag a change alters;
+// OldTag or NewTag is "" for a step only one side builds.
+type TagChange struct {
+	Worktree string `json:"worktree"`
+	Name     string `json:"name"`
+	OldTag   string `json:"old_tag"`
+	NewTag   string `json:"new_tag"`
+}
+
+// Change is what changing the workspace's files does to its builds and
+// running worktrees.
+type Change struct {
+	Steps   []TagChange `json:"steps"`
+	Restart []string    `json:"restart"`
+}
+
+// Compare judges next, the project with files changed in memory
+// (WithFile, LoadEdited), against cur. The error is next's: it does not
+// render. A current project that does not load (cur nil) or render (a
+// broken file being fixed) has no builds, and each of next's running
+// worktrees restarts.
+func (e Env) Compare(cur, next *workspace.Workspace) (*Change, error) {
+	to, err := e.render(next)
+	if err != nil {
+		return nil, err
+	}
+	from := &rendered{ws: cur}
+	if cur != nil {
+		if r, err := e.render(cur); err == nil {
+			from = r
+		}
+	}
+	c := &Change{Steps: []TagChange{}, Restart: e.restart(from, to)}
+	for i, in := range to.ins {
+		slug := to.m.Inputs.Worktrees[i].Slug
+		var before []render.BuildStep
+		if from.ins != nil {
+			before = from.ins[i].Builds
+		}
+		old := map[string]string{}
+		for _, b := range before {
+			old[b.Name] = b.Tag
+		}
+		for _, b := range in.Builds {
+			if old[b.Name] != b.Tag {
+				c.Steps = append(c.Steps, TagChange{Worktree: slug, Name: b.Name, OldTag: old[b.Name], NewTag: b.Tag})
+			}
+			delete(old, b.Name)
+		}
+		for _, b := range before {
+			if _, gone := old[b.Name]; gone {
+				c.Steps = append(c.Steps, TagChange{Worktree: slug, Name: b.Name, OldTag: b.Tag})
+			}
+		}
+	}
+	return c, nil
 }
 
 func list(names []string, one, many string) string {

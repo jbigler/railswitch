@@ -95,8 +95,8 @@ When the live stream drops, a red line under the header says so:
 is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch"; the project button (the prefix; opens the
-  switcher); `◆ N need input`; `tasks :`; `settings` (the project's
-  Settings page, below); `logs` (Dozzle at
+  switcher); `◆ N need input`; `tasks :`; `images`, `library` and
+  `settings` (the project's Images, Library and Settings pages, below); `logs` (Dozzle at
   `http://logs.localhost/`); a `notifications` button until the browser
   permission is decided; `⚙` colours. The tab title is `(N) RailSwitch`,
   N counting agents in permission, question or waiting-for-reply across
@@ -193,6 +193,96 @@ offers to reload the file; your text stays in the editor until you do.
 
 Every settings action is a job of the project, so it waits for (and
 blocks) the project's other jobs. Its output shows under the panel.
+
+## Images
+
+`/p/<prefix>/images` (`images` in the header) shows what a worktree
+builds. Every `RUN` line in these Containerfiles runs on this machine
+during the build, outside the firewall.
+
+- **Worktree:** one chip per worktree; the base worktree is shown first
+  (`?wt=<slug>` picks another; an unknown slug is a 404).
+- The project's warnings from `railswitch --json -w <slug> containerfile
+  list`, then the **build chain** in build order: step, kind (`base`,
+  `addon`, `agent-base`, `agent`, or `image` for a tool or an option's
+  image), file, `FROM` images and tag, and Edit.
+- **New addon:** a name (lower-case letters, digits and `-`) runs
+  `railswitch containerfile new <name>` as a project-level job; when it
+  ends ok the editor opens on the new file.
+
+**Editor** (`/p/<prefix>/images/edit/<name>`): the file from `railswitch
+--json containerfile show <name>` in a text area. "Load from file…" reads
+a local file into it, in the browser only (1 MiB at most).
+
+- **Changes from the default (<ref>):** the diff from the built-in default
+  to the file (its eject header left out); "Same as the default." when
+  there is none to show. A notice says when the default changed since the
+  file was ejected. "Reset to default" (after a confirm) runs `railswitch
+  containerfile eject <name> --force` as a job; it renders, so the
+  running worktrees show "restart to apply". A file `containerfile new`
+  made has no default and no panel.
+- **Check** posts the text to `POST /p/<prefix>/images/check/<name>`,
+  which runs `railswitch --json containerfile write <name> --if-hash <h>
+  --dry-run` with the text on stdin: every worktree is rendered with it
+  and nothing is written. The panel shows the contract errors, or "Check
+  passed" with each image tag that changes, and "Rebuild and restart:
+  <slugs>" (off) when running worktrees build a changed tag.
+- **Save** is on only when "I've read this file. Every RUN line runs on
+  this machine during the build, outside the firewall." is ticked and the
+  last Check passed for the text as it is now; an edit after Check turns
+  it off again and says so. It runs `railswitch containerfile write
+  <name> --if-hash <h> [--restart]` as a project-level job, the text on
+  its stdin. The server refuses a Save without the acknowledgement (400).
+  When the job ends ok the editor reloads the file; when only its
+  restart failed (exit 3) it reloads with "Saved. The rebuild and restart
+  failed" above the job's output. If the file changed
+  on disk since the page read it, nothing is written and the page offers
+  Reload; your text stays until you reload.
+
+## Library
+
+`/p/<prefix>/library` (`library` in the header) lists the packages from
+`railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
+each `built in` or `local` (the workspace's `packs/<name>/` and
+`options/<name>/`). "used by this project" marks the refs the project's stack uses
+(`used` of `railswitch --json project show`).
+
+- Picking one (`?ref=<ref>`; an unknown ref is a 404) shows its
+  `railswitch --json pack show <ref>`: kind, path, app, slot, runtimes,
+  ports, pin, the env it gives, its README, and its files. A local
+  package's files open in the editor (Edit); a built-in's open read-only
+  (View). A package that doesn't load (no file list) offers its manifest.
+- **Add file** (a local package) opens the editor on a new, empty file
+  at the path typed: a top-level `Containerfile.<name>`, `deps.allow`,
+  `README.md` or `<name>.sh`, or `entrypoints/<file>` or `initdb/<file>`.
+- **New pack** and **New option**: a name, and either "blank" or a
+  built-in to copy. A copy runs `railswitch pack eject <ref> --as <name>`;
+  a blank pack `railswitch pack new <name>`; a blank option `railswitch
+  pack new --option <slot> <name>` with the slot picked. When the job
+  ends ok the new package's manifest opens in the editor.
+
+**Package file editor** (`/p/<prefix>/library/<ref>/<path>`): the file
+from `railswitch --json pack file show <ref> <path>` in the same editor as
+the Images page, without the default panel.
+
+- A built-in's file is read-only: no Save, Check or Delete, and the
+  server refuses a write to it (422).
+- Save needs "I've read this file. A package's RUN lines run on this
+  machine during the build, outside the firewall, and its scripts run in
+  the project's containers." for every file but `README.md`. It runs
+  `railswitch pack file write <ref> <path> --if-hash <h> [--restart]` as a
+  project-level job, the text on its stdin; a new file goes with
+  `--if-hash ""` (the file must not exist yet).
+- Save also needs a passing Check (`railswitch --json pack file write …
+  --dry-run`, the text on stdin), as on the Images page: for any local
+  package it says whether the package still loads; for one the project
+  uses, also the changed tags and "Rebuild and restart".
+- **Delete file** (after a confirm; not for the manifest, nor a file not
+  saved yet) runs `railswitch pack file rm <ref> <path> --if-hash <h>` and
+  goes back to the package.
+
+The page refuses a ref or path of the wrong shape (404) before anything
+runs; the CLI checks the exact list of files a package may have.
 
 ## New project
 
@@ -464,6 +554,15 @@ docs/json.md.
   new worktree.
 - `railswitch [--json] pack ls`: the built-in packs, options (with slot
   and `works_with`) and agent packages, for the new page.
+- `railswitch [--json] -w <slug> containerfile list`, `--json containerfile
+  show <name>`, `containerfile write <name> --if-hash <h> [--dry-run]
+  [--restart]` (text on stdin), `containerfile eject <name> --force`,
+  `containerfile new <name>`: the Images page and its editor.
+- `railswitch [--json] pack ls`, `--json pack show <ref>`, `--json pack file
+  show <ref> <path>`, `pack file write <ref> <path> --if-hash <h>
+  [--dry-run] [--restart]` (text on stdin), `pack file rm <ref> <path>
+  --if-hash <h>`, `pack eject <ref> --as <name>`, `pack new <name>`, `pack
+  new --option <slot> <name>`: the Library and its editor.
 - `railswitch dashboard`: prints the login link.
 - `railswitch [--json] dashboard colors`,
   `dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb…]`,
@@ -477,9 +576,9 @@ docs/json.md.
 Server-Sent Events stream. On connect it sends the current fragments
 (`header`, `projects`, `strip`, `banner`, `list`, `detail`, `jobs`);
 afterwards only fragments that changed (a single list row by its own id
-while the order and selection stay), and `: ping` every 15 s. A settings
-page connects with `&view=settings`: it gets no `list` or `detail`, and
-its `jobs` are the project-level ones only. The new page connects when
+while the order and selection stay), and `: ping` every 15 s. A settings,
+images, library or editor page connects with `&view=settings`: it gets no
+`list` or `detail`, and its `jobs` are the project-level ones only. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
 project and that prefix's project-level `jobs`. Each `data:` line is one

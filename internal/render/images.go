@@ -114,13 +114,47 @@ func (b *builder) images() error {
 	return errors.Join(errs...)
 }
 
+// Containerfiles are the workspace Containerfiles p's stack st builds, the
+// files images reads: the chain, each tool's, agent-base and each agent
+// package's, and each standalone option's.
+func Containerfiles(p *config.Project, st *pack.Stack) []string {
+	out := slices.Concat([]string{p.Image.Base}, p.Image.Addons)
+	add := func(file string) {
+		if rel := "containerfiles/" + file; !slices.Contains(out, rel) {
+			out = append(out, rel)
+		}
+	}
+	for _, t := range st.Tools {
+		add(t.Image.File)
+	}
+	if len(st.Agents) > 0 {
+		add("Containerfile.agent-base")
+	}
+	for _, a := range st.Agents {
+		add(a.Agent.Image.File)
+	}
+	for _, ch := range st.Options {
+		if ch.Option.Image.Build != "" {
+			add(ch.Option.Image.Build)
+		}
+	}
+	return out
+}
+
 func (b *builder) readContainerfile(rel string) (*containerfile, error) {
 	m := containerfileRe.FindStringSubmatch(rel)
 	if m == nil {
 		return nil, fmt.Errorf("%s: not containerfiles/Containerfile.<name>", rel)
 	}
 	abs := b.ws(filepath.FromSlash(rel))
-	data, err := os.ReadFile(abs)
+	data, over := b.in.Overlay[rel]
+	var err error
+	switch {
+	case !over:
+		data, err = os.ReadFile(abs)
+	case data == nil:
+		err = fs.ErrNotExist
+	}
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("%s is missing: run `railswitch containerfile eject %s`", rel, m[1])
 	}

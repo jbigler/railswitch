@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -22,7 +22,7 @@ function connect() {
   if (es) es.close();
   clearTimeout(retry);
   // The new page has a prefix only once Create starts its job.
-  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view.startsWith("settings") ? "settings" : view });
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" ? "new" : view ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -632,6 +632,138 @@ if (view.startsWith("settings")) {
   });
 }
 
+// Editor (a Containerfile or a package file): Save waits for the
+// acknowledgement and, where Check is required, a passing Check of the
+// text as it is now; an edit after Check turns Save off again.
+
+function startEditor() {
+  const f = $("#editor");
+  if (!f) return;
+  const text = f.elements.text;
+  let passed = null; // the text the last passing Check judged
+  let checkSeq = 0;
+
+  function ready() {
+    const save = $("[data-save]", f);
+    if (!save) return;
+    const ack = !f.hasAttribute("data-ack-required") || f.elements.ack.checked;
+    const checked = !f.hasAttribute("data-check-required") || passed === text.value;
+    save.disabled = !(ack && checked);
+  }
+
+  function edited() {
+    const c = $("#check");
+    if (passed !== null && passed !== text.value && c && !$("[data-stale]", c)) {
+      c.removeAttribute("data-ok");
+      const p = document.createElement("p");
+      p.className = "yellow";
+      p.dataset.stale = "";
+      p.textContent = "Edited since this Check: check again before saving.";
+      c.prepend(p);
+    }
+    ready();
+  }
+
+  async function check() {
+    const seq = ++checkSeq;
+    const sent = text.value;
+    const btn = $("[data-check-run]", f);
+    btn.disabled = true;
+    let r;
+    try {
+      r = await fetch(f.dataset.check, {
+        method: "POST", body: new URLSearchParams({ hash: f.elements.hash.value, text: sent }), credentials: "same-origin",
+      });
+    } catch {
+      btn.disabled = false;
+      return toast("Check failed: the dashboard is not reachable.", true);
+    }
+    const html = await r.text();
+    btn.disabled = false;
+    if (seq !== checkSeq) return; // a newer Check is on its way
+    if (!r.ok) return toast(html.trim(), true);
+    swap("check", html);
+    passed = $("#check").hasAttribute("data-ok") ? sent : null;
+    edited(); // typed while it ran
+  }
+
+  function saved(state, conflict, exit) {
+    if (state === "ok") location.assign(location.pathname); // drops ?restart=failed
+    else if (exit === "3") location.assign(location.pathname + "?restart=failed"); // written; restart failed
+    else if (conflict) $("#ed-conflict").hidden = false;
+    else toast("The file was not written. The output is below.", true);
+  }
+
+  text.addEventListener("input", edited);
+  f.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.name === "ack") return ready();
+    if (!t.matches("[data-load]") || !t.files.length) return;
+    const file = t.files[0];
+    t.value = "";
+    if (file.size > 1 << 20) return toast("The file is larger than 1 MiB.", true);
+    file.text().then((s) => {
+      text.value = s;
+      edited();
+    });
+  });
+  f.addEventListener("click", (e) => {
+    if (e.target.closest("[data-check-run]")) check();
+  });
+  f.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const data = new URLSearchParams(new FormData(f));
+    data.set("text", text.value); // as typed: FormData would send CRLF
+    $("#ed-conflict").hidden = true;
+    startJob(f.action, data, saved);
+  });
+  ready();
+}
+
+// Job forms of the images, library and editor pages: an optional
+// confirm, then the job; when it ends ok the page goes on to the file it
+// made (data-next) or reloads.
+
+// copiedVersion is the version a new package gets: the copied built-in's
+// (pack eject keeps it), 1 for a blank one.
+function copiedVersion(from) {
+  const m = /@(\d+)$/.exec(from);
+  return m ? m[1] : "1";
+}
+
+function jobNext(f) {
+  const v = (n) => (f.elements[n] ? f.elements[n].value.trim() : "");
+  switch (f.dataset.job) {
+    case "new-addon":
+      return f.dataset.next + v("name");
+    case "new-package":
+      return f.dataset.next + "local:" + v("name") + "@" + copiedVersion(v("from")) + "/" + (v("kind") === "option" ? "option.toml" : "pack.toml");
+    case "delete":
+      return f.dataset.next;
+  }
+  return "";
+}
+
+if (view === "images" || view === "library" || view === "editor") {
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (f.matches("form[data-add-file]")) {
+      e.preventDefault();
+      location.href = f.dataset.base + f.elements.path.value.trim() + "?new=1";
+      return;
+    }
+    if (!f.matches("form[data-job]")) return;
+    e.preventDefault();
+    if (f.dataset.confirm && !confirm(f.dataset.confirm)) return;
+    const next = jobNext(f);
+    startJob(f.action, new URLSearchParams(new FormData(f)), (state) => {
+      if (state !== "ok") return toast("It did not finish: " + state + ". The output is below.", true);
+      if (next) location.href = next;
+      else location.reload();
+    });
+  });
+}
+
 // New project: Read the repository posts repo and branch (with the
 // picked pack, when one is picked) to /new/detect and swaps in the Stack
 // card; Next: review posts the whole form to /new/review and swaps in
@@ -870,6 +1002,7 @@ function startNew() {
   if (view) {
     afterSwap("header");
     if (view === "settings") startSettings();
+    if (view === "editor") startEditor();
     connect();
     return;
   }

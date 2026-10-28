@@ -45,6 +45,8 @@ type Workspace struct {
 	Lock    *config.Lock
 	Dirs    machine.Dirs
 	Slug    string // current worktree, "" at the root
+
+	overlay map[string][]byte // WithFile's files, by workspace-relative path (nil: removed)
 }
 
 // Root walks up from startDir (the working directory when empty) to the
@@ -76,7 +78,18 @@ func absDir(dir string) (string, error) {
 // when set (-w), else the first path element of startDir below the root.
 // stack.lock must exist (an error wrapping config.ErrNoLock otherwise); it
 // may be out of date (see CheckLock), so teardown and diagnosis still work.
-func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
+func Load(ctx context.Context, startDir, slug string) (*Workspace, error) {
+	return load(startDir, slug, nil)
+}
+
+// LoadEdited is Load of the workspace at root, with cat (a LoadCatalog of
+// root with edits in memory, Catalog.WithFile) as its catalog: the project
+// as an edit would leave it, written nowhere.
+func LoadEdited(_ context.Context, root string, cat *pack.Catalog) (*Workspace, error) {
+	return load(root, "", cat)
+}
+
+func load(startDir, slug string, cat *pack.Catalog) (*Workspace, error) {
 	root, err := Root(startDir)
 	if err != nil {
 		return nil, err
@@ -92,9 +105,10 @@ func Load(_ context.Context, startDir, slug string) (*Workspace, error) {
 	if err != nil {
 		return nil, err
 	}
-	cat, err := pack.LoadCatalog(root)
-	if err != nil {
-		return nil, err
+	if cat == nil {
+		if cat, err = pack.LoadCatalog(root); err != nil {
+			return nil, err
+		}
 	}
 	st, err := cat.Resolve(p)
 	if err != nil {
@@ -193,6 +207,18 @@ func (w *Workspace) WithProject(p *config.Project) (*Workspace, error) {
 	c := *w
 	c.Project, c.Stack, c.Lock = p, st, &l
 	return &c, nil
+}
+
+// WithFile is a copy of w whose renders read data at rel, a
+// workspace-relative slash path (nil: rel is removed), in memory only.
+func (w *Workspace) WithFile(rel string, data []byte) *Workspace {
+	c := *w
+	c.overlay = maps.Clone(w.overlay)
+	if c.overlay == nil {
+		c.overlay = map[string][]byte{}
+	}
+	c.overlay[rel] = data
+	return &c
 }
 
 // Hash is the content hash of a project.toml: "sha256:<hex>".
@@ -332,6 +358,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 		Generated: gen,
 		Host:      host,
 		Mounts:    mounts,
+		Overlay:   w.overlay,
 	})
 }
 

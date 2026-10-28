@@ -387,3 +387,56 @@ USER appuser
 		t.Errorf("unsupported: error = %v", err)
 	}
 }
+
+// TestImageOverlay: an overlaid Containerfile is read instead of the disk
+// file, so a render judges new text before it is written; nil is missing.
+func TestImageOverlay(t *testing.T) {
+	ws := fixtureWS(t)
+	rel := "containerfiles/Containerfile.vips"
+	writeFile(t, filepath.Join(ws, rel), vipsAddon)
+	before := chainTags(t, ws)["addon vips"]
+
+	in := fixtureInputs(t, ws, withVips)
+	in.Overlay = map[string][]byte{rel: []byte(vipsAddon + "# changed\n")}
+	after := ""
+	for _, b := range mustInstance(t, mustBuild(t, in), "master").Builds {
+		if b.Name == "addon vips" {
+			after = b.Tag
+		}
+	}
+	if after == "" || after == before {
+		t.Errorf("overlaid tag %q; want one other than the disk file's %q", after, before)
+	}
+	if data, err := os.ReadFile(filepath.Join(ws, rel)); err != nil || string(data) != vipsAddon {
+		t.Errorf("the disk file changed: %q %v", data, err)
+	}
+
+	in.Overlay = map[string][]byte{rel: []byte("FROM debian:trixie\n")}
+	if err := buildErr(in); err == nil || !strings.Contains(err.Error(), "Containerfile.vips") {
+		t.Errorf("overlaid contract error: %v", err)
+	}
+	in.Overlay = map[string][]byte{rel: nil}
+	if err := buildErr(in); err == nil || !strings.Contains(err.Error(), "containerfile eject vips") {
+		t.Errorf("overlaid removal: %v", err)
+	}
+}
+
+// TestContainerfilesMatchBuilds: Containerfiles names exactly the files a
+// worktree's builds read.
+func TestContainerfilesMatchBuilds(t *testing.T) {
+	ws := fixtureWS(t)
+	writeFile(t, filepath.Join(ws, "containerfiles", "Containerfile.vips"), vipsAddon)
+	in := fixtureInputs(t, ws, withVips)
+	var built []string
+	for _, b := range mustInstance(t, mustBuild(t, in), "master").Builds {
+		rel, err := filepath.Rel(ws, b.File)
+		if err != nil {
+			t.Fatal(err)
+		}
+		built = append(built, filepath.ToSlash(rel))
+	}
+	got := Containerfiles(in.Project, in.Stack)
+	if !slices.Equal(slices.Sorted(slices.Values(got)), slices.Sorted(slices.Values(built))) {
+		t.Errorf("Containerfiles = %q; the builds read %q", got, built)
+	}
+}

@@ -171,6 +171,7 @@ type Volume struct {
 	Name   string // name template without the prefix, e.g. "db-data-pg{postgres.major}"
 	Mount  string // container path
 	Chown  bool   // mount with :U
+	Cache  bool   // rebuildable content: losing it is no data loss (pack data = "cache")
 	Shared bool   // shared by every worktree: <prefix>_<name>; else <prefix>-<slug>-<name>
 	Seed   string // file under <workspace>/db-dumps/ imported when the volume is created (D18)
 }
@@ -461,10 +462,10 @@ func (b *builder) appVolumes() []Volume {
 	pk := b.in.Stack.Pack
 	var out []Volume
 	for _, v := range pk.Caches {
-		out = append(out, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+		out = append(out, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Shared: true})
 	}
 	for _, v := range pk.WorktreeVolumes {
-		out = append(out, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown})
+		out = append(out, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache})
 	}
 	return out
 }
@@ -497,7 +498,7 @@ func (b *builder) optionService(ch *pack.Chosen, role string) (Service, error) {
 		s.Image = ImageSpec{Kind: ImageStandalone, File: b.ws("containerfiles", o.Image.Build), Tag: o.Image.Tag, Args: o.Image.Args}
 	}
 	for _, v := range o.Volumes {
-		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Seed: v.Seed})
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Seed: v.Seed})
 	}
 	if err := b.packageMounts(&s, o.Name, o.Files, o.Mounts); err != nil {
 		return s, err
@@ -543,7 +544,7 @@ func (b *builder) toolService(t *pack.Tool) (Service, error) {
 	if t.Worktree {
 		s.Mounts = worktreeMounts("z")
 		for _, v := range pk.WorktreeVolumes {
-			s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown})
+			s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache})
 		}
 	}
 	if t.Home {
@@ -551,11 +552,11 @@ func (b *builder) toolService(t *pack.Tool) (Service, error) {
 	}
 	if t.Caches {
 		for _, v := range pk.Caches {
-			s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+			s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Shared: true})
 		}
 	}
 	for _, v := range t.Shared {
-		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Shared: true})
 	}
 	return s, b.entrypoint(&s, t.Name, t.Files, t.Entrypoint)
 }
@@ -593,13 +594,13 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 		return s, err
 	}
 	for _, v := range pk.WorktreeVolumes {
-		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown})
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache})
 	}
 	for _, v := range pk.Caches {
-		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Shared: true})
 	}
 	for _, v := range ag.Shared {
-		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Shared: true})
+		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Shared: true})
 	}
 	return s, b.entrypoint(&s, pkg, ag.Files, ag.Entrypoint)
 }

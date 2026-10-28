@@ -83,12 +83,19 @@ type Chain struct {
 	Fallback string   `toml:"fallback"`
 }
 
+// Volume.Data values; "" means DataPersistent.
+const (
+	DataPersistent = "persistent"
+	DataCache      = "cache"
+)
+
 // Volume is a named volume mounted at Mount.
 type Volume struct {
 	Name  string `toml:"name"`  // name suffix; may hold placeholders ("gems_ruby{ruby}")
 	Mount string `toml:"mount"` // container path
 	Chown bool   `toml:"chown"` // mount with :U (a volume under a bind mount has no image content to copy up)
 	Seed  string `toml:"seed"`  // option volumes only: file under <workspace>/db-dumps/ imported when the volume is created (D18)
+	Data  string `toml:"data"`  // "persistent" (default) or "cache": a cache volume holds only rebuildable content
 }
 
 // Port is a published port: host port Base + worktree ID, container port

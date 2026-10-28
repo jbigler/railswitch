@@ -1227,3 +1227,21 @@ func TestPhoenixFixtureResolves(t *testing.T) {
 	}
 	hasLine(t, units, "phx-master-nvim.container", "Volume=phx_npm_global_node:/home/appuser/.npm-global:U")
 }
+
+// A package volume's data = "cache" reaches the render volume.
+func TestVolumeCacheFlag(t *testing.T) {
+	in := fixtureInputs(t, fixtureWS(t), nil)
+	pk := in.Stack.Pack
+	if len(pk.Caches) == 0 || len(pk.WorktreeVolumes) == 0 {
+		t.Fatal("the fixture pack needs a cache and a worktree volume")
+	}
+	pk.Caches[0].Data = pack.DataCache
+	cached := map[string]bool{pk.Caches[0].Name: true}
+	for _, s := range mustBuild(t, in).Services {
+		for _, v := range s.Volumes {
+			if v.Cache != cached[v.Name] {
+				t.Errorf("%s volume %s: Cache = %v", s.ID, v.Name, v.Cache)
+			}
+		}
+	}
+}

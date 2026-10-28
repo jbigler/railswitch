@@ -324,8 +324,8 @@ there is no shared add-on package (user, 2026-10-27).
 | `[env]` | the app's env (layer 1): only what the framework reads |
 | `[db_scheme] <option> = "<scheme>"` | the `DATABASE_URL` scheme per database option |
 | `[share] env` | env while the worktree is shared on the tailnet |
-| `[[caches]]` | volumes shared by every worktree: `name`, `mount`, `chown` |
-| `[[worktree_volumes]]` | one volume per worktree: `name`, `mount`, `chown` |
+| `[[caches]]` | volumes shared by every worktree: `name`, `mount`, `chown`, `data` |
+| `[[worktree_volumes]]` | one volume per worktree: `name`, `mount`, `chown`, `data` |
 | `[[ports]]` | `name`, `env`, `base` (host port `base` + worktree ID), `container` or `same_port`, `share` |
 | `[defaults] <slot> = "<ref>"` | the options `project new` picks |
 | `[tasks]`, `[[links]]` | named commands and worktree links |
@@ -346,7 +346,15 @@ there is no shared add-on package (user, 2026-10-27).
 | `[gives]`, `[deps_env]`, `[agent_gives]`, `[env]` | env it gives the app, the deps service, agents, and its own service |
 | `[share] gives` | `[gives]` while shared |
 | `[dump]` | `command`, `file`: how `railswitch db dump` dumps it; with `list` (a command printing one database name per line) both run once per name as `{dump.db}`, each to its own file. `postgres@1` dumps every non-template database but `postgres` |
-| `[[volumes]]`, `[[mounts]]`, `[[ports]]`, `[[routes]]`, `[[links]]`, `[unit]` | as named |
+| `[[volumes]]` | `name`, `mount`, `chown`, `seed`, `data` |
+| `[[mounts]]`, `[[ports]]`, `[[routes]]`, `[[links]]`, `[unit]` | as named |
+
+Every volume table (`[[caches]]`, `[[worktree_volumes]]`, an option's
+`[[volumes]]`, a tool's or agent's `[[shared]]`) takes `data = "persistent" |
+"cache"` (default `persistent`). `cache` says the volume holds only content
+the service rebuilds, so the settings preview does not report "Data not
+carried over" when an option change leaves it behind. No built-in package
+marks one today.
 
 ### `tool.toml` and `agent.toml`
 

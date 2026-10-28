@@ -372,6 +372,9 @@ func (l *loader) volumes(file, field string, vs []Volume, seeds bool) {
 		if !strings.HasPrefix(v.Mount, "/") {
 			l.add(file, "%s.mount %q is not an absolute container path", f, v.Mount)
 		}
+		if v.Data != "" && v.Data != DataPersistent && v.Data != DataCache {
+			l.add(file, "%s.data must be \"persistent\" or \"cache\", not %q", f, v.Data)
+		}
 		if v.Seed != "" && !seeds {
 			l.add(file, "%s.seed: only an option's [[volumes]] can be seeded", f)
 		}

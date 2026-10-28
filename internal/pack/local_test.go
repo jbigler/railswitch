@@ -106,6 +106,29 @@ func TestResolveLocalOption(t *testing.T) {
 	}
 }
 
+func TestVolumeData(t *testing.T) {
+	resolve := func(data string) (*Stack, error) {
+		root := t.TempDir()
+		writeLocal(t, root, "packs", "p", minimalFiles("packs/p"))
+		files := minimalFiles("options/o")
+		files["option.toml"] += "\n[[volumes]]\nname = \"scratch\"\nmount = \"/scratch\"\n" + data + "\n"
+		writeLocal(t, root, "options", "o", files)
+		return localCatalog(t, root).Resolve(localProject("local:p@1", map[string]string{"cache": "local:o@1"}))
+	}
+	for data, want := range map[string]string{"": "", `data = "persistent"`: "persistent", `data = "cache"`: "cache"} {
+		st, err := resolve(data)
+		if err != nil {
+			t.Fatalf("%q: %v", data, err)
+		}
+		if got := st.Option("cache").Option.Volumes[0].Data; got != want {
+			t.Errorf("%q: Data = %q, want %q", data, got, want)
+		}
+	}
+	if _, err := resolve(`data = "temp"`); err == nil || !strings.Contains(err.Error(), `data must be "persistent" or "cache"`) {
+		t.Errorf("data = temp: %v", err)
+	}
+}
+
 func TestLocalPackVersionMismatch(t *testing.T) {
 	root := t.TempDir()
 	files := minimalFiles("packs/p")

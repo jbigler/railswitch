@@ -110,7 +110,7 @@ func localManifests(root, top, file string) []localManifest {
 	var out []localManifest
 	ents, _ := os.ReadDir(filepath.Join(root, top))
 	for _, ent := range ents {
-		if !ent.IsDir() {
+		if !ent.IsDir() || !packNameRe.MatchString(ent.Name()) {
 			continue
 		}
 		var m localManifest

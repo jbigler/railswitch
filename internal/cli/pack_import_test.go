@@ -151,3 +151,46 @@ func TestPackImportRefuses(t *testing.T) {
 		t.Errorf("dup: exit %d: %s", code, errs)
 	}
 }
+
+// A manifest whose first double-quoted name line is not its top-level
+// name is refused, never edited in a nested table.
+func TestPackImportNameLine(t *testing.T) {
+	ws, _ := lockedWS(t)
+	folder := filepath.Join(t.TempDir(), "redis")
+	mustRun(t, "-C", ws, "pack", "export", "redis@1", "--to", folder)
+	m := filepath.Join(folder, "option.toml")
+	writeFile(t, m, strings.Replace(readFile(t, m), `name = "redis"`, `name = 'redis'`, 1))
+	if code, _, errs := runIn(t, "-C", ws, "pack", "import", folder, "--as", "myr"); code != 1 || !strings.Contains(errs, "top-level name must be one line") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+}
+
+// Export refuses a folder inside the workspace's package directories,
+// and a leftover import directory is never listed as a package.
+func TestPackExportInsideWorkspace(t *testing.T) {
+	ws, _ := lockedWS(t)
+	if code, _, errs := runIn(t, "-C", ws, "pack", "export", "redis@1", "--to", filepath.Join(ws, "options", "evil")); code != 1 || !strings.Contains(errs, "inside the workspace's options/") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+	mustRun(t, "-C", ws, "pack", "export", "redis@1", "--to", filepath.Join(t.TempDir(), "r"))
+	if err := os.MkdirAll(filepath.Join(ws, "options", ".import-1.old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(ws, "options", ".import-1.old", "option.toml"), "name = \".import-1.old\"\nversion = 1\nslot = \"cache\"\n")
+	if out := mustRun(t, "-C", ws, "pack", "ls"); strings.Contains(out, ".import-") {
+		t.Errorf("a leftover is listed:\n%s", out)
+	}
+}
+
+// A library package the project hasn't installed is never exported: its
+// content was never reviewed (D106).
+func TestPackExportLibraryNotInstalled(t *testing.T) {
+	ws, _, _ := acmeWS(t)
+	if code, _, errs := runIn(t, "-C", ws, "pack", "export", "acme:redis@1", "--to", filepath.Join(t.TempDir(), "r")); code != 1 || !strings.Contains(errs, "doesn't use") {
+		t.Errorf("unused: exit %d: %s", code, errs)
+	}
+	editProject(t, ws, `cache    = "redis@1"`, `cache    = "acme:redis@1"`)
+	if code, _, errs := runIn(t, "-C", ws, "pack", "export", "acme:redis@1", "--to", filepath.Join(t.TempDir(), "r")); code != 1 || !strings.Contains(errs, "is not installed") {
+		t.Errorf("not installed: exit %d: %s", code, errs)
+	}
+}

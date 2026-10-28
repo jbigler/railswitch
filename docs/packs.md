@@ -97,7 +97,9 @@ work with (`works_with = ["rails"]`), so a renamed pack loses them.
 
 - `railswitch pack export <ref> --to <dir>`, in a workspace: the package
   as this project runs it (a locked one's accepted copy) as a new folder
-  `dir`. Any ref: built in, `local:` or a library's.
+  `dir`, outside the workspace's `packs/`, `options/` and `agents/`. A
+  built-in or `local:` ref, or a library package this project uses and
+  has installed (never one whose content no review accepted).
 - `railswitch pack import <dir> [--as <name>] [--json]`, in their
   workspace: reviews the folder as `local:<name>@<N>` (name: `--as`, else
   the manifest's; the manifest's `name` line is set to it; `N`: its
@@ -108,8 +110,10 @@ work with (`works_with = ["rails"]`), so a renamed pack loses them.
   for a package the project uses, the worktrees it restarts. Nothing is
   written. The folder is hostile input: exactly one manifest
   (`pack.toml`, `option.toml` or `agent.toml`, which sets the kind), only
-  paths `pack file write` accepts, regular files ≤ 1 MiB, at most 512 and
-  16 MiB in all, no symlink (the folder included); it must load.
+  paths `pack file write` accepts (so no `.git/` or `.DS_Store`: share the
+  package's files only), regular files ≤ 1 MiB, at most 512 and 16 MiB in
+  all, no symlink (the folder included); the manifest's top-level `name`
+  must be one `name = "…"` line before any table; it must load.
 - `--accept <sha256> [--restart]` writes it, once the folder still has
   the hash its review printed. A package the project doesn't use is
   written beside the old directory and renamed over it. One it uses is

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing/fstest"
@@ -63,11 +64,35 @@ func packExport(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	if p, err := config.Load(filepath.Join(root, "project.toml")); err == nil {
+	p, perr := config.Load(filepath.Join(root, "project.toml"))
+	if ref.Library != "" {
+		// Only what a review accepted leaves for the user's files: a
+		// library package this project uses and has installed.
+		if perr != nil {
+			return e.fail(perr)
+		}
+		if !usesRef(p, ref) {
+			return e.fail(fmt.Errorf("pack export: %s is a library package this project doesn't use: only an installed one is exported", ref))
+		}
+		if err := workspace.CheckInstalled(root, p, cat.Libraries); err != nil {
+			return e.fail(fmt.Errorf("pack export: %w", err))
+		}
+	}
+	if perr == nil {
 		if cat, err = workspace.Accepted(root, p, cat); err != nil {
 			return e.fail(err)
 		}
 	}
+	dest, err := filepath.Abs(*to)
+	if err != nil {
+		return e.fail(err)
+	}
+	for _, k := range folderKinds {
+		if rel, err := filepath.Rel(filepath.Join(root, k.top), dest); err == nil && rel != ".." && !strings.HasPrefix(rel, "../") {
+			return e.fail(fmt.Errorf("pack export: %s is inside the workspace's %s/: export to a folder outside it (railswitch pack eject makes a local copy)", dest, k.top))
+		}
+	}
+	*to = dest
 	var files fs.FS
 	var manifest string
 	if p, err := cat.Pack(ref); err == nil && p != nil {
@@ -282,7 +307,7 @@ func readIncomingPackage(root, dir, as string) (*incomingPackage, error) {
 			return fmt.Errorf("%s: not a regular file; refused", rel)
 		}
 		if err := pack.CheckFilePath(rel, in.manifest); err != nil {
-			return err
+			return fmt.Errorf("%w (a package folder holds only the package's files: no .git, .DS_Store or other extras)", err)
 		}
 		if len(in.files) == maxFolderFiles {
 			return fmt.Errorf("more than %d files", maxFolderFiles)
@@ -322,8 +347,10 @@ func readIncomingPackage(root, dir, as string) (*incomingPackage, error) {
 	if m.Version < 1 {
 		return nil, fmt.Errorf("%s/%s: version must be 1 or more", dir, in.manifest)
 	}
-	if loc := manifestNameRe.FindIndex(mf.Data); loc == nil {
-		return nil, fmt.Errorf("%s/%s has no name line", dir, in.manifest)
+	loc := manifestNameRe.FindIndex(mf.Data)
+	table := tableHeaderRe.FindIndex(mf.Data)
+	if loc == nil || table != nil && table[0] < loc[0] || !manifestNameIs(mf.Data[loc[0]:loc[1]], m.Name) {
+		return nil, fmt.Errorf("%s/%s: its top-level name must be one line name = \"<name>\", before any [table]", dir, in.manifest)
 	} else {
 		mf.Data = slices.Concat(mf.Data[:loc[0]], []byte(fmt.Sprintf("name = %q", name)), mf.Data[loc[1]:])
 	}
@@ -485,6 +512,17 @@ func (e *env) writeImported(ctx context.Context, root string, in *incomingPackag
 	return code
 }
 
+// tableHeaderRe is a TOML table header line.
+var tableHeaderRe = regexp.MustCompile(`(?m)^\s*\[`)
+
+// manifestNameIs reports whether line, a name line manifestNameRe matched,
+// sets name.
+func manifestNameIs(line []byte, name string) bool {
+	var m struct{ Name string }
+	_, err := toml.Decode(string(line), &m)
+	return err == nil && m.Name == name
+}
+
 // useHint says where a project starts using the local package ref of kind.
 func useHint(kind string, ref pack.Ref) string {
 	switch kind {
@@ -543,7 +581,9 @@ func writeFolder(dir string, files fstest.MapFS) error {
 		return err
 	}
 	if old != "" {
-		return os.RemoveAll(old)
+		// The new directory is in place; a leftover is never a package
+		// (localManifests skips names packNameRe refuses).
+		_ = os.RemoveAll(old)
 	}
 	return nil
 }

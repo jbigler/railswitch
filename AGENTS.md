@@ -68,6 +68,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 ## CLI (Stage 8c additions)
 - Settings edit op `pack` (`{"op":"pack","ref":…}`, D115): `config.SetPack` sets `[stack] pack` (app untouched); `project show --json` gains `pack` `{ref, choices}` (`packChoices`: newest built-ins (`newestBuiltins` skips local and library refs), `packs/<name>/`, library packs, each loading with the current app service and resolving with the project's other lines). Dashboard: the pack row first in Stack and options (`data-pack`, staged as target `pack`).
 
+## CLI (Stage 8d additions)
+- Templates bundle their local packages (D116): `template.CheckPath` allows `packs/<name>/<file>` and `options/<name>/<file>` (`pack.CheckFilePath`), so library fetches and folder imports (≤ 512 files, ≤ 16 MiB) carry them; `Decode` fills `Template.Bundled` (`Bundle{Kind, Dir, Files}`) and refuses a bundle its lines don't name as `local:<name>@N`, a manifest at another name or version, or a named `local:` pack or option not bundled. `template export` bundles `bundledPackages(w.Stack)` (what the project runs); `planNew` overlays them (`Catalog.WithPackage`) before resolving, `newPathsFree` checks their dirs, `writeProject` writes them first (`writeBundle`, `.sh` 0755). `review.Compare("template", …)` checks each bundled package as its kind, paths under its directory.
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch, `library add`/`fetch`) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).

@@ -62,6 +62,68 @@ func Compare(kind string, old, new fs.FS) ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
+	if kind != "template" {
+		return compare(kind, "", a, b), nil
+	}
+	// A template's bundled packages (packs/<name>/, options/<name>/: D116)
+	// are each checked as the package they are.
+	groups := map[string]string{} // prefix → kind
+	for _, m := range []map[string][]byte{a, b} {
+		for p := range m {
+			if prefix, k := bundled(p); prefix != "" {
+				groups[prefix] = k
+			}
+		}
+	}
+	out := compare(kind, "", without(a, groups), without(b, groups))
+	for prefix, k := range groups {
+		out = append(out, compare(k, prefix, within(a, prefix), within(b, prefix))...)
+	}
+	slices.SortFunc(out, func(x, y File) int { return strings.Compare(x.Path, y.Path) })
+	return out, nil
+}
+
+// bundled is the package directory p is in within a template, with its
+// kind: "packs/<name>/" (pack) or "options/<name>/" (option); "" for
+// none.
+func bundled(p string) (prefix, kind string) {
+	top, rest, ok := strings.Cut(p, "/")
+	name, _, nested := strings.Cut(rest, "/")
+	if !ok || !nested {
+		return "", ""
+	}
+	switch top {
+	case "packs":
+		return top + "/" + name + "/", "pack"
+	case "options":
+		return top + "/" + name + "/", "option"
+	}
+	return "", ""
+}
+
+func without(m map[string][]byte, groups map[string]string) map[string][]byte {
+	out := map[string][]byte{}
+	for p, d := range m {
+		if prefix, _ := bundled(p); groups[prefix] == "" {
+			out[p] = d
+		}
+	}
+	return out
+}
+
+func within(m map[string][]byte, prefix string) map[string][]byte {
+	out := map[string][]byte{}
+	for p, d := range m {
+		if rel, ok := strings.CutPrefix(p, prefix); ok {
+			out[rel] = d
+		}
+	}
+	return out
+}
+
+// compare is Compare of a package of kind, by file maps; its files' paths
+// are shown under prefix.
+func compare(kind, prefix string, a, b map[string][]byte) []File {
 	manifest := kind + ".toml"
 	before, after := decode(kind, a[manifest]), decode(kind, b[manifest])
 	caps := after.caps
@@ -79,8 +141,8 @@ func Compare(kind string, old, new fs.FS) ([]File, error) {
 	for _, p := range paths {
 		x, inOld := a[p]
 		y, inNew := b[p]
-		f := File{Path: p, Status: Changed, Flags: []Flag{}}
-		aName, bName := "a/"+p, "b/"+p
+		f := File{Path: prefix + p, Status: Changed, Flags: []Flag{}}
+		aName, bName := "a/"+prefix+p, "b/"+prefix+p
 		switch {
 		case inOld && inNew && bytes.Equal(x, y):
 			continue
@@ -109,7 +171,7 @@ func Compare(kind string, old, new fs.FS) ([]File, error) {
 		}
 		out = append(out, f)
 	}
-	return out, nil
+	return out
 }
 
 // readAll is every regular file of fsys by slash path; nil for a nil fsys.

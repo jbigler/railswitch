@@ -2,6 +2,7 @@ package template
 
 import (
 	"fmt"
+	"io/fs"
 	"maps"
 	"slices"
 	"strings"
@@ -19,8 +20,9 @@ import (
 // containerfiles, Containerfile.<name> by name: the ones the caller judged
 // edited from their default, and user addons. p's [image] addons are kept
 // only when containerfiles holds them: an option's addon comes from its
-// eject in the new project.
-func Export(p *config.Project, containerfiles map[string][]byte, name string, version int) (*Template, []string, error) {
+// eject in the new project. bundled are the local packages p's pack and
+// options name (D116), as the project runs them.
+func Export(p *config.Project, containerfiles map[string][]byte, bundled map[pack.Ref]Bundle, name string, version int) (*Template, []string, error) {
 	var dropped []string
 	if p.From != "" {
 		dropped = append(dropped, "from")
@@ -70,6 +72,7 @@ func Export(p *config.Project, containerfiles map[string][]byte, name string, ve
 	}
 	t.Secrets = slices.Sorted(maps.Keys(lines.Secrets))
 	t.Containerfiles = containerfiles
+	t.Bundled = bundled
 	out, err := t.Build()
 	if err != nil {
 		return nil, nil, fmt.Errorf("the exported template does not decode: %w", err)
@@ -87,6 +90,19 @@ func (t *Template) Build() (*Template, error) {
 	}
 	if t.Readme != nil {
 		files[ReadmeFile] = &fstest.MapFile{Data: t.Readme, Mode: 0o644}
+	}
+	for _, b := range t.Bundled {
+		err := fs.WalkDir(b.Files, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			data, err := fs.ReadFile(b.Files, p)
+			files[b.Dir+"/"+p] = &fstest.MapFile{Data: data, Mode: 0o644}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 	return Decode(files)
 }

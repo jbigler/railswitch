@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
+	"testing/fstest"
 
 	"github.com/jbigler/railswitch/internal/libraries"
 	"github.com/jbigler/railswitch/internal/machine"
@@ -30,6 +33,9 @@ type templateImportDoc struct {
 	Packages []importPackage `json:"packages"`
 	Restart  []string        `json:"restart"` // always empty: nothing runs from the store
 	Warnings []string        `json:"warnings"`
+	// BundlesComparedWith names, by directory, the built-in a bundled
+	// package new here is shown against (its closest; D116).
+	BundlesComparedWith map[string]string `json:"bundles_compared_with"`
 }
 
 type importReplaces struct {
@@ -115,6 +121,7 @@ func importReview(in *template.Incoming, d machine.Dirs) (*templateImportDoc, er
 	if in.Status == template.ImportSame {
 		pkg.Status = "unchanged"
 	}
+	old, doc.BundlesComparedWith = withBundleBases(old, in.T)
 	files, err := review.Compare("template", old, in.T.Files)
 	if err != nil {
 		return nil, err
@@ -127,9 +134,56 @@ func importReview(in *template.Incoming, d machine.Dirs) (*templateImportDoc, er
 	return doc, nil
 }
 
+// withBundleBases is old (the stored template, or nil) with, for each
+// package t bundles that old lacks, its closest built-in under the
+// bundle's directory: a new bundle is shown as its changes from that
+// built-in, not as every file added. It returns which built-in each is.
+func withBundleBases(old fs.FS, t *template.Template) (fs.FS, map[string]string) {
+	names := map[string]string{}
+	mem := fstest.MapFS{}
+	if old != nil {
+		_ = fs.WalkDir(old, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				data, _ := fs.ReadFile(old, p)
+				mem[p] = &fstest.MapFile{Data: data}
+			}
+			return nil
+		})
+	}
+	for _, b := range t.Bundled {
+		if _, err := fs.Stat(mem, b.Dir); err == nil {
+			continue
+		}
+		files := fstest.MapFS{}
+		_ = fs.WalkDir(b.Files, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				data, _ := fs.ReadFile(b.Files, p)
+				files[p] = &fstest.MapFile{Data: data}
+			}
+			return nil
+		})
+		ref, base := closestBuiltin(b.Kind, files)
+		if base == nil {
+			continue
+		}
+		names[b.Dir] = ref.String()
+		_ = fs.WalkDir(base, ".", func(p string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				data, _ := fs.ReadFile(base, p)
+				mem[b.Dir+"/"+p] = &fstest.MapFile{Data: data}
+			}
+			return nil
+		})
+	}
+	if old == nil && len(mem) == 0 {
+		return nil, names
+	}
+	return mem, names
+}
+
 // importWarnings name the packages t uses that this machine can't give a
-// new project as they are: a workspace's own local: package, and a
-// library this machine hasn't added.
+// new project as they are: a library's, when this machine hasn't added
+// it (a local: one is bundled, D116).
 func importWarnings(t *template.Template, d machine.Dirs) []string {
 	out := []string{}
 	c, err := libraries.Load(libraries.Path(d))
@@ -142,8 +196,6 @@ func importWarnings(t *template.Template, d machine.Dirs) []string {
 		switch {
 		case err != nil:
 			continue
-		case r.Local:
-			out = append(out, fmt.Sprintf("%s is a workspace-local package: a new project needs its own copy in packs/, options/ or agents/", ref))
 		case r.Library != "" && (c == nil || c.Library(r.Library) == nil):
 			out = append(out, fmt.Sprintf("%s comes from the library %s, which this machine hasn't added (railswitch library add <url> --alias %s)", ref, r.Library, r.Library))
 		}
@@ -164,6 +216,9 @@ func printImport(e *env, dir string, doc *templateImportDoc) {
 		return
 	default:
 		head = fmt.Sprintf("template %s (sha256 %s)", p(doc.Ref), doc.SHA256)
+	}
+	for _, d := range slices.Sorted(maps.Keys(doc.BundlesComparedWith)) {
+		head += fmt.Sprintf("\n%s/ is shown as its changes from the built-in %s", d, doc.BundlesComparedWith[d])
 	}
 	next := ""
 	if doc.Status != template.ImportOlder {

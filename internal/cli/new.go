@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/netip"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -188,6 +189,28 @@ type newPlan struct {
 	// libTemplate is tpl as an Install review shows it, for a library
 	// template; nil otherwise.
 	libTemplate *workspace.Template
+	// bundles are tpl's bundled packages the stack uses (an answer or
+	// --pack may pick another): what writeProject writes.
+	bundles []template.Bundle
+}
+
+// usedBundles are tpl's bundles st's pack or options are, by directory.
+func usedBundles(tpl *template.Template, st *pack.Stack) []template.Bundle {
+	if tpl == nil {
+		return nil
+	}
+	refs := []pack.Ref{st.PackRef}
+	for _, ch := range st.Options {
+		refs = append(refs, ch.Ref)
+	}
+	var out []template.Bundle
+	for _, r := range refs {
+		if b, ok := tpl.Bundled[r]; ok {
+			out = append(out, b)
+		}
+	}
+	slices.SortFunc(out, func(x, y template.Bundle) int { return strings.Compare(x.Dir, y.Dir) })
+	return out
 }
 
 // reviewed names what an Install review of pl with refs covers.
@@ -233,6 +256,14 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 		if tpl, lines, libTemplate, err = newTemplate(dirs, a.template, a.answers); err != nil {
 			return nil, err
 		}
+		// Its bundled packages (D116) are the new workspace's own: the
+		// stack resolves with them before anything is written.
+		for _, r := range slices.SortedFunc(maps.Keys(tpl.Bundled), func(x, y pack.Ref) int { return strings.Compare(x.String(), y.String()) }) {
+			b := tpl.Bundled[r]
+			if cat, err = cat.WithPackage(b.Kind, r, b.Files, nil); err != nil {
+				return nil, fmt.Errorf("template %s: %s/: %w", a.template, b.Dir, err)
+			}
+		}
 	}
 	if a.agents == nil {
 		if ref, ok := cat.DefaultAgent(); ok {
@@ -272,10 +303,11 @@ func planNew(ctx context.Context, r sys.Runner, a newArgs) (*newPlan, error) {
 			}
 		}
 	}
-	if err := newPathsFree(ws, slug, st, tpl); err != nil {
+	bundles := usedBundles(tpl, st)
+	if err := newPathsFree(ws, slug, st, tpl, bundles); err != nil {
 		return nil, err
 	}
-	return &newPlan{ws: ws, slug: slug, p: p, cat: cat, st: st, dirs: dirs, reg: reg, tpl: tpl, answers: a.answers, libTemplate: libTemplate}, nil
+	return &newPlan{ws: ws, slug: slug, p: p, cat: cat, st: st, dirs: dirs, reg: reg, tpl: tpl, answers: a.answers, libTemplate: libTemplate, bundles: bundles}, nil
 }
 
 // newTemplate resolves the template ref on this machine (D110) and applies
@@ -333,7 +365,7 @@ func parseAnswers(flags []string) (map[string]string, error) {
 // the files it writes and each Containerfile it ejects or takes from the
 // template tpl (nil: none). Dry and real run refuse here, before the
 // clone, with the same message.
-func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template) error {
+func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template, bundles []template.Bundle) error {
 	switch fi, err := os.Stat(ws); {
 	case errors.Is(err, fs.ErrNotExist):
 		return nil
@@ -350,6 +382,9 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template) error
 		for _, n := range slices.Sorted(maps.Keys(tpl.Containerfiles)) {
 			rels = append(rels, workspaceFile(n))
 		}
+	}
+	for _, b := range bundles {
+		rels = append(rels, b.Dir)
 	}
 	for _, rel := range rels {
 		p := filepath.Join(ws, filepath.FromSlash(rel))
@@ -405,6 +440,11 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace
 // declared secret. The real run writes into the workspace, the dry run into
 // a temp dir: one path, the same bytes.
 func writeProject(dir string, pl *newPlan) ([]string, error) {
+	for _, b := range pl.bundles {
+		if err := writeBundle(filepath.Join(dir, filepath.FromSlash(b.Dir)), b.Files); err != nil {
+			return nil, fmt.Errorf("%s: %w", b.Dir, err)
+		}
+	}
 	proj := filepath.Join(dir, "project.toml")
 	if err := createFile(proj, projectTOML(pl.p), 0o644); err != nil {
 		return nil, err
@@ -434,6 +474,25 @@ func writeProject(dir string, pl *newPlan) ([]string, error) {
 	}
 	names, err := addNewSecrets(proj, pl.p, pl.st)
 	return append(declared, names...), err
+}
+
+// writeBundle writes a template's bundled package files under dir, which
+// newPathsFree found absent; scripts (.sh) are executable.
+func writeBundle(dir string, files fs.FS) error {
+	return fs.WalkDir(files, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(files, p)
+		if err != nil {
+			return err
+		}
+		mode := os.FileMode(0o644)
+		if path.Ext(p) == ".sh" {
+			mode = 0o755
+		}
+		return writePackageFile(filepath.Join(dir, filepath.FromSlash(p)), data, mode)
+	})
 }
 
 // storeTemplate stores pl's template in the store beside the packages

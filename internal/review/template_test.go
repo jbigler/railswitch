@@ -66,3 +66,33 @@ seed = "bin/rails db:seed"
 		}
 	}
 }
+
+// A template's bundled package is checked as the package it is: its
+// manifest's image is flagged, its paths shown under its directory.
+func TestTemplateBundledFlags(t *testing.T) {
+	stack := "schema = 1\nname = \"x\"\nversion = 1\n"
+	files, err := Compare("template", nil, fstest.MapFS{
+		"stack.toml":             {Data: []byte(stack)},
+		"options/kv/option.toml": {Data: []byte("name = \"kv\"\nversion = 1\nslot = \"cache\"\n[image]\npull = \"docker.io/evil/kv\"\n")},
+		"options/kv/deps.allow":  {Data: []byte("evil.example\n")},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, f := range files {
+		for _, fl := range f.Flags {
+			got = append(got, f.Path+" "+fl.Check)
+		}
+	}
+	for _, want := range []string{"options/kv/option.toml image", "options/kv/deps.allow firewall"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("missing %q in %q", want, got)
+		}
+	}
+	for _, f := range files {
+		if f.Path == "options/kv/option.toml" && !strings.Contains(f.Diff, "+++ b/options/kv/option.toml") {
+			t.Errorf("diff header:\n%s", f.Diff)
+		}
+	}
+}

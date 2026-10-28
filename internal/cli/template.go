@@ -274,7 +274,7 @@ func templateExport(ctx context.Context, e *env, args []string) int {
 	p.Image.Addons = slices.DeleteFunc(slices.Clone(p.Image.Addons), func(a string) bool {
 		return !slices.Contains(user, strings.TrimPrefix(a, "containerfiles/Containerfile."))
 	})
-	t, dropped, err := template.Export(&p, files, *name, *version)
+	t, dropped, err := template.Export(&p, files, bundledPackages(w.Stack), *name, *version)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -300,12 +300,26 @@ func templateExport(ctx context.Context, e *env, args []string) int {
 	for _, n := range slices.Sorted(maps.Keys(t.Containerfiles)) {
 		fmt.Fprintf(e.stdout, "keeps containerfiles/Containerfile.%s\n", n)
 	}
-	for _, ref := range t.Packages() {
-		if strings.HasPrefix(ref, "local:") {
-			fmt.Fprintf(e.stderr, "warning: the template uses %s, a workspace-local package: a new project needs it in its own packs/, options/ or agents/\n", ref)
-		}
+	for _, r := range slices.SortedFunc(maps.Keys(t.Bundled), func(a, b pack.Ref) int { return strings.Compare(a.String(), b.String()) }) {
+		fmt.Fprintf(e.stdout, "bundles %s (%s/)\n", r, t.Bundled[r].Dir)
 	}
 	return 0
+}
+
+// bundledPackages are st's local pack and options as a template bundles
+// them (D116): the content the project runs, its accepted copy for a
+// locked one (st is a loaded workspace's).
+func bundledPackages(st *pack.Stack) map[pack.Ref]template.Bundle {
+	out := map[pack.Ref]template.Bundle{}
+	if st.PackRef.Local {
+		out[st.PackRef] = template.Bundle{Kind: pack.KindPack, Dir: "packs/" + st.PackRef.Name, Files: st.Pack.Files}
+	}
+	for _, ch := range st.Options {
+		if ch.Ref.Local {
+			out[ch.Ref] = template.Bundle{Kind: pack.KindOption, Dir: "options/" + ch.Ref.Name, Files: ch.Option.Files}
+		}
+	}
+	return out
 }
 
 // localVersion is the version of the template in the store directory dir;

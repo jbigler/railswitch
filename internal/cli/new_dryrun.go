@@ -213,6 +213,9 @@ func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error)
 		if n := len(t.Containerfiles); n > 0 {
 			doc.Steps = slices.Insert(doc.Steps, 3, fmt.Sprintf("Write the template's %d Containerfiles", n))
 		}
+		for _, b := range pl.bundles {
+			doc.Steps = slices.Insert(doc.Steps, 1, fmt.Sprintf("Write the template's bundled package %s/ as this workspace's own", b.Dir))
+		}
 	}
 	if up {
 		doc.Steps = append(doc.Steps, fmt.Sprintf("Start %s (up)", slug))

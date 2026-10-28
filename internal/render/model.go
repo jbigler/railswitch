@@ -194,6 +194,7 @@ type UnitExtras struct {
 	RunInit           bool
 	SuccessExitStatus int
 	TTY               bool
+	Interactive       bool
 	Memory            string
 	PidsLimit         int
 }
@@ -665,7 +666,7 @@ func appHealth(a pack.App, override string) *Health {
 func unitExtras(u pack.Unit, role string, ov config.ServiceOverride) UnitExtras {
 	e := UnitExtras{
 		ShmSize: u.ShmSize, AddCapability: u.AddCapability, RunInit: u.RunInit,
-		SuccessExitStatus: u.SuccessExitStatus, TTY: u.TTY,
+		SuccessExitStatus: u.SuccessExitStatus, TTY: u.TTY, Interactive: u.Interactive,
 		Memory: u.Memory, PidsLimit: u.PidsLimit,
 	}
 	def := roleLimits[role]

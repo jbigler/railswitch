@@ -332,7 +332,7 @@ there is no shared add-on package (user, 2026-10-27).
 | `[[ports]]` | `name`, `env`, `base` (host port `base` + worktree ID), `container` or `same_port`, `share` |
 | `[defaults] <slot> = "<ref>"` | the options `project new` picks |
 | `[tasks]`, `[[links]]` | named commands and worktree links |
-| `[unit]` | `exec`, `memory`, `pids_limit`, `shm_size`, `run_init`, `tty`, `success_exit_status` |
+| `[unit]` | `exec`, `memory`, `pids_limit`, `shm_size`, `run_init`, `tty` (`--tty --interactive`), `interactive` (`--interactive` only: stdin stays open, no tty), `success_exit_status` |
 | `[detect] files` | `project detect` suggests the pack for a repository that has every one of these files (D87); no files: never suggested |
 
 ### `option.toml`

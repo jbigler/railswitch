@@ -473,7 +473,7 @@ func TestAppDependencies(t *testing.T) {
 	}
 	hasLine(t, units, rails, "UserNS=keep-id:uid=1000,gid=1000")
 	hasLine(t, units, rails, "User=1000:1000")
-	hasLine(t, units, rails, "PodmanArgs=--cpus=6")
+	hasLine(t, units, rails, "PodmanArgs=--cpus=6 --interactive") // stdin stays open: tailwindcss:watch
 	hasLine(t, units, "filial-master-nvim.container", "PodmanArgs=--cpus=2 --tty --interactive")
 	hasLine(t, units, "filial-master-nvim.container", "SuccessExitStatus=1")
 	hasLine(t, units, "filial-master-nvim.container", "Volume="+ws+"/.railswitch/home/master:/home/appuser:z")

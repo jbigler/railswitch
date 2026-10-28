@@ -330,6 +330,8 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 	}
 	if ux.TTY {
 		args = append(args, "--tty", "--interactive")
+	} else if ux.Interactive {
+		args = append(args, "--interactive")
 	}
 	if len(args) > 0 {
 		u.add(c, "PodmanArgs", strings.Join(args, " "))

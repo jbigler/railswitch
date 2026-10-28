@@ -203,6 +203,7 @@ type Unit struct {
 	RunInit           bool     `toml:"run_init"`
 	SuccessExitStatus int      `toml:"success_exit_status"` // an extra exit status that counts as a clean stop
 	TTY               bool     `toml:"tty"`                 // run with --tty --interactive
+	Interactive       bool     `toml:"interactive"`         // run with --interactive: stdin stays open, no tty
 	Memory            string   `toml:"memory"`              // D34 default for this service, e.g. "2g"
 	PidsLimit         int      `toml:"pids_limit"`          // D34 default for this service
 }

@@ -105,3 +105,8 @@ url = "{worktree.host}/rails/info/routes"
 
 [detect]                   # D87: railswitch project detect suggests this pack for a repo with every file
 files = ["Gemfile", "config/application.rb"]
+
+[unit]
+# stdin stays open (no tty, so no colour codes in the logs): a Procfile's
+# tailwindcss:watch ends at stdin's EOF, and foreman then stops the app
+interactive = true

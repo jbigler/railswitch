@@ -74,12 +74,14 @@ root, accept)` takes what it may accept: `lock --accept` passes every
 package, `pack file write` only the package it edits (reviewed in the
 editor), every other caller (`settings apply`, `project write`, `agent
 add`, `project new`) none. A package not accepted keeps its current lock
-entry when that entry's content is usable from the store; a ref that is
+entry when that entry's content is usable from the store, and the write
+refuses ("an update is waiting for review") when it isn't; a ref that is
 new to the lock (an option added in Settings) is locked as resolved, and
-stored.
+stored. `lock --accept` passes its hash down, and the lock refuses before
+writing bytes that hash differently.
 
-`status --json` and `overview --json` gain `review_pending: bool` per
-project.
+`overview --json` gains `review_pending: bool` (`status --json` is an array
+of service rows and stays as it is).
 
 ## CLI (D97)
 

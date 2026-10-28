@@ -188,7 +188,10 @@ lint    = "bin/rubocop"   # a project task
 - `railswitch pack new <name>` writes `packs/<name>/` with a `pack.toml`
   listing every field (commented), a `Containerfile.base`, an
   `entrypoints/entrypoint-app.sh` and a `README.md`. Nothing reads it until a
-  ref names it, so it can stay half-written.
+  ref names it, so it can stay half-written. For a new project, whose
+  workspace `project new` has not created yet, `pack new --dir <workspace>
+  <name>` writes `<workspace>/packs/<name>/`; then `railswitch project new
+  <workspace> --pack local:<name>@1 …`.
 - `railswitch pack show <ref>` prints a pack's or option's summary (app,
   runtimes and their sources, ports, pin, gives) and its `README.md`;
   `--json` prints one document (`docs/json.md`). Built-ins need no

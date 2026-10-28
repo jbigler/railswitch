@@ -116,6 +116,23 @@ func TestPackNewThenRender(t *testing.T) {
 	}
 }
 
+// A new project's pack is written before project new creates its
+// workspace, which then reads it as local:<name>@1.
+func TestPackNewDirBeforeProject(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "ws")
+	out := mustRun(t, "pack", "new", "--dir", dir, "web")
+	if !strings.Contains(out, "project new "+dir+" --pack local:web@1") {
+		t.Errorf("stdout %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "packs", "web", "pack.toml")); err != nil {
+		t.Fatal(err)
+	}
+	ws, _ := filialWS(t)
+	if code, _, errs := runIn(t, "pack", "new", "--dir", ws, "web"); code != 2 || !strings.Contains(errs, "already a workspace") {
+		t.Errorf("--dir on a workspace: exit %d, stderr %q", code, errs)
+	}
+}
+
 type packShowDoc struct {
 	Ref      string `json:"ref"`
 	Kind     string `json:"kind"`

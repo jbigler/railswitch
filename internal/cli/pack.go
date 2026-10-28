@@ -146,16 +146,28 @@ func refNames[T any](m map[pack.Ref]T) string {
 // railswitch pack new <name>: a skeleton pack under packs/<name>/.
 func packNew(e *env, args []string) int {
 	fset := e.flags("pack new")
-	name, code, ok := parseNamed(e, fset, args, "usage: railswitch pack new <name>")
+	into := fset.String("dir", "", "a workspace `dir` project new has not created yet")
+	name, code, ok := parseNamed(e, fset, args, "usage: railswitch pack new [--dir <workspace>] <name>")
 	if !ok {
 		return code
 	}
 	if !packNameRe.MatchString(name) {
 		return e.usageErr("pack new: %q must match %s", name, packNameRe)
 	}
-	root, err := workspace.Root(e.dir)
+	// A new project's pack comes before its workspace: project new --pack
+	// local:<name>@1 reads it from <dir>/packs/<name>/.
+	var root string
+	var err error
+	if *into == "" {
+		root, err = workspace.Root(e.dir)
+	} else {
+		root, err = filepath.Abs(*into)
+	}
 	if err != nil {
 		return e.fail(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "project.toml")); *into != "" && err == nil {
+		return e.usageErr("pack new: %s is already a workspace: run railswitch -C %s pack new %s", root, root, name)
 	}
 	dir := filepath.Join(root, "packs", name)
 	if _, err := os.Lstat(dir); err == nil {
@@ -177,6 +189,10 @@ func packNew(e *env, args []string) int {
 		if err := writePackageFile(filepath.Join(dir, filepath.FromSlash(f.rel)), []byte(f.data), f.mode); err != nil {
 			return e.fail(errors.Join(err, os.RemoveAll(dir)))
 		}
+	}
+	if *into != "" {
+		fmt.Fprintf(e.stdout, "wrote %s: fill in pack.toml (see docs/packs.md), then railswitch project new %s --pack local:%s@1 --repo <url> --prefix <prefix>\n", dir, root, name)
+		return 0
 	}
 	fmt.Fprintf(e.stdout, "wrote packs/%s/: fill in pack.toml (see docs/packs.md), then use it with [stack] pack = \"local:%s@1\"\n", name, name)
 	return 0

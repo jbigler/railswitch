@@ -67,6 +67,7 @@ var completionFlags = map[string][]string{
 	"logs":                   {"-f"},
 	"nvim reset-config":      {"--yes"},
 	"pack eject":             {"--as="},
+	"pack new":               {"--dir="},
 	"project rm":             {"--purge", "--yes"},
 	"project new":            {"--agent=", "--branch=", "--name=", "--option=", "--pack=", "--prefix=", "--repo=", "--tool="},
 	"render":                 {"--check"},

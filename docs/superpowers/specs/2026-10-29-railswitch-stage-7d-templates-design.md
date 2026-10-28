@@ -139,6 +139,15 @@ Nothing is applied: the user edits Settings or the Images page. `overview
 - Export in a project with a stale lock or a pending review: refused (a
   template is made from what was accepted).
 
+## Checks on a template (review)
+
+A library template is reviewed like a package (7a's checks, D98): its
+Containerfiles by line, and its `stack.toml` by value path: changes under
+`firewall.*`, an agent's `allow`, `tools.nvim.config_repo` (firewall), a
+`[[secret]]`'s fields (privilege: who receives it, its scope and git
+host) and `[[routes]]` (port) are flagged. Tasks, health checks and env run
+in the project's firewalled containers and are shown as diffs.
+
 ## Known limits
 
 - The machine store keeps one version per name, the latest export: a

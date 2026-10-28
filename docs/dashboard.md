@@ -472,8 +472,8 @@ until you press Create project.
 - **Tools and agents:** Neovim, and one box per agent package `pack ls`
   lists; the package with `default = true` starts ticked. With no box
   ticked the project gets no agent (`--agent none`); from a template it
-  gets the template's (no `--agent` flag), and a ticked box is added on
-  top.
+  gets the template's (no `--agent` flag); a ticked tool is added to the
+  template's, and ticked agents replace its agents (`--agent` replaces).
 - A slot changed away from what the repository suggests adds a warning:
   "<Slot>: you picked <X>, but the repository suggests <Y>."
 - **Next: review** runs the dry run (step 2). It is off until a pack or

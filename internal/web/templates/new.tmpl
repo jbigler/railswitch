@@ -81,7 +81,7 @@ question, prefilled with its default. */}}
 <span class="hint">Default <span class="mono">{{.Default}}</span></span></label>
 {{else}}<p class="muted">This template asks nothing.</p>
 {{end}}{{with .Doc.Containerfiles}}<p class="note">Its Containerfiles replace the packages' defaults: <span class="mono">{{range $i, $c := .}}{{if $i}}, {{end}}{{$c}}{{end}}</span>.</p>
-{{end}}<p class="note">Next: review shows the project.toml these answers give. Tools and agents ticked below are added to the template's.</p>
+{{end}}<p class="note">Next: review shows the project.toml these answers give. A tool ticked below is added to the template's; agents ticked below replace the template's agents (leave them unticked to keep its own).</p>
 </section>{{end}}
 
 {{define "newreview"}}<section id="new-review" class="card review">

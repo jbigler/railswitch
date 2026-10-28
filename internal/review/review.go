@@ -97,9 +97,12 @@ func Compare(kind string, old, new fs.FS) ([]File, error) {
 			if !isText(x) || !isText(y) {
 				f.Flags = append(f.Flags, Flag{Check: CheckRunsHere, Text: p + `: not text (a NUL or invalid UTF-8 byte, shown as \xNN)`})
 			}
-			if p == manifest {
+			switch {
+			case kind == "template" && p == templateManifest:
+				f.Flags = append(f.Flags, templateFlags(x, y)...)
+			case p == manifest:
 				f.Flags = append(f.Flags, manifestFlags(before, after)...)
-			} else {
+			default:
 				f.Flags = append(f.Flags, lineFlags(p, xs, ys)...)
 			}
 			f.Flags = append(f.Flags, scriptFlags(p, caps)...)

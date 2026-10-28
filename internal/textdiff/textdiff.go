@@ -1,4 +1,6 @@
-package settings
+// Package textdiff is the line diff of two texts: a unified diff to show,
+// and which lines a change adds.
+package textdiff
 
 import (
 	"fmt"
@@ -12,31 +14,13 @@ type diffOp struct {
 	line string
 }
 
-// UnifiedDiff is the unified diff from a (file aName) to b (bName), "" when
-// they are equal. Common leading and trailing lines are trimmed before the
-// LCS, so an edit of a few lines costs little however long the file.
-func UnifiedDiff(aName, bName, a, b string) string {
+// Unified is the unified diff from a (file aName) to b (bName), with 3
+// lines of context; "" when they are equal.
+func Unified(aName, bName, a, b string) string {
 	if a == b {
 		return ""
 	}
-	x, y := splitLines(a), splitLines(b)
-	pre := 0
-	for pre < len(x) && pre < len(y) && x[pre] == y[pre] {
-		pre++
-	}
-	suf := 0
-	for suf < len(x)-pre && suf < len(y)-pre && x[len(x)-1-suf] == y[len(y)-1-suf] {
-		suf++
-	}
-	var ops []diffOp
-	for _, l := range x[:pre] {
-		ops = append(ops, diffOp{' ', l})
-	}
-	ops = append(ops, lcsOps(x[pre:len(x)-suf], y[pre:len(y)-suf])...)
-	for _, l := range x[len(x)-suf:] {
-		ops = append(ops, diffOp{' ', l})
-	}
-
+	ops := lineOps(a, b)
 	var out strings.Builder
 	out.WriteString("--- " + aName + "\n+++ " + bName + "\n")
 	aLine, bLine := 1, 1 // line numbers of ops[i]
@@ -82,6 +66,46 @@ func UnifiedDiff(aName, bName, a, b string) string {
 		i = end
 	}
 	return out.String()
+}
+
+// Added is the 1-based numbers of b's lines that the diff from a to b adds.
+func Added(a, b string) []int {
+	var out []int
+	n := 0
+	for _, op := range lineOps(a, b) {
+		if op.kind == '-' {
+			continue
+		}
+		n++
+		if op.kind == '+' {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// lineOps turns a into b line by line. Common leading and trailing lines
+// are trimmed before the LCS, so an edit of a few lines costs little
+// however long the file.
+func lineOps(a, b string) []diffOp {
+	x, y := splitLines(a), splitLines(b)
+	pre := 0
+	for pre < len(x) && pre < len(y) && x[pre] == y[pre] {
+		pre++
+	}
+	suf := 0
+	for suf < len(x)-pre && suf < len(y)-pre && x[len(x)-1-suf] == y[len(y)-1-suf] {
+		suf++
+	}
+	var ops []diffOp
+	for _, l := range x[:pre] {
+		ops = append(ops, diffOp{' ', l})
+	}
+	ops = append(ops, lcsOps(x[pre:len(x)-suf], y[pre:len(y)-suf])...)
+	for _, l := range x[len(x)-suf:] {
+		ops = append(ops, diffOp{' ', l})
+	}
+	return ops
 }
 
 func hunkRange(start, n int) string {

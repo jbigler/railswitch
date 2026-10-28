@@ -22,7 +22,7 @@ import (
 	builtinfs "github.com/jbigler/railswitch/internal/pack/builtin"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
-	"github.com/jbigler/railswitch/internal/settings"
+	"github.com/jbigler/railswitch/internal/textdiff"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -411,7 +411,7 @@ func cfShowJSON(root, name string) (*cfShowDoc, error) {
 		doc.Kind = kindNames[b.kind]
 		doc.Default = &cfDefault{Ref: b.ref, Text: string(def)}
 		doc.DefaultChanged = doc.Ejected != nil && fmt.Sprintf("%x", sha256.Sum256(def)) != doc.Ejected.SHA256
-		doc.Diff = settings.UnifiedDiff("default", rel, string(def), body)
+		doc.Diff = textdiff.Unified("default", rel, string(def), body)
 	}
 	return doc, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/textdiff"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -72,7 +73,7 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 		p.Edits = append(p.Edits, r)
 	}
 	p.NewText = text
-	p.Diff = UnifiedDiff("project.toml", "project.toml", string(data), text)
+	p.Diff = textdiff.Unified("project.toml", "project.toml", string(data), text)
 	p.Restart = e.restart(cur, prev)
 	return p, nil
 }

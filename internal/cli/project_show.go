@@ -24,6 +24,7 @@ type projectDoc struct {
 	Repo       string      `json:"repo"`
 	BaseBranch string      `json:"base_branch"`
 	Hash       string      `json:"hash"`
+	File       string      `json:"file"` // the raw editor's text
 	Options    []optionRow `json:"options"`
 	Env        []envPair   `json:"env"`
 	Links      []linkRow   `json:"links"`
@@ -107,7 +108,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	p, st := w.Project, w.Stack
 	d := projectDoc{
 		Prefix: p.Project.Prefix, Name: p.Project.Name, Repo: p.Project.Repo, BaseBranch: p.Project.BaseBranch,
-		Hash: workspace.Hash(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
+		Hash: workspace.Hash(data), File: string(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
 	}
 	opts := optionRefs(w.Catalog, w.Root)
 	for _, key := range pack.OptionKeys(p.Options) {

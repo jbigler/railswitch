@@ -348,7 +348,7 @@ What the settings page reads: the project's choices, env and links.
 {
   "prefix": "filial", "name": "Filial Rails",
   "repo": "git@github.com:[ORG]/[REPO].git", "base_branch": "master",
-  "hash": "sha256:5cc7…",
+  "hash": "sha256:5cc7…", "file": "schema = 1\n…",
   "options": [
     {"key": "database", "slot": true, "ref": "postgres@1", "choices": ["postgres@1", "local:mariadb@1", "none"]},
     {"key": "jobs", "slot": true, "ref": "none", "choices": ["sidekiq@1", "none"]}
@@ -366,6 +366,7 @@ What the settings page reads: the project's choices, env and links.
 |---|---|---|
 | `prefix`, `name`, `repo`, `base_branch` | string | The `[project]` table. |
 | `hash` | string | As `settings preview`. |
+| `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
 | `options[].slot` | bool | The key is a slot (otherwise an extra service, D81). |
 | `options[].choices` | string[] | For a slot, the built-in options of that slot (newest version per name) then the workspace's `options/<name>/` ones as `local:<name>@N`; for an extra key every option; always ending in `none`. The current ref is always among them. |

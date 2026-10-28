@@ -197,9 +197,9 @@ func TestSettingsApplyRestart(t *testing.T) {
 }
 
 type projectShowDoc struct {
-	Prefix, Name, Repo, Hash string
-	BaseBranch               string `json:"base_branch"`
-	Options                  []struct {
+	Prefix, Name, Repo, Hash, File string
+	BaseBranch                     string `json:"base_branch"`
+	Options                        []struct {
 		Key     string
 		Slot    bool
 		Ref     string
@@ -235,7 +235,7 @@ service = "db"
 	if err := json.Unmarshal([]byte(out), &d); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
-	if d.Prefix != "filial" || d.BaseBranch != "master" || d.Hash != workspace.Hash([]byte(readFile(t, p))) {
+	if d.Prefix != "filial" || d.BaseBranch != "master" || d.Hash != workspace.Hash([]byte(readFile(t, p))) || d.File != readFile(t, p) {
 		t.Errorf("doc %+v", d)
 	}
 	if len(d.Options) < 6 || d.Options[0].Key != "database" || !d.Options[0].Slot || d.Options[0].Ref != "postgres@1" {

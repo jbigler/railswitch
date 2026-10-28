@@ -156,7 +156,7 @@ func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
 		}
 		p := reviewPkg{Ref: c.Ref.String(), Kind: c.Kind, Status: c.Status, From: c.From, To: c.To, AlsoLockedIn: []string{}, Files: files, library: c.Ref.Library != ""}
 		for _, o := range others {
-			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && workspace.Pins(e, c.Ref) {
+			if e, ok := lockTable(o.lock, c.Kind)[lockKey(c.Kind, c.Ref)]; ok && c.To != "" && e.SHA256 == c.To && workspace.Pins(e, c.Ref, pl.Next.Catalog.Libraries) {
 				p.AlsoLockedIn = append(p.AlsoLockedIn, o.prefix)
 			}
 		}

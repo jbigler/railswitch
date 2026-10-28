@@ -362,7 +362,16 @@ or revoke a key (docs/dashboard.md).
 A fetched library's packages are refs `<alias>:<name>@<N>`, in every place
 a ref goes (`[stack] pack`, `[options]`, `[agents.<n>] use`): see
 docs/packs.md (Library packages). A library package is never locked
-without being reviewed, even the first time (D106):
+without being reviewed, even the first time (D106).
+
+A `stack.lock` entry records the library a package came from by its id
+(`source = "library <id>"`), not by its alias. The entry pins a ref only
+when the ref's alias names that library on this machine: an entry for
+`acme:redis@1` never pins `evil:redis@1`, nor `acme:redis@1` once the
+alias `acme` names another library. A library ref the lock's tables don't
+pin is new to the lock, even when `[[removed]]` remembers it: installing
+it again is an Install review, and accepting it verifies its library
+again.
 
 - `railswitch lock --review` lists a library ref new to `stack.lock` as
   `added`, every file shown and flagged (compared against nothing). Plain
@@ -379,6 +388,11 @@ without being reviewed, even the first time (D106):
   library's checkout again against today's `signers.toml`, one
   `ssh-keygen` call: a signer distrusted or revoked since the fetch can't
   install or update ("the signer of acme is no longer trusted").
+
+`containerfile eject`, `containerfile new` and `containerfile show`'s
+default refuse while the project names a library ref the lock doesn't pin
+("acme:postgres@1 is not installed: review it first"): nothing copies an
+unreviewed library file into your workspace.
 
 A later fetch that changes a locked package's content leaves the project
 running the accepted copy from the store, with the update waiting in

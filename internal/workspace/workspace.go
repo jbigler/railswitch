@@ -297,9 +297,23 @@ func table(l *config.Lock, kind string) map[string]config.LockEntry {
 }
 
 // Pins reports whether e locks ref r: its version and where it comes from
-// (built in, local or a library).
-func Pins(e config.LockEntry, r pack.Ref) bool {
-	return e.Version == refVersion(r) && sourceKind(e.Source) == refKind(r)
+// (built in, local or a library). A library entry pins a library ref only
+// when its library (by id) is the one r's alias names on this machine
+// (libs): acme's redis@1 never pins evil:redis@1, nor acme:redis@1 once
+// the alias acme names another library.
+func Pins(e config.LockEntry, r pack.Ref, libs pack.Libraries) bool {
+	if e.Version != refVersion(r) || sourceKind(e.Source) != refKind(r) {
+		return false
+	}
+	id, ok := LibraryID(e)
+	return !ok || id != "" && libs != nil && libs.Alias(id) == r.Library
+}
+
+// sameSource reports whether two lock sources name the same place: the
+// same kind, and for library packages the same library. The built-in
+// source text, which carries the railswitch version, is not compared.
+func sameSource(a, b string) bool {
+	return sourceKind(a) == sourceKind(b) && (sourceKind(a) != fromLibrary || a == b)
 }
 
 // localSource is a workspace-local package's lock source; librarySource
@@ -374,7 +388,7 @@ func (w *Workspace) CheckLock() error {
 			if !ok && len(adopt) > 0 {
 				continue
 			}
-			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || sourceKind(h.Source) != sourceKind(x.Source) {
+			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || !sameSource(h.Source, x.Source) {
 				stale = append(stale, label(name, x))
 			}
 		}

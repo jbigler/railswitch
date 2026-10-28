@@ -256,4 +256,32 @@ func TestSignerWarnings(t *testing.T) {
 	}
 }
 
+// A signer warning names the library the lock entry came from, and only
+// for the ref that entry pins: acme's redis@1 entry says nothing of
+// evil:redis@1.
+func TestSignerWarningsOtherLibrary(t *testing.T) {
+	ctx := context.Background()
+	root, lib := installRedis(t)
+	if err := Lock(ctx, root, Accept{All: true, Run: sys.Exec{}}); err != nil {
+		t.Fatal(err)
+	}
+	testfixture.Library(t, lib.Dirs, "evil", "example.org/evil/stack-library", "options/redis")
+	setOption(t, root, "cache", "evil:redis@1")
+	lib.Distrust(t)
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, err := signing.LoadTrust(filepath.Join(lib.Dirs.Config, signing.TrustFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := w.SignerWarnings(tr); len(got) != 0 {
+		t.Fatalf("SignerWarnings = %+v, want none", got)
+	}
+	if err := w.CheckLock(); err == nil {
+		t.Fatal("CheckLock accepts acme's entry for evil:redis@1")
+	}
+}
+
 func fsStat(fsys fs.FS, name string) (fs.FileInfo, error) { return fs.Stat(fsys, name) }

@@ -80,6 +80,15 @@ check accepts it.
 - `stack.lock` entries for library packages: `source = "library <id>"`,
   `commit = <fetched commit>`, plus `signer = "<fingerprint>"` (new field,
   library entries only).
+- Packs and options are keyed by name in `stack.lock`, so an entry pins a
+  library ref only when the entry's library id is the id of the library
+  the ref's alias names on this machine (`workspace.Pins`, through
+  `pack.Libraries.Alias`): `acme:redis@1`'s entry never pins
+  `evil:redis@1`, nor `acme:redis@1` after the alias is removed and added
+  for another library. `CheckLock` and `[[removed]]` compare a library
+  entry's whole source (its id) too. A stored accepted copy run in place
+  of a library package carries its lock entry's library, commit and
+  signer.
 - 7a applies unchanged: a library package runs what its lock entry pins,
   from the store; a fetch that changes a package's content leaves the
   project running the accepted copy with `review_pending`.
@@ -89,6 +98,10 @@ check accepts it.
 A library package's content is never locked without being reviewed, even
 the first time:
 
+- A library ref is new to the lock when the lock's tables don't pin it,
+  even when `[[removed]]` remembers it: one coming back is installed
+  again (an Install review, accepted by name or by `lock --accept`, and
+  re-verified), since the trust it was accepted under may be gone.
 - `lock --review` lists a library ref new to the lock as `added`, every
   file shown and flagged (compared against nothing), as an Install review.
 - Writes that don't accept (`settings apply`, `project write`, `agent add`,
@@ -106,6 +119,11 @@ the first time:
   a library whose key was distrusted or revoked since the fetch can't be
   installed or updated ("the signer of acme is no longer trusted").
 - Built-in and local refs are unaffected (7a's rules).
+- `containerfile eject`, `new` and `show`'s default refuse while the
+  project names a library ref the lock doesn't pin ("acme:postgres@1 is
+  not installed: review it first (railswitch settings preview, or
+  railswitch lock --review)"), so an unreviewed library Containerfile is
+  never copied into the workspace (`workspace.CheckInstalled`).
 
 ## Tools and the agent base in the lock (D107)
 

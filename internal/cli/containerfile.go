@@ -206,6 +206,9 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if err := workspace.CheckInstalled(root, p, cat.Libraries); err != nil {
+		return nil, nil, nil, err
+	}
 	if cat, err = workspace.Accepted(root, p, cat); err != nil {
 		return nil, nil, nil, err
 	}

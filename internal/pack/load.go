@@ -254,8 +254,9 @@ const AgentBaseFile = "Containerfile.agent-base"
 // WithPackage is a copy of c with files, loaded and checked as the package
 // of kind at r, in place of the one r names: a built-in's, a local or a
 // library package's accepted content (D97); for KindTool the tool r.Name,
-// for KindBase the agent base image.
-func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS) (*Catalog, error) {
+// for KindBase the agent base image. origin, set for a library package,
+// is the library it was accepted from (stack.lock's entry).
+func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS, origin *LibraryOrigin) (*Catalog, error) {
 	top := kindDirs[kind]
 	if top == "" {
 		return nil, fmt.Errorf("%s: unknown package kind %q", r, kind)
@@ -283,11 +284,23 @@ func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS) (*Catalog, error)
 	n := &Catalog{Packs: maps.Clone(c.Packs), Options: maps.Clone(c.Options), Tools: maps.Clone(c.Tools), Agents: maps.Clone(c.Agents), AgentBase: c.AgentBase, Root: c.Root, Libraries: c.Libraries, overlay: c.overlay}
 	switch kind {
 	case KindPack:
-		n.Packs[r], err = l.pack(dir, r)
+		var p *Pack
+		if p, err = l.pack(dir, r); err == nil {
+			p.Origin = origin
+		}
+		n.Packs[r] = p
 	case KindOption:
-		n.Options[r], err = l.option(dir, r)
+		var o *Option
+		if o, err = l.option(dir, r); err == nil {
+			o.Origin = origin
+		}
+		n.Options[r] = o
 	case KindAgent:
-		n.Agents[r], err = l.agent(dir, r)
+		var a *Agent
+		if a, err = l.agent(dir, r); err == nil {
+			a.Origin = origin
+		}
+		n.Agents[r] = a
 	case KindTool:
 		var t *Tool
 		if t, err = l.tool(dir); err == nil && t.Name != r.Name {

@@ -241,3 +241,117 @@ func TestLibraryPackagesOffered(t *testing.T) {
 		t.Error("a package whose files no longer hash to the index is listed")
 	}
 }
+
+const evilID = "example.org/evil/stack-library"
+
+// previewEdits is settings preview of edits in ws.
+func previewEdits(t *testing.T, ws, edits string) installPreview {
+	t.Helper()
+	code, out, errs := runStdin(t, installFake(), edits, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("preview: exit %d: %s", code, errs)
+	}
+	var p installPreview
+	if err := json.Unmarshal([]byte(out), &p); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	return p
+}
+
+// installedAcme is acmeWS with acme:redis@1 installed through its Install
+// review.
+func installedAcme(t *testing.T) (string, machine.Dirs, *testfixture.Lib) {
+	t.Helper()
+	ws, dirs, lib := acmeWS(t)
+	p := previewAcme(t, ws)
+	if code, _, errs := runStdin(t, installFake(), cacheAcme, "-C", ws, "settings", "apply", "--if-hash", p.Hash, "--accept-install", p.Install.Hash); code != 0 {
+		t.Fatalf("install acme:redis@1: exit %d: %s", code, errs)
+	}
+	return ws, dirs, lib
+}
+
+// installsOnly fails unless p's Install review adds exactly ref.
+func installsOnly(t *testing.T, p installPreview, ref string) {
+	t.Helper()
+	if in := p.Install; in == nil || len(in.Packages) != 1 || in.Packages[0].Ref != ref || in.Packages[0].Status != "added" {
+		t.Fatalf("install = %+v, want %s added", p.Install, ref)
+	}
+}
+
+// A lock entry of acme's redis@1 doesn't pin another library's redis@1:
+// installing it is an Install review of its own, refused unaccepted.
+func TestInstallOtherLibrarySameName(t *testing.T) {
+	ws, dirs, _ := installedAcme(t)
+	evil := testfixture.Library(t, dirs, "evil", evilID, "options/redis")
+	testfixture.WriteFile(t, filepath.Join(evil.Dir(), "options", "redis", "NOTES.md"), "not acme's\n")
+	evil.Publish(t)
+	toml, lock := readFile(t, filepath.Join(ws, "project.toml")), readFile(t, filepath.Join(ws, "stack.lock"))
+	const cacheEvil = `[{"op":"option","key":"cache","ref":"evil:redis@1"}]`
+	p := previewEdits(t, ws, cacheEvil)
+	installsOnly(t, p, "evil:redis@1")
+	code, _, errs := runStdin(t, installFake(), cacheEvil, "-C", ws, "settings", "apply", "--if-hash", p.Hash)
+	if code != 1 || !strings.Contains(errs, "installing evil:redis@1 needs review") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	unchanged(t, ws, toml, lock)
+}
+
+// An alias that names another library now (removed and added again) pins
+// nothing its old library's entries locked.
+func TestInstallAliasReAdded(t *testing.T) {
+	ws, dirs, _ := installedAcme(t)
+	if err := libraries.Remove(dirs, "acme"); err != nil {
+		t.Fatal(err)
+	}
+	testfixture.Library(t, dirs, "acme", evilID, "options/redis")
+	lock := readFile(t, filepath.Join(ws, "stack.lock"))
+	code, out, errs := runStdin(t, installFake(), "", "-C", ws, "lock")
+	if code != 1 || !strings.Contains(out, "added option acme:redis@1") {
+		t.Fatalf("exit %d\n%s\n%s", code, out, errs)
+	}
+	if readFile(t, filepath.Join(ws, "stack.lock")) != lock {
+		t.Error("stack.lock changed")
+	}
+}
+
+// A library ref back from [[removed]] is installed again: reviewed, and
+// its library verified against today's trust.
+func TestInstallBackFromRemoved(t *testing.T) {
+	ws, _, lib := installedAcme(t)
+	if code, _, errs := runStdin(t, installFake(), cacheNone, "-C", ws, "settings", "apply", "--if-hash", previewEdits(t, ws, cacheNone).Hash); code != 0 {
+		t.Fatalf("cache=none: exit %d: %s", code, errs)
+	}
+	lib.Distrust(t)
+	toml, lock := readFile(t, filepath.Join(ws, "project.toml")), readFile(t, filepath.Join(ws, "stack.lock"))
+	p := previewAcme(t, ws)
+	installsOnly(t, p, "acme:redis@1")
+	code, _, errs := runStdin(t, installFake(), cacheAcme, "-C", ws, "settings", "apply", "--if-hash", p.Hash)
+	if code != 1 || !strings.Contains(errs, "installing acme:redis@1 needs review") {
+		t.Fatalf("without --accept-install: exit %d: %s", code, errs)
+	}
+	unchanged(t, ws, toml, lock)
+	code, _, errs = runStdin(t, installFake(), cacheAcme, "-C", ws, "settings", "apply", "--if-hash", p.Hash, "--accept-install", p.Install.Hash)
+	if code != 1 || !strings.Contains(errs, "no longer trusted") {
+		t.Fatalf("distrusted: exit %d: %s", code, errs)
+	}
+	unchanged(t, ws, toml, lock)
+}
+
+// Nothing copies an uninstalled library package's Containerfile out.
+func TestContainerfileUninstalledLibrary(t *testing.T) {
+	ws, dirs := lockedWS(t)
+	testfixture.Library(t, dirs, "acme", acmeID, "options/postgres")
+	path := filepath.Join(ws, "project.toml")
+	writeFile(t, path, strings.Replace(readFile(t, path), `database = "postgres@1"`, `database = "acme:postgres@1"`, 1))
+	cf := filepath.Join(ws, "containerfiles", "Containerfile.pg-client")
+	before := readFile(t, cf)
+	for _, args := range [][]string{{"containerfile", "eject", "--force", "pg-client"}, {"containerfile", "show", "--default", "pg-client"}, {"--json", "containerfile", "show", "pg-client"}, {"containerfile", "new", "extra"}} {
+		code, out, errs := run(t, append([]string{"-C", ws}, args...)...)
+		if code != 1 || !strings.Contains(errs, "acme:postgres@1 is not installed") {
+			t.Errorf("%v: exit %d\n%s\n%s", args, code, out, errs)
+		}
+	}
+	if readFile(t, cf) != before || exists(filepath.Join(ws, "containerfiles", "Containerfile.extra")) {
+		t.Error("containerfile wrote a file")
+	}
+}

@@ -86,7 +86,7 @@ func (w *Workspace) SignerWarnings(t *signing.Trust) []SignerWarning {
 			continue
 		}
 		seen[x.ref] = true
-		e, ok := lockedEntry(w.Lock, x.kind, x.key, x.ref)
+		e, ok := lockedEntry(w.Lock, x.kind, x.key, x.ref, w.Catalog.Libraries)
 		if !ok {
 			continue
 		}

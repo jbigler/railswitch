@@ -35,7 +35,7 @@ func store(d machine.Dirs) lockstore.Store { return lockstore.Store{Dir: locksto
 func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lockstore.Store, keep []pack.Ref) (*pack.Catalog, []pack.Ref) {
 	var pending []pack.Ref
 	for _, x := range projectPackages(p) {
-		e, ok := lockedEntry(lock, x.kind, x.key, x.ref)
+		e, ok := lockedEntry(lock, x.kind, x.key, x.ref, cat.Libraries)
 		if slices.Contains(keep, x.ref) || slices.Contains(pending, x.ref) || !ok {
 			continue
 		}
@@ -50,7 +50,7 @@ func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lock
 				continue
 			}
 		}
-		next, err := accepted(cat, s, x.kind, x.ref, e.SHA256)
+		next, err := accepted(cat, s, x.kind, x.ref, e)
 		if err != nil {
 			continue
 		}
@@ -81,13 +81,18 @@ func Accepted(root string, p *config.Project, cat *pack.Catalog) (*pack.Catalog,
 	return cat, nil
 }
 
-// accepted is cat with the store's copy sha as the package of kind at r.
-func accepted(cat *pack.Catalog, s lockstore.Store, kind string, r pack.Ref, sha string) (*pack.Catalog, error) {
-	files, err := s.Get(sha)
+// accepted is cat with the store's copy of what e pins as the package of
+// kind at r, from e's library when it has one.
+func accepted(cat *pack.Catalog, s lockstore.Store, kind string, r pack.Ref, e config.LockEntry) (*pack.Catalog, error) {
+	files, err := s.Get(e.SHA256)
 	if err != nil {
 		return nil, err
 	}
-	return cat.WithPackage(kind, r, files)
+	var origin *pack.LibraryOrigin
+	if id, ok := LibraryID(e); ok {
+		origin = &pack.LibraryOrigin{ID: id, Commit: e.Commit, Signer: e.Signer}
+	}
+	return cat.WithPackage(kind, r, files, origin)
 }
 
 // projectPackages are the packages p's project.toml names, as stack.lock
@@ -170,10 +175,10 @@ type Accept struct {
 	Run sys.Runner
 }
 
-// accepts reports whether a accepts sp's content: new to the lock (had
-// false) or changed under the ref it pins.
-func (a Accept) accepts(sp stackPkg, had bool) bool {
-	return a.All || !had && slices.Contains(a.Install, sp.ref)
+// accepts reports whether a accepts sp's content: installed (install,
+// see installs) or changed under the ref the lock pins.
+func (a Accept) accepts(sp stackPkg, install bool) bool {
+	return a.All || install && slices.Contains(a.Install, sp.ref)
 }
 
 // FileEdit is one file of the package of Kind at Ref, by its
@@ -317,13 +322,14 @@ func plan(root string, p *config.Project, cat *pack.Catalog, accept Accept) (*lo
 		if err != nil {
 			return nil, err
 		}
-		o, had := lockedAt(old, sp)
+		o, had := lockedAt(old, sp, cat.Libraries)
+		install := installs(old, sp, cat.Libraries)
 		switch {
-		case !had && sp.ref.Library != "" && !accept.accepts(sp, had):
+		case install && !accept.accepts(sp, true):
 			// A library package is never locked unseen, even the first
 			// time (D106).
 			return nil, fmt.Errorf("installing %s needs review: %s", sp.ref, installHint)
-		case had && o.SHA256 != e.SHA256 && !accept.accepts(sp, had):
+		case had && !install && o.SHA256 != e.SHA256 && !accept.accepts(sp, false):
 			if accept.Edit != nil && accept.Edit.Kind == sp.kind && accept.Edit.Ref == sp.ref {
 				if err := onlyEdited(pl.store, o.SHA256, e.SHA256, sp.files, *accept.Edit); err != nil {
 					return nil, err
@@ -332,12 +338,12 @@ func plan(root string, p *config.Project, cat *pack.Catalog, accept Accept) (*lo
 			}
 			// The accepted copy keeps the project running; without one,
 			// locking the update would accept it unseen.
-			if _, err := accepted(cat, pl.store, sp.kind, sp.ref, o.SHA256); err != nil {
+			if _, err := accepted(cat, pl.store, sp.kind, sp.ref, o); err != nil {
 				return nil, fmt.Errorf("%s %s: %s", sp.kind, sp.ref, reviewHint)
 			}
 			table(&l, sp.kind)[sp.key] = o
 			continue
-		case sp.ref.Library != "" && (!had || o.SHA256 != e.SHA256):
+		case install || sp.ref.Library != "" && o.SHA256 != e.SHA256:
 			pl.verify = append(pl.verify, sp)
 		}
 		table(&l, sp.kind)[sp.key] = e
@@ -400,20 +406,52 @@ func (pl *lockPlan) reverify(ctx context.Context, run sys.Runner) error {
 
 // lockedAt is what old accepted for sp's ref: its table's entry, or the
 // entry a write dropped (Removed) when the ref left the lock since.
-func lockedAt(old *config.Lock, sp stackPkg) (config.LockEntry, bool) {
-	return lockedEntry(old, sp.kind, sp.key, sp.ref)
+func lockedAt(old *config.Lock, sp stackPkg, libs pack.Libraries) (config.LockEntry, bool) {
+	return lockedEntry(old, sp.kind, sp.key, sp.ref, libs)
+}
+
+// installs reports whether locking sp installs it (D106): a library
+// package old's tables don't pin, new to the lock or back from Removed.
+// An install is accepted only by name (Accept.Install) or by All, and its
+// library is verified again: the trust its Removed entry was accepted
+// under may be gone.
+func installs(old *config.Lock, sp stackPkg, libs pack.Libraries) bool {
+	if sp.ref.Library == "" {
+		return false
+	}
+	e, ok := table(old, sp.kind)[sp.key]
+	return !ok || !Pins(e, sp.ref, libs)
+}
+
+// CheckInstalled refuses a library package of p that root's stack.lock
+// doesn't pin in its tables (installs; no stack.lock: every one): its
+// content was never reviewed, so nothing copies it out to the user's files
+// (an eject).
+func CheckInstalled(root string, p *config.Project, libs pack.Libraries) error {
+	lock, err := config.ReadLock(filepath.Join(root, lockFile))
+	if errors.Is(err, config.ErrNoLock) {
+		lock = &config.Lock{}
+	} else if err != nil {
+		return err
+	}
+	for _, x := range projectPackages(p) {
+		if installs(lock, x, libs) {
+			return fmt.Errorf("%s is not installed: review it first (railswitch settings preview, or railswitch lock --review)", x.ref)
+		}
+	}
+	return nil
 }
 
 // lockedEntry is what lock accepted for ref r of kind under key: its
 // table's entry, or the entry a write dropped (Removed). Load, ejects and
 // Lock all ask it, so a ref back from Removed runs and ejects its accepted
 // copy, as Lock keeps it.
-func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref) (config.LockEntry, bool) {
-	if o, ok := table(lock, kind)[key]; ok && Pins(o, r) {
+func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref, libs pack.Libraries) (config.LockEntry, bool) {
+	if o, ok := table(lock, kind)[key]; ok && Pins(o, r, libs) {
 		return o, true
 	}
 	for _, rm := range lock.Removed {
-		if rm.Kind == kind && rm.Key == key && Pins(rm.Entry(), r) {
+		if rm.Kind == kind && rm.Key == key && Pins(rm.Entry(), r, libs) {
 			return rm.Entry(), true
 		}
 	}
@@ -425,7 +463,7 @@ func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref) (config.LockEn
 // none that l pins again, at most config.MaxRemoved.
 func dropped(old, l *config.Lock) []config.LockRemoved {
 	same := func(a, b config.LockRemoved) bool {
-		return a.Kind == b.Kind && a.Key == b.Key && a.Version == b.Version && sourceKind(a.Source) == sourceKind(b.Source)
+		return a.Kind == b.Kind && a.Key == b.Key && a.Version == b.Version && sameSource(a.Source, b.Source)
 	}
 	var out []config.LockRemoved
 	add := func(r config.LockRemoved) {
@@ -514,12 +552,12 @@ func Review(_ context.Context, root string) (*Plan, error) {
 			return nil, err
 		}
 		o, ok := table(old, sp.kind)[sp.key]
-		inTable := ok && Pins(o, sp.ref)
+		inTable := ok && Pins(o, sp.ref, pl.cat.Libraries)
 		if ok && !inTable {
 			removed(sp.kind, sp.key, o)
 		}
 		// A ref back in the lock is reviewed against what it last accepted.
-		prev, had := lockedAt(old, sp)
+		prev, had := lockedAt(old, sp, pl.cat.Libraries)
 		switch {
 		case inTable && prev.SHA256 == e.SHA256:
 		case !had && (sp.kind == pack.KindTool || sp.kind == pack.KindBase):
@@ -565,7 +603,7 @@ func Install(_ context.Context, root string, p *config.Project, cat *pack.Catalo
 	var refs []pack.Ref
 	var changes []Change
 	for _, sp := range stackPackages(pl.st) {
-		if _, had := lockedAt(old, sp); had || sp.ref.Library == "" {
+		if !installs(old, sp, pl.cat.Libraries) {
 			continue
 		}
 		e, err := sp.entry()

@@ -1,0 +1,104 @@
+{{define "settings"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="settings" data-preview="{{.PreviewURL}}">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Settings</h1>
+<p class="note">Changes are staged, not applied. The panel on the right shows what each one does to data and to running worktrees before anything happens.</p>
+{{if .Error}}<p class="red set-error">project.toml: {{.Error}}</p>
+<p><a class="ln" href="{{.FileURL}}">Edit project.toml</a></p>
+{{else}}{{with .Project}}<section class="card">
+<h2>Project</h2>
+<dl class="kv">
+<dt>Name</dt><dd>{{.Name}}</dd>
+<dt>Repository</dt><dd><span class="mono">{{.Repo}}</span> · base branch <span class="mono">{{.BaseBranch}}</span></dd>
+<dt>Prefix</dt><dd><span class="mono">{{.Prefix}}</span> <span class="muted">· fixed: it names every container, volume, network and hostname</span></dd>
+</dl>
+</section>{{end}}
+
+<section class="card">
+<h2>Stack and options</h2>
+{{range .Options}}<div class="opt" data-key="{{.Key}}" data-ref="{{.Ref}}">
+<div class="opt-hd"><b>{{.Key}}</b>{{if not .Slot}} <span class="muted">extra</span>{{end}} <span class="mono opt-cur">{{.Ref}}</span> <span class="mono opt-new" hidden></span><span class="sp"></span><button type="button" class="ln dim" data-change>Change</button></div>
+<div class="choices" hidden>{{$k := .Key}}{{range .Choices}}<label class="choice"><input type="radio" name="opt-{{$k}}" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
+</div>
+{{else}}<p class="muted">No options.</p>
+{{end}}</section>
+
+<section class="card">
+<h2>Environment</h2>
+<table class="set-table">
+<thead><tr><th>Name</th><th>Value</th><th></th></tr></thead>
+<tbody>
+{{range .Project.Env}}<tr class="env" data-name="{{.Name}}" data-value="{{.Value}}"><td class="mono">{{.Name}}</td><td><input class="mono env-value" value="{{.Value}}" autocomplete="off" aria-label="{{.Name}}"></td><td><button type="button" class="ln danger" data-env-remove>Remove</button></td></tr>
+{{else}}<tr><td colspan="3" class="muted">No project env.</td></tr>
+{{end}}</tbody>
+</table>
+<form class="add-row" data-stage="env">
+<input name="name" placeholder="NAME" class="mono" autocomplete="off" required aria-label="Name">
+<input name="value" placeholder="value" class="mono" autocomplete="off" aria-label="Value">
+<button class="ln" disabled>Add</button>
+</form>
+<p class="note">The project's <code>[env]</code>, given to the app. A changed value is staged when you leave the field.</p>
+</section>
+
+<section class="card">
+<h2>Worktree links</h2>
+<table class="set-table">
+<thead><tr><th>Show</th><th>Label</th><th>Address</th><th>From</th><th></th></tr></thead>
+<tbody>
+{{range .Links}}<tr class="link" data-label="{{.Label}}" data-hidden="{{.Hidden}}">
+<td>{{if .Own}}<input type="checkbox" checked disabled title="A project link always shows">{{else}}<input type="checkbox" class="link-show"{{if not .Hidden}} checked{{end}} aria-label="Show {{.Label}}">{{end}}</td>
+<td>{{.Label}}</td><td class="mono addr">{{.URL}}</td><td><span class="chip">{{.From}}</span></td>
+<td>{{if .Own}}<button type="button" class="ln danger" data-link-remove>Remove</button>{{end}}</td>
+</tr>
+{{else}}<tr><td colspan="5" class="muted">No links.</td></tr>
+{{end}}</tbody>
+</table>
+<form class="add-row" data-stage="link">
+<input name="label" placeholder="Label" autocomplete="off" required aria-label="Label">
+<input name="url" placeholder="Address" class="mono" autocomplete="off" required aria-label="Address">
+<button class="ln" disabled>Add link</button>
+</form>
+<p class="note">Use <code>{worktree.host}</code>, <code>{worktree.slug}</code> or <code>{branch}</code>; they are filled in per worktree.</p>
+</section>
+
+<section class="card">
+<h2>Secrets</h2>
+{{if .SecretsError}}<p class="red">{{.SecretsError}}</p>
+{{end}}<table class="set-table">
+<thead><tr><th>Name</th><th>Services</th><th>Delivery</th><th>Value</th><th></th></tr></thead>
+<tbody>
+{{range .Secrets}}<tr class="secret"><td class="mono">{{.Name}}</td><td class="mono">{{.Services}}</td><td class="mono">{{.Delivery}}</td><td>{{if .Set}}<span class="green">set {{.When}}</span>{{else}}<span class="yellow">not set</span>{{end}}</td>
+<td><form method="post" action="{{$.SecretURL}}" class="secret-form" data-job="secret"><input type="hidden" name="name" value="{{.Name}}"><input type="password" name="value" required autocomplete="off" placeholder="new value" aria-label="Value of {{.Name}}"><button class="ln">Set value</button></form></td></tr>
+{{else}}<tr><td colspan="5" class="muted">No secrets declared.</td></tr>
+{{end}}</tbody>
+</table>
+<details class="add-secret">
+<summary>Add a secret</summary>
+<form method="post" action="{{.SecretURL}}" class="secret-form" data-job="secret">
+<input type="hidden" name="add" value="1">
+<label>Name <input name="name" required class="mono" autocomplete="off"></label>
+<fieldset><legend>Services that receive it</legend>{{range .Services}}<label class="check"><input type="checkbox" name="services" value="{{.}}"> <span class="mono">{{.}}</span></label>{{else}}<span class="muted">No services known yet.</span>{{end}}</fieldset>
+<label>Env variable <input name="env" class="mono" autocomplete="off" placeholder="empty: the file /run/secrets/&lt;name&gt;"></label>
+<label>Value <input type="password" name="value" required autocomplete="off"></label>
+<div class="btns"><button class="ln main">Add secret</button></div>
+</form>
+</details>
+<p class="note">A value goes to podman on stdin and is never shown again. Running containers get a new value when they restart.</p>
+</section>
+
+<p class="set-file"><a class="ln" href="{{.FileURL}}">Edit project.toml</a> <span class="muted">for services, routes, tasks, firewall, agents, image, tools and versions</span></p>
+{{end}}</section>
+<section class="pane">
+{{template "staged" .Staged}}
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

@@ -86,6 +86,12 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /jobs/{id}/cancel", s.cancelJob)
 	m.HandleFunc("POST /colors", s.setColors)
 	m.HandleFunc("POST /colors/reset", s.resetColors)
+	m.HandleFunc("GET /p/{prefix}/settings", s.settingsPage)
+	m.HandleFunc("GET /p/{prefix}/settings/file", s.settingsFilePage)
+	m.HandleFunc("POST /p/{prefix}/settings/preview", s.settingsPreview)
+	m.HandleFunc("POST /p/{prefix}/settings/apply", s.settingsApply)
+	m.HandleFunc("POST /p/{prefix}/settings/secret", s.settingsSecret)
+	m.HandleFunc("POST /p/{prefix}/settings/file", s.settingsFile)
 	s.mux = m
 	return s
 }
@@ -238,7 +244,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if !write([]byte("retry: 2000\n\n")) {
 		return
 	}
-	sub := s.subscribe(p.Prefix, q.Get("w"), parseSort(q.Get("sort")))
+	sub := s.subscribe(p.Prefix, q.Get("w"), parseSort(q.Get("sort")), q.Get("view") == "settings")
 	defer s.unsubscribe(sub)
 	ping := time.NewTicker(s.ping)
 	defer ping.Stop()
@@ -331,9 +337,10 @@ func (s *Server) theme(w http.ResponseWriter, r *http.Request) {
 
 // Actions.
 
-// start runs spec as a job: 202 with its id, 409 while busy.
-func (s *Server) start(w http.ResponseWriter, r *http.Request, spec jobs.Spec, back string) {
-	snap, err := s.c.Jobs.Start(r.Context(), spec)
+// start runs spec as a job with stdin (nil: none): 202 with its id, 409
+// while busy.
+func (s *Server) start(w http.ResponseWriter, r *http.Request, spec jobs.Spec, stdin []byte, back string) {
+	snap, err := s.c.Jobs.StartInput(r.Context(), spec, stdin)
 	if errors.Is(err, jobs.ErrBusy) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -375,7 +382,7 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 	s.start(w, r, jobs.Spec{
 		Project: p.Prefix, Slug: wt.Slug, Label: action, Dir: p.Workspace,
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, action},
-	}, worktreePath(p, wt.Slug))
+	}, nil, worktreePath(p, wt.Slug))
 }
 
 // remove runs wt rm; --force only with the worktree's name typed.
@@ -396,7 +403,7 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 		}
 		argv = append(argv, "--force")
 	}
-	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "remove", Dir: p.Workspace, Argv: append(argv, wt.Slug)}, "/p/"+p.Prefix)
+	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "remove", Dir: p.Workspace, Argv: append(argv, wt.Slug)}, nil, "/p/"+p.Prefix)
 }
 
 // badName: empty, a flag, or holding a blank or control character.
@@ -430,7 +437,7 @@ func (s *Server) addWorktree(w http.ResponseWriter, r *http.Request) {
 	if r.PostFormValue("up") != "" {
 		argv = append(argv, "--up")
 	}
-	s.start(w, r, jobs.Spec{Project: p.Prefix, Label: "wt add " + branch, Dir: p.Workspace, Argv: append(argv, branch)}, "/p/"+p.Prefix)
+	s.start(w, r, jobs.Spec{Project: p.Prefix, Label: "wt add " + branch, Dir: p.Workspace, Argv: append(argv, branch)}, nil, "/p/"+p.Prefix)
 }
 
 // runTask runs one of the worktree's tasks, with shell-split args; term
@@ -460,7 +467,7 @@ func (s *Server) runTask(w http.ResponseWriter, r *http.Request) {
 		argv = append(argv, "--new-term")
 	}
 	argv = append(append(argv, name), args...)
-	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "task " + name, Dir: p.Workspace, Argv: argv}, worktreePath(p, wt.Slug))
+	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "task " + name, Dir: p.Workspace, Argv: argv}, nil, worktreePath(p, wt.Slug))
 }
 
 func (s *Server) refreshPRs(w http.ResponseWriter, r *http.Request) {

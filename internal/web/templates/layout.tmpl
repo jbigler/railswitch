@@ -1,19 +1,34 @@
-{{define "page"}}<!doctype html>
-<html lang="en">
-<head>
+{{/* The parts every page shares; each takes a view with Title, Header,
+Strip, Banner and Projects. */}}
+{{define "head"}}<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/theme.css" id="theme">
 <script src="/static/app.js" defer></script>
-</head>
-<body data-prefix="{{.Prefix}}" data-sel="{{.Sel}}" data-sort="{{.Sort}}">
-{{template "header" .Header}}
+</head>{{end}}
+
+{{define "top"}}{{template "header" .Header}}
 {{template "strip" .Strip}}
 {{template "banner" .Banner}}
 <div id="conn" class="banner conn" hidden></div>
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" hidden></div>{{end}}
+
+{{define "common-dialogs"}}<dialog id="switcher" class="dlg">
+<h2>Projects</h2>
+<input id="switcher-filter" type="search" placeholder="Filter projects and worktrees" autocomplete="off">
+{{template "projects" .Projects}}
+<p class="note">1–9 jump · Esc closes</p>
+</dialog>
+<dialog id="palette" class="dlg"></dialog>
+<dialog id="colors" class="dlg"></dialog>{{end}}
+
+{{define "page"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-sel="{{.Sel}}" data-sort="{{.Sort}}">
+{{template "top" .}}
 <main class="grid">
 <section class="left">
 {{template "list" .List}}
@@ -24,16 +39,9 @@
 {{template "jobs" .Jobs}}
 </section>
 </main>
-<dialog id="switcher" class="dlg">
-<h2>Projects</h2>
-<input id="switcher-filter" type="search" placeholder="Filter projects and worktrees" autocomplete="off">
-{{template "projects" .Projects}}
-<p class="note">1–9 jump · Esc closes</p>
-</dialog>
+{{template "common-dialogs" .}}
 {{template "newwt" .List}}
 <dialog id="remove" class="dlg"></dialog>
-<dialog id="palette" class="dlg"></dialog>
-<dialog id="colors" class="dlg"></dialog>
 </body>
 </html>
 {{end}}

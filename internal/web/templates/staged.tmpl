@@ -1,0 +1,23 @@
+{{define "staged"}}<section id="staged" class="staged" data-hash="{{.Hash}}" data-count="{{.Count}}"{{if .Blocked}} data-blocked{{end}}>
+<h2>Staged changes · {{.Count}}</h2>
+{{if not .Cards}}<p class="note">Nothing staged. Change a setting on the left to see what it does.</p>
+{{else}}{{if .Error}}<p class="red">Preview failed: {{.Error}}</p>
+{{end}}{{range .Cards}}<div class="card stagecard edge-{{.Class}}" data-index="{{.Index}}">
+<div class="stage-hd"><b>{{.Title}}</b><span class="sp"></span>{{if .Label}}<span class="chip {{.Class}}">{{.Label}}</span>{{end}}</div>
+{{if .Error}}<div class="red">{{.Error}}</div>
+{{end}}{{range .Reasons}}<div class="reason">{{.}}</div>
+{{end}}<button type="button" class="ln dim" data-undo="{{.Index}}">Undo this change</button>
+</div>
+{{end}}<div class="lbl">When you apply</div>
+<ol class="steps">
+<li>project.toml is written.</li>
+<li>The units are rendered.</li>
+<li>Running worktrees keep their containers until restarted{{if .Restart}}, or restart now, one at a time, when ticked{{end}}.</li>
+</ol>
+<form method="post" action="{{.ApplyURL}}" class="apply" data-apply>
+<input type="hidden" name="hash" value="{{.Hash}}">
+{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> {{.Restart}} <span class="muted mono">{{.RestartWho}}</span></label>
+{{end}}<div class="btns"><button class="ln main"{{if .Blocked}} disabled{{end}}>{{.ApplyText}}</button></div>
+</form>
+{{if .Diff}}<details class="diff"><summary>See the project.toml diff</summary><pre class="out mono">{{.Diff}}</pre></details>
+{{end}}{{end}}</section>{{end}}

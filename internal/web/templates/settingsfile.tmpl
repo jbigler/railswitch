@@ -1,0 +1,27 @@
+{{define "settingsfile"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="settingsfile">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="{{.SettingsURL}}">← Settings</a></div>
+<h1>project.toml</h1>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{else}}<p class="note">Save checks the file, writes it, locks and renders; a file that does not load is refused and nothing changes. Running worktrees keep their containers until restarted.</p>
+<form method="post" action="{{.URL}}" class="file-form" data-job="file">
+<input type="hidden" name="hash" value="{{.Hash}}">
+<textarea name="text" class="mono toml" spellcheck="false" rows="32" aria-label="project.toml">
+{{.Text}}</textarea>
+<div id="file-conflict" class="red" hidden>project.toml changed since you opened it, so nothing was written. Your text is still here. <a href="{{.URL}}">Reload the file</a> (drops your text).</div>
+<div class="btns"><a class="ln dim" href="{{.SettingsURL}}">Cancel</a><button class="ln main">Save</button></div>
+</form>
+{{end}}</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

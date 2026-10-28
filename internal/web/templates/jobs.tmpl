@@ -1,6 +1,6 @@
 {{define "jobs"}}<section id="jobs" class="jobs">
 {{if .Jobs}}<div class="lbl">Jobs</div>
-{{end}}{{range .Jobs}}<div class="job" id="{{.ID}}">
+{{end}}{{range .Jobs}}<div class="job" id="{{.ID}}" data-state="{{.State}}"{{if .Conflict}} data-conflict{{end}}>
 <div class="job-hd"><b>{{.Label}}</b> <span class="{{.Class}}">{{.State}}{{if eq .State "failed"}} (exit {{.Exit}}){{end}}</span> <span class="muted">{{.Started}}</span>{{if .Running}}<form method="post" action="{{.CancelURL}}" data-post><button class="ln danger">Cancel</button></form>{{end}}</div>
 {{if or .Lines .Earlier}}<pre class="out mono">{{if .Earlier}}… {{.Earlier}} earlier lines
 {{end}}{{range .Lines}}{{.}}

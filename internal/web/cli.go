@@ -40,6 +40,7 @@ type worktree struct {
 	Branch   string    `json:"branch"`
 	Base     bool      `json:"base"`
 	Stack    string    `json:"stack"`
+	Stale    bool      `json:"stale"`
 	Services []service `json:"services"`
 	Agent    *agent    `json:"agent"`
 	Links    []link    `json:"links"`
@@ -107,6 +108,64 @@ type colorsDoc struct {
 	} `json:"warnings"`
 }
 
+// projectShow is `project show`: what the settings page edits. File is
+// project.toml's text, for the raw editor.
+type projectShow struct {
+	Prefix     string        `json:"prefix"`
+	Name       string        `json:"name"`
+	Repo       string        `json:"repo"`
+	BaseBranch string        `json:"base_branch"`
+	Hash       string        `json:"hash"`
+	Options    []optionRow   `json:"options"`
+	Env        []envRow      `json:"env"`
+	Links      []projectLink `json:"links"`
+	File       string        `json:"file"`
+}
+
+type optionRow struct {
+	Key     string   `json:"key"`
+	Slot    bool     `json:"slot"`
+	Ref     string   `json:"ref"`
+	Choices []string `json:"choices"`
+}
+
+type envRow struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type projectLink struct {
+	Label  string `json:"label"`
+	URL    string `json:"url"`
+	From   string `json:"from"` // "project", or the stack part that brings it
+	Hidden bool   `json:"hidden"`
+}
+
+// previewDoc is `settings preview`: each staged edit's impact.
+type previewDoc struct {
+	Hash    string       `json:"hash"`
+	Diff    string       `json:"diff"`
+	Edits   []editResult `json:"edits"`
+	Restart []string     `json:"restart"`
+}
+
+type editResult struct {
+	Index   int      `json:"index"`
+	Impact  string   `json:"impact"` // none, check, data or blocked
+	Reasons []string `json:"reasons"`
+	Error   string   `json:"error"`
+}
+
+// secretRow is one `secret ls` row; it never holds a value.
+type secretRow struct {
+	Name     string   `json:"name"`
+	Scope    string   `json:"scope"`
+	Delivery string   `json:"delivery"`
+	Set      bool     `json:"set"`
+	Created  *string  `json:"created"`
+	Services []string `json:"services"`
+}
+
 // readJSON runs `railswitch --json <args>` and decodes its document.
 func readJSON[T any](ctx context.Context, c CLI, args ...string) (T, error) {
 	var v T
@@ -142,4 +201,25 @@ func readWorktrees(ctx context.Context, c CLI, ws string) ([]wtRow, error) {
 
 func readColors(ctx context.Context, c CLI) (colorsDoc, error) {
 	return readJSON[colorsDoc](ctx, c, "dashboard", "colors")
+}
+
+func readProjectShow(ctx context.Context, c CLI, ws string) (projectShow, error) {
+	return readJSON[projectShow](ctx, c, "-C", ws, "project", "show")
+}
+
+func readSecrets(ctx context.Context, c CLI, ws string) ([]secretRow, error) {
+	return readJSON[[]secretRow](ctx, c, "-C", ws, "secret", "ls")
+}
+
+// readPreview runs `settings preview` with the edit list on stdin.
+func readPreview(ctx context.Context, c CLI, ws string, edits []byte) (previewDoc, error) {
+	var v previewDoc
+	out, err := c.RunInput(ctx, edits, "--json", "-C", ws, "settings", "preview")
+	if err != nil {
+		return v, err
+	}
+	if err := json.Unmarshal(out, &v); err != nil {
+		return v, fmt.Errorf("settings preview: %w", err)
+	}
+	return v, nil
 }

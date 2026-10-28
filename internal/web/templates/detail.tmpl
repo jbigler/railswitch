@@ -1,7 +1,7 @@
 {{define "detail"}}<section id="detail" class="detail" data-slug="{{.Slug}}" data-tasks="{{.TasksURL}}">
 {{if .Empty}}<p class="note">No worktree selected.</p>
 {{else}}<h1>{{.Slug}}</h1>
-<div class="br">⎇ {{.Branch}}{{with .PR}} · <span class="{{.StateClass}}">{{.Line}}</span>{{end}} · <span class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}</span></div>
+<div class="br">⎇ {{.Branch}}{{with .PR}} · <span class="{{.StateClass}}">{{.Line}}</span>{{end}} · <span class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}</span>{{if .Stale}} · <span class="stale">restart to apply</span>{{end}}</div>
 <div class="lbl">Links</div>
 <div class="links">{{range .Links}}<a class="{{.Class}}" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div>
 <div class="lbl">Services</div>

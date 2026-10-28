@@ -5,6 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
+const view = body.dataset.view || ""; // "", settings or settingsfile
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -19,7 +20,7 @@ let failures = 0;
 function connect() {
   if (es) es.close();
   clearTimeout(retry);
-  const q = new URLSearchParams({ p: prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name" });
+  const q = new URLSearchParams({ p: prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view.startsWith("settings") ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -85,6 +86,8 @@ function afterSwap(id) {
     if (btn) btn.hidden = !("Notification" in window) || Notification.permission !== "default";
   } else if (id === "projects") {
     filterSwitcher();
+  } else if (id === "jobs") {
+    [...watched.keys()].forEach(jobEnded);
   } else if (id === "detail") {
     const slug = $("#detail").dataset.slug || "";
     body.dataset.sel = slug;
@@ -400,10 +403,238 @@ function contrast(a, b) {
   return (x + 0.05) / (y + 0.05);
 }
 
+// Settings: the staged edit list lives in sessionStorage (a reload keeps
+// it). Every change posts the whole list to preview and swaps #staged for
+// the server's answer; the left column shows each control as staged.
+
+const stagedStore = "rs-staged-" + prefix;
+let staged = [];
+let previewSeq = 0;
+let restartWanted = false;
+const watched = new Map(); // job id → called with (state, conflict) when it ends
+
+function startSettings() {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(stagedStore) || "[]");
+    staged = Array.isArray(s) ? s : [];
+  } catch {
+    staged = [];
+  }
+  syncLeft();
+  if (staged.length) preview();
+}
+
+// target is what an edit changes; a later edit of the same target
+// replaces the earlier one.
+function target(e) {
+  if (e.op === "option") return "option " + e.key;
+  if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
+  if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
+  return e.op + " " + e.label;
+}
+
+// stage puts e in the list; back (the control is at its current value
+// again) only takes the earlier edit of its target out.
+function stage(e, back) {
+  const t = target(e);
+  staged = staged.filter((x) => target(x) !== t);
+  if (!back) staged.push(e);
+  stagedChanged();
+}
+
+function stagedChanged() {
+  try {
+    sessionStorage.setItem(stagedStore, JSON.stringify(staged));
+  } catch {
+    // a private window: the list lives until the page goes
+  }
+  syncLeft();
+  preview();
+}
+
+function stagedFor(t) {
+  return staged.find((x) => target(x) === t);
+}
+
+function syncLeft() {
+  $$(".opt").forEach((row) => {
+    const e = stagedFor("option " + row.dataset.key);
+    const ref = e ? e.ref : row.dataset.ref;
+    $$("input[type=radio]", row).forEach((r) => (r.checked = r.value === ref));
+    row.classList.toggle("staged", !!e);
+    const nw = $(".opt-new", row);
+    nw.hidden = !e;
+    nw.textContent = e ? "→ " + e.ref : "";
+  });
+  $$("tr.env").forEach((row) => {
+    const e = stagedFor("env " + row.dataset.name);
+    const input = $(".env-value", row);
+    if (document.activeElement !== input) input.value = e && e.op === "env.set" ? e.value : row.dataset.value;
+    input.disabled = !!e && e.op === "env.unset";
+    row.classList.toggle("staged", !!e && e.op === "env.set");
+    row.classList.toggle("removed", !!e && e.op === "env.unset");
+  });
+  $$("tr.link").forEach((row) => {
+    const e = stagedFor("show " + row.dataset.label);
+    const box = $(".link-show", row);
+    if (box) box.checked = e ? e.op === "link.show" : row.dataset.hidden !== "true";
+    row.classList.toggle("staged", !!e);
+    row.classList.toggle("removed", !!stagedFor("link.remove " + row.dataset.label));
+  });
+}
+
+async function preview() {
+  const seq = ++previewSeq;
+  const apply = $("#staged form[data-apply] button");
+  if (apply) apply.disabled = true; // its labels are for the list before this change
+  let r;
+  try {
+    r = await fetch(body.dataset.preview, {
+      method: "POST", body: JSON.stringify(staged), credentials: "same-origin", headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    return toast("Preview failed: the dashboard is not reachable.", true);
+  }
+  const text = await r.text();
+  if (seq !== previewSeq) return; // a newer preview is on its way
+  if (!r.ok) return toast(text.trim(), true);
+  swap("staged", text);
+  const restart = $("#staged input[name=restart]");
+  if (restart) restart.checked = restartWanted;
+}
+
+// startJob posts a form that starts a job and calls done when the job
+// ends, as the jobs fragment shows it.
+async function startJob(url, data, done) {
+  const r = await fetch(url, { method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" } });
+  if (!r.ok) return toast((await r.text()).trim(), true);
+  const j = await r.json();
+  toast("Started: " + j.label, false);
+  watched.set(j.id, done);
+  jobEnded(j.id); // it may have ended before this answer came
+}
+
+function jobEnded(id) {
+  const done = watched.get(id);
+  const el = document.getElementById("job-" + id);
+  if (!done || !el || el.dataset.state === "running") return;
+  watched.delete(id);
+  done(el.dataset.state, el.hasAttribute("data-conflict"));
+}
+
+function applied(state, conflict) {
+  if (state === "ok") {
+    staged = [];
+    try {
+      sessionStorage.removeItem(stagedStore);
+    } catch {
+      // nothing kept
+    }
+    location.reload();
+  } else if (conflict) {
+    toast("project.toml changed since the preview. Look at the changes again before applying.", true);
+    preview();
+  } else {
+    toast("Apply " + state + ": nothing was changed. Its output is below.", true);
+  }
+}
+
+function secretDone(state) {
+  if (state === "ok") location.reload();
+  else toast("The secret was not stored. Its output is below.", true);
+}
+
+function fileSaved(state, conflict) {
+  if (state === "ok") location.reload();
+  else if (conflict) $("#file-conflict").hidden = false;
+  else toast("project.toml was not written. The output is below.", true);
+}
+
+// Add buttons wait for their required fields.
+function addReady(f) {
+  $("button", f).disabled = $$("input[required]", f).some((i) => !i.value.trim());
+}
+
+if (view) {
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    const change = t.closest("[data-change]");
+    if (change) {
+      const c = $(".choices", change.closest(".opt"));
+      c.hidden = !c.hidden;
+      return;
+    }
+    const undo = t.closest("[data-undo]");
+    if (undo) {
+      staged.splice(Number(undo.dataset.undo), 1);
+      stagedChanged();
+      return;
+    }
+    const envRm = t.closest("[data-env-remove]");
+    if (envRm) return stage({ op: "env.unset", name: envRm.closest("tr").dataset.name }, false);
+    const linkRm = t.closest("[data-link-remove]");
+    if (linkRm) stage({ op: "link.remove", label: linkRm.closest("tr").dataset.label }, false);
+  });
+
+  document.addEventListener("change", (e) => {
+    const t = e.target;
+    const opt = t.closest(".opt");
+    if (opt && t.type === "radio") return stage({ op: "option", key: opt.dataset.key, ref: t.value }, t.value === opt.dataset.ref);
+    if (t.classList.contains("env-value")) {
+      const row = t.closest("tr");
+      return stage({ op: "env.set", name: row.dataset.name, value: t.value }, t.value === row.dataset.value);
+    }
+    if (t.classList.contains("link-show")) {
+      const row = t.closest("tr");
+      return stage({ op: t.checked ? "link.show" : "link.hide", label: row.dataset.label }, t.checked === (row.dataset.hidden !== "true"));
+    }
+    if (t.name === "restart" && t.closest("#staged")) restartWanted = t.checked;
+  });
+
+  document.addEventListener("input", (e) => {
+    const f = e.target.closest("form[data-stage]");
+    if (f) addReady(f);
+  });
+
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (f.matches("form[data-stage]")) {
+      e.preventDefault();
+      const v = (n) => f.elements[n].value.trim();
+      if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
+      else stage({ op: "link.add", label: v("label"), url: v("url") }, false);
+      f.reset();
+      addReady(f);
+    } else if (f.matches("form[data-apply]")) {
+      e.preventDefault();
+      const data = new URLSearchParams(new FormData(f));
+      data.set("edits", JSON.stringify(staged));
+      startJob(f.action, data, applied);
+    } else if (f.matches("form[data-job]")) {
+      e.preventDefault();
+      const data = new URLSearchParams(new FormData(f));
+      if (f.dataset.job === "file") {
+        data.set("text", f.elements.text.value); // as typed: FormData would send CRLF
+        $("#file-conflict").hidden = true;
+        startJob(f.action, data, fileSaved);
+      } else {
+        f.reset(); // the value leaves the page at once
+        startJob(f.action, data, secretDone);
+      }
+    }
+  });
+}
+
 // Start: the remembered project and sort, then the stream.
 
 (function start() {
   if (!prefix) return;
+  if (view) {
+    afterSwap("header");
+    if (view === "settings") startSettings();
+    connect();
+    return;
+  }
   const nav = performance.getEntriesByType("navigation")[0];
   const last = localStorage.getItem(projectStore);
   if (nav && nav.redirectCount > 0 && last && last !== prefix && $$("#projects .proj-item").some((li) => li.dataset.filter === last)) {

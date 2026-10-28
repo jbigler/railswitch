@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -92,12 +93,16 @@ func (f *fakeCLI) count(key string) int {
 }
 
 // recRunner is the job hub's runner: it records each argv (the
-// systemd-run scope prefix cut off) and, with block set, keeps each job
-// running until block is closed.
+// systemd-run scope prefix cut off) and stdin (nil: none) and, with
+// block set, keeps each job running until block is closed. A job writes
+// out and, with exit set, fails with that code.
 type recRunner struct {
-	mu    sync.Mutex
-	argvs [][]string
-	block chan struct{}
+	mu     sync.Mutex
+	argvs  [][]string
+	stdins [][]byte
+	block  chan struct{}
+	out    string
+	exit   int
 }
 
 func (r *recRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
@@ -105,9 +110,14 @@ func (r *recRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
 	if i := slices.Index(argv, "--"); i >= 0 && argv[0] == "systemd-run" {
 		argv = argv[i+1:]
 	}
+	var in []byte
+	if c.Stdin != nil {
+		in, _ = io.ReadAll(c.Stdin)
+	}
 	r.mu.Lock()
 	r.argvs = append(r.argvs, argv)
-	block := r.block
+	r.stdins = append(r.stdins, in)
+	block, out, exit := r.block, r.out, r.exit
 	r.mu.Unlock()
 	if block != nil {
 		select {
@@ -115,7 +125,19 @@ func (r *recRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
 		case <-ctx.Done():
 		}
 	}
+	if out != "" {
+		_, _ = io.WriteString(c.Stdout, out)
+	}
+	if exit != 0 {
+		return sys.Result{ExitCode: exit}, fmt.Errorf("job: %w (exit %d)", sys.ErrExit, exit)
+	}
 	return sys.Result{}, nil
+}
+
+func (r *recRunner) Stdins() [][]byte {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.stdins)
 }
 
 func (r *recRunner) Argvs() [][]string {
@@ -207,6 +229,7 @@ type fixture struct {
 	cli   *fakeCLI
 	run   *recRunner
 	clock *fakeClock
+	logs  string // the job hub's log directory
 }
 
 // newFixture is a server over the scripted CLI and a real job hub.
@@ -224,7 +247,8 @@ func newFixture(t *testing.T) *fixture {
 		"--json dashboard colors":             colorsJSON,
 	}, errs: map[string]error{}}
 	run := &recRunner{}
-	hub, err := jobs.New(run, t.TempDir(), func(context.Context) []string { return nil })
+	logs := t.TempDir()
+	hub, err := jobs.New(run, logs, func(context.Context) []string { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +266,7 @@ func newFixture(t *testing.T) *fixture {
 			time.Sleep(5 * time.Millisecond)
 		}
 	})
-	return &fixture{s: s, cli: cli, run: run, clock: clock}
+	return &fixture{s: s, cli: cli, run: run, clock: clock, logs: logs}
 }
 
 // req is a request as the logged-in page sends it: allowed Host, the

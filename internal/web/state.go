@@ -59,6 +59,7 @@ type jobInfo struct {
 type subscriber struct {
 	prefix, sel string
 	sort        sortKey
+	settings    bool // a settings page: its jobs are the project-level ones
 	ch          chan event
 	gone        chan struct{} // closed when the page fell behind
 	dropped     bool
@@ -89,8 +90,8 @@ func (sub *subscriber) diff(typ, id, html string, job *jobInfo) {
 	sub.send(event{Type: typ, ID: id, HTML: html, Job: job})
 }
 
-func (s *Server) subscribe(prefix, sel string, k sortKey) *subscriber {
-	sub := &subscriber{prefix: prefix, sel: sel, sort: k, ch: make(chan event, subBuffer), gone: make(chan struct{}), sent: map[string]string{}}
+func (s *Server) subscribe(prefix, sel string, k sortKey, settings bool) *subscriber {
+	sub := &subscriber{prefix: prefix, sel: sel, sort: k, settings: settings, ch: make(chan event, subBuffer), gone: make(chan struct{}), sent: map[string]string{}}
 	s.mu.Lock()
 	s.subs[sub] = struct{}{}
 	s.push(sub)
@@ -335,8 +336,7 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		if snaps == nil {
 			snaps = s.c.Jobs.Jobs(j.Spec.Project, "")
 		}
-		rows, sel := s.rows(sub.prefix, sub.sort, sub.sel)
-		html, err := render("jobs", newJobs(snaps, rows, sel))
+		html, err := render("jobs", s.subJobs(sub, snaps))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
 			continue
@@ -371,6 +371,15 @@ func (s *Server) push(sub *subscriber) {
 			return
 		}
 		sub.diff("html", f.id, html, nil)
+	}
+	if sub.settings {
+		html, err := render("jobs", s.subJobs(sub, s.c.Jobs.Jobs(sub.prefix, "")))
+		if err != nil {
+			log.Printf("dashboard: %v", err)
+			return
+		}
+		sub.diff("html", "jobs", html, nil)
+		return
 	}
 	rows := make([]string, len(pv.List.Rows))
 	keys := []string{pv.Sel}
@@ -410,6 +419,17 @@ func (s *Server) push(sub *subscriber) {
 		}
 		sub.diff("html", f.id, html, nil)
 	}
+}
+
+// subJobs is the jobs fragment of sub's page: the selected worktree's
+// with the project's, or on a settings page the project's alone. s.mu is
+// held.
+func (s *Server) subJobs(sub *subscriber, snaps []jobs.Snapshot) jobsView {
+	rows, sel := s.rows(sub.prefix, sub.sort, sub.sel)
+	if sub.settings {
+		sel = ""
+	}
+	return newJobs(snaps, rows, sel)
 }
 
 // rows is prefix's worktrees with their PRs sorted by k, and the slug

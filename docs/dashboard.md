@@ -95,7 +95,8 @@ When the live stream drops, a red line under the header says so:
 is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch"; the project button (the prefix; opens the
-  switcher); `◆ N need input`; `tasks :`; `logs` (Dozzle at
+  switcher); `◆ N need input`; `tasks :`; `settings` (the project's
+  Settings page, below); `logs` (Dozzle at
   `http://logs.localhost/`); a `notifications` button until the browser
   permission is decided; `⚙` colours. The tab title is `(N) RailSwitch`,
   N counting agents in permission, question or waiting-for-reply across
@@ -105,10 +106,91 @@ is no longer accepted. What the page shows meanwhile may be stale.
   other project's worktree that needs input; click it to go there.
 - **List:** a toolbar with the sort bar, `+ New worktree` and `Refresh
   PRs`, then one row per worktree: name, branch, PR (number, checks,
-  state, review), stack state, agent state.
+  state, review), stack state, agent state. A worktree whose running
+  containers were created from older units than the rendered ones
+  (`overview`'s `stale`, after a settings change, say) shows "restart to
+  apply" next to its stack state, in the row and in the detail; `restart`
+  clears it.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
   (`PR #2141 ready · checks ✓ · approved`), then Links, Services (a glyph
   and state per service), Agent (state and message), Actions and Jobs.
+
+## Settings
+
+`/p/<prefix>/settings` (`settings` in the header) edits the project's
+`project.toml`. Changes are staged, not applied: the right-hand panel
+shows what each one does before anything is written.
+
+**Left column**
+
+- **Project:** name, repository, base branch and prefix. Read-only; the
+  prefix is fixed because it names every container, volume, network and
+  hostname.
+- **Stack and options:** one row per slot and extra `[options]` key with
+  its current package. "Change" opens its choices (the current one tagged
+  `current`); picking another stages it and the row shows `→ <new>`.
+  Picking the current one again unstages it.
+- **Environment:** the project's `[env]`. Editing a value stages it when
+  you leave the field; Remove stages its removal; the add form (name,
+  value) stages a new one.
+- **Worktree links:** every link with Show, Label, Address and From
+  (`project`, or the stack part that brings it). Unticking Show on a stack
+  link stages adding it to `hide_links`; Remove is offered on the
+  project's own `[[links]]` only. The add form needs both a label and an
+  address. Use `{worktree.host}`, `{worktree.slug}` or `{branch}`; they
+  are filled in per worktree.
+- **Secrets:** one row per declared secret: services, delivery (`file` or
+  `env <VAR>`), set (with its date) or not set; never the value. "Set
+  value" runs `railswitch secret set <name>` as a job; "Add a secret"
+  (name, the services that receive it, an optional env variable, value)
+  runs `railswitch secret add <name> --service <id>… [--env VAR]`. The
+  value goes only to the job's stdin; the field clears as soon as you
+  press the button. Secrets act at once; they are not staged.
+- **Edit project.toml** opens the raw editor (below), for everything
+  else: services, routes, tasks, firewall, agents, image, tools, versions.
+
+**Staged changes**
+
+- "Staged changes · N", one card per edit: what changes (`cache: kv@1 →
+  none`, `Env BIND: "0.0.0.0" → "127.0.0.1"`, `Link Admin: added`), its
+  label and the reasons, and "Undo this change".
+
+  | Label | Means |
+  |---|---|
+  | No data affected (green) | nothing is lost and the app's env is the same |
+  | Check before applying (yellow) | no data is lost, but an env variable the app gets is gone or changes |
+  | Data not carried over (red) | a worktree's volume is no longer mounted (left behind) or starts empty; the reasons say which, and suggest `railswitch db dump` first when a database goes |
+  | Blocked (red) | the edit can't be placed or the edited project doesn't load, validate, resolve or render; the error says why |
+
+- "When you apply": project.toml is written; the units are rendered;
+  running worktrees keep their containers until restarted.
+- "Restart the N affected running worktrees now" (off; shown only when a
+  running worktree's units change) restarts them after the write, one at
+  a time.
+- "Apply N changes" is off while any card is blocked. "See the
+  project.toml diff" shows the whole change.
+- Apply runs `railswitch settings apply --if-hash <hash> [--restart]` as
+  a project-level job, the edit list on its stdin. It writes all the
+  edits or none. When it ends ok the list is cleared and the page
+  reloads. If project.toml changed after the preview (edited by hand,
+  say), the job is refused and nothing is written; the page previews the
+  list again and says so.
+- The staged list is kept in the browser's `sessionStorage`
+  (`rs-staged-<prefix>`), so a reload keeps it; closing the tab drops it.
+  Every change posts the whole list to `POST
+  /p/<prefix>/settings/preview`, which runs `railswitch --json settings
+  preview` (list on stdin) and answers the panel.
+
+**Raw editor** (`/p/<prefix>/settings/file`): the whole `project.toml`
+(from `railswitch --json project show`'s `file`) and its hash. Save runs
+`railswitch project write --if-hash <hash>` as a project-level job with
+the text on stdin: it checks the file loads and validates, writes it,
+locks and renders, and puts the old file back if any step fails. If the
+file changed since the page read it, nothing is written and the page
+offers to reload the file; your text stays in the editor until you do.
+
+Every settings action is a job of the project, so it waits for (and
+blocks) the project's other jobs. Its output shows under the panel.
 
 ## Links
 
@@ -200,7 +282,9 @@ Every action is a job (below).
   `systemd-run --user --scope`, so restarting the dashboard doesn't kill a
   running `up`. It gets the session's display, SSH agent and terminal
   variables from `systemctl --user show-environment`, plus `NO_COLOR=1`.
-  Its stdin is `/dev/null`.
+  Its stdin is `/dev/null`, except for the settings jobs: their edit
+  list, secret value or project.toml text is written to the child's stdin
+  and kept nowhere else (not the job's label, log, page or events).
 - One job at a time per worktree; a project-level job (`wt add`) blocks the
   whole project. A second request answers "busy: <running job>".
 - A worktree's Jobs list shows its own jobs, the project-level ones and
@@ -319,8 +403,10 @@ docs/json.md.
 Server-Sent Events stream. On connect it sends the current fragments
 (`header`, `projects`, `strip`, `banner`, `list`, `detail`, `jobs`);
 afterwards only fragments that changed (a single list row by its own id
-while the order and selection stay), and `: ping` every 15 s. Each
-`data:` line is one JSON object:
+while the order and selection stay), and `: ping` every 15 s. A settings
+page connects with `&view=settings`: it gets no `list` or `detail`, and
+its `jobs` are the project-level ones only. Each `data:` line is one
+JSON object:
 
 ```json
 {"type":"html","id":"list","html":"<div id=\"list\" class=\"list\">…</div>"}

@@ -411,6 +411,7 @@ type rowView struct {
 	StackGlyph, StackText, StackClass string
 	AgentGlyph, AgentText, AgentClass string
 	AgentTitle                        string
+	Stale                             bool // runs an older unit: "restart to apply"
 }
 
 func newRow(prefix string, r row, sel string, k sortKey) rowView {
@@ -420,6 +421,7 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 		Branch: r.WT.Branch, Base: r.WT.Base, Sel: r.WT.Slug == sel, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(r.WT.Stack), StackText: stackText(r.WT), StackClass: stackClass(r.WT.Stack),
 		AgentGlyph: agentGlyph(kind), AgentText: agentLabel(kind), AgentClass: agentClass(kind),
+		Stale: r.WT.Stale,
 	}
 	if r.WT.Agent != nil {
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
@@ -437,7 +439,7 @@ type detailView struct {
 	Agent                             *agentView
 	Actions                           []actionView
 	RemoveURL, TasksURL               string // RemoveURL "" for the base worktree
-	Merged                            bool
+	Merged, Stale                     bool
 }
 
 type linkView struct{ Label, URL, Class string }
@@ -457,7 +459,7 @@ func newDetail(prefix string, r row) detailView {
 	v := detailView{
 		Slug: wt.Slug, Branch: wt.Branch, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(wt.Stack), StackText: stackText(wt), StackClass: stackClass(wt.Stack),
-		TasksURL: path + "/tasks",
+		TasksURL: path + "/tasks", Stale: wt.Stale,
 	}
 	dim := ""
 	if wt.Stack == "stopped" {
@@ -505,8 +507,13 @@ type jobView struct {
 	Running                                     bool
 	Earlier                                     int // kept lines not shown
 	Dropped                                     bool
+	Conflict                                    bool // refused: project.toml changed since it was read
 	Lines                                       []string
 }
+
+// conflictText is how settings apply and project write refuse a stale
+// --if-hash.
+const conflictText = "changed since"
 
 var jobClasses = map[jobs.State]string{jobs.StateRunning: "blue", jobs.StateOK: "green", jobs.StateFailed: "red", jobs.StateCancelled: "muted"}
 
@@ -525,6 +532,7 @@ func newJobs(snaps []jobs.Snapshot, rows []row, slug string) jobsView {
 			Started: j.Started.Local().Format("15:04:05"), Exit: j.Exit,
 			Running: j.State == jobs.StateRunning, CancelURL: "/jobs/" + j.ID + "/cancel",
 			Dropped: j.Dropped, Lines: j.Lines,
+			Conflict: j.State == jobs.StateFailed && slices.ContainsFunc(j.Lines, func(l string) bool { return strings.Contains(l, conflictText) }),
 		}
 		if n := len(j.Lines); n > viewLines {
 			jv.Earlier, jv.Lines = n-viewLines, j.Lines[n-viewLines:]

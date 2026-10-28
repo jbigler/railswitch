@@ -646,22 +646,30 @@ type packLsOption struct {
 	Library   string   `json:"library,omitempty"`
 }
 
-// libraryPackages adds to doc every package of each fetched library's
-// verified checkout that still resolves (its files hash to the signed
-// index). A library not fetched or trusted yet adds nothing.
-func libraryPackages(root string, doc *packLsDoc) error {
+// libraryPackage is one package of a library on this machine that
+// resolves now: listed in libraries.toml, in its verified checkout, its
+// files still hashing to the signed index. Option is set for an option.
+type libraryPackage struct {
+	kind   string
+	ref    pack.Ref
+	option *pack.Option
+}
+
+// libraryPackages are cat's library packages, by libraries.toml order then
+// the index's; a library not fetched or trusted yet has none.
+func libraryPackages(cat *pack.Catalog) ([]libraryPackage, error) {
+	if cat.Libraries == nil {
+		return nil, nil
+	}
 	d, err := machine.DefaultDirs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	c, err := libraries.Load(libraries.Path(d))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	cat, err := pack.LoadCatalog(root, workspace.Libraries(d))
-	if err != nil {
-		return err
-	}
+	var out []libraryPackage
 	for _, lib := range c.Libraries {
 		co, err := cat.Libraries.Checkout(lib.Alias)
 		if err != nil {
@@ -670,23 +678,25 @@ func libraryPackages(root string, doc *packLsDoc) error {
 		for _, lp := range co.Packages {
 			r := lp.Ref
 			r.Library = lib.Alias
+			lpk := libraryPackage{kind: lp.Kind, ref: r}
 			switch lp.Kind {
 			case pack.KindPack:
-				if p, err := cat.Pack(r); err == nil && p != nil {
-					doc.Packs = append(doc.Packs, packLsPack{Ref: r.String(), Name: r.Name, Library: lib.Alias})
+				if p, err := cat.Pack(r); err != nil || p == nil {
+					continue
 				}
 			case pack.KindOption:
-				if o, err := cat.Option(r); err == nil && o != nil {
-					doc.Options = append(doc.Options, packLsOption{Ref: r.String(), Name: r.Name, Slot: o.Slot, WorksWith: slices.Clone(o.WorksWith), Library: lib.Alias})
+				if lpk.option, err = cat.Option(r); err != nil || lpk.option == nil {
+					continue
 				}
 			case pack.KindAgent:
-				if a, err := cat.Agent(r); err == nil && a != nil {
-					doc.Agents = append(doc.Agents, packLsAgent{Ref: r.String(), Name: r.Name, Library: lib.Alias})
+				if a, err := cat.Agent(r); err != nil || a == nil {
+					continue
 				}
 			}
+			out = append(out, lpk)
 		}
 	}
-	return nil
+	return out, nil
 }
 
 // railswitch pack ls: every pack and option a new or current project can
@@ -724,8 +734,23 @@ func packLs(e *env, args []string) int {
 	for _, r := range newestBuiltins(cat.Agents) {
 		doc.Agents = append(doc.Agents, packLsAgent{Ref: r.String(), Name: r.Name, Default: cat.Agents[r].Default})
 	}
-	if err := libraryPackages(root, &doc); err != nil {
+	libcat, err := workspace.LoadCatalog(root)
+	if err != nil {
 		return e.fail(err)
+	}
+	libs, err := libraryPackages(libcat)
+	if err != nil {
+		return e.fail(err)
+	}
+	for _, lp := range libs {
+		switch lp.kind {
+		case pack.KindPack:
+			doc.Packs = append(doc.Packs, packLsPack{Ref: lp.ref.String(), Name: lp.ref.Name, Library: lp.ref.Library})
+		case pack.KindOption:
+			doc.Options = append(doc.Options, packLsOption{Ref: lp.ref.String(), Name: lp.ref.Name, Slot: lp.option.Slot, WorksWith: slices.Clone(lp.option.WorksWith), Library: lp.ref.Library})
+		case pack.KindAgent:
+			doc.Agents = append(doc.Agents, packLsAgent{Ref: lp.ref.String(), Name: lp.ref.Name, Library: lp.ref.Library})
+		}
 	}
 	slices.SortFunc(doc.Packs, func(a, b packLsPack) int { return strings.Compare(a.Ref, b.Ref) })
 	slices.SortFunc(doc.Options, func(a, b packLsOption) int { return strings.Compare(a.Ref, b.Ref) })

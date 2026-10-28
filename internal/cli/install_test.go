@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -193,7 +194,7 @@ func TestLockFirstRefusesLibrary(t *testing.T) {
 // pack ls lists the packages of a library on this machine (libraries.toml)
 // whose verified checkout still resolves, with their alias; not those of a
 // checkout no libraries.toml entry names.
-func TestPackLsLibrary(t *testing.T) {
+func TestLibraryPackagesOffered(t *testing.T) {
 	ws, dirs, _ := acmeWS(t)
 	options := func() map[string]string {
 		code, out, errs := run(t, "-C", ws, "--json", "pack", "ls")
@@ -221,6 +222,19 @@ func TestPackLsLibrary(t *testing.T) {
 	}
 	if got := options()["acme:redis@1"]; got != "acme/cache" {
 		t.Errorf("acme:redis@1 = %q, want library acme, slot cache", got)
+	}
+	// Settings offers it too: project show's cache choices.
+	code, out, errs := run(t, "-C", ws, "--json", "project", "show")
+	if code != 0 {
+		t.Fatalf("project show: exit %d: %s", code, errs)
+	}
+	var show projectDoc
+	if err := json.Unmarshal([]byte(out), &show); err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(show.Options, func(o optionRow) bool { return o.Key == "cache" })
+	if i < 0 || !slices.Contains(show.Options[i].Choices, "acme:redis@1") {
+		t.Errorf("project show cache choices lack acme:redis@1: %+v", show.Options)
 	}
 	testfixture.WriteFile(t, filepath.Join(libraries.CurrentDir(dirs, "acme"), "options", "redis", "README.md"), "tampered\n")
 	if _, ok := options()["acme:redis@1"]; ok {

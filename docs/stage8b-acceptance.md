@@ -11,7 +11,7 @@ Chromium).
 | `pack export rails@1 --to <dir>`; `filial.example` added to the folder's `deps.allow` | PASS |
 | `pack import <dir> --as filial-rails`: new, shown as its changes from the built-in `rails@1`: `deps.allow` (1 firewall flag) and the manifest's name line | PASS, after the first cut showed every file as added (15 flags burying the one change) |
 | Switching Maybe to `local:filial-rails@1` | Refused: `sidekiq@1 does not work with pack filial-rails`. Options name the packs they work with, so a shared pack keeps its name; documented |
-| `pack import <dir>` (as `local:rails@1`), accepted; `project write` with `pack = "local:rails@1"`: locked `source = "local"`, `filial.example` in the rendered firewall list, nothing pending | PASS (Settings has no pack control: the project.toml editor does it; documented) |
+| `pack import <dir>` (as `local:rails@1`), accepted; `project write` with `pack = "local:rails@1"`: locked `source = "local"`, `filial.example` in the rendered firewall list, nothing pending | PASS (Settings had no pack control then; Stage 8c adds it, D115) |
 
 ## An update of a used package (the Library page)
 

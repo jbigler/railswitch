@@ -30,6 +30,7 @@ type opSpec struct{ required, optional []string }
 
 var ops = map[string]opSpec{
 	"option":      {required: []string{"key", "ref"}},
+	"pack":        {required: []string{"ref"}},
 	"env.set":     {required: []string{"name"}, optional: []string{"value"}},
 	"env.unset":   {required: []string{"name"}},
 	"link.add":    {required: []string{"label", "url"}},
@@ -80,6 +81,8 @@ func ApplyText(data string, e Edit) (string, error) {
 	switch e.Op {
 	case "option":
 		return config.SetOption(data, e.Key, e.Ref, slices.Contains(config.Slots, e.Key))
+	case "pack":
+		return config.SetPack(data, e.Ref)
 	case "env.set":
 		return config.SetEnv(data, e.Name, e.Value)
 	case "env.unset":

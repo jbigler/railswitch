@@ -147,8 +147,10 @@ shows what each one does before anything is written.
 - **Project:** name, repository, base branch and prefix. Read-only; the
   prefix is fixed because it names every container, volume, network and
   hostname.
-- **Stack and options:** one row per slot and extra `[options]` key with
-  its current package. "Change" opens its choices (the current one tagged
+- **Stack and options:** first the pack (D115), when `project show`'s
+  `pack.choices` offers another (a local copy, a library's, another
+  version: each with the same app service); then one row per slot and
+  extra `[options]` key with its current package. "Change" opens its choices (the current one tagged
   `current`); picking another stages it and the row shows `→ <new>`.
   Picking the current one again unstages it. "Add service" (a key and an
   option from `project show`'s `add_choices`) stages a new extra key (D81);

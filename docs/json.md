@@ -747,7 +747,8 @@ runs one. The text form is a table `NAME SOURCE COMMAND`.
 
 ## `settings preview`
 
-Reads an edit list on stdin (a JSON array; ops `option`, `env.set`,
+Reads an edit list on stdin (a JSON array; ops `pack` (`ref`: sets
+`[stack] pack`, D115), `option`, `env.set`,
 `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`; strict:
 an unknown field or op is an error), writes nothing and judges each edit
 against the project with the edits before it applied. Without `--json` it
@@ -820,6 +821,7 @@ What the settings page reads: the project's choices, env and links.
 | `prefix`, `name`, `repo`, `base_branch` | string | The `[project]` table. |
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
+| `pack` | object | `ref`: `[stack] pack`; `choices`: the packs Settings offers, sorted, the current one among them: the newest built-in of each name, the workspace's `packs/<name>/` as `local:<name>@N` and the libraries' packs, each that loads with the current pack's app service (so `[stack] app` stays valid). |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
 | `used` | string[] | The stack's refs: the pack, each option, each agent package (once). |
 | `add_choices` | string[] | Every option a new extra key (D81) can take: built-ins at their newest version, then the workspace's `local:<name>@N`. |

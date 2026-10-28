@@ -128,9 +128,8 @@ work with (`works_with = ["rails"]`), so a renamed pack loses them.
   folder over it (shown as the diff from yours).
 
 To start a teammate's new project on it: create the project from the
-built-in (or from a template), import the package, then use it: an option
-in Settings, a pack as `[stack] pack = "local:rails@1"` in `project.toml`
-(the Settings page's project.toml editor), an agent with `agent add`. A template that names a `local:` package
+built-in (or from a template), import the package, then pick it in
+Settings (a pack or an option), or for an agent run `agent add`. A template that names a `local:` package
 can't start a project on a machine without it.
 
 ## Locking

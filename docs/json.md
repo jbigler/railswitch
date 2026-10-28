@@ -195,8 +195,10 @@ same way (never the manifest), with no `--dry-run`.
 
 Every pack and option, for the new-project page's pickers: each built-in
 name at its newest version, then, when run in a workspace (`-C <ws>`), its
-local packages (`packs/<name>/`, `options/<name>/`) as `local:<name>@N`.
-Each list is sorted by ref.
+local packages (`packs/<name>/`, `options/<name>/`) as `local:<name>@N`,
+then the packages of every library in `libraries.toml` whose verified
+checkout still resolves (its files hash to the signed index) as
+`<alias>:<name>@N`. Each list is sorted by ref.
 
 ```json
 {"packs": [{"ref": "rails@1", "name": "rails"}],
@@ -206,7 +208,8 @@ Each list is sorted by ref.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `packs[].ref`, `options[].ref` | string | `name@N` or `local:name@N`. |
+| `packs[].ref`, `options[].ref` | string | `name@N`, `local:name@N` or `<alias>:name@N`. |
+| `library` (any entry) | string | The alias of the library it comes from; absent for built-in and local packages. |
 | `packs[].name`, `options[].name` | string | The package name. |
 | `options[].slot` | string | The option's slot. |
 | `options[].works_with` | string[] | Pack names it works with, or `["*"]`. |

@@ -16,6 +16,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/libraries"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -626,12 +628,14 @@ type packLsDoc struct {
 type packLsAgent struct {
 	Ref     string `json:"ref"`
 	Name    string `json:"name"`
-	Default bool   `json:"default"` // the agent a new project gets unless told otherwise
+	Default bool   `json:"default"`           // the agent a new project gets unless told otherwise
+	Library string `json:"library,omitempty"` // the alias of the library it comes from
 }
 
 type packLsPack struct {
-	Ref  string `json:"ref"`
-	Name string `json:"name"`
+	Ref     string `json:"ref"`
+	Name    string `json:"name"`
+	Library string `json:"library,omitempty"`
 }
 
 type packLsOption struct {
@@ -639,6 +643,50 @@ type packLsOption struct {
 	Name      string   `json:"name"`
 	Slot      string   `json:"slot"`
 	WorksWith []string `json:"works_with"`
+	Library   string   `json:"library,omitempty"`
+}
+
+// libraryPackages adds to doc every package of each fetched library's
+// verified checkout that still resolves (its files hash to the signed
+// index). A library not fetched or trusted yet adds nothing.
+func libraryPackages(root string, doc *packLsDoc) error {
+	d, err := machine.DefaultDirs()
+	if err != nil {
+		return err
+	}
+	c, err := libraries.Load(libraries.Path(d))
+	if err != nil {
+		return err
+	}
+	cat, err := pack.LoadCatalog(root, workspace.Libraries(d))
+	if err != nil {
+		return err
+	}
+	for _, lib := range c.Libraries {
+		co, err := cat.Libraries.Checkout(lib.Alias)
+		if err != nil {
+			continue
+		}
+		for _, lp := range co.Packages {
+			r := lp.Ref
+			r.Library = lib.Alias
+			switch lp.Kind {
+			case pack.KindPack:
+				if p, err := cat.Pack(r); err == nil && p != nil {
+					doc.Packs = append(doc.Packs, packLsPack{Ref: r.String(), Name: r.Name, Library: lib.Alias})
+				}
+			case pack.KindOption:
+				if o, err := cat.Option(r); err == nil && o != nil {
+					doc.Options = append(doc.Options, packLsOption{Ref: r.String(), Name: r.Name, Slot: o.Slot, WorksWith: slices.Clone(o.WorksWith), Library: lib.Alias})
+				}
+			case pack.KindAgent:
+				if a, err := cat.Agent(r); err == nil && a != nil {
+					doc.Agents = append(doc.Agents, packLsAgent{Ref: r.String(), Name: r.Name, Library: lib.Alias})
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // railswitch pack ls: every pack and option a new or current project can
@@ -661,20 +709,23 @@ func packLs(e *env, args []string) int {
 	}
 	doc := packLsDoc{Packs: []packLsPack{}, Options: []packLsOption{}, Agents: []packLsAgent{}}
 	for _, r := range newestBuiltins(cat.Packs) {
-		doc.Packs = append(doc.Packs, packLsPack{r.String(), r.Name})
+		doc.Packs = append(doc.Packs, packLsPack{Ref: r.String(), Name: r.Name})
 	}
 	for _, m := range localManifests(root, "packs", "pack.toml") {
-		doc.Packs = append(doc.Packs, packLsPack{m.ref.String(), m.ref.Name})
+		doc.Packs = append(doc.Packs, packLsPack{Ref: m.ref.String(), Name: m.ref.Name})
 	}
 	for _, r := range newestBuiltins(cat.Options) {
 		o := cat.Options[r]
-		doc.Options = append(doc.Options, packLsOption{r.String(), r.Name, o.Slot, slices.Clone(o.WorksWith)})
+		doc.Options = append(doc.Options, packLsOption{Ref: r.String(), Name: r.Name, Slot: o.Slot, WorksWith: slices.Clone(o.WorksWith)})
 	}
 	for _, m := range localManifests(root, "options", "option.toml") {
-		doc.Options = append(doc.Options, packLsOption{m.ref.String(), m.ref.Name, m.Slot, append([]string{}, m.WorksWith...)})
+		doc.Options = append(doc.Options, packLsOption{Ref: m.ref.String(), Name: m.ref.Name, Slot: m.Slot, WorksWith: append([]string{}, m.WorksWith...)})
 	}
 	for _, r := range newestBuiltins(cat.Agents) {
-		doc.Agents = append(doc.Agents, packLsAgent{r.String(), r.Name, cat.Agents[r].Default})
+		doc.Agents = append(doc.Agents, packLsAgent{Ref: r.String(), Name: r.Name, Default: cat.Agents[r].Default})
+	}
+	if err := libraryPackages(root, &doc); err != nil {
+		return e.fail(err)
 	}
 	slices.SortFunc(doc.Packs, func(a, b packLsPack) int { return strings.Compare(a.Ref, b.Ref) })
 	slices.SortFunc(doc.Options, func(a, b packLsOption) int { return strings.Compare(a.Ref, b.Ref) })

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/libraries"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 	"github.com/jbigler/railswitch/internal/testfixture"
@@ -186,5 +187,43 @@ func TestLockFirstRefusesLibrary(t *testing.T) {
 	}
 	if exists(filepath.Join(ws, "stack.lock")) {
 		t.Error("lock wrote stack.lock")
+	}
+}
+
+// pack ls lists the packages of a library on this machine (libraries.toml)
+// whose verified checkout still resolves, with their alias; not those of a
+// checkout no libraries.toml entry names.
+func TestPackLsLibrary(t *testing.T) {
+	ws, dirs, _ := acmeWS(t)
+	options := func() map[string]string {
+		code, out, errs := run(t, "-C", ws, "--json", "pack", "ls")
+		if code != 0 {
+			t.Fatalf("pack ls: exit %d: %s", code, errs)
+		}
+		var doc packLsDoc
+		if err := json.Unmarshal([]byte(out), &doc); err != nil {
+			t.Fatal(err)
+		}
+		m := map[string]string{}
+		for _, o := range doc.Options {
+			m[o.Ref] = o.Library + "/" + o.Slot
+		}
+		return m
+	}
+	if _, ok := options()["acme:redis@1"]; ok {
+		t.Error("a checkout libraries.toml doesn't name is listed")
+	}
+	err := libraries.Update(dirs, func(c *libraries.Config) (bool, error) {
+		return true, c.Add(libraries.Library{Alias: "acme", URL: "https://example.org/acme.git", ID: acmeID})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := options()["acme:redis@1"]; got != "acme/cache" {
+		t.Errorf("acme:redis@1 = %q, want library acme, slot cache", got)
+	}
+	testfixture.WriteFile(t, filepath.Join(libraries.CurrentDir(dirs, "acme"), "options", "redis", "README.md"), "tampered\n")
+	if _, ok := options()["acme:redis@1"]; ok {
+		t.Error("a package whose files no longer hash to the index is listed")
 	}
 }

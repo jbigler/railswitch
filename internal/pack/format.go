@@ -47,7 +47,8 @@ type Pack struct {
 	Unit     Unit              `toml:"unit"`     // extras for the app unit
 	Detect   PackDetect        `toml:"detect"`   // D87: how project detect recognises a repository
 
-	Files fs.FS `toml:"-"` // the pack's directory
+	Files  fs.FS          `toml:"-"` // the pack's directory
+	Origin *LibraryOrigin `toml:"-"` // the library it was loaded from; nil for a built-in or local pack
 }
 
 // PackDetect is a pack's [detect] table: the pack fits a repository that
@@ -269,7 +270,8 @@ type Option struct {
 	Unit       Unit              `toml:"unit"`
 	Detect     []OptionDetect    `toml:"detect"` // D87
 
-	Files fs.FS `toml:"-"` // the option's directory
+	Files  fs.FS          `toml:"-"` // the option's directory
+	Origin *LibraryOrigin `toml:"-"` // as Pack.Origin
 }
 
 // Dump is an option's [dump] table (C3): Command runs in its container
@@ -360,7 +362,8 @@ type Agent struct {
 	Secrets    []AgentSecret     `toml:"secrets"`
 	Unit       Unit              `toml:"unit"`
 
-	Files fs.FS `toml:"-"` // the package's directory
+	Files  fs.FS          `toml:"-"` // the package's directory
+	Origin *LibraryOrigin `toml:"-"` // as Pack.Origin
 }
 
 // AgentImage is an agent package's Containerfile, built on the agent base image.

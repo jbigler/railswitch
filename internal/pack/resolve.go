@@ -3,6 +3,7 @@ package pack
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"slices"
 	"strings"
@@ -18,6 +19,9 @@ type Stack struct {
 	Options []*Chosen // the [options] in OptionKeys order; "none" ones are absent
 	Tools   []*Tool
 	Agents  []*ChosenAgent // sorted by Name
+	// AgentBase is the agent base image's files (Catalog.AgentBase) when
+	// the stack has agents; nil otherwise.
+	AgentBase fs.FS
 }
 
 // ChosenAgent is one [agents.<name>] of the project, resolved.
@@ -188,6 +192,10 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 			}
 		}
 		s.Agents = append(s.Agents, &ChosenAgent{Name: name, Service: "agent-" + name, Run: run, Agent: a, Ref: r, Env: pa.Env, Allow: allow})
+	}
+
+	if len(s.Agents) > 0 {
+		s.AgentBase = c.AgentBase
 	}
 
 	// Service ids name containers, units and DNS aliases: one owner each.

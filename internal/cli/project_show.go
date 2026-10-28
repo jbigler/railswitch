@@ -59,7 +59,8 @@ type optionRef struct {
 
 // optionRefs are the options a workspace offers: each built-in name at its
 // newest version, then each workspace-local one (options/<name>/) at the
-// version its option.toml declares, sorted by name.
+// version its option.toml declares, sorted by name, then each library
+// option that resolves on this machine.
 func optionRefs(cat *pack.Catalog, root string) []optionRef {
 	var out []optionRef
 	for _, r := range newestBuiltins(cat.Options) {
@@ -67,6 +68,12 @@ func optionRefs(cat *pack.Catalog, root string) []optionRef {
 	}
 	for _, m := range localManifests(root, "options", "option.toml") {
 		out = append(out, optionRef{m.ref, m.Slot})
+	}
+	libs, _ := libraryPackages(cat) // a broken libraries.toml offers none
+	for _, lp := range libs {
+		if lp.kind == pack.KindOption {
+			out = append(out, optionRef{lp.ref, lp.option.Slot})
+		}
 	}
 	return out
 }
@@ -258,14 +265,14 @@ func projectWrite(ctx context.Context, e *env, args []string) int {
 	if err := p.Validate(); err != nil {
 		return e.fail(fmt.Errorf("project.toml: %w", err))
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := workspace.LoadCatalog(root)
 	if err != nil {
 		return e.fail(err)
 	}
 	if _, err := cat.Resolve(p); err != nil {
 		return e.fail(err)
 	}
-	if err := e.commitProject(ctx, root, next); err != nil {
+	if err := e.commitProject(ctx, root, next, &workspace.Accept{}); err != nil {
 		return e.fail(err)
 	}
 	return 0

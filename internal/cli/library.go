@@ -11,25 +11,41 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/jbigler/railswitch/internal/libraries"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/signing"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
-const libraryUsage = `usage: railswitch library verify <dir>
-       railswitch library trust <dir> --fingerprint <fp> [--rotation | --new-signer]
+const libraryUsage = `usage: railswitch library add <url> --alias <alias> [--branch <branch>]
+       railswitch library fetch [<alias>]
+       railswitch library ls
+       railswitch library rm <alias>
+       railswitch library verify <dir>
+       railswitch library trust <alias | dir> --fingerprint <fp> [--rotation | --new-signer]
        railswitch library index <dir> --library <id> [--serial <n>]
        railswitch library sign <dir> --key <private-key-file>
        railswitch library rotate <dir> --old-key <private-key-file> --new <public-key-file>`
 
-// railswitch library verify|trust|index|sign|rotate: a library folder's
-// signed index (D99): checking it against signers.toml, and publishing it.
+// railswitch library add|fetch|ls|rm: the library repositories on the
+// machine (D103, D104). verify|trust|index|sign|rotate: a library
+// folder's signed index (D99): checking it against signers.toml, and
+// publishing it.
 func cmdLibrary(ctx context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr("%s", libraryUsage)
 	}
 	switch args[0] {
+	case "add":
+		return libraryAdd(ctx, e, args[1:])
+	case "fetch":
+		return libraryFetch(ctx, e, args[1:])
+	case "ls":
+		return libraryLs(e, args[1:])
+	case "rm":
+		return libraryRm(e, args[1:])
 	case "verify":
 		return libraryVerify(ctx, e, args[1:])
 	case "trust":
@@ -142,19 +158,24 @@ func libraryTrust(ctx context.Context, e *env, args []string) int {
 	fp := fs.String("fingerprint", "", "the `fingerprint` library verify reported, checked with the publisher")
 	rotation := fs.Bool("rotation", false, "confirm a rotation: trust the new key the trusted one vouches for")
 	newSigner := fs.Bool("new-signer", false, "trust a key no trusted key vouches for, for a library that already has keys or revocations")
-	dir, code, ok := parseNamed(e, fs, args, libraryUsage)
+	target, code, ok := parseNamed(e, fs, args, libraryUsage)
 	if !ok {
 		return code
 	}
 	if *fp == "" {
-		return e.usageErr("library trust: --fingerprint is required (the one library verify %s reports)", dir)
+		return e.usageErr("library trust: --fingerprint is required (the one library verify or fetch reported)")
 	}
 	if *rotation && *newSigner {
 		return e.usageErr("library trust: --rotation and --new-signer don't go together")
 	}
+	dir, promote, done, err := trustTarget(target)
+	if err != nil {
+		return e.fail(err)
+	}
+	defer done()
 	var res, again *signing.Result
 	var added string
-	err := updateTrust(func(t *signing.Trust) (bool, error) {
+	trust := func(t *signing.Trust) (bool, error) {
 		var err error
 		res, err = signing.Verify(ctx, e.run, dir, t)
 		if err != nil {
@@ -189,16 +210,58 @@ func libraryTrust(ctx context.Context, e *env, args []string) int {
 				safefile.Printable(dir), again.Status, safefile.Printable(again.Reason))
 		}
 		return true, nil
+	}
+	err = updateTrust(func(t *signing.Trust) (bool, error) {
+		save, err := trust(t)
+		if err != nil || promote == nil {
+			return save, err
+		}
+		// Under the trust lock: a promote that fails trusts nothing.
+		return true, promote()
 	})
 	if err != nil {
 		return e.fail(err)
 	}
+	then := ""
+	if promote != nil {
+		then = "; " + target + "'s fetch is now current"
+	}
 	if again == nil {
-		fmt.Fprintf(e.stdout, "%s is already trusted for %s\n", *fp, res.Library)
+		fmt.Fprintf(e.stdout, "%s is already trusted for %s%s\n", *fp, res.Library, then)
 		return 0
 	}
-	fmt.Fprintf(e.stdout, "trusted %s for %s\n", added, res.Library)
+	fmt.Fprintf(e.stdout, "trusted %s for %s%s\n", added, res.Library, then)
 	return 0
+}
+
+// trustTarget is what library trust verifies: an alias in libraries.toml
+// names its pending/ fetch, which promote makes current, with the alias's
+// lock held until done; anything else is a library folder (write ./<dir>
+// for a folder named like an alias).
+func trustTarget(target string) (dir string, promote func() error, done func(), err error) {
+	d, err := machine.DefaultDirs()
+	if err != nil {
+		return "", nil, nil, err
+	}
+	c, err := libraries.Load(libraries.Path(d))
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if c.Library(target) == nil {
+		return target, nil, func() {}, nil
+	}
+	unlock, err := libraries.Lock(d, target)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if _, err := libraries.ReadPending(d, target); err != nil {
+		unlock()
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", nil, nil, fmt.Errorf("library %s has no fetch waiting for trust (library fetch %s fetches it)", target, target)
+		}
+		return "", nil, nil, err
+	}
+	return libraries.PendingDir(d, target), func() error { return libraries.Promote(d, target) }, unlock, nil
 }
 
 // trustRefusal says why library trust refuses: the index's state is not

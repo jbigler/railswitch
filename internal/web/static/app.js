@@ -22,7 +22,7 @@ function connect() {
   if (es) es.close();
   clearTimeout(retry);
   // The new page has a prefix only once Create starts its job.
-  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" || view === "machine" ? "new" : view ? "settings" : "" });
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" || view === "machine" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -595,6 +595,10 @@ if (view.startsWith("settings")) {
       return stage({ op: t.checked ? "link.show" : "link.hide", label: row.dataset.label }, t.checked === (row.dataset.hidden !== "true"));
     }
     if (t.name === "restart" && t.closest("#staged")) restartWanted = t.checked;
+    // An Install review with flags: Apply waits for the tick.
+    if (t.name === "ack" && t.closest("#staged")) {
+      $("#staged form[data-apply] button").disabled = $("#staged").hasAttribute("data-blocked") || !t.checked;
+    }
   });
 
   document.addEventListener("input", (e) => {
@@ -969,6 +973,15 @@ function startNew() {
     ready();
   });
 
+  // An Install review with flags: Create waits for the tick (and for a
+  // fresh review when step 1 changed).
+  document.addEventListener("change", (e) => {
+    const f = e.target.closest("form[data-create]");
+    if (!f || e.target.name !== "ack") return;
+    const note = $("#new-review [data-stale]");
+    $("button", f).disabled = !e.target.checked || (note && !note.hidden);
+  });
+
   document.addEventListener("submit", async (e) => {
     const f = e.target;
     if (!f.matches("form[data-create]")) return;
@@ -976,6 +989,8 @@ function startNew() {
     const btn = $("button", f);
     const data = new URLSearchParams(new FormData(form));
     if (f.elements.up && f.elements.up.checked) data.set("up", "1");
+    if (f.elements.accept_install) data.set("accept_install", f.elements.accept_install.value);
+    if (f.elements.ack && f.elements.ack.checked) data.set("ack", "1");
     const p = el.prefix.value.trim();
     body.dataset.prefix = p;
     connect();

@@ -117,6 +117,7 @@ type stagedView struct {
 	RestartWho string
 	ApplyText  string
 	ApplyURL   string
+	Install    *installView // the library packages the edits install; nil: none
 }
 
 type cardView struct {
@@ -150,6 +151,8 @@ func newStaged(applyURL string, show projectShow, edits []edit, doc previewDoc, 
 		ApplyText: fmt.Sprintf("Apply %d %s", n, plural(n, "change", "changes"))}
 	if err != nil {
 		v.Error, v.Blocked = err.Error(), true
+	} else {
+		v.Install = newInstall(doc.Install)
 	}
 	judged := map[int]editResult{}
 	for _, r := range doc.Edits {
@@ -300,8 +303,10 @@ func (s *Server) settingsPreview(w http.ResponseWriter, r *http.Request) {
 	s.html(w, http.StatusOK, "staged", newStaged(applyURL, show, edits, doc, err))
 }
 
-// settingsApply runs `settings apply --if-hash <h> [--restart]` with the
-// edit list on stdin, a project-level job.
+// settingsApply runs `settings apply --if-hash <h> [--accept-install <r>]
+// [--restart]` with the edit list on stdin, a project-level job. Edits
+// that install a library package need the Install review's hash and,
+// with flags, the tick.
 func (s *Server) settingsApply(w http.ResponseWriter, r *http.Request) {
 	p, _, ok := s.lookup(w, r)
 	if !ok {
@@ -324,6 +329,21 @@ func (s *Server) settingsApply(w http.ResponseWriter, r *http.Request) {
 	}
 	argv := []string{s.c.Exe, "-C", p.Workspace, "settings", "apply", "--if-hash", hash}
 	label := "settings apply"
+	// Without --accept-install the CLI installs no library package, so
+	// only a form that names an Install review needs the preview again.
+	if posted := r.PostFormValue("accept_install"); posted != "" {
+		doc, err := readPreview(r.Context(), s.c.CLI, p.Workspace, in)
+		if err != nil {
+			http.Error(w, "preview failed: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if err := checkInstall(doc.Install, posted, r.PostFormValue("ack")); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		argv = append(argv, "--accept-install", doc.Install.Hash)
+		label += " --accept-install"
+	}
 	if r.PostFormValue("restart") != "" {
 		argv = append(argv, "--restart")
 		label += " --restart"

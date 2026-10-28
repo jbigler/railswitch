@@ -112,6 +112,9 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /machine/signers/add", s.signerAdd)
 	m.HandleFunc("POST /machine/signers/rm", s.signerRm)
 	m.HandleFunc("POST /machine/signers/revoke", s.signerRevoke)
+	m.HandleFunc("POST /machine/libraries/add", s.libraryAdd)
+	m.HandleFunc("POST /machine/libraries/fetch", s.libraryFetch)
+	m.HandleFunc("POST /machine/libraries/trust", s.libraryTrust)
 	m.HandleFunc("GET /new", s.newPage)
 	m.HandleFunc("POST /new/detect", s.newDetect)
 	m.HandleFunc("POST /new/review", s.newReview)
@@ -263,7 +266,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	view := q.Get("view")
-	if view != "settings" && view != "new" {
+	if view != "settings" && view != "new" && view != "library" {
 		view = ""
 	}
 	prefix := q.Get("p")

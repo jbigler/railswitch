@@ -195,8 +195,10 @@ same way (never the manifest), with no `--dry-run`.
 
 Every pack and option, for the new-project page's pickers: each built-in
 name at its newest version, then, when run in a workspace (`-C <ws>`), its
-local packages (`packs/<name>/`, `options/<name>/`) as `local:<name>@N`.
-Each list is sorted by ref.
+local packages (`packs/<name>/`, `options/<name>/`) as `local:<name>@N`,
+then the packages of every library in `libraries.toml` whose verified
+checkout still resolves (its files hash to the signed index) as
+`<alias>:<name>@N`. Each list is sorted by ref.
 
 ```json
 {"packs": [{"ref": "rails@1", "name": "rails"}],
@@ -206,7 +208,8 @@ Each list is sorted by ref.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `packs[].ref`, `options[].ref` | string | `name@N` or `local:name@N`. |
+| `packs[].ref`, `options[].ref` | string | `name@N`, `local:name@N` or `<alias>:name@N`. |
+| `library` (any entry) | string | The alias of the library it comes from; absent for built-in and local packages. |
 | `packs[].name`, `options[].name` | string | The package name. |
 | `options[].slot` | string | The option's slot. |
 | `options[].works_with` | string[] | Pack names it works with, or `["*"]`. |
@@ -315,6 +318,46 @@ error (no `ssh-keygen`, an unreadable `packs/`) prints no JSON and exits 1.
 | `packages[].signed` | boolean | `status` is `trusted`, the index lists the package, and its content hash (`pack.ContentHash`, the hash `stack.lock` pins) matches. Always `false` for any other status. |
 | `packages[].reason` | string | Why it is not signed: the index is not trusted (`"the index is not trusted"`), the directory doesn't load, declares another ref, its content differs, or the index doesn't list it. Absent when signed. |
 
+## `library ls`
+
+The library repositories on the machine (D103), in `libraries.toml`
+order, each with its last fetch. `libraries` is `[]` when there are none.
+
+```json
+{
+  "libraries": [
+    {
+      "alias": "acme",
+      "url": "https://github.com/acme/stack-library",
+      "branch": "",
+      "id": "github.com/acme/stack-library",
+      "status": "rotation",
+      "serial": 7,
+      "commit": "4f1c2a9e0b7d6c5a4b3e2f1d0c9b8a7f6e5d4c3b",
+      "fetched": "2026-10-29T14:03:11Z",
+      "packages": 3,
+      "pending": {
+        "fingerprint": "SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU",
+        "new_fingerprint": "SHA256:FMVaaJrORVs5Xx60M485oK5AtUTpvWqQapBKMLidPeA",
+        "status": "rotation",
+        "known_library": true
+      }
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `alias` | string | The ref prefix: `<alias>:<name>@N`. |
+| `url`, `branch` | string | As added; `branch` `""` is the remote's default. |
+| `id` | string | The library id of the first verified index; `""` until a fetch is trusted. |
+| `status` | string | The last fetch's verdict (a `library verify` status); `""` when it was never fetched. |
+| `serial`, `commit` | number, string | The current copy's index serial and git commit; `0` and `""` when there is no current copy. |
+| `fetched` | string | When the last fetch reached its verdict, RFC 3339 UTC; `""` when never. |
+| `packages` | number | The packages the current copy's index lists; `0` without one. |
+| `pending` | object or null | A fetch waiting for `library trust <alias>`: `status` `unknown-signer` or `rotation`; `fingerprint` the signer (for a rotation, the trusted key that vouches for the new one); `new_fingerprint` a rotation's new key, else `""`; `known_library` as in `library verify` (trust needs `--new-signer`). `null` when none waits. |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1
@@ -421,7 +464,7 @@ row.
   "prefix": "filial",
   "workspace": "/home/u/workspace/filial",
   "review_pending": false,
-  "signer_warnings": [],
+  "signer_warnings": [{"ref": "acme:django@1", "library": "github.com/acme/stack-library", "fingerprint": "SHA256:…"}],
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
@@ -442,7 +485,7 @@ row.
 | `prefix` | string | The project's prefix. |
 | `workspace` | string | Its workspace directory as registered. |
 | `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
-| `signer_warnings` | array of strings | Library packages this project runs whose signer was revoked or is no longer trusted (D102). Always `[]` until library packages can be installed (Stage 7c). |
+| `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
@@ -478,9 +521,9 @@ of a `changed` package is the store's copy of what the lock accepted.
 | `hash` | string | `sha256:<hex>` of the exact `stack.lock` bytes the accept writes; `lock --accept` takes it and refuses any other. |
 | `flags` | number | Every flag of every file, summed; Accept needs "I've read the N flagged items" when it is above 0. |
 | `packages` | array | One per package the accept changes; `[]` when there is nothing to review. |
-| `packages[].ref` | string | `name@N` or `local:name@N`. |
-| `packages[].kind` | string | `pack`, `option` or `agent`. |
-| `packages[].status` | string | `changed` (same ref, new content; also a ref back in the lock whose content differs from the entry `stack.lock` remembers in `[[removed]]`); `first` (changed, no stored copy of what was accepted: compared against nothing, every file `added`); `added` (a ref new to the lock); `removed` (a ref the lock drops; a version or locality change is a `removed` and an `added`). |
+| `packages[].ref` | string | `name@N`, `local:name@N` or `<alias>:name@N`. |
+| `packages[].kind` | string | `pack`, `option`, `agent`, `tool` (the nvim tool when `[tools.nvim]` is set, ref `nvim`) or `base` (the agent base image when the project has agents, ref `agent-base`) (D107). |
+| `packages[].status` | string | A library package new to the lock is `added` with every file shown and flagged (an Install review, D106); `changed` (same ref, new content; also a ref back in the lock whose content differs from the entry `stack.lock` remembers in `[[removed]]`); `first` (changed, no stored copy of what was accepted: compared against nothing, every file `added`); `added` (a ref new to the lock); `removed` (a ref the lock drops; a version or locality change is a `removed` and an `added`). |
 | `packages[].from`, `to` | string | The content hash locked now and the one the accept locks (lowercase hex); `""` for none (`added`: no `from`, `removed`: no `to`). |
 | `packages[].also_locked_in` | array | Prefixes of other registered projects whose `stack.lock` already pins this ref at `to`; `[]` when none. |
 | `packages[].files` | array | Every file that differs, by path (unchanged files left out). |
@@ -556,12 +599,14 @@ prints a short summary and the diff. Exit 0 even when an edit is blocked.
   "edits": [
     {"index": 0, "impact": "check", "reasons": ["REDIS_URL is no longer given to rails"], "error": ""}
   ],
-  "restart": ["master"]
+  "restart": ["master"],
+  "install": null
 }
 ```
 
 | Field | Type | Meaning |
 |---|---|---|
+| `install` | object or null | The Install review (D106): when the project as the edits leave it uses a library package `stack.lock` doesn't lock yet, the [`lock --review`](#lock---review) document of just those packages (each `added`, compared against nothing), `hash` the hash of the exact `stack.lock` `settings apply --accept-install <hash>` writes, `restart` always `[]` (the top-level `restart` lists the worktrees). `null` when the edits install no library package, or when the edited project doesn't resolve (the edits say why). |
 | `hash` | string | `sha256:<hex>` of the current `project.toml`; `settings apply` and `project write` take it as `--if-hash`. |
 | `diff` | string | Unified diff of `project.toml` before and after every edit that could be placed. |
 | `edits[].index` | number | Position in the edit list. |
@@ -570,13 +615,21 @@ prints a short summary and the diff. Exit 0 even when an edit is blocked.
 | `edits[].error` | string | For `blocked`, the message; else `""`. |
 | `restart` | string[] | Registered worktrees whose app unit is active and whose rendered units the edits change. One batched `systemctl show` reads the states. |
 
-`settings apply --if-hash <h> [--restart]` takes the same list and prints
+`settings apply --if-hash <h> [--accept-install <review-hash>] [--restart]` takes the same list and prints
 text, not JSON: `wrote <path>/project.toml`, `wrote <path>/stack.lock`,
 the render's `added|changed|removed <file>` lines, then `restarted <slug>`
 per restarted worktree. It refuses (exit 1) when the hash differs
 (`project.toml changed since the preview`) or an edit is blocked (one
 `edit <i> is blocked: <error>` line each), and puts the old
-`project.toml` and `stack.lock` back when lock or render fails.
+`project.toml` and `stack.lock` back when lock or render fails. An edit
+list that installs a library package needs `--accept-install` with the
+preview's `install.hash`: without it the lock refuses (`installing
+acme:django@1 needs review`), with another hash it refuses (`the install
+changed since it was reviewed`), and accepting verifies the library's
+checkout again against today's trust (one `ssh-keygen` call), refusing a
+signer distrusted or revoked since the fetch (`the signer of acme is no
+longer trusted`). Every refusal leaves `project.toml` and `stack.lock` as
+they were.
 
 ## `project show`
 
@@ -694,7 +747,8 @@ branch (`git ls-remote`).
     "Eject 4 Containerfiles",
     "Register, lock and render",
     "Start main (up)"
-  ]
+  ],
+  "install": null
 }
 ```
 
@@ -707,6 +761,7 @@ branch (`git ls-remote`).
 | `worktree.env` | string[] | The app service's env names, sorted. No values: a real run generates the passwords. |
 | `warnings` | string[] | The render's warnings. |
 | `steps` | string[] | What the real run does, in order. The last step is there only with `--up`. |
+| `install` | object or null | The Install review of the library packages the project uses, as `settings preview`'s `install`; `null` when it uses none. The real run then needs `project new … --accept-install <install.hash>`, checked before the clone and again by the lock. |
 
 The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,

@@ -29,9 +29,11 @@ type Lock struct {
 	Schema     int                  `toml:"schema"` // 1 (D39)
 	Packs      map[string]LockEntry `toml:"pack"`   // key = name
 	Options    map[string]LockEntry `toml:"option"`
-	Agents     map[string]LockEntry `toml:"agent"`      // key = ref string: "myagent@1", "local:probe@1"
-	Images     []LockImage          `toml:"image"`      // pulled service images (D15)
-	BaseImages []LockImage          `toml:"base_image"` // FROM images of built steps, by first pull (D36)
+	Agents     map[string]LockEntry `toml:"agent"`          // key = ref string: "myagent@1", "local:probe@1"
+	Tools      map[string]LockEntry `toml:"tool,omitempty"` // key = tool name: "nvim" (D107)
+	Base       map[string]LockEntry `toml:"base,omitempty"` // key "agent": the agent base image (D107)
+	Images     []LockImage          `toml:"image"`          // pulled service images (D15)
+	BaseImages []LockImage          `toml:"base_image"`     // FROM images of built steps, by first pull (D36)
 	// Removed are the entries lock writes dropped, most recent first, at
 	// most MaxRemoved: a ref that comes back is locked at what was
 	// accepted, not at content nobody reviewed (D97).
@@ -48,20 +50,30 @@ type LockRemoved struct {
 	Key     string `toml:"key"`
 	Version string `toml:"version"`
 	Source  string `toml:"source"`
+	Commit  string `toml:"commit,omitempty"`
 	SHA256  string `toml:"sha256"`
+	Signer  string `toml:"signer,omitempty"`
+}
+
+// Removed is e, of kind under key, as a dropped entry.
+func Removed(kind, key string, e LockEntry) LockRemoved {
+	return LockRemoved{Kind: kind, Key: key, Version: e.Version, Source: e.Source, Commit: e.Commit, SHA256: e.SHA256, Signer: e.Signer}
 }
 
 // Entry is r as a table entry.
 func (r LockRemoved) Entry() LockEntry {
-	return LockEntry{Version: r.Version, Source: r.Source, SHA256: r.SHA256}
+	return LockEntry{Version: r.Version, Source: r.Source, Commit: r.Commit, SHA256: r.SHA256, Signer: r.Signer}
 }
 
-// LockEntry pins one pack or option.
+// LockEntry pins one package. A library package's (Source "library <id>",
+// D105) records the commit it was fetched at and the fingerprint of the
+// key that signed its index.
 type LockEntry struct {
 	Version string `toml:"version"`
 	Source  string `toml:"source"`
 	Commit  string `toml:"commit"`
 	SHA256  string `toml:"sha256"`
+	Signer  string `toml:"signer,omitempty"`
 }
 
 // LockImage pins one image ref to a digest.

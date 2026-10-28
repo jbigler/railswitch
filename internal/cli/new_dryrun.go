@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/naming"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -20,6 +22,9 @@ type newDryRunDoc struct {
 	Worktree    dryWorktree `json:"worktree"`
 	Warnings    []string    `json:"warnings"`
 	Steps       []string    `json:"steps"`
+	// Install is the Install review (D106) of the library packages the
+	// project installs; nil when it installs none.
+	Install *reviewDoc `json:"install"`
 }
 
 type dryWorktree struct {
@@ -41,8 +46,8 @@ type dryContainer struct {
 
 // newDryRun prints what project new would write and what its base worktree
 // gets, and writes nothing in the workspace, the registry or the units.
-func (e *env) newDryRun(pl *newPlan, up bool) int {
-	doc, err := dryRunDoc(pl, up)
+func (e *env) newDryRun(ctx context.Context, pl *newPlan, up bool) int {
+	doc, err := dryRunDoc(ctx, pl, up)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -67,14 +72,37 @@ func (e *env) newDryRun(pl *newPlan, up bool) int {
 	for i, s := range doc.Steps {
 		fmt.Fprintf(e.stdout, "%d. %s\n", i+1, s)
 	}
+	if doc.Install != nil {
+		fmt.Fprintf(e.stdout, "install review (create with --accept-install %s):\n", doc.Install.Hash)
+		printReview(e.stdout, doc.Install)
+	}
 	return 0
+}
+
+// newInstall is the Install review of what project new writes for pl
+// (D106), worked out in a temp dir as the dry run does; nil when it
+// installs no library package.
+func newInstall(ctx context.Context, pl *newPlan) (*reviewDoc, []pack.Ref, error) {
+	tmp, err := os.MkdirTemp("", "railswitch-new-")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer os.RemoveAll(tmp)
+	if _, err := writeProject(tmp, pl); err != nil {
+		return nil, nil, err
+	}
+	p, err := config.Load(filepath.Join(tmp, "project.toml"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return installReview(ctx, tmp, p, pl.cat)
 }
 
 // dryRunDoc writes pl's files into a temp dir with the real run's
 // writeProject, then renders them in memory: the base worktree as the only
 // worktree, on a registry entry that is never saved. The temp dir is
 // removed; the rendered paths that name it are not reported.
-func dryRunDoc(pl *newPlan, up bool) (*newDryRunDoc, error) {
+func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error) {
 	tmp, err := os.MkdirTemp("", "railswitch-new-")
 	if err != nil {
 		return nil, err
@@ -93,6 +121,10 @@ func dryRunDoc(pl *newPlan, up bool) (*newDryRunDoc, error) {
 	}
 	if err := p.Validate(); err != nil {
 		return nil, fmt.Errorf("project.toml: %w", err)
+	}
+	install, _, err := installReview(ctx, tmp, p, pl.cat)
+	if err != nil {
+		return nil, err
 	}
 	// Placeholders: a real run generates the passwords, and only names are shown.
 	if err := writeGenerated(tmp, pl.st, func() string { return "dry-run" }); err != nil {
@@ -131,6 +163,7 @@ func dryRunDoc(pl *newPlan, up bool) (*newDryRunDoc, error) {
 		ProjectTOML: string(data),
 		Worktree:    dryWorktree{Slug: slug, Routes: []dryRoute{}, Containers: []dryContainer{}, Env: []string{}},
 		Warnings:    append(slices.Clone(m.Warnings), in.Warnings...),
+		Install:     install,
 		Steps: []string{
 			fmt.Sprintf("Clone %s (%s) into %s", p.Project.Repo, p.Project.BaseBranch, filepath.Join(pl.ws, slug)),
 			"Write project.toml and stack.lock, generate local passwords",

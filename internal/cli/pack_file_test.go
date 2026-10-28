@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -117,12 +118,12 @@ func TestPackFileShow(t *testing.T) {
 
 func TestPackFilePath(t *testing.T) {
 	for _, ok := range []string{"pack.toml", "Containerfile.base", "deps.allow", "README.md", "init-firewall-x.sh", "entrypoints/entrypoint-app.sh", "initdb/02-seed.sql"} {
-		if err := packFilePath(ok, "pack.toml"); err != nil {
+		if err := pack.CheckFilePath(ok, "pack.toml"); err != nil {
 			t.Errorf("%s: %v", ok, err)
 		}
 	}
 	for _, bad := range []string{"option.toml", "Containerfile.", "notes.txt", ".sh", "entrypoints/sub/x.sh", "initdb/.x", "other/x", "", "/etc/passwd", "../x", "entrypoints/../../project.toml", "foo/bar", ".hidden", "entrypoints/", "README.md/x"} {
-		if err := packFilePath(bad, "pack.toml"); err == nil {
+		if err := pack.CheckFilePath(bad, "pack.toml"); err == nil {
 			t.Errorf("%q allowed", bad)
 		}
 	}

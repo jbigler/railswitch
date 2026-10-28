@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/podman"
@@ -18,7 +19,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const settingsUsage = "usage: railswitch settings preview | apply --if-hash <hash> [--restart]  (an edit list on stdin)"
+const settingsUsage = "usage: railswitch settings preview | apply --if-hash <hash> [--accept-install <review-hash>] [--restart]  (an edit list on stdin)"
 
 // maxStdin caps what settings and project write read from stdin.
 const maxStdin = 1 << 20
@@ -123,8 +124,13 @@ func settingsPreview(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	install := previewInstall(ctx, se.WS.Root, p)
 	if e.json {
-		if err := json.NewEncoder(e.stdout).Encode(p); err != nil {
+		doc := struct {
+			*settings.Preview
+			Install *reviewDoc `json:"install"`
+		}{p, install}
+		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
 			return e.fail(err)
 		}
 		return 0
@@ -142,14 +148,34 @@ func settingsPreview(ctx context.Context, e *env, args []string) int {
 		fmt.Fprintf(e.stdout, "restart: %s\n", strings.Join(p.Restart, ", "))
 	}
 	io.WriteString(e.stdout, p.Diff)
+	if install != nil {
+		fmt.Fprintf(e.stdout, "install review (apply with --accept-install %s):\n", install.Hash)
+		printReview(e.stdout, install)
+	}
 	return 0
 }
 
-// railswitch settings apply --if-hash <h> [--restart]: write the edited
-// project.toml, lock and render, all or none.
+// previewInstall is the Install review of the project as p leaves it
+// (D106); nil when it installs no library package, or when the edited
+// project doesn't resolve (its edits say why).
+func previewInstall(ctx context.Context, root string, p *settings.Preview) *reviewDoc {
+	next, err := config.Parse([]byte(p.NewText))
+	if err != nil || next.Validate() != nil {
+		return nil
+	}
+	doc, _, err := installReview(ctx, root, next, nil)
+	if err != nil {
+		return nil
+	}
+	return doc
+}
+
+// railswitch settings apply --if-hash <h> [--accept-install <r>]
+// [--restart]: write the edited project.toml, lock and render, all or none.
 func settingsApply(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("settings apply")
 	hash := fs.String("if-hash", "", "the project.toml hash the preview saw (required)")
+	acceptHash := fs.String("accept-install", "", "accept the install review with this hash (settings preview --json install.hash)")
 	restart := fs.Bool("restart", false, "restart the worktrees the preview lists")
 	if code, ok := parse(fs, args); !ok {
 		return code
@@ -182,7 +208,17 @@ func settingsApply(ctx context.Context, e *env, args []string) int {
 	if blocked {
 		return 1
 	}
-	if err := e.commitProject(ctx, se.WS.Root, []byte(p.NewText)); err != nil {
+	accept := &workspace.Accept{}
+	if *acceptHash != "" {
+		next, err := config.Parse([]byte(p.NewText))
+		if err != nil {
+			return e.fail(err)
+		}
+		if accept, err = e.acceptInstall(ctx, se.WS.Root, next, nil, *acceptHash); err != nil {
+			return e.fail(err)
+		}
+	}
+	if err := e.commitProject(ctx, se.WS.Root, []byte(p.NewText), accept); err != nil {
 		return e.fail(err)
 	}
 	if *restart {
@@ -212,13 +248,13 @@ func (e *env) restartAll(ctx context.Context, slugs []string) int {
 }
 
 // commitProject replaces root's project.toml with next, keeping its mode,
-// then locks and renders (commit).
-func (e *env) commitProject(ctx context.Context, root string, next []byte) error {
+// then locks accepting what accept says and renders (commit).
+func (e *env) commitProject(ctx context.Context, root string, next []byte, accept *workspace.Accept) error {
 	fi, err := os.Stat(filepath.Join(root, "project.toml"))
 	if err != nil {
 		return err
 	}
-	return e.commit(ctx, root, []fileChange{{Rel: "project.toml", Data: next, Mode: fi.Mode().Perm()}}, &workspace.Accept{})
+	return e.commit(ctx, root, []fileChange{{Rel: "project.toml", Data: next, Mode: fi.Mode().Perm()}}, accept)
 }
 
 // fileChange is one file commit writes: Data at Rel (workspace-relative,

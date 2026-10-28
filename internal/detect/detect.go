@@ -16,7 +16,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
@@ -63,12 +62,7 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 	}
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
-	base := os.Getenv("XDG_RUNTIME_DIR")
-	if base == "" {
-		base = os.TempDir()
-	}
-	removeStale(base, time.Now())
-	tmp, err := os.MkdirTemp(base, tempPrefix)
+	tmp, err := sys.RuntimeTemp(tempPrefix, staleAfter)
 	if err != nil {
 		return nil, err
 	}
@@ -119,30 +113,6 @@ func Fetch(ctx context.Context, r sys.Runner, repo, branch string, paths []strin
 		files[p] = buf.b
 	}
 	return files, nil
-}
-
-// removeStale removes the temp dirs in base that a Fetch killed before its
-// defer left behind: real directories (not symlinks) named with
-// tempPrefix, owned by this user, last modified before now-staleAfter.
-func removeStale(base string, now time.Time) {
-	ents, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	for _, e := range ents {
-		if !strings.HasPrefix(e.Name(), tempPrefix) {
-			continue
-		}
-		p := filepath.Join(base, e.Name())
-		fi, err := os.Lstat(p)
-		if err != nil || !fi.IsDir() || now.Sub(fi.ModTime()) < staleAfter {
-			continue
-		}
-		if st, ok := fi.Sys().(*syscall.Stat_t); !ok || int(st.Uid) != os.Getuid() {
-			continue
-		}
-		_ = os.RemoveAll(p)
-	}
 }
 
 // regularBlobs is path → blob id for each entry of `git ls-tree -z` output

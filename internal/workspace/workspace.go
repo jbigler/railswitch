@@ -112,7 +112,7 @@ func load(startDir, slug string, cat *pack.Catalog, keep []pack.Ref) (*Workspace
 		return nil, err
 	}
 	if cat == nil {
-		if cat, err = pack.LoadCatalog(root); err != nil {
+		if cat, err = LoadCatalog(root); err != nil {
 			return nil, err
 		}
 	}
@@ -129,7 +129,7 @@ func load(startDir, slug string, cat *pack.Catalog, keep []pack.Ref) (*Workspace
 	}
 	// The swap comes before Resolve: an update that no longer resolves
 	// (or a local package broken in an editor) still runs what was accepted.
-	cat, pending := runAccepted(cat, p, lock, store(dirs), keep)
+	cat, pending, _ := runAccepted(cat, p, lock, store(dirs), keep)
 	st, err := cat.Resolve(p)
 	if err != nil {
 		return nil, err
@@ -180,7 +180,7 @@ func (w *Workspace) WithProject(p *config.Project) (*Workspace, error) {
 		return nil, err
 	}
 	l := *w.Lock
-	l.Packs, l.Options, l.Agents = want.Packs, want.Options, want.Agents
+	l.Packs, l.Options, l.Agents, l.Tools, l.Base = want.Packs, want.Options, want.Agents, want.Tools, want.Base
 	c := *w
 	c.Project, c.Stack, c.Lock = p, st, &l
 	return &c, nil
@@ -208,7 +208,7 @@ func Hash(data []byte) string {
 // options are keyed by name, agents by ref string ("local:probe@1"); a
 // workspace-local package's source is "local" (D43).
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
-	l := &config.Lock{Packs: map[string]config.LockEntry{}, Options: map[string]config.LockEntry{}, Agents: map[string]config.LockEntry{}}
+	l := &config.Lock{}
 	for _, sp := range stackPackages(st) {
 		e, err := sp.entry()
 		if err != nil {
@@ -224,61 +224,147 @@ type stackPkg struct {
 	kind, key string // pack.KindPack etc.; the lock table's key
 	ref       pack.Ref
 	files     fs.FS
+	origin    *pack.LibraryOrigin // a library package's; nil otherwise
 }
 
-// stackPackages are st's pack, options and agent packages, one per key.
+// lockKinds are stack.lock's package tables, in the order reviews list
+// them.
+var lockKinds = []string{pack.KindPack, pack.KindOption, pack.KindAgent, pack.KindTool, pack.KindBase}
+
+// baseKey is the agent base image's key in [base] (D107).
+const baseKey = "agent"
+
+// refVersion is r's version as a lock entry writes it: "" for an
+// unversioned tool or the agent base image.
+func refVersion(r pack.Ref) string {
+	if r.Version == 0 {
+		return ""
+	}
+	return strconv.Itoa(r.Version)
+}
+
+// stackPackages are st's pack, options and agent packages, its tools and,
+// with agents, the agent base image (D107), one per key.
 func stackPackages(st *pack.Stack) []stackPkg {
-	out := []stackPkg{{pack.KindPack, st.Pack.Name, st.PackRef, st.Pack.Files}}
+	out := []stackPkg{{pack.KindPack, st.Pack.Name, st.PackRef, st.Pack.Files, st.Pack.Origin}}
 	for _, ch := range st.Options {
-		out = append(out, stackPkg{pack.KindOption, ch.Option.Name, ch.Ref, ch.Option.Files})
+		out = append(out, stackPkg{pack.KindOption, ch.Option.Name, ch.Ref, ch.Option.Files, ch.Option.Origin})
 	}
 	seen := map[string]bool{}
 	for _, a := range st.Agents {
 		if key := a.Ref.String(); !seen[key] {
 			seen[key] = true
-			out = append(out, stackPkg{pack.KindAgent, key, a.Ref, a.Agent.Files})
+			out = append(out, stackPkg{pack.KindAgent, key, a.Ref, a.Agent.Files, a.Agent.Origin})
 		}
+	}
+	for _, t := range st.Tools {
+		out = append(out, stackPkg{pack.KindTool, t.Name, pack.Ref{Name: t.Name}, t.Files, nil})
+	}
+	if st.AgentBase != nil {
+		out = append(out, stackPkg{pack.KindBase, baseKey, pack.AgentBaseRef, st.AgentBase, nil})
 	}
 	return out
 }
 
-// entry is sp's lock entry, its content hashed.
+// entry is sp's lock entry, its content hashed. A library package's
+// records its library, commit and signer (D105).
 func (sp stackPkg) entry() (config.LockEntry, error) {
-	src := "built in (railswitch " + buildinfo.Version + ")"
-	if sp.ref.Local {
-		src = localSource
+	e := config.LockEntry{Version: refVersion(sp.ref), Source: "built in (railswitch " + buildinfo.Version + ")"}
+	switch {
+	case sp.ref.Local:
+		e.Source = localSource
+	case sp.ref.Library != "":
+		e.Source = librarySource
+		if o := sp.origin; o != nil {
+			e.Source, e.Commit, e.Signer = librarySource+o.ID, o.Commit, o.Signer
+		}
 	}
 	sum, err := pack.ContentHash(sp.files)
 	if err != nil {
 		return config.LockEntry{}, fmt.Errorf("%s %s: %w", sp.kind, sp.ref, err)
 	}
-	return config.LockEntry{Version: strconv.Itoa(sp.ref.Version), Source: src, SHA256: sum}, nil
+	e.SHA256 = sum
+	return e, nil
 }
 
 // table is l's table of kind, made when nil.
 func table(l *config.Lock, kind string) map[string]config.LockEntry {
-	t := map[string]*map[string]config.LockEntry{pack.KindPack: &l.Packs, pack.KindOption: &l.Options, pack.KindAgent: &l.Agents}[kind]
+	t := map[string]*map[string]config.LockEntry{pack.KindPack: &l.Packs, pack.KindOption: &l.Options, pack.KindAgent: &l.Agents, pack.KindTool: &l.Tools, pack.KindBase: &l.Base}[kind]
 	if *t == nil {
 		*t = map[string]config.LockEntry{}
 	}
 	return *t
 }
 
-// pins reports whether e locks ref r: its version and locality.
-func pins(e config.LockEntry, r pack.Ref) bool {
-	return e.Version == strconv.Itoa(r.Version) && (e.Source == localSource) == r.Local
+// Pins reports whether e locks ref r: its version and where it comes from
+// (built in, local or a library). A library entry pins a library ref only
+// when its library (by id) is the one r's alias names on this machine
+// (libs): acme's redis@1 never pins evil:redis@1, nor acme:redis@1 once
+// the alias acme names another library.
+func Pins(e config.LockEntry, r pack.Ref, libs pack.Libraries) bool {
+	if e.Version != refVersion(r) || sourceKind(e.Source) != refKind(r) {
+		return false
+	}
+	id, ok := LibraryID(e)
+	return !ok || id != "" && libs != nil && libs.Alias(id) == r.Library
 }
 
-// localSource is a workspace-local package's lock source.
-const localSource = "local"
+// sameSource reports whether two lock sources name the same place: the
+// same kind, and for library packages the same library. The built-in
+// source text, which carries the railswitch version, is not compared.
+func sameSource(a, b string) bool {
+	return sourceKind(a) == sourceKind(b) && (sourceKind(a) != fromLibrary || a == b)
+}
+
+// localSource is a workspace-local package's lock source; librarySource
+// prefixes a library package's, "library <id>".
+const (
+	localSource   = "local"
+	librarySource = "library "
+)
+
+// Where a package comes from: sourceKind of a lock entry's source, refKind
+// of a ref.
+const (
+	fromBuiltin = "built in"
+	fromLocal   = "local"
+	fromLibrary = "library"
+)
+
+func sourceKind(src string) string {
+	switch {
+	case src == localSource:
+		return fromLocal
+	case strings.HasPrefix(src, librarySource):
+		return fromLibrary
+	}
+	return fromBuiltin
+}
+
+func refKind(r pack.Ref) string {
+	switch {
+	case r.Local:
+		return fromLocal
+	case r.Library != "":
+		return fromLibrary
+	}
+	return fromBuiltin
+}
+
+// LibraryID is the library a lock entry's package comes from; ok is false
+// for a built-in or local one.
+func LibraryID(e config.LockEntry) (id string, ok bool) {
+	return strings.CutPrefix(e.Source, librarySource)
+}
 
 // ErrStaleLock is wrapped by CheckLock's (and so Render's) error when
 // stack.lock differs from the resolved stack.
 var ErrStaleLock = errors.New("stack.lock is out of date")
 
 // CheckLock refuses a stack.lock whose packs, options or agents differ from
-// the resolved stack by version, content hash or locality (a built-in and a
-// local copy of it are different packages, even byte for byte), or that
+// the resolved stack by version, content hash or where it comes from (a
+// built-in, a local and a library copy of it are different packages, even
+// byte for byte), or that
 // lacks or has an extra one: the hash exists to stop unreviewed package
 // content (HANDOFF §3.11). The built-in source text, which carries the
 // railswitch version, is not compared.
@@ -291,11 +377,18 @@ func (w *Workspace) CheckLock() error {
 	var stale []string
 	// label names an entry in the error: [local:]name@version for packs and
 	// options, the key itself for agents (already a ref string).
-	cmp := func(have, want map[string]config.LockEntry, label func(string, config.LockEntry) string) {
+	// adopt: an entry the lock lacks is not stale. The nvim tool and the
+	// agent base ran built in and unlocked before D107; until a lock write
+	// adds them (as resolved) they run as resolved, so an upgrade never
+	// stops up.
+	cmp := func(have, want map[string]config.LockEntry, label func(string, config.LockEntry) string, adopt ...bool) {
 		for _, name := range sortedKeys(want) {
 			h, ok := have[name]
 			x := want[name]
-			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || (h.Source == localSource) != (x.Source == localSource) {
+			if !ok && len(adopt) > 0 {
+				continue
+			}
+			if !ok || h.Version != x.Version || h.SHA256 != x.SHA256 || !sameSource(h.Source, x.Source) {
 				stale = append(stale, label(name, x))
 			}
 		}
@@ -306,14 +399,19 @@ func (w *Workspace) CheckLock() error {
 		}
 	}
 	versioned := func(name string, e config.LockEntry) string {
-		if e.Source == localSource {
+		switch sourceKind(e.Source) {
+		case fromLocal:
 			return config.LocalPrefix + name + "@" + e.Version
+		case fromLibrary:
+			return name + "@" + e.Version + " (" + strings.TrimSpace(e.Source) + ")"
 		}
 		return name + "@" + e.Version
 	}
 	cmp(have.Packs, want.Packs, versioned)
 	cmp(have.Options, want.Options, versioned)
 	cmp(have.Agents, want.Agents, func(key string, _ config.LockEntry) string { return key })
+	cmp(have.Tools, want.Tools, func(key string, _ config.LockEntry) string { return "tool " + key }, true)
+	cmp(have.Base, want.Base, func(string, config.LockEntry) string { return pack.AgentBaseRef.String() }, true)
 	if len(stale) > 0 {
 		return fmt.Errorf("%w for %s: %s", ErrStaleLock, strings.Join(stale, ", "), reviewHint)
 	}

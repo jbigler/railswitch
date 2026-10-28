@@ -173,6 +173,30 @@ var (
 // [stack] pack, [options] and [agents.<n>] use take one.
 const LocalPrefix = "local:"
 
+// aliasRe is a library's alias on this machine (D103), the prefix of its
+// refs: "<alias>:<name>@N" (D105).
+var aliasRe = regexp.MustCompile(`^[a-z][a-z0-9-]{0,19}$`)
+
+// ValidAlias refuses a library alias outside the grammar, and "local",
+// which LocalPrefix holds.
+func ValidAlias(alias string) error {
+	if !aliasRe.MatchString(alias) || alias+":" == LocalPrefix {
+		return fmt.Errorf("library alias %q must match %s and not be \"local\"", alias, aliasRe)
+	}
+	return nil
+}
+
+// LibraryRef splits a library package ref "<alias>:<name>@N" into its
+// alias and "<name>@N"; ok is false for any other string, a local: ref
+// included. rest is not checked against the ref grammar.
+func LibraryRef(s string) (alias, rest string, ok bool) {
+	alias, rest, found := strings.Cut(s, ":")
+	if !found || ValidAlias(alias) != nil {
+		return "", "", false
+	}
+	return alias, rest, true
+}
+
 // reservedAgents are names an agent cannot take: they are subcommands or
 // image names of `railswitch agent`.
 var reservedAgents = []string{"ls", "stop", "add", "base"}
@@ -411,16 +435,20 @@ func (v *validator) add(path, format string, args ...any) {
 	v.errs = append(v.errs, fmt.Errorf("%s: %s", path, fmt.Sprintf(format, args...)))
 }
 
-// ref checks a package ref; local allows "local:name@N" (D43).
+// ref checks a package ref: "name@N" or a library's "<alias>:name@N"
+// (D105); local allows "local:name@N" (D43).
 func (v *validator) ref(path, ref string, local bool) {
 	r, isLocal := strings.CutPrefix(ref, LocalPrefix)
+	if _, rest, ok := LibraryRef(ref); ok {
+		r = rest
+	}
 	switch {
 	case isLocal && !local:
 		v.add(path, "%q: local: refs are not allowed here", ref)
 	case !refRe.MatchString(r) && local:
-		v.add(path, "%q is not a ref name@N or local:name@N, e.g. \"postgres@1\"", ref)
+		v.add(path, "%q is not a ref name@N, local:name@N or <library>:name@N, e.g. \"postgres@1\"", ref)
 	case !refRe.MatchString(r):
-		v.add(path, "%q is not a ref name@N, e.g. \"postgres@1\"", ref)
+		v.add(path, "%q is not a ref name@N or <library>:name@N, e.g. \"postgres@1\"", ref)
 	}
 }
 

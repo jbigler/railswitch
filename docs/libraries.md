@@ -235,6 +235,84 @@ the old key. A first trust, for a library with no entry in
 `signers.toml`, needs no `--new-signer`. Trusting the signer of an index
 that then verifies as rolled back trusts nothing.
 
+## Adding a library repository
+
+A library you install from is a git repository, added to the machine
+under an alias (D103). The alias prefixes the library's refs:
+`acme:django@1` is the package `django@1` of the library added as `acme`.
+
+1. Add the repository:
+
+   ```sh
+   railswitch library add https://github.com/acme/stack-library --alias acme
+   ```
+
+   The alias matches `[a-z][a-z0-9-]{0,19}` and is not `local`. Pass
+   `--branch <branch>` to fetch a branch other than the remote's default.
+   The URL is an https, ssh, git or file URL, or a local path. `library add`
+   records the library in `~/.config/railswitch/libraries.toml` and fetches
+   it. If the fetch fails before it reaches a verdict (a wrong URL, a
+   refused file), the library is not added.
+
+2. The first fetch of a library reports `unknown-signer` and the signing
+   key's fingerprint, unless you already trust the key. Check the
+   fingerprint with the publisher, then trust it by the alias:
+
+   ```sh
+   railswitch library trust acme --fingerprint SHA256:Ays0teoPOjVM/BphiuEfsQ7gCq7VhFUQd9F9RRAZJXU
+   ```
+
+   This verifies the waiting fetch again, trusts the key and makes the
+   fetch the library's current copy, as `library trust <dir>` does for a
+   folder (`--rotation` and `--new-signer` too). To trust a folder whose
+   name is an alias, write it as `./<name>`.
+
+3. Fetch updates later:
+
+   ```sh
+   railswitch library fetch acme     # or: library fetch (every library)
+   railswitch library ls             # --json: docs/json.md
+   ```
+
+`library rm acme` removes the library and its copy. It refuses while a
+registered project's `project.toml` names a ref of it (`acme:…`), and names
+those projects.
+
+### What a fetch does
+
+A library repository is hostile input (D104). A fetch:
+
+- clones only the branch's last commit, with no file contents and no
+  working tree, into a temporary directory under `$XDG_RUNTIME_DIR` that
+  is always removed. No hook, LFS filter or prompt runs, and git may use
+  only the https, ssh, git and file transports. The whole fetch has a
+  5 minute deadline.
+- reads the tree of `library.toml`, `library.toml.sig`, `packs/`,
+  `options/` and `agents/`, and refuses the whole fetch when any of them
+  holds a symlink or a submodule, or a path that is not a package file
+  (`<kind>s/<name>/<file>`, where `<file>` is one the package format
+  allows: docs/packs.md), or more than 2,000 files, a file over 1 MiB, or
+  over 64 MiB in all. The tree listing stops at the 2,001st file. Other
+  files in the repository are never fetched (but see Known limits).
+- writes those files (0644, `.sh` 0755) into a staging directory and
+  verifies it against your trust, then acts on the verdict:
+
+| Verdict | Effect |
+|---|---|
+| `trusted` | The fetch becomes the library's current copy. The library's id is recorded the first time; later fetches must have the same id. |
+| `unknown-signer`, `rotation` | The fetch waits for `library trust <alias>`. The current copy, if any, stays. |
+| `rolled-back`, `revoked`, `bad-signature` | The fetch is dropped. The current copy stays. |
+
+A refused fetch, or one that fails (network, deadline), changes nothing.
+`library add` and `library fetch` exit 0 for `trusted`, `unknown-signer`
+and `rotation`, and 1 for any other verdict or a failure.
+
+Each library has a directory in `~/.local/share/railswitch/libraries/<alias>/`:
+`current/` (the verified copy that projects install from), `pending/` (a
+fetch that waits for trust) and `fetch.toml` (current's id, commit,
+serial and signer, and the last fetch's status, time and reason). The
+current copy is out of every container's reach.
+
 ## Managing trust
 
 ```sh
@@ -278,3 +356,59 @@ or revoke a key (docs/dashboard.md).
 
 `railswitch --json library verify <dir>` prints the verdict as JSON
 (docs/json.md). Only `trusted` exits 0.
+
+## Using library packages in a project
+
+A fetched library's packages are refs `<alias>:<name>@<N>`, in every place
+a ref goes (`[stack] pack`, `[options]`, `[agents.<n>] use`): see
+docs/packs.md (Library packages). A library package is never locked
+without being reviewed, even the first time (D106).
+
+A `stack.lock` entry records the library a package came from by its id
+(`source = "library <id>"`), not by its alias. The entry pins a ref only
+when the ref's alias names that library on this machine: an entry for
+`acme:redis@1` never pins `evil:redis@1`, nor `acme:redis@1` once the
+alias `acme` names another library. A library ref the lock's tables don't
+pin is new to the lock, even when `[[removed]]` remembers it: installing
+it again is an Install review, and accepting it verifies its library
+again.
+
+- `railswitch lock --review` lists a library ref new to `stack.lock` as
+  `added`, every file shown and flagged (compared against nothing). Plain
+  `railswitch lock` refuses it, even with no `stack.lock` yet.
+- `settings apply`, `project write`, `agent add` and `project new` refuse a
+  library ref new to the lock ("installing acme:django@1 needs review")
+  and put `project.toml` and `stack.lock` back.
+- `railswitch --json settings preview` reports the Install review as
+  `install`; `settings apply --if-hash <h> --accept-install <install.hash>`
+  accepts exactly those packages, and refuses another hash. `project new
+  --dry-run --json` reports `install` the same way; `project new …
+  --accept-install <hash>` accepts it (checked before the clone).
+- Accepting an install or an update (`lock --accept` too) verifies the
+  library's checkout again against today's `signers.toml`, one
+  `ssh-keygen` call: a signer distrusted or revoked since the fetch can't
+  install or update ("the signer of acme is no longer trusted").
+
+`containerfile eject`, `containerfile new` and `containerfile show`'s
+default refuse while the project names a library ref the lock doesn't pin
+("acme:postgres@1 is not installed: review it first"): nothing copies an
+unreviewed library file into your workspace.
+
+A later fetch that changes a locked package's content leaves the project
+running the accepted copy from the store, with the update waiting in
+`lock --review` (`changed`), as for any package (docs/packs.md). Built-in
+and local packages are unaffected.
+
+When the key that signed a locked library package is distrusted or
+revoked, the project keeps running it, and `overview --json` lists it in
+`signer_warnings` (`{ref, library, fingerprint}`, docs/json.md).
+
+## Known limits
+
+- The clone downloads every tree of the branch's last commit before the
+  tree is checked: `--filter=blob:none` leaves out file contents, not
+  directories. A repository with a huge tree is bounded only by the
+  5 minute deadline and the space under `$XDG_RUNTIME_DIR` (a tmpfs on
+  most systems). Git has no client-side size limit for a clone, and
+  `--filter=tree:0` would fetch each directory under `packs/`, `options/`
+  and `agents/` in its own round trip.

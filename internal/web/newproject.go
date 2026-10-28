@@ -181,6 +181,7 @@ type newReviewView struct {
 	Empty     bool
 	Error     string // the dry run's refusal: Create is off
 	Doc       dryRunDoc
+	Install   *installView // the library packages it installs; nil: none
 	CreateURL string
 }
 
@@ -316,12 +317,16 @@ func (s *Server) newReview(w http.ResponseWriter, r *http.Request) {
 	v.Doc, err = readJSON[dryRunDoc](r.Context(), s.c.CLI, append(f.args(), "--dry-run")...)
 	if err != nil {
 		v.Error = err.Error()
+	} else {
+		v.Install = newInstall(v.Doc.Install)
 	}
 	s.html(w, http.StatusOK, "newreview", v)
 }
 
-// newCreate runs project new [--up], a project-level job of the new
-// prefix: a second create of it is refused busy while the first runs.
+// newCreate runs project new [--accept-install <r>] [--up], a
+// project-level job of the new prefix: a second create of it is refused
+// busy while the first runs. A form that names an Install review has it
+// read again by the dry run: the same hash and, with flags, the tick.
 func (s *Server) newCreate(w http.ResponseWriter, r *http.Request) {
 	f, err := parseNewForm(r, s.c.Home, true)
 	if err != nil {
@@ -329,6 +334,18 @@ func (s *Server) newCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	argv := append([]string{s.c.Exe}, f.args()...)
+	if posted := r.PostFormValue("accept_install"); posted != "" {
+		doc, err := readJSON[dryRunDoc](r.Context(), s.c.CLI, append(f.args(), "--dry-run")...)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+		if err := checkInstall(doc.Install, posted, r.PostFormValue("ack")); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		argv = append(argv, "--accept-install", doc.Install.Hash)
+	}
 	if r.PostFormValue("up") != "" {
 		argv = append(argv, "--up")
 	}

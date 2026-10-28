@@ -29,7 +29,7 @@ func acceptVariant(t *testing.T, root, kind, key string, edit func(fstest.MapFS)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pl, err := plan(root, Accept{All: true})
+	pl, err := plan(root, nil, nil, Accept{All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestLockStores(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := lockOf(t, root)
-	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents} {
+	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents, l.Tools, l.Base} {
 		for k, e := range tbl {
 			if _, err := testStore(t).Get(e.SHA256); err != nil {
 				t.Errorf("%s not stored: %v", k, err)
@@ -385,7 +385,7 @@ func TestLoadBackfillsStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := lockOf(t, root)
-	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents} {
+	for _, tbl := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents, l.Tools, l.Base} {
 		for k, e := range tbl {
 			if _, err := testStore(t).Get(e.SHA256); err != nil {
 				t.Errorf("%s not stored by Load: %v", k, err)
@@ -399,12 +399,12 @@ func TestLoadBackfillsStore(t *testing.T) {
 func TestLockEditedMeanwhile(t *testing.T) {
 	root := projectRoot(t)
 	localRails(t, root)
-	pl, err := plan(root, Accept{All: true})
+	pl, err := plan(root, nil, nil, Accept{All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	appendTo(t, filepath.Join(root, "packs", "rails", "deps.allow"), "meanwhile.example\n")
-	if err := pl.write(""); err == nil || !strings.Contains(err.Error(), "changed while it was being locked") {
+	if err := pl.write(context.Background(), Accept{}); err == nil || !strings.Contains(err.Error(), "changed while it was being locked") {
 		t.Fatalf("write: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "stack.lock")); !errors.Is(err, fs.ErrNotExist) {

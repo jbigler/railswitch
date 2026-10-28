@@ -45,6 +45,8 @@ func decode(kind string, data []byte) manifest {
 		v = &t
 	case "agent":
 		v = &a
+	case "base":
+		return manifest{} // the agent base image: a Containerfile, no manifest
 	default:
 		return manifest{err: fmt.Errorf("unknown package kind %q", kind)}
 	}

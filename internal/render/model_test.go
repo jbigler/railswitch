@@ -45,7 +45,7 @@ func writeFile(t *testing.T, path, data string) {
 // workspace has its directory.
 func fixtureInputs(t *testing.T, ws string, mutate func(*config.Project)) Inputs {
 	t.Helper()
-	cat, err := pack.LoadCatalog(ws)
+	cat, err := pack.LoadCatalog(ws, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -645,7 +645,7 @@ func TestBrowserGetsNoCredentials(t *testing.T) {
 
 func TestAssets(t *testing.T) {
 	m, _ := filial(t, nil)
-	cat, err := pack.LoadCatalog(fixtureDir)
+	cat, err := pack.LoadCatalog(fixtureDir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

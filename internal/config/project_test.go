@@ -247,6 +247,31 @@ func TestStackLocalRefs(t *testing.T) {
 	}
 }
 
+// D105: every place a ref goes takes a library's <alias>:name@N.
+func TestConfigAcceptsLibraryRef(t *testing.T) {
+	p := loadFilial(t)
+	p.Options["database"] = "acme:pg@1"
+	p.Stack.Pack = "acme:django@1"
+	p.Agents = map[string]Agent{"probe": {Use: "acme-2:probe@3"}}
+	p.From = "acme:tpl@1"
+	if err := p.Validate(); err != nil {
+		t.Fatalf("Validate = %v", err)
+	}
+	if alias, rest, ok := LibraryRef("acme:pg@1"); !ok || alias != "acme" || rest != "pg@1" {
+		t.Errorf("LibraryRef = %q, %q, %v", alias, rest, ok)
+	}
+	for _, bad := range []string{"Acme:pg@1", "acme:PG@1", "acme:pg", "acme::pg@1", "a:b:pg@1"} {
+		p := loadFilial(t)
+		p.Options["database"] = bad
+		if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "options.database") {
+			t.Errorf("Validate %q = %v", bad, err)
+		}
+	}
+	if _, _, ok := LibraryRef("local:pg@1"); ok {
+		t.Error("local:pg@1 is a library ref")
+	}
+}
+
 // C1, D54: [tools.nvim] is a table; the old bool is refused, and unknown
 // keys under it are errors (the custom decoder checks them itself).
 func TestToolsNvimTable(t *testing.T) {

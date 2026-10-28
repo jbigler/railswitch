@@ -34,7 +34,7 @@ func TestAcceptedRunsRemovedCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cat, err := pack.LoadCatalog(root)
+	cat, err := LoadCatalog(root)
 	if err != nil {
 		t.Fatal(err)
 	}

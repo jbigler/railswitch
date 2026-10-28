@@ -124,6 +124,11 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | D100 | Signer trust | Per library, added on purpose (a fingerprint checked with the publisher, or `signer add`), in `~/.config/railswitch/signers.toml` | User, 2026-10-28: a key trusted for one library never signs another |
 | D101 | Rotation, revocation, rollback | Rotation vouched by the old key and confirmed once; revocations in a trusted index apply at once and the CLI can't undo them; the serial never goes down | User, 2026-10-28 |
 | D102 | Revocation's effect | Stops installs and updates from that library; running projects keep their pinned packages, with a warning (7c) | User, 2026-10-28: content is pinned by hash and was reviewed |
+| D103 | Libraries on a machine | `~/.config/railswitch/libraries.toml`: url, branch, alias (the ref prefix), id from the first verified index | Own judgement (user, 2026-10-28: "use your own judgement"): aliases keep refs short and stable |
+| D104 | Library fetch | A hardened shallow clone of only the package paths (no symlinks, submodules or off-list paths; size caps); only a `trusted` verify replaces `current/`; an untrusted one waits as `pending/` for "Trust this key" | Own judgement: a library repo is hostile input, like `project detect`'s |
+| D105 | Library refs | `<alias>:<name>@N`, resolved only from a verified checkout whose files still hash to the signed index | Own judgement |
+| D106 | Install through the review | A library ref new to the lock is a 7a review (`added`), accepted by its hash (`settings apply --accept-install`, `project new --accept-install`, `lock --accept`) after a re-verify against today's trust | HANDOFF §3.11: nothing from a library is installed until reviewed |
+| D107 | Tools and the agent base locked | The nvim tool and the agent base image are locked, stored and reviewed like packages | The 7a known limit |
 
 ## Stages
 
@@ -141,7 +146,7 @@ Each later stage gets its own detailed plan after the stage before it is accepte
 | 6d Packs and Containerfiles | detailed (`2026-10-28-railswitch-stage-6d.md`) | Containerfiles and local packages edited from the browser with the read-it acknowledgement; new packs and options from a copy or a skeleton (docs/stage6d-acceptance.md) |
 | 7a Update review | detailed (`2026-10-28-railswitch-stage-7a.md`) | A package change (a railswitch upgrade, a local edit outside the dashboard) is shown as per-file diffs with flagged items and accepted only after review; the project runs what it last accepted meanwhile (docs/stage7a-acceptance.md) |
 | 7b Signers | detailed (`2026-10-28-railswitch-stage-7b.md`) | Signer trust, rotation and revocation |
-| 7c Library repositories | later | Library repos; install and update through 7a's review; Install review |
+| 7c Library repositories | detailed (`2026-10-29-railswitch-stage-7c.md`) | Library repos; install and update through 7a's review; Install review |
 | 7d Templates | later | Export a project as `<name>.stack/`; start a project from one |
 
 ### Stage 3 — Machine layer

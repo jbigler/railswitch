@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 
@@ -180,5 +181,64 @@ func TestEjectReadsAccepted(t *testing.T) {
 	mustRun(t, "-C", ws, "pack", "eject", "postgres@1", "--as", "pg")
 	if got := readFile(t, filepath.Join(ws, "options", "pg", "Containerfile.pg-client")); got != string(accepted) {
 		t.Errorf("pack eject copied:\n%s", got)
+	}
+}
+
+// D107: the agent base image is locked; while an update of it waits, an
+// eject (and containerfile show's default) reads the accepted copy.
+func TestEjectAgentBaseAccepted(t *testing.T) {
+	ws, _ := lockedWS(t)
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, err := fs.ReadFile(cat.AgentBase, pack.AgentBaseFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted := append(def, "# accepted\n"...)
+	sha, err := testStore(t).Put(fstest.MapFS{pack.AgentBaseFile: {Data: accepted}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := readLock(t, ws)
+	e, ok := l.Base["agent"]
+	if !ok {
+		t.Fatalf("stack.lock has no [base.agent]: %+v", l.Base)
+	}
+	e.SHA256 = sha
+	l.Base["agent"] = e
+	if err := l.Write(filepath.Join(ws, "stack.lock")); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "containerfile", "eject", "agent-base", "--force")
+	if got, want := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.agent-base")), ejected("agent-base", pack.AgentBaseFile, accepted); got != want {
+		t.Errorf("containerfile eject wrote:\n%s\nwant:\n%s", got, want)
+	}
+	var doc cfShowDoc
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "containerfile", "show", "agent-base")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Default == nil || doc.Default.Text != string(accepted) {
+		t.Errorf("containerfile show default: %+v", doc.Default)
+	}
+}
+
+// While a built-in's update waits and its accepted copy is gone from the
+// store, an eject refuses: copying the resolved text would hand the
+// unreviewed update to a build.
+func TestEjectRefusesWithoutAcceptedCopy(t *testing.T) {
+	ws, _ := lockedWS(t)
+	pendingOption(t, ws, "postgres", func(m fstest.MapFS) {
+		m["Containerfile.pg-client"].Data = append(m["Containerfile.pg-client"].Data, "# accepted\n"...)
+	})
+	dropStore(t)
+	file := filepath.Join(ws, "containerfiles", "Containerfile.pg-client")
+	before := readFile(t, file)
+	if code, _, errs := run(t, "-C", ws, "containerfile", "eject", "pg-client", "--force"); code == 0 || !strings.Contains(errs, "accepted copy is missing") {
+		t.Errorf("eject without the accepted copy: exit %d: %s", code, errs)
+	}
+	if readFile(t, file) != before {
+		t.Error("the eject wrote the unreviewed text")
 	}
 }

@@ -8,16 +8,23 @@
 {{end}}{{range .Reasons}}<div class="reason">{{.}}</div>
 {{end}}<button type="button" class="ln dim" data-undo="{{.Index}}">Undo this change</button>
 </div>
+{{end}}{{with .Install}}<section id="install-review" class="install-review">
+<h2>Install review</h2>
+<p class="note">These changes install a library package. Nothing from it is locked until you apply with this review: read every file, the flagged ones first.</p>
+{{template "review-packages" .Packages}}</section>
 {{end}}<div class="lbl">When you apply</div>
 <ol class="steps">
 <li>project.toml is written.</li>
-<li>The units are rendered.</li>
+{{if .Install}}<li>The library packages above are locked as reviewed.</li>
+{{end}}<li>The units are rendered.</li>
 <li>Running worktrees keep their containers until restarted{{if .Restart}}, or restart now, one at a time, when ticked{{end}}.</li>
 </ol>
-<form method="post" action="{{.ApplyURL}}" class="apply" data-apply>
+<form method="post" action="{{.ApplyURL}}" class="apply" data-apply{{if and .Install .Install.AckText}} data-ack-required{{end}}>
 <input type="hidden" name="hash" value="{{.Hash}}">
-{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> {{.Restart}} <span class="muted mono">{{.RestartWho}}</span></label>
-{{end}}<div class="btns"><button class="ln main"{{if .Blocked}} disabled{{end}}>{{.ApplyText}}</button></div>
+{{with .Install}}<input type="hidden" name="accept_install" value="{{.Hash}}">
+{{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
+{{end}}{{end}}{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> {{.Restart}} <span class="muted mono">{{.RestartWho}}</span></label>
+{{end}}<div class="btns"><button class="ln main"{{if or .Blocked (and .Install .Install.AckText)}} disabled{{end}}>{{.ApplyText}}</button></div>
 </form>
 {{if .Diff}}<details class="diff"><summary>See the project.toml diff</summary><pre class="out mono">{{.Diff}}</pre></details>
 {{end}}{{end}}</section>{{end}}

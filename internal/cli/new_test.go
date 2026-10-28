@@ -674,7 +674,7 @@ func TestNewSetsPortsBeforeWorktree(t *testing.T) {
 // the tools, and nothing for agents when the stack has none.
 func TestEjectNamesAgents(t *testing.T) {
 	p := loadProject(t, filialFixture)
-	cat, err := pack.LoadCatalog(filialFixture)
+	cat, err := pack.LoadCatalog(filialFixture, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

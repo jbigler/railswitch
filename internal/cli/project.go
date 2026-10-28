@@ -14,7 +14,7 @@ import (
 	"github.com/jbigler/railswitch/internal/machine"
 )
 
-const projectUsage = "usage: railswitch project new|init|rm|ls …"
+const projectUsage = "usage: railswitch project new|init|rm|ls|show|write …"
 
 // railswitch project new|init|rm|ls: the project-level commands (D56).
 func cmdProject(ctx context.Context, e *env, args []string) int {
@@ -30,6 +30,10 @@ func cmdProject(ctx context.Context, e *env, args []string) int {
 		return projectRm(ctx, e, args[1:])
 	case "ls":
 		return projectLs(e, args[1:])
+	case "show":
+		return projectShow(ctx, e, args[1:])
+	case "write":
+		return projectWrite(ctx, e, args[1:])
 	}
 	return e.usageErr("%s", projectUsage)
 }

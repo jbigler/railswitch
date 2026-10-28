@@ -303,6 +303,80 @@ runs one. The text form is a table `NAME SOURCE COMMAND`.
 | `command` | string | Its shell command, run as `sh -c '<command> "$@"' <name> <args…>`. |
 | `source` | string | `pack` or `project`. |
 
+## `settings preview`
+
+Reads an edit list on stdin (a JSON array; ops `option`, `env.set`,
+`env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`; strict:
+an unknown field or op is an error), writes nothing and judges each edit
+against the project with the edits before it applied. Without `--json` it
+prints a short summary and the diff. Exit 0 even when an edit is blocked.
+
+```json
+{
+  "hash": "sha256:5cc7…",
+  "diff": "--- project.toml\n+++ project.toml\n@@ -14,7 +14,7 @@\n…",
+  "edits": [
+    {"index": 0, "impact": "check", "reasons": ["REDIS_URL is no longer given to rails"], "error": ""}
+  ],
+  "restart": ["master"]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hash` | string | `sha256:<hex>` of the current `project.toml`; `settings apply` and `project write` take it as `--if-hash`. |
+| `diff` | string | Unified diff of `project.toml` before and after every edit that could be placed. |
+| `edits[].index` | number | Position in the edit list. |
+| `edits[].impact` | string | `none` (no data affected), `check` (an env value the app gets changes), `data` (a non-cache volume is left behind) or `blocked`. |
+| `edits[].reasons` | string[] | Why, one line each; empty for `none`. |
+| `edits[].error` | string | For `blocked`, the message; else `""`. |
+| `restart` | string[] | Registered worktrees whose app unit is active and whose rendered units the edits change. One batched `systemctl show` reads the states. |
+
+`settings apply --if-hash <h> [--restart]` takes the same list and prints
+text, not JSON: `wrote <path>/project.toml`, `wrote <path>/stack.lock`,
+the render's `added|changed|removed <file>` lines, then `restarted <slug>`
+per restarted worktree. It refuses (exit 1) when the hash differs
+(`project.toml changed since the preview`) or an edit is blocked (one
+`edit <i> is blocked: <error>` line each), and puts the old
+`project.toml` and `stack.lock` back when lock or render fails.
+
+## `project show`
+
+What the settings page reads: the project's choices, env and links.
+
+```json
+{
+  "prefix": "filial", "name": "Filial Rails",
+  "repo": "git@github.com:[ORG]/[REPO].git", "base_branch": "master",
+  "hash": "sha256:5cc7…",
+  "options": [
+    {"key": "database", "slot": true, "ref": "postgres@1", "choices": ["postgres@1", "local:mariadb@1", "none"]},
+    {"key": "jobs", "slot": true, "ref": "none", "choices": ["sidekiq@1", "none"]}
+  ],
+  "env": [{"name": "TZ", "value": "Asia/Bangkok"}],
+  "links": [
+    {"label": "Admin", "url": "{worktree.host}/admin", "from": "project", "hidden": false},
+    {"label": "Mailer previews", "url": "{worktree.host}/rails/mailers", "from": "pack rails@1", "hidden": false},
+    {"label": "Storage console", "url": "s3-ui.{worktree.host}", "from": "option rustfs@1", "hidden": false}
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `prefix`, `name`, `repo`, `base_branch` | string | The `[project]` table. |
+| `hash` | string | As `settings preview`. |
+| `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
+| `options[].slot` | bool | The key is a slot (otherwise an extra service, D81). |
+| `options[].choices` | string[] | For a slot, the built-in options of that slot (newest version per name) then the workspace's `options/<name>/` ones as `local:<name>@N`; for an extra key every option; always ending in `none`. The current ref is always among them. |
+| `env[]` | array | The `[env]` table by name. |
+| `links[]` | array | The project's `[[links]]` (`from: "project"`), then the stack's: pack, options in key order, tools (`pack <ref>`, `option <ref>`, `tool <name>`). URLs keep their `{placeholders}`. |
+| `links[].hidden` | bool | The label is in `hide_links`. |
+
+`project write --if-hash <h>` reads the whole `project.toml` on stdin,
+refuses on a hash mismatch, parse, validation or resolve error (exit 1,
+file untouched), else writes, locks and renders as `settings apply` does.
+
 ## `doctor`
 
 The host checks (among them whether another podman network uses the

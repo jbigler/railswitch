@@ -107,6 +107,12 @@ func cmdRender(ctx context.Context, e *env, args []string) int {
 		}
 		return 0
 	}
+	e.printRendered(d)
+	return 0
+}
+
+// printRendered lists what a render added, changed and removed.
+func (e *env) printRendered(d *render.Diff) {
 	for _, c := range []struct {
 		what  string
 		names []string
@@ -115,7 +121,6 @@ func cmdRender(ctx context.Context, e *env, args []string) int {
 			fmt.Fprintf(e.stdout, "%s %s\n", c.what, n)
 		}
 	}
-	return 0
 }
 
 // envRow is one line of `railswitch env` (and one element of its --json).

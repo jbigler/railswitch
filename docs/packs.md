@@ -107,6 +107,10 @@ railswitch: stack.lock is out of date for local:phoenix@1: an update is waiting 
   only the file it writes, reviewed in the editor: when any other file of
   that package changed since it was accepted, the write refuses ("other
   files of <ref> changed since it was accepted: review them first").
+- Ejects copy what was accepted: `containerfile eject` (Reset to default
+  in the editor), the default `containerfile show` compares against,
+  `agent add`'s Containerfiles and `pack eject` of a built-in the project
+  locks all read the stored accepted copy while an update waits.
 - A package that leaves the lock is remembered in its `[[removed]]` list
   (kind, key, version, source, sha256; the newest 32, one per ref). When
   the ref comes back (an option turned off and on in Settings, a version

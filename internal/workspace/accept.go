@@ -51,6 +51,27 @@ func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lock
 	return cat, pending
 }
 
+// Accepted is cat with each package of p whose content changed under the
+// ref root's stack.lock pins replaced by the store's accepted copy, as Load
+// does; cat itself when root has no stack.lock. Whatever copies package
+// text out to the user's files (an eject) reads this catalog, so an
+// unreviewed update never reaches a build that way.
+func Accepted(root string, p *config.Project, cat *pack.Catalog) (*pack.Catalog, error) {
+	lock, err := config.ReadLock(filepath.Join(root, lockFile))
+	if errors.Is(err, config.ErrNoLock) {
+		return cat, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return nil, err
+	}
+	cat, _ = runAccepted(cat, p, lock, store(dirs), nil)
+	return cat, nil
+}
+
 // accepted is cat with the store's copy sha as the package of kind at r.
 func accepted(cat *pack.Catalog, s lockstore.Store, kind string, r pack.Ref, sha string) (*pack.Catalog, error) {
 	files, err := s.Get(sha)

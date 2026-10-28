@@ -197,9 +197,10 @@ func undoCreate(root, rel string, created bool, err error) error {
 	return err
 }
 
-// projectStack loads root's project.toml and resolves its stack. It needs
-// no stack.lock and does not Validate: eject is how a project lacking
-// [image] base gets one.
+// projectStack loads root's project.toml and resolves its stack, on the
+// packages stack.lock accepted (workspace.Accepted) when there is one. It
+// needs no stack.lock and does not Validate: eject is how a project
+// lacking [image] base gets one.
 func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, error) {
 	p, err := config.Load(filepath.Join(root, "project.toml"))
 	if err != nil {
@@ -207,6 +208,9 @@ func projectStack(root string) (*config.Project, *pack.Catalog, *pack.Stack, err
 	}
 	cat, err := pack.LoadCatalog(root)
 	if err != nil {
+		return nil, nil, nil, err
+	}
+	if cat, err = workspace.Accepted(root, p, cat); err != nil {
 		return nil, nil, nil, err
 	}
 	st, err := cat.Resolve(p)

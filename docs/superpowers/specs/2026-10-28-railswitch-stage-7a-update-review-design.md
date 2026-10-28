@@ -67,7 +67,13 @@ Nothing removes copies (they are small; garbage collection is out of 7a).
 The replacement happens in the catalog, before anything else reads the
 stack, so every in-memory render (`settings preview`, `containerfile
 write --dry-run`, `pack file write --dry-run`) sees the accepted content
-too.
+too. So does everything that copies package text into the user's files:
+`containerfile eject` (and `--force`, the editor's Reset to default),
+`containerfile show`'s `default`, `agent add`'s ejects (read after its
+lock write) and `pack eject` of a built-in the project locks read the
+accepted catalog (`workspace.Accepted`), so an unreviewed Containerfile
+never reaches a build through an eject. With no `stack.lock` (`project
+new`), or for a ref the project doesn't lock, the raw catalog is the one.
 
 **Other writes never accept a waiting update.** `workspace.Lock(ctx,
 root, accept)` takes what it may accept: `lock --accept` passes every

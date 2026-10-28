@@ -79,6 +79,12 @@ func packEject(e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	// A built-in the project locks is copied as it was accepted.
+	if p, err := config.Load(filepath.Join(root, "project.toml")); err == nil {
+		if cat, err = workspace.Accepted(root, p, cat); err != nil {
+			return e.fail(err)
+		}
+	}
 	var top, manifest, use string
 	var files fs.FS
 	if p := cat.Packs[ref]; p != nil {

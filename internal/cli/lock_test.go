@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -153,4 +154,31 @@ func TestLockStores(t *testing.T) {
 	shop := filepath.Join(t.TempDir(), "shop")
 	mustNew(t, shop, "--repo", repo, "--prefix", "shop", "--branch", "main")
 	storeHolds(t, shop)
+}
+
+// While a built-in's update waits, everything that copies its text out
+// (containerfile eject, its default in containerfile show, pack eject)
+// reads the accepted copy, not the unreviewed update.
+func TestEjectReadsAccepted(t *testing.T) {
+	ws, _ := lockedWS(t)
+	var accepted []byte
+	pendingOption(t, ws, "postgres", func(m fstest.MapFS) {
+		accepted = append(m["Containerfile.pg-client"].Data, "# accepted\n"...)
+		m["Containerfile.pg-client"].Data = accepted
+	})
+	mustRun(t, "-C", ws, "containerfile", "eject", "pg-client", "--force")
+	if got, want := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.pg-client")), ejected("postgres@1", "Containerfile.pg-client", accepted); got != want {
+		t.Errorf("containerfile eject wrote:\n%s\nwant:\n%s", got, want)
+	}
+	var doc cfShowDoc
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "containerfile", "show", "pg-client")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Default == nil || doc.Default.Text != string(accepted) {
+		t.Errorf("containerfile show default: %+v", doc.Default)
+	}
+	mustRun(t, "-C", ws, "pack", "eject", "postgres@1", "--as", "pg")
+	if got := readFile(t, filepath.Join(ws, "options", "pg", "Containerfile.pg-client")); got != string(accepted) {
+		t.Errorf("pack eject copied:\n%s", got)
+	}
 }

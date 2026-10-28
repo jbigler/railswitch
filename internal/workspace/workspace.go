@@ -634,12 +634,18 @@ var executable = func() (string, error) {
 // (machine.WriteDashboardUnit); `up` restarts a running dashboard whose
 // unit file is newer than its start.
 func writeDashboardUnit(d machine.Dirs) error {
+	_, err := WriteDashboardUnit(d)
+	return err
+}
+
+// WriteDashboardUnit writes the dashboard's unit for this railswitch;
+// changed says the file changed (systemd then needs a daemon-reload).
+func WriteDashboardUnit(d machine.Dirs) (changed bool, err error) {
 	exe, err := executable()
 	if err != nil {
-		return fmt.Errorf("the dashboard unit needs railswitch's path: %w", err)
+		return false, fmt.Errorf("the dashboard unit needs railswitch's path: %w", err)
 	}
-	_, err = machine.WriteDashboardUnit(d, exe)
-	return err
+	return machine.WriteDashboardUnit(d, exe)
 }
 
 // portList is " name=base" for each port, sorted by name.

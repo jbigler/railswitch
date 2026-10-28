@@ -27,6 +27,9 @@ Description=RailSwitch dashboard
 ExecStart=/usr/bin/railswitch dashboard serve
 Restart=always
 RestartSec=2
+
+[Install]
+WantedBy=default.target
 `
 	if got := string(machine.DashboardUnit("/usr/bin/railswitch")); got != want {
 		t.Errorf("DashboardUnit:\n%s\nwant:\n%s", got, want)

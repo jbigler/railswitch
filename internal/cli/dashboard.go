@@ -10,6 +10,7 @@ import (
 	"github.com/jbigler/railswitch/internal/dashconf"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/podman"
+	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 const (
@@ -47,13 +48,30 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "%slogin?token=%s\n", machine.DashboardURL, tok)
-	props, err := podman.Systemd{R: e.run}.Show(ctx, machine.DashboardService, "ActiveState")
-	switch {
-	case err != nil: // the link stands; only whether to start it is unknown
-		fmt.Fprintf(e.stderr, "railswitch: dashboard state unknown: %v\n", err)
-	case props["ActiveState"] != "active":
-		fmt.Fprintf(e.stdout, "start it: systemctl --user start %s\n", machine.DashboardService)
+	// The link stands whatever follows: the dashboard is written, enabled
+	// (it starts at every login, with no project needed) and started.
+	sd := podman.Systemd{R: e.run}
+	changed, err := workspace.WriteDashboardUnit(dirs)
+	if err == nil && changed {
+		err = sd.DaemonReload(ctx)
 	}
+	if err != nil {
+		fmt.Fprintf(e.stderr, "railswitch: dashboard unit: %v\n", err)
+		return 0
+	}
+	props, err := sd.Show(ctx, machine.DashboardService, "ActiveState", "UnitFileState")
+	if err != nil {
+		fmt.Fprintf(e.stderr, "railswitch: dashboard state unknown: %v\n", err)
+		return 0
+	}
+	if props["ActiveState"] == "active" && props["UnitFileState"] == "enabled" {
+		return 0
+	}
+	if err := sd.EnableNow(ctx, machine.DashboardService); err != nil {
+		fmt.Fprintf(e.stderr, "railswitch: starting the dashboard: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
+		return 0
+	}
+	fmt.Fprintln(e.stdout, "started the dashboard; it starts at every login from now on")
 	return 0
 }
 

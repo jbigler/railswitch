@@ -43,6 +43,12 @@ func (s Systemd) DaemonReload(ctx context.Context) error {
 	return err
 }
 
+// EnableNow runs `systemctl --user enable --now <units…>`: started now and
+// at every login.
+func (s Systemd) EnableNow(ctx context.Context, units ...string) error {
+	return s.units(ctx, s.startTimeout(), "enable", append([]string{"--now"}, units...))
+}
+
 // Start runs `systemctl --user start <units…>`.
 func (s Systemd) Start(ctx context.Context, units ...string) error {
 	return s.units(ctx, s.startTimeout(), "start", units)

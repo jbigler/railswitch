@@ -74,7 +74,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, sshKeygen(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
+	out = append(out, sshKeygen(ctx, r), dashboard(ctx, r), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
 	}
@@ -143,6 +143,38 @@ func exists(name, path, fix string) Check {
 		return Check{Name: name, Detail: err.Error(), Fix: fix}
 	}
 	return Check{Name: name, OK: true, Detail: path}
+}
+
+// dashboard warns unless the dashboard's unit is enabled: started at
+// every login, with no project running (railswitch dashboard enables it).
+func dashboard(ctx context.Context, r sys.Runner) Check {
+	c := Check{Name: "dashboard enabled", Warn: true, Fix: "railswitch dashboard (it enables and starts " + machine.DashboardService + ")"}
+	res, err := r.Run(ctx, sys.Cmd{Name: "systemctl", Args: []string{"--user", "is-enabled", machine.DashboardService}})
+	state := strings.TrimSpace(string(res.Stdout))
+	c.OK = err == nil && state == "enabled"
+	c.Detail = state
+	if c.Detail == "" && err != nil {
+		c.Detail = err.Error()
+	}
+	return c
+}
+
+// linger warns when the user's services stop at logout: then no project
+// and no dashboard runs until the next login (loginctl enable-linger).
+func linger(ctx context.Context, r sys.Runner) Check {
+	c := Check{Name: "user services outlive logout", Warn: true, Fix: "loginctl enable-linger (only needed to keep projects and the dashboard running while you are logged out)"}
+	res, err := r.Run(ctx, sys.Cmd{Name: "loginctl", Args: []string{"show-user", "--property=Linger", "--value"}})
+	state := strings.TrimSpace(string(res.Stdout))
+	c.OK = err == nil && state == "yes"
+	switch {
+	case c.OK:
+		c.Detail = "linger on"
+	case state == "no":
+		c.Detail = "linger off: projects and the dashboard stop when you log out and start at your next login"
+	case err != nil:
+		c.Detail = err.Error()
+	}
+	return c
 }
 
 func socket(ctx context.Context, r sys.Runner) Check {

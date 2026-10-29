@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/jobs"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -387,7 +388,7 @@ func TestGuardLoginAndAccept(t *testing.T) {
 	r = httptest.NewRequest("GET", "/healthz", nil)
 	r.Host = "127.0.0.1:7700"
 	w = f.do(r)
-	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "ok v9" {
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "ok v9 "+machine.TokenFingerprint(testToken) {
 		t.Errorf("healthz: %d %q", w.Code, w.Body.String())
 	}
 	checkHeaders(t, "healthz", w)

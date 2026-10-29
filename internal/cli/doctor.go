@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/doctor"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -34,6 +35,9 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	}
 	h := doctor.DefaultHost
 	h.Dashboard = dashboardAddr
+	if dirs, err := machine.DefaultDirs(); err == nil {
+		h.Fingerprint, _ = machine.DashboardFingerprint(dirs) // unreadable: any railswitch dashboard passes
+	}
 	return e.printChecks(append(checks, h.Run(ctx, e.run, ws)...))
 }
 

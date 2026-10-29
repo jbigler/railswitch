@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/jbigler/railswitch/internal/jobs"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 )
 
@@ -220,7 +221,9 @@ func (s *Server) lookup(w http.ResponseWriter, r *http.Request) (projectRow, wor
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	fmt.Fprintf(w, "ok %s\n", s.c.Version)
+	// The token's fingerprint tells `railswitch dashboard` and doctor this
+	// is their user's dashboard (machine.ProbeDashboard).
+	fmt.Fprintf(w, "ok %s %s\n", s.c.Version, machine.TokenFingerprint(s.c.Token))
 }
 
 // root redirects to the first project; the page's script swaps it for

@@ -41,9 +41,6 @@ func fakeHost() *systest.Fake {
 	return f
 }
 
-// host is a Host whose proc/sys files live in a temp dir: the port start
-// file holds portStart, and the quadlet generator and cgroup.controllers
-// exist when present. LookPath finds every binary in found.
 // dashboardServer answers /healthz with code and body; its address.
 func dashboardServer(t *testing.T, code int, body string) string {
 	t.Helper()
@@ -59,6 +56,9 @@ func dashboardServer(t *testing.T, code int, body string) string {
 	return strings.TrimPrefix(srv.URL, "http://")
 }
 
+// host is a Host whose proc/sys files live in a temp dir: the port start
+// file holds portStart, and the quadlet generator and cgroup.controllers
+// exist when present. LookPath finds every binary in found.
 func host(t *testing.T, portStart string, present bool, found ...string) Host {
 	t.Helper()
 	dir := t.TempDir()

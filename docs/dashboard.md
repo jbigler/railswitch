@@ -50,10 +50,13 @@ prints `http://railswitch.localhost:7700/login?token=<token>`, writes the
 dashboard's unit and, unless it is enabled and running, enables and
 starts it (D118). Then it asks `http://127.0.0.1:7700/healthz` as the
 browser would (Host `railswitch.localhost:7700`) for railswitch's answer,
-`ok <version>`, waiting up to 5 s for a dashboard just started (D127).
-Another program answering there (an older dashboard holding the port),
-or nothing answering, is reported on stderr with what to do, and the
-command exits 1: the link wouldn't work. `doctor` makes the same check
+`ok <version> <fingerprint>` (12 hex of a hash of the login token: it
+tells your dashboard from another user's, or one an `ssh -L` forward of
+the port reaches, and gives nothing to log in with), waiting up to 10 s
+while nothing answers (a dashboard just started) (D127). Another program
+answering there (an older dashboard holding the port), a railswitch
+dashboard with another token, or nothing answering is reported on stderr
+with what to do, and the command exits 1: the link wouldn't work. `doctor` makes the same check
 (`dashboard answers`, a warning). Open the link once: the dashboard sets the cookie
 `railswitch_dashboard` (HttpOnly, SameSite=Strict, one year) and
 redirects to `/`, so the token leaves the address bar. Without the cookie

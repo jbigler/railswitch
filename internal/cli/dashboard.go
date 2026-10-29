@@ -75,7 +75,7 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	}
 	// A started unit isn't a dashboard that answers: another program on
 	// its port (an older dashboard) gets the browser, and this one fails.
-	if p := waitDashboard(ctx); !p.Ours {
+	if p := waitDashboard(ctx, machine.TokenFingerprint(tok)); !p.Ours {
 		fmt.Fprintf(e.stderr, "railswitch: the link won't open the dashboard: %s\nnext: %s\n", p, p.Fix())
 		return 1
 	}
@@ -85,14 +85,14 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	return 0
 }
 
-// waitDashboard probes the dashboard until it answers, for a few seconds
-// while nothing does (a unit just started); another program's answer is
-// final.
-func waitDashboard(ctx context.Context) machine.Probe {
-	deadline := time.Now().Add(5 * time.Second)
+// waitDashboard probes the dashboard until it answers, for a while when
+// nothing does (a unit just started, or restarting onto a new binary);
+// any other answer is final.
+func waitDashboard(ctx context.Context, fp string) machine.Probe {
+	deadline := time.Now().Add(10 * time.Second)
 	for {
-		p := machine.ProbeDashboard(ctx, dashboardAddr)
-		if p.Ours || p.Other != "" || !time.Now().Before(deadline) {
+		p := machine.ProbeDashboard(ctx, dashboardAddr, fp)
+		if p.Ours || p.Foreign || p.Other != "" || !time.Now().Before(deadline) {
 			return p
 		}
 		select {

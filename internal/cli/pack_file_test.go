@@ -18,12 +18,22 @@ import (
 )
 
 // localPG is a locked workspace with postgres@1 ejected as local:pg@1,
-// which the project does not use.
+// which the project does not use, plus a mounted initdb/restore-dump.sh
+// (an option file in a subdirectory that the manifest mounts).
 func localPG(t *testing.T) (ws, dir string) {
 	t.Helper()
 	ws, _ = lockedWS(t)
 	mustRun(t, "-C", ws, "pack", "eject", "postgres@1", "--as", "pg")
-	return ws, filepath.Join(ws, "options", "pg")
+	dir = filepath.Join(ws, "options", "pg")
+	if err := os.MkdirAll(filepath.Join(dir, "initdb"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "initdb", "restore-dump.sh"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := filepath.Join(dir, "option.toml")
+	writeFile(t, m, readFile(t, m)+"\n[[mounts]]\nsource = \"initdb/restore-dump.sh\"\ntarget = \"/docker-entrypoint-initdb.d/restore-dump.sh\"\noptions = \"ro,z\"\n")
+	return ws, dir
 }
 
 // localRails is a rendered workspace whose stack uses local:rails@1, an
@@ -77,11 +87,8 @@ func TestPackShowFiles(t *testing.T) {
 	paths = nil
 	for _, f := range d.Files {
 		paths = append(paths, f.Path)
-		if f.Path == "initdb/restore-dump.sh" && !f.Executable {
-			t.Errorf("%s: not executable", f.Path)
-		}
 	}
-	if want := []string{"Containerfile.pg-client", "initdb/restore-dump.sh", "option.toml"}; !slices.Equal(paths, want) {
+	if want := []string{"Containerfile.pg-client", "option.toml"}; !slices.Equal(paths, want) {
 		t.Errorf("built-in files %q; want %q", paths, want)
 	}
 }

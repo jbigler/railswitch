@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -132,5 +133,25 @@ func TestDBRestoreFlagsAfterNames(t *testing.T) {
 	code, _, errs := runIn(t, "-C", ws, "-w", "master", "db", "restore", "filial_dev", "--yes", "--from", "/nonexistent")
 	if code == 0 || strings.Contains(errs, "no dump of --yes") || !strings.Contains(errs, "--from /nonexistent is not a directory") {
 		t.Errorf("exit %d: %s", code, errs)
+	}
+}
+
+func TestParseMixed(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		pos  []string
+		up   bool
+	}{
+		{[]string{"feature-x", "--up"}, []string{"feature-x"}, true},
+		{[]string{"--up", "feature-x"}, []string{"feature-x"}, true},
+		{[]string{"a", "b"}, []string{"a", "b"}, false},
+		{[]string{"--", "--up"}, []string{"--up"}, false},
+	} {
+		fs := flag.NewFlagSet("t", flag.ContinueOnError)
+		up := fs.Bool("up", false, "")
+		pos, _, ok := parseMixed(fs, c.args)
+		if !ok || !slices.Equal(pos, c.pos) || *up != c.up {
+			t.Errorf("%q: %q %v %v", c.args, pos, *up, ok)
+		}
 	}
 }

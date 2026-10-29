@@ -57,8 +57,9 @@ Caches (gems, npm, corepack) are shared by the project's worktrees, so a
 new worktree doesn't download everything again. Data is per worktree: a
 new worktree's database starts from the dumps in `<workspace>/db-dumps/`
 if there are any (`railswitch db dump` writes them from a worktree you
-like), else empty; then the app's own setup runs (`db:prepare` for
-Rails). `railswitch db restore` puts the dumps back into a running
+like), else empty: `up` starts the new database alone, restores each
+dump with the database option's own restore, and only then starts the
+app, whose own setup (`db:prepare` for Rails) runs on the restored data. `railswitch db restore` puts the dumps back into a running
 worktree's database at any time: each database that has a dump is
 replaced, the others are left as they are (it asks first, naming each
 one; `--from <dir>` for dumps from elsewhere, `--yes` without asking).

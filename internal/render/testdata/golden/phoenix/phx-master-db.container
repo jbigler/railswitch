@@ -5,14 +5,12 @@
 Description=phx db of worktree master
 
 [Container]
-Label=phx.unit-hash=5bcc05423e98
+Label=phx.unit-hash=b784aae82009
 Image=docker.io/library/postgres:16
 ContainerName=phx-master-db
 Network=phx-master-dev.network:alias=db
 EnvironmentFile=/WORKSPACES/phoenix/.railswitch/env/master/db.env
 PublishPort=127.0.0.1:55433:5432
-Volume=/WORKSPACES/phoenix/.railswitch/assets/postgres/initdb/restore-dump.sh:/docker-entrypoint-initdb.d/restore-dump.sh:ro,z
-Volume=/WORKSPACES/phoenix/db-dumps:/db-dumps:ro,z
 Volume=phx-master-db-data-pg16:/var/lib/postgresql/data
 ShmSize=256mb
 NoNewPrivileges=true

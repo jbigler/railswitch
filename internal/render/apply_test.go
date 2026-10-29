@@ -272,7 +272,6 @@ func TestPlanAssets(t *testing.T) {
 	p, _, _ := filialPlan(t)
 	for rel, src := range map[string]string{
 		".railswitch/assets/rails/entrypoints/entrypoint-app.sh": "packs/rails/entrypoints/entrypoint-app.sh",
-		".railswitch/assets/postgres/initdb/restore-dump.sh":     "options/postgres/initdb/restore-dump.sh",
 	} {
 		f, ok := p.Files[rel]
 		if !ok {

@@ -189,6 +189,11 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	if err := l.seedVolumes(ctx, m, in); err != nil {
 		return err
 	}
+	// Read before anything starts: starting the database creates its volume.
+	fresh, err := l.freshDatabase(ctx, m, in, slug)
+	if err != nil {
+		return err
+	}
 
 	sd := l.systemd()
 	names, err := m.NamesFor(slug)
@@ -292,6 +297,18 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		done(err)
 		if err != nil {
 			return err
+		}
+	}
+	// A new database with dumps waiting (D122): it starts alone, its
+	// option's [dump] restore fills it, and only then does the app start,
+	// so the app's own setup (db:prepare) runs on the restored data.
+	if fresh != nil {
+		fmt.Fprintf(l.Out, "restoring %s into the new database\n", strings.Join(fresh.dbs, ", "))
+		if err := sd.Start(ctx, fresh.unit); err != nil {
+			return l.startFailure(ctx, sd, slug, []string{fresh.unit}, err)
+		}
+		if _, err := l.runRestore(ctx, fresh.ctr, fresh.o, fresh.sc, fresh.files, fresh.dbs, fresh.label); err != nil {
+			return fmt.Errorf("restoring the dumps into the new database: %w (railswitch db restore tries again)", err)
 		}
 	}
 	// The app also needs the project's proxy network and Traefik. The

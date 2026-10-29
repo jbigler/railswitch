@@ -45,7 +45,7 @@ PGTZ = "{env.TZ}"
 # multi-database app (primary, queue, cache, cable) or a second Ecto repo.
 list = ["psql", "-U", "postgres", "-Atc", "SELECT datname FROM pg_database WHERE NOT datistemplate AND datname <> 'postgres' ORDER BY datname"]
 command = ["pg_dump", "-Fc", "-U", "postgres", "{dump.db}"]
-file = "{dump.db}.dump" # initdb/restore-dump.sh restores each into a new volume
+file = "{dump.db}.dump" # up restores each into a new volume with restore below (D122)
 # railswitch db restore (D121): into the running server, each file replacing
 # its database; --force ends the app's connections to it.
 prepare = ["sh", "-c", "dropdb --if-exists --force -U postgres \"$1\" && createdb -U postgres \"$1\"", "sh", "{dump.db}"]
@@ -55,15 +55,6 @@ restore = ["pg_restore", "-U", "postgres", "--no-owner", "--no-acl", "-d", "{dum
 name = "db-data-pg{postgres.major}"
 mount = "/var/lib/postgresql/data"
 
-[[mounts]]              # a relative source is a package asset (Task 8 writes it to .railswitch/assets/postgres/…)
-source = "initdb/restore-dump.sh"
-target = "/docker-entrypoint-initdb.d/restore-dump.sh"
-options = "ro,z"
-
-[[mounts]]
-source = "{dumps}"
-target = "/db-dumps"
-options = "ro,z"
 
 [[ports]]
 name = "db"

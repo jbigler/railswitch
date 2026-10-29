@@ -120,3 +120,62 @@ func TestOpenRegularRefusesSymlink(t *testing.T) {
 		t.Error("opened a symlink")
 	}
 }
+
+// A new database with a dump waiting is filled before the app starts
+// (D122): the database alone, its option's prepare and restore, then the
+// app, whose own setup then runs on the restored data.
+func TestUpRestoresNewDatabase(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "image", "exists")
+	e.missing("podman", "volume", "exists")
+	if err := os.WriteFile(filepath.Join(e.ws, "db-dumps", "filial_dev.dump"), []byte("PGDMP dev"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(),
+		"podman volume exists filial-feat-db-data-pg",
+		"systemctl --user start filial-feat-db.service",
+		"podman exec filial-feat-db sh -c dropdb",
+		"podman exec -i filial-feat-db pg_restore -U postgres --no-owner --no-acl -d filial_dev",
+		"systemctl --user start filial-feat-rails.service")
+	if !strings.Contains(e.out.String(), "restoring filial_dev into the new database") {
+		t.Errorf("output:\n%s", e.out)
+	}
+}
+
+// An existing database is never restored into by up.
+func TestUpKeepsExistingDatabase(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "image", "exists")
+	if err := os.WriteFile(filepath.Join(e.ws, "db-dumps", "filial_dev.dump"), []byte("PGDMP dev"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(e.calls(), "pg_restore"); n != 0 {
+		t.Errorf("restored into an existing database")
+	}
+}
+
+// Nothing runs when a dump can't be opened at the last moment: every file
+// is opened before the first prepare.
+func TestDBRestoreOpensBeforePrepare(t *testing.T) {
+	e := setup(t)
+	e.dbRunning("feat")
+	dir := writeDumps(t, e.ws)
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	if err := os.Chmod(filepath.Join(dir, "filial_queue.dump"), 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.l.DBRestore(ctx, "feat", "", nil, true); err == nil {
+		t.Fatal("restored with an unreadable dump")
+	}
+	if n := count(e.calls(), "dropdb"); n != 0 {
+		t.Errorf("prepare ran before every file was opened")
+	}
+}

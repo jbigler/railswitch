@@ -43,7 +43,7 @@ func TestLoadBuiltins(t *testing.T) {
 	if _, err := fs.Stat(cat.Packs[Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"); err != nil {
 		t.Errorf("rails Files: %v", err)
 	}
-	if _, err := fs.Stat(cat.Options[Ref{Name: "postgres", Version: 1}].Files, "initdb/restore-dump.sh"); err != nil {
+	if _, err := fs.Stat(cat.Options[Ref{Name: "postgres", Version: 1}].Files, "Containerfile.pg-client"); err != nil {
 		t.Errorf("postgres Files: %v", err)
 	}
 	if _, err := fs.Stat(cat.Tools["nvim"].Files, "Containerfile.nvim"); err != nil {

@@ -90,17 +90,18 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("wt add")
 	name := fs.String("name", "", "the worktree's `name` (default: the branch, sanitized)")
 	up := fs.Bool("up", false, "run up in the new worktree")
-	if code, ok := parse(fs, args); !ok {
+	pos, code, ok := parseMixed(fs, args)
+	if !ok {
 		return code
 	}
-	if fs.NArg() != 1 {
+	if len(pos) != 1 {
 		return e.usageErr("%s", wtUsage)
 	}
 	m, err := e.manager(ctx)
 	if err != nil {
 		return e.fail(err)
 	}
-	w, err := m.Add(ctx, fs.Arg(0), *name)
+	w, err := m.Add(ctx, pos[0], *name)
 	if err != nil {
 		return e.fail(err)
 	}

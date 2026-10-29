@@ -33,15 +33,9 @@ func cmdDB(ctx context.Context, e *env, args []string) int {
 		from := fs.String("from", "", "restore the dumps in `dir` (default: <workspace>/db-dumps)")
 		yes := fs.Bool("yes", false, "replace the databases without asking")
 		// Flags may follow the database names (db restore mydb --yes).
-		var only []string
-		for rest := args[1:]; ; {
-			if code, ok := parse(fs, rest); !ok {
-				return code
-			}
-			if fs.NArg() == 0 {
-				break
-			}
-			only, rest = append(only, fs.Arg(0)), fs.Args()[1:]
+		only, code, ok := parseMixed(fs, args[1:])
+		if !ok {
+			return code
 		}
 		l, slug, code := e.lifecycle(ctx, "db restore")
 		if code != 0 {

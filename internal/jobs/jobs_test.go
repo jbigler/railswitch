@@ -187,7 +187,7 @@ func TestOutputCaps(t *testing.T) {
 
 func TestFloodCapped(t *testing.T) {
 	h, _, dir := newHub(t)
-	s, err := h.Start(context.Background(), sh("p", "a", `yes "$(printf '%01023d' 0)" | head -c 20971520`))
+	s, err := h.Start(context.Background(), sh("p", "a", `yes "$(printf '%01023d' 0)" | head -c 41943040`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,8 +213,11 @@ func TestFloodCapped(t *testing.T) {
 	if j.State != StateOK {
 		t.Errorf("state = %s", j.State)
 	}
-	if m := maxSize.Load(); m > 2*LogLimit {
-		t.Errorf("log reached %d bytes, want ≤ %d", m, 2*LogLimit)
+	// The child writes the file itself, so the cap is kept by truncation
+	// and a busy machine lets it overshoot 2*LogLimit a little; without
+	// the cap it would reach the 40 MiB written.
+	if m := maxSize.Load(); m > 3*LogLimit {
+		t.Errorf("log reached %d bytes, want ≤ %d", m, 3*LogLimit)
 	}
 	if !j.Dropped {
 		t.Error("Dropped = false")

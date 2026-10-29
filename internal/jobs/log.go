@@ -13,7 +13,9 @@ const droppedLine = "… output dropped (log over 8 MiB)\n"
 
 // backstop is the size at which a log the tail is behind on is truncated
 // unread. The child writes the file directly, so it can outrun the tail
-// between two size checks; the headroom keeps the file within 2*LogLimit.
+// between two size checks; the headroom usually keeps the file within
+// 2*LogLimit, and a starved tail lets it pass that by what the child
+// writes before the next check: bounded, not exact.
 const backstop = 2*LogLimit - 2<<20
 
 // logTail follows a job's log file: the child writes it (Stdout and

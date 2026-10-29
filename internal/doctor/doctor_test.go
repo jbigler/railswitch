@@ -41,7 +41,8 @@ func fakeHost() *systest.Fake {
 	return f
 }
 
-// dashboardServer answers /healthz with code and body; its address.
+// dashboardServer answers /healthz with code and body, a body "ok <v>"
+// with the proof for dashToken; its address.
 func dashboardServer(t *testing.T, code int, body string) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,11 +51,17 @@ func dashboardServer(t *testing.T, code int, body string) string {
 			return
 		}
 		w.WriteHeader(code)
+		if v, ok := strings.CutPrefix(body, "ok "); ok {
+			body = "ok " + strings.TrimSpace(v) + " " + machine.ProbeProof(dashToken, r.URL.Query().Get("nonce")) + "\n"
+		}
 		io.WriteString(w, body)
 	}))
 	t.Cleanup(srv.Close)
 	return strings.TrimPrefix(srv.URL, "http://")
 }
+
+// dashToken is the dashboard login token host's Host knows.
+const dashToken = "dashtoken"
 
 // host is a Host whose proc/sys files live in a temp dir: the port start
 // file holds portStart, and the quadlet generator and cgroup.controllers
@@ -74,6 +81,7 @@ func host(t *testing.T, portStart string, present bool, found ...string) Host {
 		},
 	}
 	h.Dashboard = dashboardServer(t, http.StatusOK, "ok v0.1.0\n")
+	h.Token = dashToken
 	if err := os.WriteFile(h.PortStart, []byte(portStart+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -556,6 +564,11 @@ func TestDashboardAnswers(t *testing.T) {
 	c := h.dashboardAnswers(context.Background())
 	if c.OK || !c.Warn || !strings.Contains(c.Detail, `another program answers on 127.0.0.1:7700 (403 "forbidden host")`) || !strings.Contains(c.Fix, "ss -ltnp") {
 		t.Errorf("another program: %+v", c)
+	}
+	h.Dashboard = dashboardServer(t, http.StatusOK, "ok v0.1.1\n")
+	h.Token = "another"
+	if c := h.dashboardAnswers(context.Background()); c.OK || !strings.Contains(c.Detail, "not with your login") {
+		t.Errorf("another token: %+v", c)
 	}
 	h.Dashboard = "127.0.0.1:1"
 	c = h.dashboardAnswers(context.Background())

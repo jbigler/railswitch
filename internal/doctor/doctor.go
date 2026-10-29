@@ -46,9 +46,9 @@ type Host struct {
 	Cgroup    string   // cgroup v2's root cgroup.controllers
 	LookPath  func(name string) (string, error)
 	Dashboard string // the dashboard's address, asked for /healthz
-	// Fingerprint is this user's machine.TokenFingerprint ("": any
-	// railswitch dashboard passes).
-	Fingerprint string
+	// Token is this user's dashboard login token, which the dashboard
+	// proves it holds ("": none yet, nothing passes).
+	Token string
 }
 
 // DefaultHost is this machine.
@@ -163,7 +163,7 @@ func dashboard(ctx context.Context, r sys.Runner) Check {
 // address: another program on the port (an older dashboard) gets the
 // browser instead, and railswitch's can't start.
 func (h Host) dashboardAnswers(ctx context.Context) Check {
-	p := machine.ProbeDashboard(ctx, h.Dashboard, h.Fingerprint)
+	p := machine.ProbeDashboard(ctx, h.Dashboard, h.Token)
 	c := Check{Name: "dashboard answers", Warn: true, OK: p.Ours, Detail: p.String()}
 	if !p.Ours {
 		c.Fix = p.Fix()

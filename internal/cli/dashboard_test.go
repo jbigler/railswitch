@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -69,14 +71,14 @@ func TestDashboardPrintsLogin(t *testing.T) {
 	}
 }
 
-// TestDashboardLoginSystemctlFails: the link is printed even when
-// systemctl fails; the failure goes to stderr.
+// TestDashboardLoginSystemctlFails: a systemctl failure goes to stderr, and
+// the link is still printed when the dashboard answers with its proof.
 func TestDashboardLoginSystemctlFails(t *testing.T) {
 	dashEnv(t)
 	f := &systest.Fake{}
 	f.On([]string{"systemctl"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
 	code, out, errs := runWith(t, f, "dashboard")
-	if code != 0 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "started") || !strings.Contains(errs, "railswitch: dashboard") {
+	if code != 0 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "started") || !strings.Contains(errs, "railswitch: the dashboard's unit") {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errs)
 	}
 }
@@ -156,23 +158,35 @@ func TestColorsCLI(t *testing.T) {
 }
 
 // TestDashboardPortTaken: another program on the dashboard's port (an
-// older dashboard refusing the host) makes `dashboard` say so and exit 1,
-// after printing the link.
+// older dashboard refusing the host), or a dashboard that can't prove it
+// holds this user's token, gets no link: `dashboard` says why and exits 1.
 func TestDashboardPortTaken(t *testing.T) {
 	dashEnv(t)
-	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "forbidden host", http.StatusForbidden)
-	}))
-	defer other.Close()
-	old := dashboardAddr
-	dashboardAddr = strings.TrimPrefix(other.URL, "http://")
-	defer func() { dashboardAddr = old }()
-	f := &systest.Fake{}
-	f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,UnitFileState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=inactive\nUnitFileState=disabled\n")}, nil)
-	f.On([]string{"systemctl", "--user"}, sys.Result{}, nil)
-	code, out, errs := runWith(t, f, "dashboard")
-	if code != 1 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "started the dashboard") ||
-		!strings.Contains(errs, `another program answers on 127.0.0.1:7700 (403 "forbidden host")`) || !strings.Contains(errs, "ss -ltnp") {
-		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errs)
+	oldWait := dashboardWait
+	dashboardWait = 500 * time.Millisecond
+	defer func() { dashboardWait = oldWait }()
+	for _, c := range []struct {
+		name, want string
+		h          http.HandlerFunc
+	}{
+		{"another program", `another program answers on 127.0.0.1:7700 (403 "forbidden host")`, func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+		}},
+		{"no proof", "a railswitch dashboard (v0.1.0) answers on 127.0.0.1:7700 but not with your login", func(w http.ResponseWriter, _ *http.Request) {
+			io.WriteString(w, "ok v0.1.0\n")
+		}},
+	} {
+		other := httptest.NewServer(c.h)
+		old := dashboardAddr
+		dashboardAddr = strings.TrimPrefix(other.URL, "http://")
+		f := &systest.Fake{}
+		f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,UnitFileState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=active\nUnitFileState=enabled\n")}, nil)
+		f.On([]string{"systemctl", "--user"}, sys.Result{}, nil)
+		code, out, errs := runWith(t, f, "dashboard")
+		dashboardAddr = old
+		other.Close()
+		if code != 1 || strings.Contains(out, "token=") || !strings.Contains(errs, "no login link: "+c.want) {
+			t.Errorf("%s: exit %d, stdout %q, stderr %q", c.name, code, out, errs)
+		}
 	}
 }

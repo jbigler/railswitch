@@ -36,7 +36,7 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	h := doctor.DefaultHost
 	h.Dashboard = dashboardAddr
 	if dirs, err := machine.DefaultDirs(); err == nil {
-		h.Fingerprint, _ = machine.DashboardFingerprint(dirs) // unreadable: any railswitch dashboard passes
+		h.Token, _ = machine.ReadDashboardToken(dirs) // none or unreadable: the dashboard can't prove it's yours
 	}
 	return e.printChecks(append(checks, h.Run(ctx, e.run, ws)...))
 }

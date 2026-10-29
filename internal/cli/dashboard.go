@@ -21,8 +21,8 @@ const (
 	colorsResetUsage = "usage: railswitch dashboard colors reset [--dark]"
 )
 
-// railswitch dashboard: print the dashboard's login link (and how to start
-// it when its unit isn't active); `dashboard colors …` edits its colours;
+// railswitch dashboard: start the dashboard and print its login link once
+// it proves it is this user's; `dashboard colors …` edits its colours;
 // `dashboard serve` is the dashboard.
 func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	if len(args) > 0 {
@@ -48,51 +48,54 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	fmt.Fprintf(e.stdout, "%slogin?token=%s\n", machine.DashboardURL, tok)
-	// The link stands whatever follows: the dashboard is written, enabled
-	// (it starts at every login, with no project needed) and started.
+	// The unit is written, enabled (it starts at every login, with no
+	// project needed) and started; a systemctl failure is reported and the
+	// dashboard asked all the same (it may run already).
 	sd := podman.Systemd{R: e.run}
+	started := false
 	changed, err := workspace.WriteDashboardUnit(dirs)
 	if err == nil && changed {
 		err = sd.DaemonReload(ctx)
 	}
-	if err != nil {
-		fmt.Fprintf(e.stderr, "railswitch: dashboard unit: %v\n", err)
-		return 0
+	var props map[string]string
+	if err == nil {
+		props, err = sd.Show(ctx, machine.DashboardService, "ActiveState", "UnitFileState")
 	}
-	props, err := sd.Show(ctx, machine.DashboardService, "ActiveState", "UnitFileState")
-	if err != nil {
-		fmt.Fprintf(e.stderr, "railswitch: dashboard state unknown: %v\n", err)
-		return 0
-	}
-	started := false
-	if props["ActiveState"] != "active" || props["UnitFileState"] != "enabled" {
-		if err := sd.EnableNow(ctx, machine.DashboardService); err != nil {
-			fmt.Fprintf(e.stderr, "railswitch: starting the dashboard: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
-			return 0
+	if err == nil && (props["ActiveState"] != "active" || props["UnitFileState"] != "enabled") {
+		if err = sd.EnableNow(ctx, machine.DashboardService); err == nil {
+			started = true
 		}
-		started = true
 	}
-	// A started unit isn't a dashboard that answers: another program on
-	// its port (an older dashboard) gets the browser, and this one fails.
-	if p := waitDashboard(ctx, machine.TokenFingerprint(tok)); !p.Ours {
-		fmt.Fprintf(e.stderr, "railswitch: the link won't open the dashboard: %s\nnext: %s\n", p, p.Fix())
+	if err != nil {
+		fmt.Fprintf(e.stderr, "railswitch: the dashboard's unit: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
+	}
+	// The link carries the token: it is printed only once the dashboard on
+	// the port has proved it holds that token. Another program there (an
+	// older dashboard, a squatter) would get the token from the browser.
+	if p := waitDashboard(ctx, tok); !p.Ours {
+		fmt.Fprintf(e.stderr, "railswitch: no login link: %s\nnext: %s\n", p, p.Fix())
 		return 1
 	}
+	fmt.Fprintf(e.stdout, "%slogin?token=%s\n", machine.DashboardURL, tok)
 	if started {
 		fmt.Fprintln(e.stdout, "started the dashboard; it starts at every login from now on")
 	}
 	return 0
 }
 
-// waitDashboard probes the dashboard until it answers, for a while when
-// nothing does (a unit just started, or restarting onto a new binary);
-// any other answer is final.
-func waitDashboard(ctx context.Context, fp string) machine.Probe {
-	deadline := time.Now().Add(10 * time.Second)
+// dashboardWait is how long waitDashboard waits for the proof; tests
+// shorten it.
+var dashboardWait = 10 * time.Second
+
+// waitDashboard probes the dashboard until it proves it holds tok, for a
+// while when nothing answers or a dashboard answers without the proof (a
+// unit just started, or an older one restarting onto a new binary);
+// another program's answer is final.
+func waitDashboard(ctx context.Context, tok string) machine.Probe {
+	deadline := time.Now().Add(dashboardWait)
 	for {
-		p := machine.ProbeDashboard(ctx, dashboardAddr, fp)
-		if p.Ours || p.Foreign || p.Other != "" || !time.Now().Before(deadline) {
+		p := machine.ProbeDashboard(ctx, dashboardAddr, tok)
+		if p.Ours || p.Other != "" || !time.Now().Before(deadline) {
 			return p
 		}
 		select {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,7 +16,7 @@ import (
 
 // TestMain points procRoot at a dir whose net/tcp lists no socket: no test
 // sees the host's listening ports unless it sets some with listening; and
-// dashboardAddr at a server answering as the dashboard.
+// dashboardAddr at a server answering as the test's dashboard.
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "railswitch-proc")
 	if err != nil {
@@ -34,7 +33,12 @@ func TestMain(m *testing.M) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
-		io.WriteString(w, "ok test\n")
+		// Proves the token of the test's own data dir, as the dashboard does.
+		tok := ""
+		if d, err := machine.DefaultDirs(); err == nil {
+			tok, _ = machine.ReadDashboardToken(d)
+		}
+		fmt.Fprintf(w, "ok test %s\n", machine.ProbeProof(tok, r.URL.Query().Get("nonce")))
 	}))
 	dashboardAddr = strings.TrimPrefix(dash.URL, "http://")
 	code := m.Run()

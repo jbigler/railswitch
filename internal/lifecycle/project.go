@@ -205,7 +205,11 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		}
 	}
 
-	// 8. --purge: the shared volumes and the workspace's generated files.
+	// 8. The images built for the project, each name by itself: a name in
+	// use (another project's container, by hand) is refused and kept.
+	removeImages(ctx, p, out, prefix)
+
+	// 9. --purge: the shared volumes and the workspace's generated files.
 	if purge {
 		for _, v := range vols {
 			ok, err := p.VolumeExists(ctx, v)
@@ -229,6 +233,39 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 	}
 	fmt.Fprintf(out, "removed project %s; its workspace %s and git repo are kept\n", prefix, pe.Workspace)
 	return nil
+}
+
+// removeImages removes each image name railswitch built for prefix. They
+// are rebuilt on the next up; a failure is printed and the removal goes on.
+func removeImages(ctx context.Context, p podman.Podman, out io.Writer, prefix string) {
+	imgs, err := p.Images(ctx)
+	if err != nil {
+		fmt.Fprintf(out, "kept the images of %s: %v\n", prefix, err)
+		return
+	}
+	var names []string
+	for _, img := range imgs {
+		for _, n := range img.Names {
+			if pfx, ok := podman.BuiltPrefix(n); ok && pfx == prefix && !slices.Contains(names, n) {
+				names = append(names, n)
+			}
+		}
+	}
+	slices.Sort(names)
+	gone := 0
+	for _, n := range names {
+		if err := p.ImageRemove(ctx, n); err != nil {
+			fmt.Fprintf(out, "kept image %s: %v\n", n, err)
+			continue
+		}
+		gone++
+	}
+	switch {
+	case gone == 1:
+		fmt.Fprintf(out, "removed 1 image of %s\n", prefix)
+	case gone > 1:
+		fmt.Fprintf(out, "removed %d images of %s\n", gone, prefix)
+	}
 }
 
 // unserveRecorded turns off each tailnet port share recorded for worktree

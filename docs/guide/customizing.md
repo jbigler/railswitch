@@ -84,4 +84,13 @@ removed, or the old one after a PostgreSQL major upgrade
 It keeps everything any registered project's worktrees use now, running
 or not, and everything of a project that doesn't load.
 
+Removing a whole project removes its images too:
+
+```bash
+railswitch project rm shop            # worktrees, units, networks, images
+railswitch project rm shop --purge    # also the shared volumes and <workspace>/.railswitch
+```
+
+The workspace folder and its git repositories are kept either way.
+
 Next: [Sharing](sharing.md).

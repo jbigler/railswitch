@@ -11,6 +11,7 @@ import (
 	"maps"
 	"net/netip"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -138,6 +139,19 @@ type Image struct {
 	Size       int64             `json:"Size"`
 	Containers int               `json:"Containers"`
 	Labels     map[string]string `json:"Labels"`
+}
+
+// builtImageRe is an image railswitch builds: localhost/<prefix>/<repo>:<version>-<hash8>.
+var builtImageRe = regexp.MustCompile(`^localhost/([a-z][a-z0-9]{1,15})/[a-z0-9][a-z0-9._-]*:[A-Za-z0-9._-]+-[0-9a-f]{8}$`)
+
+// BuiltPrefix is the project prefix of an image name railswitch builds;
+// false for any other name.
+func BuiltPrefix(name string) (string, bool) {
+	m := builtImageRe.FindStringSubmatch(name)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
 }
 
 // Images is every local image.

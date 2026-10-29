@@ -824,7 +824,7 @@ prints a short summary and the diff. Exit 0 even when an edit is blocked.
 | `edits[].reasons` | string[] | Why, one line each; empty for `none`. |
 | `edits[].error` | string | For `blocked`, the message; else `""`. |
 | `restart` | string[] | Registered worktrees whose app unit is active and whose rendered units the edits change. One batched `systemctl show` reads the states. |
-| `writes` | string[] | Containerfiles the edits eject with `project.toml` (D123): a newly chosen option's addon the workspace has no file for. An option or pack edit keeps `[image] addons` in line with the options it changed (the old option's addon leaves the list, its file stays; the new one's is added); addons of options it leaves alone stay as you set them. `[]` for none. |
+| `writes` | string[] | Containerfiles the edits eject with `project.toml` (D123): a newly chosen option's addon, or its own image's Containerfile (`[image] build`, playwright), that the workspace has no file for, copied from the package the lock accepted (a package back from `[[removed]]` at its old content). An option or pack edit keeps `[image] addons` in line with the options it changed (the old option's addon leaves the list, its file stays; the new one's is added); addons of options it leaves alone stay as you set them. `[]` for none. |
 
 `settings apply --if-hash <h> [--accept-install <review-hash>] [--restart]` takes the same list and prints
 text, not JSON: `wrote <path>/project.toml`, `wrote <path>/stack.lock`,

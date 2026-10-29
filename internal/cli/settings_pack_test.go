@@ -220,3 +220,31 @@ func TestSettingsOptionEjectsItsImage(t *testing.T) {
 		t.Error("choosing playwright again replaced your Containerfile")
 	}
 }
+
+// An option chosen again comes back at what the lock accepted (its
+// [[removed]] entry), so its ejected Containerfile never carries a change
+// made since, which no one has reviewed.
+func TestSettingsOptionEjectsAcceptedImage(t *testing.T) {
+	ws, _ := lockedWS(t)
+	apply := func(ref string) {
+		t.Helper()
+		before := readFile(t, filepath.Join(ws, "project.toml"))
+		edits := `[{"op":"option","key":"browser","ref":"` + ref + `"}]`
+		if code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+			t.Fatalf("%s: exit %d: %s\n%s", ref, code, out, errs)
+		}
+	}
+	mustRun(t, "-C", ws, "pack", "eject", "playwright@1")
+	apply("local:playwright@1")
+	apply("none")
+	local := filepath.Join(ws, "options", "playwright", "Containerfile.playwright")
+	writeFile(t, local, readFile(t, local)+"RUN echo UNREVIEWED\n")
+	pw := filepath.Join(ws, "containerfiles", "Containerfile.playwright")
+	if err := os.Remove(pw); err != nil {
+		t.Fatal(err)
+	}
+	apply("local:playwright@1")
+	if got := readFile(t, pw); strings.Contains(got, "UNREVIEWED") || !strings.HasPrefix(got, "# Ejected from local:playwright@1") {
+		t.Errorf("ejected the unreviewed change:\n%s", got)
+	}
+}

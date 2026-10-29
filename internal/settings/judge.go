@@ -44,8 +44,9 @@ type Preview struct {
 	Edits   []EditResult `json:"edits"`
 	Restart []string     `json:"restart"` // registered worktrees whose running app runs units the edits change
 	NewText string       `json:"-"`
-	// NewFiles are the option addons the edits eject (workspace-relative
-	// path → content): written with NewText (D123).
+	// NewFiles are the Containerfiles the edits eject, a newly chosen
+	// option's addon or own image (workspace-relative path → content):
+	// written with NewText (D123).
 	NewFiles map[string][]byte `json:"-"`
 	// Writes are NewFiles' paths, sorted: what the preview shows (D123).
 	Writes []string `json:"writes"`
@@ -99,7 +100,9 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 // added, ejected from its default when the workspace has no file of that
 // name. Only the changed options' addons are touched (all of them when the
 // pack changed, which sets the OS): an addon you removed or added by hand
-// for an option the edit leaves alone stays as you left it. It returns text
+// for an option the edit leaves alone stays as you left it. A newly chosen
+// option with its own image ([image] build) gets that Containerfile ejected
+// the same way. Ejects copy the accepted package. It returns text
 // as it was when either stack doesn't resolve (judge then blocks it).
 func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) {
 	p, err := config.Parse([]byte(text))
@@ -110,12 +113,17 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 	if err != nil {
 		return text, nil, nil
 	}
-	cat := e.WS.Catalog
+	// Ejects copy what the lock accepted (a package back from [[removed]]
+	// at its old content), never a change not reviewed yet.
+	cat, err := workspace.Accepted(e.WS.Root, p, e.WS.Catalog)
+	if err != nil {
+		return text, nil, err
+	}
 	st, err := cat.Resolve(p)
 	if err != nil {
 		return text, nil, nil
 	}
-	oldSt, err := cat.Resolve(old)
+	oldSt, err := e.WS.Catalog.Resolve(old)
 	if err != nil {
 		return text, nil, nil
 	}

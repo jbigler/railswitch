@@ -80,7 +80,7 @@ func host(t *testing.T, portStart string, present bool, found ...string) Host {
 			return "", exec.ErrNotFound
 		},
 	}
-	h.Dashboard = dashboardServer(t, http.StatusOK, "ok v0.1.0\n")
+	h.Dashboards = []string{dashboardServer(t, http.StatusOK, "ok v0.1.0\n")}
 	h.Token = dashToken
 	if err := os.WriteFile(h.PortStart, []byte(portStart+"\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -210,7 +210,7 @@ func TestAllFail(t *testing.T) {
 	inspect(f, "filial_proxy", `"mtu": "1400"`)
 	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{}, fmt.Errorf("ssh-keygen: %w", exec.ErrNotFound))
 	h := host(t, "1024", false)
-	h.Dashboard = dashboardServer(t, http.StatusForbidden, "forbidden host\n")
+	h.Dashboards = []string{dashboardServer(t, http.StatusForbidden, "forbidden host\n")}
 
 	got := h.Run(context.Background(), f, ws)
 	if len(got) != len(hostChecks)+8 {
@@ -560,17 +560,17 @@ func TestDashboardAnswers(t *testing.T) {
 	if c := h.dashboardAnswers(context.Background()); !c.OK || c.Detail != "railswitch dashboard v0.1.0" {
 		t.Errorf("ours: %+v", c)
 	}
-	h.Dashboard = dashboardServer(t, http.StatusForbidden, "forbidden host\n")
+	h.Dashboards = []string{dashboardServer(t, http.StatusForbidden, "forbidden host\n")}
 	c := h.dashboardAnswers(context.Background())
-	if c.OK || !c.Warn || !strings.Contains(c.Detail, `another program answers on 127.0.0.1:7700 (403 "forbidden host")`) || !strings.Contains(c.Fix, "ss -ltnp") {
+	if c.OK || !c.Warn || !strings.Contains(c.Detail, `(403 "forbidden host")`) || !strings.Contains(c.Fix, "ss -ltnp") {
 		t.Errorf("another program: %+v", c)
 	}
-	h.Dashboard = dashboardServer(t, http.StatusOK, "ok v0.1.1\n")
+	h.Dashboards = []string{dashboardServer(t, http.StatusOK, "ok v0.1.1\n")}
 	h.Token = "another"
 	if c := h.dashboardAnswers(context.Background()); c.OK || !strings.Contains(c.Detail, "not with your login") {
 		t.Errorf("another token: %+v", c)
 	}
-	h.Dashboard = "127.0.0.1:1"
+	h.Dashboards = []string{"127.0.0.1:1"}
 	c = h.dashboardAnswers(context.Background())
 	if c.OK || !strings.Contains(c.Detail, "nothing answers") || !strings.Contains(c.Fix, "journalctl") {
 		t.Errorf("nothing: %+v", c)

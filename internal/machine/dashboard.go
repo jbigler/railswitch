@@ -19,7 +19,11 @@ import (
 const (
 	DashboardService = "railswitch-dashboard.service"
 	DashboardAddr    = "127.0.0.1:7700"
-	DashboardURL     = "http://railswitch.localhost:7700/"
+	// DashboardAddr6 is IPv6 loopback, where browsers try *.localhost
+	// first: the dashboard holds it too, so no other program gets the
+	// browser (and its token) there (D127).
+	DashboardAddr6 = "[::1]:7700"
+	DashboardURL   = "http://railswitch.localhost:7700/"
 )
 
 // dashboardMarker is line 1 of the dashboard unit.

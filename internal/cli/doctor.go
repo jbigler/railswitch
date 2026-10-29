@@ -34,9 +34,9 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 		}
 	}
 	h := doctor.DefaultHost
-	h.Dashboard = dashboardAddr
+	h.Dashboards = dashboardAddrs
 	if dirs, err := machine.DefaultDirs(); err == nil {
-		h.Token, _ = machine.ReadDashboardToken(dirs) // none or unreadable: the dashboard can't prove it's yours
+		h.Token, h.TokenErr = machine.ReadDashboardToken(dirs) // none: the dashboard can't prove it's yours
 	}
 	return e.printChecks(append(checks, h.Run(ctx, e.run, ws)...))
 }

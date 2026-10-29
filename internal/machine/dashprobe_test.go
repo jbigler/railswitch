@@ -55,10 +55,10 @@ func TestProbeDashboard(t *testing.T) {
 		ours             bool
 	}{
 		{"ours", serve(t, proving("mine")), "railswitch dashboard v0.1.1", true},
-		{"another user's", serve(t, proving("theirs")), "a railswitch dashboard (v0.1.1) answers on 127.0.0.1:7700 but not with your login", false},
+		{"another user's", serve(t, proving("theirs")), "but not with your login", false},
 		{"replayed proof", rp, "but not with your login", false},
 		{"no proof (older)", serve(t, answer(200, "ok v0.1.0\n")), "a railswitch dashboard (v0.1.0) answers", false},
-		{"older dashboard", serve(t, answer(403, "forbidden host\n")), `another program answers on 127.0.0.1:7700 (403 "forbidden host")`, false},
+		{"older dashboard", serve(t, answer(403, "forbidden host\n")), `(403 "forbidden host")`, false},
 		{"200 not ok", serve(t, answer(200, "hello\n")), `(200 "hello")`, false},
 		{"hostile version", serve(t, answer(200, "ok \x1b]0;pwned\x07\n")), `(200 "ok \x1b]0;pwned\a")`, false},
 		{"bad proof", serve(t, answer(200, "ok v1 XYZ\n")), `(200 "ok v1 XYZ")`, false},
@@ -112,5 +112,35 @@ func TestProbeProof(t *testing.T) {
 	}
 	if !NonceOK(strings.Repeat("a", 32)) || NonceOK("x") || NonceOK(strings.Repeat("A", 32)) {
 		t.Error("NonceOK")
+	}
+}
+
+// TestProbeDashboards: the first address must prove; a later one passes
+// when it proves too or nothing is there, and anything else there (a
+// squatter on IPv6 loopback, another token) fails, named by its address.
+func TestProbeDashboards(t *testing.T) {
+	ctx := context.Background()
+	ours := serve(t, proving("mine"))
+	squat := serve(t, answer(200, "hello\n"))
+	theirs := serve(t, proving("theirs"))
+	srv := httptest.NewServer(http.NotFoundHandler())
+	gone := strings.TrimPrefix(srv.URL, "http://")
+	srv.Close()
+	for _, c := range []struct {
+		name  string
+		addrs []string
+		ours  bool
+		addr  string
+	}{
+		{"both prove", []string{ours, ours}, true, ours},
+		{"second empty", []string{ours, gone}, true, ours},
+		{"squatter second", []string{ours, squat}, false, squat},
+		{"another token second", []string{ours, theirs}, false, theirs},
+		{"first empty", []string{gone, ours}, false, gone},
+	} {
+		p := ProbeDashboards(ctx, c.addrs, "mine")
+		if p.Ours != c.ours || p.Addr != c.addr || (!c.ours && !strings.Contains(p.String(), c.addr)) {
+			t.Errorf("%s: %+v, want ours %v at %s", c.name, p, c.ours, c.addr)
+		}
 	}
 }

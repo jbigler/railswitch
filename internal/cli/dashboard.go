@@ -94,7 +94,7 @@ var dashboardWait = 10 * time.Second
 func waitDashboard(ctx context.Context, tok string) machine.Probe {
 	deadline := time.Now().Add(dashboardWait)
 	for {
-		p := machine.ProbeDashboard(ctx, dashboardAddr, tok)
+		p := machine.ProbeDashboards(ctx, dashboardAddrs, tok)
 		if p.Ours || p.Other != "" || !time.Now().Before(deadline) {
 			return p
 		}

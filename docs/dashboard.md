@@ -36,7 +36,7 @@ exactly what the page sees (docs/json.md).
   is running, exits 0; systemd starts the new binary 2 s later. When the
   unit file itself changes, `up` reloads systemd and restarts an active
   dashboard.
-- It listens on `127.0.0.1:7700` only, at
+- It listens on `127.0.0.1:7700` and `[::1]:7700` only, at
   `http://railswitch.localhost:7700/` (browsers resolve `*.localhost` to
   loopback). It has no Traefik route.
 
@@ -49,7 +49,9 @@ railswitch dashboard
 writes the dashboard's unit and, unless it is enabled and running,
 enables and starts it (D118). Then it asks `http://127.0.0.1:7700/healthz`
 as the browser would (Host `railswitch.localhost:7700`) with a fresh
-random nonce; railswitch's dashboard answers `ok <version> <proof>`, an
+random nonce, and `http://[::1]:7700/healthz` too (browsers try IPv6
+loopback first for `*.localhost`; the dashboard listens there as well,
+so no other program can, and without IPv6 nothing is there); railswitch's dashboard answers `ok <version> <proof>`, an
 HMAC of the nonce keyed by the login token (D127). Only when the proof is
 right does it print `http://railswitch.localhost:7700/login?token=<token>`:
 the link carries the token, so it never goes to another program on the
@@ -78,7 +80,8 @@ railswitch dashboard
 
 ## Security model
 
-- **Loopback only**, and the `Host` header must be exactly
+- **Loopback only** (127.0.0.1 and ::1, port 7700), and the `Host`
+  header must be exactly
   `railswitch.localhost:7700`, `localhost:7700` or `127.0.0.1:7700`;
   anything else is 403 for every request (DNS rebinding), a text reply
   that quotes the `Host` it got and names the addresses that work.

@@ -169,23 +169,23 @@ func TestDashboardPortTaken(t *testing.T) {
 		name, want string
 		h          http.HandlerFunc
 	}{
-		{"another program", `another program answers on 127.0.0.1:7700 (403 "forbidden host")`, func(w http.ResponseWriter, _ *http.Request) {
+		{"another program", `(403 "forbidden host")`, func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 		}},
-		{"no proof", "a railswitch dashboard (v0.1.0) answers on 127.0.0.1:7700 but not with your login", func(w http.ResponseWriter, _ *http.Request) {
+		{"no proof", "but not with your login", func(w http.ResponseWriter, _ *http.Request) {
 			io.WriteString(w, "ok v0.1.0\n")
 		}},
 	} {
 		other := httptest.NewServer(c.h)
-		old := dashboardAddr
-		dashboardAddr = strings.TrimPrefix(other.URL, "http://")
+		old := dashboardAddrs
+		dashboardAddrs = []string{strings.TrimPrefix(other.URL, "http://")}
 		f := &systest.Fake{}
 		f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,UnitFileState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=active\nUnitFileState=enabled\n")}, nil)
 		f.On([]string{"systemctl", "--user"}, sys.Result{}, nil)
 		code, out, errs := runWith(t, f, "dashboard")
-		dashboardAddr = old
+		dashboardAddrs = old
 		other.Close()
-		if code != 1 || strings.Contains(out, "token=") || !strings.Contains(errs, "no login link: "+c.want) {
+		if code != 1 || strings.Contains(out, "token=") || !strings.Contains(errs, "no login link: ") || !strings.Contains(errs, c.want) {
 			t.Errorf("%s: exit %d, stdout %q, stderr %q", c.name, code, out, errs)
 		}
 	}

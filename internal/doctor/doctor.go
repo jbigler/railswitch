@@ -41,23 +41,24 @@ type Check struct {
 // Host is where doctor reads the host's proc and sys files and looks up
 // binaries; DefaultHost is the real host.
 type Host struct {
-	PortStart string   // ip_unprivileged_port_start
-	Quadlet   []string // podman's quadlet generator: the first that exists
-	Cgroup    string   // cgroup v2's root cgroup.controllers
-	LookPath  func(name string) (string, error)
-	Dashboard string // the dashboard's address, asked for /healthz
+	PortStart  string   // ip_unprivileged_port_start
+	Quadlet    []string // podman's quadlet generator: the first that exists
+	Cgroup     string   // cgroup v2's root cgroup.controllers
+	LookPath   func(name string) (string, error)
+	Dashboards []string // the dashboard's addresses, asked for /healthz (machine.ProbeDashboards)
 	// Token is this user's dashboard login token, which the dashboard
 	// proves it holds ("": none yet, nothing passes).
-	Token string
+	Token    string
+	TokenErr error // reading the token file failed
 }
 
 // DefaultHost is this machine.
 var DefaultHost = Host{
-	PortStart: "/proc/sys/net/ipv4/ip_unprivileged_port_start",
-	Quadlet:   podman.QuadletPaths,
-	Cgroup:    "/sys/fs/cgroup/cgroup.controllers",
-	LookPath:  exec.LookPath,
-	Dashboard: machine.DashboardAddr,
+	PortStart:  "/proc/sys/net/ipv4/ip_unprivileged_port_start",
+	Quadlet:    podman.QuadletPaths,
+	Cgroup:     "/sys/fs/cgroup/cgroup.controllers",
+	LookPath:   exec.LookPath,
+	Dashboards: machine.DashboardAddrs,
 }
 
 // minPodman is the oldest podman major version railswitch supports.
@@ -163,7 +164,10 @@ func dashboard(ctx context.Context, r sys.Runner) Check {
 // address: another program on the port (an older dashboard) gets the
 // browser instead, and railswitch's can't start.
 func (h Host) dashboardAnswers(ctx context.Context) Check {
-	p := machine.ProbeDashboard(ctx, h.Dashboard, h.Token)
+	if h.TokenErr != nil {
+		return Check{Name: "dashboard answers", Warn: true, Detail: "the login token: " + h.TokenErr.Error(), Fix: "remove the token file named in detail, then railswitch dashboard (it makes a new one; every browser logs in again)"}
+	}
+	p := machine.ProbeDashboards(ctx, h.Dashboards, h.Token)
 	c := Check{Name: "dashboard answers", Warn: true, OK: p.Ours, Detail: p.String()}
 	if !p.Ours {
 		c.Fix = p.Fix()

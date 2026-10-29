@@ -46,8 +46,14 @@ func ReadDashboardToken(d Dirs) (string, error) {
 	return tok, err
 }
 
-// Probe is what answers at the dashboard's address.
+// DashboardAddrs are where the dashboard listens and is probed: IPv4
+// loopback, which must answer, and IPv6 loopback, which may refuse (IPv6
+// off: browsers don't use it either).
+var DashboardAddrs = []string{DashboardAddr, DashboardAddr6}
+
+// Probe is what answers at one of the dashboard's addresses.
 type Probe struct {
+	Addr    string // the address asked
 	Ours    bool   // the dashboard proved it holds this user's token
 	Version string // its version, when it answered as a railswitch dashboard
 	// Unproved: a railswitch dashboard answered without the proof (one from
@@ -69,7 +75,8 @@ var (
 // ProbeDashboard asks addr's /healthz as the dashboard's browser would,
 // with a fresh nonce. railswitch's dashboard answers 200 "ok <version>
 // <ProbeProof(token, nonce)>"; only the proof made with tok is Ours.
-func ProbeDashboard(ctx context.Context, addr, tok string) Probe {
+func ProbeDashboard(ctx context.Context, addr, tok string) (p Probe) {
+	defer func() { p.Addr = addr }()
 	nb := make([]byte, 16)
 	rand.Read(nb) // never fails (crypto/rand)
 	nonce := hex.EncodeToString(nb)
@@ -81,7 +88,7 @@ func ProbeDashboard(ctx context.Context, addr, tok string) Probe {
 	}
 	req.Host = DashboardHost
 	resp, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(req)
-	if errors.Is(err, syscall.ECONNREFUSED) {
+	if nothingThere(err) {
 		return Probe{Err: err}
 	}
 	if err != nil {
@@ -108,20 +115,52 @@ func (p Probe) String() string {
 	case p.Ours:
 		return "railswitch dashboard " + p.Version
 	case p.Unproved:
-		return "a railswitch dashboard (" + p.Version + ") answers on " + DashboardAddr + " but not with your login: an older one still running, another user's, or an ssh -L forward of the port"
+		return "a railswitch dashboard (" + p.Version + ") answers on " + p.Addr + " but not with your login: an older one still running, one started before the login token changed, another user's, or an ssh -L forward of the port"
 	case p.Other != "":
-		return "another program answers on " + DashboardAddr + " (" + p.Other + ")"
+		return "another program answers on " + p.Addr + " (" + p.Other + ")"
 	}
-	return "nothing answers on " + DashboardAddr + ": " + p.Err.Error()
+	return "nothing answers on " + p.Addr + ": " + p.Err.Error()
 }
 
 // Fix is the next step for a probe that isn't Ours.
 func (p Probe) Fix() string {
 	switch {
 	case p.Unproved:
-		return "systemctl --user restart " + DashboardService + "; if it still fails, stop the program listening on " + DashboardAddr + " (ss -ltnp 'sport = :7700' names it)"
+		return "systemctl --user restart " + DashboardService + "; if it still fails, stop the program listening on " + p.Addr + " (ss -ltnp 'sport = :7700' names it)"
 	case p.Other != "":
-		return "stop the program listening on " + DashboardAddr + " (ss -ltnp 'sport = :7700' names it), then systemctl --user restart " + DashboardService
+		return "stop the program listening on " + p.Addr + " (ss -ltnp 'sport = :7700' names it), then systemctl --user restart " + DashboardService
 	}
 	return "railswitch dashboard; if it keeps failing: journalctl --user -u " + DashboardService
+}
+
+// ProbeDashboards probes each of addrs (the first must answer; a later one
+// may refuse: nothing there, so browsers use the others) and returns the
+// first that isn't Ours, or the first's when all are.
+func ProbeDashboards(ctx context.Context, addrs []string, tok string) Probe {
+	var first Probe
+	for i, a := range addrs {
+		p := ProbeDashboard(ctx, a, tok)
+		switch {
+		case i == 0:
+			first = p
+			if !p.Ours {
+				return p
+			}
+		case p.Ours, p.Err != nil:
+		default:
+			return p
+		}
+	}
+	return first
+}
+
+// nothingThere is whether err means no program listens at the address:
+// refused, or (IPv6 off) no such address or network.
+func nothingThere(err error) bool {
+	for _, e := range []syscall.Errno{syscall.ECONNREFUSED, syscall.EADDRNOTAVAIL, syscall.ENETUNREACH, syscall.EAFNOSUPPORT} {
+		if errors.Is(err, e) {
+			return true
+		}
+	}
+	return false
 }

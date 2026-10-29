@@ -45,7 +45,7 @@ railswitch dashboard
 
 This starts the dashboard (and from then on at every login) and prints a
 login link. The dashboard lives at `http://railswitch.localhost:7700/`, on
-127.0.0.1 only, behind a token only you can read. Run the command again
+loopback only (127.0.0.1 and ::1), behind a token only you can read. Run the command again
 whenever you need the link.
 
 Open it in a browser on the same machine, at that address, on port 7700:

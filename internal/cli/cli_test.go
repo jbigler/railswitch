@@ -16,7 +16,7 @@ import (
 
 // TestMain points procRoot at a dir whose net/tcp lists no socket: no test
 // sees the host's listening ports unless it sets some with listening; and
-// dashboardAddr at a server answering as the test's dashboard.
+// dashboardAddrs at a server answering as the test's dashboard.
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "railswitch-proc")
 	if err != nil {
@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 		}
 		fmt.Fprintf(w, "ok test %s\n", machine.ProbeProof(tok, r.URL.Query().Get("nonce")))
 	}))
-	dashboardAddr = strings.TrimPrefix(dash.URL, "http://")
+	dashboardAddrs = []string{strings.TrimPrefix(dash.URL, "http://")}
 	code := m.Run()
 	dash.Close()
 	os.RemoveAll(dir)

@@ -30,9 +30,9 @@ type env struct {
 // TCP ports from; tests point it elsewhere.
 var procRoot = "/proc"
 
-// dashboardAddr is where `dashboard` and `doctor` ask for the dashboard's
-// /healthz; tests point it at their own server.
-var dashboardAddr = machine.DashboardAddr
+// dashboardAddrs are where `dashboard` and `doctor` ask for the
+// dashboard's /healthz; tests point them at their own server.
+var dashboardAddrs = machine.DashboardAddrs
 
 type command func(ctx context.Context, e *env, args []string) int
 

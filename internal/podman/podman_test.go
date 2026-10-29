@@ -245,6 +245,16 @@ func TestStopLoaded(t *testing.T) {
 	if err := s.StopLoaded(ctx, "b.service"); err == nil {
 		t.Fatal("a failed stop was ignored")
 	}
+	// A database may take its whole TimeoutStopSec (90 s) to flush and
+	// exit: no stop gives up before systemd does.
+	if err := s.Stop(ctx, "c.service"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range f.Cmds {
+		if c.Timeout != stopTimeout || stopTimeout <= 90*time.Second {
+			t.Errorf("%v: timeout %v; want stopTimeout above 90s", c.Args, c.Timeout)
+		}
+	}
 }
 
 func TestSystemd(t *testing.T) {

@@ -61,9 +61,15 @@ func (s Systemd) StartOnly(ctx context.Context, units ...string) error {
 	return s.units(ctx, s.startTimeout(), "start", append([]string{"--job-mode=ignore-requirements"}, units...))
 }
 
-// Stop runs `systemctl --user stop <units…>`.
+// stopTimeout bounds one `systemctl stop`: above the longest stop a unit
+// may take (a data service's TimeoutStopSec, 90 s: a database flushing
+// before it exits), so systemd, not this call, decides when a stop failed.
+const stopTimeout = 2 * time.Minute
+
+// Stop runs `systemctl --user stop <units…>` (they stop together, so one
+// stopTimeout bounds them all).
 func (s Systemd) Stop(ctx context.Context, units ...string) error {
-	return s.units(ctx, 0, "stop", units)
+	return s.units(ctx, stopTimeout, "stop", units)
 }
 
 // unitNotLoaded is systemctl's exit code for a unit it doesn't know.
@@ -74,7 +80,7 @@ const unitNotLoaded = 5
 // file is gone) counts as stopped.
 func (s Systemd) StopLoaded(ctx context.Context, units ...string) error {
 	for _, u := range units {
-		r, err := s.run(ctx, 0, "stop", u)
+		r, err := s.run(ctx, stopTimeout, "stop", u)
 		if err != nil && !(errors.Is(err, sys.ErrExit) && r.ExitCode == unitNotLoaded) {
 			return err
 		}

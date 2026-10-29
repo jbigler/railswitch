@@ -302,10 +302,17 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 			label("traefik.http.routers." + name + ".service=" + name)
 			label("traefik.http.services." + name + ".loadbalancer.server.port=" + strconv.Itoa(r.Port))
 			if r.RootRedirect != "" {
-				mw := name + "-root"
-				label("traefik.http.routers." + name + ".middlewares=" + mw)
-				label("traefik.http.middlewares." + mw + ".redirectregex.regex=^http://([^/]+)/?$")
-				label("traefik.http.middlewares." + mw + ".redirectregex.replacement=http://${1}" + x(r.RootRedirect))
+				// Its own router, for GET and HEAD of / only: a redirect on
+				// the route itself sent the RustFS console's login (POST /,
+				// answered 307, which keeps the method) to the console page,
+				// so login failed. Traefik ranks the longer rule first.
+				root := name + "-root"
+				label("traefik.http.routers." + root + ".rule=(" + machine.RouterRule(rr.Host, m.Inputs.Machine.Subnet) + ") && Path(`/`) && (Method(`GET`) || Method(`HEAD`))")
+				label("traefik.http.routers." + root + ".entrypoints=web")
+				label("traefik.http.routers." + root + ".service=" + name)
+				label("traefik.http.routers." + root + ".middlewares=" + root)
+				label("traefik.http.middlewares." + root + ".redirectregex.regex=^http://([^/]+)/?$")
+				label("traefik.http.middlewares." + root + ".redirectregex.replacement=http://${1}" + x(r.RootRedirect))
 			}
 		}
 	}

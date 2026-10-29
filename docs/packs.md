@@ -321,7 +321,13 @@ service = "rails"    # any long-running service of the project (not deps, not an
 port    = 3036       # the container port
 ```
 
-Render refuses two routes of one project with the same name or host
+An option route's `root_redirect` (a path) sends `GET` and `HEAD` of `/`
+there, through a second router (`<router>-root`) that matches only those;
+every other request to `/` reaches the service. The RustFS console logs
+in with `POST /`, which a redirect of every method would send to its page.
+
+Render refuses two routes of one project with the same name or host, and
+a route named like another's root router (`s3-ui-root` next to rustfs)
 (`routes: router "s3" is used by rails and storage`). `railswitch machine`
 lists every route.
 

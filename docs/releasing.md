@@ -15,8 +15,8 @@ To cut one:
 ```bash
 git checkout main && git pull
 make check
-git tag -a v0.2.0 -m v0.2.0
-git push origin v0.2.0
+git tag -a v0.1.1 -m v0.1.1
+git push origin v0.1.1
 ```
 
 Versions stay below 1.0 while commands and files still change: a minor

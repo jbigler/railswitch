@@ -9,17 +9,21 @@ Install railswitch, one static binary for amd64 or arm64 from the
 check the machine:
 
 ```bash
+cd "$(mktemp -d)"
 arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
 base=https://github.com/jbigler/railswitch/releases/latest/download
 curl -fLO "$base/railswitch-linux-$arch"
 curl -fLO "$base/SHA256SUMS"
-sha256sum --check --ignore-missing SHA256SUMS
-install -m755 "railswitch-linux-$arch" ~/.local/bin/railswitch
+sha256sum --check --ignore-missing SHA256SUMS &&
+  install -D -m755 "railswitch-linux-$arch" ~/.local/bin/railswitch
 railswitch doctor
 ```
 
-`~/.local/bin` must be on your `PATH`. To upgrade, run the same commands
-for the new release; the dashboard restarts itself on the new binary. From a clone
+`~/.local/bin` must be on your `PATH` (if the folder is new, log in
+again). To upgrade, run the same commands for the new release; the
+dashboard restarts itself on the new binary. A dashboard you started from
+another copy (a clone's `./railswitch`) keeps that one until `railswitch
+dashboard` and then `systemctl --user restart railswitch-dashboard`. From a clone
 with Go instead: `make build && install -m755 railswitch ~/.local/bin/`.
 
 `doctor` checks podman, its socket and Quadlet, cgroup v2, port 80, the

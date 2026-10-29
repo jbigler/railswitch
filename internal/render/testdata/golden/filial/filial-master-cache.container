@@ -5,7 +5,7 @@
 Description=filial cache of worktree master
 
 [Container]
-Label=filial.unit-hash=279180ef6c7b
+Label=filial.unit-hash=99f15e6faeef
 Image=docker.io/library/redis:8-alpine
 ContainerName=filial-master-cache
 Network=filial-master-dev.network:alias=cache
@@ -21,7 +21,8 @@ Notify=healthy
 GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
 Annotation=filial.firewall=none
 Annotation=filial.firewall.networks=filial-master-dev
-Annotation=filial.firewall.mode=log
+Annotation=filial.firewall.mode=enforce
+Annotation=filial.firewall.lists=fdbb9db68f1d
 LogDriver=journald
 Exec=redis-server --loglevel warning --save "" --appendonly no
 

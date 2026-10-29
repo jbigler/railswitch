@@ -109,6 +109,7 @@ func TestScriptFiles(t *testing.T) {
 		".railswitch/firewall/agent-claude.allow",
 		".railswitch/firewall/agent-probe.allow",
 		".railswitch/firewall/agent.allow",
+		".railswitch/firewall/app.allow",
 		".railswitch/firewall/deps.allow",
 		".railswitch/firewall/firewall.sh",
 		".railswitch/firewall/hook.sh",
@@ -151,6 +152,24 @@ func TestDepsAllow(t *testing.T) {
 	}
 	if got := listed(f.Data); !slices.Equal(got, want) || f.Mode != 0o644 {
 		t.Errorf("deps.allow mode %04o entries\n%v\nwant\n%v", f.Mode, got, want)
+	}
+}
+
+// The app profile's list (the app and its workers, D119) is [firewall]
+// allow.app: the rails pack ships no app.allow.
+func TestAppAllow(t *testing.T) {
+	_, fw := filial(t)
+	if got := listed(files(t, fw)[".railswitch/firewall/app.allow"].Data); len(got) != 0 {
+		t.Errorf("app.allow without allow.app: %v", got)
+	}
+	fw.Allow = map[string][]string{"app": {"api.example.com", "api.example.com", "mail.example.com"}}
+	if got := listed(files(t, fw)[".railswitch/firewall/app.allow"].Data); !slices.Equal(got, []string{"api.example.com", "mail.example.com"}) {
+		t.Errorf("app.allow = %v", got)
+	}
+	fw.Allow = map[string][]string{"app": {"bad host"}}
+	st, _ := filial(t)
+	if _, err := Files("filial", ws, networkDir, st, fw); err == nil || !strings.Contains(err.Error(), "firewall.allow.app") {
+		t.Errorf("a bad allow.app entry: %v", err)
 	}
 }
 
@@ -327,6 +346,29 @@ func TestHookFilesPrivate(t *testing.T) {
 		if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != want {
 			t.Errorf("%s: %v %v, want %v", path, fi.Mode().Perm(), err, want)
 		}
+	}
+}
+
+// The app profile (D119) reads app.allow: a container with it starts.
+func TestHookAppProfile(t *testing.T) {
+	root, dir := t.TempDir(), t.TempDir()
+	script := filepath.Join(dir, "hook.sh")
+	data, err := os.ReadFile(filepath.Join("assets", "hook.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(script, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "app.allow"), []byte("# list\n203.0.113.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if msg, err := runHookAt(t, script, root, hookEnv(t, filepath.Join(t.TempDir(), "nft.out")), map[string]string{
+		"filial.firewall":          "app",
+		"filial.firewall.mode":     "enforce",
+		"filial.firewall.networks": "filial-feat-dev",
+	}); err != nil {
+		t.Fatalf("hook with profile app: %v\n%s", err, msg)
 	}
 }
 

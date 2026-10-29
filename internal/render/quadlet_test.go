@@ -349,7 +349,8 @@ func TestPlaywrightNoHook(t *testing.T) {
 	hasLine(t, units, "filial-master-deps.container", "Annotation=filial.firewall=deps")
 	hasLine(t, units, "filial-master-deps.container", "Annotation=filial.firewall.networks=filial-master-dev")
 	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall=agent,deps")
-	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.mode=log")
+	// The project has agents: its editor is enforced too (D119).
+	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.mode=enforce")
 }
 
 func TestHardening(t *testing.T) {

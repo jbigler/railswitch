@@ -1245,3 +1245,25 @@ func TestVolumeCacheFlag(t *testing.T) {
 		}
 	}
 }
+
+// The default firewall mode is enforce once a project has agents (D119);
+// a set mode wins, and with no agents it is log.
+func TestFirewallModeDefault(t *testing.T) {
+	agents := &pack.Stack{Agents: []*pack.ChosenAgent{{Name: "a"}}}
+	for _, c := range []struct {
+		mode string
+		st   *pack.Stack
+		want string
+	}{
+		{"", agents, "enforce"},
+		{"", &pack.Stack{}, "log"},
+		{"log", agents, "log"},
+		{"off", agents, "off"},
+		{"enforce", &pack.Stack{}, "enforce"},
+	} {
+		p := &config.Project{Firewall: config.Firewall{Mode: c.mode}}
+		if got := FirewallMode(p, c.st); got != c.want {
+			t.Errorf("mode %q agents %d: %s, want %s", c.mode, len(c.st.Agents), got, c.want)
+		}
+	}
+}

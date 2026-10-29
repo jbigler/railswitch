@@ -66,3 +66,52 @@ func TestNewestBuiltinsSkipsLibrary(t *testing.T) {
 		}
 	}
 }
+
+// Firewall edits set the mode and the allow lists; the rendered app.allow
+// lists the host.
+func TestSettingsApplyFirewall(t *testing.T) {
+	ws, _ := lockedWS(t)
+	before := readFile(t, filepath.Join(ws, "project.toml"))
+	edits := `[{"op":"firewall.mode","value":"enforce"},{"op":"firewall.allow.add","key":"app","value":"pay.example.com"}]`
+	if code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+		t.Fatalf("exit %d: %s\n%s", code, out, errs)
+	}
+	if !strings.Contains(readFile(t, filepath.Join(ws, ".railswitch", "firewall", "app.allow")), "pay.example.com\n") {
+		t.Error("app.allow lacks the host")
+	}
+	var doc projectDoc
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "project", "show")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Firewall.Mode != "enforce" || doc.Firewall.Effective != "enforce" || !slices.Equal(doc.Firewall.Allow["app"], []string{"pay.example.com"}) || doc.Firewall.Allow["agent"] == nil {
+		t.Errorf("firewall = %+v", doc.Firewall)
+	}
+}
+
+// An allow-list edit restarts the running worktree (the hook reads the
+// lists only at a container's start), and a bad host is blocked in the
+// preview, not only refused by apply.
+func TestSettingsPreviewFirewallEdits(t *testing.T) {
+	ws, _ := lockedWS(t)
+	code, out, errs := runStdin(t, unitsFake(), `[{"op":"firewall.allow.add","key":"app","value":"pay.example.com"}]`, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var p previewDoc
+	if err := json.Unmarshal([]byte(out), &p); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Restart, []string{"master"}) {
+		t.Errorf("restart %v; want [master]", p.Restart)
+	}
+	code, out, errs = runStdin(t, unitsFake(), `[{"op":"firewall.allow.add","key":"app","value":"bad host"}]`, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if err := json.Unmarshal([]byte(out), &p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Edits) != 1 || p.Edits[0].Impact != "blocked" || !strings.Contains(p.Edits[0].Error, "not a host name") {
+		t.Errorf("bad host: %+v", p.Edits)
+	}
+}

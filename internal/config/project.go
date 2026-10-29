@@ -402,6 +402,16 @@ func (p *Project) Validate() error {
 	default:
 		v.add("firewall.mode", "%q must be \"log\", \"enforce\" or \"off\"", p.Firewall.Mode)
 	}
+	for _, prof := range sortedKeys(p.Firewall.Allow) {
+		if !slices.Contains(FirewallProfiles, prof) {
+			v.add("firewall.allow."+key(prof), "not a profile: allow lists are %s", strings.Join(FirewallProfiles, ", "))
+		}
+		for i, h := range p.Firewall.Allow[prof] {
+			if err := CheckAllowHost(h); err != nil {
+				v.add(fmt.Sprintf("firewall.allow.%s[%d]", key(prof), i), "%v", err)
+			}
+		}
+	}
 
 	if p.Image.Base == "" {
 		v.add("image.base", "missing; run `railswitch containerfile eject base`")

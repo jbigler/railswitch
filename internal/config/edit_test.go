@@ -572,3 +572,36 @@ func TestSetPack(t *testing.T) {
 		t.Error("no [stack] pack: no error")
 	}
 }
+
+func TestFirewallEdits(t *testing.T) {
+	in := "schema = 1\n\n[firewall]\nallow.deps = [\"github.com\"]   # for gems\n\n[image]\nbase = \"x\"\n"
+	out, err := SetFirewallMode(in, "enforce")
+	if err != nil || out != "schema = 1\n\n[firewall]\nallow.deps = [\"github.com\"]   # for gems\nmode = \"enforce\"\n\n[image]\nbase = \"x\"\n" {
+		t.Fatalf("mode: %q %v", out, err)
+	}
+	if back, err := SetFirewallMode(out, ""); err != nil || back != in {
+		t.Errorf("unset mode: %q %v", back, err)
+	}
+	out, err = AddFirewallAllow(out, "app", "api.example.com")
+	if err != nil || !strings.Contains(out, "mode = \"enforce\"\nallow.app = [\"api.example.com\"]\n") {
+		t.Fatalf("add new list: %q %v", out, err)
+	}
+	if out, err = AddFirewallAllow(out, "deps", "gems.example.com"); err != nil || !strings.Contains(out, `allow.deps = ["github.com", "gems.example.com"]   # for gems`) {
+		t.Fatalf("add to list: %q %v", out, err)
+	}
+	if _, err := AddFirewallAllow(out, "deps", "github.com"); err == nil {
+		t.Error("a duplicate host was added")
+	}
+	if out, err = RemoveFirewallAllow(out, "deps", "github.com"); err != nil || !strings.Contains(out, `allow.deps = ["gems.example.com"]`) {
+		t.Errorf("remove: %q %v", out, err)
+	}
+	if _, err := AddFirewallAllow(out, "agent-x", "h"); err == nil {
+		t.Error("an unknown profile was edited")
+	}
+	if _, err := AddFirewallAllow("[firewall.allow]\napp = []\n", "app", "h"); err == nil {
+		t.Error("a [firewall.allow] table was edited")
+	}
+	if out, err := SetFirewallMode("schema = 1\n", "log"); err != nil || out != "schema = 1\n\n[firewall]\nmode = \"log\"\n" {
+		t.Errorf("new table: %q %v", out, err)
+	}
+}

@@ -5,7 +5,7 @@
 Description=phx deps of worktree master
 
 [Container]
-Label=phx.unit-hash=bdd89714d7d4
+Label=phx.unit-hash=29ec2c2a6359
 Image=localhost/phx/base:elixir1.18.4-otp27-bac86656
 ContainerName=phx-master-deps
 Network=phx-master-dev.network:alias=deps
@@ -27,7 +27,8 @@ PidsLimit=4096
 GlobalArgs=--hooks-dir=/WORKSPACES/phoenix/.railswitch/firewall/hooks.d
 Annotation=phx.firewall=deps
 Annotation=phx.firewall.networks=phx-master-dev
-Annotation=phx.firewall.mode=log
+Annotation=phx.firewall.mode=enforce
+Annotation=phx.firewall.lists=8d3ea52ef5b5
 PodmanArgs=--cpus=6
 LogDriver=passthrough
 Entrypoint=/usr/local/bin/entrypoint-deps.sh

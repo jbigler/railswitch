@@ -8,7 +8,7 @@ Wants=filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.se
 After=filial-feat-deps.service filial-feat-db.service filial-feat-cache.service filial-feat-storage.service filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=filial.unit-hash=9dbaf91dce8b
+Label=filial.unit-hash=c3c3a05cf372
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-feat-rails
 Network=filial-feat-dev.network:alias=rails
@@ -45,9 +45,10 @@ HealthRetries=3
 HealthStartPeriod=120s
 Notify=healthy
 GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
-Annotation=filial.firewall=none
+Annotation=filial.firewall=app
 Annotation=filial.firewall.networks=filial-feat-dev,filial_proxy
-Annotation=filial.firewall.mode=log
+Annotation=filial.firewall.mode=enforce
+Annotation=filial.firewall.lists=741c42189628
 PodmanArgs=--cpus=6 --interactive
 LogDriver=journald
 Entrypoint=/usr/local/bin/entrypoint-app.sh

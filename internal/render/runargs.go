@@ -1,11 +1,15 @@
 package render
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 )
@@ -96,7 +100,8 @@ func (in *Instance) CPUs(s *Service) string {
 
 // FirewallAnnotations are the annotations the firewall hook reads for a
 // container of s on networks; nil when s is not firewalled. The mode is
-// s.FirewallMode when set (an agent's: D55), else the project's.
+// s.FirewallMode when set (an agent's: D55), else the project's, else
+// FirewallMode's default.
 func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string {
 	if !s.Firewalled() {
 		return nil
@@ -104,20 +109,71 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 	p := in.m.Prefix
 	mode := s.FirewallMode
 	if mode == "" {
-		mode = in.m.Inputs.Project.Firewall.Mode
-	}
-	if mode == "" {
-		mode = "log"
+		mode = FirewallMode(in.m.Inputs.Project, in.m.Inputs.Stack)
 	}
 	ann := []string{
 		p + ".firewall=" + strings.Join(s.Firewall, ","),
 		p + ".firewall.networks=" + strings.Join(networks, ","),
 		p + ".firewall.mode=" + mode,
+		// The hook reads the lists only when a container starts: their
+		// digest in the unit makes a list change restart it (D119).
+		p + ".firewall.lists=" + in.allowDigest(s),
 	}
 	if len(s.FirewallExtra) > 0 {
 		ann = append(ann, p+".firewall.extra="+strings.Join(s.FirewallExtra, ","))
 	}
 	return ann
+}
+
+// allowDigest is a digest of what s's profiles' allow lists are made of:
+// the pack's app.allow and deps.allow, the project's [firewall] allow
+// lists, each agent's allow.
+func (in *Instance) allowDigest(s *Service) string {
+	st, fw := in.m.Inputs.Stack, in.m.Inputs.Project.Firewall
+	h := sha256.New()
+	file := func(name string) {
+		if st != nil && st.Pack != nil && st.Pack.Files != nil {
+			data, _ := fs.ReadFile(st.Pack.Files, name)
+			h.Write(data)
+		}
+		h.Write([]byte{0})
+	}
+	list := func(l []string) {
+		h.Write([]byte(strings.Join(l, "\n")))
+		h.Write([]byte{0})
+	}
+	for _, prof := range s.Firewall {
+		h.Write([]byte(prof + "\x00"))
+		switch {
+		case prof == "app" || prof == "deps":
+			file(prof + ".allow")
+			list(fw.Allow[prof])
+		case prof == "agent":
+			list(fw.Allow["agent"])
+		case strings.HasPrefix(prof, "agent-") && st != nil:
+			for _, a := range st.Agents {
+				if a.Service == prof {
+					list(a.Allow)
+				}
+			}
+			list(fw.Allow["agent"])
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
+// FirewallMode is the mode of p's services with no mode of their own:
+// [firewall] mode, else enforce when the project has agents (an agent
+// edits the code the app, its workers and deps run, so their egress is
+// the agents' too: D119), else log.
+func FirewallMode(p *config.Project, st *pack.Stack) string {
+	switch {
+	case p.Firewall.Mode != "":
+		return p.Firewall.Mode
+	case st != nil && len(st.Agents) > 0:
+		return "enforce"
+	}
+	return "log"
 }
 
 // VolumeSpecs are s's bind mounts, then its named volumes, as podman -v

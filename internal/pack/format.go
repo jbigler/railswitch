@@ -319,6 +319,9 @@ type Tool struct {
 
 	Entrypoint string   `toml:"entrypoint"`
 	Firewall   Profiles `toml:"firewall"`
+	// Allow are hosts the tool reaches beyond its profiles' lists (an
+	// editor's plugin and language-server sources, D119).
+	Allow []string `toml:"allow"`
 
 	// Worktree mounts the worktree at /app, the base worktree's .git, and the
 	// pack's [[worktree_volumes]] (they live under /app), as the app has them.

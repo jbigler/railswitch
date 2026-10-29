@@ -212,7 +212,7 @@ inside a firewalled container):
 
 | Check | Flagged |
 |---|---|
-| `firewall` | a host added to `deps.allow` or an agent's `allow`; an option's or tool's `firewall` profiles changed |
+| `firewall` | a host added to `deps.allow`, `app.allow` (D119), an agent's or a tool's `allow`; an option's or tool's `firewall` profiles changed |
 | `runs-here` | an added or changed `Containerfile.*` instruction (continuation lines and heredoc bodies joined, flagged at its first changed line; commented lines too) that pipes `curl`/`wget` into a shell or interpreter (`sh`, `bash`, `zsh`, `dash`, `ash`, `ksh`, `fish`, `python`, `python3`, `perl`, `ruby`, `node`, `php`; any case or spacing, through `sudo`/`env` or a path), runs one through `<(`, `$(` or backticks, `ADD http(s)://`, `--security=insecure`, `--network=host`; a manifest that does not load; any file that is not text (a NUL or invalid UTF-8 byte: it is still diffed and checked, the byte shown as `\xNN`) |
 | `image` | a `Containerfile.*` `FROM` line added or changed; any `[image]` field that picks what a service runs changed: an option's `pull`, `use`, `build`, `tag`, `args` and `[pin] default`, a pack's `file`, `tag` and `args`, a tool's or agent's `file` |
 | `host-mount` | a `[[mounts]]` entry added or changed whose source is an absolute path or a placeholder |

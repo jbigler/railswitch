@@ -160,3 +160,12 @@ relabel = false   # root-owned: rootless podman cannot relabel it on an SELinux 
 `relabel = false` drops `z` (options `ro`, or none when `ro = false`). Use it
 for a source you do not own (it cannot be relabelled, so the start fails on an
 SELinux-enforcing host) or whose host label must stay as it is.
+
+## Firewall (D119)
+
+nvim follows the project's firewall mode (`enforce` when the project has
+agents). It may reach the `deps` and `agent` lists (package registries,
+`github.com` and its downloads), its tool's own `allow` (GitHub's API and
+raw files, PyPI) and the config repo's host. A plugin or language server
+from elsewhere needs its host in `[firewall] allow.agent` (the Settings
+page's Firewall card). docs/firewall.md.

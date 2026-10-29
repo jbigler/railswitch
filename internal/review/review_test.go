@@ -428,3 +428,16 @@ func TestCommentDoesNotHideFlags(t *testing.T) {
 		}
 	}
 }
+
+// A pack's app.allow (D119) and a tool's allow are firewall lists: each
+// host they add is flagged.
+func TestAppAllowAndToolAllowFlagged(t *testing.T) {
+	files, err := Compare("pack", fstest.MapFS{"app.allow": {Data: []byte("a.example\n")}}, fstest.MapFS{"app.allow": {Data: []byte("a.example\nevil.example\n")}})
+	if err != nil || len(files) != 1 || len(files[0].Flags) != 1 || files[0].Flags[0].Check != CheckFirewall {
+		t.Errorf("app.allow: %+v %v", files, err)
+	}
+	files, err = Compare("tool", fstest.MapFS{"tool.toml": {Data: []byte("name = \"nvim\"\n")}}, fstest.MapFS{"tool.toml": {Data: []byte("name = \"nvim\"\nallow = [\"evil.example\"]\n")}})
+	if err != nil || len(files) != 1 || len(files[0].Flags) != 1 || files[0].Flags[0].Check != CheckFirewall {
+		t.Errorf("tool allow: %+v %v", files, err)
+	}
+}

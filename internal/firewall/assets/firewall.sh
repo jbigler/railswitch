@@ -23,6 +23,8 @@
 #                    in-container firewall (firewall = "self": no hook)
 set -euo pipefail
 umask 077 # state files: only this user (as hook.sh)
+TSV="${FW_FORMAT:-}" # tsv: show prints C/R lines for railswitch fw show --json
+[[ -z "$TSV" || "$TSV" == tsv ]] || { printf 'FW_FORMAT must be tsv\n' >&2; exit 2; }
 
 : "${FIREWALL_DIR:?FIREWALL_DIR unset (run through railswitch fw)}"
 : "${PREFIX:?PREFIX unset (run through railswitch fw)}"
@@ -92,8 +94,10 @@ cmd_show() {
       # A firewall = "self" service (the browser) keeps its own
       # in-container firewall and has no hook.
       if self_firewalled "$name"; then
+        if [[ "$TSV" ]]; then printf 'C\t%s\tself\t\t\n' "$name"; continue; fi
         printf '\n%s  own in-container firewall\n' "$name"
       else
+        if [[ "$TSV" ]]; then printf 'C\t%s\tnone\t\t\n' "$name"; continue; fi
         printf '\n%s  NO FIREWALL -- the hook did not run for this container.\n' "$name"
         printf '  Check: railswitch doctor; then recreate it (railswitch render, then restart it)\n'
       fi
@@ -101,24 +105,38 @@ cmd_show() {
     fi
     profiles="$(sed -n 's/^profiles=//p' "$f")"
     mode="$(sed -n 's/^mode=//p' "$f")"
-    printf '\n%s  profiles=%s mode=%s\n' "$name" "$profiles" "$mode"
+    if [[ "$TSV" ]]; then
+      printf 'C\t%s\tfirewalled\t%s\t%s\n' "$name" "$profiles" "$mode"
+    else
+      printf '\n%s  profiles=%s mode=%s\n' "$name" "$profiles" "$mode"
+    fi
     [[ "$mode" == off ]] && continue
     local pid entries
     pid="$(podman inspect -f '{{.State.Pid}}' "$id")"
     entries="$( { set_entries "$pid" blocked4; set_entries "$pid" blocked6; } | sort -u)"
     if [[ -z "$entries" ]]; then
-      printf '  nothing %s\n' "$([[ "$mode" == log ]] && echo 'would have been rejected' || echo rejected)"
+      [[ "$TSV" ]] || printf '  nothing %s\n' "$([[ "$mode" == log ]] && echo 'would have been rejected' || echo rejected)"
       continue
     fi
-    printf '  %s:\n' "$([[ "$mode" == log ]] && echo 'would reject under enforce' || echo rejected)"
+    [[ "$TSV" ]] || printf '  %s:\n' "$([[ "$mode" == log ]] && echo 'would reject under enforce' || echo rejected)"
     local addr proto port host
     while read -r addr proto port; do
       host="$(timeout 2 getent hosts "$addr" 2>/dev/null | awk '{ print $2; exit }')" || true
-      printf '    %-40s %s/%s  %s\n' "$addr" "$proto" "$port" "${host:-}"
+      # A reverse name is the address owner's to choose: show it only when
+      # it resolves back to the address (else Settings would offer to
+      # allow a name the owner of that address picked).
+      if [[ -n "$host" ]] && ! timeout 2 getent ahosts "$host" 2>/dev/null | awk '{ print $1 }' | grep -qxF "$addr"; then
+        host=""
+      fi
+      if [[ "$TSV" ]]; then
+        printf 'R\t%s\t%s\t%s\t%s\t%s\n' "$name" "$addr" "$proto" "$port" "${host:-}"
+      else
+        printf '    %-40s %s/%s  %s\n' "$addr" "$proto" "$port" "${host:-}"
+      fi
     done <<<"$entries"
   done < <(podman ps --format '{{.ID}} {{.Names}} {{.Networks}}')
 
-  (( any )) || printf 'no running containers%s%s\n' "${svc:+ of service $svc}" "${W:+ for worktree $W}"
+  (( any )) || [[ "$TSV" ]] || printf 'no running containers%s%s\n' "${svc:+ of service $svc}" "${W:+ for worktree $W}"
 }
 
 cmd_allow() {

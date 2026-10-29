@@ -38,7 +38,27 @@
 <p class="note">Any other key runs an option as one more service, named after the key (a second database, ClickHouse beside Postgres).</p>
 </section>
 
-<section class="card">
+{{with .Firewall}}<section class="card" id="firewall" data-mode="{{.Mode}}">
+<h2>Firewall</h2>
+<p class="note">What each kind of container may reach outside this machine. Now: <b>{{.Effective}}</b>. The default is {{.Default}}{{if eq .Default "enforce"}}: the project has agents, and an agent edits the code the app, its workers and installs run{{end}}. Under enforce a host not listed is blocked; log only records what enforce would block.</p>
+{{if .OptedOut}}<p class="yellow notice">This project has agents and its firewall is {{.Effective}}: an agent can reach the network through code the app or its workers run. Pick Default or Enforce to close that.</p>
+{{end}}
+<div class="choices fw-modes">{{range .Modes}}<label class="choice"><input type="radio" name="fw-mode" value="{{.Value}}"{{if .Current}} checked{{end}}> {{.Label}}{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
+{{range .Profiles}}{{$prof := .Name}}<h3><span class="mono">{{.Name}}</span> <span class="muted">· {{.Note}}</span></h3>
+<table class="set-table">
+<tbody>
+{{range .Hosts}}<tr class="fwhost" data-prof="{{$prof}}" data-host="{{.}}"><td class="mono">{{.}}</td><td><button type="button" class="ln danger" data-fw-remove>Remove</button></td></tr>
+{{else}}<tr><td colspan="2" class="muted">Nothing beyond the packages' own lists.</td></tr>
+{{end}}</tbody>
+</table>
+<form class="add-row" data-stage="fw">
+<input type="hidden" name="key" value="{{$prof}}">
+<input name="value" placeholder="host.example.com" class="mono" autocomplete="off" required aria-label="Host for {{$prof}}">
+<button class="ln" disabled>Allow</button>
+</form>
+{{end}}<div id="fw-blocked" data-src="{{.BlockedURL}}"><p class="muted">Reading what the firewall blocked…</p></div>
+</section>
+{{end}}<section class="card">
 <h2>Environment</h2>
 <table class="set-table">
 <thead><tr><th>Name</th><th>Value</th><th></th></tr></thead>
@@ -136,3 +156,19 @@ the project was made from it; Accept records its new version. */}}
 <p class="note">Accept records the template's version now (<span class="mono">{{.SHA256}}</span>): the notice goes away until it changes again.</p>
 {{end}}</section>
 {{end}}{{end}}
+
+{{/* fw-blocked is the Firewall card's "Would be blocked", loaded after
+the page. */}}
+{{define "fw-blocked"}}<div id="fw-blocked">
+<h3>Blocked, or would be under enforce</h3>
+{{if .Error}}<p class="red">Firewall state unavailable: {{.Error}}</p>
+{{else}}<table class="set-table">
+<thead><tr><th>Container</th><th>Address</th><th>Host</th><th></th></tr></thead>
+<tbody>
+{{range .Rows}}<tr><td class="mono">{{.Container}} <span class="chip">{{.Mode}}</span></td><td class="mono">{{.Addr}} {{.Port}}</td><td class="mono">{{.Host}}</td><td>{{if and .Host .Profile}}<button type="button" class="ln" data-fw-allow data-prof="{{.Profile}}" data-host="{{.Host}}">Allow in {{.Profile}}</button>{{else if not .Profile}}<span class="muted">a data container: nothing to allow</span>{{else}}<span class="muted">no host name: add the host by hand</span>{{end}}</td></tr>
+{{else}}<tr><td colspan="4" class="muted">Nothing blocked since the containers started.</td></tr>
+{{end}}</tbody>
+</table>
+{{range .None}}<p class="yellow notice"><span class="mono">{{.}}</span> has no firewall: the hook did not run for it (railswitch doctor, then restart it).</p>
+{{end}}{{end}}</div>
+{{end}}

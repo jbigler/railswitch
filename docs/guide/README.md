@@ -19,4 +19,4 @@ for the details.
 The reference: [dashboard](../dashboard.md), [packages](../packs.md),
 [firewall](../firewall.md), [templates](../templates.md),
 [libraries](../libraries.md), [editor](../nvim.md),
-[JSON output](../json.md).
+[JSON output](../json.md), [shell completion](../completion.md).

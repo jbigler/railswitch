@@ -11,7 +11,9 @@ make build && install -m755 railswitch ~/.local/bin/
 railswitch doctor
 ```
 
-Every check should say `ok`. Two common fixes:
+`doctor` checks podman, its socket and Quadlet, cgroup v2, port 80, the
+firewall's tools and `ssh-keygen -Y` (for signed libraries). Every check
+should say `ok`. Two common fixes:
 
 - **Port 80.** Every app is served on `http://<worktree>.<prefix>.localhost`
   through one proxy on 127.0.0.1:80, which is a privileged port:
@@ -61,26 +63,42 @@ needs you.
 Each branch you work on is a worktree: a git worktree with its own
 containers, database and ports.
 
+Project commands run in the workspace, worktree commands in a worktree
+(or anywhere, with `-C <workspace>` and `-w <worktree>`):
+
 ```bash
+cd ~/workspace/shop
 railswitch wt add feature-x --up      # a branch, a PR number, or a new branch
-cd ~/workspace/shop/feature-x
-railswitch up | stop | restart | down
+cd feature-x
+railswitch up | stop | restart
 railswitch logs -f rails
 railswitch exec bin/rails console
 railswitch task test                  # the pack's and project's tasks
+railswitch db dump                    # the databases, into <workspace>/db-dumps/
+railswitch down                       # stops it AND deletes its volumes (asks first)
 railswitch wt rm feature-x            # --force: even with uncommitted changes (lost)
 ```
 
-The dashboard does the same from each worktree's row: up, stop, restart,
-open the app, open a terminal, start an agent.
+`stop` keeps a worktree's data; `down` deletes its volumes, the database
+included. The dashboard does the same from each worktree's row: up, stop,
+restart, open the app and its links, and run a task (Shift+Enter runs it
+in a new terminal).
+
+Each worktree also publishes a few ports on 127.0.0.1 for tools on your
+machine: the database (55432 + its number), the Ruby debugger (33000 +),
+the Playwright server (18888 +) and nvim (17000 +). `railswitch env` and
+the dashboard show them.
 
 ## Secrets
 
-A project declares the secrets it needs (an API key, an agent's token);
-you set the values:
+A project declares the secrets it needs (an agent's token, a
+`github_token` for a GitHub repository); `project new` lists the ones to
+set. You set the values, and declare your own:
 
 ```bash
-railswitch secret set rails_master_key    # asks without echo, or reads stdin
+railswitch secret set claude_token        # asks without echo, or reads stdin
+railswitch secret add rails_master_key --service rails --env RAILS_MASTER_KEY
+railswitch secret set rails_master_key
 ```
 
 Values live in podman's secret store, never in a file railswitch writes,

@@ -31,10 +31,10 @@ railswitch agent stop
 ```
 
 An agent runs **on demand** (a container for as long as you use it) or as
-a **service** (started by `up`, and `agent` attaches to it). One agent
-runs at a time per worktree. The dashboard starts it in a terminal from
-the worktree's row and shows when it is waiting on you: a permission
-prompt, a question, a finished reply (`◆ N need input`).
+a **service** (`railswitch agent` starts its unit if needed and attaches;
+`up` never starts it). One agent runs at a time per worktree. Agents start
+from the terminal; the dashboard shows when one is waiting on you: a
+permission prompt, a question, a finished reply (`◆ N need input`).
 
 Its home, logins and history included, is a folder per worktree
 (`.railswitch/agent-home/<worktree>/<agent>`), kept across `down` and
@@ -49,9 +49,12 @@ deleted by `wt rm --force`.
 - **The rest of the project too.** An agent edits code the app, workers
   and installs run, so a project with agents has them on enforce as well.
   See [The firewall](firewall.md).
-- **No host credentials.** No SSH keys, SSH agent or git config reach it.
-  For git over HTTPS, declare a token secret with `git_host`; to sign
-  commits, a signing-only key with `secret add --git-signing`.
+- **No host credentials.** No SSH keys, SSH agent or git config file reach
+  it (only your git name and email are passed in). For a GitHub
+  repository, `project new` declares a `github_token` secret for the
+  agents and nvim: `railswitch secret set github_token` gives them git
+  over HTTPS. To sign commits, add a signing-only key with `secret add
+  --git-signing`.
 - **Git hooks are guarded.** The worktree's `.git/hooks` are mounted
   read-only, and `railswitch hooks check` (and `doctor`) report hooks or
   git config an agent changed.

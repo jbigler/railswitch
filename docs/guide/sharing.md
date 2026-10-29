@@ -56,9 +56,9 @@ reviewed update. Signing uses an SSH key you probably already have; the
 key isn't shared, each publisher signs with their own.
 
 ```bash
-railswitch library add git@github.com:team/stack-lib.git --alias team
-railswitch library trust team --fingerprint SHA256:…
-railswitch library fetch
+railswitch library add git@github.com:team/stack-lib.git --alias team   # fetches it
+railswitch library trust team --fingerprint SHA256:…                    # once
+railswitch library fetch team                                           # later updates
 ```
 
 Then `team:rails@2` and `team:shop-stack@1` are refs like any other.

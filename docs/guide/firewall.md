@@ -36,9 +36,10 @@ firewall would be easy to get around. A project without agents defaults to
 On the Settings page, the **Firewall** card has the mode, the `app`,
 `deps` and `agent` lists, and **Blocked, or would be under enforce**: each
 address a container tried to reach, with the host it belongs to and an
-**Allow** button that stages it into the right list. Apply like any other
-Settings change; the affected containers restart, since the lists are read
-when a container starts.
+**Allow in <list>** button that stages it into the right list. Apply like
+any other Settings change. The lists are read when a container starts, so
+running worktrees pick a change up when restarted: tick the restart box to
+do it now.
 
 From the terminal:
 

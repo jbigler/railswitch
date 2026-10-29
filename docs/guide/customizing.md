@@ -43,6 +43,10 @@ The **Library** page lists the built-in packages, the workspace's own
 - A copy of a pack should keep its name (`local:rails@1`): options name
   the packs they work with.
 - Then pick it in Settings.
+- `pack import` (or **Import a package**) brings in a package someone
+  handed you, as a new one or an update of yours; a folder at another
+  version than the one the project uses is refused (import it under
+  another name).
 
 The package format: [docs/packs.md](../packs.md).
 

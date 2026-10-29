@@ -49,17 +49,21 @@ The app, worker and deps mount the worktree; data containers don't. Every
 container runs with no privilege escalation and memory and process
 limits; the app, worker, deps, tools and agents also drop every
 capability. Each gets an egress firewall applied from outside it, except
-the browser, which runs its own.
+the browser, which runs its own. Image builds are not containers of the
+project: a Containerfile's `RUN` lines run on this machine, outside the
+firewall, which is why a review flags every new download in one.
 
 Caches (gems, npm, corepack) are shared by the project's worktrees, so a
 new worktree doesn't download everything again. Data is per worktree: a
-new worktree's database starts empty and the app's own setup fills it
-(`db:prepare` for Rails).
+new worktree's database starts from the dumps in `<workspace>/db-dumps/`
+if there are any (`railswitch db dump` writes them from a worktree you
+like), else empty; then the app's own setup runs (`db:prepare` for
+Rails).
 
 ## What stays on your machine
 
 Nothing in a container sees your home directory, SSH keys, SSH agent or
-git config. Secrets reach only the containers that declare them, through
+git config file (only your git name and email are passed in). Secrets reach only the containers that declare them, through
 podman's secret store. `project.toml` is yours: the dashboard and the CLI
 edit it in place, keeping your comments.
 

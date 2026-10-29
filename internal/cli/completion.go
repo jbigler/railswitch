@@ -69,6 +69,7 @@ var completionFlags = map[string][]string{
 	"dashboard colors set":   {"--base=", "--dark"},
 	"down":                   {"--yes"},
 	"exec":                   {"--fresh"},
+	"gc":                     {"--dry-run", "--volumes", "--yes"},
 	"hooks restore":          {"--force"},
 	"lock":                   {"--accept=", "--restart", "--review"},
 	"library add":            {"--alias=", "--branch="},

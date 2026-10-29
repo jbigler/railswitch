@@ -49,6 +49,7 @@ type BuildArgs struct {
 	Tag     string            // image tag (-t)
 	Context string            // build context dir
 	Args    map[string]string // --build-arg K=V, emitted sorted by key
+	Prefix  string            // the project's prefix: --label railswitch.prefix=<prefix>
 	// Progress, when set, receives the build's stdout and stderr as it
 	// runs, so a long build shows what it is doing; the stderr tail still
 	// ends up in the error.
@@ -109,6 +110,10 @@ func (p Podman) Pull(ctx context.Context, ref string) (string, error) {
 // FROM images first (D36).
 func (p Podman) Build(ctx context.Context, b BuildArgs) error {
 	args := []string{"build", "--pull=never", "-f", b.File, "-t", b.Tag}
+	if b.Prefix != "" {
+		// gc knows a removed project's images by it (D120).
+		args = append(args, "--label", PrefixLabel+"="+b.Prefix)
+	}
 	keys := make([]string, 0, len(b.Args))
 	for k := range b.Args {
 		keys = append(keys, k)
@@ -120,6 +125,51 @@ func (p Podman) Build(ctx context.Context, b BuildArgs) error {
 	args = append(args, b.Context)
 	_, err := p.R.Run(ctx, sys.Cmd{Name: "podman", Args: args, Timeout: BuildTimeout, Stdout: b.Progress, Stderr: b.Progress})
 	return err
+}
+
+// PrefixLabel is the label every image railswitch builds carries: the
+// project's prefix.
+const PrefixLabel = "railswitch.prefix"
+
+// Image is one local image of `podman images --format json`.
+type Image struct {
+	ID         string            `json:"Id"`
+	Names      []string          `json:"Names"`
+	Size       int64             `json:"Size"`
+	Containers int               `json:"Containers"`
+	Labels     map[string]string `json:"Labels"`
+}
+
+// Images is every local image.
+func (p Podman) Images(ctx context.Context) ([]Image, error) {
+	out, err := p.out(ctx, "images", "--format", "json")
+	if err != nil {
+		return nil, err
+	}
+	var imgs []Image
+	if strings.TrimSpace(out) == "" {
+		return nil, nil
+	}
+	if err := json.Unmarshal([]byte(out), &imgs); err != nil {
+		return nil, fmt.Errorf("podman images: %w", err)
+	}
+	return imgs, nil
+}
+
+// ImageRemove runs `podman rmi <name>`, without -f: an image a container
+// uses is refused, and an image with other names only loses this one.
+func (p Podman) ImageRemove(ctx context.Context, name string) error {
+	_, err := p.run(ctx, 0, "rmi", name)
+	return err
+}
+
+// Volumes is every volume's name.
+func (p Podman) Volumes(ctx context.Context) ([]string, error) {
+	out, err := p.out(ctx, "volume", "ls", "--format", "{{.Name}}")
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(out), nil
 }
 
 // Tag runs `podman tag <src> <dst>`.

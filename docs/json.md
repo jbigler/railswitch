@@ -518,6 +518,27 @@ no document.
 | `restart` | array of strings | For a used package, the running worktrees the write restarts; else `[]`. |
 | `warnings` | array of strings | Always `[]` for now. |
 
+## `gc`
+
+What `railswitch gc` removed (or, with `--dry-run`, would remove), D120.
+Exit 0; a failed removal is a warning.
+
+```json
+{"dry_run": true,
+ "images": [{"name": "localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "size": 1390000000}],
+ "unsure": [{"name": "localhost/old/base:ruby3.4.4-node22.11.0-fc430f4a", "size": 888000000}],
+ "store": ["df728e1a…"], "volumes": ["shop-feature-x-db-data"], "bytes": 1390000000, "warnings": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `images` | array | Images of a registered project (or carrying `railswitch.prefix=<an unregistered prefix>`) that no worktree's current render builds and no container uses: `name`, `size` (bytes). |
+| `unsure` | array | Images shaped like railswitch's (`localhost/<prefix>/<repo>:<version>-<hash8>`) of no registered project and without the build label: never removed; remove each with `podman rmi <name>`. |
+| `store` | array | Stored package copies (D96) no `stack.lock` (its tables and `[[removed]]`) or `[template] sha256` of a registered project names, and not changed in the last 10 minutes. `[]` when a project doesn't load. |
+| `volumes` | array | Volumes of a registered project whose name a railswitch package declares (`<prefix>_<cache or shared name>`, `<prefix>-<slug>-<volume name>`, placeholders as wildcards) and no worktree's render mounts. Removed only with `--volumes`, after a prompt naming each one (or `--yes`), asked before anything else is removed: a refusal removes nothing (exit 1 without a terminal). |
+| `bytes` | number | The removed images' size, layers they share with kept images included. |
+| `warnings` | array | A project that doesn't load (nothing of its prefix is removed), a removal that failed. |
+
 ## `fw show [service]`
 
 The firewall of the worktree's containers (the workspace root: every

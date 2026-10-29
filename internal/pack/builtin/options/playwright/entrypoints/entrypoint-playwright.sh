@@ -150,7 +150,8 @@ socat TCP-LISTEN:"$CDP_PUBLIC_PORT",fork,reuseaddr TCP:127.0.0.1:"$CDP_PORT" &
 # The browser starts before the app it opens: until the app is up, Traefik
 # has no route for it and answers 404 (502 while it starts), and that is the
 # first page. Once the app answers, open it in a fresh tab and close the
-# stale ones, over CDP (which stays available meanwhile, for agents). Only
+# stale one (a page still at that URL, not one an agent or you opened), over
+# CDP (which stays available meanwhile, for agents). Only
 # while the app had not answered; given up after 3 minutes (an app whose /
 # is a 404 for good keeps its page).
 (
@@ -164,7 +165,7 @@ socat TCP-LISTEN:"$CDP_PUBLIC_PORT",fork,reuseaddr TCP:127.0.0.1:"$CDP_PORT" &
   done
   [ "$stale" = 1 ] && [ "$(date +%s)" -lt "$deadline" ] || exit 0
   cdp="http://127.0.0.1:$CDP_PORT"
-  old=$(curl -s --max-time 5 "$cdp/json/list" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{for(const t of JSON.parse(s))if(t.type==="page")console.log(t.id)}catch{}})')
+  old=$(curl -s --max-time 5 "$cdp/json/list" | START="$CHROME_START_URL" node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const u=process.env.START.replace(/\/$/,"");try{for(const t of JSON.parse(s))if(t.type==="page"&&t.url.replace(/\/$/,"")===u)console.log(t.id)}catch{}})')
   curl -s --max-time 5 -X PUT "$cdp/json/new?$CHROME_START_URL" >/dev/null || exit 0
   for id in $old; do
     curl -s --max-time 5 "$cdp/json/close/$id" >/dev/null

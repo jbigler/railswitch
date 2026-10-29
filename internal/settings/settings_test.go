@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -291,7 +292,7 @@ func TestPreviewBlockedShape(t *testing.T) {
 func TestParseEditsStrict(t *testing.T) {
 	good := `[{"op":"option","key":"cache","ref":"none"},{"op":"env.set","name":"A","value":""},{"op":"link.add","label":"L","url":"u"}]`
 	got, err := ParseEdits(strings.NewReader(good))
-	if err != nil || len(got) != 3 || got[0] != (Edit{Op: "option", Key: "cache", Ref: "none"}) {
+	if err != nil || len(got) != 3 || !reflect.DeepEqual(got[0], Edit{Op: "option", Key: "cache", Ref: "none"}) {
 		t.Fatalf("ParseEdits = %+v, %v", got, err)
 	}
 	for in, want := range map[string]string{
@@ -303,9 +304,33 @@ func TestParseEditsStrict(t *testing.T) {
 		`[{"op":"link.add","label":"L"}]`:                             "edit 0: link.add needs url",
 		`{"op":"option"}`:                                             "cannot unmarshal",
 		`[] []`:                                                       "one JSON array",
+		`[{"op":"env.unset","name":"A","values":["x"]}]`:              "edit 0: env.unset takes no values",
+		`[{"op":"hooks.set","values":["x"]}]`:                         "edit 0: hooks.set needs key",
 	} {
 		if _, err := ParseEdits(strings.NewReader(in)); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want %q", in, err, want)
 		}
+	}
+}
+
+// TestPreviewHooks (D126): a start hook restarts the running worktrees; a
+// create hook restarts nothing; a bad command blocks; apply writes them.
+func TestPreviewHooks(t *testing.T) {
+	e := filialEnv(t, nil)
+	e.Running = func(unit string) bool { return unit == "filial-master-rails.service" }
+	p := preview(t, e, Edit{Op: "hooks.set", Key: "start", Values: []string{"bin/rails db:test:prepare"}})
+	if r := p.Edits[0]; r.Impact == ImpactBlocked {
+		t.Fatalf("result = %+v", r)
+	}
+	if !slices.Equal(p.Restart, []string{"master"}) {
+		t.Errorf("start: Restart = %v, want the running master", p.Restart)
+	}
+	p = preview(t, e, Edit{Op: "hooks.set", Key: "create", Values: []string{"bin/rails db:seed"}})
+	if len(p.Restart) != 0 || p.Edits[0].Impact == ImpactBlocked {
+		t.Errorf("create: %+v, Restart = %v", p.Edits[0], p.Restart)
+	}
+	p = preview(t, e, Edit{Op: "hooks.set", Key: "deps", Values: []string{"-x"}})
+	if r := p.Edits[0]; r.Impact != ImpactBlocked || !strings.Contains(r.Error, "starts with -") {
+		t.Errorf("bad command: %+v", r)
 	}
 }

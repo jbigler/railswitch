@@ -170,6 +170,11 @@ shows what each one does before anything is written.
   `firewall.allow.add`) when it resolves and the container has a list; a
   data container has nothing to allow; a container with no hook is
   named.
+- **Hooks** (D126): a box per `[hooks]` list (`deps`, `start`, `create`),
+  one command per line, in order; blank lines are dropped. Leaving a
+  changed box stages `hooks.set` with the whole list (an empty box removes
+  it); changing it back unstages it. The preview's restart list shows
+  what a `deps` or `start` change restarts (`create` restarts nothing).
 - **Environment:** the project's `[env]`. Editing a value stages it when
   you leave the field; Remove stages its removal; the add form (name,
   value) stages a new one.

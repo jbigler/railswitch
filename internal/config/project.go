@@ -58,6 +58,19 @@ type Hooks struct {
 	Create []string `toml:"create"` // in the running app, once per new worktree, after its first up
 }
 
+// List is the hooks of list, one of HookLists.
+func (h Hooks) List(list string) []string {
+	switch list {
+	case "deps":
+		return h.Deps
+	case "start":
+		return h.Start
+	case "create":
+		return h.Create
+	}
+	return nil
+}
+
 // TemplateRef is the [template] table: the template project new started
 // the project from and the content hash it was accepted at (D111).
 // Nothing else reads it: a template is never applied again.
@@ -407,18 +420,9 @@ func (p *Project) Validate() error {
 		}
 	}
 
-	for _, h := range []struct {
-		name string
-		cmds []string
-	}{{"deps", p.Hooks.Deps}, {"start", p.Hooks.Start}, {"create", p.Hooks.Create}} {
-		for i, c := range h.cmds {
-			path := fmt.Sprintf("hooks.%s[%d]", h.name, i)
-			if strings.TrimSpace(c) == "" {
-				v.add(path, "is empty")
-			} else if strings.HasPrefix(c, "-") || strings.HasPrefix(c, "+") {
-				v.add(path, "starts with %c: sh would read it as an option", c[0])
-			}
-			v.oneLine(path, c)
+	for _, list := range HookLists {
+		for i, c := range p.Hooks.List(list) {
+			v.hook(fmt.Sprintf("hooks.%s[%d]", list, i), c)
 		}
 	}
 
@@ -503,6 +507,16 @@ func (v *validator) ref(path, ref string, local bool) {
 	case !refRe.MatchString(r):
 		v.add(path, "%q is not a ref name@N or <library>:name@N, e.g. \"postgres@1\"", ref)
 	}
+}
+
+// hook checks one [hooks] command: one line, not empty, not an sh option.
+func (v *validator) hook(path, c string) {
+	if strings.TrimSpace(c) == "" {
+		v.add(path, "is empty")
+	} else if strings.HasPrefix(c, "-") || strings.HasPrefix(c, "+") {
+		v.add(path, "starts with %c: sh would read it as an option", c[0])
+	}
+	v.oneLine(path, c)
 }
 
 func (v *validator) oneLine(path, s string) {

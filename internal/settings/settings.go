@@ -22,6 +22,8 @@ type Edit struct {
 	Value string `json:"value,omitempty"`
 	Label string `json:"label,omitempty"`
 	URL   string `json:"url,omitempty"`
+	// Values is the whole list hooks.set writes (D126); no other op takes it.
+	Values []string `json:"values,omitempty"`
 }
 
 // opSpec is what an op takes: required fields must be non-empty, optional
@@ -42,6 +44,9 @@ var ops = map[string]opSpec{
 	"link.remove":           {required: []string{"label"}},
 	"link.hide":             {required: []string{"label"}},
 	"link.show":             {required: []string{"label"}},
+	// key is a list of config.HookLists; values its commands in order, none
+	// removes it.
+	"hooks.set": {required: []string{"key"}},
 }
 
 func (e Edit) fields() map[string]string {
@@ -64,6 +69,9 @@ func ParseEdits(r io.Reader) ([]Edit, error) {
 		spec, ok := ops[e.Op]
 		if !ok {
 			return nil, fmt.Errorf("edit %d: unknown op %q", i, e.Op)
+		}
+		if e.Values != nil && e.Op != "hooks.set" {
+			return nil, fmt.Errorf("edit %d: %s takes no values", i, e.Op)
 		}
 		f := e.fields()
 		for _, name := range []string{"key", "ref", "name", "value", "label", "url"} {
@@ -106,6 +114,8 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.HideLink(data, e.Label)
 	case "link.show":
 		return config.ShowLink(data, e.Label)
+	case "hooks.set":
+		return config.SetHooks(data, e.Key, e.Values)
 	}
 	return "", fmt.Errorf("unknown op %q", e.Op)
 }

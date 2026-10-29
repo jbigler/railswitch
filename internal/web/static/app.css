@@ -220,3 +220,6 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 
 .toast{position:fixed;right:16px;bottom:16px;max-width:460px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap}
 .toast.err{color:var(--red);border-color:var(--red)}
+#hooks label.hook{display:block;margin:10px 0}
+#hooks label.hook textarea{display:block;width:100%;margin-top:4px;resize:vertical}
+#hooks label.hook.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}

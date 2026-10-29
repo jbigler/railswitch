@@ -130,12 +130,20 @@ type projectShow struct {
 	Hash       string        `json:"hash"`
 	Pack       packRow       `json:"pack"`
 	Firewall   firewallShow  `json:"firewall"`
+	Hooks      hooksShow     `json:"hooks"`
 	Options    []optionRow   `json:"options"`
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
 	AddChoices []string      `json:"add_choices"`
 	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`
+}
+
+// hooksShow is project show's hooks (D126): each list's commands.
+type hooksShow struct {
+	Deps   []string `json:"deps"`
+	Start  []string `json:"start"`
+	Create []string `json:"create"`
 }
 
 // firewallShow is project show's firewall (D119).

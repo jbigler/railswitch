@@ -58,7 +58,13 @@
 </form>
 {{end}}<div id="fw-blocked" data-src="{{.BlockedURL}}"><p class="muted">Reading what the firewall blocked…</p></div>
 </section>
-{{end}}<section class="card">
+{{end}}<section class="card" id="hooks">
+<h2>Hooks</h2>
+<p class="note">Commands railswitch runs for you inside the containers, one per line, top to bottom, each in its own shell in <code>/app</code>. A failing <b>deps</b> or <b>start</b> command stops the app's start; a failing <b>create</b> command runs again on the next up. Changed lists are staged when you leave the box.</p>
+{{range .Hooks}}<label class="field hook" data-list="{{.Name}}" data-orig="{{.Text}}"><span><span class="mono">{{.Name}}</span> <span class="muted">· {{.Note}}</span></span>
+<textarea class="mono hook-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="{{if eq .Name "deps"}}gem list -i retest >/dev/null || gem install retest{{else if eq .Name "start"}}bin/rails db:test:prepare{{else}}bin/rails db:seed{{end}}">{{.Text}}</textarea></label>
+{{end}}</section>
+<section class="card">
 <h2>Environment</h2>
 <table class="set-table">
 <thead><tr><th>Name</th><th>Value</th><th></th></tr></thead>

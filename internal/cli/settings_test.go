@@ -202,6 +202,7 @@ type projectShowDoc struct {
 	BaseBranch                     string   `json:"base_branch"`
 	AddChoices                     []string `json:"add_choices"`
 	Used                           []string
+	Hooks                          struct{ Deps, Start, Create []string }
 	Options                        []struct {
 		Key     string
 		Slot    bool
@@ -230,7 +231,7 @@ service = "db"
 	}
 	p := filepath.Join(ws, "project.toml")
 	b := readFile(t, p)
-	if err := os.WriteFile(p, []byte(strings.Replace(b, "schema = 1\n", "schema = 1\nhide_links = [\"Mailer previews\"]\n", 1)), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(strings.Replace(b, "schema = 1\n", "schema = 1\nhide_links = [\"Mailer previews\"]\n", 1)+"\n[hooks]\nstart = [\"b\", \"a\"]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out := mustRun(t, "-C", ws, "--json", "project", "show")
@@ -240,6 +241,9 @@ service = "db"
 	}
 	if d.Prefix != "filial" || d.BaseBranch != "master" || d.Hash != workspace.Hash([]byte(readFile(t, p))) || d.File != readFile(t, p) {
 		t.Errorf("doc %+v", d)
+	}
+	if !slices.Equal(d.Hooks.Start, []string{"b", "a"}) || !strings.Contains(out, `"deps":[]`) || !strings.Contains(out, `"create":[]`) {
+		t.Errorf("hooks %+v (empty lists must be [])", d.Hooks)
 	}
 	if len(d.Options) < 6 || d.Options[0].Key != "database" || !d.Options[0].Slot || d.Options[0].Ref != "postgres@1" {
 		t.Fatalf("options %+v", d.Options)

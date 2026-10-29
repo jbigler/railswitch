@@ -794,8 +794,10 @@ Reads an edit list on stdin (a JSON array; ops `pack` (`ref`: sets
 or absent for the default), `firewall.allow.add` and
 `firewall.allow.remove` (`key`: `app`, `deps` or `agent`; `value`: a
 host) (D119), `option`, `env.set`,
-`env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`; strict:
-an unknown field or op is an error), writes nothing and judges each edit
+`env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`,
+`hooks.set` (`key`: `deps`, `start` or `create`; `values`: the list's
+commands in order, absent or `[]` to remove it; D126; no other op takes
+`values`); strict: an unknown field or op is an error), writes nothing and judges each edit
 against the project with the edits before it applied. Without `--json` it
 prints a short summary and the diff. Exit 0 even when an edit is blocked.
 
@@ -848,6 +850,7 @@ What the settings page reads: the project's choices, env and links.
   "prefix": "filial", "name": "Filial Rails",
   "repo": "git@github.com:[ORG]/[REPO].git", "base_branch": "master",
   "hash": "sha256:5cc7…", "file": "schema = 1\n…",
+  "hooks": {"deps": [], "start": ["bin/rails db:test:prepare"], "create": []},
   "options": [
     {"key": "database", "slot": true, "ref": "postgres@1", "choices": ["postgres@1", "local:mariadb@1", "none"]},
     {"key": "jobs", "slot": true, "ref": "none", "choices": ["sidekiq@1", "none"]}
@@ -867,6 +870,7 @@ What the settings page reads: the project's choices, env and links.
 | `prefix`, `name`, `repo`, `base_branch` | string | The `[project]` table. |
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
+| `hooks` | object | `deps`, `start`, `create`: each `[hooks]` list's commands in order (`[]` for none; D126). |
 | `firewall` | object | `mode`: `[firewall] mode` (`""`: the default); `effective`: the mode the project's services get (`enforce` with agents, else `log`, unless `mode` is set: D119); `allow`: `app`, `deps`, `agent`, each `[firewall] allow.<profile>` (`[]` for none). |
 | `pack` | object | `ref`: `[stack] pack`; `choices`: the packs Settings offers, sorted, the current one among them: the newest built-in of each name, the workspace's `packs/<name>/` as `local:<name>@N` and the libraries' packs, each that loads with the current pack's app service (so `[stack] app` stays valid) and that the project's other lines resolve with (an option's `works_with`). |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |

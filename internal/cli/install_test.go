@@ -155,18 +155,18 @@ func TestProjectNewInstall(t *testing.T) {
 	if in == nil || len(in.Packages) != 1 || in.Packages[0].Ref != "acme:redis@1" || in.Packages[0].Status != "added" {
 		t.Fatalf("install = %+v", in)
 	}
-	code, _, errs := runWith(t, f, append([]string{"project", "new", ws}, args...)...)
+	code, _, errs := runWith(t, f, append([]string{"project", "new", "--no-detect", ws}, args...)...)
 	if code != 1 || !strings.Contains(errs, "installing acme:redis@1 needs review") {
 		t.Fatalf("without --accept-install: exit %d: %s", code, errs)
 	}
 	if exists(ws) {
 		t.Error("a refused install left the workspace")
 	}
-	code, _, errs = runWith(t, f, append([]string{"project", "new", ws, "--accept-install", "sha256:0"}, args...)...)
+	code, _, errs = runWith(t, f, append([]string{"project", "new", "--no-detect", ws, "--accept-install", "sha256:0"}, args...)...)
 	if code != 1 || !strings.Contains(errs, "the install changed since it was reviewed") {
 		t.Fatalf("stale: exit %d: %s", code, errs)
 	}
-	code, out, errs := runWith(t, f, append([]string{"project", "new", ws, "--accept-install", in.Hash}, args...)...)
+	code, out, errs := runWith(t, f, append([]string{"project", "new", "--no-detect", ws, "--accept-install", in.Hash}, args...)...)
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, out, errs)
 	}

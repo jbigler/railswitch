@@ -104,3 +104,42 @@ func TestProjectDetectRefusals(t *testing.T) {
 		}
 	}
 }
+
+// project new with neither --pack nor --template reads the repository as
+// the New project page does (D124): the detected pack and options, an
+// --option beating the detected one, what it found on stderr with --json.
+func TestNewDetects(t *testing.T) {
+	newEnv(t)
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	repo := railsRepo(t)
+	ws := filepath.Join(t.TempDir(), "shop")
+	code, out, errs := runWith(t, gitHost(), "--json", "project", "new", "--dry-run", ws, "--repo", repo, "--prefix", "shop", "--agent", "none")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var doc newDryRunDoc
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if !strings.Contains(doc.ProjectTOML, `database = "postgres@1"`) || !strings.Contains(doc.ProjectTOML, `base_branch = "trunk"`) {
+		t.Errorf("project.toml:\n%s", doc.ProjectTOML)
+	}
+	if !strings.Contains(errs, "detected pack rails@1") || !strings.Contains(errs, "detected database postgres@1 (Gemfile: pg)") {
+		t.Errorf("stderr: %s", errs)
+	}
+	code, out, errs = runWith(t, gitHost(), "--json", "project", "new", "--dry-run", ws, "--repo", repo, "--prefix", "shop", "--agent", "none", "--option", "database=mariadb@1")
+	if code != 0 || json.Unmarshal([]byte(out), &doc) != nil || !strings.Contains(doc.ProjectTOML, `database = "mariadb@1"`) || strings.Contains(errs, "detected database") {
+		t.Errorf("--option over detection: exit %d %s\n%s", code, errs, doc.ProjectTOML)
+	}
+}
+
+// A repository no pack matches is refused, naming --pack.
+func TestNewDetectNoPack(t *testing.T) {
+	newEnv(t)
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	repo := bareRepo(t, "main")
+	code, _, errs := runWith(t, gitHost(), "project", "new", filepath.Join(t.TempDir(), "x"), "--repo", repo, "--prefix", "xx", "--dry-run")
+	if code != 1 || !strings.Contains(errs, "pass --pack") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+}

@@ -53,6 +53,12 @@ The same from the terminal:
 railswitch project new ~/workspace/shop --repo git@github.com:you/shop.git --prefix shop --up
 ```
 
+Like the page, it reads the repository for the pack and options and says
+what it found ("detected database mariadb@1 (Gemfile: mysql2)"). An
+`--option slot=ref` you give wins over a detected one; `--pack` or
+`--template` skips the reading, and `--no-detect` takes the pack's
+defaults.
+
 The app answers at `http://main.shop.localhost/` (the branch name, then the
 prefix). The dashboard's project page shows every container, the links the
 pack gives (mail previews, the job queue, storage) and whether anything

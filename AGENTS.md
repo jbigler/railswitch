@@ -81,6 +81,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 - Built-in `mariadb@1` (D123): database slot, `[[detect]]` `gem 'mysql2'`, port `mariadb`/`DB_PORT` base 53306, data volume `db-data-mariadb{mariadb.major}`, `[dump]` (`.sql` files) and `[health]`; commands read `$MARIADB_ROOT_PASSWORD` inside the container as `MYSQL_PWD`.
 - Settings `option`/`pack` edits sync `[image] addons` (`settings.Env.syncAddons`, `config.SetImageAddons`): addons of options no longer chosen leave the list (files stay), chosen options' addons are added, ejected (`workspace.EjectedContainerfile`) when the workspace has no file of that name; user addons stay; `Preview.NewFiles` are written by `settings apply` in the same commit.
 
+## CLI (Stage 9i additions)
+- `project new` detects (D124): without `--pack`, `--template` or `--no-detect` it runs `detectNew` (`project detect`'s fetch and `detect.Choose` on the built-ins), takes the detected pack and every `Source == "repo"` slot not given by `--option`, prints `detected …` (stderr under `--json`); no pack matched is an error naming `--pack`. Tests: `noDetect` adds `--no-detect` to project new calls that name no pack.
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch, `library add`/`fetch`) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).

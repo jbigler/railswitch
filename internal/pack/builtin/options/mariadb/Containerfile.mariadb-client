@@ -1,0 +1,10 @@
+# mariadb option addon (D31): the MariaDB client library and tools the app
+# needs (the mysql2 gem builds against libmariadb; mariadb, mariadb-dump for
+# db tasks). MariaDB speaks MySQL's protocol: a MySQL app uses it as is.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER root
+RUN apt-get update -qq && \
+  apt-get install -y --no-install-recommends libmariadb-dev mariadb-client && \
+  rm -rf /var/lib/apt/lists/*
+USER appuser

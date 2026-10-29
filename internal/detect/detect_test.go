@@ -63,6 +63,17 @@ func TestPaths(t *testing.T) {
 // TestChooseRails: a pack needs every one of its files; options fire on a
 // matching line, not a commented one; the rest fall back to the pack's
 // defaults.
+// A mysql2 app gets mariadb for its database.
+func TestChooseMariaDB(t *testing.T) {
+	r := choose(t, builtins(t), map[string]string{
+		"Gemfile":               "gem 'mysql2', '~> 0.5'\n# gem 'pg'\n",
+		"config/application.rb": "module App; end\n",
+	}, "")
+	if db := option(t, r, "database"); db.Ref != "mariadb@1" || db.Source != "repo" || db.Evidence != "Gemfile: mysql2" {
+		t.Errorf("database = %+v", db)
+	}
+}
+
 func TestChooseRails(t *testing.T) {
 	cat := builtins(t)
 	r := choose(t, cat, map[string]string{

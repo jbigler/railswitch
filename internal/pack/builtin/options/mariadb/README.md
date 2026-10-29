@@ -1,0 +1,12 @@
+# mariadb
+
+MariaDB for the `database` slot. MariaDB speaks MySQL's protocol, so an
+app written for MySQL (the `mysql2` gem) uses it unchanged.
+
+- `DATABASE_URL` uses the pack's scheme for it (`mysql2://` for Rails).
+  An app on the `trilogy` gem sets its own in Settings:
+  `DATABASE_URL = "trilogy://root:…@db/…"`.
+- `railswitch db dump` writes one `<database>.sql` per database;
+  `db restore` and a new worktree's first `up` load them back.
+- Pin a version with `[versions] mariadb = "11.4"`; the data volume is per
+  major version (`db-data-mariadb11`).

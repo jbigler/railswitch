@@ -194,6 +194,22 @@ func TestLayerPrecedence(t *testing.T) {
 	}
 }
 
+// mariadb gives the app a mysql2:// URL with the generated root password,
+// and its dump commands read the password inside the container.
+func TestMariaDB(t *testing.T) {
+	_, in := filial(t, func(p *config.Project) { p.Options["database"] = "mariadb@1"; p.Versions["mariadb"] = "11.4" })
+	e, _ := envVar(in, "rails", "DATABASE_URL")
+	if e.Value != "mysql2://root:s3cret@db/filial_dev" {
+		t.Errorf("rails DATABASE_URL = %q", e.Value)
+	}
+	if v, _ := envVar(in, "db", "MARIADB_ROOT_PASSWORD"); v.Value != "s3cret" {
+		t.Errorf("db MARIADB_ROOT_PASSWORD = %q", v.Value)
+	}
+	if _, ok := envVar(in, "rails", "MARIADB_ROOT_PASSWORD"); ok {
+		t.Error("the app got the root password variable")
+	}
+}
+
 func TestDatabaseURL(t *testing.T) {
 	_, in := filial(t, nil)
 	e, _ := envVar(in, "rails", "DATABASE_URL")

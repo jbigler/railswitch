@@ -208,6 +208,7 @@ func TestPackLsJSON(t *testing.T) {
 	newEnv(t)
 	out := mustRun(t, "-C", t.TempDir(), "--json", "pack", "ls")
 	want := `{"packs":[{"ref":"rails@1","name":"rails"}],"options":[` +
+		`{"ref":"mariadb@1","name":"mariadb","slot":"database","works_with":["*"]},` +
 		`{"ref":"playwright@1","name":"playwright","slot":"browser","works_with":["*"]},` +
 		`{"ref":"postgres@1","name":"postgres","slot":"database","works_with":["*"]},` +
 		`{"ref":"redis@1","name":"redis","slot":"cache","works_with":["*"]},` +

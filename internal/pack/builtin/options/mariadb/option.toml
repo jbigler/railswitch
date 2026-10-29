@@ -1,0 +1,62 @@
+name = "mariadb"
+version = 1
+slot = "database"
+service = "db"
+works_with = ["*"]
+generated = ["DB_PASSWORD"]   # D17: railswitch generates the value into mise.local.toml; never user-declared
+
+[pin]
+name = "mariadb"
+default = "11.4"
+
+[image]
+pull = "docker.io/library/mariadb:{mariadb}"
+
+[app_addon]             # D31: extends the app's base image with the client libraries the app needs
+file = "Containerfile.mariadb-client"
+os = "debian"
+
+[health]                # the image's own check: the server answers and InnoDB is up
+cmd = "healthcheck.sh --connect --innodb_initialized"
+interval = "5s"
+timeout = "3s"
+retries = 5
+start_period = "30s"
+
+[gives]                 # layer 2, to app/worker/tool services
+DATABASE_URL = "{scheme}root:{generated.DB_PASSWORD}@{service}/{db}"
+
+[env]                   # the option's own service
+MARIADB_ROOT_PASSWORD = "{generated.DB_PASSWORD}"
+# The image creates {db} at its first start, for apps that never create
+# their own; Rails db:prepare loads the schema into it as into a missing one.
+MARIADB_DATABASE = "{db}"
+TZ = "{env.TZ}"
+
+# Every command runs in the db container, where the root password is in its
+# environment: MYSQL_PWD carries it, never an argument.
+[dump]                  # C3, D121, D122: dump, restore, and restore into a new worktree
+list = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" mariadb -uroot -N -e 'SHOW DATABASES' | grep -Exv 'information_schema|mysql|performance_schema|sys'"]
+command = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb-dump -uroot --single-transaction --routines --triggers --events \"$1\"", "sh", "{dump.db}"]
+file = "{dump.db}.sql"
+prepare = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb -uroot -e \"DROP DATABASE IF EXISTS \\`$1\\`; CREATE DATABASE \\`$1\\`\"", "sh", "{dump.db}"]
+restore = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb -uroot \"$1\"", "sh", "{dump.db}"]
+
+[[volumes]]
+name = "db-data-mariadb{mariadb.major}"
+mount = "/var/lib/mysql"
+
+[[ports]]
+name = "mariadb"
+env = "DB_PORT"
+base = 53306         # its own base: every built-in port base is unique
+container = 3306
+
+[unit]
+# Dev tuning: no flush at every commit, no DNS lookups for clients.
+exec = ["mariadbd", "--innodb-flush-log-at-trx-commit=0", "--skip-name-resolve"]
+
+[[detect]]                    # D87: a Gemfile line naming the gem; a commented one does not count
+file = "Gemfile"
+match = '''^\s*gem\s+['"]mysql2['"]'''
+evidence = "Gemfile: mysql2"

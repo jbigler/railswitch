@@ -474,6 +474,8 @@ there is no shared add-on package (user, 2026-10-27).
   sends the command's process group SIGHUP, then SIGKILL after 3 s: podman
   would leave an exec session or a `run` running. Transient containers
   run with `--init` so that SIGHUP reaches a command that would be PID 1.
+  An on-demand agent's package entrypoint runs inside the wrapper
+  (`--entrypoint sh`), so it gets the agent's arguments alone.
 - The dev server listens on `0.0.0.0` (a pack sets the env its framework
   reads, or its `README.md` says what the app must change).
 

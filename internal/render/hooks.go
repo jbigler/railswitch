@@ -89,7 +89,8 @@ func (b *builder) hookAsset(s *Service, rel, target string, data []byte) {
 // CreatePending is the marker of a worktree whose [hooks] create haven't
 // all run yet: written (empty) when the worktree is added; up records each
 // command that succeeds in it, one per line, and removes it when all have
-// (or there are none). A worktree from before has none and never runs them.
+// (or there are none); down writes it again (empty), as its data starts
+// over. A worktree from before has none and runs them only after a down.
 func CreatePending(ws, slug string) string {
 	return filepath.Join(ws, ".railswitch", "create-pending", slug)
 }

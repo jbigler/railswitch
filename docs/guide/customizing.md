@@ -43,10 +43,16 @@ create = ["bin/rails runner 'Admin.create_default!'"]
 | `start` | the app | before its server, on every app start |
 | `create` | the running app | once per new worktree, after its first `up` is ready |
 
-- Each command runs in its own `sh -ec`, in order; one that fails stops
-  the rest. A failing `deps` or `start` hook fails the app's start, with
-  its output in the start error. A failing `create` hook is run again,
-  with the others, by the next `up`.
+- Each command runs in its own `sh -ec` in `/app`, the worktree, in
+  order; one that fails stops the rest. A failing `deps` or `start` hook
+  fails the app's start, with its output in the start error. Editing
+  either restarts the app on the next `up`.
+- `create` hooks run once the app passes its health check (a project
+  whose app has none can't have them). A failing one is run again by the
+  next `up`, with the ones after it; those that succeeded aren't.
+- `start` hooks count against the app's health start period (120 s for
+  the Rails pack): a slow one can make the start time out. Keep them
+  quick, or move a slow step to `create`.
 - `deps` hooks install into the shared gem and package caches, so what
   they install is there for the app, `exec` and the editor too: a test
   watcher, `ruby-lsp`. Write them to check first, as above, so a start
@@ -55,6 +61,9 @@ create = ["bin/rails runner 'Admin.create_default!'"]
   for the ones you have.
 - They are in `project.toml`, so they're yours. A template carries its
   `[hooks]`, and its review flags each one.
+
+These are not `railswitch hooks`, which checks the git hooks of your
+repository.
 
 To copy files git doesn't track (`.env.development.local`, a `tags` file)
 into each new worktree, list them in `[project] seed_files`: `wt add`

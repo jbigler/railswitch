@@ -483,7 +483,7 @@ there is no shared add-on package (user, 2026-10-27).
 | `[app] port` | the container port the app route sends `<slug>.<prefix>.localhost` to |
 | `[app] install` | the deps command, run through `deps_entrypoint` |
 | `[app] health`, `health_start_period` | the app's health command (empty: none) and its start grace |
-| `[app] entrypoint`, `deps_entrypoint` | package files mounted as the app's and the deps service's entrypoint |
+| `[app] entrypoint`, `deps_entrypoint` | package files mounted as the app's and the deps service's entrypoint. A project's `[hooks] deps` (D126) replaces deps's entrypoint with railswitch's hook runner, which runs `deps_entrypoint` first: a pack without one, whose image has an `ENTRYPOINT`, loses that entrypoint for deps while the project has deps hooks. The app's entrypoint must exec its arguments (the server, behind the start hooks) |
 | `[deps] frozen_env` | env on the deps service only (a frozen install); `railswitch deps` leaves it out |
 | `[image] file`, `tag`, `os`, `args` | the base image's Containerfile (ejected to `containerfiles/`), tag part, OS family and build args |
 | `[runtimes.<name>]` | a version chain (`from`, optional `fallback`): `{<name>}` |

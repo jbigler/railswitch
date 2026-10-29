@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -33,6 +34,11 @@ func templateFlags(old, new []byte) []Flag {
 		return out
 	}
 	before, after := flatten(a), flatten(b)
+	for _, k := range slices.Sorted(maps.Keys(before)) {
+		if _, ok := after[k]; !ok && strings.HasPrefix(k, "hooks.") {
+			add(CheckRunsHere, "%s: %s -> (none)", k, before[k])
+		}
+	}
 	for _, k := range slices.Sorted(maps.Keys(after)) {
 		v := after[k]
 		if before[k] == v {
@@ -83,6 +89,14 @@ func flatten(m map[string]any) map[string]string {
 			s := make([]string, len(v))
 			for i, x := range v {
 				s[i] = fmt.Sprint(x)
+			}
+			if strings.HasPrefix(prefix, ".hooks.") {
+				// Commands: their order matters and each is its own shell.
+				for i := range s {
+					s[i] = strconv.Quote(s[i])
+				}
+				out[prefix[1:]] = strings.Join(s, " ")
+				break
 			}
 			slices.Sort(s)
 			out[prefix[1:]] = strings.Join(s, ", ")

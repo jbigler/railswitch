@@ -46,7 +46,7 @@ func TestCreateHooks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := l.createHooks(ctx, m, "master"); err != nil {
+	if err := l.createHooks(ctx, m, "master", true); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(nonGit(fake(l))); n != 0 {
@@ -55,7 +55,7 @@ func TestCreateHooks(t *testing.T) {
 	if err := render.MarkCreatePending(ws, "master"); err != nil {
 		t.Fatal(err)
 	}
-	if err := l.createHooks(ctx, m, "master"); err != nil {
+	if err := l.createHooks(ctx, m, "master", true); err != nil {
 		t.Fatal(err)
 	}
 	want := [][]string{
@@ -81,8 +81,8 @@ func TestCreateHookFails(t *testing.T) {
 	if err := render.MarkCreatePending(ws, "master"); err != nil {
 		t.Fatal(err)
 	}
-	err = l.createHooks(ctx, m, "master")
-	if err == nil || !strings.Contains(err.Error(), "the next up runs the create hooks again") {
+	err = l.createHooks(ctx, m, "master", true)
+	if err == nil || !strings.Contains(err.Error(), "the next up runs it again") {
 		t.Fatalf("err = %v", err)
 	}
 	if n := len(nonGit(fake(l))); n != 1 {
@@ -90,5 +90,37 @@ func TestCreateHookFails(t *testing.T) {
 	}
 	if _, err := os.Stat(render.CreatePending(ws, "master")); err != nil {
 		t.Errorf("marker gone: %v", err)
+	}
+}
+
+// TestCreateHooksResume: a retry skips the hooks recorded as done, and a
+// route that never came up runs none and keeps the marker.
+func TestCreateHooksResume(t *testing.T) {
+	l, ws := hookWS(t)
+	m, err := l.model(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := render.MarkCreatePending(ws, "master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.createHooks(ctx, m, "master", false); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(nonGit(fake(l))); n != 0 {
+		t.Fatalf("ran %d commands with the app not ready", n)
+	}
+	if err := os.WriteFile(render.CreatePending(ws, "master"), []byte("bin/rails db:seed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.createHooks(ctx, m, "master", true); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{{"podman", "exec", "-w", "/app", "api-master-rails", "sh", "-ec", "echo 'done'"}}
+	if got := nonGit(fake(l)); !slices.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("calls %q, want %q", got, want)
+	}
+	if _, err := os.Stat(render.CreatePending(ws, "master")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("marker left: %v", err)
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/testfixture"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 // TestHookUnits (D126): start hooks go in front of the app's server, deps
@@ -57,27 +58,31 @@ func TestHookScriptsRun(t *testing.T) {
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}
-	out, err := run(hookScript("start", []string{"echo one; exit 0; echo never", "cd /; echo \"it's $PWD\"", `printf '%s\n' 'two\n'`}, true), "sh", "-c", `echo "server in $PWD"`)
+	sub := filepath.Join(dir, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out, err := run(hookScript("start", []string{"echo one; exit 0; echo never", "cd /; echo \"it's $PWD\"", `printf '%s\n' 'two\n'`, `echo "in $PWD"`}, true, sub), "sh", "-c", `echo "server in $PWD"`)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	want := "hook start: echo one; exit 0; echo never\none\nhook start: cd /; echo \"it's $PWD\"\nit's /\nhook start: printf '%s\\n' 'two\\n'\ntwo\\n\nserver in " + dir + "\n"
+	want := "hook start: echo one; exit 0; echo never\none\nhook start: cd /; echo \"it's $PWD\"\nit's /\nhook start: printf '%s\\n' 'two\\n'\ntwo\\n\nhook start: echo \"in $PWD\"\nin " + sub + "\nserver in " + dir + "\n"
 	if out != want {
 		t.Errorf("start output:\n%q\nwant\n%q", out, want)
 	}
-	out, err = run(hookScript("start", []string{"false", "echo after"}, true), "echo", "server")
+	out, err = run(hookScript("start", []string{"false", "echo after"}, true, dir), "echo", "server")
 	if err == nil || strings.Contains(out, "after") || strings.Contains(out, "server") {
 		t.Errorf("a failing hook went on: %v\n%s", err, out)
 	}
-	out, err = run(hookScript("deps", []string{"echo hook"}, false), "echo", "installs")
+	out, err = run(hookScript("deps", []string{"echo hook"}, false, dir), "echo", "installs")
 	if err != nil || out != "installs\nhook deps: echo hook\nhook\n" {
 		t.Errorf("deps: %v\n%q", err, out)
 	}
-	out, err = run(hookScript("deps", []string{"echo hook"}, false), "false")
+	out, err = run(hookScript("deps", []string{"echo hook"}, false, dir), "false")
 	if err == nil || strings.Contains(out, "hook") {
 		t.Errorf("deps hooks ran after a failed install: %v\n%q", err, out)
 	}
-	if out, err = run(hookScript("deps", []string{"echo hook"}, false)); err != nil || !strings.HasSuffix(out, "hook\n") {
+	if out, err = run(hookScript("deps", []string{"echo hook"}, false, dir)); err != nil || !strings.HasSuffix(out, "hook\n") {
 		t.Errorf("deps without a command: %v\n%q", err, out)
 	}
 }
@@ -91,10 +96,48 @@ func TestHookAssets(t *testing.T) {
 		t.Fatal(err)
 	}
 	f, ok := plan.Files[startHookRel]
-	if !ok || f.Mode != 0o755 || !strings.Contains(string(f.Data), "sh -ec 'true'\nexec \"$@\"\n") {
+	if !ok || f.Mode != 0o755 || !strings.Contains(string(f.Data), "(cd '/app' && exec sh -ec 'true')\nexec \"$@\"\n") {
 		t.Errorf("start.sh %v %o:\n%s", ok, f.Mode, f.Data)
 	}
 	if _, ok := plan.Files[depsHookRel]; ok {
 		t.Error("deps.sh planned without deps hooks")
+	}
+}
+
+// TestHookChangeRestarts: a changed start or deps hook changes the app's or
+// deps's unit hash (up restarts a running one); the unit text alone doesn't.
+func TestHookChangeRestarts(t *testing.T) {
+	ws := testfixture.Workspace(t, fixtureDir)
+	hash := func(h config.Hooks) (string, string) {
+		units, err := Quadlet(mustBuild(t, fixtureInputs(t, ws, func(p *config.Project) { p.Hooks = h })))
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := unithash.Key("filial")
+		return unithash.Read(units["filial-master-rails.container"], key), unithash.Read(units["filial-master-deps.container"], key)
+	}
+	a1, d1 := hash(config.Hooks{Start: []string{"one"}, Deps: []string{"one"}})
+	a2, d2 := hash(config.Hooks{Start: []string{"two"}, Deps: []string{"one"}})
+	a3, d3 := hash(config.Hooks{Start: []string{"two"}, Deps: []string{"two"}})
+	if a1 == a2 || d1 != d2 || a2 != a3 || d2 == d3 {
+		t.Errorf("hashes app %s %s %s, deps %s %s %s", a1, a2, a3, d1, d2, d3)
+	}
+}
+
+// TestCreateHooksNeedHealth: without the app's health check up couldn't
+// tell when the app is ready for them.
+func TestCreateHooksNeedHealth(t *testing.T) {
+	ws := testfixture.Workspace(t, fixtureDir)
+	err := buildErr(fixtureInputs(t, ws, func(p *config.Project) {
+		p.Hooks.Create = []string{"true"}
+		s := p.Services["rails"]
+		s.Health = "none"
+		if p.Services == nil {
+			p.Services = map[string]config.ServiceOverride{}
+		}
+		p.Services["rails"] = s
+	}))
+	if err == nil || !strings.Contains(err.Error(), "[hooks] create need the app's health check") {
+		t.Errorf("err = %v", err)
 	}
 }

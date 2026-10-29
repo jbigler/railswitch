@@ -380,6 +380,7 @@ func TestHideLinksAndTasksDecode(t *testing.T) {
 		{func(p *Project) { p.Hooks.Start = []string{"true", " "} }, "hooks.start[1]: is empty"},
 		{func(p *Project) { p.Hooks.Deps = []string{"a\nb"} }, "hooks.deps[0]: value contains a newline"},
 		{func(p *Project) { p.Hooks.Create = []string{""} }, "hooks.create[0]: is empty"},
+		{func(p *Project) { p.Hooks.Start = []string{"-x"} }, "hooks.start[0]: starts with -"},
 	} {
 		q, err := Load(path)
 		if err != nil {

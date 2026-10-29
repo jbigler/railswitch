@@ -1,6 +1,12 @@
 name = "rails"
 version = 1
 
+# DATABASE_URL without the database name: Rails applies DATABASE_URL (and a
+# database.yml url:) to whichever environment runs, so a name there would
+# point tests at the development database. Without it each environment
+# takes database.yml's own (…_development, …_test) on the same server.
+db_url_name = false
+
 [app]
 service = "rails"
 server = "bin/dev"
@@ -37,6 +43,7 @@ fallback = "1.60.0"
 [db_name]
 from = ["config/database.yml:development.database"]
 fallback = "{project.prefix}_development"
+
 
 [env]                      # only what Rails itself reads; app-specific names go in the project's [env]
 RAILS_ENV = "development"

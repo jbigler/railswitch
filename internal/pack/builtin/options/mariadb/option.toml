@@ -24,7 +24,7 @@ retries = 5
 start_period = "30s"
 
 [gives]                 # layer 2, to app/worker/tool services
-DATABASE_URL = "{scheme}root:{generated.DB_PASSWORD}@{service}/{db}"
+DATABASE_URL = "{scheme}root:{generated.DB_PASSWORD}@{service}{db_path}"   # {db_path}: "/{db}", or "" for a pack that names it per environment (rails)
 
 [env]                   # the option's own service
 MARIADB_ROOT_PASSWORD = "{generated.DB_PASSWORD}"

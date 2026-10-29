@@ -493,7 +493,8 @@ there is no shared add-on package (user, 2026-10-27).
 | `[deps] frozen_env` | env on the deps service only (a frozen install); `railswitch deps` leaves it out |
 | `[image] file`, `tag`, `os`, `args` | the base image's Containerfile (ejected to `containerfiles/`), tag part, OS family and build args |
 | `[runtimes.<name>]` | a version chain (`from`, optional `fallback`): `{<name>}` |
-| `[db_name]` | the database name chain: `{db}` |
+| `[db_name]` | the database name chain: `{db}`, and `{db_path}` (`/{db}`) that the database options end `DATABASE_URL` with |
+| `db_url_name = false` | `{db_path}` is empty: `DATABASE_URL` names no database, for a framework that takes the name per environment from its own config. Rails applies `DATABASE_URL` to whichever environment runs, so with the name in it tests would use the development database; the rails pack sets this |
 | `[env]` | the app's env (layer 1): only what the framework reads |
 | `[db_scheme] <option> = "<scheme>"` | the `DATABASE_URL` scheme per database option |
 | `[share] env` | env while the worktree is shared on the tailnet |

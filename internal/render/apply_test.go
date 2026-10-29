@@ -263,7 +263,7 @@ func TestApplyEnvFileModes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(strings.Split(string(data), "\n"), "DATABASE_URL=postgres://postgres:s3cret@db/filial_dev") {
+	if !slices.Contains(strings.Split(string(data), "\n"), "DATABASE_URL=postgres://postgres:s3cret@db") {
 		t.Errorf("rails.env lacks DATABASE_URL verbatim:\n%s", data)
 	}
 }

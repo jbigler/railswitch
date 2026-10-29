@@ -8,7 +8,7 @@ Wants=filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.se
 After=filial-feat-deps.service filial-feat-db.service filial-feat-cache.service filial-feat-storage.service filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=filial.unit-hash=16dd7035ec6d
+Label=filial.unit-hash=7a5f6f065799
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-feat-rails
 Network=filial-feat-dev.network:alias=rails
@@ -59,3 +59,6 @@ Exec=bin/dev
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=180
+
+[Quadlet]
+DefaultDependencies=false

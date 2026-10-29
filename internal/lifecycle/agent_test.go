@@ -184,7 +184,7 @@ func TestUpNoReloadForOnDemand(t *testing.T) {
 	if n := count(e.calls(), "systemctl --user daemon-reload"); n != 0 {
 		t.Errorf("daemon-reload with every unit loaded:\n%s", dump(e.calls()))
 	}
-	if n := count(e.calls(), "systemctl --user show -p LoadState,NeedDaemonReload,ActiveState,ExecStart filial-feat-agent-claude.service"); n != 0 {
+	if n := count(e.calls(), "systemctl --user show -p LoadState,NeedDaemonReload,ActiveState,ExecStart,After filial-feat-agent-claude.service"); n != 0 {
 		t.Errorf("asked systemd about the on-demand agent's unit:\n%s", dump(e.calls()))
 	}
 }

@@ -44,7 +44,7 @@ type tenv struct {
 // units makes every unit-state query report stdout; unit, if given,
 // narrows it to that unit.
 func (e *tenv) units(stdout string, unit ...string) {
-	e.f.On(append([]string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart"}, unit...), sys.Result{Stdout: []byte(stdout)}, nil)
+	e.f.On(append([]string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart,After"}, unit...), sys.Result{Stdout: []byte(stdout)}, nil)
 }
 
 // missing makes calls with argv prefix exit 1 ("does not exist").
@@ -777,7 +777,7 @@ func TestUpReloadsUnloadedUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantInOrder(t, e.calls(),
-		"systemctl --user show -p LoadState,NeedDaemonReload,ActiveState,ExecStart filial-feat-rails.service",
+		"systemctl --user show -p LoadState,NeedDaemonReload,ActiveState,ExecStart,After filial-feat-rails.service",
 		"systemctl --user daemon-reload",
 		"systemctl --user start filial-feat-rails.service")
 	if n := count(e.calls(), "podman pull"); n != 0 {
@@ -1411,7 +1411,7 @@ func TestUpRestartsStaleDashboard(t *testing.T) {
 // start time is garbage, or whose restart fails is a warning; up goes on
 // to start the worktree.
 func TestUpDashboardNeverBlocks(t *testing.T) {
-	stateCmd := []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart", machine.DashboardService}
+	stateCmd := []string{"systemctl", "--user", "show", "-p", "LoadState,NeedDaemonReload,ActiveState,ExecStart,After", machine.DashboardService}
 	startCmd := []string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", machine.DashboardService}
 	restartCmd := []string{"systemctl", "--user", "restart", machine.DashboardService}
 	failed := fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit)
@@ -1511,6 +1511,32 @@ func TestUpReloadsUnitLoadedFromOlderFile(t *testing.T) {
 		}
 		if n := count(e.calls(), "systemctl --user daemon-reload"); (n == 1) != stale {
 			t.Errorf("stale=%v: %d daemon-reloads:\n%s", stale, n, dump(e.calls()))
+		}
+	}
+}
+
+// TestUpReloadsUnitWaitingForNetwork (D130): a unit systemd loaded before
+// its file turned the network wait off still has it in After=, which no
+// other state shows: up reloads.
+func TestUpReloadsUnitWaitingForNetwork(t *testing.T) {
+	e := setup(t)
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	for _, waits := range []bool{true, false} {
+		e.reset()
+		e.labels(t)
+		after := "After=basic.target\n"
+		if waits {
+			after = "After=basic.target podman-user-wait-network-online.service\n"
+		}
+		e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n"+after, "filial-feat-dev-network.service")
+		if err := e.l.Up(ctx, "feat"); err != nil {
+			t.Fatal(err)
+		}
+		if n := count(e.calls(), "systemctl --user daemon-reload"); (n == 1) != waits {
+			t.Errorf("waits=%v: %d daemon-reloads:\n%s", waits, n, dump(e.calls()))
 		}
 	}
 }

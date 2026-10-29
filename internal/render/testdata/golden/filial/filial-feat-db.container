@@ -5,7 +5,7 @@
 Description=filial db of worktree feat
 
 [Container]
-Label=filial.unit-hash=7a1acdd86d6e
+Label=filial.unit-hash=2bf640b5b236
 Image=docker.io/library/postgres:17
 ContainerName=filial-feat-db
 Network=filial-feat-dev.network:alias=db
@@ -33,3 +33,6 @@ Exec=postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statemen
 [Service]
 Restart=on-failure
 RestartSec=5
+
+[Quadlet]
+DefaultDependencies=false

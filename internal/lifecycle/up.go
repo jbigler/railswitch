@@ -110,6 +110,10 @@ func (l *L) load(ctx context.Context, slug string) (*render.Model, *render.Insta
 
 func (l *L) lockPath() string { return filepath.Join(l.WS.Root, "stack.lock") }
 
+// networkWaitService is podman's wait for network-online.target, which
+// Quadlet puts in After= unless [Quadlet] DefaultDependencies=false (D130).
+const networkWaitService = "podman-user-wait-network-online.service"
+
 // changes accumulates the unit changes of every render of one Up.
 type changes struct{ units bool }
 
@@ -227,7 +231,9 @@ func (l *L) Up(ctx context.Context, slug string) error {
 		if err != nil {
 			return err
 		}
-		if st.Load != "loaded" || st.NeedReload {
+		// A unit loaded before D130 still waits for network-online.target
+		// although its file no longer says so: systemd never flagged it.
+		if st.Load != "loaded" || st.NeedReload || slices.Contains(strings.Fields(st.After), networkWaitService) {
 			reload = true
 		}
 		// systemd never flags a changed Quadlet file (NeedDaemonReload

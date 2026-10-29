@@ -7,3 +7,6 @@ Description=Dev network of phx worktree master
 NetworkName=phx-master-dev
 Options=mtu=1400
 Options=isolate=strict
+
+[Quadlet]
+DefaultDependencies=false

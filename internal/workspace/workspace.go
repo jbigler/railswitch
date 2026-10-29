@@ -607,6 +607,27 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 		if err := (podman.Systemd{R: r}).StopLoaded(ctx, gone...); err != nil {
 			return d, fmt.Errorf("stop a removed unit: %w", err)
 		}
+		// Units of other projects written before D130 still wait for
+		// network-online.target, and Traefik starts their proxy networks.
+		// Only units of projects the registry (held) still has: a removed
+		// project's files are being deleted outside the lock.
+		older, warns := machine.AddNoNetworkWait(w.Dirs.Quadlet, func(line1 string) bool {
+			pfx, isMachine, ok := render.UnitOwner(line1)
+			if !ok {
+				return false
+			}
+			_, registered := reg.Project(pfx)
+			return isMachine || registered
+		})
+		for _, wn := range warns {
+			d.Warnings = append(d.Warnings, "turn off the network wait: "+wn)
+		}
+		for _, n := range older {
+			if !slices.Contains(d.Changed, n) && !slices.Contains(d.Added, n) {
+				d.Changed = append(d.Changed, n)
+			}
+		}
+		slices.Sort(d.Changed)
 		// The dashboard is a convenience: its unit failing to be written
 		// must not stop an up.
 		if werr := writeDashboardUnit(w.Dirs); werr != nil {

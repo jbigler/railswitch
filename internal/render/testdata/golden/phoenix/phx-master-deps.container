@@ -5,7 +5,7 @@
 Description=phx deps of worktree master
 
 [Container]
-Label=phx.unit-hash=29ec2c2a6359
+Label=phx.unit-hash=080af883db21
 Image=localhost/phx/base:elixir1.18.4-otp27-bac86656
 ContainerName=phx-master-deps
 Network=phx-master-dev.network:alias=deps
@@ -36,3 +36,6 @@ Entrypoint=/usr/local/bin/entrypoint-deps.sh
 [Service]
 Type=oneshot
 TimeoutStartSec=900
+
+[Quadlet]
+DefaultDependencies=false

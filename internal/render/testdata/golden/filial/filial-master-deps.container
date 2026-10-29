@@ -5,7 +5,7 @@
 Description=filial deps of worktree master
 
 [Container]
-Label=filial.unit-hash=e011b516726e
+Label=filial.unit-hash=f26ceda5adc3
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-master-deps
 Network=filial-master-dev.network:alias=deps
@@ -36,3 +36,6 @@ Entrypoint=/usr/local/bin/entrypoint-deps.sh
 [Service]
 Type=oneshot
 TimeoutStartSec=900
+
+[Quadlet]
+DefaultDependencies=false

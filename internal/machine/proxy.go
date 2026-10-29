@@ -156,11 +156,71 @@ func ProxyUnits(r *Registry) map[string][]byte {
 
 	key := unithash.Key("railswitch")
 	return map[string][]byte{
-		ProxyUnitName:          unithash.StampExcept(lines(traefik...), key, isNetworkLine),
-		MachineNetworkUnitName: network,
-		DozzleUnitName:         unithash.Stamp(dozzle, key),
+		ProxyUnitName:          NoNetworkWait(unithash.StampExcept(lines(traefik...), key, isNetworkLine)),
+		MachineNetworkUnitName: NoNetworkWait(network),
+		DozzleUnitName:         NoNetworkWait(unithash.Stamp(dozzle, key)),
 	}
 }
+
+// NoNetworkWait is unit with Quadlet's network-online dependency turned
+// off (podman 5.3, D130): railswitch's networks and containers need no
+// host network to start, and where network-online.target never comes
+// (its wait-online service masked) podman's wait holds every start for
+// 90 s. It is appended after the unit-hash stamp, so it changes no hash
+// and restarts nothing.
+func NoNetworkWait(unit []byte) []byte {
+	return append(unit, NoNetworkWaitSection...)
+}
+
+// AddNoNetworkWait appends NoNetworkWaitSection to every Quadlet unit in
+// dir whose line 1 ours accepts (a railswitch unit of a registered project
+// or of the machine) and that lacks it: a unit written before D130, which
+// a render of its own project would rewrite but that Traefik may start
+// first (it requires every project's proxy network). It returns the files
+// it changed and, as warnings, the ones it could not: this is a
+// convenience, never a reason for a render to fail. A file gone meanwhile
+// (another project's `project rm`) is skipped.
+func AddNoNetworkWait(dir string, ours func(line1 string) bool) (changed, warnings []string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			warnings = append(warnings, err.Error())
+		}
+		return nil, warnings
+	}
+	for _, e := range entries {
+		switch filepath.Ext(e.Name()) {
+		case ".container", ".network", ".volume":
+		default:
+			continue
+		}
+		if !e.Type().IsRegular() {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := os.ReadFile(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			warnings = append(warnings, err.Error())
+			continue
+		}
+		line1, _, _ := bytes.Cut(data, []byte("\n"))
+		if !bytes.HasPrefix(data, []byte(Marker)) || !ours(string(line1)) || bytes.HasSuffix(data, []byte(NoNetworkWaitSection)) {
+			continue
+		}
+		if err := tomlfile.WriteAtomic(path, NoNetworkWait(data), 0o644); err != nil {
+			warnings = append(warnings, err.Error())
+			continue
+		}
+		changed = append(changed, e.Name())
+	}
+	return changed, warnings
+}
+
+// NoNetworkWaitSection is what NoNetworkWait appends.
+const NoNetworkWaitSection = "\n[Quadlet]\nDefaultDependencies=false\n"
 
 // RefreshProxyUnits brings the machine-wide units already in quadletDir in
 // line with r, for a change of r made without a render (a project

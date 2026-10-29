@@ -1039,7 +1039,7 @@ code, and the text output shows it as `warn`.
 
 ```json
 [
-  {"name": "podman >= 5.0", "ok": true, "warn": false, "detail": "podman 5.2.1", "fix": ""},
+  {"name": "podman >= 5.3", "ok": true, "warn": false, "detail": "podman 5.4.2", "fix": ""},
   {"name": "unprivileged port 80", "ok": false, "warn": false, "detail": "net.ipv4.ip_unprivileged_port_start = 1024", "fix": "railswitch allow-ports"},
   {"name": "units current", "ok": true, "warn": false, "detail": "render would change nothing", "fix": ""},
   {"name": "git-guard", "ok": false, "warn": true, "detail": "1 finding(s): hook-missing-backup /home/u/app/main/.git/hooks/pre-push", "fix": "railswitch hooks check"}
@@ -1048,7 +1048,7 @@ code, and the text output shows it as `warn`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.0`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
 | `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |

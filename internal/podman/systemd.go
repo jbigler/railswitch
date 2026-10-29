@@ -147,16 +147,17 @@ type UnitState struct {
 	NeedReload bool   // NeedDaemonReload: its file changed since the last daemon-reload
 	Active     string // ActiveState: "active", "inactive", "failed", …
 	ExecStart  string // ExecStart as systemd shows it: the loaded command line
+	After      string // After: the loaded ordering, space-separated units
 }
 
-// UnitState reads unit's LoadState, NeedDaemonReload, ActiveState and
-// ExecStart.
+// UnitState reads unit's LoadState, NeedDaemonReload, ActiveState,
+// ExecStart and After.
 func (s Systemd) UnitState(ctx context.Context, unit string) (UnitState, error) {
-	m, err := s.Show(ctx, unit, "LoadState", "NeedDaemonReload", "ActiveState", "ExecStart")
+	m, err := s.Show(ctx, unit, "LoadState", "NeedDaemonReload", "ActiveState", "ExecStart", "After")
 	if err != nil {
 		return UnitState{}, err
 	}
-	return UnitState{Load: m["LoadState"], NeedReload: m["NeedDaemonReload"] == "yes", Active: m["ActiveState"], ExecStart: m["ExecStart"]}, nil
+	return UnitState{Load: m["LoadState"], NeedReload: m["NeedDaemonReload"] == "yes", Active: m["ActiveState"], ExecStart: m["ExecStart"], After: m["After"]}, nil
 }
 
 // activeEnterLayout is ActiveEnterTimestamp under --timestamp=us+utc.

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,9 +38,15 @@ func TestProxyUnitsLintClean(t *testing.T) {
 }
 
 // TestProxyUnitHashLabel: Traefik's unit carries railswitch.unit-hash, the
-// hash of the unit with that label line and its Network= lines excluded.
+// hash of the unit with that label line, its Network= lines and the
+// [Quadlet] section NoNetworkWait appends excluded: turning the network
+// wait off restarts no container.
 func TestProxyUnitHashLabel(t *testing.T) {
 	data := machine.ProxyUnits(twoProjects())[machine.ProxyUnitName]
+	if !bytes.HasSuffix(data, []byte(machine.NoNetworkWaitSection)) {
+		t.Fatalf("no [Quadlet] DefaultDependencies=false at the end:\n%s", data)
+	}
+	data = bytes.TrimSuffix(data, []byte(machine.NoNetworkWaitSection))
 	key := unithash.Key("railswitch")
 	h := unithash.Read(data, key)
 	var rest []byte
@@ -215,12 +222,64 @@ func TestDozzleUnitHashReadOnly(t *testing.T) {
 	data := machine.ProxyUnits(twoProjects())[machine.DozzleUnitName]
 	key := unithash.Key("railswitch")
 	h := unithash.Read(data, key)
-	if rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1); h == "" || unithash.Sum(rest) != h {
+	if rest := bytes.TrimSuffix(bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1), []byte(machine.NoNetworkWaitSection)); h == "" || unithash.Sum(rest) != h {
 		t.Errorf("dozzle unit-hash %q; want %q", h, unithash.Sum(rest))
 	}
 	for _, want := range []string{"\nEnvironment=DOZZLE_ENABLE_ACTIONS=false\n", "\nEnvironment=DOZZLE_ENABLE_SHELL=false\n"} {
 		if !bytes.Contains(data, []byte(want)) {
 			t.Errorf("dozzle unit lacks %q:\n%s", want[1:], data)
 		}
+	}
+}
+
+// TestAddNoNetworkWait: a railswitch unit ours accepts, without the
+// [Quadlet] section, gets it once; one with it, one ours refuses (an
+// unregistered prefix), another program's unit, a non-unit file and a
+// symlink are left alone; an unreadable file is a warning, not a stop.
+func TestAddNoNetworkWait(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"old-proxy.network":  machine.Marker + "x (prefix old).\n\n[Network]\nNetworkName=old_proxy\n",
+		"gone-proxy.network": machine.Marker + "x (prefix gone).\n\n[Network]\n",
+		"new-proxy.network":  string(machine.NoNetworkWait([]byte(machine.Marker + "x (prefix new).\n\n[Network]\n"))),
+		"mine.container":     "[Container]\nImage=x\n",
+		"notes.txt":          machine.Marker + "x\n",
+	}
+	for n, s := range files {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join(dir, "gone-proxy.network"), filepath.Join(dir, "link.network")); err != nil {
+		t.Fatal(err)
+	}
+	ours := func(line1 string) bool { return !strings.Contains(line1, "prefix gone") }
+	for i, want := range [][]string{{"old-proxy.network"}, nil} {
+		got, warns := machine.AddNoNetworkWait(dir, ours)
+		if !slices.Equal(got, want) || len(warns) != 0 {
+			t.Errorf("run %d: %q, %q; want %q", i, got, warns, want)
+		}
+	}
+	for n, s := range files {
+		data, _ := os.ReadFile(filepath.Join(dir, n))
+		want := s
+		if n == "old-proxy.network" {
+			want = s + machine.NoNetworkWaitSection
+		}
+		if string(data) != want {
+			t.Errorf("%s = %q; want %q", n, data, want)
+		}
+	}
+	if os.Getuid() != 0 {
+		bad := filepath.Join(dir, "bad.container")
+		if err := os.WriteFile(bad, []byte(machine.Marker+"x (prefix old).\n"), 0o000); err != nil {
+			t.Fatal(err)
+		}
+		if got, warns := machine.AddNoNetworkWait(dir, ours); len(got) != 0 || len(warns) != 1 {
+			t.Errorf("unreadable file: %q, %q; want one warning", got, warns)
+		}
+	}
+	if got, warns := machine.AddNoNetworkWait(filepath.Join(dir, "none"), ours); got != nil || warns != nil {
+		t.Errorf("missing dir: %q, %q", got, warns)
 	}
 }

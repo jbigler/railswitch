@@ -5,7 +5,7 @@
 Description=phx nvim of worktree master
 
 [Container]
-Label=phx.unit-hash=0a8f6ca1d33d
+Label=phx.unit-hash=7f0728bf3bea
 Image=localhost/phx/nvim:elixir1.18.4-otp27-12e39b54
 ContainerName=phx-master-nvim
 Network=phx-master-dev.network:alias=nvim
@@ -49,3 +49,6 @@ Exec=/usr/local/bin/nvim --headless --listen 0.0.0.0:7777
 Restart=on-failure
 RestartSec=5
 SuccessExitStatus=1
+
+[Quadlet]
+DefaultDependencies=false

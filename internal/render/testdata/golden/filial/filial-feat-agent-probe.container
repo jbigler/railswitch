@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=08db87d79d16
+Label=filial.unit-hash=941a220865c5
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-0b480561
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
@@ -43,3 +43,6 @@ LogDriver=journald
 [Service]
 Restart=on-failure
 RestartSec=5
+
+[Quadlet]
+DefaultDependencies=false

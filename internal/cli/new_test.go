@@ -185,6 +185,9 @@ func TestNew(t *testing.T) {
 		t.Errorf("project.toml has tools or secrets:\n%s", raw)
 	}
 
+	if _, err := os.Stat(filepath.Join(ws, ".railswitch", "create-pending", "main")); err != nil {
+		t.Errorf("the base worktree has no create-pending marker (D126): %v", err)
+	}
 	if got := containerfiles(t, ws); !slices.Equal(got, []string{"Containerfile.base", "Containerfile.pg-client"}) {
 		t.Errorf("containerfiles/ = %v", got)
 	}

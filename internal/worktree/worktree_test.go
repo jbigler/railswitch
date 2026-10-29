@@ -202,6 +202,9 @@ func TestAddAllocatesAfterGit(t *testing.T) {
 	if e.renders != 1 {
 		t.Errorf("renders = %d; want 1", e.renders)
 	}
+	if !exists(filepath.Join(e.ws, ".railswitch", "create-pending", "feat")) {
+		t.Error("no create-pending marker for the new worktree (D126)")
+	}
 	for _, c := range e.f.Calls {
 		if c[0] == "git" && !slices.Contains(c, "core.fsmonitor=false") || c[0] == "git" && !slices.Contains(c, "core.hooksPath=/dev/null") {
 			t.Errorf("git call without the safety config: %q", c)
@@ -363,6 +366,9 @@ func TestAddRenderFailsRollsBack(t *testing.T) {
 		t.Fatalf("Add = %v; want the render error", err)
 	}
 	e.rolledBack(t, "feat")
+	if exists(filepath.Join(e.ws, ".railswitch", "create-pending", "feat")) {
+		t.Error("the rollback left the create-pending marker")
+	}
 	if hasBranch(e.base, "feat") {
 		t.Error("the branch feat that the failed Add created remains")
 	}
@@ -719,6 +725,12 @@ func TestWtRmRemovesStatusDir(t *testing.T) {
 	}
 	if exists(filepath.Join(e.ws, ".railswitch", "status", "feat")) {
 		t.Error("status/feat remains after wt rm")
+	}
+	if exists(filepath.Join(e.ws, ".railswitch", "create-pending", "feat")) {
+		t.Error("create-pending/feat remains after wt rm")
+	}
+	if !exists(filepath.Join(e.ws, ".railswitch", "create-pending", "other")) {
+		t.Error("wt rm feat removed create-pending/other")
 	}
 	if !exists(filepath.Join(e.ws, ".railswitch", "status", "other", "claude.json")) {
 		t.Error("wt rm feat removed status/other")

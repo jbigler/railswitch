@@ -45,7 +45,17 @@ type Project struct {
 	Firewall  Firewall                    `toml:"firewall"`
 	Image     ImageConfig                 `toml:"image"`
 	Agents    map[string]Agent            `toml:"agents"` // agent name → its package and settings
+	Hooks     Hooks                       `toml:"hooks"`
 	Template  *TemplateRef                `toml:"template"`
+}
+
+// Hooks is the [hooks] table (D126): shell commands railswitch runs at
+// fixed points of a worktree's life, each in its own `sh -ec` inside a
+// container, never on the host.
+type Hooks struct {
+	Deps   []string `toml:"deps"`   // in deps, after its installs: on every app start
+	Start  []string `toml:"start"`  // in the app, before its server: on every app start
+	Create []string `toml:"create"` // in the running app, once per new worktree, after its first up
 }
 
 // TemplateRef is the [template] table: the template project new started
@@ -394,6 +404,19 @@ func (p *Project) Validate() error {
 		}
 		if r.Port < 1 || r.Port > 65535 {
 			v.add(path+".port", "%d is not a port", r.Port)
+		}
+	}
+
+	for _, h := range []struct {
+		name string
+		cmds []string
+	}{{"deps", p.Hooks.Deps}, {"start", p.Hooks.Start}, {"create", p.Hooks.Create}} {
+		for i, c := range h.cmds {
+			path := fmt.Sprintf("hooks.%s[%d]", h.name, i)
+			if strings.TrimSpace(c) == "" {
+				v.add(path, "is empty")
+			}
+			v.oneLine(path, c)
 		}
 	}
 

@@ -22,6 +22,44 @@ Everything has a command too: `railswitch settings preview` and `settings
 apply` take the same edits as JSON; `project show` and `project write`
 read and write the whole file.
 
+## Hooks
+
+Hooks are commands railswitch runs for you at fixed points, inside the
+containers, never on your machine. They cover the project's own setup
+steps that the pack doesn't already do (it installs the lockfiles' gems
+and packages in `deps`, and the Rails pack's app runs `bin/rails
+db:prepare` before its server).
+
+```toml
+[hooks]
+deps   = ["gem list -i retest >/dev/null || gem install retest --no-document"]
+start  = ["bin/rails db:test:prepare"]
+create = ["bin/rails runner 'Admin.create_default!'"]
+```
+
+| List | Runs in | When |
+|---|---|---|
+| `deps` | deps (the one container that reaches the package registries) | after its installs, on every app start |
+| `start` | the app | before its server, on every app start |
+| `create` | the running app | once per new worktree, after its first `up` is ready |
+
+- Each command runs in its own `sh -ec`, in order; one that fails stops
+  the rest. A failing `deps` or `start` hook fails the app's start, with
+  its output in the start error. A failing `create` hook is run again,
+  with the others, by the next `up`.
+- `deps` hooks install into the shared gem and package caches, so what
+  they install is there for the app, `exec` and the editor too: a test
+  watcher, `ruby-lsp`. Write them to check first, as above, so a start
+  doesn't fetch every time.
+- `create` hooks run only for worktrees added after you add them, never
+  for the ones you have.
+- They are in `project.toml`, so they're yours. A template carries its
+  `[hooks]`, and its review flags each one.
+
+To copy files git doesn't track (`.env.development.local`, a `tags` file)
+into each new worktree, list them in `[project] seed_files`: `wt add`
+copies each from the base worktree when the new one doesn't have it.
+
 ## Images
 
 The **Images** page lists the Containerfiles the project builds: the base

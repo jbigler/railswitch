@@ -1114,6 +1114,9 @@ func (e *env) registerAndRender(ctx context.Context, dirs machine.Dirs, w *works
 	if err != nil {
 		return 0, err
 	}
+	if err := render.MarkCreatePending(w.Root, slug); err != nil {
+		return 0, errors.Join(err, unregister(dirs, prefix))
+	}
 	if _, err := e.render(ctx, w, false); err != nil {
 		return 0, errors.Join(err, unregister(dirs, prefix))
 	}

@@ -19,7 +19,7 @@ func HideLinksTOML(p *Project) string {
 // LinesTOML renders the tables of p that a template carries (D108) and
 // project new writes, each only when set: [stack], [options], [versions],
 // [env], [services.<id>], [tasks], [[links]], [[routes]], [tools.nvim],
-// [agents.<name>] and [firewall]. Not [project], [worktrees], [secrets],
+// [agents.<name>], [firewall] and [hooks]. Not [project], [worktrees], [secrets],
 // [share], [image] or [template]: each caller writes the ones it has.
 func LinesTOML(p *Project) string {
 	var b strings.Builder
@@ -106,6 +106,17 @@ func LinesTOML(p *Project) string {
 		}
 		for _, prof := range slices.Sorted(maps.Keys(f.Allow)) {
 			fmt.Fprintf(&b, "allow.%s = %s\n", key(prof), stringArray(f.Allow[prof]))
+		}
+	}
+	if h := p.Hooks; len(h.Deps)+len(h.Start)+len(h.Create) > 0 {
+		b.WriteString("\n[hooks]                    # commands run inside the containers (D126)\n")
+		for _, l := range []struct {
+			k string
+			v []string
+		}{{"deps", h.Deps}, {"start", h.Start}, {"create", h.Create}} {
+			if len(l.v) > 0 {
+				b.WriteString(l.k + " = " + stringArray(l.v) + "\n")
+			}
 		}
 	}
 	return b.String()

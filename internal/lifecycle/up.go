@@ -365,7 +365,10 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	if othersErr != nil {
 		l.warnFailed(ctx, sd, others, othersErr)
 	}
-	return l.waitRoute(ctx, m, in, slug)
+	if err := l.waitRoute(ctx, m, in, slug); err != nil {
+		return err
+	}
+	return l.createHooks(ctx, m, slug)
 }
 
 // startedServices are the service IDs up starts, the app last: every

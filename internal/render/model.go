@@ -303,6 +303,7 @@ func (b *builder) services() error {
 	var errs []error
 	errs = append(errs, b.entrypoint(&app, pk.Name, pk.Files, pk.App.Entrypoint))
 	errs = append(errs, b.entrypoint(&deps, pk.Name, pk.Files, pk.App.DepsEntrypoint))
+	errs = append(errs, b.hooks(&app, &deps))
 
 	var workers, data, toolOpts, tools []Service
 	for _, ch := range st.Options {

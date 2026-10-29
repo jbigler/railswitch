@@ -17,7 +17,8 @@ const templateManifest = "stack.toml"
 // or hand on (D98's checks, applied to project.toml lines). Values are
 // compared by their path, so reordering or reformatting adds no flag.
 // Tasks, health checks, env and the rest run inside the project's
-// firewalled containers and are shown as diffs, as a package's are.
+// firewalled containers and are shown as diffs, as a package's are; hooks
+// too, but they run without being asked (D126), so each is flagged.
 func templateFlags(old, new []byte) []Flag {
 	var out []Flag
 	add := func(check, format string, args ...any) {
@@ -45,6 +46,8 @@ func templateFlags(old, new []byte) []Flag {
 			check = CheckPrivilege // who receives a secret, and where it may go
 		case strings.HasPrefix(k, "routes."):
 			check = CheckPort // a host Traefik routes to a service
+		case strings.HasPrefix(k, "hooks."):
+			check = CheckRunsHere // runs on every start (deps: with the registries) or once per worktree
 		default:
 			continue
 		}

@@ -324,3 +324,24 @@ func TestDecodeBundledDefault(t *testing.T) {
 		t.Errorf("bundled default: %v %+v", err, tp)
 	}
 }
+
+// TestHooksCarried: a template exports and decodes [hooks] (D126).
+func TestHooksCarried(t *testing.T) {
+	p := filial(t)
+	p.Hooks.Start = []string{"bin/rails db:test:prepare"}
+	tp, _, err := Export(p, map[string][]byte{}, nil, "filial-stack", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack := string(tp.Encode())
+	if !strings.Contains(stack, "[hooks]") {
+		t.Fatalf("no [hooks]:\n%s", stack)
+	}
+	got, err := Decode(stackFS(stack))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got.Lines.Hooks.Start, p.Hooks.Start) {
+		t.Errorf("decoded hooks %+v", got.Lines.Hooks)
+	}
+}

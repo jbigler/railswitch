@@ -53,8 +53,8 @@ cache = "redis@1"
 postgres = "16"
 [env]
 TZ = "UTC"
-# [services.<id>], [tasks], [[links]], hide_links, [[routes]]
-# and [firewall] likewise; never [tools] or [agents]
+# [services.<id>], [tasks], [[links]], hide_links, [[routes]],
+# [firewall] and [hooks] likewise; never [tools] or [agents]
 
 [image]                      # user addons only (containerfile new)
 addons = ["containerfiles/Containerfile.extra"]

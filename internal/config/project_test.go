@@ -3,8 +3,11 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/BurntSushi/toml"
 )
 
 const filial = "../../testdata/fixtures/filial/project.toml"
@@ -374,6 +377,9 @@ func TestHideLinksAndTasksDecode(t *testing.T) {
 		{func(p *Project) { p.Tasks["lint"] = "a\nb" }, "tasks.lint: value contains a newline"},
 		{func(p *Project) { p.Tasks["ls"] = "ls -la" }, `tasks.ls: "ls" is a railswitch task subcommand`},
 		{func(p *Project) { p.HideLinks = []string{"Routes", ""} }, "hide_links[1]: "},
+		{func(p *Project) { p.Hooks.Start = []string{"true", " "} }, "hooks.start[1]: is empty"},
+		{func(p *Project) { p.Hooks.Deps = []string{"a\nb"} }, "hooks.deps[0]: value contains a newline"},
+		{func(p *Project) { p.Hooks.Create = []string{""} }, "hooks.create[0]: is empty"},
 	} {
 		q, err := Load(path)
 		if err != nil {
@@ -408,5 +414,28 @@ func TestRoutesValidate(t *testing.T) {
 		if err := p.Validate(); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("Validate with %+v = %v; want %q", c.r, err, c.want)
 		}
+	}
+}
+
+// TestHooksRoundTrip: [hooks] decodes, validates and is written back by
+// LinesTOML in its order (D126).
+func TestHooksRoundTrip(t *testing.T) {
+	src := "[hooks]\ndeps = [\"gem list -i retest || gem install retest\"]\nstart = [\"bin/rails db:test:prepare\", \"echo 'it''s'\"]\ncreate = [\"bin/rails runner 'User.first'\"]\n"
+	var p Project
+	if _, err := toml.Decode(src, &p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Hooks.Start) != 2 || p.Hooks.Create[0] != "bin/rails runner 'User.first'" {
+		t.Fatalf("Hooks = %+v", p.Hooks)
+	}
+	var q Project
+	if _, err := toml.Decode(LinesTOML(&p), &q); err != nil {
+		t.Fatalf("%v\n%s", err, LinesTOML(&p))
+	}
+	if !reflect.DeepEqual(p.Hooks, q.Hooks) {
+		t.Errorf("round trip %+v, want %+v", q.Hooks, p.Hooks)
+	}
+	if strings.Contains(LinesTOML(&Project{}), "[hooks]") {
+		t.Error("[hooks] written without hooks")
 	}
 }

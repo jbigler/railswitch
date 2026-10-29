@@ -28,6 +28,8 @@ service = "rails"
 port = 3000
 [tasks]
 seed = "bin/rails db:seed"
+[hooks]
+deps = ["gem install retest"]
 `
 	files, err := Compare("template", nil, fstest.MapFS{"stack.toml": {Data: []byte(stack)}})
 	if err != nil {
@@ -45,6 +47,7 @@ seed = "bin/rails db:seed"
 		"privilege secret.github_token.git_host: (none) -> evil.example",
 		"privilege secret.github_token.services: (none) -> rails",
 		"port routes.admin.port: (none) -> 3000",
+		"runs-here hooks.deps: (none) -> gem install retest",
 	} {
 		if !slices.Contains(got, want) {
 			t.Errorf("missing flag %q in\n%s", want, strings.Join(got, "\n"))

@@ -139,8 +139,13 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	if opts.Name != "" {
 		args = append(args, "--name", opts.Name)
 	}
+	cmd := hangup(argv)
 	if opts.Entrypoint != "" {
-		args = append(args, "--entrypoint", opts.Entrypoint)
+		// The watcher goes in front of the entrypoint: behind it, the
+		// entrypoint would take hangup's sh -c as the command to run.
+		cmd = hangup(append([]string{opts.Entrypoint}, argv...))
+		args = append(args, "--entrypoint", cmd[0])
+		cmd = cmd[1:]
 	}
 	args = append(args, "--label", "traefik.enable=false")
 	for _, a := range in.FirewallAnnotations(s, networks) {
@@ -178,5 +183,5 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 		args = append(args, "-w", s.Workdir)
 	}
 	args = append(args, image)
-	return append(args, hangup(argv)...), nil
+	return append(args, cmd...), nil
 }

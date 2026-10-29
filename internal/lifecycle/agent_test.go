@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/machine"
@@ -69,7 +71,7 @@ func TestAgentOnDemandArgv(t *testing.T) {
 	for _, want := range []string{
 		"--rm", "-i", "--init", "--preserve-fds 1",
 		"--name filial-feat-agent-claude",
-		"--entrypoint /usr/local/bin/entrypoint-claude.sh",
+		"--entrypoint sh",
 		"--network filial-feat-dev",
 		"--network filial_proxy",
 		"--add-host s3.feat.filial.localhost:" + ip,
@@ -81,8 +83,30 @@ func TestAgentOnDemandArgv(t *testing.T) {
 			t.Errorf("argv lacks %q:\n%s", want, j)
 		}
 	}
-	if tail := hangup([]string{"--version"}); !strings.HasPrefix(c[len(c)-len(tail)-1], "localhost/filial/agent-claude:") || !slices.Equal(c[len(c)-len(tail):], tail) {
-		t.Errorf("argv does not end with the claude image and --version: %q", c[len(c)-len(tail)-1:])
+	tail := hangup([]string{"/usr/local/bin/entrypoint-claude.sh", "--version"})[1:]
+	if !strings.HasPrefix(c[len(c)-len(tail)-1], "localhost/filial/agent-claude:") || !slices.Equal(c[len(c)-len(tail):], tail) {
+		t.Errorf("argv does not end with the claude image, the entrypoint and --version: %q", c[len(c)-len(tail)-1:])
+	}
+	// What the container runs, with a stand-in entrypoint: it gets exactly
+	// the agent's arguments, never hangup's sh -c.
+	ep := filepath.Join(t.TempDir(), "entrypoint")
+	if err := os.WriteFile(ep, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run := append([]string{}, tail...)
+	run[3] = ep
+	cmd := exec.Command("sh", run...)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	cmd.ExtraFiles = []*os.File{r}                        // fd 3, as --preserve-fds 1 passes it
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true} // the watcher hangs up its group
+	out, err := cmd.Output()
+	w.Close()
+	if err != nil || string(out) != "--version\n" {
+		t.Errorf("the entrypoint got %q (%v); want --version alone", out, err)
 	}
 	// An agent's cap is its role's: the service agent's unit shows it.
 	probe, err := os.ReadFile(filepath.Join(e.l.WS.Dirs.Quadlet, "filial-feat-agent-probe.container"))

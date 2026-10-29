@@ -648,6 +648,11 @@ func TestRouterClientIP(t *testing.T) {
 			if !strings.Contains(line, ".rule=") {
 				continue
 			}
+			// A root-redirect router narrows the same rule to GET and HEAD of /.
+			const rootOnly = ") && Path(`/`) && (Method(`GET`) || Method(`HEAD`))\""
+			if strings.Contains(line, "-root.rule=(") && strings.HasSuffix(line, rootOnly) {
+				line = strings.Replace(strings.TrimSuffix(line, rootOnly), "-root.rule=(", "-root.rule=", 1) + `"`
+			}
 			m := ruleLabel.FindStringSubmatch(line)
 			if m == nil {
 				t.Errorf("%s: unexpected rule label %q", file, line)
@@ -660,8 +665,8 @@ func TestRouterClientIP(t *testing.T) {
 			}
 		}
 	}
-	if rules != 8 {
-		t.Errorf("found %d router rules in filial goldens; want 8", rules)
+	if rules != 10 { // 8 routes, 2 of them (s3-ui) with a root router
+		t.Errorf("found %d router rules in filial goldens; want 10", rules)
 	}
 }
 

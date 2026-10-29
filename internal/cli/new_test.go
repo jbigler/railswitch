@@ -72,9 +72,20 @@ func gitHost() *systest.Fake {
 }
 
 // mustNew runs railswitch project new and fails the test on a non-zero exit.
+// noDetect is args with --no-detect when they name no pack, template or
+// --no-detect: these tests' repositories have no stack to read (D124).
+func noDetect(args []string) []string {
+	for _, a := range args {
+		if a == "--pack" || a == "--template" || a == "--no-detect" || strings.HasPrefix(a, "--pack=") || strings.HasPrefix(a, "--template=") {
+			return args
+		}
+	}
+	return append(slices.Clone(args), "--no-detect")
+}
+
 func mustNew(t *testing.T, args ...string) string {
 	t.Helper()
-	code, out, errs := runWith(t, gitHost(), append([]string{"project", "new"}, args...)...)
+	code, out, errs := runWith(t, gitHost(), append([]string{"project", "new"}, noDetect(args)...)...)
 	if code != 0 {
 		t.Fatalf("new %v: exit %d\nstdout: %s\nstderr: %s", args, code, out, errs)
 	}
@@ -339,7 +350,7 @@ func TestNewNoRemoteHead(t *testing.T) {
 	repo := bareRepo(t, "main")
 	gitIn(t, strings.TrimPrefix(repo, "file://"), "symbolic-ref", "HEAD", "refs/heads/gone")
 	ws := filepath.Join(t.TempDir(), "shop")
-	code, _, errs := runWith(t, gitHost(), "project", "new", ws, "--repo", repo, "--prefix", "shop")
+	code, _, errs := runWith(t, gitHost(), "project", "new", "--no-detect", ws, "--repo", repo, "--prefix", "shop")
 	if code == 0 || !strings.Contains(errs, "--branch") {
 		t.Errorf("exit %d, stderr %q; want an error asking for --branch", code, errs)
 	}
@@ -354,7 +365,7 @@ func TestNewPrefixTaken(t *testing.T) {
 	first := filepath.Join(t.TempDir(), "one")
 	mustNew(t, first, "--repo", repo, "--prefix", "x1")
 	second := filepath.Join(t.TempDir(), "two")
-	code, _, errs := runWith(t, gitHost(), "project", "new", second, "--repo", repo, "--prefix", "x1")
+	code, _, errs := runWith(t, gitHost(), "project", "new", "--no-detect", second, "--repo", repo, "--prefix", "x1")
 	if want := `prefix "x1" is already used by ` + first; code == 0 || !strings.Contains(errs, want) {
 		t.Errorf("exit %d, stderr %q; want %q", code, errs, want)
 	}
@@ -367,7 +378,7 @@ func TestNewRefusesExistingProject(t *testing.T) {
 	newEnv(t)
 	ws := t.TempDir()
 	writeFile(t, filepath.Join(ws, "project.toml"), "schema = 1\n")
-	code, _, errs := runWith(t, gitHost(), "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
+	code, _, errs := runWith(t, gitHost(), "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
 	if code == 0 || !strings.Contains(errs, "project.toml") {
 		t.Errorf("exit %d, stderr %q; want a refusal naming project.toml", code, errs)
 	}
@@ -377,7 +388,7 @@ func TestNewRenderFailureUnregisters(t *testing.T) {
 	dirs := newEnv(t)
 	ws := filepath.Join(t.TempDir(), "shop")
 	f := &systest.Fake{Passthrough: []string{"git"}} // no podman: render fails
-	code, _, errs := runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
+	code, _, errs := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
 	if code == 0 {
 		t.Fatal("new succeeded without podman")
 	}
@@ -421,7 +432,7 @@ func TestNewRenderFailureRefreshesProxy(t *testing.T) {
 
 	ws := filepath.Join(t.TempDir(), "shop")
 	f := &systest.Fake{Passthrough: []string{"git"}} // no podman: render fails
-	if code, _, _ := runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop"); code == 0 {
+	if code, _, _ := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop"); code == 0 {
 		t.Fatal("new succeeded without podman")
 	}
 	got := readFile(t, unit)
@@ -442,8 +453,8 @@ func TestNewRefusesHelperURLs(t *testing.T) {
 	marker := filepath.Join(t.TempDir(), "RAN")
 	for _, url := range []string{"ext::sh -c touch% " + marker, "fd::17", "FD::3,4"} {
 		for _, args := range [][]string{
-			{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", url, "--prefix", "shop", "--branch", "main"},
-			{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", url, "--prefix", "shop"},
+			{"project", "new", "--no-detect", filepath.Join(t.TempDir(), "shop"), "--repo", url, "--prefix", "shop", "--branch", "main"},
+			{"project", "new", "--no-detect", filepath.Join(t.TempDir(), "shop"), "--repo", url, "--prefix", "shop"},
 			{"project", "detect", url},
 			{"project", "detect", url, "--branch", "main"},
 		} {
@@ -461,8 +472,8 @@ func TestNewRefusesHelperURLs(t *testing.T) {
 		t.Error("ext:: ran its command")
 	}
 	for _, args := range [][]string{
-		{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", "http://127.0.0.1:1/app.git", "--prefix", "shop", "--branch", "main"},
-		{"project", "new", filepath.Join(t.TempDir(), "shop"), "--repo", "http://127.0.0.1:1/app.git", "--prefix", "shop"},
+		{"project", "new", "--no-detect", filepath.Join(t.TempDir(), "shop"), "--repo", "http://127.0.0.1:1/app.git", "--prefix", "shop", "--branch", "main"},
+		{"project", "new", "--no-detect", filepath.Join(t.TempDir(), "shop"), "--repo", "http://127.0.0.1:1/app.git", "--prefix", "shop"},
 		{"project", "detect", "http://127.0.0.1:1/app.git"},
 		{"project", "detect", "http://127.0.0.1:1/app.git", "--branch", "main"},
 	} {
@@ -482,7 +493,7 @@ func TestNewRefusesOptionLikeGitValues(t *testing.T) {
 	} {
 		ws := filepath.Join(t.TempDir(), "shop")
 		f := gitHost()
-		code, _, errs := runWith(t, f, append([]string{"project", "new", ws}, args...)...)
+		code, _, errs := runWith(t, f, append([]string{"project", "new", "--no-detect", ws}, args...)...)
 		if code == 0 || !strings.Contains(errs, "not a usable git value") {
 			t.Errorf("new %q: exit %d, stderr %q; want a refusal", args, code, errs)
 		}
@@ -597,7 +608,7 @@ func TestNewGitNonInteractive(t *testing.T) {
 		repo := bareRepo(t, "main")
 		f := gitHost()
 		ws := filepath.Join(t.TempDir(), "shop")
-		if code, _, errs := runWith(t, f, "project", "new", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
+		if code, _, errs := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", repo, "--prefix", "shop"); code != 0 {
 			t.Fatalf("new: exit %d: %s", code, errs)
 		}
 		seen := 0
@@ -626,7 +637,7 @@ func TestNewSkipsPodmanSubnets(t *testing.T) {
 	f := gitHost()
 	f.On([]string{"podman", "network", "ls", "--format", "json"},
 		sys.Result{Stdout: []byte(`[{"name":"filial_proxy","subnets":[{"subnet":"10.214.0.0/24","gateway":"10.214.0.1"}]}]`)}, nil)
-	if code, out, errs := runWith(t, f, "project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"); code != 0 {
+	if code, out, errs := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"); code != 0 {
 		t.Fatalf("new: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
 	if pe, _ := registry(t, dirs).Project("shop"); pe.Subnet != 1 {
@@ -644,7 +655,7 @@ func TestNewNetworkLsFails(t *testing.T) {
 	f := gitHost()
 	f.On([]string{"podman", "network", "ls"}, sys.Result{ExitCode: 125, Stderr: []byte("Error: boom\n")},
 		fmt.Errorf("podman: %w (exit 125): Error: boom", sys.ErrExit))
-	code, _, errs := runWith(t, f, "project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main")
+	code, _, errs := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", repo, "--prefix", "shop", "--branch", "main")
 	if code == 0 || !strings.Contains(errs, "boom") {
 		t.Fatalf("new: exit %d, stderr %q; want failure naming the podman error", code, errs)
 	}
@@ -740,7 +751,7 @@ func TestNewAgentNone(t *testing.T) {
 	if s, ok := loadProject(t, ws2).Secrets["github_token"]; !ok || !slices.Equal(s.Services, []string{"nvim"}) {
 		t.Errorf("--agent none --tool nvim: github_token %+v, %v", s, ok)
 	}
-	if code, _, errs := runWith(t, gitHost(), "project", "new", filepath.Join(t.TempDir(), "x"), "--repo", gh, "--prefix", "x", "--agent", "none", "--agent", "a=claude@1"); code != 2 || !strings.Contains(errs, "none") {
+	if code, _, errs := runWith(t, gitHost(), "project", "new", "--no-detect", filepath.Join(t.TempDir(), "x"), "--repo", gh, "--prefix", "x", "--agent", "none", "--agent", "a=claude@1"); code != 2 || !strings.Contains(errs, "none") {
 		t.Errorf("--agent none with another: exit %d, stderr %q; want a usage error", code, errs)
 	}
 }
@@ -767,7 +778,7 @@ func TestNewAgentFlag(t *testing.T) {
 		t.Errorf("github_token services %v", s.Services)
 	}
 	for _, bad := range []string{"claude", "a=", "Bad=claude@1", "ls=claude@1", "a=nope@1"} {
-		code, _, _ := runWith(t, gitHost(), "project", "new", filepath.Join(t.TempDir(), "x"), "--repo", gh, "--prefix", "x", "--agent", bad)
+		code, _, _ := runWith(t, gitHost(), "project", "new", "--no-detect", filepath.Join(t.TempDir(), "x"), "--repo", gh, "--prefix", "x", "--agent", bad)
 		if code == 0 {
 			t.Errorf("--agent %s: exit 0", bad)
 		}

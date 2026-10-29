@@ -25,7 +25,7 @@ func libraryTemplateProject(t *testing.T) (string, *testfixture.Lib, *systest.Fa
 	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("[]")}, nil)
 	args := []string{ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main", "--template", "acme:rails-pg@1"}
 	in := dryRun(t, f, args...).Install
-	if code, out, errs := runWith(t, f, append([]string{"project", "new", "--accept-install", in.Hash}, args...)...); code != 0 {
+	if code, out, errs := runWith(t, f, append([]string{"project", "new", "--no-detect", "--accept-install", in.Hash}, args...)...); code != 0 {
 		t.Fatalf("new: exit %d\n%s\n%s", code, out, errs)
 	}
 	return ws, lib, f

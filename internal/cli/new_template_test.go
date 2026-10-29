@@ -237,7 +237,7 @@ func TestNewTemplateBadAnswer(t *testing.T) {
 		{[]string{"--template", "nosuch@1"}, "no template nosuch@1 on this machine"},
 	} {
 		f := gitHost()
-		code, _, errs := runWith(t, f, append([]string{"project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"}, tc.args...)...)
+		code, _, errs := runWith(t, f, append([]string{"project", "new", "--no-detect", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"}, tc.args...)...)
 		if code == 0 || !strings.Contains(errs, tc.want) {
 			t.Errorf("%q: exit %d: %s; want %q", tc.args, code, errs, tc.want)
 		}
@@ -289,12 +289,12 @@ func TestNewLibraryTemplateNeedsReview(t *testing.T) {
 	// Changed after the review: the hash covers the template.
 	testfixture.WriteFile(t, filepath.Join(lib.Dir(), "templates", "rails-pg", "README.md"), "changed\n")
 	lib.Publish(t)
-	code, _, errs = runWith(t, f, append([]string{"project", "new", "--accept-install", in.Hash}, args...)...)
+	code, _, errs = runWith(t, f, append([]string{"project", "new", "--no-detect", "--accept-install", in.Hash}, args...)...)
 	if code != 1 || !strings.Contains(errs, "the install changed since it was reviewed") {
 		t.Fatalf("a changed template: exit %d: %s", code, errs)
 	}
 	in = dryRun(t, f, args...).Install
-	if code, out, errs := runWith(t, f, append([]string{"project", "new", "--accept-install", in.Hash}, args...)...); code != 0 {
+	if code, out, errs := runWith(t, f, append([]string{"project", "new", "--no-detect", "--accept-install", in.Hash}, args...)...); code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, out, errs)
 	}
 	if got := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.pg-client")); got != editedPGClient(t) {

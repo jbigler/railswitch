@@ -22,7 +22,7 @@ import (
 // dryRun runs project new --dry-run --json and decodes its document.
 func dryRun(t *testing.T, f *systest.Fake, args ...string) newDryRunDoc {
 	t.Helper()
-	code, out, errs := runWith(t, f, append([]string{"--json", "project", "new", "--dry-run"}, args...)...)
+	code, out, errs := runWith(t, f, append([]string{"--json", "project", "new", "--dry-run"}, noDetect(args)...)...)
 	if code != 0 {
 		t.Fatalf("new --dry-run %v: exit %d\nstdout: %s\nstderr: %s", args, code, out, errs)
 	}
@@ -139,7 +139,7 @@ func TestNewDryRunRefusals(t *testing.T) {
 		{"prefix in use", filepath.Join(t.TempDir(), "two"), "x1", `prefix "x1" is already used by ` + first},
 		{"existing project.toml", existing, "x2", "already exists"},
 	} {
-		args := []string{"project", "new", tc.dir, "--repo", repo, "--prefix", tc.prefix}
+		args := []string{"project", "new", "--no-detect", tc.dir, "--repo", repo, "--prefix", tc.prefix}
 		code, out, dry := runWith(t, gitHost(), append([]string{"--json"}, append(args, "--dry-run")...)...)
 		if code != 1 || out != "" || !strings.Contains(dry, tc.want) {
 			t.Errorf("%s: dry run exit %d, stdout %q, stderr %q; want exit 1 with %q", tc.name, code, out, dry, tc.want)
@@ -199,7 +199,7 @@ func TestNewDryRunSummary(t *testing.T) {
 func TestNewDryRunText(t *testing.T) {
 	newEnv(t)
 	ws := filepath.Join(t.TempDir(), "shop")
-	code, out, errs := runWith(t, gitHost(), "project", "new", "--dry-run", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--agent", "none")
+	code, out, errs := runWith(t, gitHost(), "project", "new", "--no-detect", "--dry-run", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--agent", "none")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errs)
 	}
@@ -228,7 +228,7 @@ func TestNewUp(t *testing.T) {
 	f := gitHost()
 	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
 	ws := filepath.Join(t.TempDir(), "shop")
-	code, out, errs := runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--agent", "none", "--up")
+	code, out, errs := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--agent", "none", "--up")
 	if code != 0 {
 		t.Fatalf("new --up: exit %d\n%s%s", code, out, errs)
 	}
@@ -241,14 +241,14 @@ func TestNewUp(t *testing.T) {
 	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
 	f.On([]string{"systemctl", "--user", "start"}, sys.Result{ExitCode: 1}, fmt.Errorf("systemctl: %w (exit 1)", sys.ErrExit))
 	ws = filepath.Join(t.TempDir(), "cart")
-	code, out, errs = runWith(t, f, "project", "new", ws, "--repo", bareRepo(t, "main"), "--prefix", "cart", "--agent", "none", "--up")
+	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "cart", "--agent", "none", "--up")
 	if code != 3 || !strings.Contains(out, "created workspace") || !strings.Contains(errs, "project cart was created in "+ws+", but up failed") {
 		t.Errorf("new --up with a failing up: exit %d\n%s%s; want exit 3 and the project named as created", code, out, errs)
 	}
 
 	// A create whose render fails (no podman) starts nothing.
 	failing := &systest.Fake{Passthrough: []string{"git"}}
-	code, _, _ = runWith(t, failing, "project", "new", filepath.Join(t.TempDir(), "two"), "--repo", bareRepo(t, "main"), "--prefix", "two", "--agent", "none", "--up")
+	code, _, _ = runWith(t, failing, "project", "new", "--no-detect", filepath.Join(t.TempDir(), "two"), "--repo", bareRepo(t, "main"), "--prefix", "two", "--agent", "none", "--up")
 	if code == 0 {
 		t.Fatal("new succeeded without podman")
 	}
@@ -272,7 +272,7 @@ func TestNewRefusesExistingPaths(t *testing.T) {
 		want := filepath.Join(ws, filepath.FromSlash(rel)) + " already exists"
 		var msgs []string
 		for _, dry := range []bool{true, false} {
-			args := []string{"project", "new", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"}
+			args := []string{"project", "new", "--no-detect", ws, "--repo", repo, "--prefix", "shop", "--branch", "main"}
 			if dry {
 				args = append(args, "--dry-run")
 			}

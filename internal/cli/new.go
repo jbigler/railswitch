@@ -18,12 +18,14 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/detect"
 	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/template"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -69,6 +71,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
 	up := fset.Bool("up", false, "run up in the base worktree once it is created (exit 3: created, up failed)")
 	tplRef := fset.String("template", "", "start from the template `ref` (template ls): its lines, the answers, then the other flags on top")
+	noDetect := fset.Bool("no-detect", false, "don't read the repository for the pack and options: the pack's defaults")
 	var opts, tools, agentFlags, answerFlags stringList
 	fset.Var(&answerFlags, "answer", "answer a --template question: `key=value` (repeatable; an empty value sets it empty, no flag keeps the default)")
 	fset.Var(&opts, "option", "fill an option slot: `slot=ref` or slot=none (repeatable)")
@@ -101,6 +104,40 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	if *tplRef != "" && !isSet(fset, "pack") {
 		*packRef = "" // the template's
+	}
+	// Neither a pack nor a template: read the repository as the New project
+	// page does (D124). The page passes --pack after its own detection.
+	if *tplRef == "" && !isSet(fset, "pack") && !*noDetect {
+		// What needs no network is checked before the repository is read.
+		if err := newOffline(dir, *prefix); err != nil {
+			return e.fail(err)
+		}
+		res, err := e.detectNew(ctx, *repo, *branch)
+		if err != nil {
+			return e.fail(err)
+		}
+		*packRef, *branch = res.Pack.Ref, res.Branch
+		set := map[string]bool{}
+		for _, o := range opts {
+			k, _, _ := strings.Cut(o, "=")
+			set[k] = true
+		}
+		out := e.stdout
+		if e.json {
+			out = e.stderr // stdout is the one JSON document
+		}
+		fmt.Fprintf(out, "detected pack %s (%s)\n", res.Pack.Ref, safefile.Printable(strings.Join(res.Pack.Evidence, ", ")))
+		for _, o := range res.Options {
+			if o.Source != "repo" || set[o.Key] {
+				continue
+			}
+			opts = append(opts, o.Key+"="+o.Ref)
+			line := fmt.Sprintf("detected %s %s (%s)", o.Key, o.Ref, safefile.Printable(o.Evidence))
+			if len(o.Others) > 0 {
+				line += "; also in the repository: " + strings.Join(o.Others, ", ")
+			}
+			fmt.Fprintln(out, line)
+		}
 	}
 	pl, err := planNew(ctx, e.run, newArgs{dir: dir, repo: *repo, prefix: *prefix, name: *name, branch: *branch, packRef: *packRef, opts: opts, nvim: nvim, agents: agents, template: *tplRef, answers: answers})
 	if err != nil {
@@ -592,6 +629,59 @@ func (e *env) printNext(ws, slug string, unset []string) {
 	for _, n := range unset {
 		fmt.Fprintf(e.stdout, "next: railswitch secret set %s\n", n)
 	}
+}
+
+// newOffline is what planNew checks that needs no network: the prefix's
+// form, that no project has it, and that dir holds no project yet.
+func newOffline(dir, prefix string) error {
+	if err := naming.ValidPrefix(prefix); err != nil {
+		return err
+	}
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return err
+	}
+	if err := prefixFree(dirs, prefix); err != nil {
+		return err
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "project.toml")); err == nil {
+		return fmt.Errorf("%s already exists: run railswitch project init there to join that project", filepath.Join(dir, "project.toml"))
+	}
+	return nil
+}
+
+// detectNew reads repo (at branch, else the remote's HEAD) for the pack and
+// options, as project detect does (D88); no pack matching is an error that
+// names --pack.
+func (e *env) detectNew(ctx context.Context, repo, branch string) (*detect.Result, error) {
+	if err := sys.GitArg("--repo", repo); err != nil {
+		return nil, err
+	}
+	cat, err := pack.LoadBuiltins()
+	if err != nil {
+		return nil, err
+	}
+	if branch == "" {
+		if branch, err = remoteHead(ctx, e.run, repo); err != nil {
+			return nil, err
+		}
+	}
+	if err := sys.GitArg("--branch", branch); err != nil {
+		return nil, err
+	}
+	files, err := detect.Fetch(ctx, e.run, repo, branch, detect.Paths(cat))
+	if err != nil {
+		return nil, fmt.Errorf("reading the repository: %w (--pack or --no-detect skips it)", err)
+	}
+	res, err := detect.Choose(cat, files, "")
+	if err != nil {
+		return nil, err
+	}
+	if res.Pack == nil {
+		return nil, errors.New("no pack's files are all in the repository: pass --pack")
+	}
+	res.Branch = branch
+	return &res, nil
 }
 
 // newProject is the project.toml new writes, before [image] and secrets:

@@ -56,6 +56,7 @@ func TestDetectRulesLoad(t *testing.T) {
 		option, line, evidence string
 	}{
 		{"postgres", `gem "pg", "~> 1.1"`, "Gemfile: pg"},
+		{"mariadb", `gem "mysql2", "~> 0.5"`, "Gemfile: mysql2"},
 		{"redis", `  gem 'redis', '>= 4.0'`, "Gemfile: redis"},
 		{"rustfs", `gem "aws-sdk-s3", require: false`, "Gemfile: aws-sdk-s3"},
 		{"sidekiq", `gem 'sidekiq'`, "Gemfile: sidekiq"},

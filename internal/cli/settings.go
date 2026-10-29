@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
@@ -218,7 +220,16 @@ func settingsApply(ctx context.Context, e *env, args []string) int {
 			return e.fail(err)
 		}
 	}
-	if err := e.commitProject(ctx, se.WS.Root, []byte(p.NewText), accept); err != nil {
+	fi, err := os.Stat(filepath.Join(se.WS.Root, "project.toml"))
+	if err != nil {
+		return e.fail(err)
+	}
+	changes := []fileChange{{Rel: "project.toml", Data: []byte(p.NewText), Mode: fi.Mode().Perm()}}
+	for _, rel := range slices.Sorted(maps.Keys(p.NewFiles)) {
+		// An option's addon the edits eject (D123), committed with it.
+		changes = append(changes, fileChange{Rel: rel, Data: p.NewFiles[rel], Mode: 0o644})
+	}
+	if err := e.commit(ctx, se.WS.Root, changes, accept); err != nil {
 		return e.fail(err)
 	}
 	if *restart {

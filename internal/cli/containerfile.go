@@ -16,7 +16,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
@@ -141,8 +140,7 @@ func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bo
 		return err
 	}
 	rel := workspaceFile(name)
-	header := fmt.Sprintf("# Ejected from %s Containerfile.%s (sha256 %x) by railswitch %s. Edit freely: railswitch builds this file.\n", b.ref, name, sha256.Sum256(def), buildinfo.Version)
-	created, err := writeContainerfile(root, rel, append([]byte(header), def...), force)
+	created, err := writeContainerfile(root, rel, workspace.EjectedContainerfile(b.ref, name, def), force)
 	if errors.Is(err, fs.ErrExist) {
 		return fmt.Errorf("%w: pass --force to replace it with the default", err)
 	}

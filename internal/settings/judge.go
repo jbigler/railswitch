@@ -3,7 +3,10 @@ package settings
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -41,6 +44,11 @@ type Preview struct {
 	Edits   []EditResult `json:"edits"`
 	Restart []string     `json:"restart"` // registered worktrees whose running app runs units the edits change
 	NewText string       `json:"-"`
+	// NewFiles are the option addons the edits eject (workspace-relative
+	// path → content): written with NewText (D123).
+	NewFiles map[string][]byte `json:"-"`
+	// Writes are NewFiles' paths, sorted: what the preview shows (D123).
+	Writes []string `json:"writes"`
 }
 
 // Env is the loaded project the edits apply to.
@@ -60,22 +68,105 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &Preview{Hash: workspace.Hash(data), Edits: []EditResult{}}
+	p := &Preview{Hash: workspace.Hash(data), Edits: []EditResult{}, NewFiles: map[string][]byte{}}
 	text, prev := string(data), cur // prev renders text
 	for i, ed := range edits {
 		r, next := EditResult{Impact: ImpactBlocked, Reasons: []string{}}, (*rendered)(nil)
-		if t, err := ApplyText(text, ed); err != nil {
+		t, err := ApplyText(text, ed)
+		var files map[string][]byte
+		if err == nil && (ed.Op == "option" || ed.Op == "pack") {
+			t, files, err = e.syncAddons(text, t)
+		}
+		if err != nil {
 			r.Error = err.Error()
-		} else if r, next = e.judge(prev, t); next != nil {
+		} else if r, next = e.judge(prev, t, files); next != nil {
 			text, prev = t, next
+			maps.Copy(p.NewFiles, files)
 		}
 		r.Index = i
 		p.Edits = append(p.Edits, r)
 	}
 	p.NewText = text
+	p.Writes = append([]string{}, slices.Sorted(maps.Keys(p.NewFiles))...)
 	p.Diff = textdiff.Unified("project.toml", "project.toml", string(data), text)
 	p.Restart = e.restart(cur, prev)
 	return p, nil
+}
+
+// syncAddons makes text's [image] addons follow the options the edit
+// changed from before (D123): the addon of an option no longer chosen goes
+// (its file stays: it may hold your edits), a newly chosen option's addon is
+// added, ejected from its default when the workspace has no file of that
+// name. Only the changed options' addons are touched (all of them when the
+// pack changed, which sets the OS): an addon you removed or added by hand
+// for an option the edit leaves alone stays as you left it. It returns text
+// as it was when either stack doesn't resolve (judge then blocks it).
+func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) {
+	p, err := config.Parse([]byte(text))
+	if err != nil {
+		return text, nil, nil
+	}
+	old, err := config.Parse([]byte(before))
+	if err != nil {
+		return text, nil, nil
+	}
+	cat := e.WS.Catalog
+	st, err := cat.Resolve(p)
+	if err != nil {
+		return text, nil, nil
+	}
+	oldSt, err := cat.Resolve(old)
+	if err != nil {
+		return text, nil, nil
+	}
+	rel := func(file string) string { return "containerfiles/" + file }
+	addonOf := func(st *pack.Stack) map[string]string { // option key → its addon, for this pack's OS
+		out := map[string]string{}
+		for _, ch := range st.Options {
+			if a := ch.Option.AppAddon; a != nil && a.OS == st.Pack.Image.OS {
+				out[ch.Key] = rel(a.File)
+			}
+		}
+		return out
+	}
+	was, now := addonOf(oldSt), addonOf(st)
+	packChanged := oldSt.PackRef != st.PackRef
+	changed := func(key string) bool {
+		return packChanged || old.Options[key] != p.Options[key]
+	}
+	drop := map[string]bool{}
+	for key, a := range was {
+		if changed(key) && !slices.Contains(slices.Collect(maps.Values(now)), a) {
+			drop[a] = true
+		}
+	}
+	var addons []string
+	for _, a := range p.Image.Addons {
+		if !drop[a] {
+			addons = append(addons, a)
+		}
+	}
+	files := map[string][]byte{}
+	for _, ch := range st.Options {
+		a := ch.Option.AppAddon
+		if a == nil || now[ch.Key] == "" || !changed(ch.Key) || slices.Contains(addons, rel(a.File)) {
+			continue
+		}
+		addons = append(addons, rel(a.File))
+		if _, err := os.Lstat(filepath.Join(e.WS.Root, "containerfiles", a.File)); err == nil {
+			continue // a copy you had: kept as it is
+		}
+		def, err := fs.ReadFile(ch.Option.Files, a.File)
+		if err != nil {
+			return "", nil, err
+		}
+		files[rel(a.File)] = workspace.EjectedContainerfile(ch.Ref.String(), strings.TrimPrefix(a.File, "Containerfile."), def)
+	}
+	if slices.Equal(addons, p.Image.Addons) {
+		return text, nil, nil
+	}
+	out, err := config.SetImageAddons(text, addons)
+	return out, files, err
 }
 
 // rendered is one render of the project: its model, its stamped units, the
@@ -114,7 +205,7 @@ func (e Env) render(ws *workspace.Workspace) (*rendered, error) {
 
 // judge compares the render of text with prev's; the render is nil when
 // text does not load, validate, resolve or render (blocked).
-func (e Env) judge(prev *rendered, text string) (EditResult, *rendered) {
+func (e Env) judge(prev *rendered, text string, files map[string][]byte) (EditResult, *rendered) {
 	blocked := func(err error) (EditResult, *rendered) {
 		return EditResult{Impact: ImpactBlocked, Reasons: []string{}, Error: err.Error()}, nil
 	}
@@ -128,6 +219,9 @@ func (e Env) judge(prev *rendered, text string) (EditResult, *rendered) {
 	ws, err := prev.ws.WithProject(p)
 	if err != nil {
 		return blocked(err)
+	}
+	for rel, data := range files {
+		ws = ws.WithFile(rel, data)
 	}
 	next, err := e.render(ws)
 	if err != nil {

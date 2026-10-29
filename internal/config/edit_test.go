@@ -608,3 +608,17 @@ func TestFirewallEdits(t *testing.T) {
 		t.Errorf("new table: %q %v", out, err)
 	}
 }
+
+func TestSetImageAddons(t *testing.T) {
+	in := "[image]\nbase = \"containerfiles/Containerfile.base\"\naddons = [\"containerfiles/Containerfile.pg-client\"]   # options\n"
+	out, err := SetImageAddons(in, []string{"containerfiles/Containerfile.mariadb-client", "containerfiles/Containerfile.extra"})
+	if err != nil || !strings.Contains(out, `addons = ["containerfiles/Containerfile.mariadb-client", "containerfiles/Containerfile.extra"]   # options`) {
+		t.Errorf("set: %q %v", out, err)
+	}
+	if out, err := SetImageAddons(in, nil); err != nil || strings.Contains(out, "addons") {
+		t.Errorf("empty: %q %v", out, err)
+	}
+	if out, err := SetImageAddons("[image]\nbase = \"b\"\n", []string{"containerfiles/Containerfile.x"}); err != nil || !strings.Contains(out, "addons = [\"containerfiles/Containerfile.x\"]") {
+		t.Errorf("insert: %q %v", out, err)
+	}
+}

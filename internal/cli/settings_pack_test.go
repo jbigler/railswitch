@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -113,5 +114,78 @@ func TestSettingsPreviewFirewallEdits(t *testing.T) {
 	}
 	if len(p.Edits) != 1 || p.Edits[0].Impact != "blocked" || !strings.Contains(p.Edits[0].Error, "not a host name") {
 		t.Errorf("bad host: %+v", p.Edits)
+	}
+}
+
+// Switching the database option swaps its image addon (D123): the old
+// option's addon leaves [image] addons (its file stays, edits and all), the
+// new one's is ejected and added; switching back reuses the kept file.
+func TestSettingsOptionSwapsAddon(t *testing.T) {
+	ws, _ := lockedWS(t)
+	pg := filepath.Join(ws, "containerfiles", "Containerfile.pg-client")
+	writeFile(t, pg, readFile(t, pg)+"RUN echo mine\n")
+	// The fixture holds every option's addon: this one must come from the eject.
+	if err := os.Remove(filepath.Join(ws, "containerfiles", "Containerfile.mariadb-client")); err != nil {
+		t.Fatal(err)
+	}
+	apply := func(ref string) {
+		t.Helper()
+		before := readFile(t, filepath.Join(ws, "project.toml"))
+		edits := `[{"op":"option","key":"database","ref":"` + ref + `"}]`
+		if code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+			t.Fatalf("%s: exit %d: %s\n%s", ref, code, out, errs)
+		}
+	}
+	apply("mariadb@1")
+	p, err := config.Load(filepath.Join(ws, "project.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(p.Image.Addons, "containerfiles/Containerfile.pg-client") || !slices.Contains(p.Image.Addons, "containerfiles/Containerfile.mariadb-client") {
+		t.Errorf("addons after mariadb: %v", p.Image.Addons)
+	}
+	if got := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.mariadb-client")); !strings.HasPrefix(got, "# Ejected from mariadb@1 Containerfile.mariadb-client") {
+		t.Errorf("mariadb-client:\n%s", got)
+	}
+	if !strings.HasSuffix(readFile(t, pg), "RUN echo mine\n") {
+		t.Error("the edited pg-client file was not kept")
+	}
+	apply("postgres@1")
+	if p, err = config.Load(filepath.Join(ws, "project.toml")); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(p.Image.Addons, "containerfiles/Containerfile.pg-client") || slices.Contains(p.Image.Addons, "containerfiles/Containerfile.mariadb-client") {
+		t.Errorf("addons after postgres: %v", p.Image.Addons)
+	}
+	if !strings.HasSuffix(readFile(t, pg), "RUN echo mine\n") {
+		t.Error("switching back replaced your pg-client file")
+	}
+}
+
+// An edit of another option leaves the addons as you set them: one you
+// removed stays removed, one you added stays (D123).
+func TestSettingsOtherOptionKeepsAddons(t *testing.T) {
+	ws, _ := lockedWS(t)
+	proj := filepath.Join(ws, "project.toml")
+	writeFile(t, proj, strings.Replace(readFile(t, proj), `addons = ["containerfiles/Containerfile.pg-client"]`, `addons = ["containerfiles/Containerfile.mariadb-client"]`, 1))
+	before := readFile(t, proj)
+	edits := `[{"op":"option","key":"cache","ref":"none"}]`
+	code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var p struct{ Writes []string }
+	if err := json.Unmarshal([]byte(out), &p); err != nil || p.Writes == nil || len(p.Writes) != 0 {
+		t.Errorf("writes %v (%v)", p.Writes, err)
+	}
+	if code, _, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+		t.Fatalf("apply: exit %d: %s", code, errs)
+	}
+	c, err := config.Load(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(c.Image.Addons, []string{"containerfiles/Containerfile.mariadb-client"}) {
+		t.Errorf("addons %v", c.Image.Addons)
 	}
 }

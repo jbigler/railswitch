@@ -147,7 +147,7 @@ func TestPreviewPinChangeData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, _ := e.judge(cur, text)
+	r, _ := e.judge(cur, text, nil)
 	if r.Impact != ImpactData || !hasReason(r, "filial-master-db-data-pg16 is left behind; filial-master-db-data-pg17 starts empty") || !hasReason(r, "run railswitch db dump first") {
 		t.Fatalf("result = %+v", r)
 	}

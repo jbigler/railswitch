@@ -691,6 +691,21 @@ func TestSetAgentSetup(t *testing.T) {
 	if _, err := SetAgentSetup(base, "claude", []string{"-rf /"}); err == nil {
 		t.Error("a command starting with - was accepted")
 	}
+	// An [agents.<n>.env] sub-table, before or after, is fine.
+	for _, text := range []string{
+		"schema = 1\n\n[agents.claude]\nuse = \"claude@1\"\n\n[agents.claude.env]\nFOO = \"bar\"\n",
+		"schema = 1\n\n[agents.claude.env]\nFOO = \"bar\"\n\n[agents.claude]\nuse = \"claude@1\"\n",
+	} {
+		out, err := SetAgentSetup(text, "claude", []string{"echo hi"})
+		if err != nil {
+			t.Errorf("%q: %v", text, err)
+			continue
+		}
+		p, err := Parse([]byte(out))
+		if err != nil || !slices.Equal(p.Agents["claude"].Setup, []string{"echo hi"}) || p.Agents["claude"].Env["FOO"] != "bar" {
+			t.Errorf("%q: %+v, %v\n%s", text, p.Agents["claude"], err, out)
+		}
+	}
 	// An agent written inline or as dotted keys is refused, not mangled.
 	for _, text := range []string{
 		"schema = 1\n\n[agents]\nclaude = { use = \"claude@1\" }\n",

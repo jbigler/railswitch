@@ -79,13 +79,14 @@ func SetAgentSetup(data, name string, cmds []string) (string, error) {
 		case s.header && !s.array && len(s.path) == 2:
 			plain = true
 		case s.header:
-		case len(s.table) == 2 && len(s.key) == 1:
+		case len(s.table) > 2, len(s.table) == 2 && len(s.key) == 1:
+			// a key of a sub-table ([agents.<n>.env]) or a plain key here
 		default:
-			return "", &BlockedError{d.line(s.start), "agents." + name + " is not a plain table with plain keys (an inline table or a dotted key): edit project.toml"}
+			return "", &BlockedError{d.line(s.start), "agents." + name + " is not a plain table with plain keys (an inline table or a dotted key)"}
 		}
 	}
 	if !plain {
-		return "", &BlockedError{1, "agents." + name + " has no [agents." + name + "] table (it is written inline or as dotted keys): edit project.toml"}
+		return "", &BlockedError{1, "agents." + name + " has no [agents." + name + "] table (it is written inline or as dotted keys)"}
 	}
 	q := make([]string, len(cmds))
 	for i, c := range cmds {

@@ -30,7 +30,7 @@ set -eu
 # /etc/hosts itself: newer glibc also answers every *.localhost with ::1
 # (RFC 6761) and lists it first, and forwarding loopback to loopback gave
 # the browser an empty response.
-traefik_ip=$(awk -v h="$WORKTREE_HOST" '$1 !~ /^(127\.|::1$)/ { for (i = 2; i <= NF; i++) if ($i == h) { print $1; exit } }' /etc/hosts)
+traefik_ip=$(awk -v h="$WORKTREE_HOST" '{ sub(/#.*/, "") } $1 != "" && $1 !~ /^(127\.|::1$)/ { for (i = 2; i <= NF; i++) if ($i == h) { print $1; exit } }' /etc/hosts)
 if [ -n "$traefik_ip" ]; then
   socat TCP-LISTEN:80,bind=127.0.0.1,fork,reuseaddr TCP:"$traefik_ip":80 &
   if ip -6 addr show lo 2>/dev/null | grep -q '::1/128'; then
@@ -127,16 +127,6 @@ done
 # restart. --test-type suppresses the "unsupported command-line flag:
 # --no-sandbox" warning bar (--disable-infobars alone no longer covers it).
 (
-  # The browser starts before the app it opens: until the app is up,
-  # Traefik has no route for it and answers 404 (or 502 while it starts).
-  # Wait up to 3 minutes for a real answer so the first page is the app.
-  # Only this first launch waits: the CDP endpoint comes up with it.
-  for _ in $(seq 1 180); do
-    case "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$CHROME_START_URL")" in
-      000 | 404 | 502 | 503 | 504) sleep 1 ;;
-      *) break ;;
-    esac
-  done
   while true; do
     "$CHROME_BIN" \
       --no-sandbox \
@@ -156,6 +146,30 @@ done
 ) &
 
 socat TCP-LISTEN:"$CDP_PUBLIC_PORT",fork,reuseaddr TCP:127.0.0.1:"$CDP_PORT" &
+
+# The browser starts before the app it opens: until the app is up, Traefik
+# has no route for it and answers 404 (502 while it starts), and that is the
+# first page. Once the app answers, open it in a fresh tab and close the
+# stale ones, over CDP (which stays available meanwhile, for agents). Only
+# while the app had not answered; given up after 3 minutes (an app whose /
+# is a 404 for good keeps its page).
+(
+  deadline=$(($(date +%s) + 180))
+  stale=0
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    case "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$CHROME_START_URL")" in
+      000 | 404 | 502 | 503 | 504) stale=1; sleep 1 ;;
+      *) break ;;
+    esac
+  done
+  [ "$stale" = 1 ] && [ "$(date +%s)" -lt "$deadline" ] || exit 0
+  cdp="http://127.0.0.1:$CDP_PORT"
+  old=$(curl -s --max-time 5 "$cdp/json/list" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{for(const t of JSON.parse(s))if(t.type==="page")console.log(t.id)}catch{}})')
+  curl -s --max-time 5 -X PUT "$cdp/json/new?$CHROME_START_URL" >/dev/null || exit 0
+  for id in $old; do
+    curl -s --max-time 5 "$cdp/json/close/$id" >/dev/null
+  done
+) &
 
 # Host the browser server. The browser is launched into $DISPLAY when a client
 # connects; clients reach it at ws://<service>:${PLAYWRIGHT_PORT}/connect

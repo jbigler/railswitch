@@ -247,3 +247,25 @@ func TestJobsOfRemovedWorktree(t *testing.T) {
 		t.Errorf("removed worktree's job not rendered (%v):\n%s", err, html)
 	}
 }
+
+// TestServiceLook: each systemd state reads as one plain word, coloured
+// like its glyph.
+func TestServiceLook(t *testing.T) {
+	for state, want := range map[string][3]string{
+		"active/running":    {"●", "green", "running"},
+		"active/exited":     {"●", "green", "running"},
+		"activating/start":  {"◐", "yellow", "starting"},
+		"deactivating/stop": {"◐", "yellow", "stopping"},
+		"failed/failed":     {"✗", "red", "failed"},
+		"inactive/dead":     {"○", "muted", "stopped"},
+		"on-demand":         {"○", "muted", "on demand"},
+		"reloading/reload":  {"◐", "yellow", "reloading"},
+		"maintenance/clean": {"◐", "yellow", "busy"},
+		"/":                 {"○", "muted", "unknown"},
+	} {
+		g, c, w := serviceLook(state)
+		if got := [3]string{g, c, w}; got != want {
+			t.Errorf("%s: %q; want %q", state, got, want)
+		}
+	}
+}

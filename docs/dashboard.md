@@ -166,8 +166,11 @@ is no longer accepted. What the page shows meanwhile may be stale.
   says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with such secrets opens with this card.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
-  (`PR #2141 ready · checks ✓ · approved`), then Links, Services (a glyph
-  and state per service), Agent (state and message), Actions and Jobs.
+  (`PR #2141 ready · checks ✓ · approved`), then Links, Services (one aligned row per service: a
+  glyph, the name and a plain state word, `running`, `starting`,
+  `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
+  `unknown`, in the glyph's colour;
+  the systemd state is the row's tooltip), Agent (state and message), Actions and Jobs.
 
 ## Settings
 

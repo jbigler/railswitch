@@ -239,17 +239,28 @@ func stackText(wt worktree) string {
 	return fmt.Sprintf("%d/%d", active, n)
 }
 
-// serviceLook is a unit state's glyph and class.
-func serviceLook(state string) (string, string) {
+// serviceLook is a service state's glyph, colour class and plain word
+// (the systemd state itself is the row's title).
+func serviceLook(state string) (glyph, class, word string) {
 	switch {
 	case strings.HasPrefix(state, "active/"), state == "running":
-		return "●", "green"
-	case strings.HasPrefix(state, "activating/"), strings.HasPrefix(state, "deactivating/"), strings.HasPrefix(state, "reloading/"):
-		return "◐", "yellow"
+		return "●", "green", "running"
+	case strings.HasPrefix(state, "activating/"):
+		return "◐", "yellow", "starting"
+	case strings.HasPrefix(state, "deactivating/"):
+		return "◐", "yellow", "stopping"
+	case strings.HasPrefix(state, "reloading/"):
+		return "◐", "yellow", "reloading"
 	case strings.HasPrefix(state, "failed/"):
-		return "✗", "red"
+		return "✗", "red", "failed"
+	case state == "on-demand":
+		return "○", "muted", "on demand"
+	case strings.HasPrefix(state, "inactive/"):
+		return "○", "muted", "stopped"
+	case strings.HasPrefix(state, "maintenance/"), strings.HasPrefix(state, "refreshing/"):
+		return "◐", "yellow", "busy"
 	}
-	return "○", "muted"
+	return "○", "muted", "unknown"
 }
 
 // PRs.
@@ -495,7 +506,7 @@ type detailView struct {
 
 type linkView struct{ Label, URL, Class string }
 
-type serviceView struct{ Name, State, Glyph, Class string }
+type serviceView struct{ Name, State, Word, Glyph, Class string }
 
 type agentView struct{ Name, Glyph, Label, Class, Message string }
 
@@ -533,8 +544,8 @@ func newDetail(prefix string, r row) detailView {
 	}
 	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln quiet"})
 	for _, s := range wt.Services {
-		g, c := serviceLook(s.State)
-		v.Services = append(v.Services, serviceView{Name: s.Service, State: s.State, Glyph: g, Class: c})
+		g, c, word := serviceLook(s.State)
+		v.Services = append(v.Services, serviceView{Name: s.Service, State: s.State, Word: word, Glyph: g, Class: c})
 	}
 	if a := wt.Agent; a != nil {
 		kind := agentKind(a)

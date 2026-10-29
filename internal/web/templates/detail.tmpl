@@ -5,7 +5,7 @@
 <div class="lbl">Links</div>
 <div class="links">{{range .Links}}<a class="{{.Class}}" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div>
 <div class="lbl">Services</div>
-<div class="mono services">{{range .Services}}<span class="svc"><span class="{{.Class}}">{{.Glyph}}</span> {{.Name}} <span class="muted">{{.State}}</span></span>{{else}}<span class="muted">none</span>{{end}}</div>
+<div class="services">{{range .Services}}<div class="svc" title="{{.Name}}: {{.State}}"><span class="g {{.Class}}" aria-hidden="true">{{.Glyph}}</span><span class="mono name">{{.Name}}</span><span class="st {{.Class}}">{{.Word}}</span></div>{{else}}<span class="muted">none</span>{{end}}</div>
 <div class="lbl">Agent</div>
 {{with .Agent}}<div><span class="{{.Class}}">{{.Glyph}} {{.Label}}</span> <span class="muted">{{.Name}}</span></div>
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}

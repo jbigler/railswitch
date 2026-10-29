@@ -4,14 +4,20 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/machine"
 )
 
 // TestMain points procRoot at a dir whose net/tcp lists no socket: no test
-// sees the host's listening ports unless it sets some with listening.
+// sees the host's listening ports unless it sets some with listening; and
+// dashboardAddr at a server answering as the dashboard.
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "railswitch-proc")
 	if err != nil {
@@ -21,7 +27,18 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	procRoot = dir
+	// The dashboard's /healthz, as railswitch's answers it: no test asks
+	// the host's port 7700.
+	dash := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != machine.DashboardHost {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		io.WriteString(w, "ok test\n")
+	}))
+	dashboardAddr = strings.TrimPrefix(dash.URL, "http://")
 	code := m.Run()
+	dash.Close()
 	os.RemoveAll(dir)
 	os.Exit(code)
 }

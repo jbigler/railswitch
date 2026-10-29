@@ -61,6 +61,11 @@ ssh -L 7700:127.0.0.1:7700 <the machine running railswitch>
 The local port must be 7700 too, and free there: a dashboard of your own
 on that machine has to be stopped first.
 
+If `railswitch dashboard` says another program answers on
+127.0.0.1:7700, that program has the port and your browser reaches it
+instead (an older dashboard of your own, say). Stop it, then
+`systemctl --user restart railswitch-dashboard`.
+
 ## A first project
 
 In the dashboard, choose **New project**:

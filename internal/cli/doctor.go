@@ -32,7 +32,9 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 			ws, checks = nil, []doctor.Check{doctor.Workspace(err)}
 		}
 	}
-	return e.printChecks(append(checks, doctor.Run(ctx, e.run, ws)...))
+	h := doctor.DefaultHost
+	h.Dashboard = dashboardAddr
+	return e.printChecks(append(checks, h.Run(ctx, e.run, ws)...))
 }
 
 // printChecks prints doctor's checks, as JSON with --json, and returns its

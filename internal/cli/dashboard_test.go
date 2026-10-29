@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -150,5 +152,27 @@ func TestColorsCLI(t *testing.T) {
 	doc = colorsJSON(t)
 	if doc.Light.Base != "flexoki" || len(doc.Light.Overrides) != 0 || doc.Dark.Base != "paper" || len(doc.Warnings.Light) != 0 {
 		t.Errorf("after reset: %+v", doc)
+	}
+}
+
+// TestDashboardPortTaken: another program on the dashboard's port (an
+// older dashboard refusing the host) makes `dashboard` say so and exit 1,
+// after printing the link.
+func TestDashboardPortTaken(t *testing.T) {
+	dashEnv(t)
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "forbidden host", http.StatusForbidden)
+	}))
+	defer other.Close()
+	old := dashboardAddr
+	dashboardAddr = strings.TrimPrefix(other.URL, "http://")
+	defer func() { dashboardAddr = old }()
+	f := &systest.Fake{}
+	f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,UnitFileState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=inactive\nUnitFileState=disabled\n")}, nil)
+	f.On([]string{"systemctl", "--user"}, sys.Result{}, nil)
+	code, out, errs := runWith(t, f, "dashboard")
+	if code != 1 || !strings.HasPrefix(out, "http://railswitch.localhost:7700/login?token=") || strings.Contains(out, "started the dashboard") ||
+		!strings.Contains(errs, `another program answers on 127.0.0.1:7700 (403 "forbidden host")`) || !strings.Contains(errs, "ss -ltnp") {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errs)
 	}
 }

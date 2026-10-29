@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +44,21 @@ func fakeHost() *systest.Fake {
 // host is a Host whose proc/sys files live in a temp dir: the port start
 // file holds portStart, and the quadlet generator and cgroup.controllers
 // exist when present. LookPath finds every binary in found.
+// dashboardServer answers /healthz with code and body; its address.
+func dashboardServer(t *testing.T, code int, body string) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != machine.DashboardHost || r.URL.Path != "/healthz" {
+			http.Error(w, "forbidden host", http.StatusForbidden)
+			return
+		}
+		w.WriteHeader(code)
+		io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return strings.TrimPrefix(srv.URL, "http://")
+}
+
 func host(t *testing.T, portStart string, present bool, found ...string) Host {
 	t.Helper()
 	dir := t.TempDir()
@@ -55,6 +73,7 @@ func host(t *testing.T, portStart string, present bool, found ...string) Host {
 			return "", exec.ErrNotFound
 		},
 	}
+	h.Dashboard = dashboardServer(t, http.StatusOK, "ok v0.1.0\n")
 	if err := os.WriteFile(h.PortStart, []byte(portStart+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +158,7 @@ func names(cs []Check) []string {
 
 var hostChecks = []string{
 	"podman >= 5.0", "quadlet generator", "podman.socket active", "unprivileged port 80",
-	"nft", "nsenter", "getent", "jq", "curl", "ssh-keygen -Y", "dashboard enabled", "user services outlive logout", "machine subnet free", "networks isolated",
+	"nft", "nsenter", "getent", "jq", "curl", "ssh-keygen -Y", "dashboard enabled", "dashboard answers", "user services outlive logout", "machine subnet free", "networks isolated",
 }
 
 func TestAllOK(t *testing.T) {
@@ -183,6 +202,7 @@ func TestAllFail(t *testing.T) {
 	inspect(f, "filial_proxy", `"mtu": "1400"`)
 	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{}, fmt.Errorf("ssh-keygen: %w", exec.ErrNotFound))
 	h := host(t, "1024", false)
+	h.Dashboard = dashboardServer(t, http.StatusForbidden, "forbidden host\n")
 
 	got := h.Run(context.Background(), f, ws)
 	if len(got) != len(hostChecks)+8 {
@@ -521,5 +541,25 @@ func TestDashboardLingerWarn(t *testing.T) {
 		if c.OK || !c.Warn || c.Fix == "" || c.Detail == "" {
 			t.Errorf("%+v", c)
 		}
+	}
+}
+
+// TestDashboardAnswers: only railswitch's /healthz passes; another program
+// on the port (an older dashboard refusing the host) and nothing at all
+// are each a warning with what to do.
+func TestDashboardAnswers(t *testing.T) {
+	h := host(t, "80", true)
+	if c := h.dashboardAnswers(context.Background()); !c.OK || c.Detail != "railswitch dashboard v0.1.0" {
+		t.Errorf("ours: %+v", c)
+	}
+	h.Dashboard = dashboardServer(t, http.StatusForbidden, "forbidden host\n")
+	c := h.dashboardAnswers(context.Background())
+	if c.OK || !c.Warn || !strings.Contains(c.Detail, `another program answers on 127.0.0.1:7700 (403 "forbidden host")`) || !strings.Contains(c.Fix, "ss -ltnp") {
+		t.Errorf("another program: %+v", c)
+	}
+	h.Dashboard = "127.0.0.1:1"
+	c = h.dashboardAnswers(context.Background())
+	if c.OK || !strings.Contains(c.Detail, "nothing answers") || !strings.Contains(c.Fix, "journalctl") {
+		t.Errorf("nothing: %+v", c)
 	}
 }

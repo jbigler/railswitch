@@ -45,6 +45,7 @@ type Host struct {
 	Quadlet   []string // podman's quadlet generator: the first that exists
 	Cgroup    string   // cgroup v2's root cgroup.controllers
 	LookPath  func(name string) (string, error)
+	Dashboard string // the dashboard's address, asked for /healthz
 }
 
 // DefaultHost is this machine.
@@ -53,6 +54,7 @@ var DefaultHost = Host{
 	Quadlet:   podman.QuadletPaths,
 	Cgroup:    "/sys/fs/cgroup/cgroup.controllers",
 	LookPath:  exec.LookPath,
+	Dashboard: machine.DashboardAddr,
 }
 
 // minPodman is the oldest podman major version railswitch supports.
@@ -74,7 +76,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, sshKeygen(ctx, r), dashboard(ctx, r), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
+	out = append(out, sshKeygen(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
 	}
@@ -155,6 +157,18 @@ func dashboard(ctx context.Context, r sys.Runner) Check {
 	c.Detail = state
 	if c.Detail == "" && err != nil {
 		c.Detail = err.Error()
+	}
+	return c
+}
+
+// dashboardAnswers warns unless railswitch's dashboard answers at its
+// address: another program on the port (an older dashboard) gets the
+// browser instead, and railswitch's can't start.
+func (h Host) dashboardAnswers(ctx context.Context) Check {
+	p := machine.ProbeDashboard(ctx, h.Dashboard)
+	c := Check{Name: "dashboard answers", Warn: true, OK: p.Ours, Detail: p.String()}
+	if !p.Ours {
+		c.Fix = p.Fix()
 	}
 	return c
 }

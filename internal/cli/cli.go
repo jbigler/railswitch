@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/buildinfo"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -28,6 +29,10 @@ type env struct {
 // procRoot is the procfs root machine.Listening reads the host's listening
 // TCP ports from; tests point it elsewhere.
 var procRoot = "/proc"
+
+// dashboardAddr is where `dashboard` and `doctor` ask for the dashboard's
+// /healthz; tests point it at their own server.
+var dashboardAddr = machine.DashboardAddr
 
 type command func(ctx context.Context, e *env, args []string) int
 

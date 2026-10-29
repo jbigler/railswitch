@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/dashconf"
 	"github.com/jbigler/railswitch/internal/machine"
@@ -64,15 +65,42 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 		fmt.Fprintf(e.stderr, "railswitch: dashboard state unknown: %v\n", err)
 		return 0
 	}
-	if props["ActiveState"] == "active" && props["UnitFileState"] == "enabled" {
-		return 0
+	started := false
+	if props["ActiveState"] != "active" || props["UnitFileState"] != "enabled" {
+		if err := sd.EnableNow(ctx, machine.DashboardService); err != nil {
+			fmt.Fprintf(e.stderr, "railswitch: starting the dashboard: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
+			return 0
+		}
+		started = true
 	}
-	if err := sd.EnableNow(ctx, machine.DashboardService); err != nil {
-		fmt.Fprintf(e.stderr, "railswitch: starting the dashboard: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
-		return 0
+	// A started unit isn't a dashboard that answers: another program on
+	// its port (an older dashboard) gets the browser, and this one fails.
+	if p := waitDashboard(ctx); !p.Ours {
+		fmt.Fprintf(e.stderr, "railswitch: the link won't open the dashboard: %s\nnext: %s\n", p, p.Fix())
+		return 1
 	}
-	fmt.Fprintln(e.stdout, "started the dashboard; it starts at every login from now on")
+	if started {
+		fmt.Fprintln(e.stdout, "started the dashboard; it starts at every login from now on")
+	}
 	return 0
+}
+
+// waitDashboard probes the dashboard until it answers, for a few seconds
+// while nothing does (a unit just started); another program's answer is
+// final.
+func waitDashboard(ctx context.Context) machine.Probe {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		p := machine.ProbeDashboard(ctx, dashboardAddr)
+		if p.Ours || p.Other != "" || !time.Now().Before(deadline) {
+			return p
+		}
+		select {
+		case <-ctx.Done():
+			return p
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
 
 // colorsMode is one mode of `dashboard colors --json` (docs/json.md).

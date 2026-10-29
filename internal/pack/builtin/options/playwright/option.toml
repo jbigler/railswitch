@@ -44,9 +44,9 @@ name = "vnc"
 host = "vnc.{worktree.host}"
 port = 8080
 
-[[links]]
+[[links]]                     # noVNC's viewer, connected at once (its root is a file listing)
 label = "Browser (VNC)"
-url = "vnc.{worktree.host}"
+url = "vnc.{worktree.host}/vnc.html?autoconnect=1&resize=scale"
 
 [unit]
 add_capability = ["NET_ADMIN", "NET_RAW"]   # for its own firewall (D34)

@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -541,6 +542,50 @@ func TestRenderKeepsDashboardExe(t *testing.T) {
 		}
 		if data, _ := os.ReadFile(path); string(data) != string(machine.DashboardUnit("/opt/rs/railswitch")) {
 			t.Errorf("an unsafe or missing railswitch was kept:\n%s", data)
+		}
+	}
+}
+
+// TestRenderAddsNoNetworkWaitToOlderUnits (D130): a render gives a
+// registered project's older unit the [Quadlet] section and reports it
+// changed; an unregistered prefix's unit (a project being removed) stays.
+func TestRenderAddsNoNetworkWaitToOlderUnits(t *testing.T) {
+	ctx := context.Background()
+	w, f, dirs := dashboardWS(t)
+	reg, err := machine.Open(dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.AddProject("shop", t.TempDir(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reg.Close()
+	if err := os.MkdirAll(w.Dirs.Quadlet, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := map[string]string{
+		"shop-proxy.network": machine.Marker + "/x/shop/project.toml (prefix shop). Edit project.toml, not this file.\n\n[Network]\n",
+		"gone-proxy.network": machine.Marker + "/x/gone/project.toml (prefix gone). Edit project.toml, not this file.\n\n[Network]\n",
+	}
+	for n, s := range old {
+		if err := os.WriteFile(filepath.Join(w.Dirs.Quadlet, n), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := w.Render(ctx, f, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(d.Changed, "shop-proxy.network") || slices.Contains(d.Changed, "gone-proxy.network") || !slices.IsSorted(d.Changed) {
+		t.Errorf("changed %q", d.Changed)
+	}
+	for n, s := range old {
+		data, _ := os.ReadFile(filepath.Join(w.Dirs.Quadlet, n))
+		if want := strings.HasPrefix(n, "shop"); bytes.HasSuffix(data, []byte(machine.NoNetworkWaitSection)) != want || !bytes.HasPrefix(data, []byte(s)) {
+			t.Errorf("%s = %q", n, data)
 		}
 	}
 }

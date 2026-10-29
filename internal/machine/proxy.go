@@ -173,22 +173,24 @@ func NoNetworkWait(unit []byte) []byte {
 }
 
 // AddNoNetworkWait appends NoNetworkWaitSection to every Quadlet unit in
-// dir that railswitch rendered (line 1 is its Marker) and that lacks it:
-// a unit written before D130, of any project, which a render of its own
-// project would rewrite but that Traefik may start first (it requires
-// every project's proxy network). It returns the files it changed.
-func AddNoNetworkWait(dir string) ([]string, error) {
+// dir whose line 1 ours accepts (a railswitch unit of a registered project
+// or of the machine) and that lacks it: a unit written before D130, which
+// a render of its own project would rewrite but that Traefik may start
+// first (it requires every project's proxy network). It returns the files
+// it changed and, as warnings, the ones it could not: this is a
+// convenience, never a reason for a render to fail. A file gone meanwhile
+// (another project's `project rm`) is skipped.
+func AddNoNetworkWait(dir string, ours func(line1 string) bool) (changed, warnings []string) {
 	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, fs.ErrNotExist) {
+			warnings = append(warnings, err.Error())
+		}
+		return nil, warnings
 	}
-	var changed []string
 	for _, e := range entries {
 		switch filepath.Ext(e.Name()) {
-		case ".container", ".network", ".volume", ".pod", ".kube", ".build", ".image":
+		case ".container", ".network", ".volume":
 		default:
 			continue
 		}
@@ -197,18 +199,24 @@ func AddNoNetworkWait(dir string) ([]string, error) {
 		}
 		path := filepath.Join(dir, e.Name())
 		data, err := os.ReadFile(path)
-		if err != nil {
-			return changed, err
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
 		}
-		if !bytes.HasPrefix(data, []byte(Marker)) || bytes.HasSuffix(data, []byte(NoNetworkWaitSection)) {
+		if err != nil {
+			warnings = append(warnings, err.Error())
+			continue
+		}
+		line1, _, _ := bytes.Cut(data, []byte("\n"))
+		if !bytes.HasPrefix(data, []byte(Marker)) || !ours(string(line1)) || bytes.HasSuffix(data, []byte(NoNetworkWaitSection)) {
 			continue
 		}
 		if err := tomlfile.WriteAtomic(path, NoNetworkWait(data), 0o644); err != nil {
-			return changed, err
+			warnings = append(warnings, err.Error())
+			continue
 		}
 		changed = append(changed, e.Name())
 	}
-	return changed, nil
+	return changed, warnings
 }
 
 // NoNetworkWaitSection is what NoNetworkWait appends.

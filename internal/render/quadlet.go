@@ -106,6 +106,13 @@ func markerLine(m *Model, slug string) string {
 // markerScope is the last parenthesised group of the marker line.
 var markerScope = regexp.MustCompile(`\(([^()]*)\)[^()]*$`)
 
+// UnitOwner reads a unit's line 1 (parseMarker): ok, it is a railswitch
+// unit of the machine or of project prefix.
+func UnitOwner(line string) (prefix string, machine, ok bool) {
+	prefix, _, machine, ok = parseMarker(line)
+	return prefix, machine, ok
+}
+
 // parseMarker reads a unit's line 1. ok: it is a railswitch marker; machine:
 // a machine-wide unit; else the unit's project prefix and worktree slug (""
 // for a project-wide unit).

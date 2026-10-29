@@ -232,26 +232,32 @@ func TestDozzleUnitHashReadOnly(t *testing.T) {
 	}
 }
 
-// TestAddNoNetworkWait: a railswitch unit without the [Quadlet] section
-// gets it once; one with it, another program's unit and a non-unit file
-// are left alone.
+// TestAddNoNetworkWait: a railswitch unit ours accepts, without the
+// [Quadlet] section, gets it once; one with it, one ours refuses (an
+// unregistered prefix), another program's unit, a non-unit file and a
+// symlink are left alone; an unreadable file is a warning, not a stop.
 func TestAddNoNetworkWait(t *testing.T) {
 	dir := t.TempDir()
 	files := map[string]string{
-		"old-proxy.network": machine.Marker + "x (prefix old).\n\n[Network]\nNetworkName=old_proxy\n",
-		"new-proxy.network": string(machine.NoNetworkWait([]byte(machine.Marker + "x (prefix new).\n\n[Network]\n"))),
-		"mine.container":    "[Container]\nImage=x\n",
-		"notes.txt":         machine.Marker + "x\n",
+		"old-proxy.network":  machine.Marker + "x (prefix old).\n\n[Network]\nNetworkName=old_proxy\n",
+		"gone-proxy.network": machine.Marker + "x (prefix gone).\n\n[Network]\n",
+		"new-proxy.network":  string(machine.NoNetworkWait([]byte(machine.Marker + "x (prefix new).\n\n[Network]\n"))),
+		"mine.container":     "[Container]\nImage=x\n",
+		"notes.txt":          machine.Marker + "x\n",
 	}
 	for n, s := range files {
 		if err := os.WriteFile(filepath.Join(dir, n), []byte(s), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
+	if err := os.Symlink(filepath.Join(dir, "gone-proxy.network"), filepath.Join(dir, "link.network")); err != nil {
+		t.Fatal(err)
+	}
+	ours := func(line1 string) bool { return !strings.Contains(line1, "prefix gone") }
 	for i, want := range [][]string{{"old-proxy.network"}, nil} {
-		got, err := machine.AddNoNetworkWait(dir)
-		if err != nil || !slices.Equal(got, want) {
-			t.Errorf("run %d: %q, %v; want %q", i, got, err, want)
+		got, warns := machine.AddNoNetworkWait(dir, ours)
+		if !slices.Equal(got, want) || len(warns) != 0 {
+			t.Errorf("run %d: %q, %q; want %q", i, got, warns, want)
 		}
 	}
 	for n, s := range files {
@@ -264,7 +270,16 @@ func TestAddNoNetworkWait(t *testing.T) {
 			t.Errorf("%s = %q; want %q", n, data, want)
 		}
 	}
-	if got, err := machine.AddNoNetworkWait(filepath.Join(dir, "none")); got != nil || err != nil {
-		t.Errorf("missing dir: %q, %v", got, err)
+	if os.Getuid() != 0 {
+		bad := filepath.Join(dir, "bad.container")
+		if err := os.WriteFile(bad, []byte(machine.Marker+"x (prefix old).\n"), 0o000); err != nil {
+			t.Fatal(err)
+		}
+		if got, warns := machine.AddNoNetworkWait(dir, ours); len(got) != 0 || len(warns) != 1 {
+			t.Errorf("unreadable file: %q, %q; want one warning", got, warns)
+		}
+	}
+	if got, warns := machine.AddNoNetworkWait(filepath.Join(dir, "none"), ours); got != nil || warns != nil {
+		t.Errorf("missing dir: %q, %q", got, warns)
 	}
 }

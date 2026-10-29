@@ -936,6 +936,10 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 			return nil, fmt.Errorf("db_name: %q is not a valid database name (%s)", r.Value, version.ValidDBName)
 		}
 		v["db"] = r.Value
+		v["db_path"] = "/" + r.Value
+		if pk.DBURLName != nil && !*pk.DBURLName {
+			v["db_path"] = ""
+		}
 	}
 
 	for _, s := range m.Services {

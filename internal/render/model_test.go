@@ -199,7 +199,7 @@ func TestLayerPrecedence(t *testing.T) {
 func TestMariaDB(t *testing.T) {
 	_, in := filial(t, func(p *config.Project) { p.Options["database"] = "mariadb@1"; p.Versions["mariadb"] = "11.4" })
 	e, _ := envVar(in, "rails", "DATABASE_URL")
-	if e.Value != "mysql2://root:s3cret@db/filial_dev" {
+	if e.Value != "mysql2://root:s3cret@db" { // rails: database.yml names it per environment
 		t.Errorf("rails DATABASE_URL = %q", e.Value)
 	}
 	if v, _ := envVar(in, "db", "MARIADB_ROOT_PASSWORD"); v.Value != "s3cret" {
@@ -213,7 +213,9 @@ func TestMariaDB(t *testing.T) {
 func TestDatabaseURL(t *testing.T) {
 	_, in := filial(t, nil)
 	e, _ := envVar(in, "rails", "DATABASE_URL")
-	if e.Value != "postgres://postgres:s3cret@db/filial_dev" {
+	// The rails pack leaves the name out (db_url_name = false): database.yml
+	// names it per environment, so tests never get development's database.
+	if e.Value != "postgres://postgres:s3cret@db" {
 		t.Errorf("rails DATABASE_URL = %q", e.Value)
 	}
 	if e.Layer != LayerOption {
@@ -1223,7 +1225,8 @@ func TestPhoenixFixtureResolves(t *testing.T) {
 	if v, ok := envVar(i, "web", "PGDATABASE"); !ok || v.Value != "phx_dev" {
 		t.Errorf("PGDATABASE = %+v", v)
 	}
-	if v, ok := envVar(i, "web", "DATABASE_URL"); !ok || !strings.HasPrefix(v.Value, "ecto://") {
+	// A pack without db_url_name keeps the database name in the URL.
+	if v, ok := envVar(i, "web", "DATABASE_URL"); !ok || !strings.HasPrefix(v.Value, "ecto://") || !strings.HasSuffix(v.Value, "@db/"+i.Values["db"]) {
 		t.Errorf("DATABASE_URL = %+v", v)
 	}
 	if args := i.Builds[0].Args; args["ELIXIR_VERSION"] != "1.18.4" || args["OTP_MAJOR"] != "27" {

@@ -191,8 +191,12 @@ func TestNewDryRunSummary(t *testing.T) {
 	}
 
 	up := dryRun(t, gitHost(), ws, "--repo", gh, "--prefix", "shop", "--branch", "main", "--up")
-	if len(up.Steps) != 5 || up.Steps[4] != "Start main (up)" {
+	if len(up.Steps) != 5 || up.Steps[4] != "Leave main stopped: start it once its secrets are set (claude_token, github_token)" {
 		t.Errorf("--up steps = %q", up.Steps)
+	}
+	noSecrets := dryRun(t, gitHost(), ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main", "--agent", "none", "--up")
+	if n := len(noSecrets.Steps); n != 5 || noSecrets.Steps[n-1] != "Start main (up)" {
+		t.Errorf("--up steps without secrets = %q", noSecrets.Steps)
 	}
 }
 
@@ -234,6 +238,15 @@ func TestNewUp(t *testing.T) {
 	}
 	if !started(f) || !strings.Contains(out, "created workspace") || !strings.Contains(out, "http://main.shop.localhost") {
 		t.Errorf("started %v, stdout:\n%s", started(f), out)
+	}
+
+	// A project with secrets to set is created and left stopped: up would
+	// refuse them.
+	f = gitHost()
+	ws = filepath.Join(t.TempDir(), "pay")
+	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "pay", "--up")
+	if code != 0 || started(f) || !strings.Contains(out, "not started: main needs its secrets first") || !strings.Contains(out, "next: railswitch secret set claude_token") {
+		t.Errorf("new --up with secrets: exit %d, started %v\n%s%s", code, started(f), out, errs)
 	}
 
 	// A created project whose up fails exits 3 and says it was created.

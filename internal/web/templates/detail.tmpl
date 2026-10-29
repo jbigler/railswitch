@@ -13,3 +13,18 @@
 {{end}}<div class="lbl">Actions</div>
 <div class="actions">{{range .Actions}}<form method="post" action="{{.URL}}" data-post><button class="ln">{{.Label}}</button></form>{{end}}{{if .RemoveURL}}<span class="gap"></span><a class="ln danger" href="{{.RemoveURL}}" data-dialog="remove">remove…</a>{{if .Merged}}<a class="ln danger" href="{{.RemoveURL}}" data-dialog="remove">Remove worktree</a>{{end}}{{end}}</div>
 {{end}}</section>{{end}}
+
+{{/* The project's unset secrets: up refuses them. Each value goes only to
+a secret set job's stdin; Start waits for the last one. */}}
+{{define "secrets-needed"}}<section id="secrets-needed" class="card secrets-needed">
+<h2 data-todo>Set these secrets to start {{.Base}}</h2>
+<h2 data-done hidden>All secrets are set</h2>
+<p class="note" data-todo>up refuses a secret that isn't set. Each value goes only to the job that stores it in podman's secret store.</p>
+<table class="set-table">
+<tbody>
+{{range .Unset}}<tr class="secret"><td class="mono">{{.Name}}</td><td class="mono">{{.Services}}</td><td class="mono">{{.Delivery}}</td>
+<td><form method="post" action="{{$.SecretURL}}" class="secret-form" data-secret-needed><input type="hidden" name="name" value="{{.Name}}"><input type="password" name="value" required autocomplete="off" placeholder="value" aria-label="Value of {{.Name}}"><button class="ln">Set value</button></form></td></tr>
+{{end}}</tbody>
+</table>
+{{if .StartURL}}<form method="post" action="{{.StartURL}}" data-start-base data-base="{{.Base}}"><button class="ln main" disabled>Start {{.Base}}</button></form>{{end}}
+</section>{{end}}

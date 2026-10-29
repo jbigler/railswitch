@@ -987,9 +987,14 @@ The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,
 never saved. Without `--json`, the dry run prints the same content as text.
 
-`project new --up` (without `--dry-run`) exits 3 when the project was
-created and registered but `up` failed: stderr says so and names the
-command to retry. Exit 1 means the project was not created.
+`project new --up` (without `--dry-run`) runs `up` only when the project
+declares no secret: a new project's secrets are all unset, which `up`
+refuses. With secrets it prints `not started: <slug> needs its secrets
+first` and the `secret set` commands, and exits 0; the dry run's last
+step says so ("Leave <slug> stopped: start it once its secrets are set
+(<names>)"). It exits 3 when the project was created and registered but
+`up` failed: stderr says so and names the command to retry. Exit 1 means
+the project was not created.
 
 ## `doctor`
 

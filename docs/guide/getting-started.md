@@ -98,7 +98,10 @@ Like the page, it reads the repository for the pack and options and says
 what it found ("detected database mariadb@1 (Gemfile: mysql2)"). An
 `--option slot=ref` you give wins over a detected one; `--pack` or
 `--template` skips the reading, and `--no-detect` takes the pack's
-defaults.
+defaults. A project that needs secrets (a `github_token`, an agent's
+token) is created but not started, since `up` refuses a secret that
+isn't set: set them (below, or on the project page in the dashboard),
+then `railswitch up`.
 
 The app answers at `http://main.shop.localhost/` (the branch name, then the
 prefix). The dashboard's project page shows every container, the links the

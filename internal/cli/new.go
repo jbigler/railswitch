@@ -69,7 +69,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
 	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
-	up := fset.Bool("up", false, "run up in the base worktree once it is created (exit 3: created, up failed)")
+	up := fset.Bool("up", false, "run up in the base worktree once it is created and has no secret to set (exit 3: created, up failed)")
 	tplRef := fset.String("template", "", "start from the template `ref` (template ls): its lines, the answers, then the other flags on top")
 	noDetect := fset.Bool("no-detect", false, "don't read the repository for the pack and options: the pack's defaults")
 	var opts, tools, agentFlags, answerFlags stringList
@@ -177,8 +177,12 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "created workspace %s: project %s, base worktree %s (ID %d)\n", ws, *prefix, slug, id)
 	fmt.Fprintf(e.stdout, "the workspace is a git repo: commit project.toml, stack.lock and containerfiles/ (git -C %s add -A && git -C %s commit)\n", shellQuote(ws), shellQuote(ws))
-	e.printNext(ws, slug, secrets)
-	if !*up {
+	if *up && len(secrets) > 0 {
+		// up refuses an unset secret, and a new project's are all unset.
+		fmt.Fprintf(e.stdout, "not started: %s needs its secrets first\n", slug)
+	}
+	if !*up || len(secrets) > 0 {
+		e.printNext(ws, slug, secrets)
 		return 0
 	}
 	e.dir, e.slug = filepath.Join(ws, slug), slug

@@ -592,6 +592,43 @@ function fileSaved(state, conflict) {
   else toast("project.toml was not written. The output is below.", true);
 }
 
+// The project page's unset secrets: each one set leaves the card; Start
+// waits for the last, and the card goes once the base worktree is up.
+if (view === "") {
+  document.addEventListener("submit", async (e) => {
+    const f = e.target;
+    const card = f.closest("#secrets-needed");
+    if (!card) return;
+    e.preventDefault();
+    const data = new URLSearchParams(new FormData(f));
+    if (f.matches("form[data-secret-needed]")) {
+      f.reset(); // the value leaves the page at once
+      startJob(f.action, data, (state) => {
+        if (state !== "ok") return toast("The secret was not stored. Its output is below.", true);
+        f.closest("tr").remove();
+        if ($("form[data-secret-needed]", card)) return;
+        $$("[data-todo]", card).forEach((x) => (x.hidden = true));
+        $("[data-done]", card).hidden = false;
+        const start = $("form[data-start-base] button", card);
+        if (start) start.disabled = false;
+      });
+    } else if (f.matches("form[data-start-base]")) {
+      const btn = $("button", f);
+      btn.disabled = true;
+      // The job is the base worktree's: its jobs list shows when it ends.
+      if (body.dataset.sel !== f.dataset.base) select(f.dataset.base, true);
+      const started = await startJob(f.action, data, (state) => {
+        if (state === "ok") card.remove();
+        else {
+          toast("up " + state + ". Its output is below.", true);
+          btn.disabled = false;
+        }
+      });
+      if (!started) btn.disabled = false;
+    }
+  });
+}
+
 // Add buttons wait for their required fields.
 function addReady(f) {
   $("button", f).disabled = $$("input[required]", f).some((i) => !i.value.trim());

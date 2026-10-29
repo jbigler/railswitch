@@ -336,6 +336,33 @@ type pageView struct {
 	List                     listView
 	Detail                   detailView
 	Jobs                     jobsView
+	Secrets                  *secretsCard // nil: every secret is set
+}
+
+// secretsCard asks for the project's unset secrets, which up refuses, and
+// then starts the base worktree.
+type secretsCard struct {
+	Base, SecretURL, StartURL string
+	Unset                     []secretView
+}
+
+// newSecretsCard is the card for secrets, nil when all are set.
+func newSecretsCard(prefix string, rows []rowView, secrets []secretRow) *secretsCard {
+	c := &secretsCard{SecretURL: settingsURL(prefix) + "/secret"}
+	for _, sec := range secrets {
+		if !sec.Set {
+			c.Unset = append(c.Unset, secretView{Name: sec.Name, Services: strings.Join(sec.Services, ", "), Delivery: sec.Delivery})
+		}
+	}
+	if len(c.Unset) == 0 {
+		return nil
+	}
+	for _, r := range rows {
+		if r.Base {
+			c.Base, c.StartURL = r.Slug, "/p/"+prefix+"/"+r.Slug+"/act/up"
+		}
+	}
+	return c
 }
 
 // title is the tab title: the count of agents needing input.

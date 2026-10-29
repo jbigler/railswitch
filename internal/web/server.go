@@ -275,6 +275,10 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	pv := s.pageData(p.Prefix, wt.Slug, k)
 	s.mu.Unlock()
+	// Read once per page: a secret that can't be read shows no card.
+	if secrets, err := readSecrets(r.Context(), s.c.CLI, p.Workspace); err == nil {
+		pv.Secrets = newSecretsCard(p.Prefix, pv.List.Rows, secrets)
+	}
 	s.html(w, http.StatusOK, "page", pv)
 }
 

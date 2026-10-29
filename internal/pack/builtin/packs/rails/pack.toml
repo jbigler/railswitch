@@ -42,6 +42,7 @@ fallback = "{project.prefix}_development"
 RAILS_ENV = "development"
 BINDING = "0.0.0.0"
 RUBY_DEBUG_HOST = "0.0.0.0"  # the debug port is published, so the debug gem listens on every container address
+COREPACK_HOME = "/home/appuser/.corepack" # the shared corepack cache ([[caches]] corepack)
 # Rails' development host check allows only one subdomain under .localhost, so
 # it answers 403 for <slug>.<prefix>.localhost unless the host is added here.
 RAILS_DEVELOPMENT_HOSTS = "{worktree.host}"
@@ -65,8 +66,8 @@ mount = "/home/appuser/.npm"
 chown = true
 
 [[caches]]                 # corepack's yarn and pnpm: deps fetches the version package.json names
-name = "corepack"          # (its `yarn --version`), the app reuses it without the network (D119)
-mount = "/home/appuser/.cache/node/corepack"
+name = "corepack"          # (its `yarn --version`), the app reuses it without the network (D119);
+mount = "/home/appuser/.corepack" # not under ~/.cache: the runtime would make its parents root's
 chown = true
 
 [[worktree_volumes]]       # per worktree: <prefix>-<slug>-<name>

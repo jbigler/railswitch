@@ -311,7 +311,7 @@ func TestDepsGetsNoSecrets(t *testing.T) {
 		}
 	}
 	// D11, D44: the pack layer, options' [deps_env] and [services.deps.env] only.
-	want := []string{"BINDING", "BUNDLE_FROZEN", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
+	want := []string{"BINDING", "BUNDLE_FROZEN", "COREPACK_HOME", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
 	if !slices.Equal(names, want) {
 		t.Errorf("deps env = %v; want %v", names, want)
 	}

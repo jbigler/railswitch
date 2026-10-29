@@ -5,7 +5,7 @@
 Description=filial nvim of worktree feat
 
 [Container]
-Label=filial.unit-hash=6405bd8ca5c0
+Label=filial.unit-hash=6e5c4e496d0b
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-8b570477
 ContainerName=filial-feat-nvim
 Network=filial-feat-dev.network:alias=nvim
@@ -27,7 +27,7 @@ Volume=/WORKSPACES/filial/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh
 Volume=filial-feat-node-modules:/app/node_modules:U
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
-Volume=filial_corepack:/home/appuser/.cache/node/corepack:U
+Volume=filial_corepack:/home/appuser/.corepack:U
 Volume=filial_nvim_config:/home/appuser/.config/nvim:U
 Volume=filial_nvim_share:/home/appuser/.local/share/nvim:U
 Volume=filial_npm_global_node22.11.0:/home/appuser/.npm-global:U

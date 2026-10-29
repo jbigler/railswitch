@@ -19,3 +19,4 @@ have none (`log`, now with the `app` profile).
 | The rails pack gains a `corepack` cache; Mastodon's review shows `rails@1` changed, 0 flagged; accepted | PASS |
 | `repo.yarnpkg.com` removed from `allow.app` through Settings, restarted: Vite "ready in 1169 ms", `/`, `/about`, `/explore` 200, nothing rejected under enforce; volume `masto_corepack` holds the Yarn deps fetched | PASS |
 | Removing the last host of a list removes the line (no `allow.app = []` left) | PASS |
+| Review: the first mount, under `~/.cache/node/`, left `~/.cache` root-owned in the container (the runtime made the parents), so nothing else could write there. Moved to `~/.corepack` with `COREPACK_HOME`: `~/.cache` is absent, the user can create it; Vite ready, 200, nothing rejected | PASS |

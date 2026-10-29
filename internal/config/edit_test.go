@@ -691,4 +691,14 @@ func TestSetAgentSetup(t *testing.T) {
 	if _, err := SetAgentSetup(base, "claude", []string{"-rf /"}); err == nil {
 		t.Error("a command starting with - was accepted")
 	}
+	// An agent written inline or as dotted keys is refused, not mangled.
+	for _, text := range []string{
+		"schema = 1\n\n[agents]\nclaude = { use = \"claude@1\" }\n",
+		"schema = 1\n\n[agents]\nclaude.use = \"claude@1\"\n",
+	} {
+		var be *BlockedError
+		if _, err := SetAgentSetup(text, "claude", []string{"x"}); !errors.As(err, &be) {
+			t.Errorf("%q: %v; want a BlockedError", text, err)
+		}
+	}
 }

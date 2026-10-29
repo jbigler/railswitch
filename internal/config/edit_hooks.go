@@ -67,11 +67,30 @@ func SetAgentSetup(data, name string, cmds []string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("project.toml: %w", err)
 	}
+	// Only a plain [agents.<name>] table with plain keys: an agent written
+	// inline (agents = { … }) or as dotted keys can't take an inserted key.
+	table := []string{"agents", name}
+	plain := false
+	for _, s := range d.stmts {
+		if len(s.path) < 2 || s.path[0] != "agents" || s.path[1] != name {
+			continue
+		}
+		switch {
+		case s.header && !s.array && len(s.path) == 2:
+			plain = true
+		case s.header:
+		case len(s.table) == 2 && len(s.key) == 1:
+		default:
+			return "", &BlockedError{d.line(s.start), "agents." + name + " is not a plain table with plain keys (an inline table or a dotted key): edit project.toml"}
+		}
+	}
+	if !plain {
+		return "", &BlockedError{1, "agents." + name + " has no [agents." + name + "] table (it is written inline or as dotted keys): edit project.toml"}
+	}
 	q := make([]string, len(cmds))
 	for i, c := range cmds {
 		q[i] = QuoteString(c)
 	}
-	table := []string{"agents", name}
 	s := d.find(table, "setup")
 	switch {
 	case s != nil && len(cmds) == 0:

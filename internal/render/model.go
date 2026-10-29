@@ -627,8 +627,7 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 	if err := b.entrypoint(&s, pkg, ag.Files, ag.Entrypoint); err != nil {
 		return s, err
 	}
-	b.agentSetup(&s, a.Name, b.in.Project.Agents[a.Name].Setup)
-	return s, nil
+	return s, b.agentSetup(&s, a.Name, b.in.Project.Agents[a.Name].Setup)
 }
 
 // asset lists the package file rel of pkg as a Model.Assets entry and returns
@@ -995,7 +994,11 @@ func SecretName(prefix, name string, s config.Secret) string {
 func (in *Instance) SecretSpecs(svc string) []string {
 	p := in.m.Inputs.Project
 	var specs []string
-	ghToken := false // GH_TOKEN delivered already
+	// GH_TOKEN for gh, which only the agent image has: not when the agent
+	// gets one already, from a secret or its env (which of an env file and
+	// an env secret wins is not something to rely on).
+	agent := slices.ContainsFunc(in.m.Services, func(s Service) bool { return s.ID == svc && s.Role == RoleAgent })
+	ghToken := !agent || slices.ContainsFunc(in.Env[svc], func(e EnvVar) bool { return e.Name == "GH_TOKEN" })
 	for _, name := range sortedKeys(p.Secrets) {
 		if p.Secrets[name].Env == "GH_TOKEN" && slices.Contains(p.Secrets[name].Services, svc) {
 			ghToken = true
@@ -1013,8 +1016,9 @@ func (in *Instance) SecretSpecs(svc string) []string {
 		}
 		specs = append(specs, spec+",type=mount,target=/run/secrets/"+name+",uid=1000,gid=1000,mode=0400")
 		// gh reads its token from GH_TOKEN, not git's credential helper: a
-		// github.com secret also reaches it there, as podman's env secret
-		// (never an env file, D33). The first one wins (D133).
+		// github.com secret an agent receives also reaches it there, as
+		// podman's env secret (never an env file, D33). The first one wins
+		// (D133).
 		if sec.GitHost == "github.com" && !ghToken {
 			specs = append(specs, spec+",type=env,target=GH_TOKEN")
 			ghToken = true

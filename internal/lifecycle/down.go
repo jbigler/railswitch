@@ -5,13 +5,16 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/jbigler/railswitch/internal/render"
 )
 
 // Down stops worktree slug and removes its containers and per-worktree
 // volumes, by exact name, after a confirmation that defaults to No (yes
 // skips it; without a terminal it refuses). A shared worktree's tailnet
 // ports are turned off first (DropShare). Shared "<prefix>_…" volumes and
-// images are never touched.
+// images are never touched. The worktree's [hooks] create run again on its
+// next up (render.MarkCreatePending).
 func (l *L) Down(ctx context.Context, slug string, yes bool) error {
 	m, err := l.model(ctx)
 	if err != nil {
@@ -49,5 +52,7 @@ func (l *L) Down(ctx context.Context, slug string, yes bool) error {
 			return err
 		}
 	}
-	return nil
+	// Its data starts over as a new worktree's does: the next up runs the
+	// [hooks] create commands again (a test database, say).
+	return render.MarkCreatePending(m.Inputs.Workspace, slug)
 }

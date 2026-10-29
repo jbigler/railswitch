@@ -46,7 +46,7 @@ create = ["bin/rails runner 'Admin.create_default!'"]
 |---|---|---|
 | `deps` | deps (the one container that reaches the package registries) | after its installs, on every app start |
 | `start` | the app | before its server, on every app start |
-| `create` | the running app | once per new worktree, after its first `up` is ready |
+| `create` | the running app | once per new worktree, after its first `up` is ready, and again after a `down` |
 
 - Each command runs in its own `sh -ec` in `/app`, the worktree, in
   order; one that fails stops the rest. A failing `deps` or `start` hook
@@ -64,8 +64,10 @@ create = ["bin/rails runner 'Admin.create_default!'"]
   they install is there for the app, `exec` and the editor too: a test
   watcher, `ruby-lsp`. Write them to check first, as above, so a start
   doesn't fetch every time.
-- `create` hooks run only for worktrees added after you add them, never
-  for the ones you have.
+- `create` hooks run only for worktrees added after you add them, and
+  for a worktree after `railswitch down` (which deletes its data, so the
+  next `up` sets it up again, a test database say); never for the ones you
+  have as they are. `bin/rails db:test:prepare` is a good first one.
 - They are in `project.toml`, so they're yours. A template carries its
   `[hooks]`, and its review flags each one.
 

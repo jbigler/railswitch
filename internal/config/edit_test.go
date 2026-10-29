@@ -663,3 +663,32 @@ func TestSetHooks(t *testing.T) {
 		t.Error("a dotted hooks key was edited")
 	}
 }
+
+// TestSetAgentSetup (D133): sets, replaces and removes [agents.<n>] setup;
+// an unknown agent or a command a hook couldn't be is refused.
+func TestSetAgentSetup(t *testing.T) {
+	base := "schema = 1\n\n[agents.claude]\nuse = \"claude@1\"\n\n[env]\nA = \"1\"\n"
+	out, err := SetAgentSetup(base, "claude", []string{"gh extension install github/gh-stack", `echo "x"`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := Parse([]byte(out))
+	if err != nil || !slices.Equal(p.Agents["claude"].Setup, []string{"gh extension install github/gh-stack", `echo "x"`}) || p.Env["A"] != "1" {
+		t.Fatalf("set: %+v, %v\n%s", p, err, out)
+	}
+	if out, err = SetAgentSetup(out, "claude", []string{"one"}); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ = Parse([]byte(out)); !slices.Equal(p.Agents["claude"].Setup, []string{"one"}) {
+		t.Errorf("replace:\n%s", out)
+	}
+	if out, err = SetAgentSetup(out, "claude", nil); err != nil || strings.Contains(out, "setup") {
+		t.Errorf("remove: %v\n%s", err, out)
+	}
+	if _, err := SetAgentSetup(base, "nope", []string{"x"}); err == nil {
+		t.Error("an unknown agent was accepted")
+	}
+	if _, err := SetAgentSetup(base, "claude", []string{"-rf /"}); err == nil {
+		t.Error("a command starting with - was accepted")
+	}
+}

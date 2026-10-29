@@ -64,6 +64,13 @@
 {{range .Hooks}}<label class="field hook" data-list="{{.Name}}" data-orig="{{.Text}}"><span><span class="mono">{{.Name}}</span> <span class="muted">· {{.Note}}</span></span>
 <textarea class="mono hook-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="{{if eq .Name "deps"}}gem list -i retest >/dev/null || gem install retest{{else if eq .Name "start"}}bin/rails db:test:prepare{{else}}bin/rails db:seed{{end}}">{{.Text}}</textarea></label>
 {{end}}</section>
+{{with .AgentSetups}}<section class="card" id="agent-setup">
+<h2>Agent setup</h2>
+<p class="note">Commands run in an agent's own container and home, one per line, before it first starts in a worktree, and again when you change them: tools its home keeps, like gh extensions and agent skills. A failing command is reported and the agent starts anyway; the next start tries again. Agents are yours: templates leave them out.</p>
+{{range .}}<label class="field agent-setup" data-agent="{{.Name}}" data-orig="{{.Text}}"><span class="mono">{{.Name}}</span>
+<textarea class="mono agent-setup-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="gh extension install github/gh-stack&#10;gh skill install github/gh-stack --scope user">{{.Text}}</textarea></label>
+{{end}}</section>
+{{end}}
 <section class="card">
 <h2>Environment</h2>
 <table class="set-table" id="env-table">

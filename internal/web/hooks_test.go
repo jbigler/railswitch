@@ -23,3 +23,22 @@ echo &#34;&lt;b&gt;&#34;</textarea>`, `data-list="deps" data-orig=""`, `data-lis
 		t.Errorf("preview stdin %q", stdin)
 	}
 }
+
+// TestSettingsAgentSetup (D133): the Agent setup card shows each agent's
+// setup one command per line (none without agents), and a staged
+// agent.setup reaches the CLI with its values.
+func TestSettingsAgentSetup(t *testing.T) {
+	f := settingsFixture(t)
+	body := f.do(req("GET", "/p/ftest/settings", nil)).Body.String()
+	if strings.Contains(body, `id="agent-setup"`) {
+		t.Error("an Agent setup card without agents")
+	}
+	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"options":[`, `"agents":[{"name":"claude","setup":["gh extension install github/gh-stack","echo \"<b>\""]}],"options":[`, 1))
+	body = f.do(req("GET", "/p/ftest/settings", nil)).Body.String()
+	contains(t, "settings", body, `id="agent-setup"`, `data-agent="claude" data-orig="gh extension install github/gh-stack
+echo &#34;&lt;b&gt;&#34;"`)
+	noCSPViolation(t, "settings", body)
+
+	body = f.do(jsonPost("/p/ftest/settings/preview", `[{"op":"agent.setup","key":"claude","values":["a","b"]}]`)).Body.String()
+	contains(t, "staged", body, "Agent claude setup: 2 commands")
+}

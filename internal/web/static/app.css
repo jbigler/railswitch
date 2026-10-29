@@ -228,3 +228,6 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 #hooks label.hook{display:block;margin:10px 0}
 #hooks label.hook textarea{display:block;width:100%;margin-top:4px;resize:vertical}
 #hooks label.hook.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+#agent-setup label.agent-setup{display:block;margin:10px 0}
+#agent-setup label.agent-setup textarea{display:block;width:100%;margin-top:4px;resize:vertical}
+#agent-setup label.agent-setup.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}

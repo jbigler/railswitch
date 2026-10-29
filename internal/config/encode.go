@@ -97,6 +97,9 @@ func LinesTOML(p *Project) string {
 		if len(a.Allow) > 0 {
 			b.WriteString("allow = " + stringArray(a.Allow) + "\n")
 		}
+		if len(a.Setup) > 0 {
+			b.WriteString("setup = " + stringArray(a.Setup) + "\n")
+		}
 		table(fmt.Sprintf("[agents.%s.env]", key(n)), a.Env)
 	}
 	if f := p.Firewall; f.Mode != "" || len(f.Allow) > 0 {

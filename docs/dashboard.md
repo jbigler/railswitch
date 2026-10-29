@@ -217,6 +217,9 @@ shows what each one does before anything is written.
   changed box stages `hooks.set` with the whole list (an empty box removes
   it); changing it back unstages it. The preview's restart list shows
   what a `deps` or `start` change restarts (`create` restarts nothing).
+- **Agent setup** (D133, only with agents): a box per agent, its
+  `[agents.<name>] setup` one command per line; leaving a changed box
+  stages `agent.setup` with the whole list (empty removes it).
 - **Environment:** the project's `[env]`. Editing a value stages it when
   you leave the field; Remove stages its removal; the add form (name,
   value) stages a new one, shown as a highlighted row with Undo until

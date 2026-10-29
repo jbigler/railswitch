@@ -450,6 +450,7 @@ function target(e) {
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
+  if (e.op === "agent.setup") return "agent-setup " + e.key;
   return e.op + " " + e.label;
 }
 
@@ -538,6 +539,12 @@ function syncLeft() {
   $$("label.hook").forEach((box) => {
     const e = stagedFor("hooks " + box.dataset.list);
     const area = $(".hook-cmds", box);
+    if (document.activeElement !== area) area.value = e ? (e.values || []).join("\n") : box.dataset.orig;
+    box.classList.toggle("staged", !!e);
+  });
+  $$("label.agent-setup").forEach((box) => {
+    const e = stagedFor("agent-setup " + box.dataset.agent);
+    const area = $(".agent-setup-cmds", box);
     if (document.activeElement !== area) area.value = e ? (e.values || []).join("\n") : box.dataset.orig;
     box.classList.toggle("staged", !!e);
   });
@@ -713,6 +720,11 @@ if (view.startsWith("settings")) {
     if (t.classList.contains("env-value")) {
       const row = t.closest("tr");
       return stage({ op: "env.set", name: row.dataset.name, value: t.value }, t.value === row.dataset.value);
+    }
+    if (t.classList.contains("agent-setup-cmds")) {
+      const box = t.closest("label.agent-setup");
+      const values = hookLines(t.value);
+      return stage({ op: "agent.setup", key: box.dataset.agent, values: values }, values.join("\n") === hookLines(box.dataset.orig).join("\n"));
     }
     if (t.classList.contains("hook-cmds")) {
       const box = t.closest("label.hook");

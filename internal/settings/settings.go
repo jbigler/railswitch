@@ -47,6 +47,9 @@ var ops = map[string]opSpec{
 	// key is a list of config.HookLists; values its commands in order, none
 	// removes it.
 	"hooks.set": {required: []string{"key"}},
+	// key is an agent's name; values its setup commands in order, none
+	// removes them (D133).
+	"agent.setup": {required: []string{"key"}},
 }
 
 func (e Edit) fields() map[string]string {
@@ -70,7 +73,7 @@ func ParseEdits(r io.Reader) ([]Edit, error) {
 		if !ok {
 			return nil, fmt.Errorf("edit %d: unknown op %q", i, e.Op)
 		}
-		if e.Values != nil && e.Op != "hooks.set" {
+		if e.Values != nil && e.Op != "hooks.set" && e.Op != "agent.setup" {
 			return nil, fmt.Errorf("edit %d: %s takes no values", i, e.Op)
 		}
 		f := e.fields()
@@ -116,6 +119,8 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.ShowLink(data, e.Label)
 	case "hooks.set":
 		return config.SetHooks(data, e.Key, e.Values)
+	case "agent.setup":
+		return config.SetAgentSetup(data, e.Key, e.Values)
 	}
 	return "", fmt.Errorf("unknown op %q", e.Op)
 }

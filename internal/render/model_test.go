@@ -200,7 +200,6 @@ func TestMariaDB(t *testing.T) {
 	_, in := filial(t, func(p *config.Project) { p.Options["database"] = "mariadb@1"; p.Versions["mariadb"] = "11.4" })
 	e, _ := envVar(in, "rails", "DATABASE_URL")
 	if e.Value != "mysql2://root:s3cret@db" { // rails: database.yml names it per environment
-
 		t.Errorf("rails DATABASE_URL = %q", e.Value)
 	}
 	if v, _ := envVar(in, "db", "MARIADB_ROOT_PASSWORD"); v.Value != "s3cret" {

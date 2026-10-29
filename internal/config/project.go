@@ -91,6 +91,10 @@ type Agent struct {
 	Run   string            `toml:"run"`   // "", "on-demand", "service"
 	Env   map[string]string `toml:"env"`   // added to the agent's env
 	Allow []string          `toml:"allow"` // extra firewall hosts for this agent
+	// Setup are commands run once in the agent's home (per worktree) before
+	// it first starts, and again when the list changes (D133): tools the
+	// home keeps, like gh extensions and agent skills.
+	Setup []string `toml:"setup"`
 }
 
 // Secret declares one user-provided secret (D33).
@@ -471,6 +475,9 @@ func (p *Project) Validate() error {
 			if !hostRe.MatchString(h) {
 				v.add(fmt.Sprintf("%s.allow[%d]", path, i), "%q is not a host name", h)
 			}
+		}
+		for i, c := range a.Setup {
+			v.hook(fmt.Sprintf("%s.setup[%d]", path, i), c)
 		}
 	}
 

@@ -55,9 +55,38 @@ deleted by `wt rm --force`.
   agents and nvim: `railswitch secret set github_token` gives them git
   over HTTPS. To sign commits, add a signing-only key with `secret add
   --git-signing`.
+- **GitHub CLI.** Agents have `gh`. A `github_token` (a secret with
+  `git_host = "github.com"`) an agent receives reaches it as `GH_TOKEN`
+  too, so `gh pr`, `gh stack` and the like work with the token you set
+  (not when the agent already gets a `GH_TOKEN` of its own). A project
+  made before this gets `gh` once it accepts the agent base update
+  (Review update) and, when its `Containerfile.agent-base` is its own
+  copy, takes the new default in Settings → Images.
 - **Git hooks are guarded.** The worktree's `.git/hooks` are mounted
   read-only, and `railswitch hooks check` (and `doctor`) report hooks or
   git config an agent changed.
+
+## Setting up its home
+
+An agent's home is its own per worktree, so tools it keeps there (`gh`
+extensions, agent skills) go in its setup list, in Settings → Agent setup
+or `project.toml`:
+
+```toml
+[agents.claude]
+use = "claude@1"
+setup = [
+  "gh extension install github/gh-stack",
+  "gh skill install github/gh-stack --scope user",
+]
+```
+
+The commands run in the agent's container, one per line in its own shell
+(no input: one that would prompt fails), before it first starts in a
+worktree, and again whenever you change the list. A failing one stops the
+rest and is reported, the agent starts anyway, and the next start tries
+them again. An agent package needs an entrypoint for this. Agents are
+yours: templates leave them out.
 
 ## Your own agent
 

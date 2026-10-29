@@ -30,11 +30,11 @@ type edit struct {
 	Value string `json:"value,omitempty"`
 	Label string `json:"label,omitempty"`
 	URL   string `json:"url,omitempty"`
-	// Values: hooks.set's whole list (D126).
+	// Values: hooks.set's and agent.setup's whole list (D126, D133).
 	Values []string `json:"values,omitempty"`
 }
 
-var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "hooks.set"}
+var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "hooks.set", "agent.setup"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -80,6 +80,7 @@ type settingsView struct {
 	Pack         *optionView // the stack's pack, when it has another choice
 	Firewall     firewallView
 	Hooks        []hookListView
+	AgentSetups  []hookListView // one per agent: Name, its setup as text
 	Options      []optionView
 	Links        []linkRowView
 	Secrets      []secretView
@@ -292,6 +293,15 @@ func editTitle(show projectShow, e edit) string {
 		return "Link " + e.Label + ": hidden"
 	case "link.show":
 		return "Link " + e.Label + ": shown"
+	case "agent.setup":
+		switch n := len(e.Values); n {
+		case 0:
+			return "Agent " + e.Key + " setup: removed"
+		case 1:
+			return "Agent " + e.Key + " setup: 1 command"
+		default:
+			return fmt.Sprintf("Agent %s setup: %d commands", e.Key, n)
+		}
 	case "hooks.set":
 		switch n := len(e.Values); n {
 		case 0:
@@ -340,6 +350,9 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 	v.Project = show
 	v.Firewall = newFirewallView(show.Firewall, base+"/blocked")
 	v.Hooks = newHooksView(show.Hooks)
+	for _, a := range show.Agents {
+		v.AgentSetups = append(v.AgentSetups, hookListView{Name: a.Name, Text: strings.Join(a.Setup, "\n")})
+	}
 	v.Template = s.settingsTemplate(r.Context(), p)
 	if len(show.Pack.Choices) > 1 {
 		pv := optionView{Key: "pack", Ref: show.Pack.Ref, Slot: true}

@@ -29,6 +29,7 @@ type projectDoc struct {
 	Pack       packRow     `json:"pack"`
 	Firewall   firewallRow `json:"firewall"`
 	Hooks      hooksRow    `json:"hooks"`
+	Agents     []agentRow  `json:"agents"` // by name, never null
 	Options    []optionRow `json:"options"`
 	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
 	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
@@ -43,6 +44,13 @@ type firewallRow struct {
 	Default   string              `json:"default"` // the mode without [firewall] mode: enforce with agents, else log
 	Effective string              `json:"effective"`
 	Allow     map[string][]string `json:"allow"` // config.FirewallProfiles, never null
+}
+
+// agentRow is one [agents.<name>]: its setup commands in order (D133),
+// never null.
+type agentRow struct {
+	Name  string   `json:"name"`
+	Setup []string `json:"setup"`
 }
 
 // hooksRow is [hooks] (D126): each list's commands in order, never null.
@@ -213,6 +221,10 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 		d.Firewall.Allow[prof] = append([]string{}, p.Firewall.Allow[prof]...)
 	}
 	d.Hooks = hooksRow{Deps: append([]string{}, p.Hooks.Deps...), Start: append([]string{}, p.Hooks.Start...), Create: append([]string{}, p.Hooks.Create...)}
+	d.Agents = []agentRow{}
+	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
+		d.Agents = append(d.Agents, agentRow{Name: n, Setup: append([]string{}, p.Agents[n].Setup...)})
+	}
 	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)
 	d.AddChoices = []string{}

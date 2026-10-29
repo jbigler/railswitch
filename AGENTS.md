@@ -77,6 +77,10 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 ## CLI (Stage 9e additions)
 - `gc [--dry-run] [--volumes] [--yes]` (global `--json`; D120, internal/cli/gc.go): keeps every registered project's current build tags (`Instance.Builds` of every worktree), mounted volumes (`VolumeSpecs`) and stored shas (stack.lock tables, `[[removed]]`, `[template] sha256`); removes `localhost/<prefix>/…:<ver>-<hash8>` images not kept and unused by a container (`podman rmi`, no -f), images labelled `railswitch.prefix=<unregistered>`, unreferenced `<data>/locked/<sha>` older than 10 min; volumes only with `--volumes` (`podman volume rm`, no -f), only names a package declares (`declaredVolumes`), each named in the prompt, confirmed before anything is removed. An unloadable project blocks its prefix and the store. Builds pass `--label railswitch.prefix=<prefix>` (`podman.BuildArgs.Prefix`).
 
+## CLI (Stage 9h additions)
+- Built-in `mariadb@1` (D123): database slot, `[[detect]]` `gem 'mysql2'`, port `mariadb`/`DB_PORT` base 53306, data volume `db-data-mariadb{mariadb.major}`, `[dump]` (`.sql` files) and `[health]`; commands read `$MARIADB_ROOT_PASSWORD` inside the container as `MYSQL_PWD`.
+- Settings `option`/`pack` edits sync `[image] addons` (`settings.Env.syncAddons`, `config.SetImageAddons`): addons of options no longer chosen leave the list (files stay), chosen options' addons are added, ejected (`workspace.EjectedContainerfile`) when the workspace has no file of that name; user addons stay; `Preview.NewFiles` are written by `settings apply` in the same commit.
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch, `library add`/`fetch`) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).

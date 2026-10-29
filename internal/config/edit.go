@@ -531,6 +531,30 @@ func SetOption(data, key, ref string, slot bool) (string, error) {
 	return d.insertKey(table, keyTOML(key), QuoteString(ref)), nil
 }
 
+// SetImageAddons sets [image] addons to addons (removing the key when
+// addons is empty); a project.toml without [image] gets one.
+func SetImageAddons(data string, addons []string) (string, error) {
+	d, err := parseEdit(data, "image", false, false)
+	if err != nil {
+		return "", err
+	}
+	q := make([]string, len(addons))
+	for i, a := range addons {
+		q[i] = QuoteString(a)
+	}
+	value := "[" + strings.Join(q, ", ") + "]"
+	s := d.find([]string{"image"}, "addons")
+	switch {
+	case s != nil && len(addons) == 0:
+		return d.removeStmt(s), nil
+	case s != nil:
+		return d.setValue(s, value), nil
+	case len(addons) == 0:
+		return data, nil
+	}
+	return d.insertKey([]string{"image"}, "addons", value), nil
+}
+
 // SetPack sets [stack] pack to ref; [stack] app stays (Settings offers
 // only packs with the same app service).
 func SetPack(data, ref string) (string, error) {

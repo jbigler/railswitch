@@ -21,8 +21,8 @@ published on 127.0.0.1 only.
   other stacks are local packs (`railswitch pack new`), and teams can
   publish packs in a library.
 - An **option** fills a **slot** beside the app: `database`, `cache`,
-  `storage`, `jobs`, `mail`, `browser`. Built in: PostgreSQL, Redis,
-  RustFS (S3 storage), Sidekiq, Playwright. Any other key adds one more
+  `storage`, `jobs`, `mail`, `browser`. Built in: PostgreSQL, MariaDB
+  (for MySQL apps too), Redis, RustFS (S3 storage), Sidekiq, Playwright. Any other key adds one more
   service of that name: a second database, ClickHouse beside PostgreSQL.
 - **Versions** pin what the images run (`postgres = "16"`). Runtimes such
   as Ruby and Node come from the app's own files (`.ruby-version`,

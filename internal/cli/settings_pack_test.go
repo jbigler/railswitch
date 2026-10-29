@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -113,5 +114,50 @@ func TestSettingsPreviewFirewallEdits(t *testing.T) {
 	}
 	if len(p.Edits) != 1 || p.Edits[0].Impact != "blocked" || !strings.Contains(p.Edits[0].Error, "not a host name") {
 		t.Errorf("bad host: %+v", p.Edits)
+	}
+}
+
+// Switching the database option swaps its image addon (D123): the old
+// option's addon leaves [image] addons (its file stays, edits and all), the
+// new one's is ejected and added; switching back reuses the kept file.
+func TestSettingsOptionSwapsAddon(t *testing.T) {
+	ws, _ := lockedWS(t)
+	pg := filepath.Join(ws, "containerfiles", "Containerfile.pg-client")
+	writeFile(t, pg, readFile(t, pg)+"RUN echo mine\n")
+	// The fixture holds every option's addon: this one must come from the eject.
+	if err := os.Remove(filepath.Join(ws, "containerfiles", "Containerfile.mariadb-client")); err != nil {
+		t.Fatal(err)
+	}
+	apply := func(ref string) {
+		t.Helper()
+		before := readFile(t, filepath.Join(ws, "project.toml"))
+		edits := `[{"op":"option","key":"database","ref":"` + ref + `"}]`
+		if code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+			t.Fatalf("%s: exit %d: %s\n%s", ref, code, out, errs)
+		}
+	}
+	apply("mariadb@1")
+	p, err := config.Load(filepath.Join(ws, "project.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(p.Image.Addons, "containerfiles/Containerfile.pg-client") || !slices.Contains(p.Image.Addons, "containerfiles/Containerfile.mariadb-client") {
+		t.Errorf("addons after mariadb: %v", p.Image.Addons)
+	}
+	if got := readFile(t, filepath.Join(ws, "containerfiles", "Containerfile.mariadb-client")); !strings.HasPrefix(got, "# Ejected from mariadb@1 Containerfile.mariadb-client") {
+		t.Errorf("mariadb-client:\n%s", got)
+	}
+	if !strings.HasSuffix(readFile(t, pg), "RUN echo mine\n") {
+		t.Error("the edited pg-client file was not kept")
+	}
+	apply("postgres@1")
+	if p, err = config.Load(filepath.Join(ws, "project.toml")); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(p.Image.Addons, "containerfiles/Containerfile.pg-client") || slices.Contains(p.Image.Addons, "containerfiles/Containerfile.mariadb-client") {
+		t.Errorf("addons after postgres: %v", p.Image.Addons)
+	}
+	if !strings.HasSuffix(readFile(t, pg), "RUN echo mine\n") {
+		t.Error("switching back replaced your pg-client file")
 	}
 }

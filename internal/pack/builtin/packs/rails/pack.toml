@@ -64,6 +64,11 @@ name = "npm_cache"
 mount = "/home/appuser/.npm"
 chown = true
 
+[[caches]]                 # corepack's yarn and pnpm: deps fetches the version package.json names
+name = "corepack"          # (its `yarn --version`), the app reuses it without the network (D119)
+mount = "/home/appuser/.cache/node/corepack"
+chown = true
+
 [[worktree_volumes]]       # per worktree: <prefix>-<slug>-<name>
 name = "node-modules"
 mount = "/app/node_modules"

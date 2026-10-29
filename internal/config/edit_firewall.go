@@ -106,8 +106,8 @@ func AddFirewallAllow(data, prof, host string) (string, error) {
 	return d.appendToArray(s, elem)
 }
 
-// RemoveFirewallAllow removes host from [firewall] allow.<prof>; a host not
-// there is an error.
+// RemoveFirewallAllow removes host from [firewall] allow.<prof>, and the
+// line with it when it was the last; a host not there is an error.
 func RemoveFirewallAllow(data, prof, host string) (string, error) {
 	d, s, err := parseFirewall(data, prof)
 	if err != nil {
@@ -115,6 +115,9 @@ func RemoveFirewallAllow(data, prof, host string) (string, error) {
 	}
 	if s == nil {
 		return "", fmt.Errorf("project.toml: %s is not in firewall.allow.%s", host, prof)
+	}
+	if elems, err := d.arrayElems(s); err == nil && len(elems) == 1 && elems[0].value == host {
+		return d.removeStmt(s), nil
 	}
 	return d.removeArrayElem(s, host)
 }

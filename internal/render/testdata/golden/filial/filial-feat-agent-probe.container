@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=cf7041111b33
+Label=filial.unit-hash=aacbe6ff6880
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-0b480561
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
@@ -26,6 +26,7 @@ Volume=/WORKSPACES/filial/.railswitch/agent-home/feat/probe:/home/appuser:z
 Volume=filial-feat-node-modules:/app/node_modules:U
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
+Volume=filial_corepack:/home/appuser/.cache/node/corepack:U
 Secret=filial_probe_key,type=mount,target=/run/secrets/probe_key,uid=1000,gid=1000,mode=0400
 DropCapability=all
 NoNewPrivileges=true

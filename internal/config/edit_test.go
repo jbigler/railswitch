@@ -595,6 +595,9 @@ func TestFirewallEdits(t *testing.T) {
 	if out, err = RemoveFirewallAllow(out, "deps", "github.com"); err != nil || !strings.Contains(out, `allow.deps = ["gems.example.com"]`) {
 		t.Errorf("remove: %q %v", out, err)
 	}
+	if out, err := RemoveFirewallAllow(out, "app", "api.example.com"); err != nil || strings.Contains(out, "allow.app") {
+		t.Errorf("remove the last: %q %v", out, err)
+	}
 	if _, err := AddFirewallAllow(out, "agent-x", "h"); err == nil {
 		t.Error("an unknown profile was edited")
 	}

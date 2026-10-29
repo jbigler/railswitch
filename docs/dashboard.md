@@ -145,6 +145,20 @@ is no longer accepted. What the page shows meanwhile may be stale.
   (`overview`'s `stale`, after a settings change, say) shows "restart to
   apply" next to its stack state, in the row and in the detail; `restart`
   clears it.
+- **Secrets to set** (above the detail, only while a secret `up` needs
+  is unset: `secret ls`'s `up`, read once per page load with 5 s to
+  answer; none when it can't be read): "Set these secrets to start
+  <base>", one row per unset secret (name, services, delivery, a value
+  field and Set value, the Settings page's `secret set` job: the value
+  goes only to its stdin and the field clears once the job has started);
+  an on-demand agent's comes last, marked "when it runs; not needed to
+  start". Then **Start <base>**, off until the last secret `up` needs is
+  set. Secret jobs are the project's, one at a time, so every Set value
+  waits while one runs. Each secret set leaves the card; once none that
+  `up` needs is left, the heading says "Ready to start <base>" and Start
+  turns on. Start selects the base worktree, runs `up` there and
+  says where its output is; the card goes when it ends ok. `up` refuses an unset
+  secret, so a new project with such secrets opens with this card.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
   (`PR #2141 ready · checks ✓ · approved`), then Links, Services (a glyph
   and state per service), Agent (state and message), Actions and Jobs.
@@ -575,7 +589,9 @@ until you press Create project.
   Create posts the review's hash as `accept_install`; the server runs the
   dry run again and refuses (400, no job) another hash or a missing
   tick, then adds `--accept-install <hash>`.
-- "Start <slug> when it's created" (on) adds `--up`.
+- "Start <slug> when it's created" (on) adds `--up`. A project with
+  secrets is created but not started (`up` would refuse them): the
+  project page opens with its Secrets to set card.
 - **Create project** runs the same `project new` command without
   `--dry-run` as a project-level job of the new prefix, from your home
   directory; a second create of that prefix is refused while the first

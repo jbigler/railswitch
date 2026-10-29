@@ -227,8 +227,8 @@ does not read a secret's value back from podman.
 
 ```json
 [
-  {"name": "github_token", "scope": "project", "podman_secret": "filial_github_token", "delivery": "file", "driver": "file", "set": false, "created": null, "services": ["nvim"], "driver_differs": false, "git_signing": false},
-  {"name": "twilio_auth_token", "scope": "project", "podman_secret": "filial_twilio_auth_token", "delivery": "env TWILIO_AUTH_TOKEN", "driver": "file", "set": true, "created": "2026-10-25T09:08:07Z", "services": ["rails"], "driver_differs": false, "git_signing": false}
+  {"name": "github_token", "scope": "project", "podman_secret": "filial_github_token", "delivery": "file", "driver": "file", "set": false, "created": null, "services": ["nvim"], "driver_differs": false, "git_signing": false, "up": true},
+  {"name": "twilio_auth_token", "scope": "project", "podman_secret": "filial_twilio_auth_token", "delivery": "env TWILIO_AUTH_TOKEN", "driver": "file", "set": true, "created": "2026-10-25T09:08:07Z", "services": ["rails"], "driver_differs": false, "git_signing": false, "up": true}
 ]
 ```
 
@@ -243,6 +243,7 @@ does not read a secret's value back from podman.
 | `created` | string or `null` | When the podman secret was created (RFC 3339); `null` when not set. |
 | `services` | array of strings | The service ids that receive it. |
 | `driver_differs` | boolean | The value is stored with another driver than `config.toml` configures; `railswitch secret set <name>` re-creates it under the configured one. |
+| `up` | boolean | `up` refuses to start while it is unset: a service `up` starts receives it. `false` for a secret only on-demand services (agents) receive, which is checked when they run; `true` for every secret when the services can't be told. |
 | `git_signing` | boolean | The value is an SSH commit signing key (`git_signing = true`, D61): its services sign commits and tags with it. |
 
 ## `signer ls`
@@ -987,9 +988,18 @@ The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,
 never saved. Without `--json`, the dry run prints the same content as text.
 
-`project new --up` (without `--dry-run`) exits 3 when the project was
-created and registered but `up` failed: stderr says so and names the
-command to retry. Exit 1 means the project was not created.
+`project new --up` (without `--dry-run`) runs `up` only when podman
+holds every secret `up` needs (`secret ls`'s `up`; a machine secret, or
+one a removed project of the prefix left, may be set already).
+Otherwise it prints `not started: <slug> needs its secrets first
+(<names>)` and the `secret set` commands, and exits 0. An unset secret
+only an on-demand agent receives doesn't stop it; its `secret set` line
+follows the start. The dry run, which asks podman nothing, ends with
+"Start <slug> (up), unless a secret is unset: then leave it stopped
+until it is set (<names>)" when the project declares secrets `up`
+needs. It exits 3 when the project was created and registered but
+`up` failed: stderr says so and names the command to retry. Exit 1 means
+the project was not created.
 
 ## `doctor`
 

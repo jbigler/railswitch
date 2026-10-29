@@ -19,6 +19,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/detect"
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
@@ -69,7 +70,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
 	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
-	up := fset.Bool("up", false, "run up in the base worktree once it is created (exit 3: created, up failed)")
+	up := fset.Bool("up", false, "run up in the base worktree once it is created, unless a secret is unset (exit 3: created, up failed)")
 	tplRef := fset.String("template", "", "start from the template `ref` (template ls): its lines, the answers, then the other flags on top")
 	noDetect := fset.Bool("no-detect", false, "don't read the repository for the pack and options: the pack's defaults")
 	var opts, tools, agentFlags, answerFlags stringList
@@ -177,8 +178,11 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "created workspace %s: project %s, base worktree %s (ID %d)\n", ws, *prefix, slug, id)
 	fmt.Fprintf(e.stdout, "the workspace is a git repo: commit project.toml, stack.lock and containerfiles/ (git -C %s add -A && git -C %s commit)\n", shellQuote(ws), shellQuote(ws))
-	e.printNext(ws, slug, secrets)
-	if !*up {
+	if *up && len(secrets.blocking) > 0 {
+		fmt.Fprintf(e.stdout, "not started: %s needs its secrets first (%s)\n", slug, strings.Join(secrets.blocking, ", "))
+	}
+	if !*up || len(secrets.blocking) > 0 {
+		e.printNext(ws, slug, secrets.unset)
 		return 0
 	}
 	e.dir, e.slug = filepath.Join(ws, slug), slug
@@ -187,6 +191,9 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		if err := l.Up(ctx, slug); err != nil {
 			code = e.fail(err)
 		}
+	}
+	if code == 0 && len(secrets.unset) > 0 {
+		e.printNext(ws, slug, secrets.unset) // an on-demand agent's, say
 	}
 	if code != 0 {
 		fmt.Fprintf(e.stderr, "railswitch: project %s was created in %s, but up failed; fix the cause and run: cd %s && railswitch up\n", *prefix, ws, shellQuote(filepath.Join(ws, slug)))
@@ -436,37 +443,41 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template, bundl
 }
 
 // createWorkspace is new after the clone: everything up to the render.
-// It returns the declared secrets (all unset) and the base worktree's ID.
-func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace.Accept) ([]string, int, error) {
+// It returns the declared secrets podman doesn't hold yet (a machine
+// secret, or one a removed project of this prefix left, may be set) and
+// the base worktree's ID.
+func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace.Accept) (unsetNames, int, error) {
 	ws := pl.ws
 	if _, err := e.run.Run(ctx, sys.Cmd{Name: "git", Args: []string{"init", ws}}); err != nil {
-		return nil, 0, fmt.Errorf("git init %s: %w", ws, err)
+		return unsetNames{}, 0, fmt.Errorf("git init %s: %w", ws, err)
 	}
 	if err := createFile(filepath.Join(ws, ".gitignore"), []byte(workspaceGitignore), 0o644); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := prepare(ws, pl.slug, pl.st); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
-	secrets, err := writeProject(ws, pl)
-	if err != nil {
-		return nil, 0, err
+	if _, err := writeProject(ws, pl); err != nil {
+		return unsetNames{}, 0, err
 	}
 	if err := writeGenerated(ws, pl.st, randomValue); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := workspace.Lock(ctx, ws, accept); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := storeTemplate(pl); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	w, err := workspace.Load(ctx, ws, "")
 	if err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	id, err := e.registerAndRender(ctx, pl.dirs, w, pl.slug)
-	return secrets, id, err
+	if err != nil {
+		return unsetNames{}, 0, err
+	}
+	return e.unsetSecrets(ctx, w), id, nil
 }
 
 // writeProject writes pl's project.toml into dir, ejects the stack's
@@ -604,19 +615,38 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "joined project %s in %s: base worktree %s (ID %d)\n", pm.Prefix, w.Root, slug, id)
 
+	e.printNext(w.Root, slug, e.unsetSecrets(ctx, w).unset)
+	return 0
+}
+
+// unsetNames are a workspace's declared secrets podman doesn't hold, sorted;
+// blocking are those up refuses (lifecycle.UpNeeds), not an on-demand
+// agent's.
+type unsetNames struct{ unset, blocking []string }
+
+// unsetSecrets asks podman for w's secrets; one it can't ask about counts
+// as unset, and every unset one blocks when the model can't be built.
+func (e *env) unsetSecrets(ctx context.Context, w *workspace.Workspace) unsetNames {
 	p := podman.Podman{R: e.run}
-	var unset []string
+	m, merr := e.model(ctx, w)
+	if merr != nil {
+		fmt.Fprintf(e.stderr, "railswitch: which secrets up needs: %v (counting every unset one)\n", merr)
+	}
+	var u unsetNames
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {
-		set, err := p.SecretExists(ctx, render.SecretName(pm.Prefix, name, w.Project.Secrets[name]))
+		set, err := p.SecretExists(ctx, render.SecretName(w.Project.Project.Prefix, name, w.Project.Secrets[name]))
 		if err != nil {
 			fmt.Fprintf(e.stderr, "railswitch: secret %s: %v\n", name, err)
 		}
-		if !set {
-			unset = append(unset, name)
+		if set {
+			continue
+		}
+		u.unset = append(u.unset, name)
+		if merr != nil || lifecycle.UpNeeds(m, name) {
+			u.blocking = append(u.blocking, name)
 		}
 	}
-	e.printNext(w.Root, slug, unset)
-	return 0
+	return u
 }
 
 // printNext prints the next commands: setting each unset secret, else up.

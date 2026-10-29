@@ -91,6 +91,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 ## CLI (Stage 9l additions)
 - Settings op `hooks.set` (`key` a list of `config.HookLists`, `values` the whole list; `config.SetHooks`; `Edit.Values`, taken by no other op); `project show --json` gains `hooks {deps,start,create}`; dashboard Hooks card (a textarea per list, staged on change).
 
+## CLI (Stage 9m additions)
+- `project new --up` skips `up` while a secret `up` needs is unset (D128: `unsetSecrets`, `podman secret exists` per secret, as `project init`; `lifecycle.UpNeeds`: a non-on-demand service receives it, the rule `up`'s check uses; `secret ls --json` `up`): prints `not started: <slug> needs its secrets first` and the `secret set` lines, exit 0; an unset secret only an on-demand agent receives doesn't stop it (its `secret set` line follows the start). Dashboard: the project page's Secrets to set card (unset secrets from `secret ls`, each set by the Settings `secret set` job, then Start `<base>`).
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch, `library add`/`fetch`) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).

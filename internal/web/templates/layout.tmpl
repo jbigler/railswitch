@@ -35,6 +35,7 @@ Strip, Banner and Projects. */}}
 <div class="note">↑↓ moves through worktrees · P switches project · : runs a task</div>
 </section>
 <section class="pane">
+{{with .Secrets}}{{template "secrets-needed" .}}{{end}}
 {{template "detail" .Detail}}
 {{template "jobs" .Jobs}}
 </section>

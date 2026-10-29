@@ -286,3 +286,40 @@ func TestUnknownPrefixReloadLimited(t *testing.T) {
 		t.Errorf("/p/nope after /new/registered: %d", w.Code)
 	}
 }
+
+// TestSecretsCard: the project page asks for the unset secrets and offers
+// to start the base worktree; with every secret set there is no card.
+func TestSecretsCard(t *testing.T) {
+	f := newFixture(t)
+	if body := f.do(req("GET", "/p/ftest", nil)).Body.String(); strings.Contains(body, "secrets-needed") {
+		t.Error("a card although secret ls fails")
+	}
+	// An on-demand agent's unset token alone: up starts, no card.
+	f.cli.set("--json -C /ws/ftest secret ls", secretsJSON)
+	if body := f.do(req("GET", "/p/ftest", nil)).Body.String(); strings.Contains(body, "secrets-needed") {
+		t.Error("a card for a secret up doesn't need")
+	}
+	f.cli.set("--json -C /ws/ftest secret ls", `[
+ {"name":"agent_token","set":false,"up":false,"services":["agent-x"],"delivery":"file"},
+ {"name":"api_key","set":true,"up":true,"services":["web"],"delivery":"env API_KEY"},
+ {"name":"token","set":false,"up":true,"services":["web","db"],"delivery":"file"}]`)
+	body := f.do(req("GET", "/p/ftest/b", nil)).Body.String()
+	for _, want := range []string{
+		"Set these secrets to start main",
+		`action="/p/ftest/settings/secret" class="secret-form" data-secret-needed data-blocks><input type="hidden" name="name" value="token">`,
+		`agent-x <span class="muted">(when it runs; not needed to start)</span>`,
+		`data-secret-needed><input type="hidden" name="name" value="agent_token">`,
+		`<form method="post" action="/p/ftest/main/act/up" data-start-base data-base="main"><button class="ln main" disabled>Start main</button>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	if strings.Contains(body, `value="api_key"`) {
+		t.Error("the card asks for a secret that is set")
+	}
+	f.cli.set("--json -C /ws/ftest secret ls", `[{"name":"token","set":true,"up":true,"services":["web"],"delivery":"file"}]`)
+	if body := f.do(req("GET", "/p/ftest", nil)).Body.String(); strings.Contains(body, "secrets-needed") {
+		t.Error("a card although every secret is set")
+	}
+}

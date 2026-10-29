@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/podman"
@@ -359,6 +360,7 @@ type secretRow struct {
 	Services      []string `json:"services"`
 	DriverDiffers bool     `json:"driver_differs"` // stored with another driver than config.toml's
 	GitSigning    bool     `json:"git_signing"`    // an SSH commit signing key (D61)
+	Up            bool     `json:"up"`             // up refuses to start while it is unset (lifecycle.UpNeeds)
 }
 
 func secretLs(ctx context.Context, e *env, args []string) int {
@@ -379,6 +381,12 @@ func secretLs(ctx context.Context, e *env, args []string) int {
 	}
 	configured := configuredDriver(cfg)
 	p := podman.Podman{R: e.run}
+	// Without a model, which services up starts is unknown: every secret
+	// counts as needed.
+	m, merr := e.model(ctx, w)
+	if merr != nil {
+		fmt.Fprintf(e.stderr, "railswitch: which secrets up needs: %v (up is true for all)\n", merr)
+	}
 	rows := []secretRow{}
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {
 		sec := w.Project.Secrets[name]
@@ -387,6 +395,7 @@ func secretLs(ctx context.Context, e *env, args []string) int {
 			PodmanSecret: render.SecretName(w.Project.Project.Prefix, name, sec),
 			Services:     sec.Services,
 			GitSigning:   sec.GitSigning,
+			Up:           merr != nil || lifecycle.UpNeeds(m, name),
 		}
 		if sec.Scope == "machine" {
 			r.Scope = "machine"

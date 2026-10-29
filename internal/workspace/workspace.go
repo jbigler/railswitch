@@ -607,6 +607,17 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 		if err := (podman.Systemd{R: r}).StopLoaded(ctx, gone...); err != nil {
 			return d, fmt.Errorf("stop a removed unit: %w", err)
 		}
+		// Units of other projects written before D130 still wait for
+		// network-online.target, and Traefik starts their proxy networks.
+		older, err := machine.AddNoNetworkWait(w.Dirs.Quadlet)
+		if err != nil {
+			return d, fmt.Errorf("turn off the network wait: %w", err)
+		}
+		for _, n := range older {
+			if !slices.Contains(d.Changed, n) && !slices.Contains(d.Added, n) {
+				d.Changed = append(d.Changed, n)
+			}
+		}
 		// The dashboard is a convenience: its unit failing to be written
 		// must not stop an up.
 		if werr := writeDashboardUnit(w.Dirs); werr != nil {

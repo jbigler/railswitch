@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -228,5 +229,42 @@ func TestDozzleUnitHashReadOnly(t *testing.T) {
 		if !bytes.Contains(data, []byte(want)) {
 			t.Errorf("dozzle unit lacks %q:\n%s", want[1:], data)
 		}
+	}
+}
+
+// TestAddNoNetworkWait: a railswitch unit without the [Quadlet] section
+// gets it once; one with it, another program's unit and a non-unit file
+// are left alone.
+func TestAddNoNetworkWait(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"old-proxy.network": machine.Marker + "x (prefix old).\n\n[Network]\nNetworkName=old_proxy\n",
+		"new-proxy.network": string(machine.NoNetworkWait([]byte(machine.Marker + "x (prefix new).\n\n[Network]\n"))),
+		"mine.container":    "[Container]\nImage=x\n",
+		"notes.txt":         machine.Marker + "x\n",
+	}
+	for n, s := range files {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, want := range [][]string{{"old-proxy.network"}, nil} {
+		got, err := machine.AddNoNetworkWait(dir)
+		if err != nil || !slices.Equal(got, want) {
+			t.Errorf("run %d: %q, %v; want %q", i, got, err, want)
+		}
+	}
+	for n, s := range files {
+		data, _ := os.ReadFile(filepath.Join(dir, n))
+		want := s
+		if n == "old-proxy.network" {
+			want = s + machine.NoNetworkWaitSection
+		}
+		if string(data) != want {
+			t.Errorf("%s = %q; want %q", n, data, want)
+		}
+	}
+	if got, err := machine.AddNoNetworkWait(filepath.Join(dir, "none")); got != nil || err != nil {
+		t.Errorf("missing dir: %q, %v", got, err)
 	}
 }

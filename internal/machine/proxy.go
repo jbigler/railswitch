@@ -172,6 +172,45 @@ func NoNetworkWait(unit []byte) []byte {
 	return append(unit, NoNetworkWaitSection...)
 }
 
+// AddNoNetworkWait appends NoNetworkWaitSection to every Quadlet unit in
+// dir that railswitch rendered (line 1 is its Marker) and that lacks it:
+// a unit written before D130, of any project, which a render of its own
+// project would rewrite but that Traefik may start first (it requires
+// every project's proxy network). It returns the files it changed.
+func AddNoNetworkWait(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var changed []string
+	for _, e := range entries {
+		switch filepath.Ext(e.Name()) {
+		case ".container", ".network", ".volume", ".pod", ".kube", ".build", ".image":
+		default:
+			continue
+		}
+		if !e.Type().IsRegular() {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return changed, err
+		}
+		if !bytes.HasPrefix(data, []byte(Marker)) || bytes.HasSuffix(data, []byte(NoNetworkWaitSection)) {
+			continue
+		}
+		if err := tomlfile.WriteAtomic(path, NoNetworkWait(data), 0o644); err != nil {
+			return changed, err
+		}
+		changed = append(changed, e.Name())
+	}
+	return changed, nil
+}
+
 // NoNetworkWaitSection is what NoNetworkWait appends.
 const NoNetworkWaitSection = "\n[Quadlet]\nDefaultDependencies=false\n"
 

@@ -169,7 +169,7 @@ is no longer accepted. What the page shows meanwhile may be stale.
   (`PR #2141 ready · checks ✓ · approved`), then, when its branch is in a
   gh stack (`stack ls`, read with the PRs), Stack: `2/3 open · 1 merged ·
   on main`, `⚠ restack needed` when a branch needs a rebase, the open
-  branches top first (PR number, linked through the worktree's PR URL,
+  branches top first (PR number, linked through the project's PR URL,
   the branch, `◀ HEAD` on the current one, `queued`, `⚠`), the merged ones
   folded, the trunk last; the list shows `≡ 2/3` next to the branch. Then
   Links, Services (one aligned row per service: a

@@ -159,3 +159,24 @@ func TestShadowRefuses(t *testing.T) {
 		}
 	}
 }
+
+// A worktree's own gh-stack file (an old catalog, or a planted one) is not
+// linked into the mirror: gh-stack refuses a symlinked one.
+func TestShadowSkipsWorktreeGhStack(t *testing.T) {
+	base, _ := repo(t)
+	admin := filepath.Join(base, ".git", "worktrees", "feat")
+	if err := os.WriteFile(filepath.Join(admin, "gh-stack"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(context.Background(), sys.Exec{}, filepath.Join(base, ".git"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Remove()
+	if _, err := os.Lstat(filepath.Join(s.Dir, "worktrees", "feat", "gh-stack")); !os.IsNotExist(err) {
+		t.Errorf("the worktree's gh-stack was mirrored: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(s.Dir, "worktrees", "feat", "HEAD")); err != nil {
+		t.Errorf("the worktree's HEAD wasn't: %v", err)
+	}
+}

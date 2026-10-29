@@ -27,9 +27,17 @@ import (
 // lacks reads as absent. info/, hooks/ and config are never linked.
 var links = []string{"HEAD", "objects", "refs", "packed-refs", "shallow", "gh-stack", "reftable"}
 
-// skipAdmin are worktree admin files never linked (read only under
-// extensions.worktreeConfig, which the copy never carries).
-var skipAdmin = map[string]bool{"config.worktree": true}
+// skipAdmin says which worktree admin files are never linked: config.worktree
+// (read only under extensions.worktreeConfig, which the copy never
+// carries), and gh-stack's per-worktree files (an old catalog, or one a
+// container planted: gh-stack refuses a symlinked one, failing every read).
+func skipAdmin(name string) bool {
+	return name == "config.worktree" || strings.HasPrefix(name, "gh-stack")
+}
+
+// maxAdmin bounds the worktree mirror: a container can fill
+// .git/worktrees; above this many entries the shadow fails closed.
+const maxAdmin = 10000
 
 // allowed are the config keys the copy keeps, as `git config --list` names
 // them (section and name lowercase, the subsection verbatim): the repo
@@ -158,7 +166,7 @@ func (s *Shadow) sanitizedConfig(ctx context.Context, r sys.Runner, gitDir strin
 			value = "true"
 		}
 		if n++; n > maxEntries {
-			return nil, fmt.Errorf("%s/config: more than %d remote and branch entries", gitDir, maxEntries)
+			return nil, fmt.Errorf("%s/config: more than %d entries kept", gitDir, maxEntries)
 		}
 		section, rest, _ := strings.Cut(key, ".")
 		i := strings.LastIndex(rest, ".")
@@ -196,6 +204,7 @@ func mirrorWorktrees(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	n := 0
 	for _, e := range ents {
 		if !e.IsDir() || e.Type()&os.ModeSymlink != 0 {
 			continue
@@ -209,8 +218,11 @@ func mirrorWorktrees(src, dst string) error {
 			return err
 		}
 		for _, f := range files {
-			if skipAdmin[f.Name()] {
+			if skipAdmin(f.Name()) {
 				continue
+			}
+			if n++; n > maxAdmin {
+				return fmt.Errorf("%s: more than %d worktree admin entries", src, maxAdmin)
 			}
 			if err := os.Symlink(filepath.Join(admin, f.Name()), filepath.Join(mirror, f.Name())); err != nil {
 				return err

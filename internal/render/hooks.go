@@ -73,13 +73,15 @@ func (b *builder) hooks(app, deps *Service) error {
 			deps.Command = strings.TrimSpace(deps.Entrypoint + " " + deps.Command)
 		}
 		deps.Entrypoint = DepsHookPath
-		b.hookAsset(deps, depsHookRel, DepsHookPath, hookScript("deps", h.Deps, false, hookDir))
+		script := hookScript("deps", h.Deps, false, hookDir)
+		b.hookAsset(deps, depsHookRel, DepsHookPath, script)
+		app.HookScripts = append(app.HookScripts, script)
 	}
 	return nil
 }
 
 func (b *builder) hookAsset(s *Service, rel, target string, data []byte) {
-	s.HookScript = data
+	s.HookScripts = append(s.HookScripts, data)
 	b.m.Assets = append(b.m.Assets, Asset{Rel: rel, Data: data, Mode: 0o755})
 	s.Mounts = append(s.Mounts, Mount{Source: literal(b.ws(rel)), Target: target, Options: "ro,z"})
 }

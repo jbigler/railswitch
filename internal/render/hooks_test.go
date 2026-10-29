@@ -104,8 +104,9 @@ func TestHookAssets(t *testing.T) {
 	}
 }
 
-// TestHookChangeRestarts: a changed start or deps hook changes the app's or
-// deps's unit hash (up restarts a running one); the unit text alone doesn't.
+// TestHookChangeRestarts: a changed start hook changes the app's unit
+// hash, a changed deps hook deps's and the app's (up restarts the running
+// app, and its start runs deps); the unit text alone doesn't.
 func TestHookChangeRestarts(t *testing.T) {
 	ws := testfixture.Workspace(t, fixtureDir)
 	hash := func(h config.Hooks) (string, string) {
@@ -119,7 +120,7 @@ func TestHookChangeRestarts(t *testing.T) {
 	a1, d1 := hash(config.Hooks{Start: []string{"one"}, Deps: []string{"one"}})
 	a2, d2 := hash(config.Hooks{Start: []string{"two"}, Deps: []string{"one"}})
 	a3, d3 := hash(config.Hooks{Start: []string{"two"}, Deps: []string{"two"}})
-	if a1 == a2 || d1 != d2 || a2 != a3 || d2 == d3 {
+	if a1 == a2 || d1 != d2 || a2 == a3 || d2 == d3 {
 		t.Errorf("hashes app %s %s %s, deps %s %s %s", a1, a2, a3, d1, d2, d3)
 	}
 }

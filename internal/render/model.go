@@ -113,9 +113,10 @@ type Service struct {
 	Publish    []Port   // host port = Base + worktree ID, on 127.0.0.1
 	Volumes    []Volume
 	Mounts     []Mount
-	// HookScript is the [hooks] script the service runs (D126): part of
-	// its unit stamp, so a changed hook restarts it on up.
-	HookScript []byte
+	// HookScripts are the [hooks] scripts (D126) that are part of the
+	// service's unit stamp, so a changed hook restarts it on up: the app
+	// holds deps's too, as deps (a oneshot) only runs when the app starts.
+	HookScripts [][]byte
 	Routes     []Route
 	Health     *Health
 	Requires   []string // service ids

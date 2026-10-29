@@ -415,8 +415,8 @@ func (p *Project) Validate() error {
 			path := fmt.Sprintf("hooks.%s[%d]", h.name, i)
 			if strings.TrimSpace(c) == "" {
 				v.add(path, "is empty")
-			} else if strings.HasPrefix(c, "-") {
-				v.add(path, "starts with -: sh would read it as an option")
+			} else if strings.HasPrefix(c, "-") || strings.HasPrefix(c, "+") {
+				v.add(path, "starts with %c: sh would read it as an option", c[0])
 			}
 			v.oneLine(path, c)
 		}

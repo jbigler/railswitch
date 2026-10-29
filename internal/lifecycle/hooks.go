@@ -55,7 +55,12 @@ func (l *L) createHooks(ctx context.Context, m *render.Model, slug string, ready
 			return fmt.Errorf("[hooks] create %q in %s: %w (the next up runs it again, and those after it)", safefile.Printable(c), ctr, err)
 		}
 		done = append(done, c)
-		if err := os.WriteFile(marker, []byte(strings.Join(done, "\n")+"\n"), 0o600); err != nil {
+		// Atomic: a torn marker would run a finished hook again.
+		tmp := marker + ".tmp"
+		if err := os.WriteFile(tmp, []byte(strings.Join(done, "\n")+"\n"), 0o600); err != nil {
+			return err
+		}
+		if err := os.Rename(tmp, marker); err != nil {
 			return err
 		}
 	}

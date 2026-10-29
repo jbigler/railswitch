@@ -1278,3 +1278,30 @@ func TestFirewallModeDefault(t *testing.T) {
 		}
 	}
 }
+
+// TestDBTestName: {db_test} is database.yml's test.database, else {db}
+// with _development or _dev made _test.
+func TestDBTestName(t *testing.T) {
+	_, in := filial(t, nil)
+	if got := in.Values["db_test"]; got != "filial_test" {
+		t.Errorf("default db_test = %q; want filial_test (from filial_dev)", got)
+	}
+	ws := fixtureWS(t)
+	yml := filepath.Join(ws, "master", "config", "database.yml")
+	if err := os.WriteFile(yml, []byte("development:\n  database: shop_development\ntest:\n  database: shop_specs\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := mustBuild(t, fixtureInputs(t, ws, nil))
+	for _, wt := range m.Inputs.Worktrees {
+		if wt.Slug != "master" {
+			continue
+		}
+		in, err := m.Instance(wt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := in.Values["db_test"]; got != "shop_specs" {
+			t.Errorf("db_test from database.yml = %q; want shop_specs", got)
+		}
+	}
+}

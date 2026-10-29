@@ -155,3 +155,26 @@ func TestDBDumpNoOption(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// The rails pack's dump_skip leaves its test databases (…_test and each
+// parallel worker's …_test-N) out of a dump, with a note.
+func TestDBDumpSkipsTestDatabases(t *testing.T) {
+	e := setup(t)
+	e.dbRunning("feat")
+	e.f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\nfilial_test\nfilial_test-0\nfilial_test_1\n")}, nil)
+	e.f.On([]string{"podman", "exec", "filial-feat-db", "pg_dump"}, sys.Result{Stdout: []byte("PGDMP")}, nil)
+	e.f.On([]string{"podman", "volume", "export"}, sys.Result{Stdout: []byte("tar")}, nil)
+	paths, err := e.l.DBDump(ctx, "feat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 || filepath.Base(paths[0]) != "filial_dev.dump" {
+		t.Errorf("paths = %v; want filial_dev's dump and the seed", paths)
+	}
+	if n := containing(e.calls(), "pg_dump -Fc -U postgres filial_test"); n != 0 {
+		t.Errorf("dumped a test database %d times", n)
+	}
+	if w := e.errOut(); !strings.Contains(w, "database filial_test_1 not dumped") {
+		t.Errorf("stderr %q; want a note per skipped database", w)
+	}
+}

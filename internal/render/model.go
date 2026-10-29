@@ -940,6 +940,23 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		if pk.DBURLName != nil && !*pk.DBURLName {
 			v["db_path"] = ""
 		}
+		if len(pk.DBTestName.From) > 0 || pk.DBTestName.Fallback != "" {
+			base, ok := strings.CutSuffix(r.Value, "_development")
+			if !ok {
+				base = strings.TrimSuffix(r.Value, "_dev")
+			}
+			fb := base + "_test"
+			if pk.DBTestName.Fallback != "" {
+				if fb, err = pack.Expand(pk.DBTestName.Fallback, pack.MapScope{"project.prefix": m.Prefix, "db": r.Value}); err != nil {
+					return nil, fmt.Errorf("db_test_name.fallback: %w", err)
+				}
+			}
+			t := version.Resolve(wt.Dir, pk.DBTestName.From, fb, version.ValidDBName)
+			warn(t.Warnings)
+			if version.ValidDBName.MatchString(t.Value) && t.Value != r.Value {
+				v["db_test"] = t.Value
+			}
+		}
 	}
 
 	for _, s := range m.Services {

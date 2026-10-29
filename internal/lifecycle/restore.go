@@ -63,6 +63,9 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 	if only != nil {
 		for _, db := range only {
 			if _, ok := files[db]; !ok {
+				if skipDump(m.Inputs.Stack.Pack.DumpSkip, sc, db) {
+					return nil, fmt.Errorf("%s is a database the pack leaves out of dumps and restores (dump_skip): the framework makes it itself", db)
+				}
 				return nil, fmt.Errorf("no dump of %s in %s", db, dir)
 			}
 		}
@@ -123,6 +126,13 @@ func dumpFiles(m *render.Model, dir string, o *pack.Option, sc pack.Scope) (map[
 	files, err := restoreFiles(dir, o, sc)
 	if err != nil {
 		return nil, err
+	}
+	// A dump of a database the pack leaves out (an older dump of Rails'
+	// test databases, say) is never restored.
+	for db := range files {
+		if db != "" && skipDump(m.Inputs.Stack.Pack.DumpSkip, sc, db) {
+			delete(files, db)
+		}
 	}
 	for _, s := range m.Services {
 		for _, v := range s.Volumes {

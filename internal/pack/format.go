@@ -30,10 +30,19 @@ type Pack struct {
 	// image tag parts, keyed by runtime name ("ruby", "node", "playwright").
 	Runtimes map[string]Chain `toml:"runtimes"`
 	DBName   Chain            `toml:"db_name"` // the database name chain; its result is {db}
+	// DBTestName is the test database's name chain, {db_test}; without a
+	// fallback its default is {db} with _development (or _dev) replaced by
+	// _test.
+	DBTestName Chain `toml:"db_test_name"`
 	// DBURLName false: database URLs leave the name out ({db_path} is
 	// ""), for a framework that takes it per environment from its own
 	// config (Rails' database.yml: test must never get development's).
 	DBURLName *bool `toml:"db_url_name"`
+	// DumpSkip are name patterns (path.Match, placeholders expanded, one
+	// that can't be is dropped) of databases db dump leaves out and restores
+	// ignore: ones the framework makes and remakes itself ({db_test} and
+	// its parallel workers' copies).
+	DumpSkip []string `toml:"dump_skip"`
 
 	Env      map[string]string `toml:"env"`       // layer 1 (HANDOFF §3.7): only what the framework itself reads (D42)
 	DBScheme map[string]string `toml:"db_scheme"` // database option name → URL scheme, the {scheme} placeholder

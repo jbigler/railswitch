@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -76,7 +77,7 @@ func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
 	sc := in.Scope(ch.Service)
 	dbs := []string{""} // one dump, no {dump.db}
 	if o.Dump.List != nil {
-		if dbs, err = l.dumpList(ctx, ctr, o, sc); err != nil {
+		if dbs, err = l.dumpList(ctx, ctr, o, sc, m.Inputs.Stack.Pack.DumpSkip); err != nil {
 			return nil, err
 		}
 	}
@@ -125,8 +126,9 @@ func (s dumpScope) Lookup(name string) (string, bool) {
 var dumpDBName = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}$`)
 
 // dumpList runs o's [dump] list in ctr: the databases to dump, one per
-// line. A name unsafe as a file name is skipped with a warning.
-func (l *L) dumpList(ctx context.Context, ctr string, o *pack.Option, sc pack.Scope) ([]string, error) {
+// line. A name unsafe as a file name is skipped with a warning, one skip
+// matches (the pack's dump_skip) with a note.
+func (l *L) dumpList(ctx context.Context, ctr string, o *pack.Option, sc pack.Scope, skip []string) ([]string, error) {
 	argv := make([]string, len(o.Dump.List))
 	for i, a := range o.Dump.List {
 		var err error
@@ -144,6 +146,8 @@ func (l *L) dumpList(ctx context.Context, ctr string, o *pack.Option, sc pack.Sc
 		case name == "":
 		case !dumpDBName.MatchString(name) || name == "." || name == "..":
 			fmt.Fprintf(l.Err, "warning: %s: database %q skipped: not a safe file name\n", ctr, safefile.Printable(name))
+		case skipDump(skip, sc, name):
+			fmt.Fprintf(l.Err, "%s: database %s not dumped (the pack's dump_skip)\n", ctr, name)
 		default:
 			dbs = append(dbs, name)
 		}
@@ -152,6 +156,21 @@ func (l *L) dumpList(ctx context.Context, ctr string, o *pack.Option, sc pack.Sc
 		return nil, fmt.Errorf("%s: %s [dump] list printed no database", ctr, o.Name)
 	}
 	return dbs, nil
+}
+
+// skipDump reports whether database name matches one of patterns, each
+// expanded in sc first (one that can't be, {db_test} unknown, is dropped).
+func skipDump(patterns []string, sc pack.Scope, name string) bool {
+	for _, p := range patterns {
+		p, err := pack.Expand(p, sc)
+		if err != nil || p == "" {
+			continue
+		}
+		if ok, _ := path.Match(p, name); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // dumpCommand is o's [dump] command and file name expanded in sc.

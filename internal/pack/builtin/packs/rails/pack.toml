@@ -6,6 +6,10 @@ version = 1
 # point tests at the development database. Without it each environment
 # takes database.yml's own (…_development, …_test) on the same server.
 db_url_name = false
+# The test database ({db_test}, from database.yml) and its parallel workers'
+# copies (Rails names them …-0; some apps …_0) live on the same server; db
+# dump leaves them out and restores ignore their dumps.
+dump_skip = ["{db_test}", "{db_test}-[0-9]*", "{db_test}_[0-9]*"]
 
 [app]
 service = "rails"
@@ -43,6 +47,9 @@ fallback = "1.60.0"
 [db_name]
 from = ["config/database.yml:development.database"]
 fallback = "{project.prefix}_development"
+
+[db_test_name]             # {db_test}; else {db} with _development (or _dev) made _test
+from = ["config/database.yml:test.database"]
 
 
 [env]                      # only what Rails itself reads; app-specific names go in the project's [env]

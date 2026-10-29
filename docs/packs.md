@@ -494,6 +494,8 @@ there is no shared add-on package (user, 2026-10-27).
 | `[image] file`, `tag`, `os`, `args` | the base image's Containerfile (ejected to `containerfiles/`), tag part, OS family and build args |
 | `[runtimes.<name>]` | a version chain (`from`, optional `fallback`): `{<name>}` |
 | `[db_name]` | the database name chain: `{db}`, and `{db_path}` (`/{db}`) that the database options end `DATABASE_URL` with |
+| `[db_test_name]` | the test database name chain: `{db_test}` (rails: `config/database.yml:test.database`); with no fallback, `{db}` with `_development` or `_dev` made `_test` |
+| `dump_skip = ["<pattern>", …]` | database names (`path.Match` patterns, placeholders expanded; one that can't be is dropped) that `db dump` leaves out and restores ignore: ones the framework makes itself. The rails pack sets `{db_test}`, `{db_test}-[0-9]*` and `{db_test}_[0-9]*` (the test database and its parallel workers' copies) |
 | `db_url_name = false` | `{db_path}` is empty: `DATABASE_URL` names no database, for a framework that takes the name per environment from its own config. Rails applies `DATABASE_URL` to whichever environment runs, so with the name in it tests would use the development database; the rails pack sets this |
 | `[env]` | the app's env (layer 1): only what the framework reads |
 | `[db_scheme] <option> = "<scheme>"` | the `DATABASE_URL` scheme per database option |

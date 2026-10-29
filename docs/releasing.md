@@ -6,9 +6,11 @@ A release is a tag. Pushing `v<major>.<minor>.<patch>` from `main` runs
 1. builds static `railswitch-linux-amd64` and `railswitch-linux-arm64`
    (`make build VERSION=<tag>`, so `railswitch version` prints the tag),
    and `SHA256SUMS`;
-2. creates the GitHub release with notes generated from the merged PRs.
-
-Tag a commit whose CI passed: the release workflow doesn't run the tests.
+2. runs `make check` and checks the amd64 binary prints the tag as its
+   version; a failure stops the release;
+3. attests the binaries' build provenance, which `gh attestation verify
+   <file> --repo jbigler/railswitch` checks;
+4. creates the GitHub release with notes generated from the merged PRs.
 
 To cut one:
 

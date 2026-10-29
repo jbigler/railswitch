@@ -39,8 +39,18 @@ stopping and one-off commands.
 
 ## Getting started
 
+Download the binary for your machine from the
+[latest release](https://github.com/jbigler/railswitch/releases/latest),
+check it, and put it on your `PATH`. It's one static file; you don't need Go.
+
 ```bash
-make build && install -m755 railswitch ~/.local/bin/
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+base=https://github.com/jbigler/railswitch/releases/latest/download
+curl -fLO "$base/railswitch-linux-$arch"
+curl -fLO "$base/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS
+install -m755 "railswitch-linux-$arch" ~/.local/bin/railswitch
+
 railswitch doctor          # checks podman, Quadlet, the firewall tools
 railswitch dashboard       # starts the dashboard and prints its login link
 ```
@@ -61,9 +71,19 @@ sharing.
   - [Editor](docs/nvim.md)
   - [JSON output](docs/json.md)
   - [Shell completion](docs/completion.md)
+  - [Releasing](docs/releasing.md)
 - Design: the decisions behind it are in
   [the roadmap](docs/superpowers/plans/2026-10-25-railswitch-roadmap.md)
   and [the handoff](handoff/HANDOFF.md).
+
+## Versions
+
+Releases are numbered `v0.<minor>.<patch>` until 1.0: a minor release may
+change commands or files, and its notes say how. Every file railswitch
+writes carries `schema = 1`; an older railswitch refuses a file a newer one
+wrote, so it never misreads it. To upgrade, install the new binary over the
+old one: the dashboard restarts itself on it. Building from source:
+`make build VERSION=<tag>` (Go, see `go.mod`).
 
 ## Requirements
 

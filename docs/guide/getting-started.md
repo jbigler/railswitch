@@ -4,12 +4,23 @@
 
 You need Linux with a systemd user session and podman 5 or newer (with its
 Quadlet generator), plus `nft`, `nsenter`, `getent`, `jq`, `curl` and `git`.
-Build and install railswitch, then let it check the machine:
+Install railswitch, one static binary for amd64 or arm64 from the
+[releases](https://github.com/jbigler/railswitch/releases), then let it
+check the machine:
 
 ```bash
-make build && install -m755 railswitch ~/.local/bin/
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+base=https://github.com/jbigler/railswitch/releases/latest/download
+curl -fLO "$base/railswitch-linux-$arch"
+curl -fLO "$base/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS
+install -m755 "railswitch-linux-$arch" ~/.local/bin/railswitch
 railswitch doctor
 ```
+
+`~/.local/bin` must be on your `PATH`. To upgrade, run the same commands
+for the new release; the dashboard restarts itself on the new binary. From a clone
+with Go instead: `make build && install -m755 railswitch ~/.local/bin/`.
 
 `doctor` checks podman, its socket and Quadlet, cgroup v2, port 80, the
 firewall's tools and `ssh-keygen -Y` (for signed libraries). Every check

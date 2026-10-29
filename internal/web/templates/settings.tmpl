@@ -66,11 +66,11 @@
 {{end}}</section>
 <section class="card">
 <h2>Environment</h2>
-<table class="set-table">
+<table class="set-table" id="env-table">
 <thead><tr><th>Name</th><th>Value</th><th></th></tr></thead>
 <tbody>
 {{range .Project.Env}}<tr class="env" data-name="{{.Name}}" data-value="{{.Value}}"><td class="mono">{{.Name}}</td><td><input class="mono env-value" value="{{.Value}}" autocomplete="off" aria-label="{{.Name}}"></td><td><button type="button" class="ln danger" data-env-remove>Remove</button></td></tr>
-{{else}}<tr><td colspan="3" class="muted">No project env.</td></tr>
+{{else}}<tr class="env-none"><td colspan="3" class="muted">No project env.</td></tr>
 {{end}}</tbody>
 </table>
 <form class="add-row" data-stage="env">
@@ -78,7 +78,7 @@
 <input name="value" placeholder="value" class="mono" autocomplete="off" aria-label="Value">
 <button class="ln" disabled>Add</button>
 </form>
-<p class="note">The project's <code>[env]</code>, given to the app. A changed value is staged when you leave the field.</p>
+<p class="note">The project's <code>[env]</code>, given to the app. A changed value is staged when you leave the field, and Add stages a new one: nothing is saved until you press Apply under Staged changes.</p>
 </section>
 
 <section class="card">

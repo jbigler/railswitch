@@ -506,6 +506,35 @@ function syncLeft() {
     row.classList.toggle("staged", !!e && e.op === "env.set");
     row.classList.toggle("removed", !!e && e.op === "env.unset");
   });
+  // A staged new variable shows in the table until Apply writes it.
+  const envBody = $("#env-table tbody");
+  if (envBody) {
+    $$("tr.env-new", envBody).forEach((row) => row.remove());
+    const known = new Set($$("tr.env", envBody).map((row) => row.dataset.name));
+    for (const e of staged) {
+      if (e.op !== "env.set" || known.has(e.name)) continue;
+      const row = document.createElement("tr");
+      row.className = "env-new staged";
+      row.dataset.name = e.name;
+      for (const text of [e.name, e.value]) {
+        const td = document.createElement("td");
+        td.className = "mono";
+        td.textContent = text;
+        row.append(td);
+      }
+      const td = document.createElement("td");
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "ln";
+      undo.dataset.envUndo = "";
+      undo.textContent = "Undo";
+      td.append(undo);
+      row.append(td);
+      envBody.append(row);
+    }
+    const none = $("tr.env-none", envBody);
+    if (none) none.hidden = !!$("tr.env-new", envBody);
+  }
   $$("label.hook").forEach((box) => {
     const e = stagedFor("hooks " + box.dataset.list);
     const area = $(".hook-cmds", box);
@@ -655,6 +684,11 @@ if (view.startsWith("settings")) {
       staged.splice(Number(undo.dataset.undo), 1);
       stagedChanged();
       return;
+    }
+    const envUndo = t.closest("[data-env-undo]");
+    if (envUndo) {
+      staged = staged.filter((x) => target(x) !== "env " + envUndo.closest("tr").dataset.name);
+      return stagedChanged();
     }
     const envRm = t.closest("[data-env-remove]");
     if (envRm) return stage({ op: "env.unset", name: envRm.closest("tr").dataset.name }, false);

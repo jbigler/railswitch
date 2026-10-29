@@ -5,7 +5,7 @@
 Description=filial cache of worktree master
 
 [Container]
-Label=filial.unit-hash=d5e799dae47c
+Label=filial.unit-hash=819fef064fd5
 Image=docker.io/library/redis:8-alpine
 ContainerName=filial-master-cache
 Network=filial-master-dev.network:alias=cache
@@ -25,10 +25,13 @@ Annotation=filial.firewall.mode=enforce
 Annotation=filial.firewall.lists=fdbb9db68f1d
 LogDriver=journald
 Exec=redis-server --loglevel warning --save "" --appendonly no
+StopTimeout=60
 
 [Service]
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=90
+TimeoutStartSec=300
 
 [Quadlet]
 DefaultDependencies=false

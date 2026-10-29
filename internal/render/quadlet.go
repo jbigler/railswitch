@@ -401,11 +401,26 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 		}
 		u.add(sv, "TimeoutStartSec", strconv.Itoa(t))
 	}
+	if s.Role == RoleData {
+		// A database flushes to disk when it stops: podman's 10 s before
+		// SIGKILL cut a busy Postgres short, and the crash recovery that
+		// follows (or a cold start of a large one) outlasts systemd's 90 s.
+		u.add(c, "StopTimeout", strconv.Itoa(dataStopTimeout))
+		u.add(sv, "TimeoutStopSec", strconv.Itoa(dataStopTimeout+30))
+		u.add(sv, "TimeoutStartSec", strconv.Itoa(dataStartTimeout))
+	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
 	return u, nil
 }
+
+// A data service's seconds to stop cleanly (podman's StopTimeout; systemd
+// waits 30 more) and to start, recovery included.
+const (
+	dataStopTimeout  = 60
+	dataStartTimeout = 300
+)
 
 // appStartTimeout is max(180, start period + 60) seconds: a start period
 // longer than TimeoutStartSec breaks Notify=healthy (podman #27290).

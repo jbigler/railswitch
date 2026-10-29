@@ -45,7 +45,10 @@ workspace's `packs/` or `options/`) or `alias:name@N` (a library's).
 | tool | your editor (Neovim), mail catchers | `shop-main-nvim` |
 | agent | an AI coding agent, sandboxed | `shop-main-agent-claude` |
 
-The app, worker and deps mount the worktree; data containers don't. Every
+The app, worker and deps mount the worktree; data containers don't. A
+data container gets 60 seconds to stop cleanly (a database writes out
+what it holds) and 5 minutes to start, enough for a database to recover
+after a stop that wasn't clean. Every
 container runs with no privilege escalation and memory and process
 limits; the app, worker, deps, tools and agents also drop every
 capability. Each gets an egress firewall applied from outside it, except

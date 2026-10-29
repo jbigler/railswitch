@@ -100,8 +100,10 @@ func TestExecProcessGroup(t *testing.T) {
 
 func TestKillGraceTERMThenKILL(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(100*time.Millisecond, cancel)
+	// start before the timer: the cancel then comes at least 100ms after
+	// it (timers never fire early), so the lower bound below is exact.
 	start := time.Now()
+	time.AfterFunc(100*time.Millisecond, cancel)
 	_, err := Exec{}.Run(ctx, Cmd{
 		Name:      "sh",
 		Args:      []string{"-c", `trap "" TERM; sleep 30`},

@@ -534,8 +534,8 @@ Exit 0; a failed removal is a warning.
 |---|---|---|
 | `images` | array | Images of a registered project (or carrying `railswitch.prefix=<an unregistered prefix>`) that no worktree's current render builds and no container uses: `name`, `size` (bytes). |
 | `unsure` | array | Images shaped like railswitch's (`localhost/<prefix>/<repo>:<version>-<hash8>`) of no registered project and without the build label: never removed; remove each with `podman rmi <name>`. |
-| `store` | array | Stored package copies (D96) no `stack.lock` (its tables and `[[removed]]`) or `[template] sha256` of a registered project names. `[]` when a project doesn't load. |
-| `volumes` | array | Volumes of a registered project no worktree's render mounts; removed only with `--volumes` (after a prompt, or `--yes`). |
+| `store` | array | Stored package copies (D96) no `stack.lock` (its tables and `[[removed]]`) or `[template] sha256` of a registered project names, and not changed in the last 10 minutes. `[]` when a project doesn't load. |
+| `volumes` | array | Volumes of a registered project whose name a railswitch package declares (`<prefix>_<cache or shared name>`, `<prefix>-<slug>-<volume name>`, placeholders as wildcards) and no worktree's render mounts. Removed only with `--volumes`, after a prompt naming each one (or `--yes`), asked before anything else is removed: a refusal removes nothing (exit 1 without a terminal). |
 | `bytes` | number | The removed images' size, layers they share with kept images included. |
 | `warnings` | array | A project that doesn't load (nothing of its prefix is removed), a removal that failed. |
 

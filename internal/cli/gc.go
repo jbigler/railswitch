@@ -10,10 +10,12 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -48,6 +50,9 @@ type gcKeep struct {
 	tags, volumes, shas map[string]bool
 	prefixes            map[string]bool // registered
 	blocked             map[string]bool // registered but unreadable: keep everything of theirs
+	// volumeNames are, by prefix, the volume names a railswitch package
+	// declares (placeholders as wildcards): only those are railswitch's.
+	volumeNames map[string][]*regexp.Regexp
 }
 
 // railswitch gc (D120): remove the images, stored package copies and (with
@@ -116,12 +121,25 @@ func cmdGC(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	for _, v := range names {
-		if pfx := volumePrefix(v); keep.prefixes[pfx] && !keep.blocked[pfx] && !keep.volumes[v] {
+		if pfx := volumePrefix(v); keep.prefixes[pfx] && !keep.blocked[pfx] && !keep.volumes[v] && keep.railswitchVolume(v) {
 			doc.Volumes = append(doc.Volumes, v)
 		}
 	}
 	slices.Sort(doc.Volumes)
 
+	// The volumes are confirmed (listed by name) before anything at all is
+	// removed: a refusal removes nothing.
+	removeVolumes := false
+	if !*dry && *vols && len(doc.Volumes) > 0 {
+		ok, err := e.gcConfirm(doc.Volumes, *yes)
+		if err != nil {
+			return e.fail(err)
+		}
+		removeVolumes = ok
+		if !ok {
+			doc.Warnings = append(doc.Warnings, fmt.Sprintf("kept the %d volumes: not confirmed", len(doc.Volumes)))
+		}
+	}
 	if !*dry {
 		for _, img := range doc.Images {
 			if err := p.ImageRemove(ctx, img.Name); err != nil {
@@ -134,17 +152,11 @@ func cmdGC(ctx context.Context, e *env, args []string) int {
 				doc.Warnings = append(doc.Warnings, fmt.Sprintf("stored copy %s: %v", sha, err))
 			}
 		}
-		if *vols && len(doc.Volumes) > 0 {
-			if ok, err := e.gcConfirm(len(doc.Volumes), *yes); err != nil {
-				return e.fail(err)
-			} else if ok {
-				for _, v := range doc.Volumes {
-					if err := p.VolumeRemove(ctx, v); err != nil {
-						doc.Warnings = append(doc.Warnings, fmt.Sprintf("volume %s: %v", v, err))
-					}
+		if removeVolumes {
+			for _, v := range doc.Volumes {
+				if err := p.VolumeRemove(ctx, v); err != nil {
+					doc.Warnings = append(doc.Warnings, fmt.Sprintf("volume %s: %v", v, err))
 				}
-			} else {
-				doc.Volumes = []string{}
 			}
 		}
 	}
@@ -154,13 +166,13 @@ func cmdGC(ctx context.Context, e *env, args []string) int {
 		}
 		return 0
 	}
-	e.printGC(doc, *vols)
+	e.printGC(doc, removeVolumes || *dry && *vols)
 	return 0
 }
 
 // gcKeep loads every registered project and collects what it uses.
 func (e *env) gcKeep(ctx context.Context, dirs machine.Dirs, doc *gcDoc) (gcKeep, error) {
-	keep := gcKeep{tags: map[string]bool{}, volumes: map[string]bool{}, shas: map[string]bool{}, prefixes: map[string]bool{}, blocked: map[string]bool{}}
+	keep := gcKeep{tags: map[string]bool{}, volumes: map[string]bool{}, shas: map[string]bool{}, prefixes: map[string]bool{}, blocked: map[string]bool{}, volumeNames: map[string][]*regexp.Regexp{}}
 	reg, err := readRegistry(dirs)
 	if err != nil {
 		return keep, err
@@ -185,6 +197,7 @@ func (e *env) gcKeep(ctx context.Context, dirs machine.Dirs, doc *gcDoc) (gcKeep
 			block(err)
 			continue
 		}
+		keep.volumeNames[pe.Prefix] = declaredVolumes(pe.Prefix, w.Catalog)
 		if l := w.Lock; l != nil {
 			for _, t := range []map[string]config.LockEntry{l.Packs, l.Options, l.Agents, l.Tools, l.Base} {
 				for _, en := range t {
@@ -224,6 +237,60 @@ func (e *env) gcKeep(ctx context.Context, dirs machine.Dirs, doc *gcDoc) (gcKeep
 	return keep, nil
 }
 
+// placeholderRe is a {placeholder} in a declared volume name.
+var placeholderRe = regexp.MustCompile(`\{[^}]*\}`)
+
+// declaredVolumes are the volume names of prefix that cat's packages
+// declare, as patterns: <prefix>_<name> for a pack's caches and a tool's
+// or agent's shared volumes, <prefix>-<slug>-<name> for a pack's worktree
+// volumes and an option's volumes. Another tool's <prefix>_… volume (a
+// compose project of that name) matches none.
+func declaredVolumes(prefix string, cat *pack.Catalog) []*regexp.Regexp {
+	var out []*regexp.Regexp
+	add := func(sep string, vols []pack.Volume) {
+		for _, v := range vols {
+			parts := placeholderRe.Split(v.Name, -1)
+			for i := range parts {
+				parts[i] = regexp.QuoteMeta(parts[i])
+			}
+			name := strings.Join(parts, `[A-Za-z0-9._-]+`)
+			if sep == "-" {
+				out = append(out, regexp.MustCompile(`^`+prefix+`-[a-z0-9][a-z0-9-]*-`+name+`$`))
+			} else {
+				out = append(out, regexp.MustCompile(`^`+prefix+`_`+name+`$`))
+			}
+		}
+	}
+	for _, pk := range cat.Packs {
+		if pk != nil {
+			add("_", pk.Caches)
+			add("-", pk.WorktreeVolumes)
+		}
+	}
+	for _, o := range cat.Options {
+		if o != nil {
+			add("-", o.Volumes)
+		}
+	}
+	for _, t := range cat.Tools {
+		if t != nil {
+			add("_", t.Shared)
+		}
+	}
+	for _, a := range cat.Agents {
+		if a != nil {
+			add("_", a.Shared)
+		}
+	}
+	return out
+}
+
+// railswitchVolume reports whether v is a volume a package of a registered
+// prefix declares.
+func (k gcKeep) railswitchVolume(v string) bool {
+	return slices.ContainsFunc(k.volumeNames[volumePrefix(v)], func(re *regexp.Regexp) bool { return re.MatchString(v) })
+}
+
 // gcImageVerdict is what gc does with the image name of img: "remove",
 // "unsure" (looks like railswitch's, of no registered project, without the
 // build label) or "" (keep, or not railswitch's).
@@ -239,16 +306,24 @@ func gcImageVerdict(name string, img podman.Image, keep gcKeep) string {
 }
 
 // gcStore is the stored copies (D96) no stack.lock or [template] names.
+// A copy changed in the last storeGrace is kept: a lock or an import may
+// be writing the file that will name it.
 func gcStore(dirs machine.Dirs, keep gcKeep) []string {
 	out := []string{}
 	ents, _ := os.ReadDir(lockstore.Dir(dirs))
 	for _, ent := range ents {
-		if ent.IsDir() && storeEntryRe.MatchString(ent.Name()) && !keep.shas[ent.Name()] {
-			out = append(out, ent.Name())
+		if !ent.IsDir() || !storeEntryRe.MatchString(ent.Name()) || keep.shas[ent.Name()] {
+			continue
 		}
+		if fi, err := ent.Info(); err != nil || time.Since(fi.ModTime()) < storeGrace {
+			continue
+		}
+		out = append(out, ent.Name())
 	}
 	return out
 }
+
+const storeGrace = 10 * time.Minute
 
 // volumePrefix is the project prefix a railswitch volume name starts with:
 // <prefix>-<slug>-<name> or <prefix>_<name>; "" for none.
@@ -260,15 +335,21 @@ func volumePrefix(v string) string {
 	return v[:i]
 }
 
-func (e *env) gcConfirm(n int, yes bool) (bool, error) {
+// gcConfirm asks on the terminal (stderr, so --json stays one document)
+// whether to delete vols, each named; --yes answers for it.
+func (e *env) gcConfirm(vols []string, yes bool) (bool, error) {
 	if yes {
 		return true, nil
 	}
 	in, ok := e.stdin.(*os.File)
 	if !ok || !isTerminal(in) {
-		return false, fmt.Errorf("gc --volumes deletes %d volumes and their data: pass --yes (no terminal to confirm on)", n)
+		return false, fmt.Errorf("gc --volumes deletes %d volumes and their data (%s): pass --yes (no terminal to confirm on); nothing was removed", len(vols), strings.Join(vols, ", "))
 	}
-	fmt.Fprintf(e.stdout, "Delete %d volumes and their data? [y/N] ", n)
+	fmt.Fprintln(e.stderr, "These volumes, and the data in them, would be deleted:")
+	for _, v := range vols {
+		fmt.Fprintf(e.stderr, "  %s\n", v)
+	}
+	fmt.Fprintf(e.stderr, "Delete these %d volumes? [y/N] ", len(vols))
 	line, _ := bufio.NewReader(in).ReadString('\n')
 	a := strings.ToLower(strings.TrimSpace(line))
 	return a == "y" || a == "yes", nil
@@ -288,7 +369,7 @@ func (e *env) printGC(doc gcDoc, vols bool) {
 	case len(doc.Volumes) == 0:
 		fmt.Fprintln(e.stdout, "volumes: none unused")
 	case vols:
-		fmt.Fprintf(e.stdout, "volumes: %s %d\n", verb, len(doc.Volumes))
+		fmt.Fprintf(e.stdout, "volumes: %s %d (their data with them)\n", verb, len(doc.Volumes))
 	default:
 		fmt.Fprintf(e.stdout, "volumes: %d no worktree mounts (railswitch gc --volumes removes them, with their data):\n", len(doc.Volumes))
 	}

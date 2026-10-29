@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/podman"
@@ -53,9 +54,14 @@ func TestGC(t *testing.T) {
 	if err := os.MkdirAll(stale, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chtimes(stale, time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	f := unitsFake()
 	f.On([]string{"podman", "images", "--format", "json"}, sys.Result{Stdout: []byte(fmt.Sprintf(`[{"Id":"1","Names":[%q],"Size":1000,"Containers":0},{"Id":"2","Names":[%q],"Size":2000,"Containers":0},{"Id":"2","Names":[%q],"Size":2000,"Containers":0}]`, current, old, old))}, nil)
-	f.On([]string{"podman", "volume", "ls"}, sys.Result{Stdout: []byte("filial-gone-db-data\nother_vol\n")}, nil)
+	// A removed worktree's database, another tool's volume of the same
+	// prefix (a compose project), and an unrelated one.
+	f.On([]string{"podman", "volume", "ls"}, sys.Result{Stdout: []byte("filial-gone-db-data-pg16\nfilial_compose_data\nother_vol\n")}, nil)
 	f.On([]string{"podman", "rmi"}, sys.Result{}, nil)
 	f.On([]string{"podman", "volume", "rm"}, sys.Result{}, nil)
 	code, out, errs := runWith(t, f, "--json", "gc")
@@ -79,7 +85,7 @@ func TestGC(t *testing.T) {
 	if len(ents) == 0 {
 		t.Error("gc removed the copies the lock pins")
 	}
-	if !slices.Equal(doc.Volumes, []string{"filial-gone-db-data"}) {
+	if !slices.Equal(doc.Volumes, []string{"filial-gone-db-data-pg16"}) {
 		t.Errorf("volumes %v", doc.Volumes)
 	}
 	var rmi, vrm int
@@ -96,11 +102,17 @@ func TestGC(t *testing.T) {
 	if rmi != 1 || vrm != 0 {
 		t.Errorf("rmi %d, volume rm %d (no --volumes)", rmi, vrm)
 	}
-	if code, _, errs := runWith(t, f, "gc", "--volumes"); code != 1 || !strings.Contains(errs, "pass --yes") {
+	before := len(f.Calls)
+	if code, _, errs := runWith(t, f, "gc", "--volumes"); code != 1 || !strings.Contains(errs, "pass --yes") || !strings.Contains(errs, "filial-gone-db-data-pg16") {
 		t.Errorf("--volumes without a terminal: exit %d %s", code, errs)
 	}
+	for _, c := range f.Calls[before:] {
+		if len(c) > 1 && (c[1] == "rmi" || len(c) > 2 && c[2] == "rm") {
+			t.Errorf("a refused gc --volumes removed %v", c)
+		}
+	}
 	if code, _, _ := runWith(t, f, "gc", "--volumes", "--yes"); code != 0 || !slices.ContainsFunc(f.Calls, func(c []string) bool {
-		return slices.Equal(c, []string{"podman", "volume", "rm", "filial-gone-db-data"})
+		return slices.Equal(c, []string{"podman", "volume", "rm", "filial-gone-db-data-pg16"})
 	}) {
 		t.Errorf("--volumes --yes: exit %d %v", code, f.Calls)
 	}

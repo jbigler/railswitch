@@ -74,8 +74,12 @@ copy it replaced.
 ```bash
 railswitch gc --dry-run      # what it would remove
 railswitch gc                # old images and unused stored package copies
-railswitch gc --volumes      # also volumes no worktree mounts (asks: their data is lost)
+railswitch gc --volumes      # also volumes no worktree mounts (lists them and asks: their data is lost)
 ```
+
+A volume left behind is often data: the database of a worktree you
+removed, or the old one after a PostgreSQL major upgrade
+(`db-data-pg16`). Read the list before you answer.
 
 It keeps everything any registered project's worktrees use now, running
 or not, and everything of a project that doesn't load.

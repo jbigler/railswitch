@@ -731,6 +731,8 @@ func TestRouteCollisions(t *testing.T) {
 	for name, want := range map[string]string{
 		"app": `routes: router "app" is used by rails and rails`,
 		"s3":  `routes: router "s3" is used by rails and storage`,
+		// rustfs's console route has a second router for its root redirect.
+		"s3-ui-root": `routes: router "s3-ui-root" is used by`,
 	} {
 		err := buildErr(fixtureInputs(t, fixtureWS(t), func(p *config.Project) {
 			p.Routes = []config.Route{{Name: name, Service: "rails", Port: 3036}}

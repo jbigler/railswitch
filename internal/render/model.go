@@ -401,10 +401,16 @@ func (b *builder) projectRoutes() error {
 	routers, hosts := map[string]string{}, map[string]string{}
 	for _, s := range b.m.Services {
 		for _, r := range s.Routes {
-			if prev, ok := routers[r.Name]; ok {
-				errs = append(errs, fmt.Errorf("routes: router %q is used by %s and %s", r.Name, prev, s.ID))
-			} else {
-				routers[r.Name] = s.ID
+			names := []string{r.Name}
+			if r.RootRedirect != "" { // its own router too (quadlet: <name>-root)
+				names = append(names, r.Name+"-root")
+			}
+			for _, n := range names {
+				if prev, ok := routers[n]; ok {
+					errs = append(errs, fmt.Errorf("routes: router %q is used by %s and %s", n, prev, s.ID))
+				} else {
+					routers[n] = s.ID
+				}
 			}
 			if prev, ok := hosts[r.Host]; ok {
 				errs = append(errs, fmt.Errorf("routes: host %q is used by %s and %s", r.Host, prev, s.ID))

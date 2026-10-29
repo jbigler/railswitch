@@ -652,6 +652,8 @@ func TestSetHooks(t *testing.T) {
 		{"start", []string{"a\nb"}, "hooks.start[0]: value contains a newline"},
 		{"create", []string{"ok", " "}, "hooks.create[1]: is empty"},
 		{"deps", []string{"-x"}, "hooks.deps[0]: starts with -"},
+		{"start", []string{"echo a\x00b"}, "hooks.start[0]: contains a control character"},
+		{"start", []string{"printf '\x1b[2J'"}, "hooks.start[0]: contains a control character"},
 	} {
 		if _, err := SetHooks(in, c.list, c.cmds); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("SetHooks(%s, %q) = %v; want %q", c.list, c.cmds, err, c.want)

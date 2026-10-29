@@ -515,6 +515,8 @@ func (v *validator) hook(path, c string) {
 		v.add(path, "is empty")
 	} else if strings.HasPrefix(c, "-") || strings.HasPrefix(c, "+") {
 		v.add(path, "starts with %c: sh would read it as an option", c[0])
+	} else if strings.ContainsFunc(c, func(r rune) bool { return r != '\t' && r != '\r' && r != '\n' && (r < 0x20 || r == 0x7f) }) {
+		v.add(path, "contains a control character")
 	}
 	v.oneLine(path, c)
 }

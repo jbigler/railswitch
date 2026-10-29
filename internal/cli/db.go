@@ -32,8 +32,16 @@ func cmdDB(ctx context.Context, e *env, args []string) int {
 		fs := e.flags("db restore")
 		from := fs.String("from", "", "restore the dumps in `dir` (default: <workspace>/db-dumps)")
 		yes := fs.Bool("yes", false, "replace the databases without asking")
-		if code, ok := parse(fs, args[1:]); !ok {
-			return code
+		// Flags may follow the database names (db restore mydb --yes).
+		var only []string
+		for rest := args[1:]; ; {
+			if code, ok := parse(fs, rest); !ok {
+				return code
+			}
+			if fs.NArg() == 0 {
+				break
+			}
+			only, rest = append(only, fs.Arg(0)), fs.Args()[1:]
 		}
 		l, slug, code := e.lifecycle(ctx, "db restore")
 		if code != 0 {
@@ -49,10 +57,6 @@ func cmdDB(ctx context.Context, e *env, args []string) int {
 				return e.usageErr("db restore: --from %s is not a directory", dir)
 			}
 			dir = abs
-		}
-		var only []string
-		if fs.NArg() > 0 {
-			only = fs.Args()
 		}
 		if _, err := l.DBRestore(ctx, slug, dir, only, *yes); err != nil {
 			return e.fail(err)

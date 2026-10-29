@@ -816,6 +816,21 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		if d.Prepare != nil && d.Restore == nil {
 			l.add(file, "dump.prepare needs dump.restore")
 		}
+		// Each file goes back into its own database: with a list, both
+		// name it; without one, there is no name to give.
+		for _, c := range []struct {
+			key  string
+			argv []string
+		}{{"dump.prepare", d.Prepare}, {"dump.restore", d.Restore}} {
+			uses := slices.ContainsFunc(c.argv, func(a string) bool { return strings.Contains(a, ph) })
+			switch {
+			case c.argv == nil:
+			case d.List != nil && !uses:
+				l.add(file, "%s must use %s: each dump goes back into its own database", c.key, ph)
+			case d.List == nil && uses:
+				l.add(file, "%s uses %s, which needs dump.list", c.key, ph)
+			}
+		}
 	}
 	l.volumes(file, "volumes", o.Volumes, true)
 	l.mounts(file, dir, o.Mounts)

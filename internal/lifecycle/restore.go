@@ -3,12 +3,14 @@ package lifecycle
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -56,6 +58,16 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 	if err != nil {
 		return nil, err
 	}
+	// A volume seed (db dump's tarballs) is never a database's dump.
+	for _, s := range m.Services {
+		for _, v := range s.Volumes {
+			for db, path := range files {
+				if v.Seed != "" && filepath.Base(path) == v.Seed {
+					delete(files, db)
+				}
+			}
+		}
+	}
 	if only != nil {
 		for _, db := range only {
 			if _, ok := files[db]; !ok {
@@ -98,38 +110,79 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 			return nil, nil
 		}
 	}
-	var done []string
+	// Every command is expanded and every file opened before anything
+	// runs: an argument that doesn't expand or a file that went missing (or
+	// became a symlink) never leaves a database dropped and empty.
+	type step struct {
+		db               string
+		prepare, restore []string
+		f                *os.File
+	}
+	var steps []step
+	defer func() {
+		for _, st := range steps {
+			st.f.Close()
+		}
+	}()
 	for _, db := range dbs {
-		dsc := dumpScope{sc, db}
-		if o.Dump.List == nil {
-			dsc.db = ""
-		}
+		dsc := dumpScope{sc, db} // "" for an option with one dump: no {dump.db}
+		st := step{db: db}
 		if o.Dump.Prepare != nil {
-			argv, err := expandArgv(o.Dump.Prepare, dsc, o.Name+" [dump] prepare")
-			if err != nil {
-				return done, err
-			}
-			if _, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append([]string{"exec", ctr}, argv...), Stdout: l.Out, Stderr: l.Err, Timeout: dumpTimeout}); err != nil {
-				return done, fmt.Errorf("prepare %s in %s: %w", db, ctr, err)
+			if st.prepare, err = expandArgv(o.Dump.Prepare, dsc, o.Name+" [dump] prepare"); err != nil {
+				return nil, err
 			}
 		}
-		argv, err := expandArgv(o.Dump.Restore, dsc, o.Name+" [dump] restore")
-		if err != nil {
-			return done, err
+		if st.restore, err = expandArgv(o.Dump.Restore, dsc, o.Name+" [dump] restore"); err != nil {
+			return nil, err
 		}
-		f, err := os.Open(files[db])
-		if err != nil {
-			return done, err
+		if st.f, err = openRegular(files[db]); err != nil {
+			return nil, err
 		}
-		_, err = l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append([]string{"exec", "-i", ctr}, argv...), Stdin: f, Stdout: l.Out, Stderr: l.Err, Timeout: dumpTimeout})
-		f.Close()
-		if err != nil {
-			return done, fmt.Errorf("restore %s into %s: %w", files[db], ctr, err)
+		steps = append(steps, st)
+	}
+	var done []string
+	for i, st := range steps {
+		fail := func(err error) ([]string, error) {
+			var left []string
+			for _, rest := range steps[i+1:] {
+				left = append(left, label(rest.db))
+			}
+			msg := fmt.Sprintf("%s: %v", label(st.db), err)
+			if len(done) > 0 {
+				msg += "; restored before it: " + strings.Join(done, ", ")
+			}
+			msg += "; " + label(st.db) + " may be empty or partly restored"
+			if len(left) > 0 {
+				msg += "; not touched: " + strings.Join(left, ", ")
+			}
+			return done, errors.New(msg)
 		}
-		fmt.Fprintf(l.Out, "restored %s from %s\n", label(db), files[db])
-		done = append(done, db)
+		if st.prepare != nil {
+			if _, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append([]string{"exec", ctr}, st.prepare...), Stdout: l.Out, Stderr: l.Err, Timeout: dumpTimeout}); err != nil {
+				return fail(fmt.Errorf("prepare in %s: %w", ctr, err))
+			}
+		}
+		if _, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append([]string{"exec", "-i", ctr}, st.restore...), Stdin: st.f, Stdout: l.Out, Stderr: l.Err, Timeout: dumpTimeout}); err != nil {
+			return fail(fmt.Errorf("restore %s into %s: %w", files[st.db], ctr, err))
+		}
+		fmt.Fprintf(l.Out, "restored %s from %s\n", label(st.db), files[st.db])
+		done = append(done, label(st.db))
 	}
 	return done, nil
+}
+
+// openRegular opens path without following a symlink, and refuses
+// anything but a regular file: what is read is what was listed.
+func openRegular(path string) (*os.File, error) {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, fmt.Errorf("dump %s: %w", path, err)
+	}
+	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
+		f.Close()
+		return nil, fmt.Errorf("dump %s: not a regular file", path)
+	}
+	return f, nil
 }
 
 // restoreFiles are the dumps in dir that o's [dump] file names, by the

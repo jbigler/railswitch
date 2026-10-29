@@ -533,6 +533,12 @@ func TestOptionDump(t *testing.T) {
 		"path":            "command = [\"d\"]\nfile = \"a/x.dump\"\n",
 		"dir":             "command = [\"d\"]\nfile = \"x/\"\n",
 		"dotdot":          "command = [\"d\"]\nfile = \"..\"\n",
+		// db restore (D121): each file into its own database.
+		"restore one db":      "list = [\"l\"]\ncommand = [\"d\", \"{dump.db}\"]\nfile = \"{dump.db}.dump\"\nrestore = [\"r\", \"app\"]\n",
+		"prepare one db":      "list = [\"l\"]\ncommand = [\"d\", \"{dump.db}\"]\nfile = \"{dump.db}.dump\"\nprepare = [\"p\"]\nrestore = [\"r\", \"{dump.db}\"]\n",
+		"restore no list":     "command = [\"d\"]\nfile = \"x.dump\"\nrestore = [\"r\", \"{dump.db}\"]\n",
+		"prepare, no restore": "command = [\"d\"]\nfile = \"x.dump\"\nprepare = [\"p\"]\n",
+		"empty restore":       "command = [\"d\"]\nfile = \"x.dump\"\nrestore = []\n",
 	} {
 		fsys := minimal()
 		opt := fsys["options/o/option.toml"]

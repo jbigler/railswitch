@@ -59,9 +59,12 @@ new worktree's database starts from the dumps in `<workspace>/db-dumps/`
 if there are any (`railswitch db dump` writes them from a worktree you
 like), else empty; then the app's own setup runs (`db:prepare` for
 Rails). `railswitch db restore` puts the dumps back into a running
-worktree's database at any time, replacing what it holds (it asks
-first, naming each database; `--from <dir>` for dumps from elsewhere,
-`--yes` without asking). It restores databases only: a seeded volume
+worktree's database at any time: each database that has a dump is
+replaced, the others are left as they are (it asks first, naming each
+one; `--from <dir>` for dumps from elsewhere, `--yes` without asking).
+A dump runs with the database's full rights, so restore only dumps you
+made or trust, and never point `--from` into a worktree an agent can
+write to. It restores databases only: a seeded volume
 (storage) comes back from its dump only when the volume is new
 (`down`, then `up`).
 

@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -87,5 +88,35 @@ func TestDBRestoreNotRunning(t *testing.T) {
 	writeDumps(t, e.ws)
 	if _, err := e.l.DBRestore(ctx, "feat", "", nil, true); err == nil || !strings.Contains(err.Error(), "is not running") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// When one database fails, the error says which were restored, which may
+// be empty and which weren't touched; nothing runs for the rest.
+func TestDBRestorePartialFailure(t *testing.T) {
+	e := setup(t)
+	e.dbRunning("feat")
+	writeDumps(t, e.ws)
+	e.f.On([]string{"podman", "exec", "-i", "filial-feat-db", "pg_restore", "-U", "postgres", "--no-owner", "--no-acl", "-d", "filial_dev"}, sys.Result{ExitCode: 1}, errors.New("exit 1"))
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	_, err := e.l.DBRestore(ctx, "feat", "", nil, true)
+	if err == nil || !strings.Contains(err.Error(), "filial_dev may be empty or partly restored") || !strings.Contains(err.Error(), "not touched: filial_queue") {
+		t.Errorf("err = %v", err)
+	}
+	if count(e.calls(), "sh filial_queue") != 0 {
+		t.Error("ran on after the failure")
+	}
+}
+
+// A dump replaced by a symlink after the listing is refused when opened.
+func TestOpenRegularRefusesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	link := filepath.Join(dir, "a.dump")
+	if err := os.Symlink("/etc/passwd", link); err != nil {
+		t.Fatal(err)
+	}
+	if f, err := openRegular(link); err == nil {
+		f.Close()
+		t.Error("opened a symlink")
 	}
 }

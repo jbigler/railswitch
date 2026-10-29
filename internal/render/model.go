@@ -117,11 +117,11 @@ type Service struct {
 	// service's unit stamp, so a changed hook restarts it on up: the app
 	// holds deps's too, as deps (a oneshot) only runs when the app starts.
 	HookScripts [][]byte
-	Routes     []Route
-	Health     *Health
-	Requires   []string // service ids
-	Wants      []string
-	Firewall   []string // profiles; ["self"] = no hook
+	Routes      []Route
+	Health      *Health
+	Requires    []string // service ids
+	Wants       []string
+	Firewall    []string // profiles; ["self"] = no hook
 	// FirewallMode is the firewall hook's mode for s: "" = the project's
 	// [firewall] mode; an agent's is always "enforce" (D55).
 	FirewallMode string

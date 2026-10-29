@@ -47,10 +47,11 @@ create = ["bin/rails runner 'Admin.create_default!'"]
   order; one that fails stops the rest. A failing `deps` or `start` hook
   fails the app's start, with its output in the start error. Editing
   either restarts the app on the next `up`.
-- `create` hooks run once the app passes its health check and its
-  address answers (a project whose app has no health check can't have
-  them); if it doesn't answer in time, the next `up` runs them. A failing one is run again by the
-  next `up`, with the ones after it; those that succeeded aren't.
+- `create` hooks run once the app passes its health check and Traefik
+  routes it (a project whose app has no health check can't have them);
+  if Traefik doesn't route it in time, the next `up` runs them. A
+  failing one is run again by the next `up`, with the ones after it;
+  those that succeeded aren't.
 - `start` hooks count against the app's health start period (120 s for
   the Rails pack): a slow one can make the start time out. Keep them
   quick, or move a slow step to `create`.

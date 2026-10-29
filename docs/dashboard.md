@@ -166,7 +166,13 @@ is no longer accepted. What the page shows meanwhile may be stale.
   says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with such secrets opens with this card.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
-  (`PR #2141 ready · checks ✓ · approved`), then Links, Services (one aligned row per service: a
+  (`PR #2141 ready · checks ✓ · approved`), then, when its branch is in a
+  gh stack (`stack ls`, read with the PRs), Stack: `2/3 open · 1 merged ·
+  on main`, `⚠ restack needed` when a branch needs a rebase, the open
+  branches top first (PR number, linked through the project's PR URL,
+  the branch, `◀ HEAD` on the current one, `queued`, `⚠`), the merged ones
+  folded, the trunk last; the list shows `≡ 2/3` next to the branch. Then
+  Links, Services (one aligned row per service: a
   glyph, the name and a plain state word, `running`, `starting`,
   `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
   `unknown`, in the glyph's colour;
@@ -814,6 +820,9 @@ docs/json.md.
   never matches (its head branch is the fork's). Fails with gh's
   message when gh is missing or not logged in; the page then shows "PRs
   unavailable".
+- `railswitch [--json] stack ls` (project): each worktree's gh stack, with
+  the PRs and as often (`docs/json.md`); nothing without the gh-stack
+  extension, and a failed read keeps the last stacks.
 - `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged
   with the project's `[tasks]` in `project.toml`; a project task replaces a
   pack task of the same name and `""` removes one; no task may be named

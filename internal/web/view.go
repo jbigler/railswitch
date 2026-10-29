@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/jobs"
@@ -35,8 +36,9 @@ const viewLines = 500
 
 // row is a worktree with its branch's PR (nil: none, or not known yet).
 type row struct {
-	WT worktree
-	PR *pr
+	WT      worktree
+	PR      *pr
+	Stacked *ghStackRow // nil: its branch is in no gh stack (or gh stack is missing)
 }
 
 // Sorting.
@@ -270,6 +272,7 @@ var prStates = map[string]struct{ word, class string }{
 	"open":   {"ready", "green"},
 	"merged": {"merged", "purple"},
 	"closed": {"closed", "red"},
+	"queued": {"queued", "blue"}, // in a merge queue (gh stack)
 }
 
 func prStateClass(state string) string { return prStates[state].class }
@@ -466,8 +469,108 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 	return v
 }
 
+// stackedView is a worktree branch's gh stack for the detail: Open top
+// (newest) to bottom, the merged ones counted apart, then the trunk.
+type stackedView struct {
+	Summary string // "2/3 open · 1 merged · on main"
+	Restack bool   // a branch needs a rebase
+	Open    []stackedBranch
+	Merged  []stackedBranch
+	Trunk   string
+	Error   string // gh stack couldn't say
+}
+
+type stackedBranch struct {
+	Name, PRText, PRURL, PRClass string
+	Current, NeedsRebase, Queued bool
+}
+
+// newStacked is r's stack, nil when it has none; repo is the PR URL
+// prefix ("https://github.com/o/n/pull/") the PR numbers link to, "" for
+// no links.
+func newStacked(r row, repo string) *stackedView {
+	st := r.Stacked
+	if st == nil {
+		return nil
+	}
+	if st.Stack == nil {
+		return &stackedView{Error: st.Error}
+	}
+	v := &stackedView{Trunk: st.Stack.Trunk}
+	pos, n := 0, 0
+	for _, b := range st.Stack.Branches {
+		sb := stackedBranch{Name: b.Name, Current: b.Current, NeedsRebase: b.NeedsRebase, Queued: b.Queued}
+		if b.PR != nil {
+			sb.PRText = fmt.Sprintf("#%d", b.PR.Number)
+			if repo != "" {
+				sb.PRURL = repo + strconv.Itoa(b.PR.Number)
+			}
+			sb.PRClass = prStateClass(b.PR.State)
+		}
+		v.Restack = v.Restack || b.NeedsRebase
+		if b.Merged && !b.Current {
+			v.Merged = append(v.Merged, sb)
+			continue
+		}
+		n++
+		if b.Current {
+			pos = n
+		}
+		v.Open = append([]stackedBranch{sb}, v.Open...) // top first
+	}
+	v.Summary = fmt.Sprintf("%d/%d open", pos, n)
+	if len(v.Merged) > 0 {
+		v.Summary += fmt.Sprintf(" · %d merged", len(v.Merged))
+	}
+	v.Summary += " · on " + v.Trunk
+	return v
+}
+
+// stackedRow is the list's short form: "2/3", "" without a stack.
+func stackedRow(r row) string {
+	if r.Stacked == nil || r.Stacked.Stack == nil {
+		return ""
+	}
+	pos, n := 0, 0
+	for _, b := range r.Stacked.Stack.Branches {
+		if b.Merged && !b.Current {
+			continue
+		}
+		n++
+		if b.Current {
+			pos = n
+		}
+	}
+	return fmt.Sprintf("%d/%d", pos, n)
+}
+
+// projectPRRepo is the PR URL prefix any row's PR has ("…/pull/"): every
+// worktree of a project is on one repository, so a stack's PRs link even
+// when the selected worktree's own branch has none yet.
+func projectPRRepo(rows []row) string {
+	for _, r := range rows {
+		if p := prRepo(r.PR); p != "" {
+			return p
+		}
+	}
+	return ""
+}
+
+// prRepo is the PR URL prefix of p's URL ("…/pull/"), "" without one.
+func prRepo(p *pr) string {
+	if p == nil {
+		return ""
+	}
+	i := strings.LastIndex(p.URL, "/pull/")
+	if i < 0 {
+		return ""
+	}
+	return p.URL[:i+len("/pull/")]
+}
+
 type rowView struct {
 	ID, Slug, URL, Branch             string
+	Stacked                           string // "2/3" in a gh stack, else ""
 	Base, Sel                         bool
 	PR                                *prView
 	StackGlyph, StackText, StackClass string
@@ -483,7 +586,7 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 		Branch: r.WT.Branch, Base: r.WT.Base, Sel: r.WT.Slug == sel, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(r.WT.Stack), StackText: stackText(r.WT), StackClass: stackClass(r.WT.Stack),
 		AgentGlyph: agentGlyph(kind), AgentText: agentLabel(kind), AgentClass: agentClass(kind),
-		Stale: r.WT.Stale,
+		Stale: r.WT.Stale, Stacked: stackedRow(r),
 	}
 	if r.WT.Agent != nil {
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
@@ -501,6 +604,7 @@ type detailView struct {
 	Agent                             *agentView
 	Actions                           []actionView
 	RemoveURL, TasksURL               string // RemoveURL "" for the base worktree
+	Stacked                           *stackedView
 	Merged, Stale                     bool
 }
 
@@ -515,13 +619,16 @@ type actionView struct{ Label, URL string }
 // newDetail is the selected worktree. Links: App (the main button), the
 // project's, the stack's, all greyed while the stack is stopped; then PR
 // and Logs, quieter.
-func newDetail(prefix string, r row) detailView {
+// newDetail is row r's detail; repo is the project's PR URL prefix
+// (projectPRRepo), which the stack's PR numbers link through.
+func newDetail(prefix string, r row, repo string) detailView {
 	wt := r.WT
 	path := "/p/" + prefix + "/" + wt.Slug
 	v := detailView{
 		Slug: wt.Slug, Branch: wt.Branch, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(wt.Stack), StackText: stackText(wt), StackClass: stackClass(wt.Stack),
 		TasksURL: path + "/tasks", Stale: wt.Stale,
+		Stacked: newStacked(r, repo),
 	}
 	dim := ""
 	if wt.Stack == "stopped" {

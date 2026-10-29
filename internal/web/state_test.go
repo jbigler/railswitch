@@ -341,3 +341,41 @@ func TestJobEndDuringRead(t *testing.T) {
 		t.Errorf("overview read again without a cause: %d", n)
 	}
 }
+
+// TestGhStack: a worktree whose branch is in a gh stack shows its place in
+// the row and the stack in the detail: open branches top first, HEAD
+// marked, a restack warning, merged ones folded, PR numbers linked through
+// the worktree's own PR URL.
+func TestGhStack(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.cli.set("--json -C /ws/ftest stack ls", `{"available":true,"worktrees":[
+ {"slug":"main","stack":null,"error":""},
+ {"slug":"b","stack":{"trunk":"main","current":"jb/b","branches":[
+  {"name":"jb/a","current":false,"merged":true,"queued":false,"needs_rebase":false,"pr":{"number":2140,"state":"merged"}},
+  {"name":"jb/b","current":true,"merged":false,"queued":false,"needs_rebase":true,"pr":{"number":2141,"state":"open"}},
+  {"name":"jb/c","current":false,"merged":false,"queued":false,"needs_rebase":false,"pr":null}]},"error":""}]}`)
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	evs := drain(sub)
+	if ev, ok := byID(evs, "row-b"); !ok || !strings.Contains(ev.HTML, "≡ 1/2") {
+		t.Errorf("row-b without its stack place: %q", ids(evs))
+	}
+	ev, ok := byID(evs, "detail")
+	if !ok {
+		t.Fatalf("no detail: %q", ids(evs))
+	}
+	for _, want := range []string{
+		"1/2 open · 1 merged · on main", "⚠ restack needed", "◀ HEAD",
+		`href="https://github.com/o/r/pull/2141"`, `href="https://github.com/o/r/pull/2140"`,
+		"✓ 1 merged", "no PR",
+	} {
+		if !strings.Contains(ev.HTML, want) {
+			t.Errorf("detail lacks %q", want)
+		}
+	}
+	if c, b := strings.Index(ev.HTML, "jb/c"), strings.Index(ev.HTML, "jb/b</strong> <strong"); c < 0 || b < 0 || c > b {
+		t.Errorf("open branches not top first (jb/c at %d, jb/b at %d)", c, b)
+	}
+}

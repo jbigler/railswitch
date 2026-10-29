@@ -93,6 +93,36 @@ type pr struct {
 	Review string `json:"review"`
 }
 
+// ghStackDoc is `stack ls`: each worktree's branch's gh-stack stack.
+type ghStackDoc struct {
+	Available bool         `json:"available"`
+	Worktrees []ghStackRow `json:"worktrees"`
+}
+
+type ghStackRow struct {
+	Slug  string   `json:"slug"`
+	Stack *ghStack `json:"stack"`
+	Error string   `json:"error"`
+}
+
+type ghStack struct {
+	Trunk    string          `json:"trunk"`
+	Current  string          `json:"current"`
+	Branches []ghStackBranch `json:"branches"` // bottom to top
+}
+
+type ghStackBranch struct {
+	Name        string `json:"name"`
+	Current     bool   `json:"current"`
+	Merged      bool   `json:"merged"`
+	Queued      bool   `json:"queued"`
+	NeedsRebase bool   `json:"needs_rebase"`
+	PR          *struct {
+		Number int    `json:"number"`
+		State  string `json:"state"`
+	} `json:"pr"`
+}
+
 type task struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
@@ -351,6 +381,10 @@ func readOverview(ctx context.Context, c CLI, ws string) (overview, error) {
 
 func readPRs(ctx context.Context, c CLI, ws string) ([]prRow, error) {
 	return readJSON[[]prRow](ctx, c, "-C", ws, "pr", "ls")
+}
+
+func readStacks(ctx context.Context, c CLI, ws string) (ghStackDoc, error) {
+	return readJSON[ghStackDoc](ctx, c, "-C", ws, "stack", "ls")
 }
 
 func readTasks(ctx context.Context, c CLI, ws, slug string) ([]task, error) {

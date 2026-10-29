@@ -153,7 +153,7 @@ var anchorRe = regexp.MustCompile(`<a [^>]*class="([^"]*)"[^>]*>([^<]*)</a>`)
 // merged PR offers "Remove worktree"; hostile text is escaped.
 func TestDetailFragment(t *testing.T) {
 	open := &pr{Number: 2141, Title: "x", URL: "https://github.com/o/r/pull/2141", State: "open", Checks: "pass", Review: "approved"}
-	html, err := render("detail", newDetail("ftest", fixtureRow("up", false, open)))
+	html, err := render("detail", newDetail("ftest", fixtureRow("up", false, open), ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +186,7 @@ func TestDetailFragment(t *testing.T) {
 		}
 	}
 
-	html, _ = render("detail", newDetail("ftest", fixtureRow("stopped", false, nil)))
+	html, _ = render("detail", newDetail("ftest", fixtureRow("stopped", false, nil), ""))
 	li, si = strings.Index(html, ">Links<"), strings.Index(html, ">Services<")
 	for _, l := range anchorRe.FindAllStringSubmatch(html[li:si], -1) {
 		if l[2] == "Logs" {
@@ -197,13 +197,13 @@ func TestDetailFragment(t *testing.T) {
 		}
 	}
 
-	html, _ = render("detail", newDetail("ftest", fixtureRow("up", true, nil)))
+	html, _ = render("detail", newDetail("ftest", fixtureRow("up", true, nil), ""))
 	if strings.Contains(html, "remove…") || strings.Contains(html, "Remove worktree") || strings.Contains(html, "/remove") {
 		t.Errorf("base worktree offers remove:\n%s", html)
 	}
 
 	merged := &pr{Number: 2098, State: "merged", Checks: "pass", Review: "approved", URL: "https://github.com/o/r/pull/2098"}
-	html, _ = render("detail", newDetail("ftest", fixtureRow("up", false, merged)))
+	html, _ = render("detail", newDetail("ftest", fixtureRow("up", false, merged), ""))
 	if !strings.Contains(html, "Remove worktree") {
 		t.Errorf("merged PR without Remove worktree:\n%s", html)
 	}
@@ -267,5 +267,36 @@ func TestServiceLook(t *testing.T) {
 		if got := [3]string{g, c, w}; got != want {
 			t.Errorf("%s: %q; want %q", state, got, want)
 		}
+	}
+}
+
+// TestStackedView: PR numbers link through the project's PR URL (any
+// row's), a queued PR is coloured, and a hostile branch name is text.
+func TestStackedView(t *testing.T) {
+	rows := []row{{WT: worktree{Slug: "main"}}, {WT: worktree{Slug: "b"}, PR: &pr{URL: "https://github.com/o/r/pull/7"}}}
+	repo := projectPRRepo(rows)
+	if repo != "https://github.com/o/r/pull/" {
+		t.Fatalf("projectPRRepo = %q", repo)
+	}
+	st := &ghStackRow{Slug: "c", Stack: &ghStack{Trunk: "main", Current: "<b>x", Branches: []ghStackBranch{
+		{Name: "jb/q", Queued: true},
+		{Name: "<b>x", Current: true},
+	}}}
+	st.Stack.Branches[0].PR = &struct {
+		Number int    `json:"number"`
+		State  string `json:"state"`
+	}{Number: 9, State: "queued"}
+	d := newDetail("ftest", row{WT: worktree{Slug: "c", Branch: "<b>x"}, Stacked: st}, repo)
+	html, err := render("detail", d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`href="https://github.com/o/r/pull/9"`, `class="pr blue"`, "&lt;b&gt;x", ">queued</span>"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("detail lacks %q:\n%s", want, html)
+		}
+	}
+	if strings.Contains(html, "<b>x") {
+		t.Error("a branch name reached the page as HTML")
 	}
 }

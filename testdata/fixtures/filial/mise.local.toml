@@ -1,3 +1,4 @@
+# Local values railswitch generated for the services (D17). Never commit this file.
 [env]
 DB_PASSWORD = "s3cret"
 S3_SECRET_KEY = "s3cret-s3"

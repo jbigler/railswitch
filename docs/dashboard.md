@@ -802,9 +802,7 @@ docs/json.md.
   No git call and no health check; `status` has health.
 - `railswitch [--json] pr ls` (project): each worktree's pull request via
   the host's `gh` (`gh pr list --head=<branch>` per worktree branch on the
-  repo from `project.toml`, never a worktree's git config, run in `/`: a mise-shimmed `gh` started in a
-  workspace would read its `mise.local.toml` as mise config and refuse it
-  as untrusted): number, title, url, state (`draft`, `open`,
+  repo from `project.toml`, never a worktree's git config, run in `/`, away from any workspace's config files): number, title, url, state (`draft`, `open`,
   `merged`, `closed`), checks (`pass`, `pending`, `fail`, `none`), review
   (`approved`, `changes_requested`, `pending`, `none`). For several PRs on
   one branch an open or draft one wins, then the highest number; a merged

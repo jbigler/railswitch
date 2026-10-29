@@ -374,7 +374,7 @@ func TestMissingSecret(t *testing.T) {
 	if err == nil {
 		t.Fatal("no error with DB_PASSWORD missing")
 	}
-	for _, w := range []string{"DB_PASSWORD", "mise.local.toml"} {
+	for _, w := range []string{"DB_PASSWORD", "generated.toml"} {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q does not name %s", err, w)
 		}
@@ -388,8 +388,8 @@ func TestMissingSecret(t *testing.T) {
 		body = strings.Replace(body, name+` = "`, name+` = "" # `, 1)
 		writeFile(t, filepath.Join(ws, "mise.local.toml"), body)
 		err := buildErr(fixtureInputs(t, ws, nil))
-		if err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), "mise.local.toml") {
-			t.Errorf("%s = \"\": error = %v; want one naming %s and mise.local.toml", name, err, name)
+		if err == nil || !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), "generated.toml") {
+			t.Errorf("%s = \"\": error = %v; want one naming %s and generated.toml", name, err, name)
 		}
 	}
 
@@ -404,7 +404,7 @@ func TestMissingSecret(t *testing.T) {
 	if err := os.Remove(filepath.Join(ws, "mise.local.toml")); err != nil {
 		t.Fatal(err)
 	}
-	if err := buildErr(fixtureInputs(t, ws, nil)); err == nil || !strings.Contains(err.Error(), "mise.local.toml") {
+	if err := buildErr(fixtureInputs(t, ws, nil)); err == nil || !strings.Contains(err.Error(), "generated.toml") {
 		t.Errorf("no mise.local.toml: error = %v", err)
 	}
 }

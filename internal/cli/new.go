@@ -41,7 +41,8 @@ const (
 )
 
 // workspaceGitignore is the workspace repo's allowlist (D38): worktrees,
-// .railswitch/, mise.local.toml and db-dumps/ are never tracked; local agent
+// .railswitch/ (the generated values included), mise.local.toml and
+// db-dumps/ are never tracked; local agent
 // packages under agents/ and git-guard's hook backups under githooks/ (D60)
 // are.
 const workspaceGitignore = `/*
@@ -418,7 +419,7 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template, bundl
 	case !fi.IsDir():
 		return fmt.Errorf("%s is not a directory", ws)
 	}
-	rels := []string{slug, ".gitignore", "mise.local.toml", "stack.lock"}
+	rels := []string{slug, ".gitignore", config.GeneratedFile, "stack.lock"}
 	for _, n := range ejectNames(st) {
 		rels = append(rels, workspaceFile(n))
 	}
@@ -1063,21 +1064,17 @@ func prepare(ws, slug string, st *pack.Stack) error {
 	return worktree.PrecreateVolumes(filepath.Join(ws, slug), worktree.VolumeDirs(st.Pack))
 }
 
-// writeGenerated writes <ws>/mise.local.toml (0600) with a value from value
-// for each generated name of the chosen options (D17). The values are never
-// printed.
+// writeGenerated writes <ws>/.railswitch/generated.toml (0600,
+// config.GeneratedFile) with a value from value for each generated name of
+// the chosen options (D17, D132). The values are never printed.
 func writeGenerated(ws string, st *pack.Stack, value func() string) error {
-	var names []string
+	values := map[string]string{}
 	for _, ch := range st.Options {
-		names = append(names, ch.Option.Generated...)
+		for _, n := range ch.Option.Generated {
+			values[n] = value()
+		}
 	}
-	slices.Sort(names)
-	var b strings.Builder
-	b.WriteString("# Local values railswitch generated for the services (D17). Never commit this file.\n[env]\n")
-	for _, n := range slices.Compact(names) {
-		fmt.Fprintf(&b, "%s = %s\n", n, config.QuoteString(value()))
-	}
-	return createFile(filepath.Join(ws, "mise.local.toml"), []byte(b.String()), 0o600)
+	return config.CreateGenerated(ws, values)
 }
 
 // randomValue is a fresh local password: 32 hex digits.

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/sys/systest"
@@ -307,7 +308,7 @@ func TestNewUp(t *testing.T) {
 func TestNewRefusesExistingPaths(t *testing.T) {
 	newEnv(t)
 	repo := bareRepo(t, "main")
-	for _, rel := range []string{"main", ".gitignore", "mise.local.toml", "stack.lock", "containerfiles/Containerfile.base", "containerfiles/Containerfile.agent-base"} {
+	for _, rel := range []string{"main", ".gitignore", config.GeneratedFile, "stack.lock", "containerfiles/Containerfile.base", "containerfiles/Containerfile.agent-base"} {
 		ws := filepath.Join(t.TempDir(), "shop")
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(ws, filepath.FromSlash(rel))), 0o755); err != nil {
 			t.Fatal(err)

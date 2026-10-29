@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 )
 
@@ -338,7 +339,7 @@ func (m *Model) expandEnv(in *Instance) error {
 	if gen == nil {
 		gen = map[string]string{}
 	}
-	file := filepath.Join(m.Inputs.Workspace, "mise.local.toml")
+	file := filepath.Join(m.Inputs.Workspace, config.GeneratedFile)
 	missing := func(name string) error {
 		return fmt.Errorf("%s is not set (or empty) in %s (railswitch project new generates it; restore it under [env])", name, file)
 	}

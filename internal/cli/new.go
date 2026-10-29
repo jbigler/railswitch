@@ -41,7 +41,8 @@ const (
 )
 
 // workspaceGitignore is the workspace repo's allowlist (D38): worktrees,
-// .railswitch/, mise.local.toml and db-dumps/ are never tracked; local agent
+// .railswitch/ (the generated values included), mise.local.toml and
+// db-dumps/ are never tracked; local agent
 // packages under agents/ and git-guard's hook backups under githooks/ (D60)
 // are.
 const workspaceGitignore = `/*
@@ -1073,7 +1074,7 @@ func writeGenerated(ws string, st *pack.Stack, value func() string) error {
 			values[n] = value()
 		}
 	}
-	return config.WriteGenerated(ws, values)
+	return config.CreateGenerated(ws, values)
 }
 
 // randomValue is a fresh local password: 32 hex digits.

@@ -818,7 +818,7 @@ type Instance struct {
 }
 
 // Instance resolves the model for one worktree. A generated value the
-// services use but mise.local.toml lacks is an error.
+// services use but the generated values file lacks is an error.
 func (m *Model) Instance(wt Worktree) (*Instance, error) {
 	in, err := m.values(wt)
 	if err != nil {

@@ -81,7 +81,11 @@ database password, the storage secret) are in
 `<workspace>/.railswitch/generated.toml`, readable only by you and never
 committed. Workspaces made before this kept them in `mise.local.toml`;
 the next render moves them, unchanged, and deletes that file when
-railswitch wrote it and nothing else is in it. railswitch needs no mise.
+railswitch wrote it and nothing else is in it (otherwise it stays, with a
+warning; railswitch no longer reads it). Workspaces moved this way can't
+be read by an older railswitch. `project rm --purge` deletes these values
+with the rest of `.railswitch/`, together with the volumes that used them.
+railswitch needs no mise.
 
 Nothing in a container sees your home directory, SSH keys, SSH agent or
 git config file (only your git name and email are passed in). Secrets reach only the containers that declare them, through

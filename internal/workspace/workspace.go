@@ -610,8 +610,11 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 		// Generated values still in mise.local.toml move to their own file
 		// (D132): a mise-shimmed tool run in the workspace (gh stack)
 		// refuses that file as untrusted.
-		if _, err := config.MigrateGenerated(w.Root); err != nil {
+		switch moved, kept, err := config.MigrateGenerated(w.Root); {
+		case err != nil:
 			d.Warnings = append(d.Warnings, "move the generated values to "+config.GeneratedFile+": "+err.Error())
+		case moved && kept:
+			d.Warnings = append(d.Warnings, "moved the generated values to "+config.GeneratedFile+"; "+config.LegacyGeneratedFile+" holds more than railswitch wrote, so it stays (railswitch no longer reads it)")
 		}
 		// Units of other projects written before D130 still wait for
 		// network-online.target, and Traefik starts their proxy networks.

@@ -63,7 +63,7 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	} else {
 		fmt.Fprintf(m.Out, "worktree %s is not registered: no containers to remove\n", w.Slug)
 	}
-	for _, d := range []string{"env", "status", "restore-pending"} {
+	for _, d := range []string{"env", "status", "restore-pending", "create-pending"} {
 		if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, w.Slug)); err != nil {
 			return err
 		}

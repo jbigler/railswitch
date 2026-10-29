@@ -27,15 +27,16 @@ const (
 // only after the container is healthy and the podman event reaches it, so
 // for a moment after `systemctl start` returns the host still gets a 404.
 // A route that doesn't appear is a warning, not an error: the app runs.
-func (l *L) waitRoute(ctx context.Context, m *render.Model, in *render.Instance, slug string) error {
+// It reports whether the route came up (true for an app without one).
+func (l *L) waitRoute(ctx context.Context, m *render.Model, in *render.Instance, slug string) (bool, error) {
 	app := m.Services[0]
 	if len(app.Routes) == 0 {
-		return nil
+		return true, nil
 	}
 	r := app.Routes[0]
 	host, err := pack.Expand(r.Host, in.Scope(app.ID))
 	if err != nil {
-		return fmt.Errorf("%s: route %s: %w", app.ID, r.Name, err)
+		return false, fmt.Errorf("%s: route %s: %w", app.ID, r.Name, err)
 	}
 	url := "http://" + host + "/"
 	router := m.Prefix + "-" + slug + "-" + r.Name + "@docker" // render's router label, docker provider
@@ -52,7 +53,7 @@ func (l *L) waitRoute(ctx context.Context, m *render.Model, in *render.Instance,
 			answered = true
 			if resp.StatusCode == http.StatusOK {
 				fmt.Fprintf(l.Out, "%s ready\n", url)
-				return nil
+				return true, nil
 			}
 		}
 		if !time.Now().Before(deadline) {
@@ -60,7 +61,7 @@ func (l *L) waitRoute(ctx context.Context, m *render.Model, in *render.Instance,
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return false, ctx.Err()
 		case <-time.After(poll):
 		}
 	}
@@ -68,11 +69,11 @@ func (l *L) waitRoute(ctx context.Context, m *render.Model, in *render.Instance,
 	if !answered {
 		fmt.Fprintf(l.Err, "warning: Traefik has no route for %s: its API at %s did not answer, so Traefik is not running\n"+
 			"next: systemctl --user status %s; railswitch status\n", host, base, traefikService)
-		return nil
+		return false, nil
 	}
 	fmt.Fprintf(l.Err, "warning: Traefik has no route for %s yet (router %s); its %s- routers: %s\nnext: railswitch status\n",
 		host, router, m.Prefix, l.routers(ctx, client, base, m.Prefix+"-"))
-	return nil
+	return false, nil
 }
 
 // routers lists Traefik's HTTP routers whose names start with prefix.

@@ -113,11 +113,15 @@ type Service struct {
 	Publish    []Port   // host port = Base + worktree ID, on 127.0.0.1
 	Volumes    []Volume
 	Mounts     []Mount
-	Routes     []Route
-	Health     *Health
-	Requires   []string // service ids
-	Wants      []string
-	Firewall   []string // profiles; ["self"] = no hook
+	// HookScripts are the [hooks] scripts (D126) that are part of the
+	// service's unit stamp, so a changed hook restarts it on up: the app
+	// holds deps's too, as deps (a oneshot) only runs when the app starts.
+	HookScripts [][]byte
+	Routes      []Route
+	Health      *Health
+	Requires    []string // service ids
+	Wants       []string
+	Firewall    []string // profiles; ["self"] = no hook
 	// FirewallMode is the firewall hook's mode for s: "" = the project's
 	// [firewall] mode; an agent's is always "enforce" (D55).
 	FirewallMode string
@@ -303,6 +307,7 @@ func (b *builder) services() error {
 	var errs []error
 	errs = append(errs, b.entrypoint(&app, pk.Name, pk.Files, pk.App.Entrypoint))
 	errs = append(errs, b.entrypoint(&deps, pk.Name, pk.Files, pk.App.DepsEntrypoint))
+	errs = append(errs, b.hooks(&app, &deps))
 
 	var workers, data, toolOpts, tools []Service
 	for _, ch := range st.Options {

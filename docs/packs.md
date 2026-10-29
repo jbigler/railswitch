@@ -213,7 +213,7 @@ inside a firewalled container):
 | Check | Flagged |
 |---|---|
 | `firewall` | a host added to `deps.allow`, `app.allow` (D119), an agent's or a tool's `allow`; an option's or tool's `firewall` profiles changed |
-| `runs-here` | an added or changed `Containerfile.*` instruction (continuation lines and heredoc bodies joined, flagged at its first changed line; commented lines too) that pipes `curl`/`wget` into a shell or interpreter (`sh`, `bash`, `zsh`, `dash`, `ash`, `ksh`, `fish`, `python`, `python3`, `perl`, `ruby`, `node`, `php`; any case or spacing, through `sudo`/`env` or a path), runs one through `<(`, `$(` or backticks, `ADD http(s)://`, `--security=insecure`, `--network=host`; a manifest that does not load; any file that is not text (a NUL or invalid UTF-8 byte: it is still diffed and checked, the byte shown as `\xNN`) |
+| `runs-here` | an added or changed `Containerfile.*` instruction (continuation lines and heredoc bodies joined, flagged at its first changed line; commented lines too) that pipes `curl`/`wget` into a shell or interpreter (`sh`, `bash`, `zsh`, `dash`, `ash`, `ksh`, `fish`, `python`, `python3`, `perl`, `ruby`, `node`, `php`; any case or spacing, through `sudo`/`env` or a path), runs one through `<(`, `$(` or backticks, `ADD http(s)://`, `--security=insecure`, `--network=host`; a manifest that does not load; any file that is not text (a NUL or invalid UTF-8 byte: it is still diffed and checked, the byte shown as `\xNN`); a template's `[hooks]` command added or changed (D126: they run without being asked) |
 | `image` | a `Containerfile.*` `FROM` line added or changed; any `[image]` field that picks what a service runs changed: an option's `pull`, `use`, `build`, `tag`, `args` and `[pin] default`, a pack's `file`, `tag` and `args`, a tool's or agent's `file` |
 | `host-mount` | a `[[mounts]]` entry added or changed whose source is an absolute path or a placeholder |
 | `port` | a `[[ports]]` entry added, or its `base`, `container`, `share` or `same_port` changed; an option's `[[routes]]` entry (a host Traefik exposes) added, or its `host` or `port` changed |
@@ -483,7 +483,7 @@ there is no shared add-on package (user, 2026-10-27).
 | `[app] port` | the container port the app route sends `<slug>.<prefix>.localhost` to |
 | `[app] install` | the deps command, run through `deps_entrypoint` |
 | `[app] health`, `health_start_period` | the app's health command (empty: none) and its start grace |
-| `[app] entrypoint`, `deps_entrypoint` | package files mounted as the app's and the deps service's entrypoint |
+| `[app] entrypoint`, `deps_entrypoint` | package files mounted as the app's and the deps service's entrypoint. A project's `[hooks] deps` (D126) replaces deps's entrypoint with railswitch's hook runner, which runs `deps_entrypoint` first: a pack without one, whose image has an `ENTRYPOINT`, loses that entrypoint for deps while the project has deps hooks. The app's entrypoint must exec its arguments (the server, behind the start hooks) |
 | `[deps] frozen_env` | env on the deps service only (a frozen install); `railswitch deps` leaves it out |
 | `[image] file`, `tag`, `os`, `args` | the base image's Containerfile (ejected to `containerfiles/`), tag part, OS family and build args |
 | `[runtimes.<name>]` | a version chain (`from`, optional `fallback`): `{<name>}` |

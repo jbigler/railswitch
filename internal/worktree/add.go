@@ -115,6 +115,9 @@ func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktr
 		return render.Worktree{}, err
 	}
 	u.slug = slug
+	if err := render.MarkCreatePending(m.WS, slug); err != nil {
+		return render.Worktree{}, err
+	}
 	if err := PrecreateVolumes(dir, m.WorktreeVolumes); err != nil {
 		return render.Worktree{}, err
 	}
@@ -189,7 +192,7 @@ func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
 			fail("unregister "+u.slug, err)
 			return errors.Join(errs...)
 		}
-		for _, d := range []string{"env", "status", "restore-pending"} {
+		for _, d := range []string{"env", "status", "restore-pending", "create-pending"} {
 			if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, u.slug)); err != nil {
 				fail("remove its "+d+" dir", err)
 			}

@@ -115,6 +115,7 @@ type stackFile struct {
 	Links       []config.Link                     `toml:"links"`
 	Routes      []config.Route                    `toml:"routes"`
 	Firewall    config.Firewall                   `toml:"firewall"`
+	Hooks       config.Hooks                      `toml:"hooks"`
 	Image       struct {
 		Addons []string `toml:"addons"`
 	} `toml:"image"`
@@ -229,7 +230,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 		Lines: &config.Project{
 			Schema: config.SchemaVersion, Stack: f.Stack, Options: f.Options, Versions: f.Versions, Env: f.Env,
 			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, Routes: f.Routes,
-			Firewall: f.Firewall, Image: config.ImageConfig{Addons: f.Image.Addons},
+			Firewall: f.Firewall, Hooks: f.Hooks, Image: config.ImageConfig{Addons: f.Image.Addons},
 		},
 	}
 	if t.Ask == nil {

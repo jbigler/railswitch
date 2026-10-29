@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -17,7 +18,8 @@ const templateManifest = "stack.toml"
 // or hand on (D98's checks, applied to project.toml lines). Values are
 // compared by their path, so reordering or reformatting adds no flag.
 // Tasks, health checks, env and the rest run inside the project's
-// firewalled containers and are shown as diffs, as a package's are.
+// firewalled containers and are shown as diffs, as a package's are; hooks
+// too, but they run without being asked (D126), so each is flagged.
 func templateFlags(old, new []byte) []Flag {
 	var out []Flag
 	add := func(check, format string, args ...any) {
@@ -32,6 +34,11 @@ func templateFlags(old, new []byte) []Flag {
 		return out
 	}
 	before, after := flatten(a), flatten(b)
+	for _, k := range slices.Sorted(maps.Keys(before)) {
+		if _, ok := after[k]; !ok && strings.HasPrefix(k, "hooks.") {
+			add(CheckRunsHere, "%s: %s -> (none)", k, before[k])
+		}
+	}
 	for _, k := range slices.Sorted(maps.Keys(after)) {
 		v := after[k]
 		if before[k] == v {
@@ -45,6 +52,8 @@ func templateFlags(old, new []byte) []Flag {
 			check = CheckPrivilege // who receives a secret, and where it may go
 		case strings.HasPrefix(k, "routes."):
 			check = CheckPort // a host Traefik routes to a service
+		case strings.HasPrefix(k, "hooks."):
+			check = CheckRunsHere // runs on every start (deps: with the registries) or once per worktree
 		default:
 			continue
 		}
@@ -80,6 +89,14 @@ func flatten(m map[string]any) map[string]string {
 			s := make([]string, len(v))
 			for i, x := range v {
 				s[i] = fmt.Sprint(x)
+			}
+			if strings.HasPrefix(prefix, ".hooks.") {
+				// Commands: their order matters and each is its own shell.
+				for i := range s {
+					s[i] = strconv.Quote(s[i])
+				}
+				out[prefix[1:]] = strings.Join(s, " ")
+				break
 			}
 			slices.Sort(s)
 			out[prefix[1:]] = strings.Join(s, ", ")

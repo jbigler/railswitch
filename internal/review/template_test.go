@@ -28,6 +28,8 @@ service = "rails"
 port = 3000
 [tasks]
 seed = "bin/rails db:seed"
+[hooks]
+deps = ["gem install retest"]
 `
 	files, err := Compare("template", nil, fstest.MapFS{"stack.toml": {Data: []byte(stack)}})
 	if err != nil {
@@ -45,6 +47,7 @@ seed = "bin/rails db:seed"
 		"privilege secret.github_token.git_host: (none) -> evil.example",
 		"privilege secret.github_token.services: (none) -> rails",
 		"port routes.admin.port: (none) -> 3000",
+		"runs-here hooks.deps: (none) -> \"gem install retest\"",
 	} {
 		if !slices.Contains(got, want) {
 			t.Errorf("missing flag %q in\n%s", want, strings.Join(got, "\n"))
@@ -94,5 +97,38 @@ func TestTemplateBundledFlags(t *testing.T) {
 		if f.Path == "options/kv/option.toml" && !strings.Contains(f.Diff, "+++ b/options/kv/option.toml") {
 			t.Errorf("diff header:\n%s", f.Diff)
 		}
+	}
+}
+
+// TestTemplateHookFlags: hooks are compared in order and command by
+// command; a split, a reorder and a removal are each flagged.
+func TestTemplateHookFlags(t *testing.T) {
+	stack := func(hooks string) fstest.MapFS {
+		return fstest.MapFS{"stack.toml": {Data: []byte("schema = 1\nname = \"x\"\nversion = 1\n[stack]\npack = \"rails@1\"\n" + hooks)}}
+	}
+	flags := func(old, new string) []string {
+		files, err := Compare("template", stack(old), stack(new))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, f := range files {
+			for _, fl := range f.Flags {
+				got = append(got, fl.Check+" "+fl.Text)
+			}
+		}
+		return got
+	}
+	for _, c := range []struct{ old, new, want string }{
+		{"[hooks]\nstart = [\"a, b\"]\n", "[hooks]\nstart = [\"a\", \"b\"]\n", `runs-here hooks.start: "a, b" -> "a" "b"`},
+		{"[hooks]\nstart = [\"a\", \"b\"]\n", "[hooks]\nstart = [\"b\", \"a\"]\n", `runs-here hooks.start: "a" "b" -> "b" "a"`},
+		{"[hooks]\ncreate = [\"a\"]\n", "", `runs-here hooks.create: "a" -> (none)`},
+	} {
+		if got := flags(c.old, c.new); !slices.Contains(got, c.want) {
+			t.Errorf("%q -> %q: flags %q, want %q", c.old, c.new, got, c.want)
+		}
+	}
+	if got := flags("[hooks]\nstart = [\"a\"]\n", "[hooks]\nstart = [ \"a\" ]\n"); len(got) != 0 {
+		t.Errorf("reformatted hooks flagged: %q", got)
 	}
 }

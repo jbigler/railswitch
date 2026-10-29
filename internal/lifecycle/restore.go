@@ -127,7 +127,7 @@ func dumpFiles(m *render.Model, dir string, o *pack.Option, sc pack.Scope) (map[
 	// A dump of a database the pack leaves out (an older dump of Rails'
 	// test databases, say) is never restored.
 	for db := range files {
-		if db != "" && skipDump(m.Inputs.Stack.Pack.DumpSkip, db) {
+		if db != "" && skipDump(m.Inputs.Stack.Pack.DumpSkip, sc, db) {
 			delete(files, db)
 		}
 	}

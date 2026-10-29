@@ -146,7 +146,7 @@ func (l *L) dumpList(ctx context.Context, ctr string, o *pack.Option, sc pack.Sc
 		case name == "":
 		case !dumpDBName.MatchString(name) || name == "." || name == "..":
 			fmt.Fprintf(l.Err, "warning: %s: database %q skipped: not a safe file name\n", ctr, safefile.Printable(name))
-		case skipDump(skip, name):
+		case skipDump(skip, sc, name):
 			fmt.Fprintf(l.Err, "%s: database %s not dumped (the pack's dump_skip)\n", ctr, name)
 		default:
 			dbs = append(dbs, name)
@@ -158,9 +158,14 @@ func (l *L) dumpList(ctx context.Context, ctr string, o *pack.Option, sc pack.Sc
 	return dbs, nil
 }
 
-// skipDump reports whether database name matches one of patterns.
-func skipDump(patterns []string, name string) bool {
+// skipDump reports whether database name matches one of patterns, each
+// expanded in sc first (one that can't be, {db_test} unknown, is dropped).
+func skipDump(patterns []string, sc pack.Scope, name string) bool {
 	for _, p := range patterns {
+		p, err := pack.Expand(p, sc)
+		if err != nil || p == "" {
+			continue
+		}
 		if ok, _ := path.Match(p, name); ok {
 			return true
 		}

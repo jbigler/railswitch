@@ -189,3 +189,34 @@ func TestSettingsOtherOptionKeepsAddons(t *testing.T) {
 		t.Errorf("addons %v", c.Image.Addons)
 	}
 }
+
+// Choosing an option with its own image (playwright) in Settings ejects its
+// Containerfile when the workspace has none: `containerfile eject` refuses
+// one the stack doesn't use yet, so nothing else could add it.
+func TestSettingsOptionEjectsItsImage(t *testing.T) {
+	ws, _ := lockedWS(t)
+	apply := func(ref string) {
+		t.Helper()
+		before := readFile(t, filepath.Join(ws, "project.toml"))
+		edits := `[{"op":"option","key":"browser","ref":"` + ref + `"}]`
+		if code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+			t.Fatalf("%s: exit %d: %s\n%s", ref, code, out, errs)
+		}
+	}
+	apply("none")
+	pw := filepath.Join(ws, "containerfiles", "Containerfile.playwright")
+	if err := os.Remove(pw); err != nil {
+		t.Fatal(err)
+	}
+	apply("playwright@1")
+	if got := readFile(t, pw); !strings.HasPrefix(got, "# Ejected from playwright@1 Containerfile.playwright") {
+		t.Errorf("Containerfile.playwright:\n%s", got)
+	}
+	// Choosing it again keeps the file you have.
+	writeFile(t, pw, readFile(t, pw)+"RUN echo mine\n")
+	apply("none")
+	apply("playwright@1")
+	if !strings.HasSuffix(readFile(t, pw), "RUN echo mine\n") {
+		t.Error("choosing playwright again replaced your Containerfile")
+	}
+}

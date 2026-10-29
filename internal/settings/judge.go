@@ -162,8 +162,25 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 		}
 		files[rel(a.File)] = workspace.EjectedContainerfile(ch.Ref.String(), strings.TrimPrefix(a.File, "Containerfile."), def)
 	}
+	// A newly chosen option with its own image (playwright) needs its
+	// Containerfile in the workspace too, and `containerfile eject` refuses
+	// one the stack doesn't use yet: it is ejected here, as an addon is.
+	for _, ch := range st.Options {
+		b := ch.Option.Image.Build
+		if b == "" || !changed(ch.Key) {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(e.WS.Root, "containerfiles", b)); err == nil {
+			continue // a copy you had: kept as it is
+		}
+		def, err := fs.ReadFile(ch.Option.Files, b)
+		if err != nil {
+			return "", nil, err
+		}
+		files[rel(b)] = workspace.EjectedContainerfile(ch.Ref.String(), strings.TrimPrefix(b, "Containerfile."), def)
+	}
 	if slices.Equal(addons, p.Image.Addons) {
-		return text, nil, nil
+		return text, files, nil
 	}
 	out, err := config.SetImageAddons(text, addons)
 	return out, files, err

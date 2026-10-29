@@ -20,6 +20,7 @@ type PR struct {
 	Title  string `json:"title"`
 	URL    string `json:"url"`
 	Branch string `json:"-"`
+	Head   string `json:"-"`      // the PR's head commit
 	State  string `json:"state"`  // "draft", "open", "merged", "closed"
 	Checks string `json:"checks"` // "pass", "fail", "pending", "none"
 	Review string `json:"review"` // "approved", "changes_requested", "pending", "none"
@@ -56,6 +57,7 @@ type ghPR struct {
 	Title          string    `json:"title"`
 	URL            string    `json:"url"`
 	HeadRefName    string    `json:"headRefName"`
+	HeadRefOid     string    `json:"headRefOid"`
 	IsCross        bool      `json:"isCrossRepository"`
 	IsDraft        bool      `json:"isDraft"`
 	State          string    `json:"state"`
@@ -85,7 +87,7 @@ func List(ctx context.Context, r sys.Runner, repo string, branches []string) ([]
 		res, err := r.Run(ctx, sys.Cmd{
 			Name: "gh",
 			Args: []string{"pr", "list", "--repo", repo, "--head=" + b, "--state", "all", "--limit", "20",
-				"--json", "number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"},
+				"--json", "number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"},
 			Dir:     NeutralDir,
 			Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
 			Timeout: 30 * time.Second,
@@ -106,6 +108,7 @@ func List(ctx context.Context, r sys.Runner, repo string, branches []string) ([]
 				Title:  p.Title,
 				URL:    p.URL,
 				Branch: p.HeadRefName,
+				Head:   p.HeadRefOid,
 				State:  state(p),
 				Checks: checks(p.Checks),
 				Review: review(p.ReviewDecision),
@@ -169,13 +172,16 @@ func review(d string) string {
 	return "none"
 }
 
-// ForBranch picks the PR for branch: an open or draft one first, then the
-// highest number. It returns nil when the branch has none.
-func ForBranch(prs []PR, branch string) *PR {
+// ForBranch picks the PR for branch, whose commit is head: an open or
+// draft one first, then the highest number. A merged or closed PR counts
+// only while the branch is still at its head commit: a branch name reused
+// later (a long-lived master someone once opened a PR from) has moved on.
+// It returns nil when the branch has none.
+func ForBranch(prs []PR, branch, head string) *PR {
 	var best *PR
 	for i := range prs {
 		p := &prs[i]
-		if p.Branch != branch {
+		if p.Branch != branch || !live(p) && (head == "" || p.Head != head) {
 			continue
 		}
 		if best == nil || live(p) && !live(best) || live(p) == live(best) && p.Number > best.Number {

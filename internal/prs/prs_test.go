@@ -53,7 +53,7 @@ func TestListArgv(t *testing.T) {
 	for i, b := range []string{"main", "feat"} {
 		c := f.Cmds[i]
 		want := []string{"gh", "pr", "list", "--repo", "o/n", "--head=" + b, "--state", "all", "--limit", "20", "--json",
-			"number,title,url,headRefName,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
+			"number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
 		if !slices.Equal(f.Calls[i], want) {
 			t.Errorf("argv = %q", f.Calls[i])
 		}
@@ -78,41 +78,55 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []PR{
-		{1, "Draft", "https://github.com/o/n/pull/1", "draft", "draft", "pass", "none"},
-		{2, "Approved", "https://github.com/o/n/pull/2", "approved", "open", "pass", "approved"},
-		{3, "Changes", "https://github.com/o/n/pull/3", "changes", "open", "fail", "changes_requested"},
-		{4, "Running", "https://github.com/o/n/pull/4", "running", "open", "pending", "pending"},
-		{5, "Status pending", "https://github.com/o/n/pull/5", "status", "open", "pending", "none"},
-		{6, "Merged", "https://github.com/o/n/pull/6", "merged", "merged", "pass", "approved"},
-		{7, "Closed", "https://github.com/o/n/pull/7", "closed", "closed", "fail", "none"},
-		{8, "No checks", "https://github.com/o/n/pull/8", "nochecks", "open", "none", "none"},
+		{1, "Draft", "https://github.com/o/n/pull/1", "draft", "", "draft", "pass", "none"},
+		{2, "Approved", "https://github.com/o/n/pull/2", "approved", "", "open", "pass", "approved"},
+		{3, "Changes", "https://github.com/o/n/pull/3", "changes", "", "open", "fail", "changes_requested"},
+		{4, "Running", "https://github.com/o/n/pull/4", "running", "", "open", "pending", "pending"},
+		{5, "Status pending", "https://github.com/o/n/pull/5", "status", "", "open", "pending", "none"},
+		{6, "Merged", "https://github.com/o/n/pull/6", "merged", "", "merged", "pass", "approved"},
+		{7, "Closed", "https://github.com/o/n/pull/7", "closed", "", "closed", "fail", "none"},
+		{8, "No checks", "https://github.com/o/n/pull/8", "nochecks", "", "open", "none", "none"},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)
 	}
 	// #9 is a fork's PR on its own "main": never the PR of our main.
-	if p := ForBranch(got, "main"); p != nil {
+	if p := ForBranch(got, "main", ""); p != nil {
 		t.Errorf("fork PR matched main: %+v", p)
 	}
 }
 
 func TestForBranch(t *testing.T) {
 	prs := []PR{
-		{Number: 10, Branch: "a", State: "merged"},
-		{Number: 12, Branch: "a", State: "open"},
-		{Number: 11, Branch: "a", State: "closed"},
-		{Number: 3, Branch: "b", State: "closed"},
-		{Number: 5, Branch: "b", State: "closed"},
-		{Number: 1, Branch: "c", State: "draft"},
-		{Number: 9, Branch: "c", State: "merged"},
+		{Number: 10, Branch: "a", State: "merged", Head: "a10"},
+		{Number: 12, Branch: "a", State: "open", Head: "a12"},
+		{Number: 11, Branch: "a", State: "closed", Head: "a11"},
+		{Number: 3, Branch: "b", State: "closed", Head: "b3"},
+		{Number: 5, Branch: "b", State: "closed", Head: "b5"},
+		{Number: 1, Branch: "c", State: "draft", Head: "c1"},
+		{Number: 9, Branch: "c", State: "merged", Head: "c9"},
+		{Number: 2, Branch: "master", State: "merged", Head: "m2"},
 	}
-	for branch, want := range map[string]int{"a": 12, "b": 5, "c": 1} {
-		if p := ForBranch(prs, branch); p == nil || p.Number != want {
-			t.Errorf("ForBranch(%q) = %+v, want #%d", branch, p, want)
+	for _, c := range []struct {
+		branch, head string
+		want         int // 0: none
+	}{
+		{"a", "anything", 12}, // an open PR whatever the commit
+		{"b", "b5", 5},        // a closed one only at its head
+		{"b", "b3", 3},
+		{"b", "", 0},           // head unknown: only open ones
+		{"c", "c9", 1},         // draft before merged
+		{"master", "later", 0}, // an old PR from a branch that moved on
+		{"master", "m2", 2},
+		{"zz", "x", 0},
+	} {
+		got := 0
+		if p := ForBranch(prs, c.branch, c.head); p != nil {
+			got = p.Number
 		}
-	}
-	if p := ForBranch(prs, "zz"); p != nil {
-		t.Errorf("ForBranch(zz) = %+v", p)
+		if got != c.want {
+			t.Errorf("ForBranch(%q, %q) = #%d, want #%d", c.branch, c.head, got, c.want)
+		}
 	}
 }
 

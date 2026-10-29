@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -59,7 +61,7 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 	for _, wt := range m.Inputs.Worktrees {
 		r := prRow{Slug: wt.Slug, Branch: wt.Branch}
 		if wt.Branch != "" {
-			r.PR = prs.ForBranch(list, wt.Branch)
+			r.PR = prs.ForBranch(list, wt.Branch, e.headCommit(ctx, wt.Dir))
 		}
 		rows = append(rows, r)
 	}
@@ -87,4 +89,19 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	return 0
+}
+
+// headCommit is the commit checked out in worktree dir, "" when git can't
+// say (the PR match then takes only open ones). Hooks and fsmonitor off: a
+// worktree's git config is the project's, not trusted.
+func (e *env) headCommit(ctx context.Context, dir string) string {
+	res, err := e.run.Run(ctx, sys.Cmd{Name: "git", Args: []string{"-C", dir, "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "rev-parse", "--verify", "-q", "HEAD^{commit}"}})
+	if err != nil {
+		return ""
+	}
+	h := strings.TrimSpace(string(res.Stdout))
+	if len(h) < 40 || strings.Trim(h, "0123456789abcdef") != "" {
+		return ""
+	}
+	return h
 }

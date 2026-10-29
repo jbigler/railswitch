@@ -47,6 +47,8 @@ type Preview struct {
 	// NewFiles are the option addons the edits eject (workspace-relative
 	// path → content): written with NewText (D123).
 	NewFiles map[string][]byte `json:"-"`
+	// Writes are NewFiles' paths, sorted: what the preview shows (D123).
+	Writes []string `json:"writes"`
 }
 
 // Env is the loaded project the edits apply to.
@@ -73,7 +75,7 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 		t, err := ApplyText(text, ed)
 		var files map[string][]byte
 		if err == nil && (ed.Op == "option" || ed.Op == "pack") {
-			t, files, err = e.syncAddons(t)
+			t, files, err = e.syncAddons(text, t)
 		}
 		if err != nil {
 			r.Error = err.Error()
@@ -85,18 +87,26 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 		p.Edits = append(p.Edits, r)
 	}
 	p.NewText = text
+	p.Writes = append([]string{}, slices.Sorted(maps.Keys(p.NewFiles))...)
 	p.Diff = textdiff.Unified("project.toml", "project.toml", string(data), text)
 	p.Restart = e.restart(cur, prev)
 	return p, nil
 }
 
-// syncAddons makes text's [image] addons follow its options (D123): the
-// addon of an option no longer chosen goes (its file stays: it may hold your
-// edits), a chosen option's addon is added, ejected from its default when
-// the workspace has no file of that name; your own addons stay. It returns
-// text as it was when the stack doesn't resolve (judge then blocks it).
-func (e Env) syncAddons(text string) (string, map[string][]byte, error) {
+// syncAddons makes text's [image] addons follow the options the edit
+// changed from before (D123): the addon of an option no longer chosen goes
+// (its file stays: it may hold your edits), a newly chosen option's addon is
+// added, ejected from its default when the workspace has no file of that
+// name. Only the changed options' addons are touched (all of them when the
+// pack changed, which sets the OS): an addon you removed or added by hand
+// for an option the edit leaves alone stays as you left it. It returns text
+// as it was when either stack doesn't resolve (judge then blocks it).
+func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) {
 	p, err := config.Parse([]byte(text))
+	if err != nil {
+		return text, nil, nil
+	}
+	old, err := config.Parse([]byte(before))
 	if err != nil {
 		return text, nil, nil
 	}
@@ -105,29 +115,41 @@ func (e Env) syncAddons(text string) (string, map[string][]byte, error) {
 	if err != nil {
 		return text, nil, nil
 	}
-	rel := func(file string) string { return "containerfiles/" + file }
-	known := map[string]bool{} // every option's addon: the ones this sync owns
-	for _, o := range cat.Options {
-		if o != nil && o.AppAddon != nil {
-			known[rel(o.AppAddon.File)] = true
-		}
+	oldSt, err := cat.Resolve(old)
+	if err != nil {
+		return text, nil, nil
 	}
-	want := map[string]*pack.Chosen{}
-	for _, ch := range st.Options {
-		if a := ch.Option.AppAddon; a != nil && a.OS == st.Pack.Image.OS {
-			want[rel(a.File)] = ch
+	rel := func(file string) string { return "containerfiles/" + file }
+	addonOf := func(st *pack.Stack) map[string]string { // option key → its addon, for this pack's OS
+		out := map[string]string{}
+		for _, ch := range st.Options {
+			if a := ch.Option.AppAddon; a != nil && a.OS == st.Pack.Image.OS {
+				out[ch.Key] = rel(a.File)
+			}
+		}
+		return out
+	}
+	was, now := addonOf(oldSt), addonOf(st)
+	packChanged := oldSt.PackRef != st.PackRef
+	changed := func(key string) bool {
+		return packChanged || old.Options[key] != p.Options[key]
+	}
+	drop := map[string]bool{}
+	for key, a := range was {
+		if changed(key) && !slices.Contains(slices.Collect(maps.Values(now)), a) {
+			drop[a] = true
 		}
 	}
 	var addons []string
 	for _, a := range p.Image.Addons {
-		if !known[a] || want[a] != nil {
+		if !drop[a] {
 			addons = append(addons, a)
 		}
 	}
 	files := map[string][]byte{}
 	for _, ch := range st.Options {
 		a := ch.Option.AppAddon
-		if a == nil || want[rel(a.File)] == nil || slices.Contains(addons, rel(a.File)) {
+		if a == nil || now[ch.Key] == "" || !changed(ch.Key) || slices.Contains(addons, rel(a.File)) {
 			continue
 		}
 		addons = append(addons, rel(a.File))

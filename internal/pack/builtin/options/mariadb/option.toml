@@ -36,10 +36,13 @@ TZ = "{env.TZ}"
 # Every command runs in the db container, where the root password is in its
 # environment: MYSQL_PWD carries it, never an argument.
 [dump]                  # C3, D121, D122: dump, restore, and restore into a new worktree
-list = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" mariadb -uroot -N -e 'SHOW DATABASES' | grep -Exv 'information_schema|mysql|performance_schema|sys'"]
+# A failing mariadb fails the list; no app database is an empty list.
+list = ["sh", "-c", "dbs=$(MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" mariadb -uroot -N -e 'SHOW DATABASES') || exit; printf '%s\\n' \"$dbs\" | grep -Exv 'information_schema|mysql|performance_schema|sys'; test $? -le 1"]
 command = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb-dump -uroot --single-transaction --routines --triggers --events \"$1\"", "sh", "{dump.db}"]
 file = "{dump.db}.sql"
-prepare = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb -uroot -e \"DROP DATABASE IF EXISTS \\`$1\\`; CREATE DATABASE \\`$1\\`\"", "sh", "{dump.db}"]
+# DROP DATABASE waits for open transactions (a console): 30 s, then it fails
+# rather than hangs.
+prepare = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb -uroot -e \"SET SESSION lock_wait_timeout=30; DROP DATABASE IF EXISTS \\`$1\\`; CREATE DATABASE \\`$1\\`\"", "sh", "{dump.db}"]
 restore = ["sh", "-c", "MYSQL_PWD=\"$MARIADB_ROOT_PASSWORD\" exec mariadb -uroot \"$1\"", "sh", "{dump.db}"]
 
 [[volumes]]

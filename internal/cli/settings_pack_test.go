@@ -161,3 +161,31 @@ func TestSettingsOptionSwapsAddon(t *testing.T) {
 		t.Error("switching back replaced your pg-client file")
 	}
 }
+
+// An edit of another option leaves the addons as you set them: one you
+// removed stays removed, one you added stays (D123).
+func TestSettingsOtherOptionKeepsAddons(t *testing.T) {
+	ws, _ := lockedWS(t)
+	proj := filepath.Join(ws, "project.toml")
+	writeFile(t, proj, strings.Replace(readFile(t, proj), `addons = ["containerfiles/Containerfile.pg-client"]`, `addons = ["containerfiles/Containerfile.mariadb-client"]`, 1))
+	before := readFile(t, proj)
+	edits := `[{"op":"option","key":"cache","ref":"none"}]`
+	code, out, errs := runStdin(t, unitsFake(), edits, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var p struct{ Writes []string }
+	if err := json.Unmarshal([]byte(out), &p); err != nil || p.Writes == nil || len(p.Writes) != 0 {
+		t.Errorf("writes %v (%v)", p.Writes, err)
+	}
+	if code, _, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", workspace.Hash([]byte(before))); code != 0 {
+		t.Fatalf("apply: exit %d: %s", code, errs)
+	}
+	c, err := config.Load(proj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(c.Image.Addons, []string{"containerfiles/Containerfile.mariadb-client"}) {
+		t.Errorf("addons %v", c.Image.Addons)
+	}
+}

@@ -60,6 +60,43 @@ func execPath(p string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "\n", `\n`, "\t", `\t`).Replace(p) + `"`
 }
 
+// DashboardUnitExe is the railswitch the dashboard unit in d runs (its
+// ExecStart path, as DashboardUnit wrote it); "" when there is no such
+// unit or it isn't one DashboardUnit writes.
+func DashboardUnitExe(d Dirs) (string, error) {
+	data, err := os.ReadFile(filepath.Join(d.SystemdUser, DashboardService))
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	text := string(data)
+	if !strings.HasPrefix(text, dashboardMarker+"\n") {
+		return "", nil
+	}
+	for line := range strings.Lines(text) {
+		v, ok := strings.CutPrefix(strings.TrimSuffix(line, "\n"), "ExecStart=")
+		if !ok {
+			continue
+		}
+		p, ok := strings.CutSuffix(v, " dashboard serve")
+		if !ok {
+			return "", nil
+		}
+		return unexecPath(p), nil
+	}
+	return "", nil
+}
+
+// unexecPath undoes execPath.
+func unexecPath(p string) string {
+	if len(p) >= 2 && strings.HasPrefix(p, `"`) && strings.HasSuffix(p, `"`) {
+		p = strings.NewReplacer(`\\`, `\`, `\"`, `"`, `\n`, "\n", `\t`, "\t").Replace(p[1 : len(p)-1])
+	}
+	return strings.NewReplacer("%%", "%", "$$", "$").Replace(p)
+}
+
 // WriteDashboardUnit writes DashboardUnit(exe) to d.SystemdUser (0644,
 // atomically) when it differs from what is there; changed says it did.
 func WriteDashboardUnit(d Dirs, exe string) (changed bool, err error) {

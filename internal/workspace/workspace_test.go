@@ -502,6 +502,40 @@ func TestRenderWritesDashboardUnit(t *testing.T) {
 	}
 }
 
+// TestRenderKeepsDashboardExe: render keeps the railswitch the dashboard
+// unit runs, so another copy that renders doesn't take the dashboard over;
+// a unit whose railswitch is gone gets this one.
+func TestRenderKeepsDashboardExe(t *testing.T) {
+	ctx := context.Background()
+	w, f, dirs := dashboardWS(t)
+	path := filepath.Join(dirs.SystemdUser, machine.DashboardService)
+	installed := filepath.Join(t.TempDir(), "my bin", "rail%switch")
+	if err := os.MkdirAll(filepath.Dir(installed), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(installed, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := machine.WriteDashboardUnit(dirs, installed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Render(ctx, f, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != string(machine.DashboardUnit(installed)) {
+		t.Errorf("render repointed the dashboard:\n%s", data)
+	}
+	if err := os.Remove(installed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Render(ctx, f, false); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != string(machine.DashboardUnit("/opt/rs/railswitch")) {
+		t.Errorf("a unit whose railswitch is gone kept it:\n%s", data)
+	}
+}
+
 // A unit render removes (a service no longer in the stack) is stopped, so
 // its container does not keep running on its volume; nothing else is.
 func TestRenderStopsRemovedUnit(t *testing.T) {
@@ -554,6 +588,9 @@ func TestRenderDashboardUnitUnwritable(t *testing.T) {
 		t.Errorf("units not written: %v", err)
 	}
 
+	if err := os.Remove(dirs.SystemdUser); err != nil {
+		t.Fatal(err)
+	}
 	executable = func() (string, error) { return "", errors.New("no /proc") }
 	if d, err := w.Render(ctx, f, false); err != nil || len(d.Warnings) != 1 || !strings.Contains(d.Warnings[0], "no /proc") {
 		t.Errorf("unknown path: %v %q", err, d.Warnings)

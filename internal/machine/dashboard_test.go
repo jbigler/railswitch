@@ -118,3 +118,26 @@ func TestDashboardToken(t *testing.T) {
 		t.Error("a malformed token file was accepted")
 	}
 }
+
+// TestDashboardUnitExe: what DashboardUnit writes reads back, odd paths
+// included; no unit, or one railswitch didn't write, is "".
+func TestDashboardUnitExe(t *testing.T) {
+	d := machine.Dirs{SystemdUser: t.TempDir()}
+	if exe, err := machine.DashboardUnitExe(d); exe != "" || err != nil {
+		t.Errorf("no unit: %q, %v", exe, err)
+	}
+	for _, exe := range []string{"/usr/bin/railswitch", "/home/a b/rail\"s'w\\itch", "/p/100%/$HOME/x", "/t/a\tb"} {
+		if _, err := machine.WriteDashboardUnit(d, exe); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := machine.DashboardUnitExe(d); got != exe || err != nil {
+			t.Errorf("DashboardUnitExe = %q, %v; want %q", got, err, exe)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(d.SystemdUser, machine.DashboardService), []byte("[Service]\nExecStart=/x dashboard serve\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if exe, _ := machine.DashboardUnitExe(d); exe != "" {
+		t.Errorf("a unit without the marker: %q", exe)
+	}
+}

@@ -15,9 +15,13 @@ exactly what the page sees (docs/json.md).
 
 - The dashboard is the plain systemd user unit
   `railswitch-dashboard.service` at
-  `$XDG_CONFIG_HOME/systemd/user/railswitch-dashboard.service`. Every
-  render rewrites it; its `ExecStart` is the `railswitch` that rendered
-  (symlinks resolved) with `dashboard serve`.
+  `$XDG_CONFIG_HOME/systemd/user/railswitch-dashboard.service`. Its
+  `ExecStart` is a `railswitch` (symlinks resolved) with `dashboard
+  serve`: the one that last ran `railswitch dashboard`. Every render
+  rewrites the unit but keeps that path (D129), so another copy on the
+  machine (a clone's build) never takes the dashboard over; a render
+  writes its own path only when there is no unit or its `railswitch` is
+  gone.
 - `railswitch dashboard` (D118) prints the login link, writes the unit and,
   unless it is already enabled and running, runs `systemctl --user enable
   --now railswitch-dashboard.service`: it starts now and at every login

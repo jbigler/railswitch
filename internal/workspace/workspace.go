@@ -630,11 +630,23 @@ var executable = func() (string, error) {
 	return filepath.EvalSymlinks(exe)
 }
 
-// writeDashboardUnit rewrites the dashboard's unit for this railswitch
-// (machine.WriteDashboardUnit); `up` restarts a running dashboard whose
-// unit file is newer than its start.
+// writeDashboardUnit is render's: it rewrites the dashboard's unit
+// (machine.WriteDashboardUnit) for the railswitch it already runs, so
+// another copy that renders (a clone's build) never takes the dashboard
+// over; only `railswitch dashboard` (WriteDashboardUnit) changes which one.
+// With no unit yet, or one whose railswitch is gone, it is this one. `up`
+// restarts a running dashboard whose unit file is newer than its start.
 func writeDashboardUnit(d machine.Dirs) error {
-	_, err := WriteDashboardUnit(d)
+	exe, err := machine.DashboardUnitExe(d)
+	if err != nil {
+		return err
+	}
+	if fi, serr := os.Stat(exe); exe == "" || serr != nil || !fi.Mode().IsRegular() {
+		if exe, err = executable(); err != nil {
+			return fmt.Errorf("the dashboard unit needs railswitch's path: %w", err)
+		}
+	}
+	_, err = machine.WriteDashboardUnit(d, exe)
 	return err
 }
 

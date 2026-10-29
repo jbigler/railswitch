@@ -20,8 +20,16 @@ railswitch doctor
 ```
 
 `~/.local/bin` must be on your `PATH` (if the folder is new, log in
-again). To upgrade, run the same commands for the new release; the
-dashboard restarts itself on the new binary. A dashboard you started from
+again). From v0.1.1 you can also check that the file was built from this
+repository by its release workflow, in the same shell and folder as the
+download, with the GitHub CLI logged in (`gh auth login`):
+
+```bash
+gh attestation verify "railswitch-linux-$arch" --repo jbigler/railswitch
+```
+
+To upgrade, run the same commands for the new release; the dashboard
+restarts itself on the new binary. A dashboard you started from
 another copy (a clone's `./railswitch`) keeps that one until `railswitch
 dashboard` and then `systemctl --user restart railswitch-dashboard`. From a clone
 with Go instead: `make build && install -m755 railswitch ~/.local/bin/`.

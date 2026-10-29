@@ -5,7 +5,7 @@
 Description=filial deps of worktree feat
 
 [Container]
-Label=filial.unit-hash=13d288372758
+Label=filial.unit-hash=718cd09ee8a8
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-feat-deps
 Network=filial-feat-dev.network:alias=deps
@@ -16,6 +16,7 @@ Volume=/WORKSPACES/filial/feat:/app:z
 Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
+Volume=filial_corepack:/home/appuser/.corepack:U
 Volume=filial-feat-node-modules:/app/node_modules:U
 DropCapability=all
 NoNewPrivileges=true

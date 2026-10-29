@@ -77,9 +77,12 @@ agent's own firewall is only as strong as the app's.
   `railswitch fw show` (or the Firewall card) lists what log mode
   recorded; allow those hosts first, or set `mode = "log"` to keep the old
   behaviour (the card then warns that the app is a way out).
-- Found on the first host run: Node's corepack downloads Yarn from
-  `repo.yarnpkg.com` each time Vite starts; allow it in `app` (Mastodon
-  needed it).
+- Found on the first host run: Node's corepack downloaded Yarn from
+  `repo.yarnpkg.com` each time Vite started, in the app container. The
+  rails pack now shares corepack's cache (`<prefix>_corepack` at
+  `~/.corepack`, `COREPACK_HOME`) between `deps`, which fetches it, and the app,
+  so the app needs no allow entry (accept the rails pack's review, then
+  `up`).
 - A project with nvim gets a pending review: the nvim tool's `tool.toml`
   gained `allow`. Until `railswitch lock --accept`, nvim runs the old copy
   without those hosts, so plugin and language-server downloads from

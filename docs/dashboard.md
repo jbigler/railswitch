@@ -36,7 +36,9 @@ exactly what the page sees (docs/json.md).
   is running, exits 0; systemd starts the new binary 2 s later. When the
   unit file itself changes, `up` reloads systemd and restarts an active
   dashboard.
-- It listens on `127.0.0.1:7700` and `[::1]:7700` only, at
+- It listens on `127.0.0.1:7700` and `[::1]:7700` only (`::1` when IPv6
+  is on as it starts; turned on later, the next `railswitch dashboard` or
+  `doctor` names anything else holding it), at
   `http://railswitch.localhost:7700/` (browsers resolve `*.localhost` to
   loopback). It has no Traefik route.
 

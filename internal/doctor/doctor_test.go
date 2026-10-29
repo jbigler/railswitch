@@ -576,3 +576,15 @@ func TestDashboardAnswers(t *testing.T) {
 		t.Errorf("nothing: %+v", c)
 	}
 }
+
+// TestDashboardTokenUnreadable: a token file that can't be read is the
+// check's detail, with what to do; nothing is probed.
+func TestDashboardTokenUnreadable(t *testing.T) {
+	h := host(t, "80", true)
+	h.Dashboards = []string{"127.0.0.1:1"}
+	h.TokenErr = errors.New("/x/dashboard/token: permission denied")
+	c := h.dashboardAnswers(context.Background())
+	if c.OK || !c.Warn || c.Detail != "the login token: /x/dashboard/token: permission denied" || !strings.Contains(c.Fix, "readable") || !strings.Contains(c.Fix, "systemctl --user restart") {
+		t.Errorf("%+v", c)
+	}
+}

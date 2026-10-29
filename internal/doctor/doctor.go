@@ -165,7 +165,8 @@ func dashboard(ctx context.Context, r sys.Runner) Check {
 // browser instead, and railswitch's can't start.
 func (h Host) dashboardAnswers(ctx context.Context) Check {
 	if h.TokenErr != nil {
-		return Check{Name: "dashboard answers", Warn: true, Detail: "the login token: " + h.TokenErr.Error(), Fix: "remove the token file named in detail, then railswitch dashboard (it makes a new one; every browser logs in again)"}
+		return Check{Name: "dashboard answers", Warn: true, Detail: "the login token: " + h.TokenErr.Error(),
+			Fix: "make the token file named in detail readable by you; if it is malformed, remove it, then railswitch dashboard and systemctl --user restart " + machine.DashboardService + " (a new token logs every browser out)"}
 	}
 	p := machine.ProbeDashboards(ctx, h.Dashboards, h.Token)
 	c := Check{Name: "dashboard answers", Warn: true, OK: p.Ours, Detail: p.String()}

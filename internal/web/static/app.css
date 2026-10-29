@@ -231,3 +231,8 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 #agent-setup label.agent-setup{display:block;margin:10px 0}
 #agent-setup label.agent-setup textarea{display:block;width:100%;margin-top:4px;resize:vertical}
 #agent-setup label.agent-setup.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+.stacked{font-size:.85em;color:var(--muted);white-space:nowrap}
+.gh-stack{list-style:none;margin:2px 0 4px;padding:0}
+.gh-stack li{padding:1px 0}
+.gh-stack details ol{list-style:none;margin:0 0 0 1.5em;padding:0}
+.stack-head{margin-bottom:2px}

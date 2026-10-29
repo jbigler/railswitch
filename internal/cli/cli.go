@@ -71,6 +71,7 @@ var commands = map[string]command{
 	"db":            cmdDB,
 	"hooks":         cmdHooks,
 	"pr":            cmdPr,
+	"stack":         cmdStack,
 	"task":          cmdTask,
 	"signer":        cmdSigner,
 	"library":       cmdLibrary,

@@ -30,9 +30,12 @@ type projectState struct {
 	prs   map[string]*pr // by slug
 	prAt  time.Time
 	prErr string
-	prNow bool              // Refresh PRs: due at once
-	kinds map[string]string // agentKind per slug at the last overview
-	known bool              // kinds holds a first overview (the baseline)
+	prNow bool // Refresh PRs: due at once
+	// stacks are the worktrees' gh-stack stacks (by slug), read with the
+	// PRs; a failed read leaves the last ones (gh stack is a nicety).
+	stacks map[string]*ghStackRow
+	kinds  map[string]string // agentKind per slug at the last overview
+	known  bool              // kinds holds a first overview (the baseline)
 }
 
 // event is one Server-Sent Event, as JSON.
@@ -222,6 +225,10 @@ func (s *Server) pollPRs(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		stacks, serr := readStacks(ctx, s.c.CLI, j.ws)
+		if ctx.Err() != nil {
+			return
+		}
 		s.mu.Lock()
 		if p := s.state[j.prefix]; p != nil {
 			if err != nil {
@@ -231,6 +238,14 @@ func (s *Server) pollPRs(ctx context.Context) {
 				p.prs = map[string]*pr{}
 				for _, r := range rows {
 					p.prs[r.Slug] = r.PR
+				}
+			}
+			if serr == nil {
+				p.stacks = map[string]*ghStackRow{}
+				for i := range stacks.Worktrees {
+					if r := &stacks.Worktrees[i]; stacks.Available && (r.Stack != nil || r.Error != "") {
+						p.stacks[r.Slug] = r
+					}
 				}
 			}
 			s.publish()
@@ -446,7 +461,7 @@ func (s *Server) rows(prefix string, k sortKey, sel string) ([]row, string) {
 	rows := make([]row, 0, len(p.ov.Worktrees))
 	found := false
 	for _, wt := range p.ov.Worktrees {
-		rows = append(rows, row{WT: wt, PR: p.prs[wt.Slug]})
+		rows = append(rows, row{WT: wt, PR: p.prs[wt.Slug], Stacked: p.stacks[wt.Slug]})
 		found = found || wt.Slug == sel
 	}
 	sortRows(rows, k)

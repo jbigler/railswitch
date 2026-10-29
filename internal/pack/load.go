@@ -816,6 +816,10 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		if d.Prepare != nil && d.Restore == nil {
 			l.add(file, "dump.prepare needs dump.restore")
 		}
+		if d.Restore != nil && o.Health == nil {
+			// up restores into a new database once its unit reports healthy (D122).
+			l.add(file, "dump.restore needs [health]: up restores a new database once it is healthy")
+		}
 		// Each file goes back into its own database: with a list, both
 		// name it; without one, there is no name to give.
 		for _, c := range []struct {

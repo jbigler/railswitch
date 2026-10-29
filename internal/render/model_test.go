@@ -225,18 +225,9 @@ func TestEnvScope(t *testing.T) {
 	if _, ok := envVar(in, "db", "PGHOST"); ok {
 		t.Errorf("db got PGHOST")
 	}
-	var dumps string
-	for _, mt := range service(t, m, "db").Mounts {
-		if mt.Target == "/db-dumps" {
-			v, err := pack.Expand(mt.Source, in.Scope("db"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			dumps = v
-		}
-	}
-	if want := filepath.Join(m.Inputs.Workspace, "db-dumps"); dumps != want {
-		t.Errorf("/db-dumps source = %q; want %q", dumps, want)
+	// {dumps} is the workspace's db-dumps/ (db dump, db restore, D122).
+	if want := filepath.Join(m.Inputs.Workspace, "db-dumps"); in.Values["dumps"] != want {
+		t.Errorf("{dumps} = %q; want %q", in.Values["dumps"], want)
 	}
 
 	// No TZ anywhere: PGTZ = "{env.TZ}" is dropped, not an error.
@@ -664,8 +655,9 @@ func TestAssets(t *testing.T) {
 	if app.Mode != 0o755 || string(app.Data) != string(embedded) {
 		t.Errorf("app entrypoint asset mode %v, %d bytes", app.Mode, len(app.Data))
 	}
-	if _, ok := assets[".railswitch/assets/postgres/initdb/restore-dump.sh"]; !ok {
-		t.Errorf("no restore-dump.sh asset")
+	// postgres mounts nothing: up restores the dumps itself (D122).
+	if _, ok := assets[".railswitch/assets/postgres/initdb/restore-dump.sh"]; ok {
+		t.Errorf("a restore-dump.sh asset")
 	}
 	rails := service(t, m, "rails")
 	if rails.Entrypoint != "/usr/local/bin/entrypoint-app.sh" {
@@ -793,7 +785,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 	if rails.Unit.Memory != "4g" || rails.Unit.PidsLimit != 4096 || db.Unit.Memory != "2g" || db.Unit.PidsLimit != 1024 {
 		t.Errorf("limits rails %+v db %+v", rails.Unit, db.Unit)
 	}
-	if db.Unit.ShmSize != "256mb" || len(db.Exec) == 0 || db.Exec[0] != "postgres" || db.Health == nil || db.Health.Cmd != "pg_isready -U postgres" {
+	if db.Unit.ShmSize != "256mb" || len(db.Exec) == 0 || db.Exec[0] != "postgres" || db.Health == nil || db.Health.Cmd != "pg_isready -h 127.0.0.1 -U postgres" {
 		t.Errorf("db unit %+v exec %v health %+v", db.Unit, db.Exec, db.Health)
 	}
 	if db.Image.Kind != ImagePull || db.Image.Ref != "docker.io/library/postgres:{postgres}" {

@@ -189,7 +189,7 @@ func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
 			fail("unregister "+u.slug, err)
 			return errors.Join(errs...)
 		}
-		for _, d := range []string{"env", "status"} {
+		for _, d := range []string{"env", "status", "restore-pending"} {
 			if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, u.slug)); err != nil {
 				fail("remove its "+d+" dir", err)
 			}

@@ -5,20 +5,18 @@
 Description=filial db of worktree master
 
 [Container]
-Label=filial.unit-hash=c09060c98deb
+Label=filial.unit-hash=cae6f76c7d55
 Image=docker.io/library/postgres:16
 ContainerName=filial-master-db
 Network=filial-master-dev.network:alias=db
 EnvironmentFile=/WORKSPACES/filial/.railswitch/env/master/db.env
 PublishPort=127.0.0.1:55433:5432
-Volume=/WORKSPACES/filial/.railswitch/assets/postgres/initdb/restore-dump.sh:/docker-entrypoint-initdb.d/restore-dump.sh:ro,z
-Volume=/WORKSPACES/filial/db-dumps:/db-dumps:ro,z
 Volume=filial-master-db-data-pg16:/var/lib/postgresql/data
 ShmSize=256mb
 NoNewPrivileges=true
 Memory=2g
 PidsLimit=1024
-HealthCmd=pg_isready -U postgres
+HealthCmd=pg_isready -h 127.0.0.1 -U postgres
 HealthInterval=5s
 HealthTimeout=3s
 HealthRetries=5

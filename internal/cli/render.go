@@ -60,6 +60,24 @@ func parse(fs *flag.FlagSet, args []string) (code int, ok bool) {
 	}
 }
 
+// parseMixed is parse with flags allowed after the positional arguments
+// (wt add feature-x --up); it returns the positionals. A "--" ends the
+// flags: what follows is positional.
+func parseMixed(fs *flag.FlagSet, args []string) (pos []string, code int, ok bool) {
+	for rest := args; ; {
+		if code, ok := parse(fs, rest); !ok {
+			return nil, code, false
+		}
+		if fs.NArg() == 0 {
+			return pos, 0, true
+		}
+		if i := len(rest) - fs.NArg(); i > 0 && rest[i-1] == "--" {
+			return append(pos, fs.Args()...), 0, true
+		}
+		pos, rest = append(pos, fs.Arg(0)), fs.Args()[1:]
+	}
+}
+
 // railswitch render [--check]: write every unit, env file and asset; with
 // --check, write nothing and exit 1 when something would change.
 func cmdRender(ctx context.Context, e *env, args []string) int {

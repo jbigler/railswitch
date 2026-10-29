@@ -43,7 +43,7 @@ func TestLoadBuiltins(t *testing.T) {
 	if _, err := fs.Stat(cat.Packs[Ref{Name: "rails", Version: 1}].Files, "Containerfile.base"); err != nil {
 		t.Errorf("rails Files: %v", err)
 	}
-	if _, err := fs.Stat(cat.Options[Ref{Name: "postgres", Version: 1}].Files, "initdb/restore-dump.sh"); err != nil {
+	if _, err := fs.Stat(cat.Options[Ref{Name: "postgres", Version: 1}].Files, "Containerfile.pg-client"); err != nil {
 		t.Errorf("postgres Files: %v", err)
 	}
 	if _, err := fs.Stat(cat.Tools["nvim"].Files, "Containerfile.nvim"); err != nil {
@@ -546,6 +546,13 @@ func TestOptionDump(t *testing.T) {
 		if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "dump") {
 			t.Errorf("%s: Load error = %v, want a [dump] error", name, err)
 		}
+	}
+	// up restores a new database once it is healthy (D122).
+	fsys := minimal()
+	opt := fsys["options/o/option.toml"]
+	opt.Data = append(opt.Data, []byte("[dump]\ncommand = [\"d\"]\nfile = \"x.dump\"\nrestore = [\"r\"]\n")...)
+	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "dump.restore needs [health]") {
+		t.Errorf("restore without health: %v", err)
 	}
 }
 

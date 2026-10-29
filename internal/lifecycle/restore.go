@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -54,19 +56,9 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 		dir = in.Values["dumps"]
 	}
 	sc := in.Scope(ch.Service)
-	files, err := restoreFiles(dir, o, sc)
+	files, err := dumpFiles(m, dir, o, sc)
 	if err != nil {
 		return nil, err
-	}
-	// A volume seed (db dump's tarballs) is never a database's dump.
-	for _, s := range m.Services {
-		for _, v := range s.Volumes {
-			for db, path := range files {
-				if v.Seed != "" && filepath.Base(path) == v.Seed {
-					delete(files, db)
-				}
-			}
-		}
 	}
 	if only != nil {
 		for _, db := range only {
@@ -88,12 +80,7 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 		dbs = append(dbs, db)
 	}
 	slices.Sort(dbs)
-	label := func(db string) string {
-		if db == "" {
-			return "the " + ch.Service + " database"
-		}
-		return db
-	}
+	label := restoreLabel(ch.Service)
 	if !yes {
 		names := make([]string, len(dbs))
 		for i, db := range dbs {
@@ -110,6 +97,49 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 			return nil, nil
 		}
 	}
+	done, err := l.runRestore(ctx, ctr, o, sc, files, dbs, label)
+	if err == nil {
+		// Whatever you restored is the database now: up never restores
+		// over it on a marker an earlier failure left.
+		os.Remove(restorePending(m.Inputs.Workspace, slug))
+	}
+	return done, err
+}
+
+// restoreLabel names database db of the option's service: "" (an option
+// with one dump) is "the <service> database".
+func restoreLabel(service string) func(string) string {
+	return func(db string) string {
+		if db == "" {
+			return "the " + service + " database"
+		}
+		return db
+	}
+}
+
+// dumpFiles are the dumps in dir the database option o names (restoreFiles),
+// without the volume seeds db dump also writes there.
+func dumpFiles(m *render.Model, dir string, o *pack.Option, sc pack.Scope) (map[string]string, error) {
+	files, err := restoreFiles(dir, o, sc)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range m.Services {
+		for _, v := range s.Volumes {
+			for db, path := range files {
+				if v.Seed != "" && filepath.Base(path) == v.Seed {
+					delete(files, db)
+				}
+			}
+		}
+	}
+	return files, nil
+}
+
+// runRestore restores each of dbs from files into the running container
+// ctr: o's [dump] prepare, then its restore with the file on stdin.
+func (l *L) runRestore(ctx context.Context, ctr string, o *pack.Option, sc pack.Scope, files map[string]string, dbs []string, label func(string) string) ([]string, error) {
+	var err error
 	// Every command is expanded and every file opened before anything
 	// runs: an argument that doesn't expand or a file that went missing (or
 	// became a symlink) never leaves a database dropped and empty.
@@ -238,4 +268,91 @@ func expandArgv(argv []string, sc pack.Scope, what string) ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+// freshRestore is a new database's restore that up runs (D122).
+type freshRestore struct {
+	unit, ctr string
+	o         *pack.Option
+	sc        pack.Scope
+	files     map[string]string
+	dbs       []string
+	label     func(string) string
+	pending   string // its marker (restorePending)
+}
+
+// freshDatabase is the restore up runs into worktree slug's database: when
+// the database option declares a [dump] restore, its data volume doesn't
+// exist yet (a new worktree, or one whose volumes down deleted) and the
+// workspace's db-dumps/ holds dumps it names. nil otherwise.
+func (l *L) freshDatabase(ctx context.Context, m *render.Model, in *render.Instance, slug string) (*freshRestore, error) {
+	ch := m.Inputs.Stack.Option("database")
+	if ch == nil || ch.Option.Dump == nil || ch.Option.Dump.Restore == nil {
+		return nil, nil
+	}
+	i := slices.IndexFunc(m.Services, func(s render.Service) bool { return s.ID == ch.Service })
+	if i < 0 {
+		return nil, nil
+	}
+	s := m.Services[i]
+	var data []string
+	for _, v := range s.Volumes {
+		if v.Cache || v.Shared || v.Seed != "" {
+			continue
+		}
+		name, err := in.VolumeName(s.ID, v)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, name)
+	}
+	if len(data) == 0 {
+		return nil, nil
+	}
+	pending := restorePending(m.Inputs.Workspace, slug)
+	if _, err := os.Stat(pending); err != nil {
+		// No restore left unfinished: only a new database is restored.
+		for _, name := range data {
+			ok, err := l.podman().VolumeExists(ctx, name)
+			if err != nil || ok {
+				return nil, err
+			}
+		}
+	}
+	sc := in.Scope(ch.Service)
+	files, err := dumpFiles(m, in.Values["dumps"], ch.Option, sc)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, nil // no db-dumps/: an empty database
+	case err != nil:
+		return nil, err
+	case len(files) == 0:
+		os.Remove(pending) // nothing left to restore
+		return nil, nil
+	}
+	dbs := make([]string, 0, len(files))
+	for db := range files {
+		dbs = append(dbs, db)
+	}
+	slices.Sort(dbs)
+	return &freshRestore{
+		unit: unitOf(m, slug, ch.Service), ctr: containerOf(m, slug, ch.Service),
+		o: ch.Option, sc: sc, files: files, dbs: dbs, label: restoreLabel(ch.Service),
+		pending: pending,
+	}, nil
+}
+
+// restorePending marks worktree slug's new database as not yet restored:
+// written before up starts it, removed once a restore finished, so an up
+// or a db restore after a failure or a crash restores it then (D122).
+func restorePending(ws, slug string) string {
+	return filepath.Join(ws, ".railswitch", "restore-pending", slug)
+}
+
+// markRestorePending writes f's marker.
+func (f *freshRestore) markPending() error {
+	if err := os.MkdirAll(filepath.Dir(f.pending), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(f.pending, []byte("the dumps are not restored into this worktree's new database yet\n"), 0o600)
 }

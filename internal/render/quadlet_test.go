@@ -140,8 +140,6 @@ func TestRoleLine(t *testing.T) {
 
 func TestAssetMounts(t *testing.T) {
 	ws, units := renderUnits(t, fixtureDir, nil)
-	hasLine(t, units, "filial-master-db.container",
-		"Volume="+ws+"/.railswitch/assets/postgres/initdb/restore-dump.sh:/docker-entrypoint-initdb.d/restore-dump.sh:ro,z")
 	hasLine(t, units, "filial-master-rails.container", "Entrypoint=/usr/local/bin/entrypoint-app.sh")
 	hasLine(t, units, "filial-master-rails.container",
 		"Volume="+ws+"/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z")

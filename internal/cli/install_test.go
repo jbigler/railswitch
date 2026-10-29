@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -353,5 +354,45 @@ func TestContainerfileUninstalledLibrary(t *testing.T) {
 	}
 	if readFile(t, cf) != before || exists(filepath.Join(ws, "containerfiles", "Containerfile.extra")) {
 		t.Error("containerfile wrote a file")
+	}
+}
+
+// A library option chosen again after its library changed is installed at
+// its current content (the install review), so its Containerfile is ejected
+// from that content too, not from the copy the lock had accepted before.
+func TestInstallBackFromRemovedEjectsCurrent(t *testing.T) {
+	ws, dirs := lockedWS(t)
+	lib := testfixture.Library(t, dirs, "acme", acmeID, "options/playwright")
+	browser := func(ref string) string { return `[{"op":"option","key":"browser","ref":"` + ref + `"}]` }
+	apply := func(edits string) {
+		t.Helper()
+		code, out, errs := runStdin(t, installFake(), edits, "-C", ws, "--json", "settings", "preview")
+		if code != 0 {
+			t.Fatalf("preview %s: exit %d: %s", edits, code, errs)
+		}
+		var p installPreview
+		if err := json.Unmarshal([]byte(out), &p); err != nil {
+			t.Fatal(err)
+		}
+		args := []string{"-C", ws, "settings", "apply", "--if-hash", p.Hash}
+		if p.Install != nil {
+			args = append(args, "--accept-install", p.Install.Hash)
+		}
+		if code, out, errs := runStdin(t, installFake(), edits, args...); code != 0 {
+			t.Fatalf("apply %s: exit %d: %s\n%s", edits, code, out, errs)
+		}
+	}
+	pw := filepath.Join(ws, "containerfiles", "Containerfile.playwright")
+	apply(browser("acme:playwright@1"))
+	apply(browser("none"))
+	cf := filepath.Join(lib.Dir(), "options", "playwright", "Containerfile.playwright")
+	writeFile(t, cf, readFile(t, cf)+"RUN echo NEW\n")
+	lib.Publish(t)
+	if err := os.Remove(pw); err != nil {
+		t.Fatal(err)
+	}
+	apply(browser("acme:playwright@1"))
+	if got := readFile(t, pw); !strings.HasSuffix(got, "RUN echo NEW\n") {
+		t.Errorf("ejected the old content, not what was installed:\n%s", got)
 	}
 }

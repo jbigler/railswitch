@@ -127,7 +127,7 @@ func TestProjectRemoveExactNames(t *testing.T) {
 			continue
 		}
 		j := joined(c)
-		if !(strings.HasPrefix(j, "podman container inspect ") && c[len(c)-1] == traefikContainer) && j != "systemctl --user daemon-reload" && j != "podman network ls --format json" {
+		if !(strings.HasPrefix(j, "podman container inspect ") && c[len(c)-1] == traefikContainer) && j != "systemctl --user daemon-reload" && j != "podman network ls --format json" && j != "podman images --format json" {
 			t.Errorf("unexpected call: %q", c)
 		}
 	}
@@ -154,6 +154,37 @@ func TestProjectRemoveExactNames(t *testing.T) {
 	}
 	if strings.Contains(string(traefik), "api-proxy.network") || !strings.Contains(string(traefik), "api2-proxy.network") {
 		t.Errorf("traefik unit:\n%s", traefik)
+	}
+}
+
+// TestProjectRemoveImages: project rm removes every name railswitch built
+// for the prefix, never another prefix's or a pulled image; a refused rmi
+// is printed and the removal finishes.
+func TestProjectRemoveImages(t *testing.T) {
+	dirs, _, f := projects(t, "api", "api2")
+	traefikRunning(f, "api_proxy api2_proxy railswitch_machine ")
+	f.On([]string{"podman", "images", "--format", "json"}, sys.Result{Stdout: []byte(`[
+		{"Id":"a","Names":["localhost/api/app:3.3-0123abcd","localhost/api/app:3.3-89abcdef"]},
+		{"Id":"b","Names":["localhost/api/postgres:17-00000000"]},
+		{"Id":"c","Names":["localhost/api2/app:3.3-0123abcd"]},
+		{"Id":"d","Names":["docker.io/library/postgres:17","localhost/api/notours:latest"]}]`)}, nil)
+	f.On([]string{"podman", "rmi", "localhost/api/postgres:17-00000000"}, sys.Result{ExitCode: 2}, fmt.Errorf("image in use"))
+	var out bytes.Buffer
+	if err := ProjectRemove(ctx, f, dirs, &out, strings.NewReader(""), false, "api", true, false); err != nil {
+		t.Fatal(err)
+	}
+	var rmi []string
+	for _, c := range f.Calls {
+		if len(c) == 3 && c[0] == "podman" && c[1] == "rmi" {
+			rmi = append(rmi, c[2])
+		}
+	}
+	want := []string{"localhost/api/app:3.3-0123abcd", "localhost/api/app:3.3-89abcdef", "localhost/api/postgres:17-00000000"}
+	if !slices.Equal(rmi, want) {
+		t.Errorf("rmi %q, want %q", rmi, want)
+	}
+	if !strings.Contains(out.String(), "kept image localhost/api/postgres:17-00000000") || !strings.Contains(out.String(), "removed 2 images of api") || !strings.Contains(out.String(), "removed project api") {
+		t.Errorf("output:\n%s", out.String())
 	}
 }
 

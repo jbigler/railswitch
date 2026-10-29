@@ -29,7 +29,8 @@ import (
 // unit its marked units name); the project leaves the registry and the
 // machine units; Traefik leaves <prefix>_proxy; every network the marked
 // units name is removed (no -f, <prefix>_proxy last); the marked unit files
-// are deleted and systemd reloaded. purge also removes the "<prefix>_…"
+// are deleted and systemd reloaded; each image name railswitch built for
+// the prefix is removed (no -f: a name in use is kept). purge also removes the "<prefix>_…"
 // volumes the units name (and, when the workspace loads, those its model
 // names: an on-demand agent has no unit) and <workspace>/.railswitch. The workspace
 // directory and its git repo are never deleted. It works with the
@@ -50,7 +51,7 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		return err
 	}
 	if !yes {
-		what := fmt.Sprintf("stops %d worktrees of %s and deletes their containers, per-worktree volumes, units and networks", len(wts), prefix)
+		what := fmt.Sprintf("stops %d worktrees of %s and deletes their containers, per-worktree volumes, units, networks and images", len(wts), prefix)
 		if purge {
 			what += ", the shared " + prefix + "_… volumes and, if the workspace still loads as " + prefix + ", " + filepath.Join(pe.Workspace, ".railswitch")
 		}
@@ -205,7 +206,11 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		}
 	}
 
-	// 8. --purge: the shared volumes and the workspace's generated files.
+	// 8. The images built for the project, each name by itself: a name in
+	// use (another project's container, by hand) is refused and kept.
+	removeImages(ctx, p, out, prefix)
+
+	// 9. --purge: the shared volumes and the workspace's generated files.
 	if purge {
 		for _, v := range vols {
 			ok, err := p.VolumeExists(ctx, v)
@@ -229,6 +234,39 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 	}
 	fmt.Fprintf(out, "removed project %s; its workspace %s and git repo are kept\n", prefix, pe.Workspace)
 	return nil
+}
+
+// removeImages removes each image name railswitch built for prefix. They
+// are rebuilt on the next up; a failure is printed and the removal goes on.
+func removeImages(ctx context.Context, p podman.Podman, out io.Writer, prefix string) {
+	imgs, err := p.Images(ctx)
+	if err != nil {
+		fmt.Fprintf(out, "kept the images of %s: %v\n", prefix, err)
+		return
+	}
+	var names []string
+	for _, img := range imgs {
+		for _, n := range img.Names {
+			if pfx, ok := podman.BuiltPrefix(n); ok && pfx == prefix && !slices.Contains(names, n) {
+				names = append(names, n)
+			}
+		}
+	}
+	slices.Sort(names)
+	gone := 0
+	for _, n := range names {
+		if err := p.ImageRemove(ctx, n); err != nil {
+			fmt.Fprintf(out, "kept image %s: %v\n", n, err)
+			continue
+		}
+		gone++
+	}
+	switch {
+	case gone == 1:
+		fmt.Fprintf(out, "removed 1 image of %s\n", prefix)
+	case gone > 1:
+		fmt.Fprintf(out, "removed %d images of %s\n", gone, prefix)
+	}
 }
 
 // unserveRecorded turns off each tailnet port share recorded for worktree

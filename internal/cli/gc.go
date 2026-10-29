@@ -40,8 +40,6 @@ type gcImage struct {
 }
 
 var (
-	// localImageRe is an image railswitch builds: localhost/<prefix>/<repo>:<version>-<hash8>.
-	localImageRe = regexp.MustCompile(`^localhost/([a-z][a-z0-9]{1,15})/[a-z0-9][a-z0-9._-]*:[A-Za-z0-9._-]+-[0-9a-f]{8}$`)
 	storeEntryRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
@@ -296,11 +294,11 @@ func (k gcKeep) railswitchVolume(v string) bool {
 // "unsure" (looks like railswitch's, of no registered project, without the
 // build label) or "" (keep, or not railswitch's).
 func gcImageVerdict(name string, img podman.Image, keep gcKeep) string {
-	m := localImageRe.FindStringSubmatch(name)
+	pfx, ok := podman.BuiltPrefix(name)
 	switch {
-	case m == nil, img.Containers > 0, keep.tags[name], keep.blocked[m[1]]:
+	case !ok, img.Containers > 0, keep.tags[name], keep.blocked[pfx]:
 		return ""
-	case keep.prefixes[m[1]], img.Labels[podman.PrefixLabel] == m[1]:
+	case keep.prefixes[pfx], img.Labels[podman.PrefixLabel] == pfx:
 		return "remove"
 	}
 	return "unsure"

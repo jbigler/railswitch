@@ -84,6 +84,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 ## CLI (Stage 9i additions)
 - `project new` detects (D124): without `--pack`, `--template` or `--no-detect` it runs `detectNew` (`project detect`'s fetch and `detect.Choose` on the built-ins), takes the detected pack and every `Source == "repo"` slot not given by `--option`, prints `detected …` (stderr under `--json`); no pack matched is an error naming `--pack`. Tests: `noDetect` adds `--no-detect` to project new calls that name no pack.
 
+## CLI (Stage 9j additions)
+- `project rm` removes the images railswitch built for the prefix (D125, `podman.BuiltPrefix`, `rmi` without `-f`; a refused name is printed and kept), with or without `--purge`.
+
 ## Global constraints
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.
 - Git calls that touch a remote (`project new`/`init`/`detect`, `wt add`'s fetch, `library add`/`fetch`) pass `sys.GitProtocols` (only https, ssh, git, file) and check user values with `sys.GitArg` (no leading `-`, no `<transport>::`).

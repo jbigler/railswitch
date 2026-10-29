@@ -48,6 +48,16 @@ login link. The dashboard lives at `http://railswitch.localhost:7700/`, on
 127.0.0.1 only, behind a token only you can read. Run the command again
 whenever you need the link.
 
+Open it in a browser on the same machine, at that address, on port 7700:
+it answers only as `railswitch.localhost:7700`, `localhost:7700` or
+`127.0.0.1:7700`, and says "forbidden host" for any other name or port.
+From another machine (a dev VM, a server), forward the same port and open
+the same link there:
+
+```bash
+ssh -L 7700:127.0.0.1:7700 <the machine running railswitch>
+```
+
 ## A first project
 
 In the dashboard, choose **New project**:

@@ -232,6 +232,12 @@ func TestUpOrder(t *testing.T) {
 	if len(b) != 7 {
 		t.Fatalf("builds:\n%s", dump(b))
 	}
+	for _, c := range b {
+		// gc knows a removed project's images by it (D120).
+		if argAfter(c, "--label") != "railswitch.prefix=filial" {
+			t.Errorf("build without the prefix label: %v", c)
+		}
+	}
 	baseTag := argAfter(b[0], "-t")
 	if strings.Contains(joined(b[0]), "BASE_IMAGE=") {
 		t.Errorf("base has BASE_IMAGE: %q", b[0])

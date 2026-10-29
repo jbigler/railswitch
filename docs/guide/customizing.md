@@ -66,4 +66,18 @@ railswitch lock --review
 railswitch lock --accept <hash> [--restart]
 ```
 
+## Cleaning up
+
+Each rebuild leaves the previous images behind, and an update leaves the
+copy it replaced.
+
+```bash
+railswitch gc --dry-run      # what it would remove
+railswitch gc                # old images and unused stored package copies
+railswitch gc --volumes      # also volumes no worktree mounts (asks: their data is lost)
+```
+
+It keeps everything any registered project's worktrees use now, running
+or not, and everything of a project that doesn't load.
+
 Next: [Sharing](sharing.md).

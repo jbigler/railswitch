@@ -668,7 +668,7 @@ func (l *L) build(ctx context.Context, steps []render.BuildStep, force func(i in
 			}
 		}
 		fmt.Fprintf(l.Out, "building %s (%s)\n", s.Name, s.Tag)
-		if err := p.Build(ctx, podman.BuildArgs{File: s.File, Tag: s.Tag, Context: s.Context, Args: s.Args, Progress: l.Out}); err != nil {
+		if err := p.Build(ctx, podman.BuildArgs{File: s.File, Tag: s.Tag, Context: s.Context, Args: s.Args, Prefix: l.WS.Project.Project.Prefix, Progress: l.Out}); err != nil {
 			return fmt.Errorf("build %s: %w", s.Name, err)
 		}
 	}

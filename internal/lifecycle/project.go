@@ -29,7 +29,8 @@ import (
 // unit its marked units name); the project leaves the registry and the
 // machine units; Traefik leaves <prefix>_proxy; every network the marked
 // units name is removed (no -f, <prefix>_proxy last); the marked unit files
-// are deleted and systemd reloaded. purge also removes the "<prefix>_…"
+// are deleted and systemd reloaded; each image name railswitch built for
+// the prefix is removed (no -f: a name in use is kept). purge also removes the "<prefix>_…"
 // volumes the units name (and, when the workspace loads, those its model
 // names: an on-demand agent has no unit) and <workspace>/.railswitch. The workspace
 // directory and its git repo are never deleted. It works with the
@@ -50,7 +51,7 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 		return err
 	}
 	if !yes {
-		what := fmt.Sprintf("stops %d worktrees of %s and deletes their containers, per-worktree volumes, units and networks", len(wts), prefix)
+		what := fmt.Sprintf("stops %d worktrees of %s and deletes their containers, per-worktree volumes, units, networks and images", len(wts), prefix)
 		if purge {
 			what += ", the shared " + prefix + "_… volumes and, if the workspace still loads as " + prefix + ", " + filepath.Join(pe.Workspace, ".railswitch")
 		}

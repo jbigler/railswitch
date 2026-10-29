@@ -217,30 +217,38 @@ func TestFloodCapped(t *testing.T) {
 	}
 }
 
-// TestPollBackstop: a log past the backstop that the tail hasn't read is
-// truncated by the next poll, to the drop mark alone.
+// TestPollBackstop: the next poll truncates a log 2*LogLimit long that the
+// tail hasn't read, to the drop mark alone, and leaves one LogLimit + 1 MiB
+// long alone: the backstop lies between them. The sizes are fixed, not
+// derived from backstop, so a backstop that drifts fails here.
 func TestPollBackstop(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "j.log")
-	lt, err := openLog(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer lt.Close()
-	chunk := bytes.Repeat([]byte("x"), 1<<20)
-	for written := 0; written <= backstop; written += len(chunk) {
-		if _, err := lt.w.Write(chunk); err != nil {
+	for _, c := range []struct {
+		size    int
+		dropped bool
+	}{{2 * LogLimit, true}, {LogLimit + 1<<20, false}} {
+		path := filepath.Join(t.TempDir(), "j.log")
+		lt, err := openLog(path)
+		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	_, dropped, _, err := lt.poll()
-	if err != nil || !dropped {
-		t.Fatalf("poll: dropped %v, err %v", dropped, err)
-	}
-	if b, err := os.ReadFile(path); err != nil || string(b) != droppedLine {
-		t.Errorf("after the poll the log is %d bytes, want only the drop mark (err %v)", len(b), err)
-	}
-	if lt.off != 0 {
-		t.Errorf("off = %d after the truncation", lt.off)
+		if _, err := lt.w.Write(bytes.Repeat([]byte("x"), c.size)); err != nil {
+			t.Fatal(err)
+		}
+		_, dropped, _, err := lt.poll()
+		lt.Close()
+		if err != nil || dropped != c.dropped {
+			t.Errorf("%d bytes unread: dropped %v, want %v (err %v)", c.size, dropped, c.dropped, err)
+			continue
+		}
+		fi, err := os.Stat(path)
+		switch {
+		case err != nil:
+			t.Error(err)
+		case c.dropped && fi.Size() != int64(len(droppedLine)):
+			t.Errorf("%d bytes unread: the log is %d bytes after the poll, want only the drop mark", c.size, fi.Size())
+		case !c.dropped && fi.Size() != int64(c.size):
+			t.Errorf("%d bytes unread: the log is %d bytes after the poll, want it untouched", c.size, fi.Size())
+		}
 	}
 }
 

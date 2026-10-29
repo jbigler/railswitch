@@ -58,6 +58,9 @@ the same link there:
 ssh -L 7700:127.0.0.1:7700 <the machine running railswitch>
 ```
 
+The local port must be 7700 too, and free there: a dashboard of your own
+on that machine has to be stopped first.
+
 ## A first project
 
 In the dashboard, choose **New project**:

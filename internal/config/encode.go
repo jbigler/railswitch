@@ -110,12 +110,9 @@ func LinesTOML(p *Project) string {
 	}
 	if h := p.Hooks; len(h.Deps)+len(h.Start)+len(h.Create) > 0 {
 		b.WriteString("\n[hooks]                    # commands run inside the containers (D126)\n")
-		for _, l := range []struct {
-			k string
-			v []string
-		}{{"deps", h.Deps}, {"start", h.Start}, {"create", h.Create}} {
-			if len(l.v) > 0 {
-				b.WriteString(l.k + " = " + stringArray(l.v) + "\n")
+		for _, list := range HookLists {
+			if cmds := h.List(list); len(cmds) > 0 {
+				b.WriteString(list + " = " + stringArray(cmds) + "\n")
 			}
 		}
 	}

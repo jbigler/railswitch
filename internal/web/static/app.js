@@ -449,7 +449,13 @@ function target(e) {
   if (e.op === "option") return "option " + e.key;
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
+  if (e.op === "hooks.set") return "hooks " + e.key;
   return e.op + " " + e.label;
+}
+
+// hookLines is a Hooks box's commands: one per line, blank lines left out.
+function hookLines(text) {
+  return text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
 }
 
 // stage puts e in the list; back (the control is at its current value
@@ -499,6 +505,12 @@ function syncLeft() {
     input.disabled = !!e && e.op === "env.unset";
     row.classList.toggle("staged", !!e && e.op === "env.set");
     row.classList.toggle("removed", !!e && e.op === "env.unset");
+  });
+  $$("label.hook").forEach((box) => {
+    const e = stagedFor("hooks " + box.dataset.list);
+    const area = $(".hook-cmds", box);
+    if (document.activeElement !== area) area.value = e ? (e.values || []).join("\n") : box.dataset.orig;
+    box.classList.toggle("staged", !!e);
   });
   $$("tr.link").forEach((row) => {
     const e = stagedFor("show " + row.dataset.label);
@@ -622,6 +634,11 @@ if (view.startsWith("settings")) {
     if (t.classList.contains("env-value")) {
       const row = t.closest("tr");
       return stage({ op: "env.set", name: row.dataset.name, value: t.value }, t.value === row.dataset.value);
+    }
+    if (t.classList.contains("hook-cmds")) {
+      const box = t.closest("label.hook");
+      const values = hookLines(t.value);
+      return stage({ op: "hooks.set", key: box.dataset.list, values: values }, values.join("\n") === hookLines(box.dataset.orig).join("\n"));
     }
     if (t.classList.contains("link-show")) {
       const row = t.closest("tr");

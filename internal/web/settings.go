@@ -30,9 +30,11 @@ type edit struct {
 	Value string `json:"value,omitempty"`
 	Label string `json:"label,omitempty"`
 	URL   string `json:"url,omitempty"`
+	// Values: hooks.set's whole list (D126).
+	Values []string `json:"values,omitempty"`
 }
 
-var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show"}
+var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "hooks.set"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -77,6 +79,7 @@ type settingsView struct {
 	Project      projectShow
 	Pack         *optionView // the stack's pack, when it has another choice
 	Firewall     firewallView
+	Hooks        []hookListView
 	Options      []optionView
 	Links        []linkRowView
 	Secrets      []secretView
@@ -96,6 +99,30 @@ type firewallView struct {
 	Modes      []fwModeView
 	Profiles   []fwProfileView
 	BlockedURL string
+}
+
+// hookListView is one [hooks] list on the Hooks card (D126): its
+// commands one per line, the way the box edits them.
+type hookListView struct {
+	Name, Note, Text string
+}
+
+// hookNotes say where and when each list runs.
+var hookNotes = map[string]string{
+	"deps":   "in deps, after the installs, on every app start: the one container that reaches the package registries",
+	"start":  "in the app, before its server, on every app start",
+	"create": "in the running app, once for each new worktree, after its first up",
+}
+
+func newHooksView(h hooksShow) []hookListView {
+	var out []hookListView
+	for _, l := range []struct {
+		name string
+		cmds []string
+	}{{"deps", h.Deps}, {"start", h.Start}, {"create", h.Create}} {
+		out = append(out, hookListView{Name: l.name, Note: hookNotes[l.name], Text: strings.Join(l.cmds, "\n")})
+	}
+	return out
 }
 
 type fwModeView struct {
@@ -265,6 +292,15 @@ func editTitle(show projectShow, e edit) string {
 		return "Link " + e.Label + ": hidden"
 	case "link.show":
 		return "Link " + e.Label + ": shown"
+	case "hooks.set":
+		switch n := len(e.Values); n {
+		case 0:
+			return "Hooks " + e.Key + ": removed"
+		case 1:
+			return "Hooks " + e.Key + ": 1 command"
+		default:
+			return fmt.Sprintf("Hooks %s: %d commands", e.Key, n)
+		}
 	}
 	return e.Op
 }
@@ -303,6 +339,7 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Project = show
 	v.Firewall = newFirewallView(show.Firewall, base+"/blocked")
+	v.Hooks = newHooksView(show.Hooks)
 	v.Template = s.settingsTemplate(r.Context(), p)
 	if len(show.Pack.Choices) > 1 {
 		pv := optionView{Key: "pack", Ref: show.Pack.Ref, Slot: true}

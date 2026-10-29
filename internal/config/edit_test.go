@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/BurntSushi/toml"
 )
 
 // commented is a valid project.toml with comments and no [image].
@@ -620,5 +623,43 @@ func TestSetImageAddons(t *testing.T) {
 	}
 	if out, err := SetImageAddons("[image]\nbase = \"b\"\n", []string{"containerfiles/Containerfile.x"}); err != nil || !strings.Contains(out, "addons = [\"containerfiles/Containerfile.x\"]") {
 		t.Errorf("insert: %q %v", out, err)
+	}
+}
+
+func TestSetHooks(t *testing.T) {
+	in := "[stack]\npack = \"rails@1\"\n\n[hooks]   # mine\nstart = [\"a\"]   # keep\n"
+	out, err := SetHooks(in, "start", []string{`echo "hi"`, "b"})
+	if err != nil || !strings.Contains(out, `start = ["echo \"hi\"", "b"]   # keep`) || !strings.Contains(out, "[hooks]   # mine") {
+		t.Errorf("set: %q %v", out, err)
+	}
+	if out, err := SetHooks(in, "start", nil); err != nil || strings.Contains(out, "start") || !strings.Contains(out, "[hooks]") {
+		t.Errorf("remove: %q %v", out, err)
+	}
+	out, err = SetHooks("[stack]\npack = \"rails@1\"\n", "deps", []string{"gem install retest"})
+	if err != nil || !strings.Contains(out, "[hooks]\ndeps = [\"gem install retest\"]") {
+		t.Errorf("insert: %q %v", out, err)
+	}
+	var p Project
+	if _, err := toml.Decode(out, &p); err != nil || !slices.Equal(p.Hooks.Deps, []string{"gem install retest"}) {
+		t.Errorf("decoded %+v %v", p.Hooks, err)
+	}
+	for _, c := range []struct {
+		list string
+		cmds []string
+		want string
+	}{
+		{"later", []string{"x"}, `hooks list "later"`},
+		{"start", []string{"a\nb"}, "hooks.start[0]: value contains a newline"},
+		{"create", []string{"ok", " "}, "hooks.create[1]: is empty"},
+		{"deps", []string{"-x"}, "hooks.deps[0]: starts with -"},
+		{"start", []string{"echo a\x00b"}, "hooks.start[0]: contains a control character"},
+		{"start", []string{"printf '\x1b[2J'"}, "hooks.start[0]: contains a control character"},
+	} {
+		if _, err := SetHooks(in, c.list, c.cmds); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("SetHooks(%s, %q) = %v; want %q", c.list, c.cmds, err, c.want)
+		}
+	}
+	if _, err := SetHooks("hooks.start = [\"a\"]\n", "start", []string{"b"}); err == nil {
+		t.Error("a dotted hooks key was edited")
 	}
 }

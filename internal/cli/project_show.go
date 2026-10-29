@@ -28,6 +28,7 @@ type projectDoc struct {
 	File       string      `json:"file"` // the raw editor's text
 	Pack       packRow     `json:"pack"`
 	Firewall   firewallRow `json:"firewall"`
+	Hooks      hooksRow    `json:"hooks"`
 	Options    []optionRow `json:"options"`
 	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
 	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
@@ -42,6 +43,13 @@ type firewallRow struct {
 	Default   string              `json:"default"` // the mode without [firewall] mode: enforce with agents, else log
 	Effective string              `json:"effective"`
 	Allow     map[string][]string `json:"allow"` // config.FirewallProfiles, never null
+}
+
+// hooksRow is [hooks] (D126): each list's commands in order, never null.
+type hooksRow struct {
+	Deps   []string `json:"deps"`
+	Start  []string `json:"start"`
+	Create []string `json:"create"`
 }
 
 // packRow is the stack's pack and the packs Settings offers instead: each
@@ -204,6 +212,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	for _, prof := range config.FirewallProfiles {
 		d.Firewall.Allow[prof] = append([]string{}, p.Firewall.Allow[prof]...)
 	}
+	d.Hooks = hooksRow{Deps: append([]string{}, p.Hooks.Deps...), Start: append([]string{}, p.Hooks.Start...), Create: append([]string{}, p.Hooks.Create...)}
 	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)
 	d.AddChoices = []string{}

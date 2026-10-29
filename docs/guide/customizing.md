@@ -11,6 +11,8 @@ running worktrees restart, anything it blocks) before **Apply** writes
   for one more (a second database). Switching a database to `none` leaves
   its volume behind, and the page says so.
 - **Firewall:** the mode and the allow lists ([The firewall](firewall.md)).
+- **Hooks:** the commands railswitch runs inside the containers, one box
+  per list, one command per line ([Hooks](#hooks)).
 - **Environment** and **Worktree links** (shortcuts on each worktree's
   row, with `{worktree.host}` filled in).
 - **Secrets:** set or replace a value; it's sent on stdin, never in a URL
@@ -29,6 +31,9 @@ containers, never on your machine. They cover the project's own setup
 steps that the pack doesn't already do (it installs the lockfiles' gems
 and packages in `deps`, and the Rails pack's app runs `bin/rails
 db:prepare` before its server).
+
+Edit them on the Settings page's **Hooks** card (one command per line), or
+in `project.toml`:
 
 ```toml
 [hooks]

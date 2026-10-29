@@ -57,6 +57,11 @@ func TestGC(t *testing.T) {
 	if err := os.Chtimes(stale, time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
+	// Unreferenced but just written: a lock may be about to name it.
+	fresh := filepath.Join(store, strings.Repeat("b", 64))
+	if err := os.MkdirAll(fresh, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	f := unitsFake()
 	f.On([]string{"podman", "images", "--format", "json"}, sys.Result{Stdout: []byte(fmt.Sprintf(`[{"Id":"1","Names":[%q],"Size":1000,"Containers":0},{"Id":"2","Names":[%q],"Size":2000,"Containers":0},{"Id":"2","Names":[%q],"Size":2000,"Containers":0}]`, current, old, old))}, nil)
 	// A removed worktree's database, another tool's volume of the same
@@ -80,6 +85,9 @@ func TestGC(t *testing.T) {
 	}
 	if _, err := os.Stat(stale); err == nil {
 		t.Error("the stale stored copy is still there")
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Error("a just-written stored copy was removed")
 	}
 	ents, _ := os.ReadDir(store)
 	if len(ents) == 0 {

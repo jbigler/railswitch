@@ -247,6 +247,7 @@ var placeholderRe = regexp.MustCompile(`\{[^}]*\}`)
 // compose project of that name) matches none.
 func declaredVolumes(prefix string, cat *pack.Catalog) []*regexp.Regexp {
 	var out []*regexp.Regexp
+	prefix = regexp.QuoteMeta(prefix) // a registry edited by hand
 	add := func(sep string, vols []pack.Volume) {
 		for _, v := range vols {
 			parts := placeholderRe.Split(v.Name, -1)

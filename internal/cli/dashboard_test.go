@@ -190,3 +190,24 @@ func TestDashboardPortTaken(t *testing.T) {
 		}
 	}
 }
+
+// TestDashboardRepointRestarts: a running dashboard of another railswitch
+// is restarted onto this one; an unchanged unit is left alone.
+func TestDashboardRepointRestarts(t *testing.T) {
+	d := dashEnv(t)
+	if _, err := machine.WriteDashboardUnit(d, "/elsewhere/railswitch"); err != nil {
+		t.Fatal(err)
+	}
+	restart := []string{"systemctl", "--user", "restart", "railswitch-dashboard.service"}
+	for i, want := range []bool{true, false} {
+		f := &systest.Fake{}
+		f.On([]string{"systemctl", "--user", "show", "-p", "ActiveState,UnitFileState", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("ActiveState=active\nUnitFileState=enabled\n")}, nil)
+		f.On([]string{"systemctl", "--user"}, sys.Result{}, nil)
+		if code, out, errs := runWith(t, f, "dashboard"); code != 0 {
+			t.Fatalf("run %d: exit %d\n%s%s", i, code, out, errs)
+		}
+		if got := slices.ContainsFunc(f.Calls, func(c []string) bool { return slices.Equal(c, restart) }); got != want {
+			t.Errorf("run %d: restarted %v; want %v (%q)", i, got, want, f.Calls)
+		}
+	}
+}

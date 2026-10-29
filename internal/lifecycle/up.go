@@ -474,7 +474,8 @@ func unitLogLines(out []byte, n int) []string {
 }
 
 // staleDashboard reports whether the running dashboard's unit file (render
-// rewrites it for a new railswitch path) is newer than the dashboard's
+// rewrites it when its text changes; `railswitch dashboard` for a new
+// railswitch path) is newer than the dashboard's
 // start (podman.Systemd.ActiveSince, exact to the microsecond). A missing
 // file is not stale. The dashboard never blocks a worktree's up: an error
 // is a warning (dashboardWarning) and the unit counts as not stale.

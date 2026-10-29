@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
@@ -630,12 +631,40 @@ var executable = func() (string, error) {
 	return filepath.EvalSymlinks(exe)
 }
 
-// writeDashboardUnit rewrites the dashboard's unit for this railswitch
-// (machine.WriteDashboardUnit); `up` restarts a running dashboard whose
-// unit file is newer than its start.
+// writeDashboardUnit is render's: it rewrites the dashboard's unit
+// (machine.WriteDashboardUnit) for the railswitch it already runs, so
+// another copy that renders (a clone's build) never takes the dashboard
+// over; only `railswitch dashboard` (WriteDashboardUnit) changes which one.
+// With no unit yet, or one whose railswitch is gone, it is this one. `up`
+// restarts a running dashboard whose unit file is newer than its start.
 func writeDashboardUnit(d machine.Dirs) error {
-	_, err := WriteDashboardUnit(d)
+	exe, err := machine.DashboardUnitExe(d)
+	if err != nil {
+		return err
+	}
+	if !keepableExe(exe) {
+		if exe, err = executable(); err != nil {
+			return fmt.Errorf("the dashboard unit needs railswitch's path: %w", err)
+		}
+	}
+	_, err = machine.WriteDashboardUnit(d, exe)
 	return err
+}
+
+// keepableExe reports whether render may keep exe as the dashboard's
+// railswitch: an absolute path to a regular, executable file this user
+// owns that no one else can write. Anything else (a file another user put
+// at a path a removed build had, say) gets this railswitch instead.
+func keepableExe(exe string) bool {
+	if !filepath.IsAbs(exe) {
+		return false
+	}
+	fi, err := os.Stat(exe)
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o100 == 0 || fi.Mode().Perm()&0o022 != 0 {
+		return false
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	return ok && int(st.Uid) == os.Getuid()
 }
 
 // WriteDashboardUnit writes the dashboard's unit for this railswitch;

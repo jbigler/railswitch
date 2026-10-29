@@ -220,7 +220,7 @@ func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error)
 	}
 	switch {
 	case up && len(secrets) > 0:
-		doc.Steps = append(doc.Steps, fmt.Sprintf("Leave %s stopped: start it once its secrets are set (%s)", slug, strings.Join(secrets, ", ")))
+		doc.Steps = append(doc.Steps, fmt.Sprintf("Start %s (up), unless a secret is unset: then leave it stopped until it is set (%s)", slug, strings.Join(secrets, ", ")))
 	case up:
 		doc.Steps = append(doc.Steps, fmt.Sprintf("Start %s (up)", slug))
 	}

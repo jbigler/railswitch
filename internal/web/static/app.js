@@ -594,7 +594,9 @@ function fileSaved(state, conflict) {
 
 // The project page's unset secrets: each one set leaves the card; Start
 // waits for the last, and the card goes once the base worktree is up.
+// Secret jobs are the project's, one at a time: the Set buttons wait.
 if (view === "") {
+  const setButtons = (card, on) => $$("form[data-secret-needed] button", card).forEach((b) => (b.disabled = !on));
   document.addEventListener("submit", async (e) => {
     const f = e.target;
     const card = f.closest("#secrets-needed");
@@ -602,8 +604,9 @@ if (view === "") {
     e.preventDefault();
     const data = new URLSearchParams(new FormData(f));
     if (f.matches("form[data-secret-needed]")) {
-      f.reset(); // the value leaves the page at once
-      startJob(f.action, data, (state) => {
+      setButtons(card, false);
+      const started = await startJob(f.action, data, (state) => {
+        setButtons(card, true);
         if (state !== "ok") return toast("The secret was not stored. Its output is below.", true);
         f.closest("tr").remove();
         if ($("form[data-secret-needed]", card)) return;
@@ -612,6 +615,8 @@ if (view === "") {
         const start = $("form[data-start-base] button", card);
         if (start) start.disabled = false;
       });
+      if (started) f.reset(); // the value leaves the page once the job has it
+      else setButtons(card, true);
     } else if (f.matches("form[data-start-base]")) {
       const btn = $("button", f);
       btn.disabled = true;
@@ -622,9 +627,11 @@ if (view === "") {
         else {
           toast("up " + state + ". Its output is below.", true);
           btn.disabled = false;
+          $("[data-starting]", card).hidden = true;
         }
       });
-      if (!started) btn.disabled = false;
+      if (started) $("[data-starting]", card).hidden = false;
+      else btn.disabled = false;
     }
   });
 }

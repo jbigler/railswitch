@@ -254,6 +254,9 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/p/"+first, http.StatusSeeOther)
 }
 
+// secretsWait bounds the project page's secret ls.
+const secretsWait = 5 * time.Second
+
 // page is a project's page; a worktree that no longer exists (removed,
 // say, while its URL was open) redirects to the project's.
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
@@ -275,8 +278,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	pv := s.pageData(p.Prefix, wt.Slug, k)
 	s.mu.Unlock()
-	// Read once per page: a secret that can't be read shows no card.
-	if secrets, err := readSecrets(r.Context(), s.c.CLI, p.Workspace); err == nil {
+	// Read once per page, briefly: secrets that can't be read in time
+	// show no card.
+	ctx, cancel := context.WithTimeout(r.Context(), secretsWait)
+	defer cancel()
+	if secrets, err := readSecrets(ctx, s.c.CLI, p.Workspace); err == nil {
 		pv.Secrets = newSecretsCard(p.Prefix, pv.List.Rows, secrets)
 	}
 	s.html(w, http.StatusOK, "page", pv)

@@ -987,12 +987,14 @@ The summary comes from a render in memory: the base worktree is the only
 worktree, on a registry entry with the next free subnet and worktree ID,
 never saved. Without `--json`, the dry run prints the same content as text.
 
-`project new --up` (without `--dry-run`) runs `up` only when the project
-declares no secret: a new project's secrets are all unset, which `up`
-refuses. With secrets it prints `not started: <slug> needs its secrets
-first` and the `secret set` commands, and exits 0; the dry run's last
-step says so ("Leave <slug> stopped: start it once its secrets are set
-(<names>)"). It exits 3 when the project was created and registered but
+`project new --up` (without `--dry-run`) runs `up` only when podman
+holds every secret the project declares (`up` refuses an unset one; a
+machine secret, or one a removed project of the prefix left, may be set
+already). Otherwise it prints `not started: <slug> needs its secrets
+first` and the `secret set` commands, and exits 0. The dry run, which
+asks podman nothing, ends with "Start <slug> (up), unless a secret is
+unset: then leave it stopped until it is set (<names>)" when the project
+declares secrets. It exits 3 when the project was created and registered but
 `up` failed: stderr says so and names the command to retry. Exit 1 means
 the project was not created.
 

@@ -69,7 +69,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
 	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
-	up := fset.Bool("up", false, "run up in the base worktree once it is created and has no secret to set (exit 3: created, up failed)")
+	up := fset.Bool("up", false, "run up in the base worktree once it is created, unless a secret is unset (exit 3: created, up failed)")
 	tplRef := fset.String("template", "", "start from the template `ref` (template ls): its lines, the answers, then the other flags on top")
 	noDetect := fset.Bool("no-detect", false, "don't read the repository for the pack and options: the pack's defaults")
 	var opts, tools, agentFlags, answerFlags stringList
@@ -178,7 +178,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	fmt.Fprintf(e.stdout, "created workspace %s: project %s, base worktree %s (ID %d)\n", ws, *prefix, slug, id)
 	fmt.Fprintf(e.stdout, "the workspace is a git repo: commit project.toml, stack.lock and containerfiles/ (git -C %s add -A && git -C %s commit)\n", shellQuote(ws), shellQuote(ws))
 	if *up && len(secrets) > 0 {
-		// up refuses an unset secret, and a new project's are all unset.
+		// up refuses an unset secret.
 		fmt.Fprintf(e.stdout, "not started: %s needs its secrets first\n", slug)
 	}
 	if !*up || len(secrets) > 0 {
@@ -440,7 +440,9 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template, bundl
 }
 
 // createWorkspace is new after the clone: everything up to the render.
-// It returns the declared secrets (all unset) and the base worktree's ID.
+// It returns the declared secrets podman doesn't hold yet (a machine
+// secret, or one a removed project of this prefix left, may be set) and
+// the base worktree's ID.
 func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace.Accept) ([]string, int, error) {
 	ws := pl.ws
 	if _, err := e.run.Run(ctx, sys.Cmd{Name: "git", Args: []string{"init", ws}}); err != nil {
@@ -452,8 +454,7 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace
 	if err := prepare(ws, pl.slug, pl.st); err != nil {
 		return nil, 0, err
 	}
-	secrets, err := writeProject(ws, pl)
-	if err != nil {
+	if _, err := writeProject(ws, pl); err != nil {
 		return nil, 0, err
 	}
 	if err := writeGenerated(ws, pl.st, randomValue); err != nil {
@@ -470,7 +471,10 @@ func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace
 		return nil, 0, err
 	}
 	id, err := e.registerAndRender(ctx, pl.dirs, w, pl.slug)
-	return secrets, id, err
+	if err != nil {
+		return nil, 0, err
+	}
+	return e.unsetSecrets(ctx, w), id, nil
 }
 
 // writeProject writes pl's project.toml into dir, ejects the stack's
@@ -608,10 +612,17 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "joined project %s in %s: base worktree %s (ID %d)\n", pm.Prefix, w.Root, slug, id)
 
+	e.printNext(w.Root, slug, e.unsetSecrets(ctx, w))
+	return 0
+}
+
+// unsetSecrets is w's declared secrets that podman doesn't hold (up
+// refuses them), sorted; one it can't ask about counts as unset.
+func (e *env) unsetSecrets(ctx context.Context, w *workspace.Workspace) []string {
 	p := podman.Podman{R: e.run}
 	var unset []string
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {
-		set, err := p.SecretExists(ctx, render.SecretName(pm.Prefix, name, w.Project.Secrets[name]))
+		set, err := p.SecretExists(ctx, render.SecretName(w.Project.Project.Prefix, name, w.Project.Secrets[name]))
 		if err != nil {
 			fmt.Fprintf(e.stderr, "railswitch: secret %s: %v\n", name, err)
 		}
@@ -619,8 +630,7 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 			unset = append(unset, name)
 		}
 	}
-	e.printNext(w.Root, slug, unset)
-	return 0
+	return unset
 }
 
 // printNext prints the next commands: setting each unset secret, else up.

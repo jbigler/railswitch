@@ -68,6 +68,8 @@ func asGithub(t *testing.T, url string) string {
 func gitHost() *systest.Fake {
 	f := fakeHost()
 	f.Passthrough = []string{"git"}
+	// No secret is set: a test that wants one sets it by name.
+	f.On([]string{"podman", "secret", "exists"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
 	return f
 }
 

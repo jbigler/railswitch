@@ -146,14 +146,16 @@ is no longer accepted. What the page shows meanwhile may be stale.
   apply" next to its stack state, in the row and in the detail; `restart`
   clears it.
 - **Secrets to set** (above the detail, only while the project has
-  unset secrets: `secret ls`, read once per page load; none when it can't
-  be read): "Set these secrets to start <base>", one row per unset secret
-  (name, services, delivery, a value field and Set value, the Settings
-  page's `secret set` job: the value goes only to its stdin and the field
-  clears at once), then **Start <base>**, off until the last one is set.
-  Each secret set leaves the card; after the last, the heading says "All
-  secrets are set" and Start turns on. Start selects the base worktree and
-  runs `up` there; the card goes when it ends ok. `up` refuses an unset
+  unset secrets: `secret ls`, read once per page load with 5 s to answer;
+  none when it can't be read): "Set these secrets to start <base>", one
+  row per unset secret (name, services, delivery, a value field and Set
+  value, the Settings page's `secret set` job: the value goes only to its
+  stdin and the field clears once the job has started), then **Start
+  <base>**, off until the last one is set. Secret jobs are the project's,
+  one at a time, so every Set value waits while one runs. Each secret set
+  leaves the card; after the last, the heading says "All secrets are set"
+  and Start turns on. Start selects the base worktree, runs `up` there and
+  says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with secrets opens with this card.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
   (`PR #2141 ready · checks ✓ · approved`), then Links, Services (a glyph

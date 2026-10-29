@@ -191,7 +191,7 @@ func TestNewDryRunSummary(t *testing.T) {
 	}
 
 	up := dryRun(t, gitHost(), ws, "--repo", gh, "--prefix", "shop", "--branch", "main", "--up")
-	if len(up.Steps) != 5 || up.Steps[4] != "Leave main stopped: start it once its secrets are set (claude_token, github_token)" {
+	if len(up.Steps) != 5 || up.Steps[4] != "Start main (up), unless a secret is unset: then leave it stopped until it is set (claude_token, github_token)" {
 		t.Errorf("--up steps = %q", up.Steps)
 	}
 	noSecrets := dryRun(t, gitHost(), ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main", "--agent", "none", "--up")
@@ -247,6 +247,19 @@ func TestNewUp(t *testing.T) {
 	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "pay", "--up")
 	if code != 0 || started(f) || !strings.Contains(out, "not started: main needs its secrets first") || !strings.Contains(out, "next: railswitch secret set claude_token") {
 		t.Errorf("new --up with secrets: exit %d, started %v\n%s%s", code, started(f), out, errs)
+	}
+
+	// A secret podman holds already (a machine secret, one a removed
+	// project of the prefix left) doesn't stop up.
+	f = gitHost()
+	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
+	f.On([]string{"podman", "secret", "exists", "kept_claude_token"}, sys.Result{}, nil)
+	ws = filepath.Join(t.TempDir(), "kept")
+	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "kept", "--up")
+	if kept := slices.ContainsFunc(f.Calls, func(c []string) bool {
+		return slices.Equal(c, []string{"systemctl", "--user", "start", "kept-main-rails.service"})
+	}); code != 0 || !kept || strings.Contains(out, "not started") {
+		t.Errorf("new --up with its secret set: exit %d, started %v\n%s%s", code, kept, out, errs)
 	}
 
 	// A created project whose up fails exits 3 and says it was created.

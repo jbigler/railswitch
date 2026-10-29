@@ -26,5 +26,6 @@ a secret set job's stdin; Start waits for the last one. */}}
 <td><form method="post" action="{{$.SecretURL}}" class="secret-form" data-secret-needed><input type="hidden" name="name" value="{{.Name}}"><input type="password" name="value" required autocomplete="off" placeholder="value" aria-label="Value of {{.Name}}"><button class="ln">Set value</button></form></td></tr>
 {{end}}</tbody>
 </table>
-{{if .StartURL}}<form method="post" action="{{.StartURL}}" data-start-base data-base="{{.Base}}"><button class="ln main" disabled>Start {{.Base}}</button></form>{{end}}
+{{if .StartURL}}<form method="post" action="{{.StartURL}}" data-start-base data-base="{{.Base}}"><button class="ln main" disabled>Start {{.Base}}</button></form>
+<p class="note" data-starting hidden>Starting {{.Base}}: its output is in {{.Base}}'s jobs.</p>{{end}}
 </section>{{end}}

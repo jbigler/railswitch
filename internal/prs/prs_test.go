@@ -120,9 +120,12 @@ func TestForBranch(t *testing.T) {
 		{"master", "m2", 2},
 		{"zz", "x", 0},
 	} {
-		p := ForBranch(prs, c.branch, c.head)
-		if got := 0; p != nil && p.Number != c.want || p == nil && c.want != got {
-			t.Errorf("ForBranch(%q, %q) = %+v, want #%d", c.branch, c.head, p, c.want)
+		got := 0
+		if p := ForBranch(prs, c.branch, c.head); p != nil {
+			got = p.Number
+		}
+		if got != c.want {
+			t.Errorf("ForBranch(%q, %q) = #%d, want #%d", c.branch, c.head, got, c.want)
 		}
 	}
 }

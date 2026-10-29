@@ -150,5 +150,11 @@ func TestPrLsOldPRFromBaseBranch(t *testing.T) {
 		if got := string(rows[0].PR) != "null"; rows[0].Slug != "master" || got != c.want {
 			t.Errorf("head %s: master's pr %s; want shown %v", c.oid[:7], rows[0].PR, c.want)
 		}
+		// The worktree's git config is the project's: hooks and fsmonitor off.
+		if !slices.ContainsFunc(f.Calls, func(a []string) bool {
+			return slices.Equal(a, []string{"git", "-C", filepath.Join(ws, "master"), "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "rev-parse", "--verify", "-q", "HEAD^{commit}"})
+		}) {
+			t.Errorf("no safe rev-parse of master: %q", f.Calls)
+		}
 	}
 }

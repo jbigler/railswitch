@@ -44,8 +44,9 @@ type Preview struct {
 	Edits   []EditResult `json:"edits"`
 	Restart []string     `json:"restart"` // registered worktrees whose running app runs units the edits change
 	NewText string       `json:"-"`
-	// NewFiles are the option addons the edits eject (workspace-relative
-	// path → content): written with NewText (D123).
+	// NewFiles are the Containerfiles the edits eject, a newly chosen
+	// option's addon or own image (workspace-relative path → content):
+	// written with NewText (D123).
 	NewFiles map[string][]byte `json:"-"`
 	// Writes are NewFiles' paths, sorted: what the preview shows (D123).
 	Writes []string `json:"writes"`
@@ -99,7 +100,9 @@ func (e Env) Preview(data []byte, edits []Edit) (*Preview, error) {
 // added, ejected from its default when the workspace has no file of that
 // name. Only the changed options' addons are touched (all of them when the
 // pack changed, which sets the OS): an addon you removed or added by hand
-// for an option the edit leaves alone stays as you left it. It returns text
+// for an option the edit leaves alone stays as you left it. A newly chosen
+// option with its own image ([image] build) gets that Containerfile ejected
+// the same way. Ejects copy the accepted package. It returns text
 // as it was when either stack doesn't resolve (judge then blocks it).
 func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) {
 	p, err := config.Parse([]byte(text))
@@ -110,12 +113,35 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 	if err != nil {
 		return text, nil, nil
 	}
-	cat := e.WS.Catalog
+	// Ejects copy what the lock will run: a built-in or local package back
+	// from [[removed]] at its accepted content (workspace.Accepted), never a
+	// change not reviewed yet; a library package new to the lock's tables
+	// is installed at its current verified content (the install review),
+	// which the workspace's catalog holds.
+	cat, err := workspace.Accepted(e.WS.Root, p, e.WS.Catalog)
+	if err != nil {
+		return text, nil, err
+	}
 	st, err := cat.Resolve(p)
 	if err != nil {
 		return text, nil, nil
 	}
-	oldSt, err := cat.Resolve(old)
+	installed, err := e.WS.Catalog.Resolve(p)
+	if err != nil {
+		return text, nil, nil
+	}
+	filesOf := func(ch *pack.Chosen) fs.FS {
+		if ch.Ref.Library == "" {
+			return ch.Option.Files
+		}
+		for _, c := range installed.Options {
+			if c.Key == ch.Key {
+				return c.Option.Files
+			}
+		}
+		return ch.Option.Files
+	}
+	oldSt, err := e.WS.Catalog.Resolve(old)
 	if err != nil {
 		return text, nil, nil
 	}
@@ -156,14 +182,31 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 		if _, err := os.Lstat(filepath.Join(e.WS.Root, "containerfiles", a.File)); err == nil {
 			continue // a copy you had: kept as it is
 		}
-		def, err := fs.ReadFile(ch.Option.Files, a.File)
+		def, err := fs.ReadFile(filesOf(ch), a.File)
 		if err != nil {
 			return "", nil, err
 		}
 		files[rel(a.File)] = workspace.EjectedContainerfile(ch.Ref.String(), strings.TrimPrefix(a.File, "Containerfile."), def)
 	}
+	// A newly chosen option with its own image (playwright) needs its
+	// Containerfile in the workspace too, and `containerfile eject` refuses
+	// one the stack doesn't use yet: it is ejected here, as an addon is.
+	for _, ch := range st.Options {
+		b := ch.Option.Image.Build
+		if b == "" || !changed(ch.Key) {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(e.WS.Root, "containerfiles", b)); err == nil {
+			continue // a copy you had: kept as it is
+		}
+		def, err := fs.ReadFile(filesOf(ch), b)
+		if err != nil {
+			return "", nil, err
+		}
+		files[rel(b)] = workspace.EjectedContainerfile(ch.Ref.String(), strings.TrimPrefix(b, "Containerfile."), def)
+	}
 	if slices.Equal(addons, p.Image.Addons) {
-		return text, nil, nil
+		return text, files, nil
 	}
 	out, err := config.SetImageAddons(text, addons)
 	return out, files, err

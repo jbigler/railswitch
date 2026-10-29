@@ -84,7 +84,8 @@ func CreateGenerated(root string, values map[string]string) error {
 // name GeneratedFile can't hold, is kept, its values copied. When both
 // exist (a move interrupted before the removal) a legacy file that is
 // exactly railswitch's text for the moved values is removed. It reports
-// whether it moved anything; kept says the legacy file stays.
+// whether it moved anything; kept says the legacy file stays after this
+// move (a later run that leaves it reports false: the move warned once).
 func MigrateGenerated(root string) (moved, kept bool, err error) {
 	legacy := filepath.Join(root, LegacyGeneratedFile)
 	data, err := os.ReadFile(legacy)
@@ -94,7 +95,7 @@ func MigrateGenerated(root string) (moved, kept bool, err error) {
 	if err != nil {
 		return false, false, err
 	}
-	values, err := ReadGenerated(legacy)
+	values, err := parseGenerated(legacy, data) // one read: what is removed is what was moved
 	if err != nil {
 		return false, true, err
 	}
@@ -150,6 +151,12 @@ func ReadGenerated(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseGenerated(path, data)
+}
+
+// parseGenerated is ReadGenerated on data already read from path.
+func parseGenerated(path string, data []byte) (map[string]string, error) {
+	out := map[string]string{}
 	var doc struct {
 		Env map[string]any `toml:"env"`
 	}

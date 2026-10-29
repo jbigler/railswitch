@@ -785,7 +785,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 	if rails.Unit.Memory != "4g" || rails.Unit.PidsLimit != 4096 || db.Unit.Memory != "2g" || db.Unit.PidsLimit != 1024 {
 		t.Errorf("limits rails %+v db %+v", rails.Unit, db.Unit)
 	}
-	if db.Unit.ShmSize != "256mb" || len(db.Exec) == 0 || db.Exec[0] != "postgres" || db.Health == nil || db.Health.Cmd != "pg_isready -U postgres" {
+	if db.Unit.ShmSize != "256mb" || len(db.Exec) == 0 || db.Exec[0] != "postgres" || db.Health == nil || db.Health.Cmd != "pg_isready -h 127.0.0.1 -U postgres" {
 		t.Errorf("db unit %+v exec %v health %+v", db.Unit, db.Exec, db.Health)
 	}
 	if db.Image.Kind != ImagePull || db.Image.Ref != "docker.io/library/postgres:{postgres}" {

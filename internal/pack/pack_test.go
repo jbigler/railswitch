@@ -547,6 +547,13 @@ func TestOptionDump(t *testing.T) {
 			t.Errorf("%s: Load error = %v, want a [dump] error", name, err)
 		}
 	}
+	// up restores a new database once it is healthy (D122).
+	fsys := minimal()
+	opt := fsys["options/o/option.toml"]
+	opt.Data = append(opt.Data, []byte("[dump]\ncommand = [\"d\"]\nfile = \"x.dump\"\nrestore = [\"r\"]\n")...)
+	if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "dump.restore needs [health]") {
+		t.Errorf("restore without health: %v", err)
+	}
 }
 
 // A runtime may have no fallback: an app without a version source gets an

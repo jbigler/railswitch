@@ -59,7 +59,9 @@ new worktree's database starts from the dumps in `<workspace>/db-dumps/`
 if there are any (`railswitch db dump` writes them from a worktree you
 like), else empty: `up` starts the new database alone, restores each
 dump with the database option's own restore, and only then starts the
-app, whose own setup (`db:prepare` for Rails) runs on the restored data. `railswitch db restore` puts the dumps back into a running
+app, whose own setup (`db:prepare` for Rails) runs on the restored data.
+If that restore fails, the app isn't started, and the next `up` (or `db
+restore`) tries again. `railswitch db restore` puts the dumps back into a running
 worktree's database at any time: each database that has a dump is
 replaced, the others are left as they are (it asks first, naming each
 one; `--from <dir>` for dumps from elsewhere, `--yes` without asking).

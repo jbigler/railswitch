@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/sys/systest"
 )
 
 // writeDumps puts two database dumps, a seed and a symlinked dump into the
@@ -55,7 +56,7 @@ func TestDBRestore(t *testing.T) {
 	if !slices.Equal(stdins, []string{"PGDMP dev", "PGDMP queue"}) {
 		t.Errorf("stdins %q", stdins)
 	}
-	if n := count(e.calls(), "evil"); n != 0 {
+	if n := containing(e.calls(), "evil"); n != 0 {
 		t.Error("a symlinked dump was restored")
 	}
 }
@@ -73,11 +74,11 @@ func TestDBRestoreRefusals(t *testing.T) {
 	if _, err := e.l.DBRestore(ctx, "feat", "", nil, false); err == nil || !strings.Contains(err.Error(), "pass --yes") || !strings.Contains(err.Error(), "filial_dev, filial_queue") {
 		t.Errorf("no terminal: %v", err)
 	}
-	if n := count(e.calls(), "pg_restore"); n != 0 {
+	if n := containing(e.calls(), "pg_restore"); n != 0 {
 		t.Errorf("restored after a refusal")
 	}
 	done, err := e.l.DBRestore(ctx, "feat", "", []string{"filial_queue"}, true)
-	if err != nil || !slices.Equal(done, []string{"filial_queue"}) || count(e.calls(), "-d filial_dev") != 0 {
+	if err != nil || !slices.Equal(done, []string{"filial_queue"}) || containing(e.calls(), "-d filial_dev") != 0 {
 		t.Errorf("only filial_queue: %v %v", done, err)
 	}
 }
@@ -103,7 +104,7 @@ func TestDBRestorePartialFailure(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "filial_dev may be empty or partly restored") || !strings.Contains(err.Error(), "not touched: filial_queue") {
 		t.Errorf("err = %v", err)
 	}
-	if count(e.calls(), "sh filial_queue") != 0 {
+	if containing(e.calls(), "sh filial_queue") != 0 {
 		t.Error("ran on after the failure")
 	}
 }
@@ -157,7 +158,7 @@ func TestUpKeepsExistingDatabase(t *testing.T) {
 	if err := e.l.Up(ctx, "feat"); err != nil {
 		t.Fatal(err)
 	}
-	if n := count(e.calls(), "pg_restore"); n != 0 {
+	if n := containing(e.calls(), "pg_restore"); n != 0 {
 		t.Errorf("restored into an existing database")
 	}
 }
@@ -175,7 +176,69 @@ func TestDBRestoreOpensBeforePrepare(t *testing.T) {
 	if _, err := e.l.DBRestore(ctx, "feat", "", nil, true); err == nil {
 		t.Fatal("restored with an unreadable dump")
 	}
-	if n := count(e.calls(), "dropdb"); n != 0 {
+	if n := containing(e.calls(), "dropdb"); n != 0 {
 		t.Errorf("prepare ran before every file was opened")
 	}
+}
+
+// A restore that fails leaves the app unstarted and a marker; the next up
+// restores again (the volume exists by then), and a success clears it.
+func TestUpRetriesUnfinishedRestore(t *testing.T) {
+	e := setup(t)
+	e.missing("podman", "image", "exists")
+	e.missing("podman", "volume", "exists")
+	if err := os.WriteFile(filepath.Join(e.ws, "db-dumps", "filial_dev.dump"), []byte("PGDMP dev"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.f.On([]string{"podman", "exec", "-i", "filial-feat-db", "pg_restore"}, sys.Result{ExitCode: 1}, errors.New("exit 1"))
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	err := e.l.Up(ctx, "feat")
+	marker := filepath.Join(e.ws, ".railswitch", "restore-pending", "feat")
+	if err == nil || !strings.Contains(err.Error(), "the next up or railswitch db restore restores the dumps") || !strings.Contains(err.Error(), marker) {
+		t.Fatalf("err = %v", err)
+	}
+	if count(e.calls(), "systemctl --user start filial-feat-rails.service") != 0 {
+		t.Error("the app started on a database whose restore failed")
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("no marker: %v", err)
+	}
+
+	f := setupAgain(t, e)
+	f.missing("podman", "image", "exists")
+	f.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	if err := f.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if containing(f.calls(), "pg_restore") != 1 {
+		t.Errorf("the next up didn't restore again:\n%s", dump(f.calls()))
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("the marker survived a restore")
+	}
+}
+
+// setupAgain is e with a fresh fake (the same workspace and registry): the
+// next command after one whose scripted results must not carry over.
+func setupAgain(t *testing.T, e *tenv) *tenv {
+	t.Helper()
+	f := &systest.Fake{}
+	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte("/g\n")}, nil)
+	f.On([]string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp"}, sys.Result{Stdout: []byte("ActiveEnterTimestamp=Fri 2100-01-01 00:00:00.000000 UTC\n")}, nil)
+	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
+	l := *e.l
+	l.R = f
+	return &tenv{ws: e.ws, f: f, out: e.out, l: &l}
+}
+
+// containing counts the calls whose joined argv holds sub anywhere (count
+// matches a prefix only).
+func containing(calls [][]string, sub string) int {
+	n := 0
+	for _, c := range calls {
+		if strings.Contains(joined(c), sub) {
+			n++
+		}
+	}
+	return n
 }

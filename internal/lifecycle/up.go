@@ -304,11 +304,18 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	// so the app's own setup (db:prepare) runs on the restored data.
 	if fresh != nil {
 		fmt.Fprintf(l.Out, "restoring %s into the new database\n", strings.Join(fresh.dbs, ", "))
+		if err := fresh.markPending(); err != nil {
+			return err
+		}
+		retry := fmt.Sprintf("the next up or railswitch db restore restores the dumps; to start without them, remove %s", fresh.pending)
 		if err := sd.Start(ctx, fresh.unit); err != nil {
-			return l.startFailure(ctx, sd, slug, []string{fresh.unit}, err)
+			return fmt.Errorf("%w (%s)", l.startFailure(ctx, sd, slug, []string{fresh.unit}, err), retry)
 		}
 		if _, err := l.runRestore(ctx, fresh.ctr, fresh.o, fresh.sc, fresh.files, fresh.dbs, fresh.label); err != nil {
-			return fmt.Errorf("restoring the dumps into the new database: %w (railswitch db restore tries again)", err)
+			return fmt.Errorf("restoring the dumps into the new database: %w (%s)", err, retry)
+		}
+		if err := os.Remove(fresh.pending); err != nil {
+			return err
 		}
 	}
 	// The app also needs the project's proxy network and Traefik. The

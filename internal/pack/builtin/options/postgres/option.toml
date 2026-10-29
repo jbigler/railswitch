@@ -17,7 +17,9 @@ file = "Containerfile.pg-client"
 os = "debian"
 
 [health]
-cmd = "pg_isready -U postgres"
+# Over TCP: the image's temporary initdb server listens on the socket only,
+# so "healthy" means the real server is up (up restores into it: D122).
+cmd = "pg_isready -h 127.0.0.1 -U postgres"
 interval = "5s"
 timeout = "3s"
 retries = 5

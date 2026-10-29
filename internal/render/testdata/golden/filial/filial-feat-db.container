@@ -5,7 +5,7 @@
 Description=filial db of worktree feat
 
 [Container]
-Label=filial.unit-hash=32ffdaf2b2e1
+Label=filial.unit-hash=7a1acdd86d6e
 Image=docker.io/library/postgres:17
 ContainerName=filial-feat-db
 Network=filial-feat-dev.network:alias=db
@@ -16,7 +16,7 @@ ShmSize=256mb
 NoNewPrivileges=true
 Memory=2g
 PidsLimit=1024
-HealthCmd=pg_isready -U postgres
+HealthCmd=pg_isready -h 127.0.0.1 -U postgres
 HealthInterval=5s
 HealthTimeout=3s
 HealthRetries=5

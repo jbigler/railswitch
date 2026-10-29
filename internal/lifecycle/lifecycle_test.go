@@ -1540,3 +1540,30 @@ func TestUpReloadsUnitWaitingForNetwork(t *testing.T) {
 		}
 	}
 }
+
+// TestDownRearmsCreateHooks: down deletes the worktree's data, so its next
+// up runs the [hooks] create commands again, from the first; a refused
+// down leaves the marker as it was.
+func TestDownRearmsCreateHooks(t *testing.T) {
+	e := setup(t)
+	marker := render.CreatePending(e.l.WS.Root, "feat")
+	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, []byte("bin/rails db:test:prepare\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.l.TTY, e.l.In = true, strings.NewReader("n\n")
+	if err := e.l.Down(ctx, "feat", false); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(marker); err != nil || string(data) != "bin/rails db:test:prepare\n" {
+		t.Errorf("an aborted down changed the marker: %q, %v", data, err)
+	}
+	if err := e.l.Down(ctx, "feat", true); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(marker); err != nil || len(data) != 0 {
+		t.Errorf("after down the marker is %q, %v; want empty (every create command again)", data, err)
+	}
+}

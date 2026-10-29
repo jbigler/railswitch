@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/jobs"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -389,6 +390,17 @@ func TestGuardLoginAndAccept(t *testing.T) {
 	w = f.do(r)
 	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "ok v9" {
 		t.Errorf("healthz: %d %q", w.Code, w.Body.String())
+	}
+	nonce := strings.Repeat("ab", 16)
+	r = httptest.NewRequest("GET", "/healthz?nonce="+nonce, nil)
+	r.Host = "127.0.0.1:7700"
+	if w := f.do(r); strings.TrimSpace(w.Body.String()) != "ok v9 "+machine.ProbeProof(testToken, nonce) {
+		t.Errorf("healthz with a nonce: %q", w.Body.String())
+	}
+	r = httptest.NewRequest("GET", "/healthz?nonce=../x", nil)
+	r.Host = "127.0.0.1:7700"
+	if w := f.do(r); strings.TrimSpace(w.Body.String()) != "ok v9" {
+		t.Errorf("healthz with a bad nonce: %q", w.Body.String())
 	}
 	checkHeaders(t, "healthz", w)
 

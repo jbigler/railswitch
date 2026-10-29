@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/dashconf"
 	"github.com/jbigler/railswitch/internal/machine"
@@ -20,8 +21,8 @@ const (
 	colorsResetUsage = "usage: railswitch dashboard colors reset [--dark]"
 )
 
-// railswitch dashboard: print the dashboard's login link (and how to start
-// it when its unit isn't active); `dashboard colors …` edits its colours;
+// railswitch dashboard: start the dashboard and print its login link once
+// it proves it is this user's; `dashboard colors …` edits its colours;
 // `dashboard serve` is the dashboard.
 func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	if len(args) > 0 {
@@ -47,32 +48,62 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	fmt.Fprintf(e.stdout, "%slogin?token=%s\n", machine.DashboardURL, tok)
-	// The link stands whatever follows: the dashboard is written, enabled
-	// (it starts at every login, with no project needed) and started.
+	// The unit is written, enabled (it starts at every login, with no
+	// project needed) and started; a systemctl failure is reported and the
+	// dashboard asked all the same (it may run already).
 	sd := podman.Systemd{R: e.run}
+	started := false
 	changed, err := workspace.WriteDashboardUnit(dirs)
 	if err == nil && changed {
 		err = sd.DaemonReload(ctx)
 	}
+	var props map[string]string
+	if err == nil {
+		props, err = sd.Show(ctx, machine.DashboardService, "ActiveState", "UnitFileState")
+	}
+	if err == nil && (props["ActiveState"] != "active" || props["UnitFileState"] != "enabled") {
+		if err = sd.EnableNow(ctx, machine.DashboardService); err == nil {
+			started = true
+		}
+	}
 	if err != nil {
-		fmt.Fprintf(e.stderr, "railswitch: dashboard unit: %v\n", err)
-		return 0
+		fmt.Fprintf(e.stderr, "railswitch: the dashboard's unit: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
 	}
-	props, err := sd.Show(ctx, machine.DashboardService, "ActiveState", "UnitFileState")
-	if err != nil {
-		fmt.Fprintf(e.stderr, "railswitch: dashboard state unknown: %v\n", err)
-		return 0
+	// The link carries the token: it is printed only once the dashboard on
+	// the port has proved it holds that token. Another program there (an
+	// older dashboard, a squatter) would get the token from the browser.
+	if p := waitDashboard(ctx, tok); !p.Ours {
+		fmt.Fprintf(e.stderr, "railswitch: no login link: %s\nnext: %s\n", p, p.Fix())
+		return 1
 	}
-	if props["ActiveState"] == "active" && props["UnitFileState"] == "enabled" {
-		return 0
+	fmt.Fprintf(e.stdout, "%slogin?token=%s\n", machine.DashboardURL, tok)
+	if started {
+		fmt.Fprintln(e.stdout, "started the dashboard; it starts at every login from now on")
 	}
-	if err := sd.EnableNow(ctx, machine.DashboardService); err != nil {
-		fmt.Fprintf(e.stderr, "railswitch: starting the dashboard: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)
-		return 0
-	}
-	fmt.Fprintln(e.stdout, "started the dashboard; it starts at every login from now on")
 	return 0
+}
+
+// dashboardWait is how long waitDashboard waits for the proof; tests
+// shorten it.
+var dashboardWait = 10 * time.Second
+
+// waitDashboard probes the dashboard until it proves it holds tok, for a
+// while when nothing answers or a dashboard answers without the proof (a
+// unit just started, or an older one restarting onto a new binary);
+// another program's answer is final.
+func waitDashboard(ctx context.Context, tok string) machine.Probe {
+	deadline := time.Now().Add(dashboardWait)
+	for {
+		p := machine.ProbeDashboards(ctx, dashboardAddrs, tok)
+		if p.Ours || p.Other != "" || !time.Now().Before(deadline) {
+			return p
+		}
+		select {
+		case <-ctx.Done():
+			return p
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
 
 // colorsMode is one mode of `dashboard colors --json` (docs/json.md).

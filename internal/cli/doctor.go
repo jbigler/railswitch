@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/doctor"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -32,7 +33,12 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 			ws, checks = nil, []doctor.Check{doctor.Workspace(err)}
 		}
 	}
-	return e.printChecks(append(checks, doctor.Run(ctx, e.run, ws)...))
+	h := doctor.DefaultHost
+	h.Dashboards = dashboardAddrs
+	if dirs, err := machine.DefaultDirs(); err == nil {
+		h.Token, h.TokenErr = machine.ReadDashboardToken(dirs) // none: the dashboard can't prove it's yours
+	}
+	return e.printChecks(append(checks, h.Run(ctx, e.run, ws)...))
 }
 
 // printChecks prints doctor's checks, as JSON with --json, and returns its

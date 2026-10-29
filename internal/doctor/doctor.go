@@ -41,18 +41,24 @@ type Check struct {
 // Host is where doctor reads the host's proc and sys files and looks up
 // binaries; DefaultHost is the real host.
 type Host struct {
-	PortStart string   // ip_unprivileged_port_start
-	Quadlet   []string // podman's quadlet generator: the first that exists
-	Cgroup    string   // cgroup v2's root cgroup.controllers
-	LookPath  func(name string) (string, error)
+	PortStart  string   // ip_unprivileged_port_start
+	Quadlet    []string // podman's quadlet generator: the first that exists
+	Cgroup     string   // cgroup v2's root cgroup.controllers
+	LookPath   func(name string) (string, error)
+	Dashboards []string // the dashboard's addresses, asked for /healthz (machine.ProbeDashboards)
+	// Token is this user's dashboard login token, which the dashboard
+	// proves it holds ("": none yet, nothing passes).
+	Token    string
+	TokenErr error // reading the token file failed
 }
 
 // DefaultHost is this machine.
 var DefaultHost = Host{
-	PortStart: "/proc/sys/net/ipv4/ip_unprivileged_port_start",
-	Quadlet:   podman.QuadletPaths,
-	Cgroup:    "/sys/fs/cgroup/cgroup.controllers",
-	LookPath:  exec.LookPath,
+	PortStart:  "/proc/sys/net/ipv4/ip_unprivileged_port_start",
+	Quadlet:    podman.QuadletPaths,
+	Cgroup:     "/sys/fs/cgroup/cgroup.controllers",
+	LookPath:   exec.LookPath,
+	Dashboards: machine.DashboardAddrs,
 }
 
 // minPodman is the oldest podman major version railswitch supports.
@@ -60,11 +66,6 @@ const minPodman = 5
 
 // tools are the binaries the firewall hook and its scripts run on the host.
 var tools = []string{"nft", "nsenter", "getent", "jq", "curl"}
-
-// Run runs every check on DefaultHost; see Host.Run.
-func Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []Check {
-	return DefaultHost.Run(ctx, r, ws)
-}
 
 // Run runs every check, in a fixed order. The firewall descriptor and units
 // checks need ws (nil outside a workspace: skipped); the pass, gpg and GPG
@@ -74,7 +75,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, sshKeygen(ctx, r), dashboard(ctx, r), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
+	out = append(out, sshKeygen(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
 	}
@@ -155,6 +156,22 @@ func dashboard(ctx context.Context, r sys.Runner) Check {
 	c.Detail = state
 	if c.Detail == "" && err != nil {
 		c.Detail = err.Error()
+	}
+	return c
+}
+
+// dashboardAnswers warns unless railswitch's dashboard answers at its
+// address: another program on the port (an older dashboard) gets the
+// browser instead, and railswitch's can't start.
+func (h Host) dashboardAnswers(ctx context.Context) Check {
+	if h.TokenErr != nil {
+		return Check{Name: "dashboard answers", Warn: true, Detail: "the login token: " + h.TokenErr.Error(),
+			Fix: "make the token file named in detail readable by you; if it is malformed, remove it, then railswitch dashboard and systemctl --user restart " + machine.DashboardService + " (a new token logs every browser out)"}
+	}
+	p := machine.ProbeDashboards(ctx, h.Dashboards, h.Token)
+	c := Check{Name: "dashboard answers", Warn: true, OK: p.Ours, Detail: p.String()}
+	if !p.Ours {
+		c.Fix = p.Fix()
 	}
 	return c
 }

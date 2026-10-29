@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/jbigler/railswitch/internal/jobs"
+	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 )
 
@@ -218,8 +219,15 @@ func (s *Server) lookup(w http.ResponseWriter, r *http.Request) (projectRow, wor
 
 // Pages and fragments.
 
-func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	// A probe's nonce gets the token's proof: `railswitch dashboard` and
+	// doctor tell their user's dashboard from anything else on the port
+	// (machine.ProbeDashboard).
+	if n := r.URL.Query().Get("nonce"); machine.NonceOK(n) {
+		fmt.Fprintf(w, "ok %s %s\n", s.c.Version, machine.ProbeProof(s.c.Token, n))
+		return
+	}
 	fmt.Fprintf(w, "ok %s\n", s.c.Version)
 }
 

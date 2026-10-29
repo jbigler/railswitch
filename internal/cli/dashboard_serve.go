@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jbigler/railswitch/internal/buildinfo"
@@ -35,7 +37,7 @@ const cliTimeout = 150 * time.Second
 const cliGrace = 3 * time.Second
 
 // railswitch dashboard serve: the dashboard itself (its unit's ExecStart).
-// It listens on machine.DashboardAddr until stopped, or until its
+// It listens on machine.DashboardAddr (and DashboardAddr6) until stopped, or until its
 // executable is replaced while no job runs: it exits 0 and systemd starts
 // the new binary.
 func dashboardServe(ctx context.Context, e *env, args []string) int {
@@ -75,6 +77,18 @@ func dashboardServe(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	// IPv6 loopback too: browsers try it first for *.localhost, and held
+	// here, no other program can take it (D127). Without IPv6 there's
+	// nothing to hold; taken, it's logged and `railswitch dashboard` and
+	// doctor name what holds it.
+	lns := []net.Listener{ln}
+	switch ln6, err := net.Listen("tcp", machine.DashboardAddr6); {
+	case err == nil:
+		lns = append(lns, ln6)
+	case errors.Is(err, syscall.EADDRNOTAVAIL), errors.Is(err, syscall.EAFNOSUPPORT):
+	default:
+		fmt.Fprintf(e.stderr, "railswitch: dashboard: not listening on %s: %v\n", machine.DashboardAddr6, err)
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Home: home, Version: buildinfo.Version, Now: time.Now})
@@ -84,8 +98,10 @@ func dashboardServe(ctx context.Context, e *env, args []string) int {
 	}
 	ran := make(chan error, 1)
 	go func() { ran <- srv.Run(ctx) }()
-	served := make(chan error, 1)
-	go func() { served <- hs.Serve(ln) }()
+	served := make(chan error, len(lns))
+	for _, l := range lns {
+		go func() { served <- hs.Serve(l) }()
+	}
 	watched := make(chan bool, 1)
 	go func() { watched <- watchExe(ctx, exe, exeCheckEvery, hub.Running) }()
 

@@ -384,6 +384,9 @@ func secretLs(ctx context.Context, e *env, args []string) int {
 	// Without a model, which services up starts is unknown: every secret
 	// counts as needed.
 	m, merr := e.model(ctx, w)
+	if merr != nil {
+		fmt.Fprintf(e.stderr, "railswitch: which secrets up needs: %v (up is true for all)\n", merr)
+	}
 	rows := []secretRow{}
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {
 		sec := w.Project.Secrets[name]

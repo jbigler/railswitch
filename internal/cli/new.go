@@ -624,11 +624,14 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 // agent's.
 type unsetNames struct{ unset, blocking []string }
 
-// unsetSecrets asks podman for w's secrets; one it can't ask about, or
-// whose services can't be told, counts as unset and blocking.
+// unsetSecrets asks podman for w's secrets; one it can't ask about counts
+// as unset, and every unset one blocks when the model can't be built.
 func (e *env) unsetSecrets(ctx context.Context, w *workspace.Workspace) unsetNames {
 	p := podman.Podman{R: e.run}
 	m, merr := e.model(ctx, w)
+	if merr != nil {
+		fmt.Fprintf(e.stderr, "railswitch: which secrets up needs: %v (counting every unset one)\n", merr)
+	}
 	var u unsetNames
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {
 		set, err := p.SecretExists(ctx, render.SecretName(w.Project.Project.Prefix, name, w.Project.Secrets[name]))

@@ -62,7 +62,7 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 	if _, err := os.Stat(script); err != nil {
 		return e.fail(fmt.Errorf("%w: run railswitch render", err))
 	}
-	env := append(os.Environ(),
+	env := append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "FW_FORMAT=") }),
 		"FIREWALL_DIR="+dir,
 		"PREFIX="+w.Project.Project.Prefix,
 		"WORKTREE="+w.Slug,

@@ -39,6 +39,7 @@ type projectDoc struct {
 // the mode the project's services get, and each editable allow list.
 type firewallRow struct {
 	Mode      string              `json:"mode"`
+	Default   string              `json:"default"` // the mode without [firewall] mode: enforce with agents, else log
 	Effective string              `json:"effective"`
 	Allow     map[string][]string `json:"allow"` // config.FirewallProfiles, never null
 }
@@ -197,7 +198,9 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 		Prefix: p.Project.Prefix, Name: p.Project.Name, Repo: p.Project.Repo, BaseBranch: p.Project.BaseBranch,
 		Hash: workspace.Hash(data), File: string(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
 	}
-	d.Firewall = firewallRow{Mode: p.Firewall.Mode, Effective: render.FirewallMode(p, st), Allow: map[string][]string{}}
+	unset := *p
+	unset.Firewall.Mode = ""
+	d.Firewall = firewallRow{Mode: p.Firewall.Mode, Default: render.FirewallMode(&unset, st), Effective: render.FirewallMode(p, st), Allow: map[string][]string{}}
 	for _, prof := range config.FirewallProfiles {
 		d.Firewall.Allow[prof] = append([]string{}, p.Firewall.Allow[prof]...)
 	}

@@ -90,10 +90,12 @@ type settingsView struct {
 
 // firewallView is the Firewall card (D119).
 type firewallView struct {
-	Mode, Effective string
-	Modes           []fwModeView
-	Profiles        []fwProfileView
-	BlockedURL      string
+	Mode, Default, Effective string
+	// OptedOut: the project has agents but its mode lets the app out.
+	OptedOut   bool
+	Modes      []fwModeView
+	Profiles   []fwProfileView
+	BlockedURL string
 }
 
 type fwModeView struct {
@@ -114,7 +116,8 @@ var fwProfileNotes = map[string]string{
 }
 
 func newFirewallView(f firewallShow, blockedURL string) firewallView {
-	v := firewallView{Mode: f.Mode, Effective: f.Effective, BlockedURL: blockedURL}
+	v := firewallView{Mode: f.Mode, Default: f.Default, Effective: f.Effective, BlockedURL: blockedURL,
+		OptedOut: f.Default == "enforce" && f.Effective != "enforce"}
 	for _, m := range []struct{ value, label string }{{"", "Default"}, {"enforce", "Enforce"}, {"log", "Log only"}, {"off", "Off"}} {
 		v.Modes = append(v.Modes, fwModeView{Value: m.value, Label: m.label, Current: m.value == f.Mode})
 	}
@@ -229,9 +232,12 @@ func editTitle(show projectShow, e edit) string {
 		if to == "" {
 			to = "the default"
 		}
+		if to == "the default" {
+			to += " (" + show.Firewall.Default + ")"
+		}
 		from := show.Firewall.Mode
 		if from == "" {
-			from = "the default (" + show.Firewall.Effective + ")"
+			from = "the default (" + show.Firewall.Default + ")"
 		}
 		return "Firewall mode: " + from + " → " + to
 	case "firewall.allow.add":

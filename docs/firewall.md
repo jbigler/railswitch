@@ -67,6 +67,24 @@ agent's own firewall is only as strong as the app's.
 - A review flags every host a template's `firewall.*` lines, a pack's
   `app.allow` or `deps.allow`, an agent's `allow` or a tool's `allow` adds.
 
+## Upgrading to D119
+
+- A project with agents and no `[firewall] mode` goes from `log` to
+  `enforce` for the app, its workers, `exec`, `task`, `deps`, data
+  containers and nvim the next time each container starts (`up` restarts
+  them: their units changed). Its `app` list starts empty, so anything the
+  app calls out to is blocked until you allow it. Before the restart,
+  `railswitch fw show` (or the Firewall card) lists what log mode
+  recorded; allow those hosts first, or set `mode = "log"` to keep the old
+  behaviour (the card then warns that the app is a way out).
+- Found on the first host run: Node's corepack downloads Yarn from
+  `repo.yarnpkg.com` each time Vite starts; allow it in `app` (Mastodon
+  needed it).
+- A project with nvim gets a pending review: the nvim tool's `tool.toml`
+  gained `allow`. Until `railswitch lock --accept`, nvim runs the old copy
+  without those hosts, so plugin and language-server downloads from
+  `raw.githubusercontent.com` and PyPI are blocked under enforce.
+
 ## Known limits
 
 - DNS: the worktree's resolver forwards any name upstream, so a name

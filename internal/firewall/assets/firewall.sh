@@ -122,6 +122,12 @@ cmd_show() {
     local addr proto port host
     while read -r addr proto port; do
       host="$(timeout 2 getent hosts "$addr" 2>/dev/null | awk '{ print $2; exit }')" || true
+      # A reverse name is the address owner's to choose: show it only when
+      # it resolves back to the address (else Settings would offer to
+      # allow a name the owner of that address picked).
+      if [[ -n "$host" ]] && ! timeout 2 getent ahosts "$host" 2>/dev/null | awk '{ print $1 }' | grep -qxF "$addr"; then
+        host=""
+      fi
       if [[ "$TSV" ]]; then
         printf 'R\t%s\t%s\t%s\t%s\t%s\n' "$name" "$addr" "$proto" "$port" "${host:-}"
       else

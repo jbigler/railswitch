@@ -40,7 +40,9 @@
 
 {{with .Firewall}}<section class="card" id="firewall" data-mode="{{.Mode}}">
 <h2>Firewall</h2>
-<p class="note">What each kind of container may reach outside this machine. The default is <b>{{.Effective}}</b>{{if eq .Effective "enforce"}}: the project has agents, and an agent edits the code the app, its workers and installs run{{end}}. Under enforce a host not listed is blocked; log only records what enforce would block.</p>
+<p class="note">What each kind of container may reach outside this machine. Now: <b>{{.Effective}}</b>. The default is {{.Default}}{{if eq .Default "enforce"}}: the project has agents, and an agent edits the code the app, its workers and installs run{{end}}. Under enforce a host not listed is blocked; log only records what enforce would block.</p>
+{{if .OptedOut}}<p class="yellow notice">This project has agents and its firewall is {{.Effective}}: an agent can reach the network through code the app or its workers run. Pick Default or Enforce to close that.</p>
+{{end}}
 <div class="choices fw-modes">{{range .Modes}}<label class="choice"><input type="radio" name="fw-mode" value="{{.Value}}"{{if .Current}} checked{{end}}> {{.Label}}{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
 {{range .Profiles}}{{$prof := .Name}}<h3><span class="mono">{{.Name}}</span> <span class="muted">· {{.Note}}</span></h3>
 <table class="set-table">

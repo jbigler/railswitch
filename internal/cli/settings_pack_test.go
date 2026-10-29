@@ -87,3 +87,31 @@ func TestSettingsApplyFirewall(t *testing.T) {
 		t.Errorf("firewall = %+v", doc.Firewall)
 	}
 }
+
+// An allow-list edit restarts the running worktree (the hook reads the
+// lists only at a container's start), and a bad host is blocked in the
+// preview, not only refused by apply.
+func TestSettingsPreviewFirewallEdits(t *testing.T) {
+	ws, _ := lockedWS(t)
+	code, out, errs := runStdin(t, unitsFake(), `[{"op":"firewall.allow.add","key":"app","value":"pay.example.com"}]`, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var p previewDoc
+	if err := json.Unmarshal([]byte(out), &p); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Restart, []string{"master"}) {
+		t.Errorf("restart %v; want [master]", p.Restart)
+	}
+	code, out, errs = runStdin(t, unitsFake(), `[{"op":"firewall.allow.add","key":"app","value":"bad host"}]`, "-C", ws, "--json", "settings", "preview")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if err := json.Unmarshal([]byte(out), &p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Edits) != 1 || p.Edits[0].Impact != "blocked" || !strings.Contains(p.Edits[0].Error, "not a host name") {
+		t.Errorf("bad host: %+v", p.Edits)
+	}
+}

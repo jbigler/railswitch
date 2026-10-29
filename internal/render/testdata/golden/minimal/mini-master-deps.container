@@ -5,7 +5,7 @@
 Description=mini deps of worktree master
 
 [Container]
-Label=mini.unit-hash=04698c9e7fb6
+Label=mini.unit-hash=7f44af98be1c
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-39fced4e
 ContainerName=mini-master-deps
 Network=mini-master-dev.network:alias=deps
@@ -27,6 +27,7 @@ GlobalArgs=--hooks-dir=/WORKSPACES/minimal/.railswitch/firewall/hooks.d
 Annotation=mini.firewall=deps
 Annotation=mini.firewall.networks=mini-master-dev
 Annotation=mini.firewall.mode=log
+Annotation=mini.firewall.lists=1b43b4632158
 PodmanArgs=--cpus=6
 LogDriver=passthrough
 Entrypoint=/usr/local/bin/entrypoint-deps.sh

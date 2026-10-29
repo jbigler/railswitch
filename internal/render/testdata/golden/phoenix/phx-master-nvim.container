@@ -5,7 +5,7 @@
 Description=phx nvim of worktree master
 
 [Container]
-Label=phx.unit-hash=49a02abeb15f
+Label=phx.unit-hash=0a8f6ca1d33d
 Image=localhost/phx/nvim:elixir1.18.4-otp27-12e39b54
 ContainerName=phx-master-nvim
 Network=phx-master-dev.network:alias=nvim
@@ -38,6 +38,7 @@ GlobalArgs=--hooks-dir=/WORKSPACES/phoenix/.railswitch/firewall/hooks.d
 Annotation=phx.firewall=agent,deps
 Annotation=phx.firewall.networks=phx-master-dev,phx_proxy
 Annotation=phx.firewall.mode=enforce
+Annotation=phx.firewall.lists=9925bb3c3298
 Annotation=phx.firewall.extra=api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org
 PodmanArgs=--cpus=2 --tty --interactive
 LogDriver=journald

@@ -349,6 +349,29 @@ func TestHookFilesPrivate(t *testing.T) {
 	}
 }
 
+// The app profile (D119) reads app.allow: a container with it starts.
+func TestHookAppProfile(t *testing.T) {
+	root, dir := t.TempDir(), t.TempDir()
+	script := filepath.Join(dir, "hook.sh")
+	data, err := os.ReadFile(filepath.Join("assets", "hook.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(script, data, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "app.allow"), []byte("# list\n203.0.113.5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if msg, err := runHookAt(t, script, root, hookEnv(t, filepath.Join(t.TempDir(), "nft.out")), map[string]string{
+		"filial.firewall":          "app",
+		"filial.firewall.mode":     "enforce",
+		"filial.firewall.networks": "filial-feat-dev",
+	}); err != nil {
+		t.Fatalf("hook with profile app: %v\n%s", err, msg)
+	}
+}
+
 func TestHookFailsClosed(t *testing.T) {
 	root := t.TempDir()
 	out := filepath.Join(t.TempDir(), "nft.out")

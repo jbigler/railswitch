@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree master
 
 [Container]
-Label=filial.unit-hash=9a95c024c150
+Label=filial.unit-hash=31d37ab94488
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-0b480561
 ContainerName=filial-master-agent-probe
 Network=filial-master-dev.network:alias=agent-probe
@@ -37,6 +37,7 @@ GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
 Annotation=filial.firewall=agent-probe
 Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
 Annotation=filial.firewall.mode=enforce
+Annotation=filial.firewall.lists=2367eca40f40
 PodmanArgs=--cpus=4 --tty --interactive
 LogDriver=journald
 

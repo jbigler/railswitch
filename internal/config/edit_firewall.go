@@ -2,12 +2,27 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"slices"
+	"strings"
 )
 
 // FirewallProfiles are the [firewall] allow lists the project edits: the
 // app and its workers (D119), deps installs, every agent.
 var FirewallProfiles = []string{"app", "deps", "agent"}
+
+// CheckAllowHost refuses h unless it is an allow list entry the firewall
+// hook takes: a host name, an IPv4 address or CIDR, or meta:<name> (a
+// published range set, meta:github).
+func CheckAllowHost(h string) error {
+	if _, _, err := net.ParseCIDR(h); err == nil && !strings.Contains(h, ":") {
+		return nil
+	}
+	if hostRe.MatchString(strings.TrimPrefix(h, "meta:")) {
+		return nil
+	}
+	return fmt.Errorf("%q is not a host name, IPv4 address or CIDR, or meta:<name>", h)
+}
 
 // parseFirewall splits data and checks that [firewall] is the shape the
 // firewall edits work on: one [firewall] table holding mode = "…" and
@@ -69,6 +84,9 @@ func SetFirewallMode(data, mode string) (string, error) {
 func AddFirewallAllow(data, prof, host string) (string, error) {
 	if !slices.Contains(FirewallProfiles, prof) {
 		return "", fmt.Errorf("firewall profile %q is not one of %v", prof, FirewallProfiles)
+	}
+	if err := CheckAllowHost(host); err != nil {
+		return "", fmt.Errorf("firewall.allow.%s: %w", prof, err)
 	}
 	d, s, err := parseFirewall(data, prof)
 	if err != nil {

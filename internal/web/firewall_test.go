@@ -10,9 +10,9 @@ import (
 // each rejected address that has a host and a list.
 func TestSettingsFirewall(t *testing.T) {
 	f := settingsFixture(t)
-	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"options":[`, `"firewall":{"mode":"","effective":"enforce","allow":{"app":["api.example.com"],"deps":[],"agent":[]}},"options":[`, 1))
+	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"options":[`, `"firewall":{"mode":"","default":"enforce","effective":"enforce","allow":{"app":["api.example.com"],"deps":[],"agent":[]}},"options":[`, 1))
 	body := f.do(req("GET", "/p/ftest/settings", nil)).Body.String()
-	contains(t, "settings", body, `id="firewall" data-mode=""`, "The default is <b>enforce</b>", `name="fw-mode" value="" checked`,
+	contains(t, "settings", body, `id="firewall" data-mode=""`, "Now: <b>enforce</b>. The default is enforce", `name="fw-mode" value="" checked`,
 		`data-prof="app" data-host="api.example.com"`, `data-src="/p/ftest/settings/blocked"`, `<input type="hidden" name="key" value="deps">`)
 	noCSPViolation(t, "settings", body)
 
@@ -26,4 +26,12 @@ func TestSettingsFirewall(t *testing.T) {
 
 	body = f.do(jsonPost("/p/ftest/settings/preview", `[{"op":"firewall.mode","value":"log"},{"op":"firewall.allow.add","key":"app","value":"pay.example.com"}]`)).Body.String()
 	contains(t, "staged", body, "Firewall mode: the default (enforce) → log", "Firewall app: allow pay.example.com")
+}
+
+// A project with agents set to log or off says the app is a way out.
+func TestSettingsFirewallOptedOut(t *testing.T) {
+	f := settingsFixture(t)
+	f.cli.set("--json -C /ws/ftest project show", strings.Replace(projectShowJSON, `"options":[`, `"firewall":{"mode":"log","default":"enforce","effective":"log","allow":{"app":[],"deps":[],"agent":[]}},"options":[`, 1))
+	body := f.do(req("GET", "/p/ftest/settings", nil)).Body.String()
+	contains(t, "settings", body, "This project has agents and its firewall is log")
 }

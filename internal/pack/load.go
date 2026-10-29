@@ -922,6 +922,11 @@ func (l *loader) checkTool(dir string, t *Tool) bool {
 	l.env(file, "env", t.Env)
 	l.ports(file, "tool "+t.Name, t.Ports)
 	l.links(file, t.Links)
+	for i, h := range t.Allow {
+		if !hostRe.MatchString(h) {
+			l.add(file, "allow[%d]: %q is not a host name", i, h)
+		}
+	}
 	return ok && len(l.errs) == n
 }
 

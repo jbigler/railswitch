@@ -5,7 +5,7 @@
 Description=filial nvim of worktree master
 
 [Container]
-Label=filial.unit-hash=a409dec71138
+Label=filial.unit-hash=43b20931962d
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-8b570477
 ContainerName=filial-master-nvim
 Network=filial-master-dev.network:alias=nvim
@@ -41,6 +41,7 @@ GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
 Annotation=filial.firewall=agent,deps
 Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
 Annotation=filial.firewall.mode=enforce
+Annotation=filial.firewall.lists=c984e792ce51
 Annotation=filial.firewall.extra=api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org,github.com
 PodmanArgs=--cpus=2 --tty --interactive
 LogDriver=journald

@@ -141,6 +141,7 @@ type projectShow struct {
 // firewallShow is project show's firewall (D119).
 type firewallShow struct {
 	Mode      string              `json:"mode"`
+	Default   string              `json:"default"`
 	Effective string              `json:"effective"`
 	Allow     map[string][]string `json:"allow"`
 }

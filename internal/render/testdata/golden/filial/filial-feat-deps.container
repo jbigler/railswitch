@@ -5,7 +5,7 @@
 Description=filial deps of worktree feat
 
 [Container]
-Label=filial.unit-hash=9520d43c4bf8
+Label=filial.unit-hash=13d288372758
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-feat-deps
 Network=filial-feat-dev.network:alias=deps
@@ -25,6 +25,7 @@ GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
 Annotation=filial.firewall=deps
 Annotation=filial.firewall.networks=filial-feat-dev
 Annotation=filial.firewall.mode=enforce
+Annotation=filial.firewall.lists=91990332dd56
 PodmanArgs=--cpus=6
 LogDriver=passthrough
 Entrypoint=/usr/local/bin/entrypoint-deps.sh

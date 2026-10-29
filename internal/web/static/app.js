@@ -688,7 +688,8 @@ if (view.startsWith("settings")) {
     const envUndo = t.closest("[data-env-undo]");
     if (envUndo) {
       staged = staged.filter((x) => target(x) !== "env " + envUndo.closest("tr").dataset.name);
-      return stagedChanged();
+      stagedChanged();
+      return $("form[data-stage=env] input[name=name]").focus(); // the row, and its button, are gone
     }
     const envRm = t.closest("[data-env-remove]");
     if (envRm) return stage({ op: "env.unset", name: envRm.closest("tr").dataset.name }, false);

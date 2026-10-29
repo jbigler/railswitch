@@ -47,7 +47,8 @@ type descriptor struct {
 
 // Files are the firewall's workspace files for project prefix in workspace
 // ws, keyed by workspace-relative slash path: hook.sh and firewall.sh
-// (0755), deps.allow (the pack's deps.allow, then fw.Allow["deps"],
+// (0755), app.allow (the pack's app.allow, then fw.Allow["app"]: the app
+// and its workers, D119), deps.allow (the pack's deps.allow, then fw.Allow["deps"],
 // de-duplicated, order kept), agent.allow (fw.Allow["agent"]), one
 // agent-<name>.allow per agent (its Allow, then fw.Allow["agent"]: C10) and
 // the hook descriptor hooks.d/<prefix>-firewall.json, whose hook reads
@@ -67,7 +68,7 @@ func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (m
 		return nil, fmt.Errorf("pack %s: %w", st.Pack.Name, err)
 	}
 	var errs []error
-	for _, p := range []string{"deps", "agent"} {
+	for _, p := range []string{"app", "deps", "agent"} {
 		for i, e := range fw.Allow[p] {
 			if e == "" || strings.ContainsAny(e, "# \t\r\n\v\f") {
 				errs = append(errs, fmt.Errorf("firewall.allow.%s[%d] %q: want one hostname, IPv4 address or CIDR, or meta:<name>", p, i, e))
@@ -80,6 +81,13 @@ func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (m
 	deps := allowlist("# The deps profile's allowlist: the pack's ("+st.Pack.Name+") deps.allow,\n# then [firewall] allow.deps. Written by railswitch render.\n",
 		entries(packList), fw.Allow["deps"])
 	agent := allowlist("# The agent profile's allowlist: [firewall] allow.agent. Written by\n# railswitch render.\n", fw.Allow["agent"])
+	appList, err := fs.ReadFile(st.Pack.Files, "app.allow")
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("pack %s: %w", st.Pack.Name, err)
+	}
+	app := allowlist("# The app profile's allowlist (the app and its workers, D119): the pack's\n# ("+st.Pack.Name+") app.allow, then [firewall] allow.app. Written by railswitch render.\n",
+		entries(appList), fw.Allow["app"])
+	out[path.Join(Dir, "app.allow")] = render.File{Data: app, Mode: 0o644}
 	out[path.Join(Dir, "deps.allow")] = render.File{Data: deps, Mode: 0o644}
 	out[path.Join(Dir, "agent.allow")] = render.File{Data: agent, Mode: 0o644}
 	for _, a := range st.Agents {

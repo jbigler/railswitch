@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 )
@@ -96,7 +97,8 @@ func (in *Instance) CPUs(s *Service) string {
 
 // FirewallAnnotations are the annotations the firewall hook reads for a
 // container of s on networks; nil when s is not firewalled. The mode is
-// s.FirewallMode when set (an agent's: D55), else the project's.
+// s.FirewallMode when set (an agent's: D55), else the project's, else
+// FirewallMode's default.
 func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string {
 	if !s.Firewalled() {
 		return nil
@@ -104,10 +106,7 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 	p := in.m.Prefix
 	mode := s.FirewallMode
 	if mode == "" {
-		mode = in.m.Inputs.Project.Firewall.Mode
-	}
-	if mode == "" {
-		mode = "log"
+		mode = FirewallMode(in.m.Inputs.Project, in.m.Inputs.Stack)
 	}
 	ann := []string{
 		p + ".firewall=" + strings.Join(s.Firewall, ","),
@@ -118,6 +117,20 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 		ann = append(ann, p+".firewall.extra="+strings.Join(s.FirewallExtra, ","))
 	}
 	return ann
+}
+
+// FirewallMode is the mode of p's services with no mode of their own:
+// [firewall] mode, else enforce when the project has agents (an agent
+// edits the code the app, its workers and deps run, so their egress is
+// the agents' too: D119), else log.
+func FirewallMode(p *config.Project, st *pack.Stack) string {
+	switch {
+	case p.Firewall.Mode != "":
+		return p.Firewall.Mode
+	case st != nil && len(st.Agents) > 0:
+		return "enforce"
+	}
+	return "log"
 }
 
 // VolumeSpecs are s's bind mounts, then its named volumes, as podman -v

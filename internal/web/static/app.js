@@ -424,12 +424,28 @@ function startSettings() {
   }
   syncLeft();
   if (staged.length) preview();
+  loadBlocked();
+}
+
+// loadBlocked swaps in the Firewall card's "Would be blocked", which the
+// server reads after the page: it inspects every container.
+async function loadBlocked() {
+  const el = $("#fw-blocked[data-src]");
+  if (!el) return;
+  try {
+    const r = await fetch(el.dataset.src, { credentials: "same-origin" });
+    if (r.ok) swap("fw-blocked", await r.text());
+  } catch {
+    // the dashboard went away: the placeholder stays
+  }
 }
 
 // target is what an edit changes; a later edit of the same target
 // replaces the earlier one.
 function target(e) {
   if (e.op === "pack") return "pack";
+  if (e.op === "firewall.mode") return "fwmode";
+  if (e.op === "firewall.allow.add" || e.op === "firewall.allow.remove") return "fw " + e.key + " " + e.value;
   if (e.op === "option") return "option " + e.key;
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
@@ -460,6 +476,13 @@ function stagedFor(t) {
 }
 
 function syncLeft() {
+  const fw = $("#firewall");
+  if (fw) {
+    const e = stagedFor("fwmode");
+    const mode = e ? e.value : fw.dataset.mode;
+    $$("input[name=fw-mode]", fw).forEach((r) => (r.checked = r.value === mode));
+    $$("tr.fwhost", fw).forEach((row) => row.classList.toggle("staged", !!stagedFor("fw " + row.dataset.prof + " " + row.dataset.host)));
+  }
   $$(".opt").forEach((row) => {
     const e = stagedFor(row.hasAttribute("data-pack") ? "pack" : "option " + row.dataset.key);
     const ref = e ? e.ref : row.dataset.ref;
@@ -579,6 +602,13 @@ if (view.startsWith("settings")) {
     }
     const envRm = t.closest("[data-env-remove]");
     if (envRm) return stage({ op: "env.unset", name: envRm.closest("tr").dataset.name }, false);
+    const fwRm = t.closest("[data-fw-remove]");
+    if (fwRm) {
+      const row = fwRm.closest("tr");
+      return stage({ op: "firewall.allow.remove", key: row.dataset.prof, value: row.dataset.host }, false);
+    }
+    const fwAllow = t.closest("[data-fw-allow]");
+    if (fwAllow) return stage({ op: "firewall.allow.add", key: fwAllow.dataset.prof, value: fwAllow.dataset.host }, false);
     const linkRm = t.closest("[data-link-remove]");
     if (linkRm) stage({ op: "link.remove", label: linkRm.closest("tr").dataset.label }, false);
   });
@@ -586,6 +616,7 @@ if (view.startsWith("settings")) {
   document.addEventListener("change", (e) => {
     const t = e.target;
     const opt = t.closest(".opt");
+    if (t.name === "fw-mode") return stage({ op: "firewall.mode", value: t.value }, t.value === $("#firewall").dataset.mode);
     if (opt && t.type === "radio" && opt.hasAttribute("data-pack")) return stage({ op: "pack", ref: t.value }, t.value === opt.dataset.ref);
     if (opt && t.type === "radio") return stage({ op: "option", key: opt.dataset.key, ref: t.value }, t.value === opt.dataset.ref);
     if (t.classList.contains("env-value")) {
@@ -615,6 +646,7 @@ if (view.startsWith("settings")) {
       const v = (n) => f.elements[n].value.trim();
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
       else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
+      else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);
       f.reset();
       addReady(f);

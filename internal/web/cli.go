@@ -129,12 +129,20 @@ type projectShow struct {
 	BaseBranch string        `json:"base_branch"`
 	Hash       string        `json:"hash"`
 	Pack       packRow       `json:"pack"`
+	Firewall   firewallShow  `json:"firewall"`
 	Options    []optionRow   `json:"options"`
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
 	AddChoices []string      `json:"add_choices"`
 	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`
+}
+
+// firewallShow is project show's firewall (D119).
+type firewallShow struct {
+	Mode      string              `json:"mode"`
+	Effective string              `json:"effective"`
+	Allow     map[string][]string `json:"allow"`
 }
 
 // packRow is the stack's pack and the packs with its app service.

@@ -7,7 +7,7 @@ Wants=railswitch-traefik.service
 After=railswitch-traefik.service
 
 [Container]
-Label=filial.unit-hash=6ea2e69db2ef
+Label=filial.unit-hash=df7170c66b84
 Image=docker.io/rustfs/rustfs:1.0.0-alpha.83
 ContainerName=filial-master-storage
 Network=filial-master-dev.network:alias=storage
@@ -44,7 +44,7 @@ Notify=healthy
 GlobalArgs=--hooks-dir=/WORKSPACES/filial/.railswitch/firewall/hooks.d
 Annotation=filial.firewall=none
 Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
-Annotation=filial.firewall.mode=log
+Annotation=filial.firewall.mode=enforce
 LogDriver=journald
 
 [Service]

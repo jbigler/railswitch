@@ -284,7 +284,7 @@ func (b *builder) services() error {
 		Publish:  pk.Ports,
 		Routes:   []Route{{Name: "app", Host: "{worktree.host}", Port: pk.App.Port}},
 		Health:   appHealth(pk.App, p.Services[appID].Health),
-		Firewall: []string{"none"},
+		Firewall: []string{"app"}, // app.allow (D119)
 		Worktree: true,
 		Mounts:   worktreeMounts("ro,z"),
 		Volumes:  b.appVolumes(),
@@ -323,8 +323,8 @@ func (b *builder) services() error {
 		errs = append(errs, err)
 		b.tools[s.ID] = t
 		if n := b.in.Project.Tools.Nvim; t.Name == "nvim" && n != nil {
-			if h, ok := naming.GitHost(n.ConfigRepo); ok {
-				s.FirewallExtra = []string{h}
+			if h, ok := naming.GitHost(n.ConfigRepo); ok && !slices.Contains(s.FirewallExtra, h) {
+				s.FirewallExtra = append(s.FirewallExtra, h)
 			}
 		}
 		tools = append(tools, s)
@@ -484,7 +484,12 @@ func (b *builder) optionService(ch *pack.Chosen, role string) (Service, error) {
 		Unit:     unitExtras(o.Unit, role, p.Services[ch.Service]),
 		scheme:   pk.DBScheme[o.Name],
 	}
-	if len(s.Firewall) == 0 {
+	switch {
+	case len(s.Firewall) > 0:
+	case role == RoleWorker:
+		// A worker runs the app's code: the app's allowlist (D119).
+		s.Firewall = []string{"app"}
+	default:
 		s.Firewall = []string{"none"}
 	}
 	if o.Health != nil {
@@ -537,11 +542,12 @@ func (b *builder) toolService(t *pack.Tool) (Service, error) {
 	pk, p := b.in.Stack.Pack, b.in.Project
 	s := Service{
 		ID: t.Service, Role: RoleTool, Exec: t.Unit.Exec,
-		Image:    ImageSpec{Kind: ImageBuild, File: b.ws("containerfiles", t.Image.File)},
-		Publish:  t.Ports,
-		Firewall: t.Firewall,
-		Worktree: t.Worktree,
-		Unit:     unitExtras(t.Unit, RoleTool, p.Services[t.Service]),
+		Image:         ImageSpec{Kind: ImageBuild, File: b.ws("containerfiles", t.Image.File)},
+		Publish:       t.Ports,
+		Firewall:      t.Firewall,
+		FirewallExtra: slices.Clone(t.Allow),
+		Worktree:      t.Worktree,
+		Unit:          unitExtras(t.Unit, RoleTool, p.Services[t.Service]),
 	}
 	if len(s.Firewall) == 0 {
 		s.Firewall = []string{"none"}

@@ -518,6 +518,26 @@ no document.
 | `restart` | array of strings | For a used package, the running worktrees the write restarts; else `[]`. |
 | `warnings` | array of strings | Always `[]` for now. |
 
+## `fw show [service]`
+
+The firewall of the worktree's containers (the workspace root: every
+worktree's), docs/firewall.md. Exit 1 when `firewall.sh` refuses.
+
+```json
+{"containers": [
+  {"name": "masto-main-rails", "firewall": "firewalled", "profiles": ["app"], "mode": "log",
+   "rejected": [{"addr": "104.16.169.120", "proto": "tcp", "port": "443", "host": ""}]}
+]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The container. |
+| `firewall` | string | `firewalled`; `self` (its own in-container firewall, the browser); `none` (no hook ran: `doctor`, then restart it). |
+| `profiles` | array | Its profiles (`app`, `deps`, `agent-<name>`, `none`, …); `[]` unless firewalled. |
+| `mode` | string | `enforce`, `log` or `off`; `""` unless firewalled. |
+| `rejected` | array | What it rejected (enforce) or would have (log) since it started: `addr`, `proto`, `port`, `host` (the name the address resolves back to, `""` for none). |
+
 ## `wt ls`
 
 The project's registered worktrees, by ID; the base worktree is first (ID 1
@@ -749,7 +769,10 @@ runs one. The text form is a table `NAME SOURCE COMMAND`.
 ## `settings preview`
 
 Reads an edit list on stdin (a JSON array; ops `pack` (`ref`: sets
-`[stack] pack`, D115), `option`, `env.set`,
+`[stack] pack`, D115), `firewall.mode` (`value`: `log`, `enforce`, `off`,
+or absent for the default), `firewall.allow.add` and
+`firewall.allow.remove` (`key`: `app`, `deps` or `agent`; `value`: a
+host) (D119), `option`, `env.set`,
 `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`; strict:
 an unknown field or op is an error), writes nothing and judges each edit
 against the project with the edits before it applied. Without `--json` it
@@ -822,6 +845,7 @@ What the settings page reads: the project's choices, env and links.
 | `prefix`, `name`, `repo`, `base_branch` | string | The `[project]` table. |
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
+| `firewall` | object | `mode`: `[firewall] mode` (`""`: the default); `effective`: the mode the project's services get (`enforce` with agents, else `log`, unless `mode` is set: D119); `allow`: `app`, `deps`, `agent`, each `[firewall] allow.<profile>` (`[]` for none). |
 | `pack` | object | `ref`: `[stack] pack`; `choices`: the packs Settings offers, sorted, the current one among them: the newest built-in of each name, the workspace's `packs/<name>/` as `local:<name>@N` and the libraries' packs, each that loads with the current pack's app service (so `[stack] app` stays valid) and that the project's other lines resolve with (an option's `works_with`). |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
 | `used` | string[] | The stack's refs: the pack, each option, each agent package (once). |

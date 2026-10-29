@@ -109,6 +109,7 @@ func TestScriptFiles(t *testing.T) {
 		".railswitch/firewall/agent-claude.allow",
 		".railswitch/firewall/agent-probe.allow",
 		".railswitch/firewall/agent.allow",
+		".railswitch/firewall/app.allow",
 		".railswitch/firewall/deps.allow",
 		".railswitch/firewall/firewall.sh",
 		".railswitch/firewall/hook.sh",
@@ -151,6 +152,24 @@ func TestDepsAllow(t *testing.T) {
 	}
 	if got := listed(f.Data); !slices.Equal(got, want) || f.Mode != 0o644 {
 		t.Errorf("deps.allow mode %04o entries\n%v\nwant\n%v", f.Mode, got, want)
+	}
+}
+
+// The app profile's list (the app and its workers, D119) is [firewall]
+// allow.app: the rails pack ships no app.allow.
+func TestAppAllow(t *testing.T) {
+	_, fw := filial(t)
+	if got := listed(files(t, fw)[".railswitch/firewall/app.allow"].Data); len(got) != 0 {
+		t.Errorf("app.allow without allow.app: %v", got)
+	}
+	fw.Allow = map[string][]string{"app": {"api.example.com", "api.example.com", "mail.example.com"}}
+	if got := listed(files(t, fw)[".railswitch/firewall/app.allow"].Data); !slices.Equal(got, []string{"api.example.com", "mail.example.com"}) {
+		t.Errorf("app.allow = %v", got)
+	}
+	fw.Allow = map[string][]string{"app": {"bad host"}}
+	st, _ := filial(t)
+	if _, err := Files("filial", ws, networkDir, st, fw); err == nil || !strings.Contains(err.Error(), "firewall.allow.app") {
+		t.Errorf("a bad allow.app entry: %v", err)
 	}
 }
 

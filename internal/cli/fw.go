@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -60,6 +62,14 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 	if _, err := os.Stat(script); err != nil {
 		return e.fail(fmt.Errorf("%w: run railswitch render", err))
 	}
+	env := append(os.Environ(),
+		"FIREWALL_DIR="+dir,
+		"PREFIX="+w.Project.Project.Prefix,
+		"WORKTREE="+w.Slug,
+		"SELF_FIREWALLED="+strings.Join(selfFirewalled(w.Stack), ","))
+	if sub == "show" && e.json {
+		return e.fwShowJSON(ctx, script, env, rest)
+	}
 	if sub == "show" && len(rest) == 1 && isAgent(w.Stack, rest[0]) {
 		allow := filepath.Join(dir, firewall.AllowFile(rest[0]))
 		data, err := os.ReadFile(allow)
@@ -69,13 +79,9 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 		fmt.Fprintf(e.stdout, "%s allowlist (%s):\n%s", rest[0], allow, data)
 	}
 	_, err = e.run.Run(ctx, sys.Cmd{
-		Name: script,
-		Args: append([]string{sub}, rest...),
-		Env: append(os.Environ(),
-			"FIREWALL_DIR="+dir,
-			"PREFIX="+w.Project.Project.Prefix,
-			"WORKTREE="+w.Slug,
-			"SELF_FIREWALLED="+strings.Join(selfFirewalled(w.Stack), ",")),
+		Name:    script,
+		Args:    append([]string{sub}, rest...),
+		Env:     env,
 		Stdout:  e.stdout,
 		Stderr:  e.stderr,
 		Timeout: fwTimeout,
@@ -84,6 +90,66 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 		return 1 // firewall.sh printed why
 	}
 	if err != nil {
+		return e.fail(err)
+	}
+	return 0
+}
+
+// fwDoc is `fw show --json` (docs/json.md).
+type fwDoc struct {
+	Containers []fwContainer `json:"containers"`
+}
+
+type fwContainer struct {
+	Name     string       `json:"name"`
+	Firewall string       `json:"firewall"` // firewalled, self (its own), none (no hook ran)
+	Profiles []string     `json:"profiles"`
+	Mode     string       `json:"mode"` // enforce, log, off; "" unless firewalled
+	Rejected []fwRejected `json:"rejected"`
+}
+
+// fwRejected is one address the firewall rejected (enforce) or would
+// have (log), with the host it resolves back to ("": none).
+type fwRejected struct {
+	Addr  string `json:"addr"`
+	Proto string `json:"proto"`
+	Port  string `json:"port"`
+	Host  string `json:"host"`
+}
+
+// fwShowJSON runs firewall.sh show with FW_FORMAT=tsv and prints its C
+// (container) and R (rejected) lines as one JSON document.
+func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string) int {
+	var out bytes.Buffer
+	_, err := e.run.Run(ctx, sys.Cmd{
+		Name: script, Args: append([]string{"show"}, rest...), Env: append(env, "FW_FORMAT=tsv"),
+		Stdout: &out, Stderr: e.stderr, Timeout: fwTimeout,
+	})
+	if errors.Is(err, sys.ErrExit) {
+		return 1
+	}
+	if err != nil {
+		return e.fail(err)
+	}
+	doc := fwDoc{Containers: []fwContainer{}}
+	byName := map[string]int{}
+	for line := range strings.Lines(out.String()) {
+		f := strings.Split(strings.TrimRight(line, "\n"), "\t")
+		switch {
+		case f[0] == "C" && len(f) == 5:
+			c := fwContainer{Name: f[1], Firewall: f[2], Profiles: []string{}, Mode: f[4], Rejected: []fwRejected{}}
+			if f[3] != "" {
+				c.Profiles = strings.Split(f[3], ",")
+			}
+			byName[c.Name] = len(doc.Containers)
+			doc.Containers = append(doc.Containers, c)
+		case f[0] == "R" && len(f) == 6:
+			if i, ok := byName[f[1]]; ok {
+				doc.Containers[i].Rejected = append(doc.Containers[i].Rejected, fwRejected{Addr: f[2], Proto: f[3], Port: f[4], Host: f[5]})
+			}
+		}
+	}
+	if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
 		return e.fail(err)
 	}
 	return 0

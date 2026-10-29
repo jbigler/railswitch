@@ -3,6 +3,10 @@ service = "nvim"
 entrypoint = "entrypoints/entrypoint-nvim.sh"
 # The editor installs its own plugins and language servers (npm, gems, GitHub).
 firewall = ["agent", "deps"]
+# Beyond the deps list (registries, github.com and its downloads): GitHub's
+# API and raw files (lazy.nvim, mason's registry and releases) and PyPI
+# (mason's Python servers). More: [firewall] allow.agent in project.toml.
+allow = ["api.github.com", "raw.githubusercontent.com", "pypi.org", "files.pythonhosted.org"]
 
 # Mounts, and nothing else (D33: no ~/.ssh, SSH agent socket or host gitconfig):
 worktree = true               # the worktree at /app, the base worktree's .git, the pack's [[worktree_volumes]]

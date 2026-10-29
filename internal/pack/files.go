@@ -36,7 +36,7 @@ func CheckFilePath(rel, manifest string) error {
 		cf, isCF := strings.CutPrefix(top, "Containerfile.")
 		stem, isSh := strings.CutSuffix(top, ".sh")
 		switch {
-		case top == manifest, top == "deps.allow", top == "README.md":
+		case top == manifest, top == "deps.allow", top == "app.allow", top == "README.md":
 			ok = true
 		case isCF:
 			ok = fileNameRe.MatchString(cf)
@@ -48,7 +48,7 @@ func CheckFilePath(rel, manifest string) error {
 		if manifest == "agent.toml" {
 			return fmt.Errorf("%q is not a package file: an agent's are a <file> at the top or entrypoints/<file>", rel)
 		}
-		return fmt.Errorf("%q is not a package file: the manifest (%s), Containerfile.<name>, deps.allow, README.md or <name>.sh at the top, or entrypoints/<file> or initdb/<file>", rel, manifest)
+		return fmt.Errorf("%q is not a package file: the manifest (%s), Containerfile.<name>, deps.allow, app.allow, README.md or <name>.sh at the top, or entrypoints/<file> or initdb/<file>", rel, manifest)
 	}
 	return nil
 }

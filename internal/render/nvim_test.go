@@ -20,7 +20,7 @@ func TestNvimEnvAndFirewall(t *testing.T) {
 		t.Errorf("rails gets NVIM_CONFIG_REPO = %+v", e)
 	}
 	_, units := renderUnits(t, fixtureDir, nil)
-	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.extra=github.com")
+	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.extra="+nvimHosts+",github.com")
 
 	gitlab := func(p *config.Project) {
 		p.Tools.Nvim = &config.NvimTool{ConfigRepo: "git@gitlab.com:u/c.git", ConfigRef: "v2"}
@@ -30,13 +30,12 @@ func TestNvimEnvAndFirewall(t *testing.T) {
 		t.Errorf("nvim NVIM_CONFIG_REF = %+v", e)
 	}
 	_, units = renderUnits(t, fixtureDir, gitlab)
-	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.extra=gitlab.com")
+	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.extra="+nvimHosts+",gitlab.com")
 
-	// No config repo: no env, no extra hosts.
+	// No config repo: no env, only the tool's own hosts.
 	_, units = renderUnits(t, fixtureDir, func(p *config.Project) { p.Tools.Nvim = &config.NvimTool{} })
-	for _, l := range unitLines(t, units, "filial-master-nvim.container") {
-		if l == "Annotation=filial.firewall.extra=github.com" {
-			t.Errorf("extra hosts without config_repo")
-		}
-	}
+	hasLine(t, units, "filial-master-nvim.container", "Annotation=filial.firewall.extra="+nvimHosts)
 }
+
+// nvimHosts are the nvim tool's own allow hosts (tool.toml allow, D119).
+const nvimHosts = "api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org"

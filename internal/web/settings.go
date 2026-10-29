@@ -32,7 +32,7 @@ type edit struct {
 	URL   string `json:"url,omitempty"`
 }
 
-var editOps = []string{"pack", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show"}
+var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -76,6 +76,7 @@ type settingsView struct {
 	Error        string // project show failed: the page has nothing to edit
 	Project      projectShow
 	Pack         *optionView // the stack's pack, when it has another choice
+	Firewall     firewallView
 	Options      []optionView
 	Links        []linkRowView
 	Secrets      []secretView
@@ -85,6 +86,42 @@ type settingsView struct {
 	Template     settingsTemplate
 
 	PreviewURL, SecretURL, FileURL string
+}
+
+// firewallView is the Firewall card (D119).
+type firewallView struct {
+	Mode, Effective string
+	Modes           []fwModeView
+	Profiles        []fwProfileView
+	BlockedURL      string
+}
+
+type fwModeView struct {
+	Value, Label string
+	Current      bool
+}
+
+type fwProfileView struct {
+	Name, Note string
+	Hosts      []string
+}
+
+// fwProfileNotes say whom each allow list lets out.
+var fwProfileNotes = map[string]string{
+	"app":   "the app and its workers: the hosts your app itself calls (APIs, mail relays)",
+	"deps":  "dependency installs, beyond the pack's registries; nvim too",
+	"agent": "every agent, beyond its package's own list; nvim too",
+}
+
+func newFirewallView(f firewallShow, blockedURL string) firewallView {
+	v := firewallView{Mode: f.Mode, Effective: f.Effective, BlockedURL: blockedURL}
+	for _, m := range []struct{ value, label string }{{"", "Default"}, {"enforce", "Enforce"}, {"log", "Log only"}, {"off", "Off"}} {
+		v.Modes = append(v.Modes, fwModeView{Value: m.value, Label: m.label, Current: m.value == f.Mode})
+	}
+	for _, prof := range []string{"app", "deps", "agent"} {
+		v.Profiles = append(v.Profiles, fwProfileView{Name: prof, Note: fwProfileNotes[prof], Hosts: f.Allow[prof]})
+	}
+	return v
 }
 
 type optionView struct {
@@ -187,6 +224,20 @@ func editTitle(show projectShow, e edit) string {
 	switch e.Op {
 	case "pack":
 		return fmt.Sprintf("Pack: %s → %s", show.Pack.Ref, e.Ref)
+	case "firewall.mode":
+		to := e.Value
+		if to == "" {
+			to = "the default"
+		}
+		from := show.Firewall.Mode
+		if from == "" {
+			from = "the default (" + show.Firewall.Effective + ")"
+		}
+		return "Firewall mode: " + from + " → " + to
+	case "firewall.allow.add":
+		return "Firewall " + e.Key + ": allow " + e.Value
+	case "firewall.allow.remove":
+		return "Firewall " + e.Key + ": stop allowing " + e.Value
 	case "option":
 		old := "none"
 		if i := slices.IndexFunc(show.Options, func(o optionRow) bool { return o.Key == e.Key }); i >= 0 {
@@ -245,6 +296,7 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v.Project = show
+	v.Firewall = newFirewallView(show.Firewall, base+"/blocked")
 	v.Template = s.settingsTemplate(r.Context(), p)
 	if len(show.Pack.Choices) > 1 {
 		pv := optionView{Key: "pack", Ref: show.Pack.Ref, Slot: true}

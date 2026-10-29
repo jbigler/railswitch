@@ -29,14 +29,19 @@ type Edit struct {
 type opSpec struct{ required, optional []string }
 
 var ops = map[string]opSpec{
-	"option":      {required: []string{"key", "ref"}},
-	"pack":        {required: []string{"ref"}},
-	"env.set":     {required: []string{"name"}, optional: []string{"value"}},
-	"env.unset":   {required: []string{"name"}},
-	"link.add":    {required: []string{"label", "url"}},
-	"link.remove": {required: []string{"label"}},
-	"link.hide":   {required: []string{"label"}},
-	"link.show":   {required: []string{"label"}},
+	"option": {required: []string{"key", "ref"}},
+	"pack":   {required: []string{"ref"}},
+	// The firewall (D119): mode "" is the default; key is a profile of
+	// config.FirewallProfiles, value a host.
+	"firewall.mode":         {optional: []string{"value"}},
+	"firewall.allow.add":    {required: []string{"key", "value"}},
+	"firewall.allow.remove": {required: []string{"key", "value"}},
+	"env.set":               {required: []string{"name"}, optional: []string{"value"}},
+	"env.unset":             {required: []string{"name"}},
+	"link.add":              {required: []string{"label", "url"}},
+	"link.remove":           {required: []string{"label"}},
+	"link.hide":             {required: []string{"label"}},
+	"link.show":             {required: []string{"label"}},
 }
 
 func (e Edit) fields() map[string]string {
@@ -83,6 +88,12 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.SetOption(data, e.Key, e.Ref, slices.Contains(config.Slots, e.Key))
 	case "pack":
 		return config.SetPack(data, e.Ref)
+	case "firewall.mode":
+		return config.SetFirewallMode(data, e.Value)
+	case "firewall.allow.add":
+		return config.AddFirewallAllow(data, e.Key, e.Value)
+	case "firewall.allow.remove":
+		return config.RemoveFirewallAllow(data, e.Key, e.Value)
 	case "env.set":
 		return config.SetEnv(data, e.Name, e.Value)
 	case "env.unset":

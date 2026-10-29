@@ -16,7 +16,7 @@ import (
 
 // manifest is what the checks read from a package manifest.
 type manifest struct {
-	allow    []string          // agent allow
+	allow    []string          // agent or tool allow
 	firewall []string          // option and tool firewall profiles
 	image    map[string]string // what picks the image a service runs, by field ("image.pull")
 	mounts   []pack.Mount
@@ -70,7 +70,7 @@ func decode(kind string, data []byte) manifest {
 		m.firewall, m.mounts, m.ports, m.routes, m.caps = o.Firewall, o.Mounts, o.Ports, o.Routes, o.Unit.AddCapability
 	case "tool":
 		m.image = map[string]string{"image.file": t.Image.File}
-		m.firewall, m.ports, m.caps = t.Firewall, t.Ports, t.Unit.AddCapability
+		m.firewall, m.allow, m.ports, m.caps = t.Firewall, t.Allow, t.Ports, t.Unit.AddCapability
 	case "agent":
 		m.image = map[string]string{"image.file": a.Image.File}
 		m.allow, m.mounts, m.caps = a.Allow, a.Mounts, a.Unit.AddCapability
@@ -171,7 +171,8 @@ var (
 )
 
 // lineFlags are the flagged lines file p adds: in a Containerfile, what it
-// runs and the images it builds from; in deps.allow, the hosts it adds.
+// runs and the images it builds from; in deps.allow and app.allow (D119),
+// the hosts it adds.
 func lineFlags(p, old, new string) []Flag {
 	lines := strings.SplitAfter(new, "\n")
 	text := func(n int) string { return "+ " + strings.TrimRight(lines[n-1], "\r\n") }
@@ -208,7 +209,7 @@ func lineFlags(p, old, new string) []Flag {
 			}
 		}
 		slices.SortStableFunc(out, func(a, b Flag) int { return a.Line - b.Line })
-	case p == "deps.allow":
+	case p == "deps.allow", p == "app.allow":
 		had := map[string]bool{}
 		for _, l := range strings.Split(old, "\n") {
 			had[host(l)] = true

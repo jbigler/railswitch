@@ -13,6 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
@@ -26,11 +27,20 @@ type projectDoc struct {
 	Hash       string      `json:"hash"`
 	File       string      `json:"file"` // the raw editor's text
 	Pack       packRow     `json:"pack"`
+	Firewall   firewallRow `json:"firewall"`
 	Options    []optionRow `json:"options"`
 	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
 	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
 	Env        []envPair   `json:"env"`
 	Links      []linkRow   `json:"links"`
+}
+
+// firewallRow is [firewall] (D119): the mode set ("" for the default),
+// the mode the project's services get, and each editable allow list.
+type firewallRow struct {
+	Mode      string              `json:"mode"`
+	Effective string              `json:"effective"`
+	Allow     map[string][]string `json:"allow"` // config.FirewallProfiles, never null
 }
 
 // packRow is the stack's pack and the packs Settings offers instead: each
@@ -186,6 +196,10 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	d := projectDoc{
 		Prefix: p.Project.Prefix, Name: p.Project.Name, Repo: p.Project.Repo, BaseBranch: p.Project.BaseBranch,
 		Hash: workspace.Hash(data), File: string(data), Options: []optionRow{}, Env: []envPair{}, Links: []linkRow{},
+	}
+	d.Firewall = firewallRow{Mode: p.Firewall.Mode, Effective: render.FirewallMode(p, st), Allow: map[string][]string{}}
+	for _, prof := range config.FirewallProfiles {
+		d.Firewall.Allow[prof] = append([]string{}, p.Firewall.Allow[prof]...)
 	}
 	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)

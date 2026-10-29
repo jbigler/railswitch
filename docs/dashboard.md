@@ -160,6 +160,16 @@ shows what each one does before anything is written.
   Picking the current one again unstages it. "Add service" (a key and an
   option from `project show`'s `add_choices`) stages a new extra key (D81);
   setting an extra key to `none` removes it.
+- **Firewall** (D119, docs/firewall.md): the mode (Default, with what it
+  is now, Enforce, Log only, Off) and the `app`, `deps` and `agent` allow
+  lists, each host with Remove and an add row; all staged like the other
+  edits (`firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`).
+  "Blocked, or would be under enforce" loads after the page from
+  `GET /p/<prefix>/settings/blocked` (`railswitch --json fw show`): each
+  rejected address with its host and an "Allow in <list>" button (staging
+  `firewall.allow.add`) when it resolves and the container has a list; a
+  data container has nothing to allow; a container with no hook is
+  named.
 - **Environment:** the project's `[env]`. Editing a value stages it when
   you leave the field; Remove stages its removal; the add form (name,
   value) stages a new one.

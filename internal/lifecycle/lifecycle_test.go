@@ -724,7 +724,8 @@ func TestExecTransientLabels(t *testing.T) {
 	for _, want := range []string{
 		"--hooks-dir " + e.ws + "/.railswitch/firewall/hooks.d run --rm -i",
 		"--label traefik.enable=false",
-		"--annotation filial.firewall=none",
+		"--annotation filial.firewall=app",
+		"--annotation filial.firewall.mode=enforce", // the project has agents (D119)
 		"--annotation filial.firewall.networks=filial-feat-dev",
 		"--network filial-feat-dev",
 		"--env-file " + e.ws + "/.railswitch/env/feat/rails.env",

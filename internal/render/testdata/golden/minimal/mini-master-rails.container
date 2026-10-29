@@ -8,7 +8,7 @@ Wants=railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.
 After=mini-master-deps.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=mini.unit-hash=5bfc7c4dc76b
+Label=mini.unit-hash=f2b991531c83
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-39fced4e
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails
@@ -48,7 +48,7 @@ HealthRetries=3
 HealthStartPeriod=120s
 Notify=healthy
 GlobalArgs=--hooks-dir=/WORKSPACES/minimal/.railswitch/firewall/hooks.d
-Annotation=mini.firewall=none
+Annotation=mini.firewall=app
 Annotation=mini.firewall.networks=mini-master-dev,mini_proxy
 Annotation=mini.firewall.mode=log
 PodmanArgs=--cpus=6 --interactive

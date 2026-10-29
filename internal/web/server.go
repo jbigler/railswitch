@@ -89,6 +89,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /colors", s.setColors)
 	m.HandleFunc("POST /colors/reset", s.resetColors)
 	m.HandleFunc("GET /p/{prefix}/settings", s.settingsPage)
+	m.HandleFunc("GET /p/{prefix}/settings/blocked", s.settingsBlocked)
 	m.HandleFunc("GET /p/{prefix}/settings/file", s.settingsFilePage)
 	m.HandleFunc("POST /p/{prefix}/settings/preview", s.settingsPreview)
 	m.HandleFunc("POST /p/{prefix}/settings/apply", s.settingsApply)

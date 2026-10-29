@@ -28,7 +28,7 @@ func TestLinksOrder(t *testing.T) {
 		{"Routes", "http://" + host + "/rails/info/routes", "stack"},
 		{"Storage console", "http://s3-ui." + host, "stack"},
 		{"Sidekiq", "http://" + host + "/sidekiq", "stack"},
-		{"Browser (VNC)", "http://vnc." + host + "/vnc.html?autoconnect=1&resize=remote", "stack"},
+		{"Browser (VNC)", "http://vnc." + host + "/vnc.html?autoconnect=1&resize=scale", "stack"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Links =\n%+v\nwant\n%+v", got, want)

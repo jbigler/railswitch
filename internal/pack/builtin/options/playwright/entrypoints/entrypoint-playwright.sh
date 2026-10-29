@@ -26,8 +26,11 @@ set -eu
 # ERR_CONNECTION_REFUSED. Rather than fight each client, make the browser's
 # own answer correct: forward loopback :80 to Traefik, which routes on the
 # Host header exactly as it does for the host's browser. Traefik's address is
-# the one the host entries give the worktree host.
-traefik_ip=$(getent hosts "$WORKTREE_HOST" | awk '{print $1; exit}')
+# the one the host entries (AddHost) give the worktree host, read from
+# /etc/hosts itself: newer glibc also answers every *.localhost with ::1
+# (RFC 6761) and lists it first, and forwarding loopback to loopback gave
+# the browser an empty response.
+traefik_ip=$(awk -v h="$WORKTREE_HOST" '$1 !~ /^(127\.|::1$)/ { for (i = 2; i <= NF; i++) if ($i == h) { print $1; exit } }' /etc/hosts)
 if [ -n "$traefik_ip" ]; then
   socat TCP-LISTEN:80,bind=127.0.0.1,fork,reuseaddr TCP:"$traefik_ip":80 &
   if ip -6 addr show lo 2>/dev/null | grep -q '::1/128'; then
@@ -124,6 +127,16 @@ done
 # restart. --test-type suppresses the "unsupported command-line flag:
 # --no-sandbox" warning bar (--disable-infobars alone no longer covers it).
 (
+  # The browser starts before the app it opens: until the app is up,
+  # Traefik has no route for it and answers 404 (or 502 while it starts).
+  # Wait up to 3 minutes for a real answer so the first page is the app.
+  # Only this first launch waits: the CDP endpoint comes up with it.
+  for _ in $(seq 1 180); do
+    case "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$CHROME_START_URL")" in
+      000 | 404 | 502 | 503 | 504) sleep 1 ;;
+      *) break ;;
+    esac
+  done
   while true; do
     "$CHROME_BIN" \
       --no-sandbox \

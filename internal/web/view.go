@@ -239,7 +239,6 @@ func stackText(wt worktree) string {
 	return fmt.Sprintf("%d/%d", active, n)
 }
 
-// serviceLook is a unit state's glyph and class.
 // serviceLook is a service state's glyph, colour class and plain word
 // (the systemd state itself is the row's title).
 func serviceLook(state string) (glyph, class, word string) {
@@ -258,8 +257,10 @@ func serviceLook(state string) (glyph, class, word string) {
 		return "○", "muted", "on demand"
 	case strings.HasPrefix(state, "inactive/"):
 		return "○", "muted", "stopped"
+	case strings.HasPrefix(state, "maintenance/"), strings.HasPrefix(state, "refreshing/"):
+		return "◐", "yellow", "busy"
 	}
-	return "○", "muted", state
+	return "○", "muted", "unknown"
 }
 
 // PRs.

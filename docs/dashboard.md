@@ -168,7 +168,8 @@ is no longer accepted. What the page shows meanwhile may be stale.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
   (`PR #2141 ready · checks ✓ · approved`), then Links, Services (one aligned row per service: a
   glyph, the name and a plain state word, `running`, `starting`,
-  `stopping`, `failed`, `stopped` or `on demand`, in the glyph's colour;
+  `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
+  `unknown`, in the glyph's colour;
   the systemd state is the row's tooltip), Agent (state and message), Actions and Jobs.
 
 ## Settings

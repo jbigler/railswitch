@@ -259,7 +259,9 @@ func TestServiceLook(t *testing.T) {
 		"failed/failed":     {"✗", "red", "failed"},
 		"inactive/dead":     {"○", "muted", "stopped"},
 		"on-demand":         {"○", "muted", "on demand"},
-		"unknown":           {"○", "muted", "unknown"},
+		"reloading/reload":  {"◐", "yellow", "reloading"},
+		"maintenance/clean": {"◐", "yellow", "busy"},
+		"/":                 {"○", "muted", "unknown"},
 	} {
 		g, c, w := serviceLook(state)
 		if got := [3]string{g, c, w}; got != want {

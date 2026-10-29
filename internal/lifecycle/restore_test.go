@@ -280,3 +280,22 @@ func TestDBRestoreClearsMarker(t *testing.T) {
 		t.Error("the marker survived a restore with --from and a name")
 	}
 }
+
+// A dump of a database the pack's dump_skip names (one written before it,
+// of Rails' test database) is never restored.
+func TestDBRestoreSkipsTestDumps(t *testing.T) {
+	e := setup(t)
+	e.dbRunning("feat")
+	dir := writeDumps(t, e.ws)
+	if err := os.WriteFile(filepath.Join(dir, "filial_test-0.dump"), []byte("PGDMP test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	done, err := e.l.DBRestore(ctx, "feat", "", nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(done, []string{"filial_dev", "filial_queue"}) {
+		t.Errorf("restored %v; want no test database", done)
+	}
+}

@@ -34,6 +34,10 @@ type Pack struct {
 	// ""), for a framework that takes it per environment from its own
 	// config (Rails' database.yml: test must never get development's).
 	DBURLName *bool `toml:"db_url_name"`
+	// DumpSkip are name patterns (path.Match) of databases db dump leaves
+	// out and restores ignore: ones the framework makes and remakes itself
+	// (Rails' …_test and its parallel …_test-N).
+	DumpSkip []string `toml:"dump_skip"`
 
 	Env      map[string]string `toml:"env"`       // layer 1 (HANDOFF §3.7): only what the framework itself reads (D42)
 	DBScheme map[string]string `toml:"db_scheme"` // database option name → URL scheme, the {scheme} placeholder

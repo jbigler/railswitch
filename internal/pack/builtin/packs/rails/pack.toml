@@ -6,6 +6,9 @@ version = 1
 # point tests at the development database. Without it each environment
 # takes database.yml's own (…_development, …_test) on the same server.
 db_url_name = false
+# Test databases (…_test, and …_test-0 or …_test_0, … for parallel workers) live on
+# the same server; db dump leaves them out and restores ignore their dumps.
+dump_skip = ["*_test", "*_test-*", "*_test_[0-9]*"]
 
 [app]
 service = "rails"

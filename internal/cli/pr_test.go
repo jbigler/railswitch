@@ -118,3 +118,37 @@ func TestPrLsTextPrintable(t *testing.T) {
 		t.Errorf("exit %d %s\n%q", code, errs, out)
 	}
 }
+
+// TestPrLsOldPRFromBaseBranch: a merged PR someone once opened from master
+// is not master's PR once master has moved past it; while master is still
+// at that PR's head commit it is.
+func TestPrLsOldPRFromBaseBranch(t *testing.T) {
+	ws, _ := gitWS(t)
+	res, err := (sys.Exec{}).Run(t.Context(), sys.Cmd{Name: "git", Args: []string{"-C", filepath.Join(ws, "master"), "rev-parse", "HEAD"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.TrimSpace(string(res.Stdout))
+	for _, c := range []struct {
+		oid  string
+		want bool
+	}{{"0123456789abcdef0123456789abcdef01234567", false}, {head, true}} {
+		f := fakeHost()
+		f.Passthrough = []string{"git"}
+		f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(`[{"number": 3, "title": "Release", "url": "https://github.com/o/n/pull/3", "headRefName": "master", "headRefOid": "` + c.oid + `", "isDraft": false, "state": "MERGED", "reviewDecision": "", "statusCheckRollup": []}]`)}, nil)
+		code, out, errs := runWith(t, f, "-C", ws, "--json", "pr", "ls")
+		if code != 0 {
+			t.Fatalf("pr ls: exit %d: %s", code, errs)
+		}
+		var rows []struct {
+			Slug string          `json:"slug"`
+			PR   json.RawMessage `json:"pr"`
+		}
+		if err := json.Unmarshal([]byte(out), &rows); err != nil {
+			t.Fatal(err)
+		}
+		if got := string(rows[0].PR) != "null"; rows[0].Slug != "master" || got != c.want {
+			t.Errorf("head %s: master's pr %s; want shown %v", c.oid[:7], rows[0].PR, c.want)
+		}
+	}
+}

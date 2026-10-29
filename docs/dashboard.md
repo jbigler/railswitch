@@ -804,8 +804,10 @@ docs/json.md.
   as untrusted): number, title, url, state (`draft`, `open`,
   `merged`, `closed`), checks (`pass`, `pending`, `fail`, `none`), review
   (`approved`, `changes_requested`, `pending`, `none`). For several PRs on
-  one branch an open or draft one wins, then the highest number; a PR from
-  a fork never matches (its head branch is the fork's). Fails with gh's
+  one branch an open or draft one wins, then the highest number; a merged
+  or closed PR counts only while the worktree is still at its head commit,
+  so a branch that moved on (`master`, say) shows none; a PR from a fork
+  never matches (its head branch is the fork's). Fails with gh's
   message when gh is missing or not logged in; the page then shows "PRs
   unavailable".
 - `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged

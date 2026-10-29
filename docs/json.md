@@ -762,7 +762,7 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
 |---|---|---|
 | `slug` | string | The worktree's slug. |
 | `branch` | string | The branch checked out, as in [`overview`](#overview); `""` gets no PR. |
-| `pr` | object or null | The PR whose head branch is `branch`: an open (or draft) one first, then the highest number; `null` when there is none. PRs from forks (`isCrossRepository`) never match: their head branch is the fork's. |
+| `pr` | object or null | The PR whose head branch is `branch`: an open (or draft) one first, then the highest number. A merged or closed PR counts only while the worktree is still at its head commit (`headRefOid`): a branch that moved on (a `master` someone once opened a PR from) has none. `null` when there is none. PRs from forks (`isCrossRepository`) never match: their head branch is the fork's. |
 | `pr.number`, `pr.title`, `pr.url` | number, string, string | As GitHub has them. |
 | `pr.state` | string | `draft` (open and draft), `open`, `merged` or `closed`. |
 | `pr.checks` | string | `fail` if any check concluded failure, error, timed out, cancelled, action required or startup failure; else `pending` if any is not completed (or a status context is pending or expected); else `pass`; `none` with no checks. |

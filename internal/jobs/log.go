@@ -13,12 +13,14 @@ const droppedLine = "… output dropped (log over 8 MiB)\n"
 
 // backstop is the size at which a log the tail is behind on is truncated
 // unread. The child writes the file directly, so it can outrun the tail
-// between two size checks; the headroom keeps the file within 2*LogLimit.
+// between two size checks. The headroom keeps the file within 2*LogLimit
+// while the tail keeps up; a tail that isn't scheduled lets it pass that by
+// whatever the child writes until the tail runs again.
 const backstop = 2*LogLimit - 2<<20
 
 // logTail follows a job's log file: the child writes it (Stdout and
-// Stderr), the tail reads it back as cleaned, capped lines and keeps the
-// file under 2*LogLimit by truncating it.
+// Stderr), the tail reads it back as cleaned, capped lines and truncates
+// the file past LogLimit (backstop: past it unread).
 type logTail struct {
 	w     *os.File // the child's side; used to truncate and mark drops
 	r     *os.File

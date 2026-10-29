@@ -438,3 +438,16 @@ func TestGuardFormPost(t *testing.T) {
 		t.Errorf("argv %q", got)
 	}
 }
+
+// TestGuardHostHint: the refusal names the Host it got, quoted, and the
+// addresses that work.
+func TestGuardHostHint(t *testing.T) {
+	f := newFixture(t)
+	r := req("GET", "/login?token=x", nil)
+	r.Host = "localhost:7701\x1b[2J"
+	rec := f.do(r)
+	body := rec.Body.String()
+	if rec.Code != 403 || !strings.Contains(body, `forbidden host "localhost:7701\x1b[2J"`) || !strings.Contains(body, "http://railswitch.localhost:7700/") || strings.Contains(body, "\x1b") {
+		t.Errorf("%d %q", rec.Code, body)
+	}
+}

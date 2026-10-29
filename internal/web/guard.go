@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/subtle"
 	"net/http"
+	"strconv"
 )
 
 // cookieName holds the login token.
@@ -35,7 +36,11 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Cache-Control", "no-store")
 		if !allowedHosts[r.Host] {
-			http.Error(w, "forbidden host", http.StatusForbidden)
+			// Name what came and what works: a tunnel on another port or
+			// the machine's own address is the usual cause.
+			http.Error(w, "forbidden host "+strconv.Quote(r.Host)+": the dashboard answers only at "+
+				"http://railswitch.localhost:7700/, http://localhost:7700/ or http://127.0.0.1:7700/ (from another machine, "+
+				"forward the same port: ssh -L 7700:127.0.0.1:7700 <host>)", http.StatusForbidden)
 			return
 		}
 		switch r.URL.Path {

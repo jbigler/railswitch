@@ -69,7 +69,8 @@ railswitch dashboard
 
 - **Loopback only**, and the `Host` header must be exactly
   `railswitch.localhost:7700`, `localhost:7700` or `127.0.0.1:7700`;
-  anything else is 403 for every request (DNS rebinding).
+  anything else is 403 for every request (DNS rebinding), a text reply
+  that quotes the `Host` it got and names the addresses that work.
 - **Cookie on everything** except `/login` and `/healthz`, reads included.
   Another local user can't read the 0600 token file, so they can't read
   the page either.

@@ -61,10 +61,15 @@ func cmdDashboard(ctx context.Context, e *env, args []string) int {
 	if err == nil {
 		props, err = sd.Show(ctx, machine.DashboardService, "ActiveState", "UnitFileState")
 	}
-	if err == nil && (props["ActiveState"] != "active" || props["UnitFileState"] != "enabled") {
+	switch {
+	case err != nil:
+	case props["ActiveState"] != "active" || props["UnitFileState"] != "enabled":
 		if err = sd.EnableNow(ctx, machine.DashboardService); err == nil {
 			started = true
 		}
+	case changed:
+		// A running dashboard of another railswitch: this one takes over now.
+		err = sd.Restart(ctx, machine.DashboardService)
 	}
 	if err != nil {
 		fmt.Fprintf(e.stderr, "railswitch: the dashboard's unit: %v (systemctl --user enable --now %s)\n", err, machine.DashboardService)

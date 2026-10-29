@@ -21,7 +21,9 @@ exactly what the page sees (docs/json.md).
   rewrites the unit but keeps that path (D129), so another copy on the
   machine (a clone's build) never takes the dashboard over; a render
   writes its own path only when there is no unit or its `railswitch` is
-  gone.
+  gone or unsafe to keep (not an absolute path to a regular, executable
+  file you own that no one else can write). `railswitch dashboard`
+  restarts a running dashboard when it points the unit at itself.
 - `railswitch dashboard` (D118) prints the login link, writes the unit and,
   unless it is already enabled and running, runs `systemctl --user enable
   --now railswitch-dashboard.service`: it starts now and at every login

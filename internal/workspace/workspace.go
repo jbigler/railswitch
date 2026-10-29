@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
@@ -641,13 +642,29 @@ func writeDashboardUnit(d machine.Dirs) error {
 	if err != nil {
 		return err
 	}
-	if fi, serr := os.Stat(exe); exe == "" || serr != nil || !fi.Mode().IsRegular() {
+	if !keepableExe(exe) {
 		if exe, err = executable(); err != nil {
 			return fmt.Errorf("the dashboard unit needs railswitch's path: %w", err)
 		}
 	}
 	_, err = machine.WriteDashboardUnit(d, exe)
 	return err
+}
+
+// keepableExe reports whether render may keep exe as the dashboard's
+// railswitch: an absolute path to a regular, executable file this user
+// owns that no one else can write. Anything else (a file another user put
+// at a path a removed build had, say) gets this railswitch instead.
+func keepableExe(exe string) bool {
+	if !filepath.IsAbs(exe) {
+		return false
+	}
+	fi, err := os.Stat(exe)
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o100 == 0 || fi.Mode().Perm()&0o022 != 0 {
+		return false
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	return ok && int(st.Uid) == os.Getuid()
 }
 
 // WriteDashboardUnit writes the dashboard's unit for this railswitch;

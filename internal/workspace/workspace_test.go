@@ -525,14 +525,23 @@ func TestRenderKeepsDashboardExe(t *testing.T) {
 	if data, _ := os.ReadFile(path); string(data) != string(machine.DashboardUnit(installed)) {
 		t.Errorf("render repointed the dashboard:\n%s", data)
 	}
-	if err := os.Remove(installed); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.Render(ctx, f, false); err != nil {
-		t.Fatal(err)
-	}
-	if data, _ := os.ReadFile(path); string(data) != string(machine.DashboardUnit("/opt/rs/railswitch")) {
-		t.Errorf("a unit whose railswitch is gone kept it:\n%s", data)
+	// A file others can write, or one that is gone, is not kept.
+	for _, spoil := range []func() error{
+		func() error { return os.Chmod(installed, 0o775) },
+		func() error { return os.Remove(installed) },
+	} {
+		if _, err := machine.WriteDashboardUnit(dirs, installed); err != nil {
+			t.Fatal(err)
+		}
+		if err := spoil(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Render(ctx, f, false); err != nil {
+			t.Fatal(err)
+		}
+		if data, _ := os.ReadFile(path); string(data) != string(machine.DashboardUnit("/opt/rs/railswitch")) {
+			t.Errorf("an unsafe or missing railswitch was kept:\n%s", data)
+		}
 	}
 }
 

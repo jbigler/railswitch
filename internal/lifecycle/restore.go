@@ -98,8 +98,10 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 		}
 	}
 	done, err := l.runRestore(ctx, ctr, o, sc, files, dbs, label)
-	if err == nil && only == nil && from == "" {
-		os.Remove(restorePending(m.Inputs.Workspace, slug)) // a pending restore is done
+	if err == nil {
+		// Whatever you restored is the database now: up never restores
+		// over it on a marker an earlier failure left.
+		os.Remove(restorePending(m.Inputs.Workspace, slug))
 	}
 	return done, err
 }

@@ -242,3 +242,41 @@ func containing(calls [][]string, sub string) int {
 	}
 	return n
 }
+
+// A [dump] file that doesn't expand is an error, not "no dumps".
+func TestDumpFilesExpansionError(t *testing.T) {
+	e := setup(t)
+	m, in, err := e.l.load(ctx, "feat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	o := *m.Inputs.Stack.Option("database").Option
+	d := *o.Dump
+	d.File = "{nope}{dump.db}.dump"
+	o.Dump = &d
+	if _, err := dumpFiles(m, filepath.Join(e.ws, "db-dumps"), &o, in.Scope("db")); err == nil || errors.Is(err, os.ErrNotExist) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// Any successful db restore clears a marker an earlier failure left: the
+// next up never restores over what was restored by hand.
+func TestDBRestoreClearsMarker(t *testing.T) {
+	e := setup(t)
+	e.dbRunning("feat")
+	dir := writeDumps(t, e.ws)
+	marker := filepath.Join(e.ws, ".railswitch", "restore-pending", "feat")
+	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	if _, err := e.l.DBRestore(ctx, "feat", dir, []string{"filial_dev"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Error("the marker survived a restore with --from and a name")
+	}
+}

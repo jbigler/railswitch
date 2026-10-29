@@ -805,6 +805,17 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		case d.List == nil && (strings.Contains(d.File, ph) || slices.ContainsFunc(d.Command, func(a string) bool { return strings.Contains(a, ph) })):
 			l.add(file, "%s needs dump.list (the command that prints the database names)", ph)
 		}
+		for _, c := range []struct {
+			key  string
+			argv []string
+		}{{"dump.prepare", d.Prepare}, {"dump.restore", d.Restore}} {
+			if c.argv != nil && (len(c.argv) == 0 || slices.Contains(c.argv, "")) {
+				l.add(file, "%s must be a non-empty list of non-empty arguments", c.key)
+			}
+		}
+		if d.Prepare != nil && d.Restore == nil {
+			l.add(file, "dump.prepare needs dump.restore")
+		}
 	}
 	l.volumes(file, "volumes", o.Volumes, true)
 	l.mounts(file, dir, o.Mounts)

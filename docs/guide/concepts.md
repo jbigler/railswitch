@@ -58,7 +58,12 @@ new worktree doesn't download everything again. Data is per worktree: a
 new worktree's database starts from the dumps in `<workspace>/db-dumps/`
 if there are any (`railswitch db dump` writes them from a worktree you
 like), else empty; then the app's own setup runs (`db:prepare` for
-Rails).
+Rails). `railswitch db restore` puts the dumps back into a running
+worktree's database at any time, replacing what it holds (it asks
+first, naming each database; `--from <dir>` for dumps from elsewhere,
+`--yes` without asking). It restores databases only: a seeded volume
+(storage) comes back from its dump only when the volume is new
+(`down`, then `up`).
 
 ## What stays on your machine
 

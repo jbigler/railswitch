@@ -513,7 +513,7 @@ there is no shared add-on package (user, 2026-10-27).
 | `entrypoint`, `command`, `firewall` | its entrypoint file, command and firewall profile(s) |
 | `[gives]`, `[deps_env]`, `[agent_gives]`, `[env]` | env it gives the app, the deps service, agents, and its own service |
 | `[share] gives` | `[gives]` while shared |
-| `[dump]` | `command`, `file`: how `railswitch db dump` dumps it; with `list` (a command printing one database name per line) both run once per name as `{dump.db}`, each to its own file. `postgres@1` dumps every non-template database but `postgres` |
+| `[dump]` | `command`, `file`: how `railswitch db dump` dumps it; with `list` (a command printing one database name per line) both run once per name as `{dump.db}`, each to its own file. `postgres@1` dumps every non-template database but `postgres`. `prepare` (optional) and `restore` (D121) are how `railswitch db restore` puts a file back into the running server, once per file with `{dump.db}` the name the file is for: `prepare` empties the database (postgres: `dropdb --force`, `createdb`), `restore` reads the file on its stdin (`pg_restore`); both run in the option's container |
 | `[[volumes]]` | `name`, `mount`, `chown`, `seed`, `data` |
 | `[[mounts]]`, `[[ports]]`, `[[routes]]`, `[[links]]`, `[unit]` | as named |
 | `[[detect]]` | `file`, `match`, `evidence`: `project detect` suggests the option when a line of `file` matches `match` (RE2, unanchored: start it with `^\s*` so a commented line doesn't count); any rule is enough; `evidence` is what the page shows (default `<file>: <match>`) |

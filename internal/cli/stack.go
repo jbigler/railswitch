@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/jbigler/railswitch/internal/gitshadow"
 	"github.com/jbigler/railswitch/internal/prs"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -52,10 +55,31 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	doc := stackDoc{Available: prs.StackAvailable(ctx, e.run), Worktrees: []stackRow{}}
+	// gh-stack writes into the repository's common dir and runs git with
+	// its config; both are the containers' to write: it sees the repository
+	// only through a private shadow, or runs not at all.
+	var env []string
+	var shadowErr error
+	if doc.Available && len(m.Inputs.Worktrees) > 0 {
+		var in *render.Instance
+		if in, err = m.Instance(m.Inputs.Worktrees[0]); err != nil {
+			return e.fail(err)
+		}
+		sh, err := gitshadow.New(ctx, e.run, in.Values["base.git"])
+		if err == nil {
+			defer sh.Remove()
+			env = sh.Env(os.Environ())
+		}
+		shadowErr = err
+	}
 	for _, wt := range m.Inputs.Worktrees {
 		r := stackRow{Slug: wt.Slug, Branch: wt.Branch}
-		if doc.Available && wt.Branch != "" {
-			if r.Stack, err = prs.ViewStack(ctx, e.run, wt.Dir); err != nil {
+		switch {
+		case !doc.Available || wt.Branch == "":
+		case shadowErr != nil:
+			r.Error = shadowErr.Error()
+		default:
+			if r.Stack, err = prs.ViewStack(ctx, e.run, wt.Dir, env); err != nil {
 				r.Error = err.Error()
 			}
 		}

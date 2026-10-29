@@ -537,7 +537,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 	}
 	for _, r := range rows {
 		if r.WT.Slug == sel {
-			pv.Detail = newDetail(prefix, r)
+			pv.Detail = newDetail(prefix, r, projectPRRepo(rows))
 		}
 	}
 	return pv

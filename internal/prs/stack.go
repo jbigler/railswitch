@@ -32,7 +32,7 @@ type StackBranch struct {
 }
 
 // StackPR is a stack branch's pull request: State is "open", "merged" or
-// "closed".
+// "queued" (in a merge queue), as gh-stack reports it.
 type StackPR struct {
 	Number int    `json:"number"`
 	State  string `json:"state"`
@@ -52,23 +52,31 @@ func StackAvailable(ctx context.Context, r sys.Runner) bool {
 	return false
 }
 
+// notInStackExit is gh-stack's exit code for a branch in no stack.
+const notInStackExit = 2
+
 // noStack is what gh stack view says for a branch outside any stack (the
 // trunk included); every other failure is an error.
 var noStack = []string{"is not part of a stack", "belongs to multiple stacks"}
 
-// ViewStack runs `gh stack view --json` in worktree dir: its branch's
-// stack, nil when it is in none. gh-stack runs git there, so git's hooks
-// and fsmonitor are turned off through the environment (the worktree's git
-// config is the project's, not trusted), and nothing may prompt.
-func ViewStack(ctx context.Context, r sys.Runner, dir string) (*Stack, error) {
+// ViewStack runs `gh stack view --json` in worktree dir, with env: its
+// branch's stack, nil when it is in none. env must keep git off the
+// worktree's own common dir (gitshadow): gh-stack writes lock files there
+// and runs git with its config, which a container can write.
+func ViewStack(ctx context.Context, r sys.Runner, dir string, env []string) (*Stack, error) {
 	res, err := r.Run(ctx, sys.Cmd{
 		Name:    "gh",
 		Args:    []string{"stack", "view", "--json"},
 		Dir:     dir,
-		Env:     stackEnv(os.Environ()),
+		Env:     append(env, "GH_PROMPT_DISABLED=1"),
 		Timeout: 30 * time.Second,
 	})
 	if err != nil {
+		// gh-stack exits 2 for a branch in no stack (ErrNotInStack); the
+		// words are a fallback for another version.
+		if errors.Is(err, sys.ErrExit) && res.ExitCode == notInStackExit {
+			return nil, nil
+		}
 		msg := string(res.Stderr) + string(res.Stdout)
 		for _, s := range noStack {
 			if errors.Is(err, sys.ErrExit) && strings.Contains(msg, s) {
@@ -87,24 +95,6 @@ func ViewStack(ctx context.Context, r sys.Runner, dir string) (*Stack, error) {
 		return nil, nil
 	}
 	return s, nil
-}
-
-// stackEnv is environ for gh-stack's git: its own GIT_CONFIG_* pairs
-// replaced by hooks and fsmonitor off, no terminal prompt, no gh prompt.
-func stackEnv(environ []string) []string {
-	env := make([]string, 0, len(environ)+8)
-	for _, kv := range environ {
-		k, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(k, "GIT_CONFIG_") || k == "GIT_TERMINAL_PROMPT" || k == "GH_PROMPT_DISABLED" {
-			continue
-		}
-		env = append(env, kv)
-	}
-	return append(env,
-		"GIT_CONFIG_COUNT=2",
-		"GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=/dev/null",
-		"GIT_CONFIG_KEY_1=core.fsmonitor", "GIT_CONFIG_VALUE_1=false",
-		"GIT_TERMINAL_PROMPT=0", "GH_PROMPT_DISABLED=1")
 }
 
 type ghStack struct {

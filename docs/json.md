@@ -772,9 +772,13 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
 
 One project (`-C`): every registered worktree, in registry order, with its
 branch's stack as GitHub's gh-stack extension sees it (`gh stack view
---json`, run in the worktree with git's hooks and fsmonitor off through
-`GIT_CONFIG_*`, no prompt, 30 s). Without the extension (`gh extension
-list` has no `gh stack`) no worktree is asked.
+--json` in the worktree, no prompt, 30 s). gh-stack runs git and writes
+lock files in the repository's common dir, which a container can write,
+so it sees the repository only through a private shadow
+(`GIT_COMMON_DIR`: an allowlisted copy of the config, links to the refs
+and objects; a lock it creates lands there). A shadow that can't be built
+is each worktree's `error`, and gh stack doesn't run. Without the
+extension (`gh extension list` has no `gh stack`) no worktree is asked.
 
 ```json
 {"available": true, "worktrees": [
@@ -788,7 +792,7 @@ list` has no `gh stack`) no worktree is asked.
 |---|---|---|
 | `available` | boolean | gh has the gh-stack extension (`gh extension install github/gh-stack`). |
 | `worktrees[].stack` | object or null | The branch's stack; `null` when it is in none, on the trunk (gh stack shows the stack above it, with no branch current), or `available` is false. |
-| `stack.branches` | array | Bottom (next to `trunk`) to top: `name`, `current`, `merged`, `queued` (in the merge queue), `needs_rebase`, `pr` (`number` and `state`: `open`, `merged` or `closed`; `null` before `gh stack submit`). |
+| `stack.branches` | array | Bottom (next to `trunk`) to top: `name`, `current`, `merged`, `queued` (in the merge queue), `needs_rebase`, `pr` (`number` and `state`: `open`, `merged` or `queued`, as gh-stack reports them; `null` before `gh stack submit`). |
 | `worktrees[].error` | string | Why gh stack couldn't say (`""` otherwise). |
 
 ## `task ls`

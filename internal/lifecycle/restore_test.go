@@ -298,4 +298,8 @@ func TestDBRestoreSkipsTestDumps(t *testing.T) {
 	if !slices.Equal(done, []string{"filial_dev", "filial_queue"}) {
 		t.Errorf("restored %v; want no test database", done)
 	}
+	// Naming it says why, not "no dump".
+	if _, err := e.l.DBRestore(ctx, "feat", "", []string{"filial_test-0"}, true); err == nil || !strings.Contains(err.Error(), "dump_skip") {
+		t.Errorf("restore filial_test-0: %v; want the dump_skip reason", err)
+	}
 }

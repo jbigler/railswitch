@@ -156,11 +156,24 @@ func ProxyUnits(r *Registry) map[string][]byte {
 
 	key := unithash.Key("railswitch")
 	return map[string][]byte{
-		ProxyUnitName:          unithash.StampExcept(lines(traefik...), key, isNetworkLine),
-		MachineNetworkUnitName: network,
-		DozzleUnitName:         unithash.Stamp(dozzle, key),
+		ProxyUnitName:          NoNetworkWait(unithash.StampExcept(lines(traefik...), key, isNetworkLine)),
+		MachineNetworkUnitName: NoNetworkWait(network),
+		DozzleUnitName:         NoNetworkWait(unithash.Stamp(dozzle, key)),
 	}
 }
+
+// NoNetworkWait is unit with Quadlet's network-online dependency turned
+// off (podman 5.3, D130): railswitch's networks and containers need no
+// host network to start, and where network-online.target never comes
+// (its wait-online service masked) podman's wait holds every start for
+// 90 s. It is appended after the unit-hash stamp, so it changes no hash
+// and restarts nothing.
+func NoNetworkWait(unit []byte) []byte {
+	return append(unit, NoNetworkWaitSection...)
+}
+
+// NoNetworkWaitSection is what NoNetworkWait appends.
+const NoNetworkWaitSection = "\n[Quadlet]\nDefaultDependencies=false\n"
 
 // RefreshProxyUnits brings the machine-wide units already in quadletDir in
 // line with r, for a change of r made without a render (a project

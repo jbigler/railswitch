@@ -90,7 +90,7 @@ dashboard restarts itself on the new binary. Building from source:
 
 ## Requirements
 
-Linux with a systemd user session, podman 5 or newer with its Quadlet
+Linux with a systemd user session, podman 5.3 or newer with its Quadlet
 generator and socket, cgroup v2, and `nft`, `nsenter`, `getent`, `jq`,
 `curl` and `git` on the host. `railswitch doctor` checks all but `git` and
 says how to fix what's missing.

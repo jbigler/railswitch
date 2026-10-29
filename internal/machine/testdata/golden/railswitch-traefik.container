@@ -35,3 +35,6 @@ PidsLimit=1024
 
 [Service]
 Restart=on-failure
+
+[Quadlet]
+DefaultDependencies=false

@@ -39,7 +39,7 @@ func TestDoctorJSON(t *testing.T) {
 		}
 		byName[r["name"].(string)] = r
 	}
-	if r := byName["podman >= 5.0"]; r == nil || r["ok"] != false {
+	if r := byName["podman >= 5.3"]; r == nil || r["ok"] != false {
 		t.Errorf("podman row = %v", r)
 	}
 	if r := byName["units current"]; r == nil || r["ok"] != true {
@@ -56,7 +56,7 @@ func TestDoctorText(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("doctor: exit %d, want 1\n%s", code, out)
 	}
-	for _, want := range []string{"FAIL  podman >= 5.0", "podman 4.9.3", "fix: install podman 5.0 or newer", "FAIL  units current", "fix: railswitch render"} {
+	for _, want := range []string{"FAIL  podman >= 5.3", "podman 4.9.3", "fix: install podman 5.3 or newer", "FAIL  units current", "fix: railswitch render"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor output lacks %q:\n%s", want, out)
 		}
@@ -67,7 +67,7 @@ func TestDoctorText(t *testing.T) {
 // the exit code 0 when it is the only problem.
 func TestDoctorWarnLevel(t *testing.T) {
 	checks := []doctor.Check{
-		{Name: "podman >= 5.0", OK: true, Detail: "podman 5.2.1"},
+		{Name: "podman >= 5.3", OK: true, Detail: "podman 5.4.2"},
 		{Name: "git-guard", Warn: true, Detail: "1 finding(s): hook-missing-backup /w/master/.git/hooks/pre-commit", Fix: "railswitch hooks check"},
 	}
 	var out bytes.Buffer
@@ -75,7 +75,7 @@ func TestDoctorWarnLevel(t *testing.T) {
 	if code := e.printChecks(checks); code != 0 {
 		t.Errorf("text: exit %d, want 0", code)
 	}
-	for _, want := range []string{"ok    podman >= 5.0", "warn  git-guard: 1 finding(s)", "      fix: railswitch hooks check"} {
+	for _, want := range []string{"ok    podman >= 5.3", "warn  git-guard: 1 finding(s)", "      fix: railswitch hooks check"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("doctor output lacks %q:\n%s", want, out.String())
 		}
@@ -208,7 +208,7 @@ func TestDoctorOutsideWorkspace(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
 	code, rows := doctorRows(t, "-C", tmp)
 	names := rowNames(rows)
-	if code != 1 || len(names) == 0 || names[0] != "podman >= 5.0" {
+	if code != 1 || len(names) == 0 || names[0] != "podman >= 5.3" {
 		t.Fatalf("doctor outside a workspace: exit %d, checks %q", code, names)
 	}
 	for _, n := range []string{"workspace", "firewall descriptor", "units current", "proxy subnet"} {
@@ -228,7 +228,7 @@ func TestDoctorWorkspaceLoadFails(t *testing.T) {
 	if rows[0]["ok"] != false || rows[0]["fix"] != "railswitch lock" || !strings.Contains(rows[0]["detail"].(string), "railswitch lock") {
 		t.Errorf("workspace row = %v", rows[0])
 	}
-	if !slices.Contains(names, "podman >= 5.0") || slices.Contains(names, "units current") {
+	if !slices.Contains(names, "podman >= 5.3") || slices.Contains(names, "units current") {
 		t.Errorf("checks = %q, want the host checks and no project checks", names)
 	}
 }

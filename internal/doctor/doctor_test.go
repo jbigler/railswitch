@@ -165,7 +165,7 @@ func names(cs []Check) []string {
 }
 
 var hostChecks = []string{
-	"podman >= 5.0", "quadlet generator", "podman.socket active", "unprivileged port 80",
+	"podman >= 5.3", "quadlet generator", "podman.socket active", "unprivileged port 80",
 	"nft", "nsenter", "getent", "jq", "curl", "ssh-keygen -Y", "dashboard enabled", "dashboard answers", "user services outlive logout", "machine subnet free", "networks isolated",
 }
 
@@ -173,7 +173,7 @@ func TestAllOK(t *testing.T) {
 	ws := workspaceAt(t, true)
 	writeConfig(t, ws.Dirs, "[secrets]\ndriver = \"pass\"\ndriver_opts = { key = \"ABCD1234\" }\n")
 	f := fakeHost()
-	f.On(podmanVersion, sys.Result{Stdout: []byte("5.2.1\n")}, nil)
+	f.On(podmanVersion, sys.Result{Stdout: []byte("5.4.2\n")}, nil)
 	f.On(socketActive, sys.Result{Stdout: []byte("active\n")}, nil)
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{Stdout: []byte("sec rsa4096\n")}, nil)
 	h := host(t, "80", true, "nft", "nsenter", "getent", "jq", "curl", "pass", "gpg")
@@ -191,7 +191,7 @@ func TestAllOK(t *testing.T) {
 			t.Errorf("%s passed with fix text %q", c.Name, c.Fix)
 		}
 	}
-	if d := byName(got)["podman >= 5.0"].Detail; !strings.Contains(d, "5.2.1") {
+	if d := byName(got)["podman >= 5.3"].Detail; !strings.Contains(d, "5.4.2") {
 		t.Errorf("podman detail = %q, want the version", d)
 	}
 }
@@ -231,7 +231,7 @@ func TestAllFail(t *testing.T) {
 	if d := m["unprivileged port 80"].Detail; !strings.Contains(d, "1024") {
 		t.Errorf("port 80 detail = %q, want the current value", d)
 	}
-	if d := m["podman >= 5.0"].Detail; !strings.Contains(d, "4.9.3") {
+	if d := m["podman >= 5.3"].Detail; !strings.Contains(d, "4.9.3") {
 		t.Errorf("podman detail = %q", d)
 	}
 	if fix := m["gpg secret key"].Fix; !strings.Contains(fix, "driver_opts.key") {
@@ -586,5 +586,17 @@ func TestDashboardTokenUnreadable(t *testing.T) {
 	c := h.dashboardAnswers(context.Background())
 	if c.OK || !c.Warn || c.Detail != "the login token: /x/dashboard/token: permission denied" || !strings.Contains(c.Fix, "readable") || !strings.Contains(c.Fix, "systemctl --user restart") {
 		t.Errorf("%+v", c)
+	}
+}
+
+// TestPodmanMinor: 5.3 is the oldest podman that passes (its Quadlet takes
+// [Quadlet] DefaultDependencies=).
+func TestPodmanMinor(t *testing.T) {
+	for v, ok := range map[string]bool{"5.2.5": false, "5.3.0": true, "5.3-dev": true, "6.0.1": true, "4.9.3": false, "5": false} {
+		f := &systest.Fake{}
+		f.On(podmanVersion, sys.Result{Stdout: []byte(v + "\n")}, nil)
+		if c := (Host{}).podman(context.Background(), f); c.OK != ok {
+			t.Errorf("podman %s: ok %v; want %v (%+v)", v, c.OK, ok, c)
+		}
 	}
 }

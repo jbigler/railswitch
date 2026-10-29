@@ -5,7 +5,7 @@
 Description=filial nvim of worktree feat
 
 [Container]
-Label=filial.unit-hash=6e5c4e496d0b
+Label=filial.unit-hash=72eac4d7e39c
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-8b570477
 ContainerName=filial-feat-nvim
 Network=filial-feat-dev.network:alias=nvim
@@ -51,3 +51,6 @@ Exec=/usr/local/bin/nvim --headless --listen 0.0.0.0:7777
 Restart=on-failure
 RestartSec=5
 SuccessExitStatus=1
+
+[Quadlet]
+DefaultDependencies=false

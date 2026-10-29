@@ -81,6 +81,9 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 			out[name] = unithash.Stamp(out[name], unithash.Key(m.Prefix), inputs...)
 		}
 	}
+	for name, b := range out {
+		out[name] = machine.NoNetworkWait(b)
+	}
 	if fs := Lint(out); len(fs) > 0 {
 		errs := make([]error, len(fs))
 		for i, f := range fs {

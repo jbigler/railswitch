@@ -61,8 +61,9 @@ var DefaultHost = Host{
 	Dashboards: machine.DashboardAddrs,
 }
 
-// minPodman is the oldest podman major version railswitch supports.
-const minPodman = 5
+// minPodman is the oldest podman railswitch supports, major and minor:
+// 5.3's Quadlet takes [Quadlet] DefaultDependencies= (D130).
+var minPodman = [2]int{5, 3}
 
 // tools are the binaries the firewall hook and its scripts run on the host.
 var tools = []string{"nft", "nsenter", "getent", "jq", "curl"}
@@ -101,26 +102,32 @@ func Workspace(err error) Check {
 }
 
 func (h Host) podman(ctx context.Context, r sys.Runner) Check {
-	c := Check{Name: "podman >= 5.0", Fix: "install podman 5.0 or newer"}
+	c := Check{Name: "podman >= 5.3", Fix: "install podman 5.3 or newer"}
 	res, err := r.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"version", "--format", "{{.Client.Version}}"}})
 	if err != nil {
 		c.Detail = err.Error()
 		return c
 	}
 	v := strings.TrimSpace(string(res.Stdout))
-	major, _, _ := strings.Cut(v, ".")
-	n, err := strconv.Atoi(major)
-	if err != nil {
-		c.Detail = fmt.Sprintf("podman reported version %q", v)
-		return c
+	parts := strings.SplitN(v, ".", 3)
+	var n [2]int
+	for i := range n {
+		if i >= len(parts) {
+			break
+		}
+		digits, _, _ := strings.Cut(parts[i], "-") // 5.3-dev
+		if n[i], err = strconv.Atoi(digits); err != nil {
+			c.Detail = fmt.Sprintf("podman reported version %q", v)
+			return c
+		}
 	}
 	c.Detail = "podman " + v
-	c.OK = n >= minPodman
+	c.OK = n[0] > minPodman[0] || n[0] == minPodman[0] && n[1] >= minPodman[1]
 	return c
 }
 
 func (h Host) quadlet() Check {
-	c := Check{Name: "quadlet generator", Fix: "install podman's quadlet generator at " + strings.Join(h.Quadlet, " or ") + " (podman 5 ships it; some distributions package it as podman-quadlet)"}
+	c := Check{Name: "quadlet generator", Fix: "install podman's quadlet generator at " + strings.Join(h.Quadlet, " or ") + " (podman 5.3 and newer ship it; some distributions package it as podman-quadlet)"}
 	var errs []string
 	for _, p := range h.Quadlet {
 		if _, err := os.Stat(p); err != nil {

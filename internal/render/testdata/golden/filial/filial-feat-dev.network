@@ -7,3 +7,6 @@ Description=Dev network of filial worktree feat
 NetworkName=filial-feat-dev
 Options=mtu=1400
 Options=isolate=strict
+
+[Quadlet]
+DefaultDependencies=false

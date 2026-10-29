@@ -7,7 +7,7 @@ Wants=railswitch-traefik.service
 After=railswitch-traefik.service
 
 [Container]
-Label=filial.unit-hash=136a04f6c177
+Label=filial.unit-hash=2a8ced2756b2
 Image=docker.io/rustfs/rustfs:1.0.0-alpha.83
 ContainerName=filial-master-storage
 Network=filial-master-dev.network:alias=storage
@@ -51,3 +51,6 @@ LogDriver=journald
 [Service]
 Restart=on-failure
 RestartSec=5
+
+[Quadlet]
+DefaultDependencies=false

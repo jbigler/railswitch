@@ -5,7 +5,7 @@
 Description=phx db of worktree master
 
 [Container]
-Label=phx.unit-hash=ff62238d5faa
+Label=phx.unit-hash=bcb6a8a5bf89
 Image=docker.io/library/postgres:16
 ContainerName=phx-master-db
 Network=phx-master-dev.network:alias=db
@@ -33,3 +33,6 @@ Exec=postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statemen
 [Service]
 Restart=on-failure
 RestartSec=5
+
+[Quadlet]
+DefaultDependencies=false

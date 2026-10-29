@@ -2,7 +2,7 @@
 
 ## Install
 
-You need Linux with a systemd user session and podman 5 or newer (with its
+You need Linux with a systemd user session and podman 5.3 or newer (with its
 Quadlet generator), plus `nft`, `nsenter`, `getent`, `jq`, `curl` and `git`.
 Install railswitch, one static binary for amd64 or arm64 from the
 [releases](https://github.com/jbigler/railswitch/releases), then let it

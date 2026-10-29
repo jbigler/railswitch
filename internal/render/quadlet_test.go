@@ -550,7 +550,11 @@ func TestUnitHashLabel(t *testing.T) {
 			}
 			continue
 		}
-		rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1)
+		// The [Quadlet] section is outside the hash: it restarts nothing.
+		if !bytes.HasSuffix(data, []byte(machine.NoNetworkWaitSection)) {
+			t.Errorf("%s does not end with the [Quadlet] section", file)
+		}
+		rest := bytes.TrimSuffix(bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1), []byte(machine.NoNetworkWaitSection))
 		if want := unithash.Sum(rest, envOf[file]); h == "" || h != want {
 			t.Errorf("%s: unit-hash %q; want %q", file, h, want)
 		}

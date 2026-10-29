@@ -5,7 +5,7 @@
 Description=mini deps of worktree master
 
 [Container]
-Label=mini.unit-hash=af0eb7d19aae
+Label=mini.unit-hash=08265b2d101d
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-39fced4e
 ContainerName=mini-master-deps
 Network=mini-master-dev.network:alias=deps
@@ -36,3 +36,6 @@ Entrypoint=/usr/local/bin/entrypoint-deps.sh
 [Service]
 Type=oneshot
 TimeoutStartSec=900
+
+[Quadlet]
+DefaultDependencies=false

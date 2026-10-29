@@ -37,9 +37,15 @@ func TestProxyUnitsLintClean(t *testing.T) {
 }
 
 // TestProxyUnitHashLabel: Traefik's unit carries railswitch.unit-hash, the
-// hash of the unit with that label line and its Network= lines excluded.
+// hash of the unit with that label line, its Network= lines and the
+// [Quadlet] section NoNetworkWait appends excluded: turning the network
+// wait off restarts no container.
 func TestProxyUnitHashLabel(t *testing.T) {
 	data := machine.ProxyUnits(twoProjects())[machine.ProxyUnitName]
+	if !bytes.HasSuffix(data, []byte(machine.NoNetworkWaitSection)) {
+		t.Fatalf("no [Quadlet] DefaultDependencies=false at the end:\n%s", data)
+	}
+	data = bytes.TrimSuffix(data, []byte(machine.NoNetworkWaitSection))
 	key := unithash.Key("railswitch")
 	h := unithash.Read(data, key)
 	var rest []byte
@@ -215,7 +221,7 @@ func TestDozzleUnitHashReadOnly(t *testing.T) {
 	data := machine.ProxyUnits(twoProjects())[machine.DozzleUnitName]
 	key := unithash.Key("railswitch")
 	h := unithash.Read(data, key)
-	if rest := bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1); h == "" || unithash.Sum(rest) != h {
+	if rest := bytes.TrimSuffix(bytes.Replace(data, []byte("Label="+key+"="+h+"\n"), nil, 1), []byte(machine.NoNetworkWaitSection)); h == "" || unithash.Sum(rest) != h {
 		t.Errorf("dozzle unit-hash %q; want %q", h, unithash.Sum(rest))
 	}
 	for _, want := range []string{"\nEnvironment=DOZZLE_ENABLE_ACTIONS=false\n", "\nEnvironment=DOZZLE_ENABLE_SHELL=false\n"} {

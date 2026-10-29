@@ -8,7 +8,7 @@ Wants=railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.
 After=mini-master-deps.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=mini.unit-hash=66ee8bf5fe2b
+Label=mini.unit-hash=245154bbb4d2
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-39fced4e
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails
@@ -62,3 +62,6 @@ Exec=bin/dev
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=180
+
+[Quadlet]
+DefaultDependencies=false

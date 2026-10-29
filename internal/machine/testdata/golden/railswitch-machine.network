@@ -10,3 +10,6 @@ Gateway=10.214.255.1
 IPRange=10.214.255.128/25
 Options=mtu=1400
 Options=isolate=strict
+
+[Quadlet]
+DefaultDependencies=false

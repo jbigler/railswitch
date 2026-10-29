@@ -203,6 +203,7 @@ type secretRow struct {
 	Set      bool     `json:"set"`
 	Created  *string  `json:"created"`
 	Services []string `json:"services"`
+	Up       bool     `json:"up"` // up refuses to start while it is unset
 }
 
 // detectDoc is `project detect`: the pack and options a repository

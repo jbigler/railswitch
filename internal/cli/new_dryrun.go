@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
@@ -218,6 +219,8 @@ func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error)
 			doc.Steps = slices.Insert(doc.Steps, 1, fmt.Sprintf("Write the template's bundled package %s/ as this workspace's own", b.Dir))
 		}
 	}
+	// Only the secrets up refuses matter here: an on-demand agent's don't.
+	secrets = slices.DeleteFunc(secrets, func(n string) bool { return !lifecycle.UpNeeds(m, n) })
 	switch {
 	case up && len(secrets) > 0:
 		doc.Steps = append(doc.Steps, fmt.Sprintf("Start %s (up), unless a secret is unset: then leave it stopped until it is set (%s)", slug, strings.Join(secrets, ", ")))

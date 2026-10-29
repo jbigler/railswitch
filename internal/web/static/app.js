@@ -609,7 +609,7 @@ if (view === "") {
         setButtons(card, true);
         if (state !== "ok") return toast("The secret was not stored. Its output is below.", true);
         f.closest("tr").remove();
-        if ($("form[data-secret-needed]", card)) return;
+        if ($("form[data-blocks]", card)) return;
         $$("[data-todo]", card).forEach((x) => (x.hidden = true));
         $("[data-done]", card).hidden = false;
         const start = $("form[data-start-base] button", card);

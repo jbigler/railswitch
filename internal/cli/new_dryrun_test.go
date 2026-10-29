@@ -191,8 +191,13 @@ func TestNewDryRunSummary(t *testing.T) {
 	}
 
 	up := dryRun(t, gitHost(), ws, "--repo", gh, "--prefix", "shop", "--branch", "main", "--up")
-	if len(up.Steps) != 5 || up.Steps[4] != "Start main (up), unless a secret is unset: then leave it stopped until it is set (claude_token, github_token)" {
+	// The agent's secrets are checked when it runs, not by up.
+	if len(up.Steps) != 5 || up.Steps[4] != "Start main (up)" {
 		t.Errorf("--up steps = %q", up.Steps)
+	}
+	nvim := dryRun(t, gitHost(), ws, "--repo", gh, "--prefix", "shop", "--branch", "main", "--tool", "nvim", "--agent", "none", "--up")
+	if n := len(nvim.Steps); nvim.Steps[n-1] != "Start main (up), unless a secret is unset: then leave it stopped until it is set (github_token)" {
+		t.Errorf("--up steps with nvim's github_token = %q", nvim.Steps)
 	}
 	noSecrets := dryRun(t, gitHost(), ws, "--repo", bareRepo(t, "main"), "--prefix", "shop", "--branch", "main", "--agent", "none", "--up")
 	if n := len(noSecrets.Steps); n != 5 || noSecrets.Steps[n-1] != "Start main (up)" {
@@ -240,22 +245,35 @@ func TestNewUp(t *testing.T) {
 		t.Errorf("started %v, stdout:\n%s", started(f), out)
 	}
 
-	// A project with secrets to set is created and left stopped: up would
-	// refuse them.
+	// A secret up needs (nvim's github_token) leaves the project stopped.
 	f = gitHost()
 	ws = filepath.Join(t.TempDir(), "pay")
-	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "pay", "--up")
-	if code != 0 || started(f) || !strings.Contains(out, "not started: main needs its secrets first") || !strings.Contains(out, "next: railswitch secret set claude_token") {
-		t.Errorf("new --up with secrets: exit %d, started %v\n%s%s", code, started(f), out, errs)
+	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", asGithub(t, bareRepo(t, "main")), "--prefix", "pay", "--tool", "nvim", "--agent", "none", "--up")
+	if code != 0 || slices.ContainsFunc(f.Calls, func(c []string) bool { return c[0] == "systemctl" && slices.Contains(c, "start") }) ||
+		!strings.Contains(out, "not started: main needs its secrets first (github_token)") || !strings.Contains(out, "next: railswitch secret set github_token") {
+		t.Errorf("new --up with a secret up needs: exit %d\n%s%s", code, out, errs)
+	}
+
+	// An on-demand agent's unset token doesn't stop up; its secret set line
+	// comes after.
+	f = gitHost()
+	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
+	ws = filepath.Join(t.TempDir(), "agent")
+	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "agent", "--up")
+	agentUp := slices.ContainsFunc(f.Calls, func(c []string) bool {
+		return slices.Equal(c, []string{"systemctl", "--user", "start", "agent-main-rails.service"})
+	})
+	if code != 0 || !agentUp || strings.Contains(out, "not started") || !strings.HasSuffix(out, "next: railswitch secret set claude_token\n") {
+		t.Errorf("new --up with only the agent's token unset: exit %d, started %v\n%s%s", code, agentUp, out, errs)
 	}
 
 	// A secret podman holds already (a machine secret, one a removed
 	// project of the prefix left) doesn't stop up.
 	f = gitHost()
 	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
-	f.On([]string{"podman", "secret", "exists", "kept_claude_token"}, sys.Result{}, nil)
+	f.On([]string{"podman", "secret", "exists", "kept_github_token"}, sys.Result{}, nil)
 	ws = filepath.Join(t.TempDir(), "kept")
-	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "kept", "--up")
+	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", asGithub(t, bareRepo(t, "main")), "--prefix", "kept", "--tool", "nvim", "--agent", "none", "--up")
 	if kept := slices.ContainsFunc(f.Calls, func(c []string) bool {
 		return slices.Equal(c, []string{"systemctl", "--user", "start", "kept-main-rails.service"})
 	}); code != 0 || !kept || strings.Contains(out, "not started") {

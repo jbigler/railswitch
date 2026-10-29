@@ -19,6 +19,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/detect"
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/lockstore"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
@@ -177,12 +178,11 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "created workspace %s: project %s, base worktree %s (ID %d)\n", ws, *prefix, slug, id)
 	fmt.Fprintf(e.stdout, "the workspace is a git repo: commit project.toml, stack.lock and containerfiles/ (git -C %s add -A && git -C %s commit)\n", shellQuote(ws), shellQuote(ws))
-	if *up && len(secrets) > 0 {
-		// up refuses an unset secret.
-		fmt.Fprintf(e.stdout, "not started: %s needs its secrets first\n", slug)
+	if *up && len(secrets.blocking) > 0 {
+		fmt.Fprintf(e.stdout, "not started: %s needs its secrets first (%s)\n", slug, strings.Join(secrets.blocking, ", "))
 	}
-	if !*up || len(secrets) > 0 {
-		e.printNext(ws, slug, secrets)
+	if !*up || len(secrets.blocking) > 0 {
+		e.printNext(ws, slug, secrets.unset)
 		return 0
 	}
 	e.dir, e.slug = filepath.Join(ws, slug), slug
@@ -191,6 +191,9 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		if err := l.Up(ctx, slug); err != nil {
 			code = e.fail(err)
 		}
+	}
+	if code == 0 && len(secrets.unset) > 0 {
+		e.printNext(ws, slug, secrets.unset) // an on-demand agent's, say
 	}
 	if code != 0 {
 		fmt.Fprintf(e.stderr, "railswitch: project %s was created in %s, but up failed; fix the cause and run: cd %s && railswitch up\n", *prefix, ws, shellQuote(filepath.Join(ws, slug)))
@@ -443,36 +446,36 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template, bundl
 // It returns the declared secrets podman doesn't hold yet (a machine
 // secret, or one a removed project of this prefix left, may be set) and
 // the base worktree's ID.
-func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace.Accept) ([]string, int, error) {
+func (e *env) createWorkspace(ctx context.Context, pl *newPlan, accept workspace.Accept) (unsetNames, int, error) {
 	ws := pl.ws
 	if _, err := e.run.Run(ctx, sys.Cmd{Name: "git", Args: []string{"init", ws}}); err != nil {
-		return nil, 0, fmt.Errorf("git init %s: %w", ws, err)
+		return unsetNames{}, 0, fmt.Errorf("git init %s: %w", ws, err)
 	}
 	if err := createFile(filepath.Join(ws, ".gitignore"), []byte(workspaceGitignore), 0o644); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := prepare(ws, pl.slug, pl.st); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if _, err := writeProject(ws, pl); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := writeGenerated(ws, pl.st, randomValue); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := workspace.Lock(ctx, ws, accept); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	if err := storeTemplate(pl); err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	w, err := workspace.Load(ctx, ws, "")
 	if err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	id, err := e.registerAndRender(ctx, pl.dirs, w, pl.slug)
 	if err != nil {
-		return nil, 0, err
+		return unsetNames{}, 0, err
 	}
 	return e.unsetSecrets(ctx, w), id, nil
 }
@@ -612,25 +615,35 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 	}
 	fmt.Fprintf(e.stdout, "joined project %s in %s: base worktree %s (ID %d)\n", pm.Prefix, w.Root, slug, id)
 
-	e.printNext(w.Root, slug, e.unsetSecrets(ctx, w))
+	e.printNext(w.Root, slug, e.unsetSecrets(ctx, w).unset)
 	return 0
 }
 
-// unsetSecrets is w's declared secrets that podman doesn't hold (up
-// refuses them), sorted; one it can't ask about counts as unset.
-func (e *env) unsetSecrets(ctx context.Context, w *workspace.Workspace) []string {
+// unsetNames are a workspace's declared secrets podman doesn't hold, sorted;
+// blocking are those up refuses (lifecycle.UpNeeds), not an on-demand
+// agent's.
+type unsetNames struct{ unset, blocking []string }
+
+// unsetSecrets asks podman for w's secrets; one it can't ask about, or
+// whose services can't be told, counts as unset and blocking.
+func (e *env) unsetSecrets(ctx context.Context, w *workspace.Workspace) unsetNames {
 	p := podman.Podman{R: e.run}
-	var unset []string
+	m, merr := e.model(ctx, w)
+	var u unsetNames
 	for _, name := range slices.Sorted(maps.Keys(w.Project.Secrets)) {
 		set, err := p.SecretExists(ctx, render.SecretName(w.Project.Project.Prefix, name, w.Project.Secrets[name]))
 		if err != nil {
 			fmt.Fprintf(e.stderr, "railswitch: secret %s: %v\n", name, err)
 		}
-		if !set {
-			unset = append(unset, name)
+		if set {
+			continue
+		}
+		u.unset = append(u.unset, name)
+		if merr != nil || lifecycle.UpNeeds(m, name) {
+			u.blocking = append(u.blocking, name)
 		}
 	}
-	return unset
+	return u
 }
 
 // printNext prints the next commands: setting each unset secret, else up.

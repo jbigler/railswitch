@@ -339,19 +339,26 @@ type pageView struct {
 	Secrets                  *secretsCard // nil: every secret is set
 }
 
-// secretsCard asks for the project's unset secrets, which up refuses, and
-// then starts the base worktree.
+// secretsCard asks for the project's unset secrets while up refuses one
+// of them, then starts the base worktree. Later are unset secrets up
+// doesn't need (an on-demand agent's): shown, but Start doesn't wait.
 type secretsCard struct {
 	Base, SecretURL, StartURL string
-	Unset                     []secretView
+	Unset, Later              []secretView
 }
 
-// newSecretsCard is the card for secrets, nil when all are set.
+// newSecretsCard is the card for secrets, nil while up needs none of the
+// unset ones.
 func newSecretsCard(prefix string, rows []rowView, secrets []secretRow) *secretsCard {
 	c := &secretsCard{SecretURL: settingsURL(prefix) + "/secret"}
 	for _, sec := range secrets {
-		if !sec.Set {
-			c.Unset = append(c.Unset, secretView{Name: sec.Name, Services: strings.Join(sec.Services, ", "), Delivery: sec.Delivery})
+		v := secretView{Name: sec.Name, Services: strings.Join(sec.Services, ", "), Delivery: sec.Delivery}
+		switch {
+		case sec.Set:
+		case sec.Up:
+			c.Unset = append(c.Unset, v)
+		default:
+			c.Later = append(c.Later, v)
 		}
 	}
 	if len(c.Unset) == 0 {

@@ -29,6 +29,14 @@ func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 	return checkSecrets(ctx, p, m, slug, func(s *render.Service) bool { return !s.OnDemand })
 }
 
+// UpNeeds reports whether up refuses to start while secret name is unset:
+// a service up starts receives it (CheckSecrets).
+func UpNeeds(m *render.Model, name string) bool {
+	return slices.ContainsFunc(m.Services, func(s render.Service) bool {
+		return !s.OnDemand && slices.Contains(m.Inputs.Project.Secrets[name].Services, s.ID)
+	})
+}
+
 // checkSecrets is CheckSecrets for the services keep reports.
 func checkSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string, keep func(*render.Service) bool) error {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w render.Worktree) bool { return w.Slug == slug })

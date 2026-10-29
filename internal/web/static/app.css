@@ -130,6 +130,7 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .secret-form input:not([type=checkbox]){min-width:0;width:10em}
 .secret-form button{white-space:nowrap}
 .set-table tr.secret td.mono{overflow-wrap:anywhere}
+.set-table tr.env-new td.mono{overflow-wrap:anywhere}
 .set-table tr.secret td:first-child{white-space:nowrap}
 .add-secret form{display:block}
 .add-secret label{display:block;margin:6px 0}

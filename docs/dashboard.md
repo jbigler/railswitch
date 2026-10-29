@@ -216,7 +216,8 @@ shows what each one does before anything is written.
   what a `deps` or `start` change restarts (`create` restarts nothing).
 - **Environment:** the project's `[env]`. Editing a value stages it when
   you leave the field; Remove stages its removal; the add form (name,
-  value) stages a new one.
+  value) stages a new one, shown as a highlighted row with Undo until
+  Apply writes it. The card's note says nothing is saved before Apply.
 - **Worktree links:** every link with Show, Label, Address and From
   (`project`, or the stack part that brings it). Unticking Show on a stack
   link stages adding it to `hide_links`; Remove is offered on the

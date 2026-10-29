@@ -283,6 +283,12 @@ type Dump struct {
 	List    []string `toml:"list"`
 	Command []string `toml:"command"`
 	File    string   `toml:"file"` // a bare file name
+	// Prepare and Restore are how railswitch db restore puts a dump back
+	// (D121): Prepare (optional) makes the database empty, Restore reads
+	// the file on its stdin; both run in the database's container, once per
+	// file, with {dump.db} the name the file is for.
+	Prepare []string `toml:"prepare"`
+	Restore []string `toml:"restore"`
 }
 
 // DumpDB is the placeholder a [dump] with a list reads each name from.

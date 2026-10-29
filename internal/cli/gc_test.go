@@ -125,3 +125,12 @@ func TestGC(t *testing.T) {
 		t.Errorf("--volumes --yes: exit %d %v", code, f.Calls)
 	}
 }
+
+// db restore takes flags after the database names.
+func TestDBRestoreFlagsAfterNames(t *testing.T) {
+	ws, _ := lockedWS(t)
+	code, _, errs := runIn(t, "-C", ws, "-w", "master", "db", "restore", "filial_dev", "--yes", "--from", "/nonexistent")
+	if code == 0 || strings.Contains(errs, "no dump of --yes") || !strings.Contains(errs, "--from /nonexistent is not a directory") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+}

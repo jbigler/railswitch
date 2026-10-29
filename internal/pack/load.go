@@ -805,6 +805,32 @@ func (l *loader) checkOption(dir string, o *Option) bool {
 		case d.List == nil && (strings.Contains(d.File, ph) || slices.ContainsFunc(d.Command, func(a string) bool { return strings.Contains(a, ph) })):
 			l.add(file, "%s needs dump.list (the command that prints the database names)", ph)
 		}
+		for _, c := range []struct {
+			key  string
+			argv []string
+		}{{"dump.prepare", d.Prepare}, {"dump.restore", d.Restore}} {
+			if c.argv != nil && (len(c.argv) == 0 || slices.Contains(c.argv, "")) {
+				l.add(file, "%s must be a non-empty list of non-empty arguments", c.key)
+			}
+		}
+		if d.Prepare != nil && d.Restore == nil {
+			l.add(file, "dump.prepare needs dump.restore")
+		}
+		// Each file goes back into its own database: with a list, both
+		// name it; without one, there is no name to give.
+		for _, c := range []struct {
+			key  string
+			argv []string
+		}{{"dump.prepare", d.Prepare}, {"dump.restore", d.Restore}} {
+			uses := slices.ContainsFunc(c.argv, func(a string) bool { return strings.Contains(a, ph) })
+			switch {
+			case c.argv == nil:
+			case d.List != nil && !uses:
+				l.add(file, "%s must use %s: each dump goes back into its own database", c.key, ph)
+			case d.List == nil && uses:
+				l.add(file, "%s uses %s, which needs dump.list", c.key, ph)
+			}
+		}
 	}
 	l.volumes(file, "volumes", o.Volumes, true)
 	l.mounts(file, dir, o.Mounts)

@@ -67,7 +67,7 @@ type Inputs struct {
 	Lock      *config.Lock // nil: no stack.lock yet
 	Machine   machine.ProjectEntry
 	Worktrees []Worktree
-	Generated map[string]string // D17 values from mise.local.toml
+	Generated map[string]string // D17 values from config.GeneratedFile (D132)
 	Host      Host
 	Mounts    []MachineMount // machine-local mounts (D57), already filtered to this project
 	// Overlay holds workspace Containerfiles read instead of the disk file,

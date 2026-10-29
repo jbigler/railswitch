@@ -66,7 +66,7 @@ type ghPR struct {
 }
 
 // NeutralDir is where railswitch runs gh when it names the repo itself:
-// never in a workspace, whose mise.local.toml (D17) a mise-shimmed gh would
+// never in a workspace, whose mise.local.toml (D17, before D132) a mise-shimmed gh would
 // read as its own config and refuse as untrusted.
 const NeutralDir = "/"
 

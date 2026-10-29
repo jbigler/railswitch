@@ -439,7 +439,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 		dir := filepath.Join(w.Root, e.Slug)
 		wts = append(wts, render.Worktree{Slug: e.Slug, ID: e.ID, Dir: dir, Branch: branchOf(dir), Share: e.Share})
 	}
-	gen, err := config.ReadGenerated(filepath.Join(w.Root, "mise.local.toml"))
+	gen, err := config.LoadGenerated(w.Root)
 	if err != nil {
 		return nil, err
 	}
@@ -606,6 +606,12 @@ func (w *Workspace) Render(ctx context.Context, r sys.Runner, check bool) (*rend
 		}
 		if err := (podman.Systemd{R: r}).StopLoaded(ctx, gone...); err != nil {
 			return d, fmt.Errorf("stop a removed unit: %w", err)
+		}
+		// Generated values still in mise.local.toml move to their own file
+		// (D132): a mise-shimmed tool run in the workspace (gh stack)
+		// refuses that file as untrusted.
+		if _, err := config.MigrateGenerated(w.Root); err != nil {
+			d.Warnings = append(d.Warnings, "move the generated values to "+config.GeneratedFile+": "+err.Error())
 		}
 		// Units of other projects written before D130 still wait for
 		// network-online.target, and Traefik starts their proxy networks.

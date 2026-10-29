@@ -76,6 +76,13 @@ write to. It restores databases only: a seeded volume
 
 ## What stays on your machine
 
+The passwords and keys railswitch generates for a project's services (the
+database password, the storage secret) are in
+`<workspace>/.railswitch/generated.toml`, readable only by you and never
+committed. Workspaces made before this kept them in `mise.local.toml`;
+the next render moves them, unchanged, and deletes that file when
+railswitch wrote it and nothing else is in it. railswitch needs no mise.
+
 Nothing in a container sees your home directory, SSH keys, SSH agent or
 git config file (only your git name and email are passed in). Secrets reach only the containers that declare them, through
 podman's secret store. `project.toml` is yours: the dashboard and the CLI

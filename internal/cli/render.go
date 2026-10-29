@@ -210,7 +210,7 @@ func cmdEnv(ctx context.Context, e *env, args []string) int {
 // value holding a generated value masked, and every secret delivered to it
 // as an env var, without a value.
 func envRows(p *config.Project, m *render.Model, in *render.Instance, svc string) []envRow {
-	var genVals []string // every generated value in mise.local.toml, used or not
+	var genVals []string // every generated value of the workspace, used or not
 	for _, v := range m.Inputs.Generated {
 		if v != "" {
 			genVals = append(genVals, v)

@@ -136,17 +136,17 @@ func registry(t *testing.T, dirs machine.Dirs) *machine.Registry {
 
 var dbPasswordRe = regexp.MustCompile(`(?m)^DB_PASSWORD = "([0-9a-f]{32})"$`)
 
-// dbPassword is the generated DB_PASSWORD in ws's mise.local.toml, which
+// dbPassword is the generated DB_PASSWORD in ws's generated values file, which
 // must be mode 0600.
 func dbPassword(t *testing.T, ws string) string {
 	t.Helper()
-	path := filepath.Join(ws, "mise.local.toml")
+	path := filepath.Join(ws, config.GeneratedFile)
 	if m := mode(t, path); m != 0o600 {
-		t.Errorf("mise.local.toml mode = %v; want 0600", m)
+		t.Errorf("generated values mode = %v; want 0600", m)
 	}
 	m := dbPasswordRe.FindStringSubmatch(readFile(t, path))
 	if m == nil {
-		t.Fatalf("mise.local.toml has no DB_PASSWORD of 32 hex:\n%s", readFile(t, path))
+		t.Fatalf("generated values have no DB_PASSWORD of 32 hex:\n%s", readFile(t, path))
 	}
 	return m[1]
 }

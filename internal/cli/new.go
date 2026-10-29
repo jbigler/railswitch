@@ -108,6 +108,10 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	// Neither a pack nor a template: read the repository as the New project
 	// page does (D124). The page passes --pack after its own detection.
 	if *tplRef == "" && !isSet(fset, "pack") && !*noDetect {
+		// What needs no network is checked before the repository is read.
+		if err := newOffline(dir, *prefix); err != nil {
+			return e.fail(err)
+		}
 		res, err := e.detectNew(ctx, *repo, *branch)
 		if err != nil {
 			return e.fail(err)
@@ -122,7 +126,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		if e.json {
 			out = e.stderr // stdout is the one JSON document
 		}
-		fmt.Fprintf(out, "detected pack %s (%s)\n", res.Pack.Ref, strings.Join(res.Pack.Evidence, ", "))
+		fmt.Fprintf(out, "detected pack %s (%s)\n", res.Pack.Ref, safefile.Printable(strings.Join(res.Pack.Evidence, ", ")))
 		for _, o := range res.Options {
 			if o.Source != "repo" || set[o.Key] {
 				continue
@@ -625,6 +629,25 @@ func (e *env) printNext(ws, slug string, unset []string) {
 	for _, n := range unset {
 		fmt.Fprintf(e.stdout, "next: railswitch secret set %s\n", n)
 	}
+}
+
+// newOffline is what planNew checks that needs no network: the prefix's
+// form, that no project has it, and that dir holds no project yet.
+func newOffline(dir, prefix string) error {
+	if err := naming.ValidPrefix(prefix); err != nil {
+		return err
+	}
+	dirs, err := machine.DefaultDirs()
+	if err != nil {
+		return err
+	}
+	if err := prefixFree(dirs, prefix); err != nil {
+		return err
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "project.toml")); err == nil {
+		return fmt.Errorf("%s already exists: run railswitch project init there to join that project", filepath.Join(dir, "project.toml"))
+	}
+	return nil
 }
 
 // detectNew reads repo (at branch, else the remote's HEAD) for the pack and

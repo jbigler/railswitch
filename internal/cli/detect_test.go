@@ -143,3 +143,18 @@ func TestNewDetectNoPack(t *testing.T) {
 		t.Errorf("exit %d: %s", code, errs)
 	}
 }
+
+// A bad prefix is refused before the repository is read.
+func TestNewDetectChecksOfflineFirst(t *testing.T) {
+	newEnv(t)
+	f := gitHost()
+	code, _, errs := runWith(t, f, "project", "new", filepath.Join(t.TempDir(), "x"), "--repo", "https://h.example/o/r.git", "--prefix", "Bad_Prefix")
+	if code != 1 || !strings.Contains(errs, "prefix") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+	for _, c := range f.Calls {
+		if len(c) > 0 && c[0] == "git" {
+			t.Errorf("git ran before the prefix was checked: %v", c)
+		}
+	}
+}

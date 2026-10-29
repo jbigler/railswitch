@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -185,39 +184,19 @@ func TestOutputCaps(t *testing.T) {
 	}
 }
 
+// TestFloodCapped: a job flooding its log ends OK with the drop marked and
+// the kept lines capped, and the file was truncated on the way (it holds
+// less than the 40 MiB written). How far past the backstop the file gets
+// depends on scheduling, so TestPollBackstop checks that limit exactly.
 func TestFloodCapped(t *testing.T) {
 	h, _, dir := newHub(t)
 	s, err := h.Start(context.Background(), sh("p", "a", `yes "$(printf '%01023d' 0)" | head -c 41943040`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var maxSize atomic.Int64
-	stop := make(chan struct{})
-	polled := make(chan struct{})
-	go func() {
-		defer close(polled)
-		for {
-			if fi, err := os.Stat(filepath.Join(dir, s.ID+".log")); err == nil && fi.Size() > maxSize.Load() {
-				maxSize.Store(fi.Size())
-			}
-			select {
-			case <-stop:
-				return
-			case <-time.After(100 * time.Microsecond): // never starve the tail
-			}
-		}
-	}()
 	j := waitDone(t, h, s)
-	close(stop)
-	<-polled
 	if j.State != StateOK {
 		t.Errorf("state = %s", j.State)
-	}
-	// The child writes the file itself, so the cap is kept by truncation
-	// and a busy machine lets it overshoot 2*LogLimit a little; without
-	// the cap it would reach the 40 MiB written.
-	if m := maxSize.Load(); m > 3*LogLimit {
-		t.Errorf("log reached %d bytes, want ≤ %d", m, 3*LogLimit)
 	}
 	if !j.Dropped {
 		t.Error("Dropped = false")
@@ -229,8 +208,39 @@ func TestFloodCapped(t *testing.T) {
 	if kept > KeepBytes || len(j.Lines) > KeepLines {
 		t.Errorf("kept %d bytes in %d lines, want ≤ %d bytes and ≤ %d lines", kept, len(j.Lines), KeepBytes, KeepLines)
 	}
-	if b, err := os.ReadFile(filepath.Join(dir, s.ID+".log")); err != nil || !strings.Contains(string(b), "… output dropped (log over 8 MiB)\n") {
+	b, err := os.ReadFile(filepath.Join(dir, s.ID+".log"))
+	if err != nil || !strings.Contains(string(b), droppedLine) {
 		t.Errorf("log has no dropped mark (err %v)", err)
+	}
+	if len(b) >= 41943040 {
+		t.Errorf("log is %d bytes: never truncated", len(b))
+	}
+}
+
+// TestPollBackstop: a log past the backstop that the tail hasn't read is
+// truncated by the next poll, to the drop mark alone.
+func TestPollBackstop(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "j.log")
+	lt, err := openLog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lt.Close()
+	chunk := bytes.Repeat([]byte("x"), 1<<20)
+	for written := 0; written <= backstop; written += len(chunk) {
+		if _, err := lt.w.Write(chunk); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, dropped, _, err := lt.poll()
+	if err != nil || !dropped {
+		t.Fatalf("poll: dropped %v, err %v", dropped, err)
+	}
+	if b, err := os.ReadFile(path); err != nil || string(b) != droppedLine {
+		t.Errorf("after the poll the log is %d bytes, want only the drop mark (err %v)", len(b), err)
+	}
+	if lt.off != 0 {
+		t.Errorf("off = %d after the truncation", lt.off)
 	}
 }
 

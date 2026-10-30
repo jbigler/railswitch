@@ -71,3 +71,55 @@ func TestClaudeApplyDefault(t *testing.T) {
 		t.Errorf(".claude.json = %v", cj)
 	}
 }
+
+// TestClaudeMemory: railswitch's instructions go to railswitch.md, which
+// CLAUDE.md imports once; the user's lines in CLAUDE.md survive later
+// starts; a home from before keeps only its import lines.
+func TestClaudeMemory(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "CLAUDE.md")
+	if err := os.WriteFile(src, []byte("# Container instructions\nuse the browser\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run := func(dir string) {
+		t.Helper()
+		if out, err := exec.Command("sh", "builtin/agents/claude/memory.sh", src, dir).CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+	}
+	read := func(p string) string {
+		t.Helper()
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+
+	fresh := filepath.Join(t.TempDir(), ".claude")
+	run(fresh)
+	if got := read(filepath.Join(fresh, "CLAUDE.md")); got != "@railswitch.md\n" {
+		t.Errorf("fresh CLAUDE.md = %q", got)
+	}
+	if read(filepath.Join(fresh, "railswitch.md")) != read(src) {
+		t.Error("railswitch.md is not the package's")
+	}
+	// A tool adds its line (rtk init); the next start keeps it, once.
+	if err := os.WriteFile(filepath.Join(fresh, "CLAUDE.md"), []byte("@railswitch.md\n@RTK.md\nmy note\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(fresh)
+	run(fresh)
+	if got := read(filepath.Join(fresh, "CLAUDE.md")); got != "@railswitch.md\n@RTK.md\nmy note\n" {
+		t.Errorf("CLAUDE.md after restarts = %q", got)
+	}
+
+	// An old home: CLAUDE.md is the old copy plus the import a setup just added.
+	old := t.TempDir()
+	if err := os.WriteFile(filepath.Join(old, "CLAUDE.md"), []byte("# Container instructions\nold text\n@RTK.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(old)
+	if got := read(filepath.Join(old, "CLAUDE.md")); got != "@railswitch.md\n@RTK.md\n" {
+		t.Errorf("migrated CLAUDE.md = %q", got)
+	}
+}

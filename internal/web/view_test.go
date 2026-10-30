@@ -366,3 +366,17 @@ func TestDetailActions(t *testing.T) {
 		}
 	}
 }
+
+// TestReviewAppLink: a PR with a review app links it next to PR, never
+// greyed (the PR's CI deployed it, not this stack).
+func TestReviewAppLink(t *testing.T) {
+	p := &pr{Number: 7, URL: "https://github.com/o/r/pull/7", State: "open", ReviewApp: "https://app-pr-7.example.dev"}
+	d := newDetail("ftest", fixtureRow("stopped", false, p), "")
+	i := slices.IndexFunc(d.Links, func(l linkView) bool { return l.Label == "Review app" })
+	if i < 0 || d.Links[i].URL != "https://app-pr-7.example.dev" || strings.Contains(d.Links[i].Class, "dim") || d.Links[i-1].Label != "PR" {
+		t.Errorf("links %+v", d.Links)
+	}
+	if d := newDetail("ftest", fixtureRow("up", false, &pr{Number: 8, URL: "https://github.com/o/r/pull/8", State: "open"}), ""); slices.ContainsFunc(d.Links, func(l linkView) bool { return l.Label == "Review app" }) {
+		t.Error("a Review app link without one")
+	}
+}

@@ -761,7 +761,7 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
 ```json
 [
   {"slug": "master", "branch": "master", "pr": null},
-  {"slug": "feat-login", "branch": "jb/feat-login", "pr": {"number": 2141, "title": "Login", "url": "https://github.com/o/filial/pull/2141", "state": "open", "checks": "pass", "review": "approved"}}
+  {"slug": "feat-login", "branch": "jb/feat-login", "pr": {"number": 2141, "title": "Login", "url": "https://github.com/o/filial/pull/2141", "state": "open", "checks": "pass", "review": "approved", "review_app": "https://app-pr-2141.example.dev"}}
 ]
 ```
 
@@ -774,6 +774,7 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
 | `pr.state` | string | `draft` (open and draft), `open`, `merged` or `closed`. |
 | `pr.checks` | string | `fail` if any check concluded failure, error, timed out, cancelled, action required or startup failure; else `pending` if any is not completed (or a status context is pending or expected); else `pass`; `none` with no checks. |
 | `pr.review` | string | `approved`, `changes_requested`, `pending` (review required) or `none`. |
+| `pr.review_app` | string | An open or draft PR's review app: the `environmentUrl` of the newest `ACTIVE` GitHub deployment of the PR's head commit whose latest status is `SUCCESS` (how most hosting services announce one), http or https only; one `gh api graphql` query for all of them. `""` for none, or when GitHub couldn't be read (a warning on stderr). |
 
 ## `stack ls`
 

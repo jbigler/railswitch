@@ -171,7 +171,8 @@ is no longer accepted. What the page shows meanwhile may be stale.
   says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with such secrets opens with this card.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
-  (`PR #2141 ready · checks ✓ · approved`, a link to the PR), then, when its branch is in a
+  (`PR #2141 ready · checks ✓ · approved`, a link to the PR; Links gains
+  **Review app** when `pr ls` finds one, the PR's GitHub deployment), then, when its branch is in a
   gh stack (`stack ls`, read with the PRs), Stack, in gh stack view's
   words: `◆ Stack #10350` (linked to the stack on GitHub) · `Base:
   master` · `22 branches (8 merged)`, and `⚠ restack needed` when a

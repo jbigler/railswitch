@@ -26,6 +26,7 @@ func TestPrLsJSON(t *testing.T) {
 	f := fakeHost()
 	f.Passthrough = []string{"git"}
 	f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(ghFixture)}, nil)
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(`{"data":{"repository":{"p7":{"commits":{"nodes":[{"commit":{"deployments":{"nodes":[{"state":"ACTIVE","latestStatus":{"state":"SUCCESS","environmentUrl":"https://app-pr-7.example.dev"}}]}}}]}}}}}`)}, nil)
 	code, out, errs := runWith(t, f, "-C", ws, "--json", "pr", "ls")
 	if code != 0 {
 		t.Fatalf("pr ls: exit %d: %s", code, errs)
@@ -38,7 +39,7 @@ func TestPrLsJSON(t *testing.T) {
 		{"slug": "master", "branch": "master", "pr": nil},
 		{"slug": "feat", "branch": "feat", "pr": map[string]any{
 			"number": float64(7), "title": "Feat", "url": "https://github.com/o/n/pull/7",
-			"state": "open", "checks": "pass", "review": "approved"}},
+			"state": "open", "checks": "pass", "review": "approved", "review_app": "https://app-pr-7.example.dev"}},
 	}
 	if !reflect.DeepEqual(rows, want) {
 		t.Errorf("rows %v; want %v", rows, want)
@@ -46,7 +47,7 @@ func TestPrLsJSON(t *testing.T) {
 	// One query per worktree branch, never in the workspace (prs.NeutralDir).
 	var heads []string
 	for i, c := range f.Calls {
-		if c[0] != "gh" {
+		if c[0] != "gh" || c[1] == "api" {
 			continue
 		}
 		heads = append(heads, c[5])

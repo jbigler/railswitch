@@ -734,8 +734,8 @@ Every action is a job (below).
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
   <branch>`.
-- **remove…** (not offered for the base worktree; a merged PR also shows
-  "Remove worktree"): the dialog reads `railswitch --json wt ls` for the dirty flag
+- **remove…** (not offered for the base worktree; it reads "PR merged:
+  remove…" once the worktree's PR is merged): the dialog reads `railswitch --json wt ls` for the dirty flag
   and lists what goes: the checkout, its containers and volumes, its nvim
   and agent homes. A clean worktree → `wt rm <slug>`. A dirty one needs
   "Discard changes" ticked and the worktree name typed →

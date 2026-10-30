@@ -150,7 +150,7 @@ var anchorRe = regexp.MustCompile(`<a [^>]*class="([^"]*)"[^>]*>([^<]*)</a>`)
 
 // TestDetailFragment: Links come before Services, App first and main; a
 // stopped stack greys its links; remove only for non-base worktrees; a
-// merged PR offers "Remove worktree"; hostile text is escaped.
+// merged PR says so on its one remove button; hostile text is escaped.
 func TestDetailFragment(t *testing.T) {
 	open := &pr{Number: 2141, Title: "x", URL: "https://github.com/o/r/pull/2141", State: "open", Checks: "pass", Review: "approved"}
 	html, err := render("detail", newDetail("ftest", fixtureRow("up", false, open), ""))
@@ -183,7 +183,7 @@ func TestDetailFragment(t *testing.T) {
 			t.Errorf("detail lacks %q:\n%s", want, html)
 		}
 	}
-	for _, bad := range []string{"<script>", "javascript:", "Remove worktree"} {
+	for _, bad := range []string{"<script>", "javascript:", "PR merged"} {
 		if strings.Contains(html, bad) {
 			t.Errorf("detail has %q", bad)
 		}
@@ -201,14 +201,14 @@ func TestDetailFragment(t *testing.T) {
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("up", true, nil), ""))
-	if strings.Contains(html, "remove…") || strings.Contains(html, "Remove worktree") || strings.Contains(html, "/remove") {
+	if strings.Contains(html, "remove…") || strings.Contains(html, "/remove") {
 		t.Errorf("base worktree offers remove:\n%s", html)
 	}
 
 	merged := &pr{Number: 2098, State: "merged", Checks: "pass", Review: "approved", URL: "https://github.com/o/r/pull/2098"}
 	html, _ = render("detail", newDetail("ftest", fixtureRow("up", false, merged), ""))
-	if !strings.Contains(html, "Remove worktree") {
-		t.Errorf("merged PR without Remove worktree:\n%s", html)
+	if !strings.Contains(html, ">PR merged: remove…</a>") || strings.Count(html, `data-dialog="remove"`) != 1 {
+		t.Errorf("merged PR: want one remove button saying so:\n%s", html)
 	}
 }
 

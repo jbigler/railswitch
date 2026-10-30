@@ -22,10 +22,15 @@ base's packages, and two pinned downloads, each changed by its `ARG` in
 - `lazygit` (`LAZYGIT_VERSION`): the release binary for amd64 or arm64,
   checked against the release's `checksums.txt`.
 - the tree-sitter CLI (`TREE_SITTER_VERSION`), which nvim-treesitter
-  builds parsers with: built with `cargo` on Debian bookworm, since the
-  release binaries need glibc 2.39 (newer than a bookworm base has) and
-  Debian's package is older than nvim-treesitter needs. Building parsers
-  also needs a C compiler in the base image.
+  builds parsers with: the release binary, checked against the SHA-256s
+  pinned next to the version (the release publishes no checksums file;
+  change all three together). Debian's package is older than
+  nvim-treesitter needs, and bookworm has none. On a bookworm base
+  (glibc 2.36; an older pinned runtime image is often bookworm) it prints
+  a loader warning about `GLIBC_2.39` on each run and works: Rust's
+  standard library links the two functions it wants from 2.39 weakly and
+  falls back without them. Building parsers also needs a C compiler in
+  the base image.
 
 A project whose `Containerfile.nvim` is its own copy keeps it as it is:
 Settings → Images shows "default changed" for it once the update is

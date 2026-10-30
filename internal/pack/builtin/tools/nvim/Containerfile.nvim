@@ -43,32 +43,41 @@ RUN make CMAKE_BUILD_TYPE=RelWithDebInfo CMAKE_INSTALL_PREFIX=/usr/local/ && \
   make install && \
   strip /usr/local/bin/nvim
 
-# lazygit (most configs bind it to <leader>gg): the release binary, checked
-# against the release's checksums.txt.
-FROM docker.io/library/debian:trixie-slim AS lazygit
+# Release binaries for amd64 or arm64, each checked before install:
+# lazygit (most configs bind it to <leader>gg) against its release's
+# checksums.txt; the tree-sitter CLI (nvim-treesitter builds parsers with
+# it) against the SHA-256s below, as GitHub lists them for the release's
+# assets (it publishes no checksums file). Debian's tree-sitter-cli is older
+# than nvim-treesitter needs, and bookworm has none. On a bookworm base
+# (glibc 2.36) tree-sitter prints a loader warning about GLIBC_2.39 each
+# run: Rust's standard library links pidfd_spawnp/pidfd_getpid weakly and
+# falls back without them, so it works.
+FROM docker.io/library/debian:trixie-slim AS downloads
+ARG DEBIAN_FRONTEND=noninteractive
 ARG LAZYGIT_VERSION=0.66.2
+ARG TREE_SITTER_VERSION=0.27.1
+ARG TREE_SITTER_SHA256_X64=d01042f94ba3d6827ddc9788e235f75d8366431be42bdf90ade534d960c98b7d
+ARG TREE_SITTER_SHA256_ARM64=404be5d54a4955571c4067c21d4699660eab3a534cefb0659341b207f7139ec5
 RUN apt-get update -qq && \
   apt-get install -y --no-install-recommends ca-certificates curl && \
   rm -rf /var/lib/apt/lists/*
 RUN case "$(dpkg --print-architecture)" in \
-    amd64) ARCH=x86_64 ;; \
-    arm64) ARCH=arm64 ;; \
+    amd64) LG=x86_64; TS=x64; TS_SHA="${TREE_SITTER_SHA256_X64}" ;; \
+    arm64) LG=arm64; TS=arm64; TS_SHA="${TREE_SITTER_SHA256_ARM64}" ;; \
     *) echo "unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
   esac && \
-  FILE="lazygit_${LAZYGIT_VERSION}_linux_${ARCH}.tar.gz" && \
-  URL="https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}" && \
   cd /tmp && \
-  curl -fsSLO "${URL}/${FILE}" && \
-  curl -fsSL "${URL}/checksums.txt" | grep " ${FILE}\$" | sha256sum -c - && \
-  tar -xzf "${FILE}" lazygit && \
-  install -m 755 lazygit /usr/local/bin/lazygit
-
-# The tree-sitter CLI (nvim-treesitter builds parsers with it), built on
-# bookworm: the release binaries need glibc 2.39, newer than a bookworm
-# base has, and Debian's package is older than nvim-treesitter needs.
-FROM docker.io/library/rust:1-slim-bookworm AS tree-sitter
-ARG TREE_SITTER_VERSION=0.27.1
-RUN cargo install --locked --root /usr/local tree-sitter-cli --version "${TREE_SITTER_VERSION}"
+  LG_FILE="lazygit_${LAZYGIT_VERSION}_linux_${LG}.tar.gz" && \
+  LG_URL="https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}" && \
+  curl -fsSLO "${LG_URL}/${LG_FILE}" && \
+  curl -fsSL "${LG_URL}/checksums.txt" | grep " ${LG_FILE}\$" | sha256sum -c - && \
+  tar -xzf "${LG_FILE}" lazygit && \
+  install -m 755 lazygit /usr/local/bin/lazygit && \
+  TS_FILE="tree-sitter-linux-${TS}.gz" && \
+  curl -fsSLO "https://github.com/tree-sitter/tree-sitter/releases/download/v${TREE_SITTER_VERSION}/${TS_FILE}" && \
+  echo "${TS_SHA}  ${TS_FILE}" | sha256sum -c - && \
+  gunzip "${TS_FILE}" && \
+  install -m 755 "tree-sitter-linux-${TS}" /usr/local/bin/tree-sitter
 
 FROM ${BASE_IMAGE}
 USER root
@@ -76,8 +85,7 @@ USER root
 COPY --from=build-nvim /usr/local/bin/nvim /usr/local/bin/nvim
 COPY --from=build-nvim /usr/local/lib/nvim /usr/local/lib/nvim
 COPY --from=build-nvim /usr/local/share/nvim /usr/local/share/nvim
-COPY --from=lazygit /usr/local/bin/lazygit /usr/local/bin/lazygit
-COPY --from=tree-sitter /usr/local/bin/tree-sitter /usr/local/bin/tree-sitter
+COPY --from=downloads /usr/local/bin/lazygit /usr/local/bin/tree-sitter /usr/local/bin/
 
 # nvim's own Node in /opt/nvim-node, linked into /usr/local/bin (ahead of a
 # bun image's node fallback in PATH) only when the base has no npm.

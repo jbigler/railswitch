@@ -32,7 +32,8 @@ var completionFiles = map[string]string{
 // ("dashboard colors") nests. A command with completionArgs too (agent)
 // offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":            {"add", "ls", "stop"},
+	"agent":            {"add", "default", "ls", "stop"},
+	"agent default":    {"apply", "promote"},
 	"containerfile":    {"eject", "list", "new", "show", "write"},
 	"dashboard":        {"colors", "serve"},
 	"dashboard colors": {"reset", "set"},
@@ -62,6 +63,8 @@ var completionFlags = map[string][]string{
 	"":                       {"-C=", "-w=", "--json"},
 	"agent":                  {"--new-term"},
 	"agent add":              {"--run=", "--use="},
+	"agent default apply":    {"--all"},
+	"agent default promote":  {"--all"},
 	"build":                  {"--force", "--pull"},
 	"containerfile eject":    {"--force"},
 	"containerfile show":     {"--default"},

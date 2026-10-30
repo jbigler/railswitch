@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/tomlfile"
 )
 
@@ -29,9 +30,14 @@ type Plan struct {
 	// their parents) as container root, which appuser can't write.
 	HomeDirs []string
 	// StatusDirs are the per-worktree agent status dirs (D58), when the
-	// project has an agent: workspace-relative slash paths, created and kept
-	// like Homes.
+	// project has an agent, and the default dirs of agents with [config]
+	// paths (D135): workspace-relative slash paths, created and kept like
+	// Homes.
 	StatusDirs []string
+	// DefaultHomes are the agent homes (of Homes) whose agent applies the
+	// project's default config: Apply puts pack.AgentDefaultRequest in one
+	// it creates, so a new home starts from the default.
+	DefaultHomes []string
 }
 
 // File is one workspace file of a Plan.
@@ -56,6 +62,10 @@ const (
 	// per-worktree home (D55), 0700: apart from homeDir, which nvim mounts,
 	// so no agent's login is visible to nvim.
 	agentHomeDir = ".railswitch/agent-home"
+	// AgentDefaultDir holds <AgentDefaultDir>/<agent>, the project's
+	// default config for an agent with [config] paths (D135), 0700, mounted
+	// read-only into its containers, and <agent>.toml, where it came from.
+	AgentDefaultDir = ".railswitch/agent-default"
 	// statusDir holds <statusDir>/<slug>, a worktree's agent status files
 	// (D58), 0700, bind-mounted into its agents.
 	statusDir = ".railswitch/status"
@@ -112,7 +122,7 @@ func (m *Model) Plan() (*Plan, error) {
 		return nil, err
 	}
 	files := map[string]File{}
-	var homes, homeDirs, status []string
+	var homes, homeDirs, status, defaultHomes []string
 	hasAgents := len(m.Agents()) > 0
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)
@@ -127,6 +137,9 @@ func (m *Model) Plan() (*Plan, error) {
 			}
 			if !slices.Contains(homes, home) {
 				homes = append(homes, home)
+				if slices.ContainsFunc(s.Mounts, func(mt Mount) bool { return mt.Target == pack.AgentDefaultMount }) {
+					defaultHomes = append(defaultHomes, home)
+				}
 			}
 			for _, rel := range homeMountPoints(&s) {
 				if d := path.Join(home, rel); !slices.Contains(homeDirs, d) {
@@ -138,10 +151,15 @@ func (m *Model) Plan() (*Plan, error) {
 			status = append(status, path.Join(statusDir, wt.Slug))
 		}
 	}
+	for _, a := range m.Inputs.Stack.Agents {
+		if len(a.Agent.Config.Paths) > 0 {
+			status = append(status, path.Join(AgentDefaultDir, a.Name))
+		}
+	}
 	for _, a := range m.Assets {
 		files[a.Rel] = File{Data: a.Data, Mode: a.Mode}
 	}
-	return &Plan{Units: units, Files: files, Homes: homes, HomeDirs: homeDirs, StatusDirs: status}, nil
+	return &Plan{Units: units, Files: files, Homes: homes, HomeDirs: homeDirs, StatusDirs: status, DefaultHomes: defaultHomes}, nil
 }
 
 // EnvFile is a podman env file: NAME=value per line, the value verbatim
@@ -282,8 +300,16 @@ func Apply(p *Plan, ws, quadletDir, prefix string, check bool) (*Diff, error) {
 		if err := ensureDir(filepath.Dir(dir), false); err != nil {
 			return nil, err
 		}
-		if err := os.Mkdir(dir, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+		if err := os.Mkdir(dir, 0o700); errors.Is(err, fs.ErrExist) {
+			continue
+		} else if err != nil {
 			return nil, err
+		}
+		if slices.Contains(p.DefaultHomes, rel) {
+			// A new home starts from the agent's default (D135).
+			if err := os.WriteFile(filepath.Join(dir, pack.AgentDefaultRequest), nil, 0o600); err != nil {
+				return nil, err
+			}
 		}
 	}
 	for _, sd := range subdirs { // after the homes they lie in

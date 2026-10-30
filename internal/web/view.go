@@ -604,6 +604,7 @@ type detailView struct {
 	Agent                             *agentView
 	Actions                           []actionView
 	RemoveURL, TasksURL               string // RemoveURL "" for the base worktree
+	AgentDefaultURL                   string // the agent default config dialog (D135)
 	Stacked                           *stackedView
 	StackActions                      []actionView // with Stacked: push, up, down, restack
 	SwitchURL                         string       // with Stacked: posts a branch to check out
@@ -629,7 +630,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 	v := detailView{
 		Slug: wt.Slug, Branch: wt.Branch, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(wt.Stack), StackText: stackText(wt), StackClass: stackClass(wt.Stack),
-		TasksURL: path + "/tasks", Stale: wt.Stale,
+		TasksURL: path + "/tasks", AgentDefaultURL: path + "/agent-default", Stale: wt.Stale,
 		Stacked: newStacked(r, repo),
 	}
 	dim := ""
@@ -728,6 +729,32 @@ func newJobs(snaps []jobs.Snapshot, rows []row, slug string) jobsView {
 type removeView struct {
 	Slug, Dir, URL string
 	Dirty          bool
+}
+
+type agentDefaultView struct {
+	Slug, PromoteURL, ApplyURL string
+	Agents                     []agentDefaultRow
+}
+
+type agentDefaultRow struct {
+	agentRow
+	Promoted string // the default's date, as the page shows it
+}
+
+func newAgentDefault(prefix, slug string, rows []agentRow) agentDefaultView {
+	path := "/p/" + prefix + "/" + slug + "/agent-default/"
+	v := agentDefaultView{Slug: slug, PromoteURL: path + "promote", ApplyURL: path + "apply"}
+	for _, r := range rows {
+		if !r.Config {
+			continue
+		}
+		ar := agentDefaultRow{agentRow: r}
+		if r.Default != nil {
+			ar.Promoted = r.Default.Promoted.Local().Format("Jan 2 15:04")
+		}
+		v.Agents = append(v.Agents, ar)
+	}
+	return v
 }
 
 type tasksView struct {

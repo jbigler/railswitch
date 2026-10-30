@@ -572,3 +572,15 @@ decisions (D30, D55, D62) in the roadmap. Their fields: `name`, `service` or
 `version`/`run`/`default`, `[image] file`, `entrypoint`, `firewall` or
 `allow`, `worktree`/`home`/`caches` (tools), `[[shared]]`, `[[mounts]]`,
 `[env]`, `[[secrets]]` (agents), `[[ports]]`, `[[links]]`, `[unit]`.
+
+An agent's `[config] paths` (D135) are the files and directories of its
+home, relative to it, that make up its configuration: `railswitch agent
+default promote` copies them (directories and regular files only, no
+symlink) into the project's default for the agent,
+`<workspace>/.railswitch/agent-default/<agent>/`, which railswitch then
+mounts read-only at `/opt/railswitch/agent-default` in the agent's
+containers. Applying it is the package's job: its entrypoint (required
+with `[config]`) finds `~/.railswitch-apply-default` in a home that should
+take the default (a new home, or one `agent default apply` named), puts
+the default in place and removes the file. The built-in `claude@1` does
+it with its `apply-default.sh`.

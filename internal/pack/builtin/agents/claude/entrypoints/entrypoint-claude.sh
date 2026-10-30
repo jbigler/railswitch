@@ -11,6 +11,18 @@ set -eu
 CONFIG_DIR="$HOME/.claude"
 mkdir -p "$CONFIG_DIR"
 
+# The project's default config (railswitch agent default promote, D135): a
+# home holding the request (a new home, or `agent default apply`) takes it
+# once, before the steps below put railswitch's own entries back.
+REQUEST="$HOME/.railswitch-apply-default"
+if [ -f "$REQUEST" ]; then
+  if [ -n "$(ls -A /opt/railswitch/agent-default 2>/dev/null)" ]; then
+    /usr/local/bin/railswitch-apply-default /opt/railswitch/agent-default "$HOME"
+    echo "railswitch: applied the project's default Claude config (what it replaced: ~/.railswitch-default-backup)" >&2
+  fi
+  rm -f "$REQUEST"
+fi
+
 # Claude reads MCP servers and project trust from ~/.claude.json.
 CLAUDE_JSON="$HOME/.claude.json"
 [ -f "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"

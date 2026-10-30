@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // CLI runs `railswitch <args>` (argv[0] is the dashboard's own executable)
@@ -385,6 +386,20 @@ func readPRs(ctx context.Context, c CLI, ws string) ([]prRow, error) {
 
 func readStacks(ctx context.Context, c CLI, ws string) (ghStackDoc, error) {
 	return readJSON[ghStackDoc](ctx, c, "-C", ws, "stack", "ls")
+}
+
+// agentRow is an `agent ls` row, as the agent default dialog needs it.
+type agentRow struct {
+	Name    string `json:"name"`
+	Config  bool   `json:"config"`
+	Default *struct {
+		From     string    `json:"from"`
+		Promoted time.Time `json:"promoted"`
+	} `json:"default"`
+}
+
+func readAgents(ctx context.Context, c CLI, ws, slug string) ([]agentRow, error) {
+	return readJSON[[]agentRow](ctx, c, "-C", ws, "-w", slug, "agent", "ls")
 }
 
 func readTasks(ctx context.Context, c CLI, ws, slug string) ([]task, error) {

@@ -78,12 +78,14 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/tasks", s.tasksDialog)
+	m.HandleFunc("GET /p/{prefix}/{slug}/agent-default", s.agentDefaultDialog)
 	m.HandleFunc("GET /colors", s.colorsDialog)
 	m.HandleFunc("GET /theme.css", s.theme)
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
+	m.HandleFunc("POST /p/{prefix}/{slug}/agent-default/{verb}", s.agentDefault)
 	m.HandleFunc("POST /p/{prefix}/worktrees", s.addWorktree)
 	m.HandleFunc("POST /p/{prefix}/{slug}/task", s.runTask)
 	m.HandleFunc("POST /p/{prefix}/prs/refresh", s.refreshPRs)
@@ -384,6 +386,42 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.html(w, http.StatusOK, "tasks", tasksView{Slug: wt.Slug, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/task", Tasks: tasks})
+}
+
+func (s *Server) agentDefaultDialog(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	rows, err := readAgents(r.Context(), s.c.CLI, p.Workspace, wt.Slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.html(w, http.StatusOK, "agentdefault", newAgentDefault(p.Prefix, wt.Slug, rows))
+}
+
+// agentDefault runs `agent default promote|apply <name> [--all]` (D135).
+func (s *Server) agentDefault(w http.ResponseWriter, r *http.Request) {
+	verb := r.PathValue("verb")
+	if verb != "promote" && verb != "apply" {
+		http.Error(w, "unknown action", http.StatusNotFound)
+		return
+	}
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	name := r.PostFormValue("name")
+	if badName(name) {
+		http.Error(w, "bad agent name", http.StatusUnprocessableEntity)
+		return
+	}
+	argv := []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "agent", "default", verb, name}
+	if r.PostFormValue("all") != "" {
+		argv = append(argv, "--all")
+	}
+	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "agent default " + verb + " " + name, Dir: p.Workspace, Argv: argv}, nil, worktreePath(p, wt.Slug))
 }
 
 func (s *Server) colorsDialog(w http.ResponseWriter, r *http.Request) {

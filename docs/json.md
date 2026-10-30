@@ -634,8 +634,8 @@ hook writes.
 
 ```json
 [
-  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true},
-  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false}
+  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true, "config": true, "default": {"from": "main", "promoted": "2026-10-30T12:00:00Z"}},
+  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false, "config": false, "default": null}
 ]
 ```
 
@@ -649,6 +649,8 @@ hook writes.
 | `ts` | number | The status file's `ts` (Unix seconds, as the hook wrote it); `0` when unusable. |
 | `reply` | boolean | The agent waits for a reply: `state` is `done` and `message` ends in `?`, maybe followed by spaces, closing brackets, quotes or `*`/`_`/`` ` `` emphasis. The text table shows `reply` as its `STATE`. |
 | `running` | boolean | The agent's container runs in this worktree (podman, not the status file). At most one agent runs per worktree (D62). The text table marks it with `*` in its `RUNNING` column, and shows `running` as its `STATE` when the status file says `off`. |
+| `config` | boolean | Its package has `[config] paths`, so it can have a project default (`agent default`, D135). |
+| `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 
 ## `overview`
 

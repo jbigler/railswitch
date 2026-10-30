@@ -88,6 +88,33 @@ rest and is reported, the agent starts anyway, and the next start tries
 them again. An agent package needs an entrypoint for this. Agents are
 yours: templates leave them out.
 
+## A default config for every worktree
+
+Set an agent up the way you like in one worktree (theme, plugins and
+marketplaces, skills, settings), then make that the project's default:
+
+```bash
+railswitch agent default promote claude         # this worktree's config is the default
+railswitch agent default promote claude --all   # …and every other worktree takes it too
+railswitch agent default apply claude           # this worktree takes the default
+railswitch agent default apply claude --all     # every worktree does
+```
+
+Or in the dashboard: **default config…** next to Agent in a worktree.
+
+The default holds only the files the agent's package lists as its config
+(for Claude: `settings.json`, `keybindings.json`, the status line,
+`CLAUDE.local.md`, `agents/`, `commands/`, `hooks/`, `skills/`,
+`output-styles/`, the plugin and marketplace records and `.claude.json`),
+never its login, sessions or history. It lives in
+`.railswitch/agent-default/<agent>/`. A new worktree's agent starts from
+it; an existing one takes it the next time it starts (stop a running one
+first). Each item the default has replaces the home's, and the replaced
+ones are kept in `~/.railswitch-default-backup` in the agent's home;
+Claude's `.claude.json` is merged instead, keeping each worktree's own
+project entries. Plugins themselves are shared by every worktree already,
+so a promoted plugin list works everywhere at once.
+
 ## Your own agent
 
 An agent package is a folder with `agent.toml` (its hosts, mounts, secrets

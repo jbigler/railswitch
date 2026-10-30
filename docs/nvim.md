@@ -12,6 +12,26 @@ config_ref  = "v2"                                       # optional: a branch or
 `project new --tool nvim` writes an empty `[tools.nvim]` table. The old
 `[tools] nvim = true` is refused; write the table instead.
 
+## Tools in the image
+
+Besides Neovim (built from source) the image has `ripgrep`, `fd`, `fzf`,
+`universal-ctags`, `lua5.4`, `luarocks`, `xclip` and `unzip` from the
+base's packages, and two pinned downloads, each changed by its `ARG` in
+`Containerfile.nvim`:
+
+- `lazygit` (`LAZYGIT_VERSION`): the release binary for amd64 or arm64,
+  checked against the release's `checksums.txt`.
+- the tree-sitter CLI (`TREE_SITTER_VERSION`), which nvim-treesitter
+  builds parsers with: built with `cargo` on Debian bookworm, since the
+  release binaries need glibc 2.39 (newer than a bookworm base has) and
+  Debian's package is older than nvim-treesitter needs. Building parsers
+  also needs a C compiler in the base image.
+
+A project whose `Containerfile.nvim` is its own copy keeps it as it is:
+Settings → Images shows "default changed" for it once the update is
+accepted; reset it there (or `railswitch containerfile eject nvim
+--force`) to take these.
+
 ## Node for language servers (D71)
 
 The nvim image is built on the project's base image, so it sees the app's

@@ -171,3 +171,11 @@ func requestDefault(m *render.Model, agent string, pick func(slug string) bool) 
 	}
 	return slugs, nil
 }
+
+// defaultPending reports whether home holds AgentDefaultRequest (a
+// regular file: the agent writes this home, and a FIFO or link there is
+// no request its entrypoint takes).
+func defaultPending(home string) bool {
+	fi, err := os.Lstat(filepath.Join(home, pack.AgentDefaultRequest))
+	return err == nil && fi.Mode().IsRegular()
+}

@@ -720,7 +720,10 @@ Every action is a job (below).
   the default** (`agent default promote <agent> [--all]`, the box "and
   apply it to every other worktree" adding `--all`), and, with a default,
   **Apply the default here** / **to every worktree** (`agent default apply
-  <agent> [--all]`).
+  <agent> [--all]`). Applying takes effect at the agent's next start, so
+  while this worktree's home waits for it (`agent ls`'s
+  `default_pending`) the dialog says "Pending: … takes the default at its
+  next start", adding "stop it, then start it again" while it runs.
 - **terminal** runs `railswitch term`: a new terminal tab or window on
   the host with your shell in the worktree's folder.
 - **Stack branch** (with a gh stack): a click on another open branch of
@@ -773,6 +776,9 @@ Every action is a job (below).
   8 MiB with "… output dropped".
 - The last 20 jobs are kept; older finished ones and their logs are
   dropped. Logs from a previous dashboard run are deleted at start.
+
+Messages (job started, a refusal) show bottom right for a few seconds,
+above an open dialog too.
 
 ## Notifications
 

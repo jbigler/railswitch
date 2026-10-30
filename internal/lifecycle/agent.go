@@ -28,6 +28,9 @@ type AgentRow struct {
 	// default (D135); Default is where that came from, nil without one.
 	Config  bool          `json:"config"`
 	Default *AgentDefault `json:"default"`
+	// DefaultPending: its home in this worktree holds the request to take
+	// the default, which its entrypoint applies at the agent's next start.
+	DefaultPending bool `json:"default_pending"`
 }
 
 // UsageError is a lifecycle error in how the command was called.
@@ -161,6 +164,7 @@ func agentRows(m *render.Model, in *render.Instance, running []string) []AgentRo
 			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(),
 			Running: slices.Contains(running, a.Name),
 			Config:  len(a.Agent.Config.Paths) > 0, Default: ReadAgentDefault(m, a.Name),
+			DefaultPending: defaultPending(filepath.Join(in.Values["agent.home"], a.Name)),
 		})
 	}
 	return rows

@@ -403,6 +403,8 @@ func readStacks(ctx context.Context, c CLI, ws string) (ghStackDoc, error) {
 type agentRow struct {
 	Name    string `json:"name"`
 	Config  bool   `json:"config"`
+	Pending bool   `json:"default_pending"` // takes the default at its next start
+	Running bool   `json:"running"`
 	Default *struct {
 		From     string    `json:"from"`
 		Promoted time.Time `json:"promoted"`

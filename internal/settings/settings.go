@@ -22,7 +22,8 @@ type Edit struct {
 	Value string `json:"value,omitempty"`
 	Label string `json:"label,omitempty"`
 	URL   string `json:"url,omitempty"`
-	// Values is the whole list hooks.set writes (D126); no other op takes it.
+	// Values is the whole list hooks.set (D126) or agent.setup (D133) writes;
+	// no other op takes it.
 	Values []string `json:"values,omitempty"`
 }
 

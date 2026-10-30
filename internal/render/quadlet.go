@@ -205,7 +205,7 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 		return v
 	}
 	svcUnit := func(id string) string { return naming.Container(prefix, slug, id) + ".service" }
-	onProxy := slices.Contains(s.Networks, "proxy")
+	onProxy := s.onProxy()
 
 	u := &unit{Header: []string{markerLine(m, slug), "# role: " + s.Role}}
 

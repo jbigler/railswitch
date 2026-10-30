@@ -264,14 +264,14 @@ func onlyEdited(s lockstore.Store, sha, next string, files fs.FS, edit FileEdit)
 var ErrReviewChanged = errors.New("the update changed since it was reviewed: review it again")
 
 // Lock loads and validates root's project.toml, resolves its stack and
-// writes <root>/stack.lock: every pack, option and agent with its content
-// hash, keeping the image digests of an existing lock. A package whose
-// content changed under its locked ref, or a library package new to the
-// lock, is locked as resolved only when accept accepts it; otherwise a
-// changed package's entry stays (a stored copy that can't run it fails the
-// write) and a new library package refuses the write. Each library whose
-// packages it accepts is verified again first (Accept.Run). Every package
-// the new lock pins is stored first (lockstore). It needs no existing lock.
+// writes <root>/stack.lock: every package with its content hash, keeping
+// the image digests of an existing lock. A package whose content changed
+// under its locked ref, or a library package new to the lock, is locked as
+// resolved only when accept accepts it; otherwise a changed package's
+// entry stays (a stored copy that can't run it fails the write) and a new
+// library package refuses the write. Each library whose packages it
+// accepts is verified again first (Accept.Run). Every package the new lock
+// pins is stored first (lockstore). It needs no existing lock.
 func Lock(ctx context.Context, root string, accept Accept) error {
 	pl, err := plan(root, nil, nil, accept)
 	if err != nil {

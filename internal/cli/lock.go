@@ -173,7 +173,7 @@ func ejectedChanged(root string, doc *reviewDoc) []string {
 	return out
 }
 
-// reviewOf is pl as a review document, each package compared file by file
+// reviewDocOf is pl as a review document, each package compared file by file
 // and flagged; Restart is empty.
 func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
 	doc := &reviewDoc{Hash: workspace.ReviewHash(pl.Lock, pl.Template), Packages: []reviewPkg{}, Restart: []string{}, Ejected: []string{}}

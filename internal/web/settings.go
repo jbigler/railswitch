@@ -258,10 +258,7 @@ func editTitle(show projectShow, e edit) string {
 	case "firewall.mode":
 		to := e.Value
 		if to == "" {
-			to = "the default"
-		}
-		if to == "the default" {
-			to += " (" + show.Firewall.Default + ")"
+			to = "the default (" + show.Firewall.Default + ")"
 		}
 		from := show.Firewall.Mode
 		if from == "" {

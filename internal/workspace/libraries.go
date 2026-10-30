@@ -58,10 +58,7 @@ func (m machineLibraries) Checkout(alias string) (*pack.LibraryCheckout, error) 
 	}
 	co := &pack.LibraryCheckout{Dir: dir, ID: rec.ID, Commit: rec.Commit, Signer: rec.Signer}
 	for _, p := range idx.Packages {
-		r, err := pack.ParseRef(p.Ref) // checked by ParseIndex
-		if err != nil {
-			return nil, err
-		}
+		r, _ := pack.ParseRef(p.Ref) // checked by ParseIndex
 		co.Packages = append(co.Packages, pack.LibraryPackage{Kind: p.Kind, Ref: r, SHA256: p.SHA256})
 	}
 	return co, nil

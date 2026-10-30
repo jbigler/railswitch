@@ -558,10 +558,10 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		if p.prErr != "" {
 			banner.Lines = append(banner.Lines, "PRs unavailable: "+p.prErr)
 		}
-		if p.ov != nil && p.ov.ReviewPending {
-			banner.Review = reviewURL(prefix)
-		}
 		if p.ov != nil {
+			if p.ov.ReviewPending {
+				banner.Review = reviewURL(prefix)
+			}
 			for _, sw := range p.ov.SignerWarnings {
 				banner.Signers = append(banner.Signers, signerWarningText(sw))
 			}

@@ -16,9 +16,9 @@ func ValidName(name string) bool { return nameRe.MatchString(name) }
 
 // CheckFilePath checks rel, a slash path in a package whose manifest is
 // manifest, against the package format's files (D93): at the top the
-// manifest, Containerfile.<name>, deps.allow, README.md and <name>.sh; in
-// entrypoints/ and initdb/ any <file>. Nothing else, so no "..", no
-// hidden file and no deeper directory.
+// manifest, Containerfile.<name>, deps.allow, app.allow, README.md and
+// <name>.sh; in entrypoints/ and initdb/ any <file>. Nothing else, so no
+// "..", no hidden file and no deeper directory.
 func CheckFilePath(rel, manifest string) error {
 	top, file, nested := strings.Cut(rel, "/")
 	ok := false

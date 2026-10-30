@@ -57,7 +57,7 @@ func (m *Manager) fetch(ctx context.Context, dir, refspec string) error {
 // hasRef reports whether ref exists in the repo at dir.
 func (m *Manager) hasRef(ctx context.Context, dir, ref string) (bool, error) {
 	res, err := m.gitRun(ctx, 0, dir, "show-ref", "--verify", "--quiet", ref)
-	if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode == 1 {
+	if errors.Is(err, sys.ErrExit) && res.ExitCode == 1 {
 		return false, nil
 	}
 	return err == nil, err

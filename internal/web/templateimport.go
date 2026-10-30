@@ -20,7 +20,7 @@ import (
 
 const maxImportPath = 4096
 
-// importHashRe is a template's content hash, as --accept takes it.
+// importHashRe is an import review's content hash, as --accept takes it.
 var importHashRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // importDoc is `template import --json`: lock --review's document plus

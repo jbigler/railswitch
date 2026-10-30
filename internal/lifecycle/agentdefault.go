@@ -27,7 +27,7 @@ type AgentDefault struct {
 	Promoted time.Time `json:"promoted" toml:"promoted"` // when
 }
 
-// defaultLimits bound a promote: an agent's config, not its data.
+// defaultFiles and defaultBytes bound a promote: an agent's config, not its data.
 const (
 	defaultFiles = 20000
 	defaultBytes = 256 << 20

@@ -181,7 +181,7 @@ func (l Launcher) Launch(ctx context.Context, title, dir string, argv []string) 
 	if l.TTY {
 		fmt.Fprintln(l.Err, "railswitch: no terminal emulator could be launched; running here")
 		res, err := l.R.Run(ctx, sys.Cmd{Name: argv[0], Args: argv[1:], Dir: dir, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: l.Err, Timeout: sys.NoTimeout})
-		if err != nil && errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
+		if errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
 			return &ExitError{Code: res.ExitCode}
 		}
 		return err
@@ -267,7 +267,8 @@ func quoteArgv(argv []string) string {
 	return strings.Join(q, " ")
 }
 
-// quote single-quotes s for a POSIX shell: ' becomes '\”.
+// quote single-quotes s for a POSIX shell: each ' is written as a closing
+// quote, an escaped quote and an opening quote.
 func quote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

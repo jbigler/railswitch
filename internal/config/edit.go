@@ -538,11 +538,7 @@ func SetImageAddons(data string, addons []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	q := make([]string, len(addons))
-	for i, a := range addons {
-		q[i] = QuoteString(a)
-	}
-	value := "[" + strings.Join(q, ", ") + "]"
+	value := stringArray(addons)
 	s := d.find([]string{"image"}, "addons")
 	switch {
 	case s != nil && len(addons) == 0:

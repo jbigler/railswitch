@@ -10,7 +10,7 @@ import (
 // strict: a key not defined here is a Load error.
 //
 // String values are templates: "{name}" placeholders (internal/placeholder
-// grammar) are expanded per worktree by Task 8. Everything else in a value is
+// grammar) are expanded per worktree by render. Everything else in a value is
 // literal; escaping for unit files (% and $) is the unit writer's job, so no
 // value here is pre-escaped.
 //
@@ -181,7 +181,7 @@ type Link struct {
 	URL   string `toml:"url"`
 }
 
-// Mount is a bind mount. A relative Source is a package file (Task 8 writes
+// Mount is a bind mount. A relative Source is a package file (render writes
 // it under .railswitch/assets/<package>/); anything else is a template that
 // expands to an absolute host path, e.g. "{dumps}".
 type Mount struct {

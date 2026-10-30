@@ -254,10 +254,6 @@ var AgentBaseRef = Ref{Name: "agent-base"}
 // AgentBaseFile is the agent base image's Containerfile in AgentBase.
 const AgentBaseFile = "Containerfile.agent-base"
 
-// WithPackage is a copy of c with files, loaded and checked as the package
-// of kind at r, in place of the one r names: a built-in's, a local or a
-// library package's accepted content (D97); for KindTool the tool r.Name,
-// for KindBase the agent base image. origin, set for a library package,
 // WithoutFiles is a copy of c in which the package of kind at r keeps its
 // manifest but its files can't be read: every read fails with err. It is
 // for a package whose content changed and whose accepted copy is gone, so
@@ -302,6 +298,10 @@ type unreadable struct{ err error }
 
 func (u unreadable) Open(string) (fs.File, error) { return nil, u.err }
 
+// WithPackage is a copy of c with files, loaded and checked as the package
+// of kind at r, in place of the one r names: a built-in's, a local or a
+// library package's accepted content (D97); for KindTool the tool r.Name,
+// for KindBase the agent base image. origin, set for a library package,
 // is the library it was accepted from (stack.lock's entry).
 func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS, origin *LibraryOrigin) (*Catalog, error) {
 	top := kindDirs[kind]
@@ -363,7 +363,6 @@ func (c *Catalog) WithPackage(kind string, r Ref, files fs.FS, origin *LibraryOr
 		return nil, fmt.Errorf("%s: %w", r, err)
 	}
 	return n, nil
-
 }
 
 // local is a loader over the workspace and the package directory of the
@@ -391,7 +390,8 @@ func (c *Catalog) local(r Ref, top string) (*loader, string, error) {
 	return &loader{fsys: fsys, bases: map[int]string{}, names: map[string]string{}}, dir, nil
 }
 
-// version checks a local package's version against the ref that names it.
+// version checks a local or library package's version against the ref that
+// names it.
 func (l *loader) version(file string, v int, r Ref) {
 	if v != r.Version {
 		l.add(file, "version %d does not match the ref %s", v, r)

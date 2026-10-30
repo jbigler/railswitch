@@ -85,7 +85,7 @@ type Model struct {
 	Services []Service // ordered: app, deps, worker, data (slot order), tools, agents (Stack.Agents order)
 	Inputs   Inputs
 	Warnings []string // non-fatal findings, e.g. a suggested option addon missing from [image] addons
-	Assets   []Asset  // every package asset a service mounts; Task 11's Plan writes them
+	Assets   []Asset  // every package asset a service mounts; Plan writes them
 
 	baseDir    string                    // <workspace>/<sanitize(base_branch)>
 	chain      []*containerfile          // [image] base, then each addon

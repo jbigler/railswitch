@@ -67,10 +67,6 @@ func OptionKeys(options map[string]string) []string {
 	return keys
 }
 
-// agentBaseFile is the agent base image's Containerfile, which every agent
-// package's image builds on.
-const agentBaseFile = "Containerfile.agent-base"
-
 // Resolve picks the project's pack, options, tools and agents from the catalog. A
 // slot project.toml leaves out is "none". Every problem is returned at once
 // (errors.Join).
@@ -241,7 +237,7 @@ func (c *Catalog) Resolve(p *config.Project) (*Stack, error) {
 		files[file] = cfOwner{who, pkg}
 	}
 	claimFile(pk.Image.File, "pack "+pk.Name, "pack "+ref.String())
-	claimFile(agentBaseFile, "the agent base image", agentBaseFile)
+	claimFile(AgentBaseFile, "the agent base image", AgentBaseFile)
 	for _, ch := range s.Options {
 		o := ch.Option
 		who := fmt.Sprintf("options.%s (%s)", ch.Key, o.Name)
@@ -305,11 +301,7 @@ func (c *Catalog) slotRefs(slot string) string {
 func refList(refs []Ref) string {
 	out := make([]string, len(refs))
 	for i, r := range refs {
-		if r.Version == 0 {
-			out[i] = r.Name
-		} else {
-			out[i] = r.String()
-		}
+		out[i] = r.String()
 	}
 	slices.Sort(out)
 	return strings.Join(out, ", ")

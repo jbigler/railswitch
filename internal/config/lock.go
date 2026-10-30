@@ -43,8 +43,8 @@ type Lock struct {
 // MaxRemoved is how many dropped entries a stack.lock remembers.
 const MaxRemoved = 32
 
-// LockRemoved is one dropped entry: its table (pack, option or agent),
-// its key there, and the entry.
+// LockRemoved is one dropped entry: its table (pack, option, agent, tool
+// or base), its key there, and the entry.
 type LockRemoved struct {
 	Kind    string `toml:"kind"`
 	Key     string `toml:"key"`

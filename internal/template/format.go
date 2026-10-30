@@ -51,8 +51,8 @@ type Template struct {
 	Description string
 	// Lines are the project.toml lines a new project starts from: no
 	// [project], [worktrees], [share], [template], [tools] or [agents]
-	// (D112); Secrets are the
-	// declarations of [[secret]]; Image holds only the user addons.
+	// (D112); Secrets are the declarations of [[secret]]; Image holds only
+	// the user addons.
 	Lines   *config.Project
 	Ask     []Ask
 	Secrets []string // the declared secrets' names, sorted

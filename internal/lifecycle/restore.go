@@ -359,7 +359,7 @@ func restorePending(ws, slug string) string {
 	return filepath.Join(ws, ".railswitch", "restore-pending", slug)
 }
 
-// markRestorePending writes f's marker.
+// markPending writes f's marker.
 func (f *freshRestore) markPending() error {
 	if err := os.MkdirAll(filepath.Dir(f.pending), 0o700); err != nil {
 		return err

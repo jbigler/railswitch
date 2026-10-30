@@ -25,10 +25,7 @@ var executable = os.Executable
 // launchTerm opens argv in a new terminal tab or window (--new-term);
 // tests replace it.
 var launchTerm = func(ctx context.Context, e *env, title, dir string, argv []string) error {
-	tty := false
-	if isTerminal(os.Stdin) && isTerminal(os.Stdout) {
-		tty = true
-	}
+	tty := isTerminal(os.Stdin) && isTerminal(os.Stdout)
 	l := term.Launcher{R: e.run, Env: os.Getenv, LookPath: exec.LookPath, ProcRoot: procRoot, TTY: tty, Err: e.stderr}
 	return l.Launch(ctx, title, dir, argv)
 }

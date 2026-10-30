@@ -161,7 +161,7 @@ func (p Podman) Images(ctx context.Context) ([]Image, error) {
 		return nil, err
 	}
 	var imgs []Image
-	if strings.TrimSpace(out) == "" {
+	if out == "" {
 		return nil, nil
 	}
 	if err := json.Unmarshal([]byte(out), &imgs); err != nil {

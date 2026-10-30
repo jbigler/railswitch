@@ -13,8 +13,8 @@ import (
 // sign each package library, from `signer ls`. Distrust runs `signer rm
 // <library> <fingerprint>`, Revoke `signer revoke <library> <fingerprint>`;
 // Add key runs `signer add <library> -` with the pasted key on stdin,
-// never argv. Both are machine-level jobs, keyed
-// by machineKey, which is no valid project prefix.
+// never argv. All are machine-level jobs, keyed by machineKey, which is no
+// valid project prefix.
 
 // machineKey is the job key of machine-level jobs.
 const machineKey = "~machine"

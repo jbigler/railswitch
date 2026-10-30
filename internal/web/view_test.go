@@ -380,3 +380,23 @@ func TestReviewAppLink(t *testing.T) {
 		t.Error("a Review app link without one")
 	}
 }
+
+// TestRowNeedMarker: a worktree whose agent waits on you is marked by its
+// name, where the row never scrolls out of view; the branch is cut short
+// with its full name as the tooltip.
+func TestRowNeedMarker(t *testing.T) {
+	r := fixtureRow("up", false, nil) // its agent asks for permission
+	html, err := render("row", newRow("ftest", r, "", sortKey{By: "name"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`<td><span class="need" title="bot: Bash: &lt;script&gt;rm&lt;/script&gt;" aria-label="permission">◆</span> <a href=`, `<span class="trunc" title="jb/feat-login">jb/feat-login</span>`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("row lacks %q:\n%s", want, html)
+		}
+	}
+	r.WT.Agent.State = "working"
+	if html, _ := render("row", newRow("ftest", r, "", sortKey{By: "name"})); strings.Contains(html, `<span class="need"`) {
+		t.Errorf("a working agent marked as needing input:\n%s", html)
+	}
+}

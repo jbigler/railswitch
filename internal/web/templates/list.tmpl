@@ -10,8 +10,8 @@
 </div>{{end}}
 
 {{define "row"}}<tr id="{{.ID}}"{{if .Sel}} class="sel"{{end}} data-slug="{{.Slug}}">
-<td><a href="{{.URL}}" data-row>{{.Slug}}</a>{{if .Base}} <span class="muted">(base)</span>{{end}}</td>
-<td class="br mono">{{.Branch}}{{with .Stacked}} <span class="stacked" title="position in its gh stack">≡ {{.}}</span>{{end}}</td>
+<td>{{if .Need}}<span class="need" title="{{.AgentTitle}}" aria-label="{{.Need}}">◆</span> {{end}}<a href="{{.URL}}" data-row>{{.Slug}}</a>{{if .Base}} <span class="muted">(base)</span>{{end}}</td>
+<td class="br mono"><span class="trunc" title="{{.Branch}}">{{.Branch}}</span>{{with .Stacked}} <span class="stacked" title="position in its gh stack">≡ {{.}}</span>{{end}}</td>
 <td{{with .PR}} title="{{.Title}}"{{end}}>{{with .PR}}<a class="pr" href="{{.URL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{if .Glyph}} <span class="{{.ChecksClass}}">{{.Glyph}}</span>{{end}} <span class="{{.StateClass}}">{{.State}}</span>{{if .Review}} · <span class="{{.ReviewClass}}">{{.Review}}</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
 <td class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}{{if .Stale}} <span class="stale">restart to apply</span>{{end}}</td>
 <td class="{{.AgentClass}}"{{if .AgentTitle}} title="{{.AgentTitle}}"{{end}}>{{.AgentGlyph}} {{.AgentText}}</td>

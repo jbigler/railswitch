@@ -102,7 +102,20 @@ Use them for terminal integration. This kitty example passes `ctrl+h/j/k/l`
 to nvim's splits while it is attached (it pairs with a
 `map --when-focus-on var:IS_VIM=true …` block in `kitty.conf`, as
 vim-kitty-navigator uses), and pushes the host's light or dark mode into the
-server:
+server.
+
+The mode needs pushing because the server starts as `nvim --headless
+--listen` with no UI attached, so Neovim's own background detection (its
+terminal colour query, run only when a UI is attached at startup) never
+runs and `'background'` stays `dark`. The hook works it out on the host on
+every attach, so a theme flip since the server started is picked up too:
+`NVIM_BACKGROUND` (`dark` or `light`) when set; else kitty's live
+background colour (`kitten @ get-colors`, which needs `allow_remote_control
+yes` in `kitty.conf`), classified by luminance with the weights Neovim
+uses; else `dark`. It calls `BackgroundSet(mode)` if your config defines
+one (to switch colour schemes along with `'background'`), else sets
+`'background'`. The hook runs on the host, so `nvim` must be on the host
+`PATH` for it to reach the server.
 
 `~/.config/railswitch/hooks/nvim-attach`:
 
@@ -110,11 +123,27 @@ server:
 #!/bin/sh
 # Tell kitty this window runs vim, so it passes the navigation keys through.
 [ -n "${KITTY_WINDOW_ID:-}" ] && kitten @ set-user-vars IS_VIM=true
-# Push the current light/dark mode into the long-running server.
-if [ -n "${NVIM_BACKGROUND:-}" ]; then
-	nvim --server "$RAILSWITCH_NVIM_SERVER" \
-		--remote-expr "execute('set background=$NVIM_BACKGROUND')" >/dev/null 2>&1 || true
-fi
+
+# The host's light/dark mode, pushed into the long-running server on every
+# attach (its headless start skips Neovim's own detection). NVIM_BACKGROUND
+# overrides; else kitty's live background colour by luminance; else dark.
+mode=${NVIM_BACKGROUND:-}
+case "$mode" in dark | light) ;; *)
+	bg=$(kitten @ get-colors 2>/dev/null | awk '$1 == "background" { print $2; exit }')
+	# hx() instead of strtonum(): POSIX awk (mawk, busybox) has no strtonum.
+	mode=$(awk -v hex="$bg" '
+		function hx(s,  d) { d = "0123456789abcdef"; s = tolower(s)
+			return (index(d, substr(s, 1, 1)) - 1) * 16 + index(d, substr(s, 2, 1)) - 1 }
+		BEGIN {
+			if (hex !~ /^#[0-9a-fA-F]{6}$/) exit 1
+			r = hx(substr(hex, 2, 2)) / 255; g = hx(substr(hex, 4, 2)) / 255; b = hx(substr(hex, 6, 2)) / 255
+			print (0.299 * r + 0.587 * g + 0.114 * b) < 0.5 ? "dark" : "light"
+		}') || mode=dark
+	;;
+esac
+nvim --server "$RAILSWITCH_NVIM_SERVER" --remote-expr \
+	"luaeval('_G.BackgroundSet and (BackgroundSet(_A) or 1) or vim.cmd.set(\"background=\" .. _A) or 1', '$mode')" \
+	>/dev/null 2>&1 || true
 exit 0
 ```
 

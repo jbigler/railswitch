@@ -85,6 +85,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
+	m.HandleFunc("POST /p/{prefix}/{slug}/restart/{service}", s.restartService)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-default/{verb}", s.agentDefault)
 	m.HandleFunc("POST /p/{prefix}/worktrees", s.addWorktree)
 	m.HandleFunc("POST /p/{prefix}/{slug}/task", s.runTask)
@@ -497,7 +498,7 @@ var worktreeActions = map[string]struct {
 	label string
 	args  []string
 }{
-	"up":      {"up", []string{"up"}},
+	"up":      {"start", []string{"up"}},
 	"stop":    {"stop", []string{"stop"}},
 	"restart": {"restart", []string{"restart"}},
 	"term":    {"terminal", []string{"term"}},
@@ -516,6 +517,24 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 	s.start(w, r, jobs.Spec{
 		Project: p.Prefix, Slug: wt.Slug, Label: a.label, Dir: p.Workspace,
 		Argv: append([]string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug}, a.args...),
+	}, nil, worktreePath(p, wt.Slug))
+}
+
+// restartService restarts one running service of the worktree alone; the
+// CLI refuses one that isn't running or has no unit.
+func (s *Server) restartService(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	svc := r.PathValue("service")
+	if !slices.ContainsFunc(wt.Services, func(x service) bool { return x.Service == svc && x.Restartable }) {
+		http.Error(w, "unknown service", http.StatusNotFound)
+		return
+	}
+	s.start(w, r, jobs.Spec{
+		Project: p.Prefix, Slug: wt.Slug, Label: "restart " + svc, Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "restart", svc},
 	}, nil, worktreePath(p, wt.Slug))
 }
 

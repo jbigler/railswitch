@@ -62,9 +62,11 @@ type worktree struct {
 }
 
 type service struct {
-	Service string `json:"service"`
-	Role    string `json:"role"`
-	State   string `json:"state"`
+	Service     string `json:"service"`
+	Role        string `json:"role"`
+	State       string `json:"state"`
+	Container   string `json:"container"`   // its container's name
+	Restartable bool   `json:"restartable"` // `restart <service>` restarts it alone
 }
 
 type agent struct {

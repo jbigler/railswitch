@@ -626,7 +626,9 @@ type detailView struct {
 
 type linkView struct{ Label, URL, Class string }
 
-type serviceView struct{ Name, State, Word, Glyph, Class string }
+// serviceView is a service row: LogsURL (Dozzle, by container name) while
+// its container runs, RestartURL while a restartable one runs.
+type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, RestartURL string }
 
 type agentView struct{ Name, Glyph, Label, Class, Message string }
 
@@ -668,13 +670,29 @@ func newDetail(prefix string, r row, repo string) detailView {
 	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln quiet"})
 	for _, s := range wt.Services {
 		g, c, word := serviceLook(s.State)
-		v.Services = append(v.Services, serviceView{Name: s.Service, State: s.State, Word: word, Glyph: g, Class: c})
+		sv := serviceView{Name: s.Service, State: s.State, Word: word, Glyph: g, Class: c}
+		if (word == "running" || word == "starting") && s.Container != "" {
+			sv.LogsURL = logsURL + "show?name=" + url.QueryEscape(s.Container)
+			if s.Restartable {
+				sv.RestartURL = path + "/restart/" + s.Service
+			}
+		}
+		v.Services = append(v.Services, sv)
 	}
 	if a := wt.Agent; a != nil {
 		kind := agentKind(a)
 		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind), Message: a.Message}
 	}
-	for _, act := range []string{"up", "stop", "restart", "term"} {
+	// What the stack's state allows: a stopped one starts, a running one
+	// restarts or stops, a partial or failed one any of the three.
+	acts := []string{"restart", "stop"}
+	switch wt.Stack {
+	case "stopped":
+		acts = []string{"up"}
+	case "partial", "failed":
+		acts = []string{"up", "restart", "stop"}
+	}
+	for _, act := range append(acts, "term") {
 		v.Actions = append(v.Actions, actionView{Label: worktreeActions[act].label, URL: path + "/act/" + act})
 	}
 	if v.Stacked != nil && v.Stacked.Error == "" {

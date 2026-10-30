@@ -351,15 +351,15 @@ func TestGhStack(t *testing.T) {
 	ctx := context.Background()
 	f.cli.set("--json -C /ws/ftest stack ls", `{"available":true,"worktrees":[
  {"slug":"main","stack":null,"error":""},
- {"slug":"b","stack":{"trunk":"main","current":"jb/b","branches":[
+ {"slug":"b","stack":{"trunk":"main","current":"jb/b","number":10350,"branches":[
   {"name":"jb/a","current":false,"merged":true,"queued":false,"needs_rebase":false,"pr":{"number":2140,"state":"merged"}},
-  {"name":"jb/b","current":true,"merged":false,"queued":false,"needs_rebase":true,"pr":{"number":2141,"state":"open"}},
+  {"name":"jb/b","current":true,"merged":false,"queued":false,"needs_rebase":true,"pr":{"number":2141,"state":"open","checks":"pass","review":"approved"}},
   {"name":"jb/c","current":false,"merged":false,"queued":false,"needs_rebase":false,"pr":null}]},"error":""}]}`)
 	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	evs := drain(sub)
-	if ev, ok := byID(evs, "row-b"); !ok || !strings.Contains(ev.HTML, "≡ 1/2") {
+	if ev, ok := byID(evs, "row-b"); !ok || !strings.Contains(ev.HTML, "≡ 2/3") {
 		t.Errorf("row-b without its stack place: %q", ids(evs))
 	}
 	ev, ok := byID(evs, "detail")
@@ -367,7 +367,8 @@ func TestGhStack(t *testing.T) {
 		t.Fatalf("no detail: %q", ids(evs))
 	}
 	for _, want := range []string{
-		"1/2 open · 1 merged · on main", "⚠ restack needed", "◀ HEAD",
+		`◆ <a href="https://github.com/o/r/stack/10350" target="_blank" rel="noopener">Stack #10350</a> · Base: <span class="mono">main</span> · 3 branches (1 merged)`,
+		"⚠ restack needed", "◀ HEAD", `#2141</a> <span class="green">✓</span> <span class="green">ready</span> · <span class="blue">approved</span>`,
 		`href="https://github.com/o/r/pull/2141"`, `href="https://github.com/o/r/pull/2140"`,
 		"✓ 1 merged", "no PR",
 	} {
@@ -377,5 +378,26 @@ func TestGhStack(t *testing.T) {
 	}
 	if c, b := strings.Index(ev.HTML, "jb/c"), strings.Index(ev.HTML, "jb/b</strong> <strong"); c < 0 || b < 0 || c > b {
 		t.Errorf("open branches not top first (jb/c at %d, jb/b at %d)", c, b)
+	}
+
+	// A click on jb/c runs the switch; the merged jb/a and HEAD's jb/b
+	// are refused. When the switch ends ok, HEAD moves to jb/c at once.
+	for _, b := range []string{"jb/a", "jb/b", "jb/zz"} {
+		if w := f.do(req("POST", "/p/ftest/b/stack/switch", form("branch", b))); w.Code != 422 {
+			t.Errorf("switch %s: %d", b, w.Code)
+		}
+	}
+	if w := f.do(req("POST", "/p/ftest/b/stack/switch", form("branch", "jb/c"))); w.Code != 202 {
+		t.Fatalf("switch jb/c: %d %s", w.Code, w.Body)
+	}
+	want := []string{testExe, "-C", "/ws/ftest", "-w", "b", "stack", "switch", "jb/c"}
+	if got := f.run.wait(t, 1)[0]; !slices.Equal(got, want) {
+		t.Errorf("argv %q", got)
+	}
+	drain(sub)
+	f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "j9", Spec: jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/c"}, State: jobs.StateOK}})
+	ev, ok = byID(drain(sub), "detail")
+	if !ok || !strings.Contains(ev.HTML, "jb/c</strong> <strong class=\"accent\">◀ HEAD") {
+		t.Errorf("detail after the switch: %v\n%s", ok, ev.HTML)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -20,7 +19,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const stackUsage = "usage: railswitch [--json] stack ls | railswitch stack switch <branch> | railswitch stack push|up|down | railswitch stack rebase [--new-term] [--continue | --abort]"
+const stackUsage = "usage: railswitch [--json] stack ls | railswitch stack switch <branch>"
 
 // stackDoc is `stack ls --json` (docs/json.md).
 type stackDoc struct {
@@ -48,10 +47,6 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	case "ls":
 	case "switch":
 		return cmdStackSwitch(ctx, e, args[1:])
-	case "push", "up", "down":
-		return cmdStackMove(ctx, e, args[0], args[1:])
-	case "rebase":
-		return cmdStackRebase(ctx, e, args[1:])
 	default:
 		return e.usageErr("%s", stackUsage)
 	}
@@ -76,12 +71,14 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	// only through a private shadow, or runs not at all.
 	var env []string
 	var shadowErr error
+	var gitDir string
 	if doc.Available && len(m.Inputs.Worktrees) > 0 {
 		var in *render.Instance
 		if in, err = m.Instance(m.Inputs.Worktrees[0]); err != nil {
 			return e.fail(err)
 		}
-		sh, err := gitshadow.New(ctx, e.run, in.Values["base.git"])
+		gitDir = in.Values["base.git"]
+		sh, err := gitshadow.New(ctx, e.run, gitDir)
 		if err == nil {
 			defer sh.Remove()
 			env = sh.Env(os.Environ())
@@ -97,9 +94,24 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 		default:
 			if r.Stack, err = prs.ViewStack(ctx, e.run, wt.Dir, env); err != nil {
 				r.Error = err.Error()
+			} else if r.Stack != nil {
+				r.Stack.Number = prs.StackNumber(gitDir, r.Stack.Current)
 			}
 		}
 		doc.Worktrees = append(doc.Worktrees, r)
+	}
+	// gh-stack knows only open, merged and queued: draft, checks and
+	// review come from GitHub. Without them the stacks still show.
+	var stacks []*prs.Stack
+	for _, r := range doc.Worktrees {
+		if r.Stack != nil {
+			stacks = append(stacks, r.Stack)
+		}
+	}
+	if repo, err := prs.Repo(w.Project.Project.Repo); err == nil && len(stacks) > 0 {
+		if err := prs.Detail(ctx, e.run, repo, stacks); err != nil {
+			fmt.Fprintf(e.stderr, "warning: stack PRs' review and checks: %v\n", err)
+		}
 	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
@@ -122,8 +134,9 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	return 0
 }
 
-// stackText is a row's stack in a few words: "2/3 on main", with "restack"
-// when a branch needs a rebase.
+// stackText is a row's stack in gh stack view's words: "#10350, base
+// master, 22 branches (8 merged)", with "restack needed" when a branch
+// needs a rebase.
 func stackText(r stackRow) string {
 	switch {
 	case r.Error != "":
@@ -131,119 +144,30 @@ func stackText(r stackRow) string {
 	case r.Stack == nil:
 		return "-"
 	}
-	pos, n, rebase := 0, 0, false
+	merged, rebase := 0, false
 	for _, b := range r.Stack.Branches {
-		if b.Merged && !b.Current {
-			continue
-		}
-		n++
-		if b.Current {
-			pos = n
+		if b.Merged {
+			merged++
 		}
 		rebase = rebase || b.NeedsRebase
 	}
-	parts := []string{fmt.Sprintf("%d/%d on %s", pos, n, r.Stack.Trunk)}
+	var parts []string
+	if r.Stack.Number > 0 {
+		parts = append(parts, fmt.Sprintf("#%d", r.Stack.Number))
+	}
+	parts = append(parts, "base "+r.Stack.Trunk, fmt.Sprintf("%d branches (%d merged)", len(r.Stack.Branches), merged))
 	if rebase {
 		parts = append(parts, "restack needed")
 	}
 	return strings.Join(parts, ", ")
 }
 
-// stackTimeouts bound the gh stack actions: push reaches GitHub; up, down
-// and a switch only check out a branch.
-var stackTimeouts = map[string]time.Duration{"push": 10 * time.Minute, "up": 2 * time.Minute, "down": 2 * time.Minute, "switch": 2 * time.Minute}
-
-// stackRun is a stack action's worktree and the private, writable stand-in
-// for its repository's common dir that every git and gh call goes
-// through (gitshadow); call done when finished: it carries back what the
-// action changed there.
-type stackRun struct {
-	slug, dir, branch string
-	env               []string
-	sh                *gitshadow.Shadow
-}
-
-// stackStart loads the current worktree (-w, or the working directory's)
-// and makes its writable shadow; gh stack must be installed.
-func (e *env) stackStart(ctx context.Context, cmd string) (*stackRun, int) {
-	w, err := workspace.Load(ctx, e.dir, e.slug)
-	if err != nil {
-		return nil, e.fail(err)
-	}
-	if w.Slug == "" {
-		return nil, e.usageErr("stack %s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
-	}
-	m, err := e.model(ctx, w)
-	if err != nil {
-		return nil, e.fail(err)
-	}
-	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == w.Slug })
-	if i < 0 {
-		return nil, e.fail(fmt.Errorf("worktree %s is not registered", w.Slug))
-	}
-	wt := m.Inputs.Worktrees[i]
-	if !prs.StackAvailable(ctx, e.run) {
-		return nil, e.fail(errors.New("gh stack is not installed: gh extension install github/gh-stack"))
-	}
-	in, err := m.Instance(wt)
-	if err != nil {
-		return nil, e.fail(err)
-	}
-	sh, err := gitshadow.NewWritable(ctx, e.run, in.Values["base.git"])
-	if err != nil {
-		return nil, e.fail(err)
-	}
-	env := sh.Env(os.Environ())
-	if !e.interactive() {
-		env = append(env, "GH_PROMPT_DISABLED=1")
-	}
-	return &stackRun{slug: wt.Slug, dir: wt.Dir, branch: wt.Branch, env: env, sh: sh}, 0
-}
-
-// done carries the shadow's changes back and removes it: code, or 1 when
-// carrying back failed.
-func (s *stackRun) done(ctx context.Context, e *env, code int) int {
-	defer s.sh.Remove()
-	if err := s.sh.Commit(ctx, e.run); err != nil {
-		if code == 0 {
-			return e.fail(err)
-		}
-		fmt.Fprintln(e.stderr, "railswitch:", err)
-	}
-	return code
-}
-
-// run runs name args in the worktree through the shadow.
-func (s *stackRun) run(ctx context.Context, e *env, timeout time.Duration, name string, args ...string) int {
-	return e.runAttached(ctx, s.dir, s.env, timeout, name, args...)
-}
-
-// runAttached runs name args in dir with env, its output on ours (and the
-// terminal's input when there is one): its exit code.
-func (e *env) runAttached(ctx context.Context, dir string, env []string, timeout time.Duration, name string, args ...string) int {
-	c := sys.Cmd{Name: name, Args: args, Dir: dir, Env: env, Stdout: e.stdout, Stderr: e.stderr, Timeout: timeout, KillGrace: 5 * time.Second}
-	if e.interactive() {
-		c.Stdin = e.stdin
-	}
-	res, err := e.run.Run(ctx, c)
-	if err != nil {
-		if errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
-			return res.ExitCode
-		}
-		return e.fail(err)
-	}
-	return 0
-}
-
-// interactive: stdin and stdout are both a terminal.
-func (e *env) interactive() bool {
-	in, ok := e.stdin.(*os.File)
-	out, ok2 := e.stdout.(*os.File)
-	return ok && ok2 && isTerminal(in) && isTerminal(out)
-}
-
-// railswitch stack switch <branch>: check out another open branch of the
-// worktree's stack (git switch --no-guess).
+// railswitch stack switch <branch>: check branch out in the worktree (-w,
+// or the working directory's) with git switch --no-guess, the dashboard's
+// click on a branch of a worktree's stack. Git runs through a private
+// shadow of the repository's common dir (gitshadow), as gh stack does for
+// stack ls: no hook, filter or fsmonitor a container wrote runs. A switch
+// writes only the worktree's own HEAD and index, which are not in it.
 func cmdStackSwitch(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("stack switch")
 	if code, ok := parse(fs, args); !ok {
@@ -256,108 +180,36 @@ func cmdStackSwitch(ctx context.Context, e *env, args []string) int {
 	if err := sys.GitArg("branch", branch); err != nil {
 		return e.usageErr("%v", err)
 	}
-	s, code := e.stackStart(ctx, "switch")
-	if code != 0 {
-		return code
-	}
-	st, err := prs.ViewStack(ctx, e.run, s.dir, s.env)
-	if err != nil {
-		return s.done(ctx, e, e.fail(err))
-	}
-	if st == nil {
-		return s.done(ctx, e, e.fail(fmt.Errorf("%s: branch %s is in no gh stack", s.slug, safefile.Printable(s.branch))))
-	}
-	if !slices.ContainsFunc(st.Branches, func(b prs.StackBranch) bool { return b.Name == branch && !b.Merged && !b.Current }) {
-		return s.done(ctx, e, e.usageErr("%s is not another open branch of %s's stack", safefile.Printable(branch), s.slug))
-	}
-	return s.done(ctx, e, s.run(ctx, e, stackTimeouts["switch"], "git", "switch", "--no-guess", branch))
-}
-
-// railswitch stack push|up|down: gh stack's own, in the worktree.
-func cmdStackMove(ctx context.Context, e *env, verb string, args []string) int {
-	fs := e.flags("stack " + verb)
-	if code, ok := parse(fs, args); !ok {
-		return code
-	}
-	if fs.NArg() != 0 {
-		return e.usageErr("stack %s takes no arguments", verb)
-	}
-	s, code := e.stackStart(ctx, verb)
-	if code != 0 {
-		return code
-	}
-	return s.done(ctx, e, s.run(ctx, e, stackTimeouts[verb], "gh", "stack", verb))
-}
-
-// railswitch stack rebase [--new-term] [--continue | --abort]: gh stack
-// rebase in the worktree, which stops at a conflict. --new-term re-runs
-// it in a new terminal with --shell-on-stop: when it stops, the user's
-// shell starts there to resolve the conflict.
-//
-// gh stack rebase runs git in each worktree without GIT_COMMON_DIR, so it
-// can't go through the shadow: it runs on the repository itself, hooks and
-// fsmonitor off, and only while git-guard finds nothing but hook changes
-// (no config key, worktree link or submodule a container could have
-// planted).
-func cmdStackRebase(ctx context.Context, e *env, args []string) int {
-	fs := e.flags("stack rebase")
-	newTerm := fs.Bool("new-term", false, "run it in a new terminal tab or window")
-	cont := fs.Bool("continue", false, "continue after resolving a conflict")
-	abort := fs.Bool("abort", false, "abort the rebase")
-	shellOnStop := fs.Bool("shell-on-stop", false, "start your shell in the worktree when the rebase stops")
-	if code, ok := parse(fs, args); !ok {
-		return code
-	}
-	if fs.NArg() != 0 || *cont && *abort {
-		return e.usageErr("usage: railswitch stack rebase [--new-term] [--continue | --abort]")
-	}
-	var flags []string
-	switch {
-	case *cont:
-		flags = []string{"--continue"}
-	case *abort:
-		flags = []string{"--abort"}
-	}
 	w, err := workspace.Load(ctx, e.dir, e.slug)
 	if err != nil {
 		return e.fail(err)
 	}
 	if w.Slug == "" {
-		return e.usageErr("stack rebase: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>")
+		return e.usageErr("stack switch: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>")
 	}
-	dir := filepath.Join(w.Root, w.Slug)
-	if *newTerm {
-		exe, err := executable()
-		if err != nil {
-			return e.fail(err)
-		}
-		argv := append([]string{exe, "-C", w.Root, "-w", w.Slug, "stack", "rebase", "--shell-on-stop"}, flags...)
-		return e.launchIn(ctx, w.Slug+" restack", dir, argv)
-	}
-	if !prs.StackAvailable(ctx, e.run) {
-		return e.fail(errors.New("gh stack is not installed: gh extension install github/gh-stack"))
-	}
-	findings, err := w.GitGuard(ctx, e.run)
+	m, err := e.model(ctx, w)
 	if err != nil {
 		return e.fail(err)
 	}
-	var bad []string
-	for _, f := range findings {
-		if !strings.HasPrefix(f.Kind, "hook-") { // hooks don't run
-			bad = append(bad, "  "+f.String())
+	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == w.Slug })
+	if i < 0 {
+		return e.fail(fmt.Errorf("worktree %s is not registered", w.Slug))
+	}
+	in, err := m.Instance(m.Inputs.Worktrees[i])
+	if err != nil {
+		return e.fail(err)
+	}
+	sh, err := gitshadow.New(ctx, e.run, in.Values["base.git"])
+	if err != nil {
+		return e.fail(err)
+	}
+	defer sh.Remove()
+	c := sys.Cmd{Name: "git", Args: []string{"switch", "--no-guess", branch}, Dir: m.Inputs.Worktrees[i].Dir, Env: sh.Env(os.Environ()), Stdout: e.stdout, Stderr: e.stderr, Timeout: 2 * time.Minute}
+	if res, err := e.run.Run(ctx, c); err != nil {
+		if errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
+			return res.ExitCode
 		}
+		return e.fail(err)
 	}
-	if len(bad) > 0 {
-		return e.fail(fmt.Errorf("stack rebase runs git on the repository itself; refused while git-guard finds (railswitch doctor):\n%s", strings.Join(bad, "\n")))
-	}
-	env := gitshadow.Defused(os.Environ())
-	if !e.interactive() {
-		env = append(env, "GH_PROMPT_DISABLED=1")
-	}
-	code := e.runAttached(ctx, dir, env, sys.NoTimeout, "gh", append([]string{"stack", "rebase"}, flags...)...)
-	if code != 0 && *shellOnStop {
-		fmt.Fprintln(e.stderr, "\nThe rebase stopped. Resolve it here, then run: railswitch stack rebase --continue (or --abort). Exit the shell to close.")
-		return runShell(ctx, e, dir)
-	}
-	return code
+	return 0
 }

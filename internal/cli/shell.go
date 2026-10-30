@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/term"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -42,17 +41,6 @@ func (e *env) launchIn(ctx context.Context, title, dir string, argv []string) in
 			return x.Code
 		}
 		return e.failCommand(err)
-	}
-	return 0
-}
-
-// runShell runs the user's shell in dir on our terminal; its exit code is
-// not ours to report.
-func runShell(ctx context.Context, e *env, dir string) int {
-	sh := userShell()
-	_, err := e.run.Run(ctx, sys.Cmd{Name: sh, Dir: dir, Stdin: e.stdin, Stdout: e.stdout, Stderr: e.stderr, Timeout: sys.NoTimeout})
-	if err != nil && !errors.Is(err, sys.ErrExit) {
-		return e.fail(err)
 	}
 	return 0
 }

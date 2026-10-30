@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -18,7 +20,38 @@ import (
 type Stack struct {
 	Trunk    string        `json:"trunk"`
 	Current  string        `json:"current"`
+	Number   int           `json:"number"` // GitHub's stack number (StackNumber); 0 before gh stack submit
 	Branches []StackBranch `json:"branches"`
+}
+
+// StackNumber is the GitHub stack number gh-stack recorded for the stack
+// holding branch, from its catalog <gitDir>/gh-stack (gh stack view --json
+// leaves it out); 0 when there is none. The catalog is in the
+// container-writable .git: read as a hostile file, only the number used.
+func StackNumber(gitDir, branch string) int {
+	data, err := safefile.Read(filepath.Join(gitDir, "gh-stack"), safefile.Limit)
+	if err != nil {
+		return 0
+	}
+	var cat struct {
+		Stacks []struct {
+			Number   int `json:"number"`
+			Branches []struct {
+				Branch string `json:"branch"`
+			} `json:"branches"`
+		} `json:"stacks"`
+	}
+	if json.Unmarshal(data, &cat) != nil {
+		return 0
+	}
+	for _, s := range cat.Stacks {
+		for _, b := range s.Branches {
+			if b.Branch == branch && s.Number > 0 {
+				return s.Number
+			}
+		}
+	}
+	return 0
 }
 
 // StackBranch is one branch of a Stack; PR is nil before `gh stack submit`.
@@ -32,10 +65,50 @@ type StackBranch struct {
 }
 
 // StackPR is a stack branch's pull request: State is "open", "merged" or
-// "queued" (in a merge queue), as gh-stack reports it.
+// "queued" (in a merge queue), as gh-stack reports it, or "draft" once
+// Detail found it a draft; Checks and Review are as PR's, "" until Detail
+// read them (and for a merged PR).
 type StackPR struct {
 	Number int    `json:"number"`
 	State  string `json:"state"`
+	Checks string `json:"checks"`
+	Review string `json:"review"`
+}
+
+// Detail fills in draft, checks and review of each open PR of stacks
+// from GitHub (List: one query per branch, each branch once).
+func Detail(ctx context.Context, r sys.Runner, repo string, stacks []*Stack) error {
+	var branches []string
+	for _, s := range stacks {
+		for _, b := range s.Branches {
+			if b.PR != nil && b.PR.State == "open" {
+				branches = append(branches, b.Name)
+			}
+		}
+	}
+	if len(branches) == 0 {
+		return nil
+	}
+	list, err := List(ctx, r, repo, branches)
+	if err != nil {
+		return err
+	}
+	for _, s := range stacks {
+		for _, b := range s.Branches {
+			if b.PR == nil || b.PR.State != "open" {
+				continue
+			}
+			for _, p := range list {
+				if p.Number == b.PR.Number && p.Branch == b.Name {
+					if p.State == "draft" {
+						b.PR.State = "draft"
+					}
+					b.PR.Checks, b.PR.Review = p.Checks, p.Review
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // StackAvailable reports whether gh has the gh-stack extension.

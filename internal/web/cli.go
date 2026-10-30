@@ -111,19 +111,26 @@ type ghStackRow struct {
 type ghStack struct {
 	Trunk    string          `json:"trunk"`
 	Current  string          `json:"current"`
+	Number   int             `json:"number"`   // GitHub's stack number; 0 before submit
 	Branches []ghStackBranch `json:"branches"` // bottom to top
 }
 
 type ghStackBranch struct {
-	Name        string `json:"name"`
-	Current     bool   `json:"current"`
-	Merged      bool   `json:"merged"`
-	Queued      bool   `json:"queued"`
-	NeedsRebase bool   `json:"needs_rebase"`
-	PR          *struct {
-		Number int    `json:"number"`
-		State  string `json:"state"`
-	} `json:"pr"`
+	Name        string     `json:"name"`
+	Current     bool       `json:"current"`
+	Merged      bool       `json:"merged"`
+	Queued      bool       `json:"queued"`
+	NeedsRebase bool       `json:"needs_rebase"`
+	PR          *ghStackPR `json:"pr"`
+}
+
+// ghStackPR is a stack branch's PR: State open, draft, merged or queued;
+// Checks and Review "" when stack ls couldn't read them.
+type ghStackPR struct {
+	Number int    `json:"number"`
+	State  string `json:"state"`
+	Checks string `json:"checks"`
+	Review string `json:"review"`
 }
 
 type task struct {

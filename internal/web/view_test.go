@@ -285,10 +285,7 @@ func TestStackedView(t *testing.T) {
 		{Name: "jb/q", Queued: true},
 		{Name: "<b>x", Current: true},
 	}}}
-	st.Stack.Branches[0].PR = &struct {
-		Number int    `json:"number"`
-		State  string `json:"state"`
-	}{Number: 9, State: "queued"}
+	st.Stack.Branches[0].PR = &ghStackPR{Number: 9, State: "queued"}
 	d := newDetail("ftest", row{WT: worktree{Slug: "c", Branch: "<b>x"}, Stacked: st}, repo)
 	html, err := render("detail", d)
 	if err != nil {
@@ -296,7 +293,7 @@ func TestStackedView(t *testing.T) {
 	}
 	for _, want := range []string{`href="https://github.com/o/r/pull/9"`, `class="pr blue"`, "&lt;b&gt;x", ">queued</span>",
 		// another branch is a switch form; the stack's actions follow
-		`action="/p/ftest/c/stack/switch"`, `name="branch" value="jb/q"`, `action="/p/ftest/c/act/stack-push"`, `action="/p/ftest/c/act/restack"`, ">restack…</button>",
+		`action="/p/ftest/c/stack/switch"`, `name="branch" value="jb/q"`,
 		`action="/p/ftest/c/act/term"`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %q:\n%s", want, html)
@@ -305,12 +302,17 @@ func TestStackedView(t *testing.T) {
 	if strings.Contains(html, "<b>x") {
 		t.Error("a branch name reached the page as HTML")
 	}
+	for _, act := range []string{"restack", "stack-push", "stack-up", "stack-down"} {
+		if strings.Contains(html, "/act/"+act) {
+			t.Errorf("a %s button", act)
+		}
+	}
 	if strings.Contains(html, `value="&lt;b&gt;x"`) {
 		t.Error("the current branch is offered as a switch")
 	}
 	// No stack, no stack actions.
 	html, _ = render("detail", newDetail("ftest", row{WT: worktree{Slug: "c"}}, repo))
-	if strings.Contains(html, "stack-push") || strings.Contains(html, "stack/switch") {
+	if strings.Contains(html, "stack/switch") {
 		t.Errorf("stack actions without a stack:\n%s", html)
 	}
 }

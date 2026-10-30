@@ -49,10 +49,10 @@ func TestStackLs(t *testing.T) {
 
 func TestStackText(t *testing.T) {
 	// A merged branch below doesn't count; the current one is 2 of 2.
-	r := stackRow{Stack: &prs.Stack{Trunk: "main", Current: "c", Branches: []prs.StackBranch{
+	r := stackRow{Stack: &prs.Stack{Trunk: "main", Current: "c", Number: 12, Branches: []prs.StackBranch{
 		{Name: "a", Merged: true}, {Name: "b"}, {Name: "c", Current: true, NeedsRebase: true},
 	}}}
-	if got := stackText(r); got != "2/2 on main, restack needed" {
+	if got := stackText(r); got != "#12, base main, 3 branches (1 merged), restack needed" {
 		t.Errorf("stackText = %q", got)
 	}
 }
@@ -68,16 +68,17 @@ func stackFake() *systest.Fake {
 	return f
 }
 
-// TestStackSwitch: only another open branch of the stack, checked out by
-// git through the shadow: the real worktree's HEAD moves.
+// TestStackSwitch: git switch through the shadow, the real worktree's HEAD
+// moves; git refuses a branch another worktree has; gh stack's other
+// commands are gh stack's own, not railswitch's.
 func TestStackSwitch(t *testing.T) {
 	ws, _ := gitWS(t)
 	gitIn(t, filepath.Join(ws, "master"), "branch", "next")
-	gitIn(t, filepath.Join(ws, "master"), "branch", "old")
-	for _, b := range []string{"master", "old", "feat", "-x"} {
-		if code, _, _ := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", "switch", b); code != 2 {
-			t.Errorf("switch %s: exit %d; want 2", b, code)
-		}
+	if code, _, _ := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", "switch", "-x"); code != 2 {
+		t.Errorf("switch -x: exit %d; want 2", code)
+	}
+	if code, _, _ := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", "switch", "master"); code == 0 {
+		t.Error("switched to the base worktree's branch")
 	}
 	f := stackFake()
 	code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "stack", "switch", "next")
@@ -92,47 +93,26 @@ func TestStackSwitch(t *testing.T) {
 	if i < 0 || !slices.ContainsFunc(f.Cmds[i].Env, func(kv string) bool { return strings.HasPrefix(kv, "GIT_COMMON_DIR=") }) {
 		t.Errorf("git switch ran without the shadow: %v", f.Calls)
 	}
-}
-
-// TestStackPush: gh stack push in the worktree, through the shadow, no
-// prompt.
-func TestStackPush(t *testing.T) {
-	ws, _ := gitWS(t)
-	f := stackFake()
-	code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "stack", "push")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, errs)
+	if slices.ContainsFunc(f.Calls, func(c []string) bool { return c[0] == "gh" }) {
+		t.Errorf("a switch ran gh: %v", f.Calls)
 	}
-	i := slices.IndexFunc(f.Calls, func(c []string) bool { return slices.Equal(c, []string{"gh", "stack", "push"}) })
-	if i < 0 {
-		t.Fatalf("no gh stack push: %v", f.Calls)
-	}
-	c := f.Cmds[i]
-	if c.Dir != filepath.Join(ws, "feat") || !slices.Contains(c.Env, "GH_PROMPT_DISABLED=1") ||
-		!slices.ContainsFunc(c.Env, func(kv string) bool { return strings.HasPrefix(kv, "GIT_COMMON_DIR=") }) {
-		t.Errorf("push cmd = dir %s env %v", c.Dir, c.Env)
+	for _, verb := range []string{"up", "down", "push", "rebase"} {
+		if code, _, _ := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", verb); code != 2 {
+			t.Errorf("stack %s: exit %d; want 2 (no such command)", verb, code)
+		}
 	}
 }
 
-// TestStackRebaseNewTerm and TestTerm: a new terminal in the worktree,
-// running the rebase (a shell when it stops) or the user's shell.
-func TestStackRebaseNewTerm(t *testing.T) {
+// TestTerm: a new terminal in the worktree running the user's shell.
+func TestTerm(t *testing.T) {
 	ws, _ := gitWS(t)
-	oldExe, oldLaunch := executable, launchTerm
-	t.Cleanup(func() { executable, launchTerm = oldExe, oldLaunch })
-	executable = func() (string, error) { return "/bin/railswitch", nil }
+	old := launchTerm
+	t.Cleanup(func() { launchTerm = old })
 	var gotDir string
 	var gotArgv []string
 	launchTerm = func(_ context.Context, _ *env, _, dir string, argv []string) error {
 		gotDir, gotArgv = dir, argv
 		return nil
-	}
-	if code, _, errs := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", "rebase", "--new-term", "--continue"); code != 0 {
-		t.Fatalf("exit %d: %s", code, errs)
-	}
-	want := []string{"/bin/railswitch", "-C", ws, "-w", "feat", "stack", "rebase", "--shell-on-stop", "--continue"}
-	if gotDir != filepath.Join(ws, "feat") || !slices.Equal(gotArgv, want) {
-		t.Errorf("launched %s %q; want %q", gotDir, gotArgv, want)
 	}
 	t.Setenv("SHELL", "/usr/bin/fish")
 	if code, _, errs := runWith(t, stackFake(), "-C", ws, "-w", "feat", "term"); code != 0 {
@@ -154,35 +134,5 @@ func TestUserShell(t *testing.T) {
 	}
 	if got := userShell(); got != "/usr/bin/zsh" && os.Getuid() != 0 {
 		t.Errorf("userShell = %q", got)
-	}
-}
-
-// TestStackRebase: on the repository itself, hooks off, no shadow; a
-// config key a container could have planted refuses it.
-func TestStackRebase(t *testing.T) {
-	ws, _ := gitWS(t)
-	f := stackFake()
-	code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "stack", "rebase", "--continue")
-	if code != 0 {
-		t.Fatalf("exit %d: %s", code, errs)
-	}
-	i := slices.IndexFunc(f.Calls, func(c []string) bool { return slices.Equal(c, []string{"gh", "stack", "rebase", "--continue"}) })
-	if i < 0 {
-		t.Fatalf("no gh stack rebase: %v", f.Calls)
-	}
-	c := f.Cmds[i]
-	if c.Dir != filepath.Join(ws, "feat") || !slices.Contains(c.Env, "GIT_CONFIG_VALUE_1=/dev/null") ||
-		slices.ContainsFunc(c.Env, func(kv string) bool { return strings.HasPrefix(kv, "GIT_COMMON_DIR=") }) {
-		t.Errorf("rebase cmd = dir %s env %v", c.Dir, c.Env)
-	}
-
-	gitIn(t, filepath.Join(ws, "master"), "config", "alias.st", "!touch /tmp/x")
-	f = stackFake()
-	code, _, errs = runWith(t, f, "-C", ws, "-w", "feat", "stack", "rebase")
-	if code == 0 || !strings.Contains(errs, "alias.st") {
-		t.Errorf("planted alias: exit %d: %s", code, errs)
-	}
-	if slices.ContainsFunc(f.Calls, func(c []string) bool { return len(c) > 2 && c[0] == "gh" && c[2] == "rebase" }) {
-		t.Error("gh stack rebase ran")
 	}
 }

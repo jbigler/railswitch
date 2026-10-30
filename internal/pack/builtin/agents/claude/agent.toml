@@ -30,9 +30,14 @@ name = "claude_plugins_marketplaces"
 mount = "/home/appuser/.claude/plugins/marketplaces"
 chown = true
 
-[[mounts]]                    # copied to ~/.claude/CLAUDE.md by the entrypoint
+[[mounts]]                    # copied to ~/.claude/railswitch.md by memory.sh
 source = "CLAUDE.md"
 target = "/opt/railswitch/agent/CLAUDE.md"
+options = "ro,z"
+
+[[mounts]]                    # run by the entrypoint: ~/.claude/CLAUDE.md imports railswitch.md
+source = "memory.sh"
+target = "/usr/local/bin/railswitch-memory"
 options = "ro,z"
 
 [[mounts]]                    # run by the entrypoint for a home that asks for the default (D135)
@@ -54,6 +59,7 @@ paths = [
   ".claude/settings.json",      # theme, enabled plugins, permissions, hooks
   ".claude/keybindings.json",
   ".claude/statusline-command.sh",
+  ".claude/CLAUDE.md",           # yours: imports railswitch.md, keeps other tools' lines
   ".claude/CLAUDE.local.md",
   ".claude/agents",
   ".claude/commands",

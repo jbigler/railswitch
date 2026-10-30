@@ -79,9 +79,10 @@ jq '
 ' "$SETTINGS_JSON" > "$tmp"
 if cmp -s "$tmp" "$SETTINGS_JSON"; then rm -f "$tmp"; else mv "$tmp" "$SETTINGS_JSON"; fi
 
-# Refresh global memory from the package's CLAUDE.md. A plain copy, not a bind
-# mount at this path: tools that rewrite it via temp + rename fail on a mount.
-cp /opt/railswitch/agent/CLAUDE.md "$CONFIG_DIR/CLAUDE.md"
+# Refresh railswitch's instructions as ~/.claude/railswitch.md, imported by
+# one line of ~/.claude/CLAUDE.md, which otherwise stays the user's (rtk
+# init's @RTK.md survives restarts).
+/usr/local/bin/railswitch-memory /opt/railswitch/agent/CLAUDE.md "$CONFIG_DIR"
 
 # ~/.local/bin/claude keeps PATH and /doctor's native-install check happy.
 mkdir -p "$HOME/.local/bin"

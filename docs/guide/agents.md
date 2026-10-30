@@ -93,6 +93,14 @@ rest and is reported, the agent starts anyway, and the next start tries
 them again. An agent package needs an entrypoint for this. Agents are
 yours: templates leave them out.
 
+## Claude's instructions
+
+railswitch's instructions for Claude (the browser, the container) are
+refreshed on every start as `~/.claude/railswitch.md`, and
+`~/.claude/CLAUDE.md` imports them with one line, `@railswitch.md`.
+The rest of `CLAUDE.md` is yours: lines a tool adds there (`rtk init`'s
+`@RTK.md`, say) or you write survive restarts.
+
 ## A default config for every worktree
 
 Set an agent up the way you like in one worktree (theme, plugins and
@@ -109,7 +117,7 @@ Or in the dashboard: **default config…** next to Agent in a worktree.
 
 The default holds only the files the agent's package lists as its config
 (for Claude: `settings.json`, `keybindings.json`, the status line,
-`CLAUDE.local.md`, `agents/`, `commands/`, `hooks/`, `skills/`,
+`CLAUDE.md`, `CLAUDE.local.md`, `agents/`, `commands/`, `hooks/`, `skills/`,
 `output-styles/`, the plugin and marketplace records and `.claude.json`),
 never its login, sessions or history. It lives in
 `.railswitch/agent-default/<agent>/`. A new worktree's agent starts from

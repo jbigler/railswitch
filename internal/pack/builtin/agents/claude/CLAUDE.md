@@ -1,8 +1,9 @@
 # Container instructions
 
 <!-- Shipped in railswitch's claude@1 agent package, mounted read-only at
-     /opt/railswitch/agent/CLAUDE.md and copied to ~/.claude/CLAUDE.md by the
-     entrypoint on every start: edits to the copy are lost on restart. -->
+     /opt/railswitch/agent/CLAUDE.md and copied to ~/.claude/railswitch.md
+     on every start (edits to that copy are lost; ~/.claude/CLAUDE.md, which
+     imports it, is yours). -->
 
 # Browser (chrome-devtools MCP)
 

@@ -590,7 +590,8 @@ type rowView struct {
 	StackGlyph, StackText, StackClass string
 	AgentGlyph, AgentText, AgentClass string
 	AgentTitle                        string
-	Stale                             bool // runs an older unit: "restart to apply"
+	Need                              string // the agent waits on you: its label ("permission"), shown by the name
+	Stale                             bool   // runs an older unit: "restart to apply"
 }
 
 func newRow(prefix string, r row, sel string, k sortKey) rowView {
@@ -604,6 +605,9 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 	}
 	if r.WT.Agent != nil {
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
+	}
+	if needsInput(kind) {
+		v.Need = agentLabel(kind)
 	}
 	return v
 }

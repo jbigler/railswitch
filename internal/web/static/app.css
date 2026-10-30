@@ -253,3 +253,4 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .svc-acts form{display:inline}
 .svc-acts a,.svc-acts button{color:var(--blue);background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:none}
 .svc-acts a:hover,.svc-acts button:hover{text-decoration:underline}
+.list td.br .trunc{display:inline-block;max-width:16rem;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}

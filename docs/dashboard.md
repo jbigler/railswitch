@@ -150,8 +150,11 @@ is no longer accepted. What the page shows meanwhile may be stale.
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
 - **List:** a toolbar with the sort bar, `+ New worktree` and `Refresh
-  PRs`, then one row per worktree: name, branch, PR (number, checks,
-  state, review), stack state, agent state. A worktree whose running
+  PRs`, then one row per worktree: name (with `◆` in front while its
+  agent needs permission, asks a question or waits for a reply: the
+  column that never scrolls out of a narrow pane), branch (cut short
+  past 16rem, the full name as its tooltip), PR (number, checks, state,
+  review), stack state, agent state. A worktree whose running
   containers were created from older units than the rendered ones
   (`overview`'s `stale`, after a settings change, say) shows "restart to
   apply" next to its stack state, in the row and in the detail; `restart`

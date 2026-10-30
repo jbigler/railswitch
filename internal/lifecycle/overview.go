@@ -58,6 +58,9 @@ type Overview struct {
 	// content now (template check shows the diff, D111).
 	Template       *OverviewTemplate `json:"template"`
 	TemplateUpdate bool              `json:"template_update"`
+	// DefaultsChanged are the project's Containerfiles (by <name>) ejected
+	// from a default that changed since; never nil. The caller fills it.
+	DefaultsChanged []string `json:"defaults_changed"`
 }
 
 // OverviewTemplate is a project's [template].
@@ -141,7 +144,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust())}
+	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust()), DefaultsChanged: []string{}}
 	if rec := l.WS.Project.Template; rec != nil {
 		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
 		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()
@@ -213,6 +216,11 @@ func (l *L) PrintOverview(ctx context.Context, asJSON bool) error {
 	if err != nil {
 		return err
 	}
+	return l.WriteOverview(ov, asJSON)
+}
+
+// WriteOverview prints ov as PrintOverview does.
+func (l *L) WriteOverview(ov Overview, asJSON bool) error {
 	if asJSON {
 		return json.NewEncoder(l.Out).Encode(ov)
 	}
@@ -245,6 +253,11 @@ func (l *L) PrintOverview(ctx context.Context, asJSON bool) error {
 			fmt.Fprintf(lw, "  %s\t%s\n", k.Label, safefile.Printable(k.URL)) // {branch} expands into it
 		}
 		if err := lw.Flush(); err != nil {
+			return err
+		}
+	}
+	for _, name := range ov.DefaultsChanged {
+		if _, err := fmt.Fprintf(l.Out, "note: Containerfile.%s: its default changed since it was ejected (railswitch containerfile show %s)\n", name, name); err != nil {
 			return err
 		}
 	}

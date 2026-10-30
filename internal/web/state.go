@@ -527,6 +527,9 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 			for _, sw := range p.ov.SignerWarnings {
 				banner.Signers = append(banner.Signers, signerWarningText(sw))
 			}
+			for _, name := range p.ov.DefaultsChanged {
+				banner.Defaults = append(banner.Defaults, bannerDefault{Name: name, URL: "/p/" + prefix + "/images/edit/" + name})
+			}
 			if p.ov.TemplateUpdate && p.ov.Template != nil {
 				banner.Template = &bannerTemplate{Ref: p.ov.Template.Ref, URL: settingsURL(prefix) + "#template"}
 			}

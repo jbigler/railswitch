@@ -1,17 +1,21 @@
 {{define "header"}}<header id="header" class="hd" data-need="{{.Need}}">
 <b class="logo">RailSwitch</b>
-<button type="button" class="hb proj" data-open="switcher" title="Switch project (P)">{{if .Prefix}}<span class="mono">{{.Prefix}}</span>{{else}}projects{{end}} ▾ <kbd>P</kbd></button>
-{{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}
-<span class="sp"></span>
-{{if .Prefix}}<button type="button" class="hb" data-palette title="Run a task (:)">tasks <kbd>:</kbd></button>
+<nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>
+<button type="button" class="hb proj" data-open="switcher" title="Switch project (P)">{{if .Prefix}}<span class="mono">{{.Prefix}}</span>{{else}}choose{{end}} ▾ <kbd>P</kbd></button>
+{{if .Prefix}}<a class="hb" href="/p/{{.Prefix}}">worktrees</a>
+<button type="button" class="hb" data-palette title="Run a task (:)">tasks <kbd>:</kbd></button>
 <a class="hb" href="/p/{{.Prefix}}/images">images</a>
 <a class="hb" href="/p/{{.Prefix}}/library">library</a>
 <a class="hb" href="/p/{{.Prefix}}/settings">settings</a>
-{{end}}
-<a class="hb" href="/machine">machine</a>
+{{end}}</nav>
+{{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}
+<span class="sp"></span>
+<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>
+<a class="hb" href="/machine" title="Templates, libraries and signers on this machine">settings</a>
 <a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">logs</a>
 <button type="button" class="hb" data-notify hidden>notifications</button>
-<button type="button" class="hb" data-colors title="Colours">⚙</button>
+<button type="button" class="hb" data-colors title="Dashboard colours">⚙</button>
+</nav>
 </header>{{end}}
 
 {{define "projects"}}<ul id="projects" class="projects">

@@ -60,6 +60,17 @@ func TestContainerfileShowJSON(t *testing.T) {
 	if d = showJSON(t, ws, "pg-client"); !d.DefaultChanged {
 		t.Error("default_changed false after the header's sha changed")
 	}
+	// The build chain and the overview say so too.
+	if out := mustRun(t, "-C", ws, "-w", "master", "--json", "containerfile", "list"); !strings.Contains(out, `"name":"addon pg-client","file":"containerfiles/Containerfile.pg-client"`) || !regexp.MustCompile(`"addon pg-client"[^}]*"default_changed":true`).MatchString(out) {
+		t.Errorf("containerfile list:\n%s", out)
+	}
+	_, _, st, err := projectStack(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := staleEjects(ws, st); !slices.Equal(got, []string{"pg-client"}) {
+		t.Errorf("staleEjects = %v", got)
+	}
 
 	for name, kind := range map[string]string{"base": "base", "nvim": "tool", "playwright": "standalone", "agent-base": "agent-base", "probe": "agent"} {
 		if d := showJSON(t, ws, name); d.Kind != kind || d.Default == nil {

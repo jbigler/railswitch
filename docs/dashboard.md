@@ -123,15 +123,20 @@ When the live stream drops, a red line under the header says so:
 "Logged out — run `railswitch dashboard` for a new link" when the cookie
 is no longer accepted. What the page shows meanwhile may be stale.
 
-- **Header:** "RailSwitch"; the project button (the prefix; opens the
-  switcher); `◆ N need input`; `tasks :`; `images`, `library` and
-  `settings` (the project's Images, Library and Settings pages, below); `logs` (Dozzle at
-  `http://logs.localhost/`); a `notifications` button until the browser
-  permission is decided; `⚙` colours. The tab title is `(N) RailSwitch`,
-  N counting agents in permission, question or waiting-for-reply across
-  all projects.
+- **Header:** "RailSwitch", then two labelled groups. **project**: the
+  project button (the prefix, or "choose"; opens the switcher) and, with
+  a project, `worktrees` (its page), `tasks :`, `images`, `library` and
+  `settings` (the project's pages, below). Then `◆ N need input`. On the
+  right, **machine**: `settings` (the Machine page), `logs` (Dozzle at
+  `http://logs.localhost/`), a `notifications` button until the browser
+  permission is decided, and `⚙` (dashboard colours). The link of the
+  page shown is marked. The tab title is `(N) RailSwitch`, N counting
+  agents in permission, question or waiting-for-reply across all
+  projects.
 - **Banner** (under the header): a project's read errors ("Status
-  unavailable", "PRs unavailable") and, while `overview`'s
+  unavailable", "PRs unavailable"); for each name in `overview`'s
+  `defaults_changed`, "The default of your own Containerfile.<name>
+  changed since you ejected it", linking to its Images editor; and, while `overview`'s
   `review_pending` is true, "Package update waiting for review. Review
   update" (the Review update page, below). The switcher marks such a
   project `update`. One line per `overview` `signer_warnings` entry, in
@@ -320,7 +325,9 @@ during the build, outside the firewall.
 - The project's warnings from `railswitch --json -w <slug> containerfile
   list`, then the **build chain** in build order: step, kind (`base`,
   `addon`, `agent-base`, `agent`, or `image` for a tool or an option's
-  image), file, `FROM` images and tag, and Edit.
+  image), file, `FROM` images and tag, and Edit. A file whose default changed since it was
+  ejected (`default_changed`) carries a **default changed** badge that
+  opens its editor.
 - **New addon:** a name (lower-case letters, digits and `-`) runs
   `railswitch containerfile new <name>` as a project-level job; when it
   ends ok the editor opens on the new file.

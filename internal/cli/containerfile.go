@@ -86,6 +86,35 @@ func stackBuiltins(st *pack.Stack) map[string]builtin {
 	return out
 }
 
+// defaultChanged reports whether root's Containerfile.<name> was ejected
+// from a default other than b's text: the default changed since.
+func defaultChanged(root, name string, b builtin) bool {
+	data, err := safefile.Read(filepath.Join(root, filepath.FromSlash(workspaceFile(name))), safefile.Limit)
+	if err != nil {
+		return false
+	}
+	first, _, _ := strings.Cut(string(data), "\n")
+	_, sha, ok := parseEjectHeader(first)
+	if !ok {
+		return false
+	}
+	def, err := fs.ReadFile(b.files, b.file)
+	return err == nil && fmt.Sprintf("%x", sha256.Sum256(def)) != sha
+}
+
+// staleEjects are the names of root's Containerfiles whose default in st
+// changed since they were ejected, sorted; never nil.
+func staleEjects(root string, st *pack.Stack) []string {
+	out := []string{}
+	for name, b := range stackBuiltins(st) {
+		if defaultChanged(root, name, b) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // builtinNames is every name a built-in default has in any stack of cat,
 // and the agent images' defaults: agent-base and each agent package's,
 // built-in or workspace-local.
@@ -273,6 +302,8 @@ type buildStep struct {
 	File string   `json:"file"` // workspace-relative
 	Tag  string   `json:"tag"`
 	From []string `json:"from"`
+	// DefaultChanged: the file was ejected from a default that changed since.
+	DefaultChanged bool `json:"default_changed"`
 }
 
 // railswitch containerfile list: the current worktree's image builds, in
@@ -293,12 +324,16 @@ func containerfileList(ctx context.Context, e *env, args []string) int {
 		Steps    []buildStep `json:"steps"`
 		Warnings []string    `json:"warnings"`
 	}{Steps: []buildStep{}, Warnings: orEmpty(m.Warnings)}
+	defaults := stackBuiltins(m.Inputs.Stack)
 	for _, b := range in.Builds {
 		rel, err := filepath.Rel(m.Inputs.Workspace, b.File)
 		if err != nil {
 			return e.fail(err)
 		}
-		doc.Steps = append(doc.Steps, buildStep{Name: b.Name, File: filepath.ToSlash(rel), Tag: b.Tag, From: orEmpty(b.From)})
+		name := cfName(filepath.Base(b.File))
+		def, ok := defaults[name]
+		changed := ok && defaultChanged(m.Inputs.Workspace, name, def)
+		doc.Steps = append(doc.Steps, buildStep{Name: b.Name, File: filepath.ToSlash(rel), Tag: b.Tag, From: orEmpty(b.From), DefaultChanged: changed})
 	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {

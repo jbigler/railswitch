@@ -101,6 +101,7 @@ type wtPick struct {
 
 type stepView struct {
 	Name, Kind, File, Tag, From, EditURL string
+	DefaultChanged                       bool // its default changed since it was ejected
 }
 
 // stepKind is a build step's kind, from its name (docs/json.md).
@@ -161,7 +162,7 @@ func (s *Server) imagesPage(w http.ResponseWriter, r *http.Request) {
 	v.Warnings = chain.Warnings
 	for _, st := range chain.Steps {
 		name, _ := strings.CutPrefix(st.File, "containerfiles/Containerfile.")
-		sv := stepView{Name: st.Name, Kind: stepKind(st.Name), File: path.Base(st.File), Tag: st.Tag, From: strings.Join(st.From, ", ")}
+		sv := stepView{Name: st.Name, Kind: stepKind(st.Name), File: path.Base(st.File), Tag: st.Tag, From: strings.Join(st.From, ", "), DefaultChanged: st.DefaultChanged}
 		if cfNameRe.MatchString(name) {
 			sv.EditURL = base + "/edit/" + name
 		}

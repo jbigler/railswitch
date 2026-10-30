@@ -93,6 +93,10 @@ type reviewDoc struct {
 	Flags    int         `json:"flags"`
 	Packages []reviewPkg `json:"packages"`
 	Restart  []string    `json:"restart"`
+	// Ejected are the project's own Containerfiles (by <name>) whose
+	// default this review changes: accepting updates the default, not the
+	// copy (lock --review only; empty elsewhere).
+	Ejected []string `json:"ejected"`
 
 	firstLock bool // there is no stack.lock yet: nothing to review against
 }
@@ -125,6 +129,7 @@ func (e *env) lockReview(ctx context.Context, root string, restart bool) (*revie
 	if err != nil {
 		return nil, err
 	}
+	doc.Ejected = ejectedChanged(root, doc)
 	cur, loadErr := workspace.Load(ctx, root, "")
 	doc.firstLock = errors.Is(loadErr, config.ErrNoLock)
 	if !restart || len(doc.Packages) == 0 || loadErr != nil {
@@ -144,10 +149,34 @@ func (e *env) lockReview(ctx context.Context, root string, restart bool) (*revie
 	return doc, nil
 }
 
+// ejectedChanged are the names of root's ejected Containerfiles whose
+// default doc changes, sorted.
+func ejectedChanged(root string, doc *reviewDoc) []string {
+	out := []string{}
+	for _, p := range doc.Packages {
+		for _, f := range p.Files {
+			name, ok := strings.CutPrefix(f.Path, "Containerfile.")
+			if !ok || slices.Contains(out, name) {
+				continue
+			}
+			data, err := safefile.Read(filepath.Join(root, filepath.FromSlash(workspaceFile(name))), safefile.Limit)
+			if err != nil {
+				continue
+			}
+			first, _, _ := strings.Cut(string(data), "\n")
+			if _, _, ejected := parseEjectHeader(first); ejected {
+				out = append(out, name)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // reviewOf is pl as a review document, each package compared file by file
 // and flagged; Restart is empty.
 func reviewDocOf(pl *workspace.Plan) (*reviewDoc, error) {
-	doc := &reviewDoc{Hash: workspace.ReviewHash(pl.Lock, pl.Template), Packages: []reviewPkg{}, Restart: []string{}}
+	doc := &reviewDoc{Hash: workspace.ReviewHash(pl.Lock, pl.Template), Packages: []reviewPkg{}, Restart: []string{}, Ejected: []string{}}
 	others := otherLocks(pl.Next)
 	for _, c := range pl.Packages {
 		files, err := review.Compare(c.Kind, c.Old, c.New)

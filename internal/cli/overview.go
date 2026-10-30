@@ -16,7 +16,12 @@ func cmdOverview(ctx context.Context, e *env, args []string) int {
 	if code != 0 {
 		return code
 	}
-	if err := l.PrintOverview(ctx, e.json); err != nil {
+	ov, err := l.Overview(ctx)
+	if err != nil {
+		return e.fail(err)
+	}
+	ov.DefaultsChanged = staleEjects(l.WS.Root, l.WS.Stack)
+	if err := l.WriteOverview(ov, e.json); err != nil {
 		return e.fail(err)
 	}
 	return 0

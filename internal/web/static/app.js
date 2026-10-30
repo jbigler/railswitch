@@ -80,8 +80,21 @@ function swap(id, html) {
   afterSwap(id);
 }
 
+// markCurrent marks the header link of the page shown: the longest one the
+// path is or lies under (a project's worktrees link covers its worktrees).
+function markCurrent() {
+  let best = null;
+  for (const a of document.querySelectorAll("#header a.hb[href^='/']")) {
+    a.removeAttribute("aria-current");
+    const h = a.getAttribute("href");
+    if ((location.pathname === h || location.pathname.startsWith(h + "/")) && (!best || h.length > best.getAttribute("href").length)) best = a;
+  }
+  if (best) best.setAttribute("aria-current", "page");
+}
+
 function afterSwap(id) {
   if (id === "header") {
+    markCurrent();
     const n = Number($("#header").dataset.need || 0);
     document.title = n ? `(${n}) RailSwitch` : "RailSwitch";
     const btn = $("[data-notify]");

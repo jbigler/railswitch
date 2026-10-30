@@ -4,7 +4,7 @@ Go CLI (`railswitch`, module `github.com/jbigler/railswitch`) that runs Rails de
 Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
 
 ## Commands
-- `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...`, `go test ./...`.
+- `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...` (through `go run` at the Makefile's `STATICCHECK_VERSION`: nothing to install), `go test ./...`.
 - `make build` → `./railswitch` (`VERSION=` sets `buildinfo.Version`).
 - Integration tests carry `//go:build integration`; the full end-to-end test needs a systemd user session and is a manual run.
 

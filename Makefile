@@ -1,11 +1,15 @@
 VERSION ?= dev
+# staticcheck runs at this version through `go run` (built once, then from
+# Go's cache), so `make check` needs nothing on PATH beyond Go. Keep it in
+# step with the workflows' install step.
+STATICCHECK_VERSION = 2026.2.2
 
 .PHONY: check build test
 
 check:
 	test -z "$$(gofmt -l cmd internal)"
 	go vet ./...
-	staticcheck ./...
+	go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ./...
 	go test ./...
 
 test:

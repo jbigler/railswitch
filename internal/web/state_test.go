@@ -378,4 +378,25 @@ func TestGhStack(t *testing.T) {
 	if c, b := strings.Index(ev.HTML, "jb/c"), strings.Index(ev.HTML, "jb/b</strong> <strong"); c < 0 || b < 0 || c > b {
 		t.Errorf("open branches not top first (jb/c at %d, jb/b at %d)", c, b)
 	}
+
+	// A click on jb/c runs the switch; the merged jb/a and HEAD's jb/b
+	// are refused. When the switch ends ok, HEAD moves to jb/c at once.
+	for _, b := range []string{"jb/a", "jb/b", "jb/zz"} {
+		if w := f.do(req("POST", "/p/ftest/b/stack/switch", form("branch", b))); w.Code != 422 {
+			t.Errorf("switch %s: %d", b, w.Code)
+		}
+	}
+	if w := f.do(req("POST", "/p/ftest/b/stack/switch", form("branch", "jb/c"))); w.Code != 202 {
+		t.Fatalf("switch jb/c: %d %s", w.Code, w.Body)
+	}
+	want := []string{testExe, "-C", "/ws/ftest", "-w", "b", "stack", "switch", "jb/c"}
+	if got := f.run.wait(t, 1)[0]; !slices.Equal(got, want) {
+		t.Errorf("argv %q", got)
+	}
+	drain(sub)
+	f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "j9", Spec: jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/c"}, State: jobs.StateOK}})
+	ev, ok = byID(drain(sub), "detail")
+	if !ok || !strings.Contains(ev.HTML, "jb/c</strong> <strong class=\"accent\">◀ HEAD") || !strings.Contains(ev.HTML, "2/2 open") {
+		t.Errorf("detail after the switch: %v\n%s", ok, ev.HTML)
+	}
 }

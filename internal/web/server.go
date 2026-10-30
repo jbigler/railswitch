@@ -492,20 +492,15 @@ func (s *Server) accepted(w http.ResponseWriter, r *http.Request, id, label, bac
 func worktreePath(p projectRow, slug string) string { return "/p/" + p.Prefix + "/" + slug }
 
 // worktreeActions are a worktree's buttons: the action in the URL, the
-// railswitch arguments it runs. A label starting "stack " re-reads the
-// stacks when its job ends.
+// railswitch arguments it runs.
 var worktreeActions = map[string]struct {
 	label string
 	args  []string
 }{
-	"up":         {"up", []string{"up"}},
-	"stop":       {"stop", []string{"stop"}},
-	"restart":    {"restart", []string{"restart"}},
-	"term":       {"terminal", []string{"term"}},
-	"stack-push": {"stack push", []string{"stack", "push"}},
-	"stack-up":   {"stack up", []string{"stack", "up"}},
-	"stack-down": {"stack down", []string{"stack", "down"}},
-	"restack":    {"stack rebase", []string{"stack", "rebase", "--new-term"}},
+	"up":      {"up", []string{"up"}},
+	"stop":    {"stop", []string{"stop"}},
+	"restart": {"restart", []string{"restart"}},
+	"term":    {"terminal", []string{"term"}},
 }
 
 func (s *Server) act(w http.ResponseWriter, r *http.Request) {
@@ -524,8 +519,8 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 	}, nil, worktreePath(p, wt.Slug))
 }
 
-// stackSwitch checks out another branch of the worktree's gh stack; the
-// CLI refuses one that isn't an open branch of it.
+// stackSwitch checks out another open branch of the worktree's gh stack,
+// as the page last read it.
 func (s *Server) stackSwitch(w http.ResponseWriter, r *http.Request) {
 	p, wt, ok := s.lookup(w, r)
 	if !ok {
@@ -536,8 +531,12 @@ func (s *Server) stackSwitch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad branch name", http.StatusUnprocessableEntity)
 		return
 	}
+	if !s.stackBranch(p.Prefix, wt.Slug, branch) {
+		http.Error(w, branch+" is not another open branch of "+wt.Slug+"'s stack", http.StatusUnprocessableEntity)
+		return
+	}
 	s.start(w, r, jobs.Spec{
-		Project: p.Prefix, Slug: wt.Slug, Label: "stack switch " + branch, Dir: p.Workspace,
+		Project: p.Prefix, Slug: wt.Slug, Label: switchLabel + branch, Dir: p.Workspace,
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "stack", "switch", branch},
 	}, nil, worktreePath(p, wt.Slug))
 }

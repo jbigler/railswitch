@@ -176,9 +176,8 @@ is no longer accepted. What the page shows meanwhile may be stale.
   on main`, `⚠ restack needed` when a branch needs a rebase, the open
   branches top first (PR number, linked through the project's PR URL,
   the branch, `◀ HEAD` on the current one, `queued`, `⚠`), the merged ones
-  folded, the trunk last, then the stack's actions (push, up, down,
-  restack…; see Actions); every other open branch's name checks it out
-  here. The list shows `≡ 2/3` next to the branch. Then
+  folded, the trunk last; every other open branch's name checks it out
+  here (see Actions). The list shows `≡ 2/3` next to the branch. Then
   Links, Services (one aligned row per service: a
   glyph, the name and a plain state word, `running`, `starting`,
   `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
@@ -712,18 +711,14 @@ Every action is a job (below).
   <agent> [--all]`).
 - **terminal** runs `railswitch term`: a new terminal tab or window on
   the host with your shell in the worktree's folder.
-- **Stack** (with a gh stack): **push**, **up**, **down** run
-  `railswitch stack push|up|down`; a branch name runs `railswitch stack
-  switch <branch>`; **restack…** runs `railswitch stack rebase
-  --new-term`, a terminal running `gh stack rebase` that, when the rebase
-  stops at a conflict, leaves your shell open there to resolve it and run
-  `railswitch stack rebase --continue` (or `--abort`). The stacks are
-  read again when one of these jobs ends. Like `stack ls`, these see the
-  repository through a private copy of its git config (no filter, alias,
-  include, hook or fsmonitor a container wrote runs on the host); gh
-  stack rebase can't, so it runs on the repository itself with hooks and
-  fsmonitor off, and is refused while `doctor`'s git-guard finds
-  anything but a changed hook.
+- **Stack branch** (with a gh stack): a click on another open branch of
+  the stack runs `railswitch stack switch <branch>` (`git switch
+  --no-guess` through a private copy of the repository's git config: no
+  hook, filter or fsmonitor a container wrote runs on the host); the
+  dashboard refuses a branch the stack it last read doesn't hold. When
+  the job ends ok the page marks the branch HEAD at once and reads the
+  stacks again behind it. Everything else (`gh stack up`, `push`,
+  `rebase`) you run with gh stack in the worktree.
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
   <branch>`.

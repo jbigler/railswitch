@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -361,11 +362,48 @@ func (s *Server) jobEvent(ev jobs.Event) {
 	if p := s.state[j.Spec.Project]; p != nil && j.State != jobs.StateRunning {
 		p.ovAt = time.Time{}
 		wake(s.wakeOV)
-		if strings.HasPrefix(j.Spec.Label, "stack ") { // the stacks changed
+		if branch, ok := strings.CutPrefix(j.Spec.Label, switchLabel); ok {
+			// The checkout moved HEAD: show it now, read the stacks again
+			// (gh stack asks GitHub, which takes a while) behind it.
+			if j.State == jobs.StateOK {
+				p.switched(j.Spec.Slug, branch)
+				s.publish()
+			}
 			p.prNow = true
 			wake(s.wakePR)
 		}
 	}
+}
+
+// switchLabel starts the label of a job checking out a stack branch.
+const switchLabel = "stack switch "
+
+// stackBranch reports whether branch is an open branch of worktree
+// slug's stack, other than the current one, as last read. s.mu is not held.
+func (s *Server) stackBranch(prefix, slug, branch string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.state[prefix]
+	if p == nil || p.stacks[slug] == nil || p.stacks[slug].Stack == nil {
+		return false
+	}
+	return slices.ContainsFunc(p.stacks[slug].Stack.Branches, func(b ghStackBranch) bool { return b.Name == branch && !b.Merged && !b.Current })
+}
+
+// switched marks branch current in worktree slug's stack, as a finished
+// switch left it, until the stacks are read again. s.mu is held.
+func (p *projectState) switched(slug, branch string) {
+	r := p.stacks[slug]
+	if r == nil || r.Stack == nil {
+		return
+	}
+	st := *r.Stack
+	st.Current = branch
+	st.Branches = slices.Clone(st.Branches)
+	for i := range st.Branches {
+		st.Branches[i].Current = st.Branches[i].Name == branch
+	}
+	p.stacks[slug] = &ghStackRow{Slug: r.Slug, Stack: &st}
 }
 
 // publish brings every page up to date. s.mu is held.

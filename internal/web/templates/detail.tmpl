@@ -17,7 +17,7 @@
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
 {{end}}<div class="lbl">Actions</div>
-<div class="actions">{{range .Actions}}<form method="post" action="{{.URL}}" data-post><button class="ln">{{.Label}}</button></form>{{end}}{{if .RemoveURL}}<span class="gap"></span><a class="ln danger" href="{{.RemoveURL}}" data-dialog="remove">remove…</a>{{if .Merged}}<a class="ln danger" href="{{.RemoveURL}}" data-dialog="remove">Remove worktree</a>{{end}}{{end}}</div>
+<div class="actions">{{range .Actions}}<form method="post" action="{{.URL}}" data-post><button class="ln">{{.Label}}</button></form>{{end}}{{if .RemoveURL}}<span class="gap"></span><a class="ln danger" href="{{.RemoveURL}}" data-dialog="remove"{{if .Merged}} title="Its PR is merged"{{end}}>{{if .Merged}}PR merged: remove…{{else}}remove…{{end}}</a>{{end}}</div>
 {{end}}</section>{{end}}
 
 {{/* The project's unset secrets: up refuses them. Each value goes only to

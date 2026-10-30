@@ -16,6 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/unithash"
 )
 
 const (
@@ -114,6 +115,23 @@ func (l *L) nvimStarted(ctx context.Context, slug string) (*render.Model, *rende
 	st, err := sd.UnitState(ctx, unit)
 	if err != nil {
 		return nil, nil, nil, "", err
+	}
+	// A unit render just wrote (nvim newly enabled) or changed: systemd
+	// knows it only after a reload, which up does and this skips. It never
+	// flags a changed Quadlet file, so the loaded unit's hash is compared
+	// with the rendered file's, as up does.
+	reload := st.Load != "loaded" || st.NeedReload
+	if loaded := unithash.FromExec(st.ExecStart, unithash.Key(m.Prefix)); !reload && loaded != "" {
+		want, err := l.renderedHash(ctr+".container", unithash.Key(m.Prefix))
+		if err != nil {
+			return nil, nil, nil, "", err
+		}
+		reload = loaded != want
+	}
+	if reload {
+		if err := sd.DaemonReload(ctx); err != nil {
+			return nil, nil, nil, "", err
+		}
 	}
 	if st.Active != "active" {
 		if sd.Timeout, err = l.startTimeout([]string{ctr}); err != nil {

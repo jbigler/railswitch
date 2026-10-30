@@ -14,7 +14,9 @@ config_ref  = "v2"                                       # optional: a branch or
 
 ## Tools in the image
 
-Besides Neovim (built from source) the image has `ripgrep`, `fd`, `fzf`,
+Besides Neovim (built from source on the project's base image, so it
+links against the base's own C library: one built on a newer Debian than
+the base's doesn't start) the image has `ripgrep`, `fd`, `fzf`,
 `universal-ctags`, `lua5.4`, `luarocks`, `xclip` and `unzip` from the
 base's packages, and two pinned downloads, each changed by its `ARG` in
 `Containerfile.nvim`:
@@ -102,7 +104,8 @@ It stops every worktree's nvim unit, and removes the volume
 ## Attaching: `railswitch nvim`
 
 `railswitch nvim [--new-term] [<file>[:<line>[:<col>]]]` starts the
-worktree's nvim unit when it is not running, then attaches; with a file,
+worktree's nvim unit when it is not running (reloading systemd first when
+the unit is new or its file changed, as `up` does), then attaches; with a file,
 the server opens it first, at that line and column (clamped to the file),
 in its current window, so a UI already attached elsewhere jumps there
 too. The file can be given the way a tool printed it:

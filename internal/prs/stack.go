@@ -75,13 +75,19 @@ type StackPR struct {
 	Review string `json:"review"`
 }
 
+// maxDetail bounds Detail's queries: the stacks come from gh-stack's
+// catalog in the container-writable .git, which could list any number of
+// branches; past this many, the rest show without draft, checks or review.
+const maxDetail = 50
+
 // Detail fills in draft, checks and review of each open PR of stacks
-// from GitHub (List: one query per branch, each branch once).
+// from GitHub (List: one query per branch, each branch once, at most
+// maxDetail branches).
 func Detail(ctx context.Context, r sys.Runner, repo string, stacks []*Stack) error {
 	var branches []string
 	for _, s := range stacks {
 		for _, b := range s.Branches {
-			if b.PR != nil && b.PR.State == "open" {
+			if b.PR != nil && b.PR.State == "open" && !slices.Contains(branches, b.Name) && len(branches) < maxDetail {
 				branches = append(branches, b.Name)
 			}
 		}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -391,6 +392,28 @@ func TestAgentDefault(t *testing.T) {
 	}
 	if _, slugs, err := e.l.ApplyAgentDefault(ctx, "feat", "claude", false); err != nil || !slices.Equal(slugs, []string{"feat"}) {
 		t.Errorf("apply: %v %v", slugs, err)
+	}
+
+	// A FIFO an agent planted at the request's name fails at once.
+	req := filepath.Join(master, pack.AgentDefaultRequest)
+	if err := os.Remove(req); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(req, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, _, err := e.l.ApplyAgentDefault(ctx, "master", "claude", false)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("apply over a FIFO succeeded")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("apply blocked on a FIFO")
 	}
 }
 

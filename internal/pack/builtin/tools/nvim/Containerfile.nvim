@@ -43,12 +43,41 @@ RUN make CMAKE_BUILD_TYPE=RelWithDebInfo CMAKE_INSTALL_PREFIX=/usr/local/ && \
   make install && \
   strip /usr/local/bin/nvim
 
+# lazygit (most configs bind it to <leader>gg): the release binary, checked
+# against the release's checksums.txt.
+FROM docker.io/library/debian:trixie-slim AS lazygit
+ARG LAZYGIT_VERSION=0.66.2
+RUN apt-get update -qq && \
+  apt-get install -y --no-install-recommends ca-certificates curl && \
+  rm -rf /var/lib/apt/lists/*
+RUN case "$(dpkg --print-architecture)" in \
+    amd64) ARCH=x86_64 ;; \
+    arm64) ARCH=arm64 ;; \
+    *) echo "unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+  esac && \
+  FILE="lazygit_${LAZYGIT_VERSION}_linux_${ARCH}.tar.gz" && \
+  URL="https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}" && \
+  cd /tmp && \
+  curl -fsSLO "${URL}/${FILE}" && \
+  curl -fsSL "${URL}/checksums.txt" | grep " ${FILE}\$" | sha256sum -c - && \
+  tar -xzf "${FILE}" lazygit && \
+  install -m 755 lazygit /usr/local/bin/lazygit
+
+# The tree-sitter CLI (nvim-treesitter builds parsers with it), built on
+# bookworm: the release binaries need glibc 2.39, newer than a bookworm
+# base has, and Debian's package is older than nvim-treesitter needs.
+FROM docker.io/library/rust:1-slim-bookworm AS tree-sitter
+ARG TREE_SITTER_VERSION=0.27.1
+RUN cargo install --locked --root /usr/local tree-sitter-cli --version "${TREE_SITTER_VERSION}"
+
 FROM ${BASE_IMAGE}
 USER root
 
 COPY --from=build-nvim /usr/local/bin/nvim /usr/local/bin/nvim
 COPY --from=build-nvim /usr/local/lib/nvim /usr/local/lib/nvim
 COPY --from=build-nvim /usr/local/share/nvim /usr/local/share/nvim
+COPY --from=lazygit /usr/local/bin/lazygit /usr/local/bin/lazygit
+COPY --from=tree-sitter /usr/local/bin/tree-sitter /usr/local/bin/tree-sitter
 
 # nvim's own Node in /opt/nvim-node, linked into /usr/local/bin (ahead of a
 # bun image's node fallback in PATH) only when the base has no npm.

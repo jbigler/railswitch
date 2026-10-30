@@ -10,8 +10,11 @@ ARG NVIM_NODE_VERSION=24
 
 FROM docker.io/library/node:${NVIM_NODE_VERSION}-slim AS nvim-node
 
-# Neovim, built from source.
-FROM docker.io/library/debian:trixie-slim AS build-nvim
+# Neovim, built from source on the base image itself: a binary built on a
+# newer Debian than the base's needs a newer glibc than the base has (one
+# built on trixie doesn't start on a bookworm base).
+FROM ${BASE_IMAGE} AS build-nvim
+USER root
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG TARGET=stable

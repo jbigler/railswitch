@@ -91,6 +91,17 @@ func TestNvimAttachArgv(t *testing.T) {
 	if last := joined(calls[len(calls)-1]); last != "podman exec -i -t --preserve-fds 1 filial-feat-nvim sh -c "+hangupScript+" sh nvim --remote-ui --server 127.0.0.1:7777" {
 		t.Errorf("last call %q", last)
 	}
+	if n := count(calls, "systemctl --user daemon-reload"); n != 0 {
+		t.Errorf("%d reloads of a loaded unit", n)
+	}
+
+	// A unit systemd doesn't know yet (nvim just enabled): reload, then start.
+	e.reset()
+	e.units("LoadState=not-found\nNeedDaemonReload=no\nActiveState=inactive\n", nvimUnit)
+	if err := e.l.Nvim(ctx, "feat", nil); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(), "systemctl --user daemon-reload", "systemctl --user start "+nvimUnit)
 }
 
 // A failing hook only warns.

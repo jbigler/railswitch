@@ -49,7 +49,7 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		return err
 	}
 	id := "agent-" + name
-	if err := l.Up(ctx, slug); err != nil {
+	if err := l.up(ctx, slug, false); err != nil {
 		return err
 	}
 	m, in, err := l.load(ctx, slug) // up may have re-rendered (new image tags)

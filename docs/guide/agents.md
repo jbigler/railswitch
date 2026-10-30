@@ -30,6 +30,11 @@ railswitch agent --new-term claude  # in a new terminal window
 railswitch agent stop
 ```
 
+`railswitch agent` starts the worktree's stack first (`up`), but doesn't
+wait for the app to answer on its URL: an app that is still booting, or
+unhealthy, never holds up the agent. (It does wait while the worktree's
+`[hooks] create` haven't run yet, since they need the app.)
+
 An agent runs **on demand** (a container for as long as you use it) or as
 a **service** (`railswitch agent` starts its unit if needed and attaches;
 `up` never starts it). One agent runs at a time per worktree. Agents start

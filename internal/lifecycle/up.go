@@ -141,6 +141,14 @@ func (l *L) render(ctx context.Context) (*render.Diff, error) {
 // the first error; nothing is started after a failure, and running it
 // again resumes.
 func (l *L) Up(ctx context.Context, slug string) error {
+	return l.up(ctx, slug, true)
+}
+
+// up is Up; without route it skips the wait for the app's route unless
+// the worktree's [hooks] create still wait for it: an agent needs the
+// stack started, not the app routed, and an app that stays unhealthy
+// would hold every agent start for the whole route timeout.
+func (l *L) up(ctx context.Context, slug string, route bool) error {
 	if err := l.checkProxySubnet(ctx); err != nil {
 		return err
 	}
@@ -370,6 +378,11 @@ func (l *L) Up(ctx context.Context, slug string) error {
 	}
 	if othersErr != nil {
 		l.warnFailed(ctx, sd, others, othersErr)
+	}
+	if !route {
+		if _, err := os.Stat(render.CreatePending(m.Inputs.Workspace, slug)); errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
 	}
 	ready, err := l.waitRoute(ctx, m, in, slug)
 	if err != nil {

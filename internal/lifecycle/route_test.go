@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jbigler/railswitch/internal/render"
 )
 
 // fakeTraefik serves Traefik's router API. A router named in routers is
@@ -133,5 +137,34 @@ func TestUpTraefikAPIDown(t *testing.T) {
 	}
 	if strings.Contains(e.out.String(), "ready") {
 		t.Errorf("ready printed:\n%s", e.out)
+	}
+}
+
+// TestAgentSkipsRoute: starting an agent doesn't wait for the app's route,
+// which an unhealthy app never gets; with [hooks] create pending it does,
+// as they run only once the app is routed.
+func TestAgentSkipsRoute(t *testing.T) {
+	e := setup(t)
+	ft, url := newFakeTraefik(t, "filial-master-app@docker")
+	e.l.TraefikAPI, e.l.RoutePoll, e.l.RouteTimeout = url, time.Millisecond, 50*time.Millisecond
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+		t.Fatal(err)
+	}
+	if n := ft.polls[featRouter]; n != 0 || strings.Contains(e.errOut(), "no route") {
+		t.Errorf("agent waited for the route: %d polls\n%s", n, e.errOut())
+	}
+
+	marker := render.CreatePending(e.ws, "feat")
+	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+		t.Fatal(err)
+	}
+	if ft.polls[featRouter] == 0 {
+		t.Error("create hooks pending, and the agent didn't wait for the route")
 	}
 }

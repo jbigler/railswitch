@@ -797,7 +797,8 @@ extension (`gh extension list` has no `gh stack`) no worktree is asked.
 |---|---|---|
 | `available` | boolean | gh has the gh-stack extension (`gh extension install github/gh-stack`). |
 | `worktrees[].stack` | object or null | The branch's stack; `null` when it is in none, on the trunk (gh stack shows the stack above it, with no branch current), or `available` is false. |
-| `stack.branches` | array | Bottom (next to `trunk`) to top: `name`, `current`, `merged`, `queued` (in the merge queue), `needs_rebase`, `pr` (`number` and `state`: `open`, `merged` or `queued`, as gh-stack reports them; `null` before `gh stack submit`). |
+| `stack.number` | number | GitHub's stack number, as gh stack view's header shows it ("Stack #10350"), from gh-stack's catalog `.git/gh-stack` (read as a hostile file); `0` before `gh stack submit`. |
+| `stack.branches` | array | Bottom (next to `trunk`) to top: `name`, `current`, `merged`, `queued` (in the merge queue), `needs_rebase`, `pr` (`null` before `gh stack submit`): `number`; `state`: `open`, `merged` or `queued` as gh-stack reports them, `draft` for an open PR GitHub says is a draft; `checks` (`pass`, `fail`, `pending`, `none`) and `review` (`approved`, `changes_requested`, `pending`, `none`) of an open PR, read with one `gh pr list --head` per open branch, `""` for a merged one or when GitHub couldn't be read (a warning on stderr). |
 | `worktrees[].error` | string | Why gh stack couldn't say (`""` otherwise). |
 
 ## `task ls`

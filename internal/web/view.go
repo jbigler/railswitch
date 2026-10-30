@@ -474,19 +474,24 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 	return v
 }
 
-// stackedView is a worktree branch's gh stack for the detail: Open top
-// (newest) to bottom, the merged ones counted apart, then the trunk.
+// stackedView is a worktree branch's gh stack for the detail, in gh stack
+// view's words: "Stack #10350", "Base: master", "22 branches (8 merged)";
+// then Open top (newest) to bottom, the merged ones apart, the trunk.
 type stackedView struct {
-	Summary string // "2/3 open · 1 merged · on main"
-	Restack bool   // a branch needs a rebase
-	Open    []stackedBranch
-	Merged  []stackedBranch
-	Trunk   string
-	Error   string // gh stack couldn't say
+	Number    int
+	NumberURL string // the stack on GitHub; "" without a number or repo
+	Trunk     string
+	Count     string // "22 branches (8 merged)"
+	Restack   bool   // a branch needs a rebase
+	Open      []stackedBranch
+	Merged    []stackedBranch
+	Error     string // gh stack couldn't say
 }
 
 type stackedBranch struct {
-	Name, PRText, PRURL, PRClass string
+	Name                         string
+	PR                           *prView // nil without a PR
+	PRURL                        string  // the PR, linked through the project's PR URL
 	Current, NeedsRebase, Queued bool
 }
 
@@ -501,52 +506,56 @@ func newStacked(r row, repo string) *stackedView {
 	if st.Stack == nil {
 		return &stackedView{Error: st.Error}
 	}
-	v := &stackedView{Trunk: st.Stack.Trunk}
-	pos, n := 0, 0
+	v := &stackedView{Trunk: st.Stack.Trunk, Number: st.Stack.Number}
+	if v.Number > 0 && repo != "" {
+		v.NumberURL = strings.TrimSuffix(repo, "pull/") + "stack/" + strconv.Itoa(v.Number)
+	}
+	queued := 0
 	for _, b := range st.Stack.Branches {
 		sb := stackedBranch{Name: b.Name, Current: b.Current, NeedsRebase: b.NeedsRebase, Queued: b.Queued}
-		if b.PR != nil {
-			sb.PRText = fmt.Sprintf("#%d", b.PR.Number)
+		if p := b.PR; p != nil {
+			sb.PR = newPR(&pr{Number: p.Number, State: p.State, Checks: p.Checks, Review: p.Review})
 			if repo != "" {
-				sb.PRURL = repo + strconv.Itoa(b.PR.Number)
+				sb.PRURL = repo + strconv.Itoa(p.Number)
 			}
-			sb.PRClass = prStateClass(b.PR.State)
 		}
 		v.Restack = v.Restack || b.NeedsRebase
+		if b.Queued {
+			queued++
+		}
 		if b.Merged && !b.Current {
 			v.Merged = append(v.Merged, sb)
 			continue
 		}
-		n++
-		if b.Current {
-			pos = n
-		}
 		v.Open = append([]stackedBranch{sb}, v.Open...) // top first
 	}
-	v.Summary = fmt.Sprintf("%d/%d open", pos, n)
-	if len(v.Merged) > 0 {
-		v.Summary += fmt.Sprintf(" · %d merged", len(v.Merged))
+	n := len(st.Stack.Branches)
+	v.Count = fmt.Sprintf("%d branches", n)
+	if n == 1 {
+		v.Count = "1 branch"
 	}
-	v.Summary += " · on " + v.Trunk
+	var notes []string
+	if len(v.Merged) > 0 {
+		notes = append(notes, fmt.Sprintf("%d merged", len(v.Merged)))
+	}
+	if queued > 0 {
+		notes = append(notes, fmt.Sprintf("%d queued", queued))
+	}
+	if len(notes) > 0 {
+		v.Count += " (" + strings.Join(notes, ", ") + ")"
+	}
 	return v
 }
 
-// stackedRow is the list's short form: "2/3", "" without a stack.
+// stackedRow is the list's short form: the current branch's place among
+// all of the stack's branches, bottom first ("15/22"); "" without a stack.
 func stackedRow(r row) string {
 	if r.Stacked == nil || r.Stacked.Stack == nil {
 		return ""
 	}
-	pos, n := 0, 0
-	for _, b := range r.Stacked.Stack.Branches {
-		if b.Merged && !b.Current {
-			continue
-		}
-		n++
-		if b.Current {
-			pos = n
-		}
-	}
-	return fmt.Sprintf("%d/%d", pos, n)
+	bs := r.Stacked.Stack.Branches
+	i := slices.IndexFunc(bs, func(b ghStackBranch) bool { return b.Current })
+	return fmt.Sprintf("%d/%d", i+1, len(bs))
 }
 
 // projectPRRepo is the PR URL prefix any row's PR has ("…/pull/"): every

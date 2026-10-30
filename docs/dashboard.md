@@ -172,13 +172,16 @@ is no longer accepted. What the page shows meanwhile may be stale.
   secret, so a new project with such secrets opens with this card.
 - **Detail** (the selected worktree): name, `⎇ branch`, the PR line
   (`PR #2141 ready · checks ✓ · approved`, a link to the PR), then, when its branch is in a
-  gh stack (`stack ls`, read with the PRs), Stack: `2/3 open · 1 merged ·
-  on main`, `⚠ restack needed` when a branch needs a rebase, the open
-  branches top first (PR number, linked through the project's PR URL,
-  the branch, `◀ HEAD` on the current one, `queued`, `⚠`), the merged ones
-  folded, the trunk last; every other open branch's name checks it out
-  here (see Actions). The list shows `≡ 2/3` next to the branch. Then
-  Links, Services (one aligned row per service: a
+  gh stack (`stack ls`, read with the PRs), Stack, in gh stack view's
+  words: `◆ Stack #10350` (linked to the stack on GitHub) · `Base:
+  master` · `22 branches (8 merged)`, and `⚠ restack needed` when a
+  branch needs a rebase; the open branches top first, each with its PR
+  (number linked, checks glyph, `draft`/`ready`, review such as
+  `approved`), the branch, `◀ HEAD` on the current one, `queued`, `⚠`;
+  the merged ones folded, the trunk last. Every other open branch's name
+  checks it out here (see Actions). The list shows `≡ 15/22` next to the
+  branch: the current branch's place among all of the stack's,
+  bottom first. Then Links, Services (one aligned row per service: a
   glyph, the name and a plain state word, `running`, `starting`,
   `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
   `unknown`, in the glyph's colour;

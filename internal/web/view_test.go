@@ -285,10 +285,7 @@ func TestStackedView(t *testing.T) {
 		{Name: "jb/q", Queued: true},
 		{Name: "<b>x", Current: true},
 	}}}
-	st.Stack.Branches[0].PR = &struct {
-		Number int    `json:"number"`
-		State  string `json:"state"`
-	}{Number: 9, State: "queued"}
+	st.Stack.Branches[0].PR = &ghStackPR{Number: 9, State: "queued"}
 	d := newDetail("ftest", row{WT: worktree{Slug: "c", Branch: "<b>x"}, Stacked: st}, repo)
 	html, err := render("detail", d)
 	if err != nil {

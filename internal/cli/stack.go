@@ -71,12 +71,14 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	// only through a private shadow, or runs not at all.
 	var env []string
 	var shadowErr error
+	var gitDir string
 	if doc.Available && len(m.Inputs.Worktrees) > 0 {
 		var in *render.Instance
 		if in, err = m.Instance(m.Inputs.Worktrees[0]); err != nil {
 			return e.fail(err)
 		}
-		sh, err := gitshadow.New(ctx, e.run, in.Values["base.git"])
+		gitDir = in.Values["base.git"]
+		sh, err := gitshadow.New(ctx, e.run, gitDir)
 		if err == nil {
 			defer sh.Remove()
 			env = sh.Env(os.Environ())
@@ -92,9 +94,24 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 		default:
 			if r.Stack, err = prs.ViewStack(ctx, e.run, wt.Dir, env); err != nil {
 				r.Error = err.Error()
+			} else if r.Stack != nil {
+				r.Stack.Number = prs.StackNumber(gitDir, r.Stack.Current)
 			}
 		}
 		doc.Worktrees = append(doc.Worktrees, r)
+	}
+	// gh-stack knows only open, merged and queued: draft, checks and
+	// review come from GitHub. Without them the stacks still show.
+	var stacks []*prs.Stack
+	for _, r := range doc.Worktrees {
+		if r.Stack != nil {
+			stacks = append(stacks, r.Stack)
+		}
+	}
+	if repo, err := prs.Repo(w.Project.Project.Repo); err == nil && len(stacks) > 0 {
+		if err := prs.Detail(ctx, e.run, repo, stacks); err != nil {
+			fmt.Fprintf(e.stderr, "warning: stack PRs' review and checks: %v\n", err)
+		}
 	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
@@ -117,8 +134,9 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	return 0
 }
 
-// stackText is a row's stack in a few words: "2/3 on main", with "restack"
-// when a branch needs a rebase.
+// stackText is a row's stack in gh stack view's words: "#10350, base
+// master, 22 branches (8 merged)", with "restack needed" when a branch
+// needs a rebase.
 func stackText(r stackRow) string {
 	switch {
 	case r.Error != "":
@@ -126,18 +144,18 @@ func stackText(r stackRow) string {
 	case r.Stack == nil:
 		return "-"
 	}
-	pos, n, rebase := 0, 0, false
+	merged, rebase := 0, false
 	for _, b := range r.Stack.Branches {
-		if b.Merged && !b.Current {
-			continue
-		}
-		n++
-		if b.Current {
-			pos = n
+		if b.Merged {
+			merged++
 		}
 		rebase = rebase || b.NeedsRebase
 	}
-	parts := []string{fmt.Sprintf("%d/%d on %s", pos, n, r.Stack.Trunk)}
+	var parts []string
+	if r.Stack.Number > 0 {
+		parts = append(parts, fmt.Sprintf("#%d", r.Stack.Number))
+	}
+	parts = append(parts, "base "+r.Stack.Trunk, fmt.Sprintf("%d branches (%d merged)", len(r.Stack.Branches), merged))
 	if rebase {
 		parts = append(parts, "restack needed")
 	}

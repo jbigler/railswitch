@@ -49,10 +49,10 @@ func TestStackLs(t *testing.T) {
 
 func TestStackText(t *testing.T) {
 	// A merged branch below doesn't count; the current one is 2 of 2.
-	r := stackRow{Stack: &prs.Stack{Trunk: "main", Current: "c", Branches: []prs.StackBranch{
+	r := stackRow{Stack: &prs.Stack{Trunk: "main", Current: "c", Number: 12, Branches: []prs.StackBranch{
 		{Name: "a", Merged: true}, {Name: "b"}, {Name: "c", Current: true, NeedsRebase: true},
 	}}}
-	if got := stackText(r); got != "2/2 on main, restack needed" {
+	if got := stackText(r); got != "#12, base main, 3 branches (1 merged), restack needed" {
 		t.Errorf("stackText = %q", got)
 	}
 }

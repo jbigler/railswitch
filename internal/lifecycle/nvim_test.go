@@ -53,7 +53,7 @@ func TestNvimAttachArgv(t *testing.T) {
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", nvimUnit)
 	cfg := hooks(t)
 	e.l.ConfigDir, e.l.LookPath = cfg, findNvim
-	if err := e.l.Nvim(ctx, "feat"); err != nil {
+	if err := e.l.Nvim(ctx, "feat", nil); err != nil {
 		t.Fatal(err)
 	}
 	attach, detach := filepath.Join(cfg, "hooks", "nvim-attach"), filepath.Join(cfg, "hooks", "nvim-detach")
@@ -83,7 +83,7 @@ func TestNvimAttachArgv(t *testing.T) {
 	e.reset()
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n", nvimUnit)
 	e.l.ConfigDir, e.l.LookPath, e.l.TTY = t.TempDir(), noNvim, true
-	if err := e.l.Nvim(ctx, "feat"); err != nil {
+	if err := e.l.Nvim(ctx, "feat", nil); err != nil {
 		t.Fatal(err)
 	}
 	calls := e.calls()
@@ -100,7 +100,7 @@ func TestNvimHookFailureWarns(t *testing.T) {
 	cfg := hooks(t)
 	e.l.ConfigDir, e.l.LookPath = cfg, findNvim
 	e.f.On([]string{filepath.Join(cfg, "hooks", "nvim-attach")}, sys.Result{ExitCode: 1}, sys.ErrExit)
-	if err := e.l.Nvim(ctx, "feat"); err != nil {
+	if err := e.l.Nvim(ctx, "feat", nil); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(e.l.Err.(interface{ String() string }).String(), "nvim-attach") {
@@ -231,7 +231,7 @@ func TestNvimWaitsForServer(t *testing.T) {
 	e.l.LookPath, e.l.NvimPoll, e.l.NvimTimeout = noNvim, time.Millisecond, 200*time.Millisecond
 	pr := &probeRunner{Runner: e.f, n: 3}
 	e.l.R = pr
-	if err := e.l.Nvim(ctx, "feat"); err != nil {
+	if err := e.l.Nvim(ctx, "feat", nil); err != nil {
 		t.Fatal(err)
 	}
 	probe := "podman exec filial-feat-nvim nvim --server 127.0.0.1:7777 --remote-expr 1"
@@ -243,7 +243,7 @@ func TestNvimWaitsForServer(t *testing.T) {
 
 	e.reset()
 	pr.n, pr.calls = 0, 0
-	err := e.l.Nvim(ctx, "feat")
+	err := e.l.Nvim(ctx, "feat", nil)
 	if err == nil || !strings.Contains(err.Error(), "railswitch logs nvim") {
 		t.Fatalf("Nvim = %v; want an error naming railswitch logs nvim", err)
 	}
@@ -263,5 +263,34 @@ func TestNvimResetConfigNoVolume(t *testing.T) {
 	}
 	if !strings.Contains(e.out.String(), "nothing to reset") {
 		t.Errorf("out %q", e.out.String())
+	}
+}
+
+// TestNvimOpenTarget: with a target the server opens it, through podman
+// exec, before the UI attaches; a quote in the path stays inside its
+// Vimscript string.
+func TestNvimOpenTarget(t *testing.T) {
+	e := setup(t)
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", nvimUnit)
+	e.l.LookPath = findNvim
+	if err := e.l.Nvim(ctx, "feat", &NvimTarget{Path: "/app/it's.rb", Line: 42, Col: 3}); err != nil {
+		t.Fatal(err)
+	}
+	var open, attach = -1, -1
+	for i, c := range e.f.Cmds {
+		j := joined(append([]string{c.Name}, c.Args...))
+		switch {
+		case strings.Contains(j, "luaeval"):
+			open = i
+			if !strings.HasPrefix(j, "podman exec filial-feat-nvim nvim --server 127.0.0.1:7777 --remote-expr luaeval(") ||
+				!strings.Contains(j, "{'path': '/app/it''s.rb', 'line': 42, 'col': 3}") {
+				t.Errorf("open: %s", j)
+			}
+		case strings.Contains(j, "--remote-ui"):
+			attach = i
+		}
+	}
+	if open < 0 || attach < 0 || open > attach {
+		t.Errorf("open at %d, attach at %d", open, attach)
 	}
 }

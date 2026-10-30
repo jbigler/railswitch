@@ -33,14 +33,20 @@ const (
 )
 
 // Nvim attaches to worktree slug's nvim server, starting its unit when it
-// is not active (C4): the user's nvim-attach hook, then the host's
-// `nvim --remote-ui` on the server's loopback port (inside the container
-// through podman exec when the host has no nvim), then the nvim-detach
-// hook. A hook's failure only warns. The attach has no deadline.
-func (l *L) Nvim(ctx context.Context, slug string) error {
+// is not active (C4): with a target, the server opens it first; the user's
+// nvim-attach hook, then the host's `nvim --remote-ui` on the server's
+// loopback port (inside the container through podman exec when the host
+// has no nvim), then the nvim-detach hook. A hook's failure only warns.
+// The attach has no deadline.
+func (l *L) Nvim(ctx context.Context, slug string, target *NvimTarget) error {
 	m, in, s, ctr, err := l.nvimStarted(ctx, slug)
 	if err != nil {
 		return err
+	}
+	if target != nil {
+		if err := l.nvimOpen(ctx, ctr, *target); err != nil {
+			return err
+		}
 	}
 	i := slices.IndexFunc(s.Publish, func(p render.Port) bool { return p.Env == nvimPort })
 	if i < 0 {
@@ -253,6 +259,29 @@ func (l *L) NvimResetConfig(ctx context.Context, yes bool) error {
 		fmt.Fprintf(l.Out, "the next nvim start clones %s\n", n.ConfigRepo)
 	} else {
 		fmt.Fprintln(l.Out, "the next nvim start finds an empty config volume")
+	}
+	return nil
+}
+
+// NvimTarget is a file to open in the nvim server: Path in the container
+// (under /app), and a 1-based Line and Col (0: none).
+type NvimTarget struct {
+	Path      string
+	Line, Col int
+}
+
+// nvimOpenLua opens a.path in the server's current window and puts the
+// cursor at a.line, a.col (clamped to the file), centred; 1 when it did.
+const nvimOpenLua = `(function(a) vim.cmd("edit " .. vim.fn.fnameescape(a.path)) if a.line > 0 then pcall(vim.api.nvim_win_set_cursor, 0, {math.min(a.line, vim.api.nvim_buf_line_count(0)), math.max(a.col - 1, 0)}) vim.cmd("normal! zz") end return 1 end)(_A)`
+
+// nvimOpen opens t in the nvim server in ctr, through podman exec so the
+// host needs no nvim; the path goes in as a Vimscript string literal.
+func (l *L) nvimOpen(ctx context.Context, ctr string, t NvimTarget) error {
+	vimString := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+	expr := fmt.Sprintf("luaeval(%s, {'path': %s, 'line': %d, 'col': %d})", vimString(nvimOpenLua), vimString(t.Path), t.Line, t.Col)
+	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"exec", ctr, "nvim", "--server", "127.0.0.1:7777", "--remote-expr", expr}, Timeout: nvimProbeTimeout})
+	if err != nil {
+		return fmt.Errorf("open %s in nvim: %w%s", t.Path, err, strings.TrimSpace("\n"+string(res.Stderr)))
 	}
 	return nil
 }

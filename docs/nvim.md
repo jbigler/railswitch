@@ -101,8 +101,22 @@ It stops every worktree's nvim unit, and removes the volume
 
 ## Attaching: `railswitch nvim`
 
-`railswitch nvim` starts the worktree's nvim unit when it is not running,
-then attaches:
+`railswitch nvim [--new-term] [<file>[:<line>[:<col>]]]` starts the
+worktree's nvim unit when it is not running, then attaches; with a file,
+the server opens it first, at that line and column (clamped to the file),
+in its current window, so a UI already attached elsewhere jumps there
+too. The file can be given the way a tool printed it:
+
+- as the container sees it, `/app/app/models/user.rb:42`;
+- as a host path in the worktree;
+- relative: to the worktree root when the file is there (what test
+  runners print), else to the current directory when that is in the
+  worktree, else to the root (a new file).
+
+Whatever follows the line (`:in 'User#save'` in a Ruby backtrace, a
+compiler's `: message`) is ignored, and a file outside the worktree is
+refused. `--new-term` runs it all in a new terminal tab or window.
+The attach itself:
 
 1. runs the hook `~/.config/railswitch/hooks/nvim-attach`, if it exists and
    is executable;

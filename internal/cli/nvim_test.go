@@ -50,7 +50,7 @@ func TestNvimCommand(t *testing.T) {
 		t.Errorf("want the hook, then podman exec nvim; calls:\n%s", all)
 	}
 
-	for _, args := range [][]string{{"nvim", "bogus"}, {"nvim", "update", "x"}, {"nvim", "reset-config", "x"}, {"nvim", "--yes"}} {
+	for _, args := range [][]string{{"nvim", "a.rb", "b.rb"}, {"nvim", "/etc/passwd"}, {"nvim", "update", "x"}, {"nvim", "reset-config", "x"}, {"nvim", "--yes"}} {
 		if code, _, _ := runIn(t, append([]string{"-C", ws, "-w", "feat"}, args...)...); code != 2 {
 			t.Errorf("%q: exit %d; want 2", args, code)
 		}

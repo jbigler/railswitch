@@ -185,7 +185,10 @@ is no longer accepted. What the page shows meanwhile may be stale.
   glyph, the name and a plain state word, `running`, `starting`,
   `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
   `unknown`, in the glyph's colour;
-  the systemd state is the row's tooltip), Agent (state and message), Actions and Jobs.
+  the systemd state is the row's tooltip; while the service runs, `logs`
+  opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
+  and, for a service with a unit of its own (not an agent or deps),
+  `restart` runs `railswitch restart <service>`, which restarts it alone), Agent (state and message), Actions and Jobs.
 
 ## Settings
 
@@ -704,7 +707,9 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 
 Every action is a job (below).
 
-- **up, stop, restart** run `railswitch up|stop|restart` in the worktree.
+- **start, restart, stop** run `railswitch up|restart|stop` in the
+  worktree, as the stack's state allows: a stopped stack offers start; a
+  running one restart and stop; a partial or failed one all three.
 - **default config…** (next to the detail's Agent label) opens a dialog
   that reads `agent ls` for the worktree: per agent with `[config]
   paths`, where its default came from, **Make <worktree>'s <agent> config

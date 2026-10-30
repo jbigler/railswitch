@@ -63,7 +63,7 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .ln.quiet,.ln.dim{color:var(--muted);background:var(--bg2);border-color:var(--border);font-weight:600}
 .ln.danger{color:var(--red);background:var(--bg2);font-weight:600}
 .services{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(14rem,100%),1fr));gap:0 24px;margin:2px 0 4px}
-.services .svc{display:grid;grid-template-columns:1.3em minmax(0,9rem) 1fr;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)}
+.services .svc{display:grid;grid-template-columns:1.3em minmax(0,9rem) 1fr auto;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)}
 .services .svc .g{font-size:1.6em;line-height:.8;text-align:center}
 .services .svc .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .msg{margin-top:4px;padding:6px 8px;background:var(--bg2);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere}
@@ -249,3 +249,7 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .hd-cap{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
 .hb[aria-current=page]{color:var(--accent);font-weight:700;box-shadow:inset 0 -2px 0 var(--accent)}
 .chip.yellow{color:var(--yellow);border-color:var(--yellow);text-decoration:none}
+.svc-acts{display:flex;gap:10px;align-items:center;font-size:.85em}
+.svc-acts form{display:inline}
+.svc-acts a,.svc-acts button{color:var(--blue);background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:none}
+.svc-acts a:hover,.svc-acts button:hover{text-decoration:underline}

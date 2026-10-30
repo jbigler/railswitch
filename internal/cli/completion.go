@@ -117,6 +117,7 @@ var completionArgs = map[string]completer{
 	"share":               slugCandidates,
 	"unshare":             slugCandidates,
 	"logs":                serviceCandidates,
+	"restart":             serviceCandidates,
 	"fw show":             serviceCandidates,
 	"fw allow":            serviceCandidates,
 	"secret set":          secretCandidates,

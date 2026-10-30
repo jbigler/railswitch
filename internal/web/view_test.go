@@ -316,3 +316,53 @@ func TestStackedView(t *testing.T) {
 		t.Errorf("stack actions without a stack:\n%s", html)
 	}
 }
+
+// TestDetailActions: the actions follow the stack's state; a running
+// service links its logs in Dozzle by container name and, when it has a
+// unit of its own, restarts alone.
+func TestDetailActions(t *testing.T) {
+	acts := func(stack string) []string {
+		var out []string
+		for _, a := range newDetail("ftest", fixtureRow(stack, false, nil), "").Actions {
+			out = append(out, a.Label)
+		}
+		return out
+	}
+	for stack, want := range map[string][]string{
+		"stopped": {"start", "terminal"},
+		"up":      {"restart", "stop", "terminal"},
+		"partial": {"start", "restart", "stop", "terminal"},
+		"failed":  {"start", "restart", "stop", "terminal"},
+	} {
+		if got := acts(stack); !slices.Equal(got, want) {
+			t.Errorf("%s: actions %v; want %v", stack, got, want)
+		}
+	}
+
+	r := fixtureRow("partial", false, nil)
+	r.WT.Services = []service{
+		{Service: "web", Role: "app", State: "active/running", Container: "ftest-feat-login-web", Restartable: true},
+		{Service: "db", Role: "data", State: "inactive/dead", Container: "ftest-feat-login-db", Restartable: true},
+		{Service: "agent-bot", Role: "agent", State: "active/running", Container: "ftest-feat-login-agent-bot"},
+	}
+	d := newDetail("ftest", r, "")
+	web, db, bot := d.Services[0], d.Services[1], d.Services[2]
+	if web.LogsURL != "http://logs.localhost/show?name=ftest-feat-login-web" || web.RestartURL != "/p/ftest/feat-login/restart/web" {
+		t.Errorf("web: %+v", web)
+	}
+	if db.LogsURL != "" || db.RestartURL != "" {
+		t.Errorf("stopped db: %+v", db)
+	}
+	if bot.LogsURL == "" || bot.RestartURL != "" {
+		t.Errorf("agent: %+v", bot)
+	}
+	html, err := render("detail", d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("detail lacks %q", want)
+		}
+	}
+}

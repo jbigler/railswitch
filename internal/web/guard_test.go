@@ -195,7 +195,7 @@ func ftestOverview(branchB, stackB, agentB string) string {
   "agent":{"name":"bot","package":"bot@1","run":"on-demand","state":"working","message":"busy","ts":1,"reply":false,"running":true},
   "links":[{"label":"App","url":"http://main.ftest.localhost/","group":"app"}]},
  {"slug":"b","id":2,"branch":"` + branchB + `","base":false,"stack":"` + stackB + `",
-  "services":[{"service":"web","role":"app","state":"active/running"},{"service":"db","role":"data","state":"inactive/dead"}],
+  "services":[{"service":"web","role":"app","state":"active/running","container":"ftest-b-web","restartable":true},{"service":"db","role":"data","state":"inactive/dead","container":"ftest-b-db","restartable":true}],
   "agent":` + agentB + `,
   "links":[{"label":"App","url":"http://b.ftest.localhost/","group":"app"},{"label":"Flipper","url":"http://b.ftest.localhost/flipper","group":"project"},{"label":"Browser (VNC)","url":"http://vnc.b.ftest.localhost","group":"stack"}]}
 ]}`

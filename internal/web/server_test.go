@@ -50,6 +50,8 @@ func TestActions(t *testing.T) {
 		{"stop", "/p/ftest/b/act/stop", form(), 202, append(slices.Clone(wsb), "stop"), ""},
 		{"restart", "/p/ftest/main/act/restart", form(), 202, append(slices.Clone(ws), "-w", "main", "restart"), ""},
 		{"terminal", "/p/ftest/b/act/term", form(), 202, append(slices.Clone(wsb), "term"), ""},
+		{"restart a service", "/p/ftest/b/restart/web", form(), 202, append(slices.Clone(wsb), "restart", "web"), ""},
+		{"restart an unknown service", "/p/ftest/b/restart/nope", form(), 404, nil, ""},
 		{"agent default promote", "/p/ftest/b/agent-default/promote", form("name", "claude", "all", "1"), 202, append(slices.Clone(wsb), "agent", "default", "promote", "claude", "--all"), ""},
 		{"agent default apply", "/p/ftest/b/agent-default/apply", form("name", "claude"), 202, append(slices.Clone(wsb), "agent", "default", "apply", "claude"), ""},
 		{"agent default other", "/p/ftest/b/agent-default/rm", form("name", "claude"), 404, nil, ""},
@@ -93,7 +95,7 @@ func TestAcceptedJSON(t *testing.T) {
 	r.Header.Set("Accept", "application/json")
 	w := f.do(r)
 	var got struct{ ID, Label string }
-	if err := json.Unmarshal(w.Body.Bytes(), &got); w.Code != 202 || err != nil || got.ID == "" || got.Label != "up" {
+	if err := json.Unmarshal(w.Body.Bytes(), &got); w.Code != 202 || err != nil || got.ID == "" || got.Label != "start" {
 		t.Errorf("%d %q (%v)", w.Code, w.Body, err)
 	}
 	r = req("POST", "/jobs/"+got.ID+"/cancel", form())
@@ -113,7 +115,7 @@ func TestBusy(t *testing.T) {
 		t.Fatalf("first: %d", w.Code)
 	}
 	w := f.do(req("POST", "/p/ftest/b/act/stop", form()))
-	if w.Code != 409 || !strings.Contains(w.Body.String(), "busy: up") {
+	if w.Code != 409 || !strings.Contains(w.Body.String(), "busy: start") {
 		t.Errorf("second: %d %q", w.Code, w.Body)
 	}
 	if w := f.do(req("POST", "/p/ftest/worktrees", form("branch", "jb/y"))); w.Code != 409 {

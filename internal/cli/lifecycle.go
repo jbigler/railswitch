@@ -65,10 +65,39 @@ func simple(name string, run func(*lifecycle.L, context.Context, string) error) 
 }
 
 var (
-	cmdUp      = simple("up", (*lifecycle.L).Up)
-	cmdStop    = simple("stop", (*lifecycle.L).Stop)
-	cmdRestart = simple("restart", (*lifecycle.L).Restart)
+	cmdUp   = simple("up", (*lifecycle.L).Up)
+	cmdStop = simple("stop", (*lifecycle.L).Stop)
 )
+
+// railswitch restart [<service>]: restart the worktree's stack (stop,
+// then up), or with a service name only that service's unit.
+func cmdRestart(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("restart")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() > 1 {
+		return e.usageErr("usage: railswitch restart [<service>]")
+	}
+	l, slug, code := e.lifecycle(ctx, "restart")
+	if code != 0 {
+		return code
+	}
+	var err error
+	if fs.NArg() == 1 {
+		err = l.RestartService(ctx, slug, fs.Arg(0))
+	} else {
+		err = l.Restart(ctx, slug)
+	}
+	if err != nil {
+		var u *lifecycle.UsageError
+		if errors.As(err, &u) {
+			return e.usageErr("%s", u.Msg)
+		}
+		return e.fail(err)
+	}
+	return 0
+}
 
 // railswitch down [--yes]: stop the worktree, remove its containers and
 // per-worktree volumes.

@@ -182,8 +182,8 @@ func TestOverview(t *testing.T) {
 			t.Errorf("worktree JSON lacks %q: %v", k, wt)
 		}
 	}
-	if svc := wt["services"].([]any)[0].(map[string]any); len(svc) != 3 {
-		t.Errorf("service JSON %v; want service, role, state", svc)
+	if svc := wt["services"].([]any)[0].(map[string]any); len(svc) != 5 || svc["container"] != "filial-feat-rails" || svc["restartable"] != true {
+		t.Errorf("service JSON %v; want service, role, state, container, restartable", svc)
 	}
 	if doc["worktrees"].([]any)[0].(map[string]any)["agent"] != nil {
 		t.Errorf("master agent JSON not null")

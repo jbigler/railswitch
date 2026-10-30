@@ -223,7 +223,7 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .lib-trust .fp{display:block;margin:4px 0;font-weight:700;overflow-wrap:anywhere}
 .lib-trust label.check{display:block;margin:6px 0}
 
-.toast{position:fixed;right:16px;bottom:16px;max-width:460px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap}
+.toast{position:fixed;inset:auto 16px 16px auto;margin:0;max-width:460px;padding:8px 12px;color:var(--text);background:var(--bg2);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap}
 .toast.err{color:var(--red);border-color:var(--red)}
 #hooks label.hook{display:block;margin:10px 0}
 #hooks label.hook textarea{display:block;width:100%;margin-top:4px;resize:vertical}

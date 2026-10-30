@@ -198,7 +198,7 @@ document.addEventListener("click", (e) => {
   }
   if (t.closest("[data-cancel]")) t.closest("dialog").close();
   if (!t.closest("#toast")) return;
-  $("#toast").hidden = true;
+  hideToast();
 });
 
 function openDialog(id) {
@@ -258,14 +258,23 @@ async function post(f, data) {
   }
 }
 
+// The toast is a popover: shown again each time, it goes on top of the
+// top layer, above a modal dialog that is open (an error a dialog's form
+// caused would otherwise sit behind it).
 let toastTimer = null;
 function toast(text, err) {
   const t = $("#toast");
   t.textContent = text;
   t.classList.toggle("err", !!err);
-  t.hidden = false;
+  hideToast();
+  t.showPopover();
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), err ? 8000 : 3000);
+  toastTimer = setTimeout(hideToast, err ? 8000 : 3000);
+}
+
+function hideToast() {
+  const t = $("#toast");
+  if (t.matches(":popover-open")) t.hidePopover();
 }
 
 // Keys.
@@ -280,7 +289,7 @@ document.addEventListener("keydown", (e) => {
     if (a) location.href = a.href;
     return;
   }
-  if (e.key === "Escape") $("#toast").hidden = true;
+  if (e.key === "Escape") hideToast();
   if (d || e.ctrlKey || e.metaKey || e.altKey || e.target.closest("input, textarea, select")) return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();

@@ -217,7 +217,7 @@ const ftestPRs = `[
  {"slug":"b","branch":"jb/b","pr":{"number":2141,"title":"Login <b>","url":"https://github.com/o/r/pull/2141","state":"open","checks":"pass","review":"approved"}}
 ]`
 
-const ftestAgents = `[{"name":"claude","config":true,"default":{"from":"main","promoted":"2026-10-30T12:00:00Z"}},{"name":"probe","config":false,"default":null}]`
+const ftestAgents = `[{"name":"claude","config":true,"default_pending":true,"running":true,"default":{"from":"main","promoted":"2026-10-30T12:00:00Z"}},{"name":"probe","config":false,"default":null}]`
 
 const ftestTasks = `[{"name":"console","command":"bin/rails console","source":"pack"},{"name":"test","command":"bin/rails test","source":"project"}]`
 

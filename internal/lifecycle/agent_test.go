@@ -321,7 +321,8 @@ func TestAgentList(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []AgentRow{
-		{Name: "claude", Package: "claude@1", Run: "on-demand", State: "done", Message: "Ship it?", TS: 7, Reply: true, Config: true},
+		// A new home holds the request: it takes the default at its first start.
+		{Name: "claude", Package: "claude@1", Run: "on-demand", State: "done", Message: "Ship it?", TS: 7, Reply: true, Config: true, DefaultPending: true},
 		{Name: "probe", Package: "local:probe@1", Run: "service", State: "off"},
 	}
 	if !slices.Equal(rows, want) {
@@ -390,8 +391,14 @@ func TestAgentDefault(t *testing.T) {
 	if rows[0].Default == nil || rows[0].Default.From != "feat" {
 		t.Errorf("agent ls default = %+v", rows[0].Default)
 	}
+	if rows, _ := e.l.AgentList(ctx, "feat"); rows[0].DefaultPending {
+		t.Error("feat pending before apply")
+	}
 	if _, slugs, err := e.l.ApplyAgentDefault(ctx, "feat", "claude", false); err != nil || !slices.Equal(slugs, []string{"feat"}) {
 		t.Errorf("apply: %v %v", slugs, err)
+	}
+	if rows, _ := e.l.AgentList(ctx, "feat"); !rows[0].DefaultPending {
+		t.Error("feat not pending after apply")
 	}
 
 	// A FIFO an agent planted at the request's name fails at once.

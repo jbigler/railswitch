@@ -195,7 +195,7 @@ func TestPages(t *testing.T) {
 		{"/p/ftest/b/remove", 200, []string{"Discard changes", `name="confirm"`, "/ws/ftest/b"}},
 		{"/p/ftest/main/remove", 422, nil},
 		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`}},
-		{"/p/ftest/b/agent-default", 200, []string{"<h3>claude</h3>", "from <b>main</b>", `action="/p/ftest/b/agent-default/promote"`, `name="name" value="claude"`, "Apply the default to every worktree"}},
+		{"/p/ftest/b/agent-default", 200, []string{"<h3>claude</h3>", "from <b>main</b>", `action="/p/ftest/b/agent-default/promote"`, `name="name" value="claude"`, "Apply the default to every worktree", "Pending: b's claude takes the default at its next start (it runs now: stop it, then start it again)."}},
 		{"/colors", 200, []string{`value="#BC5215"`, "paper", "solar", "contrast"}},
 		{"/theme.css", 200, []string{"--accent:#BC5215", "prefers-color-scheme: dark", "--accent:#DA702C"}},
 		{"/static/app.js", 200, []string{"EventSource"}},

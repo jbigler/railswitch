@@ -57,7 +57,7 @@ func TestAgentLsJSON(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("rows %v", rows)
 	}
-	want := map[string]any{"name": "claude", "package": "claude@1", "run": "on-demand", "state": "working", "message": "editing", "ts": float64(42), "reply": false, "running": false, "config": true, "default": nil}
+	want := map[string]any{"name": "claude", "package": "claude@1", "run": "on-demand", "state": "working", "message": "editing", "ts": float64(42), "reply": false, "running": false, "config": true, "default": nil, "default_pending": true}
 	for k, v := range want {
 		if rows[0][k] != v {
 			t.Errorf("claude %s = %v; want %v", k, rows[0][k], v)

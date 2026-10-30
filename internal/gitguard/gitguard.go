@@ -44,7 +44,7 @@ func (f Finding) String() string { return f.Kind + " " + f.Path + ": " + f.Detai
 // normal use; any other is a finding. Widen it when a legitimate tool adds
 // one. extensions.worktreeconfig is not in it: Check reads every
 // config.worktree too, but enabling them is still worth a look.
-var ConfigAllowed = regexp.MustCompile(`^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks)|submodule\..+\.(url|active|branch)|branch\..+\.(remote|merge|rebase|pushremote|description)|remote\..+\.(url|pushurl|fetch|tagopt|prune|gh-resolved)|remote\.pushdefault|rerere\.(enabled|autoupdate)|user\.(name|email))$`)
+var ConfigAllowed = regexp.MustCompile(`^(core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks)|submodule\..+\.(url|active|branch)|branch\..+\.(remote|merge|rebase|pushremote|description)|remote\..+\.(url|pushurl|fetch|tagopt|prune|gh-resolved)|remote\.pushdefault|rerere\.(enabled|autoupdate)|gh-stack\.(remote|rerere-declined)|user\.(name|email))$`)
 
 // moduleAllowed are the keys a submodule's git dir config may hold besides
 // ConfigAllowed: git writes core.worktree there, never in the base repo.

@@ -605,6 +605,8 @@ type detailView struct {
 	Actions                           []actionView
 	RemoveURL, TasksURL               string // RemoveURL "" for the base worktree
 	Stacked                           *stackedView
+	StackActions                      []actionView // with Stacked: push, up, down, restack
+	SwitchURL                         string       // with Stacked: posts a branch to check out
 	Merged, Stale                     bool
 }
 
@@ -658,8 +660,18 @@ func newDetail(prefix string, r row, repo string) detailView {
 		kind := agentKind(a)
 		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind), Message: a.Message}
 	}
-	for _, act := range []string{"up", "stop", "restart"} {
-		v.Actions = append(v.Actions, actionView{Label: act, URL: path + "/act/" + act})
+	for _, act := range []string{"up", "stop", "restart", "term"} {
+		v.Actions = append(v.Actions, actionView{Label: worktreeActions[act].label, URL: path + "/act/" + act})
+	}
+	if v.Stacked != nil && v.Stacked.Error == "" {
+		for _, act := range []string{"stack-push", "stack-up", "stack-down", "restack"} {
+			label := strings.TrimPrefix(worktreeActions[act].label, "stack ")
+			if act == "restack" {
+				label = "restack…"
+			}
+			v.StackActions = append(v.StackActions, actionView{Label: label, URL: path + "/act/" + act})
+		}
+		v.SwitchURL = path + "/stack/switch"
 	}
 	if !wt.Base {
 		v.RemoveURL = path + "/remove"

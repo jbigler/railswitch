@@ -10,7 +10,6 @@ import (
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/render"
-	"github.com/jbigler/railswitch/internal/term"
 )
 
 const taskUsage = "usage: railswitch task [--new-term] <name> [args...] | railswitch [--json] task ls"
@@ -84,13 +83,7 @@ func (e *env) taskNewTerm(ctx context.Context, root, slug, name string, args []s
 		cmd = append(cmd, "--")
 	}
 	cmd = append(cmd, args...)
-	if err := launchTerm(ctx, e, slug+" "+name, filepath.Join(root, slug), cmd); err != nil {
-		if x, ok := errors.AsType[*term.ExitError](err); ok {
-			return x.Code
-		}
-		return e.failCommand(err)
-	}
-	return 0
+	return e.launchIn(ctx, slug+" "+name, filepath.Join(root, slug), cmd)
 }
 
 // printTasks prints task ls: JSON with --json, else a NAME SOURCE COMMAND

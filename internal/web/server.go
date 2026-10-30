@@ -83,6 +83,7 @@ func New(c Config) *Server {
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
+	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
 	m.HandleFunc("POST /p/{prefix}/worktrees", s.addWorktree)
 	m.HandleFunc("POST /p/{prefix}/{slug}/task", s.runTask)
 	m.HandleFunc("POST /p/{prefix}/prs/refresh", s.refreshPRs)
@@ -452,9 +453,26 @@ func (s *Server) accepted(w http.ResponseWriter, r *http.Request, id, label, bac
 
 func worktreePath(p projectRow, slug string) string { return "/p/" + p.Prefix + "/" + slug }
 
+// worktreeActions are a worktree's buttons: the action in the URL, the
+// railswitch arguments it runs. A label starting "stack " re-reads the
+// stacks when its job ends.
+var worktreeActions = map[string]struct {
+	label string
+	args  []string
+}{
+	"up":         {"up", []string{"up"}},
+	"stop":       {"stop", []string{"stop"}},
+	"restart":    {"restart", []string{"restart"}},
+	"term":       {"terminal", []string{"term"}},
+	"stack-push": {"stack push", []string{"stack", "push"}},
+	"stack-up":   {"stack up", []string{"stack", "up"}},
+	"stack-down": {"stack down", []string{"stack", "down"}},
+	"restack":    {"stack rebase", []string{"stack", "rebase", "--new-term"}},
+}
+
 func (s *Server) act(w http.ResponseWriter, r *http.Request) {
-	action := r.PathValue("action")
-	if action != "up" && action != "stop" && action != "restart" {
+	a, ok := worktreeActions[r.PathValue("action")]
+	if !ok {
 		http.Error(w, "unknown action", http.StatusNotFound)
 		return
 	}
@@ -463,8 +481,26 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.start(w, r, jobs.Spec{
-		Project: p.Prefix, Slug: wt.Slug, Label: action, Dir: p.Workspace,
-		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, action},
+		Project: p.Prefix, Slug: wt.Slug, Label: a.label, Dir: p.Workspace,
+		Argv: append([]string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug}, a.args...),
+	}, nil, worktreePath(p, wt.Slug))
+}
+
+// stackSwitch checks out another branch of the worktree's gh stack; the
+// CLI refuses one that isn't an open branch of it.
+func (s *Server) stackSwitch(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	branch := r.PostFormValue("branch")
+	if badName(branch) {
+		http.Error(w, "bad branch name", http.StatusUnprocessableEntity)
+		return
+	}
+	s.start(w, r, jobs.Spec{
+		Project: p.Prefix, Slug: wt.Slug, Label: "stack switch " + branch, Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "stack", "switch", branch},
 	}, nil, worktreePath(p, wt.Slug))
 }
 

@@ -122,4 +122,15 @@ func TestClaudeMemory(t *testing.T) {
 	if got := read(filepath.Join(old, "CLAUDE.md")); got != "@railswitch.md\n@RTK.md\n" {
 		t.Errorf("migrated CLAUDE.md = %q", got)
 	}
+
+	// A new home that took a promoted default: its CLAUDE.md already
+	// imports railswitch.md and is the user's, every line kept.
+	promoted := t.TempDir()
+	if err := os.WriteFile(filepath.Join(promoted, "CLAUDE.md"), []byte("@railswitch.md\n@RTK.md\nAlways run the linter.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(promoted)
+	if got := read(filepath.Join(promoted, "CLAUDE.md")); got != "@railswitch.md\n@RTK.md\nAlways run the linter.\n" {
+		t.Errorf("promoted CLAUDE.md = %q", got)
+	}
 }

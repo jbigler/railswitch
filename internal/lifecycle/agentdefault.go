@@ -160,7 +160,9 @@ func requestDefault(m *render.Model, agent string, pick func(slug string) bool) 
 		if fi, err := os.Lstat(home); err != nil || !fi.IsDir() {
 			continue // no home yet: a new one asks by itself
 		}
-		f, err := os.OpenFile(filepath.Join(home, pack.AgentDefaultRequest), os.O_WRONLY|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
+		// O_NONBLOCK: a FIFO the agent planted there fails at once instead
+		// of holding the open until something reads it.
+		f, err := os.OpenFile(filepath.Join(home, pack.AgentDefaultRequest), os.O_WRONLY|os.O_CREATE|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0o600)
 		if err != nil {
 			return slugs, fmt.Errorf("%s: %w", wt.Slug, err)
 		}

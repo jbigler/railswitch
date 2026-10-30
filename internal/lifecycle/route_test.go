@@ -154,6 +154,8 @@ func TestAgentSkipsRoute(t *testing.T) {
 		t.Errorf("agent waited for the route: %d polls\n%s", n, e.errOut())
 	}
 
+	// wt add and down write the marker even without create hooks: still
+	// no wait.
 	marker := render.CreatePending(e.ws, "feat")
 	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
 		t.Fatal(err)
@@ -161,6 +163,14 @@ func TestAgentSkipsRoute(t *testing.T) {
 	if err := os.WriteFile(marker, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+		t.Fatal(err)
+	}
+	if n := ft.polls[featRouter]; n != 0 {
+		t.Errorf("no create hooks, and the agent waited for the route: %d polls", n)
+	}
+
+	e.editProject(t, func(s string) string { return s + "\n[hooks]\ncreate = [\"bin/setup\"]\n" })
 	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
 		t.Fatal(err)
 	}

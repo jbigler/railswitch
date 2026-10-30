@@ -4,9 +4,10 @@
 # "@railswitch.md" in <~/.claude>/CLAUDE.md, which stays the user's: other
 # tools' lines there (rtk init's @RTK.md) survive every start.
 #
-# A home from before this (no railswitch.md yet) holds a CLAUDE.md the old
-# entrypoint copied over on every start: only its @-import lines (one a
-# setup command just added) are kept.
+# A home from before this (no railswitch.md yet, and a CLAUDE.md without
+# the import) holds the copy the old entrypoint wrote on every start: only
+# its @-import lines (one a setup command just added) are kept. A CLAUDE.md
+# that imports railswitch.md already (a promoted default) is the user's.
 set -eu
 
 src=$1
@@ -15,7 +16,7 @@ mkdir -p "$dir"
 memory="$dir/CLAUDE.md"
 tmp="$memory.tmp.$$"
 
-if [ ! -e "$dir/railswitch.md" ] && [ -f "$memory" ]; then
+if [ ! -e "$dir/railswitch.md" ] && [ -f "$memory" ] && ! grep -qx '@railswitch.md' "$memory"; then
   grep '^@' "$memory" > "$tmp" || true
   mv "$tmp" "$memory"
 fi

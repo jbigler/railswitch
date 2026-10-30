@@ -134,3 +134,19 @@ func TestStackNumber(t *testing.T) {
 		t.Errorf("through a symlinked catalog: %d", got)
 	}
 }
+
+// TestDetailCap: at most maxDetail branches are looked up, each once.
+func TestDetailCap(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"gh"}, sys.Result{Stdout: []byte("[]")}, nil)
+	st := &Stack{}
+	for i := range maxDetail + 20 {
+		st.Branches = append(st.Branches, StackBranch{Name: fmt.Sprintf("b%d", i), PR: &StackPR{Number: i + 1, State: "open"}})
+	}
+	if err := Detail(context.Background(), f, "o/n", []*Stack{st, st}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Calls) != maxDetail {
+		t.Errorf("%d gh calls; want %d", len(f.Calls), maxDetail)
+	}
+}

@@ -380,6 +380,10 @@ func (l *L) up(ctx context.Context, slug string, route bool) error {
 		l.warnFailed(ctx, sd, others, othersErr)
 	}
 	if !route {
+		// The marker is written whether or not there are create hooks.
+		if len(m.Inputs.Project.Hooks.Create) == 0 {
+			return nil
+		}
 		if _, err := os.Stat(render.CreatePending(m.Inputs.Workspace, slug)); errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}

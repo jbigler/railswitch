@@ -343,3 +343,22 @@ func TestEditorRestartFailedNotice(t *testing.T) {
 	f.cli.set("--json -C /ws/ftest pack file show local:kv2@1 entrypoints/kv.sh", `{"path":"entrypoints/kv.sh","text":"x\n","hash":"`+testHash+`"}`)
 	contains(t, "library editor", f.do(req("GET", "/p/ftest/library/local:kv2@1/entrypoints/kv.sh?restart=failed", nil)).Body.String(), notice)
 }
+
+// TestDefaultChanged: an ejected Containerfile whose default changed is
+// marked on the build chain, on the project page's banner and, when an
+// update changes it, on the review page.
+func TestDefaultChanged(t *testing.T) {
+	f := imagesFixture(t)
+	f.cli.set("--json -C /ws/ftest -w main containerfile list", strings.Replace(chainMain, `"from":[]},`, `"from":[],"default_changed":true},`, 1))
+	f.cli.set("--json -C /ws/ftest overview", strings.Replace(ftestOverview("jb/b", "up", agentJSON("idle", "", false)), `"workspace":"/ws/ftest",`, `"workspace":"/ws/ftest","defaults_changed":["pg-client"],`, 1))
+	f.cli.set(reviewKey, strings.Replace(reviewJSON, `"restart":["main","b"]}`, `"restart":["main","b"],"ejected":["pg-client"]}`, 1))
+	contains(t, "images", f.do(req("GET", "/p/ftest/images", nil)).Body.String(),
+		`Containerfile.pg-client <a class="chip yellow" href="/p/ftest/images/edit/pg-client"`)
+	body := f.do(req("GET", "/p/ftest", nil)).Body.String()
+	contains(t, "project", body, `<div class="cf-banner">The default of your own <a class="mono" href="/p/ftest/images/edit/pg-client">Containerfile.pg-client</a> changed since you ejected it.`)
+	contains(t, "review", f.do(req("GET", "/p/ftest/review", nil)).Body.String(),
+		`This project has its own copy of <a class="mono" href="/p/ftest/images/edit/pg-client">Containerfile.pg-client</a>. Accepting updates the default, not your copy`)
+	if c := strings.Count(f.do(req("GET", "/p/ftest/images", nil)).Body.String(), "default changed</a>"); c != 1 {
+		t.Errorf("%d badges; want 1", c)
+	}
+}

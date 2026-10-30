@@ -14,7 +14,7 @@ button{font:inherit;color:inherit}
 kbd{border:1px solid var(--border);border-radius:3px;padding:0 4px;background:var(--bg)}
 
 /* Header, strip, banner */
-.hd{display:flex;gap:12px;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.hd{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border)}
 .logo{color:var(--accent);font-size:16px}
 .hb{background:none;border:0;padding:2px 4px;cursor:pointer;color:var(--text);text-decoration:none}
 .hb:hover{color:var(--accent)}
@@ -246,3 +246,7 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .lbl a.quiet-link:hover{color:var(--blue);text-decoration:underline}
 .agent-default{margin:8px 0 12px}
 .agent-default h3{margin:0 0 4px}
+.hd-group{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+.hd-cap{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
+.hb[aria-current=page]{color:var(--accent);font-weight:700;box-shadow:inset 0 -2px 0 var(--accent)}
+.chip.yellow{color:var(--yellow);border-color:var(--yellow);text-decoration:none}

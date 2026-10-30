@@ -426,7 +426,12 @@ type bannerView struct {
 	Review   string
 	Signers  []string
 	Template *bannerTemplate
+	Defaults []bannerDefault // ejected Containerfiles whose default changed
 }
+
+// bannerDefault is one ejected Containerfile whose default changed: the
+// Images editor compares and resets it.
+type bannerDefault struct{ Name, URL string }
 
 // bannerTemplate is the notice of a changed template: Settings has its
 // Accept.

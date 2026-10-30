@@ -23,6 +23,7 @@ type reviewDoc struct {
 	Flags    int             `json:"flags"`
 	Packages []reviewPackage `json:"packages"`
 	Restart  []string        `json:"restart"`
+	Ejected  []string        `json:"ejected"` // the project's own copies of a Containerfile this changes
 }
 
 type reviewPackage struct {
@@ -64,6 +65,7 @@ type reviewView struct {
 	Restart   string // "main, b"; "" for none
 	AcceptURL string
 	Packages  []reviewPkgView
+	Ejected   []bannerDefault // the project's own copies of a default this changes
 }
 
 type reviewPkgView struct {
@@ -229,6 +231,9 @@ func (s *Server) reviewPage(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Hash, v.AckText, v.Restart = doc.Hash, ackText(doc.Flags), strings.Join(doc.Restart, ", ")
 	v.Packages = reviewPackages(doc)
+	for _, name := range doc.Ejected {
+		v.Ejected = append(v.Ejected, bannerDefault{Name: name, URL: "/p/" + p.Prefix + "/images/edit/" + name})
+	}
 	s.html(w, http.StatusOK, "review", v)
 }
 

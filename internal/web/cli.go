@@ -36,7 +36,9 @@ type overview struct {
 	SignerWarnings []signerWarning `json:"signer_warnings"`
 	Template       *templateStamp  `json:"template"`        // the template the project was made from; nil: none
 	TemplateUpdate bool            `json:"template_update"` // that template changed since
-	Worktrees      []worktree      `json:"worktrees"`
+	// DefaultsChanged: Containerfiles (<name>) ejected from a default that changed since.
+	DefaultsChanged []string   `json:"defaults_changed"`
+	Worktrees       []worktree `json:"worktrees"`
 }
 
 // signerWarning is a locked library package whose signer is no longer
@@ -446,6 +448,8 @@ type buildStep struct {
 	File string   `json:"file"` // containerfiles/Containerfile.<name>
 	Tag  string   `json:"tag"`
 	From []string `json:"from"`
+	// DefaultChanged: ejected from a default that changed since.
+	DefaultChanged bool `json:"default_changed"`
 }
 
 // containerfileDoc is `containerfile show <name>`: the file, and the

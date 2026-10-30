@@ -258,3 +258,20 @@ func TestPrintReviewHostilePath(t *testing.T) {
 		t.Errorf("control characters printed: %q", b.String())
 	}
 }
+
+// TestLockReviewEjected: a review that changes the default of a
+// Containerfile the project ejected names it; one without a header (or
+// another file) doesn't.
+func TestLockReviewEjected(t *testing.T) {
+	ws, _ := lockedWS(t)
+	pendingOption(t, ws, "postgres", func(m fstest.MapFS) {
+		m["Containerfile.pg-client"].Data = append(m["Containerfile.pg-client"].Data, "# accepted\n"...)
+	})
+	if doc := reviewOf(t, ws); len(doc.Ejected) != 0 {
+		t.Errorf("no header: ejected %v", doc.Ejected)
+	}
+	mustRun(t, "-C", ws, "containerfile", "eject", "pg-client", "--force")
+	if doc := reviewOf(t, ws); !slices.Equal(doc.Ejected, []string{"pg-client"}) {
+		t.Errorf("ejected %v", doc.Ejected)
+	}
+}

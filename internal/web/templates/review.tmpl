@@ -13,7 +13,8 @@ highlighted; Accept needs the acknowledgement when anything is flagged. */}}
 <p class="note">A package this project uses changed under its <code>stack.lock</code>. The project keeps running what was accepted before until you accept this.</p>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{else if not .Packages}}<p class="green">Nothing is waiting for review.</p>
-{{else}}{{template "review-packages" .Packages}}<form method="post" action="{{.AcceptURL}}" id="accept" class="editor" data-job="accept" data-next="/p/{{.Prefix}}"{{if .AckText}} data-ack-required{{end}}>
+{{else}}{{with .Ejected}}<p class="yellow review-ejected">This project has its own copy of {{range $i, $d := .}}{{if $i}}, {{end}}<a class="mono" href="{{$d.URL}}">Containerfile.{{$d.Name}}</a>{{end}}. Accepting updates the default, not your copy: afterwards, compare it with the new default or reset it in Images (marked "default changed").</p>
+{{end}}{{template "review-packages" .Packages}}<form method="post" action="{{.AcceptURL}}" id="accept" class="editor" data-job="accept" data-next="/p/{{.Prefix}}"{{if .AckText}} data-ack-required{{end}}>
 <input type="hidden" name="hash" value="{{.Hash}}">
 {{if .AckText}}<label class="check ack"><input type="checkbox" name="ack" value="1"> {{.AckText}}</label>
 {{end}}{{if .Restart}}<label class="check"><input type="checkbox" name="restart" value="1"> Restart after accepting: <span class="mono">{{.Restart}}</span></label>

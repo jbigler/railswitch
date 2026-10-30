@@ -185,6 +185,7 @@ func TestPages(t *testing.T) {
 		want []string
 	}{
 		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`, `<div id="conn" class="banner conn" hidden></div>`}},
+		{"/p/ftest/images", 200, []string{`<nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>`, `<a class="hb" href="/p/ftest">worktrees</a>`, `<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>`}},
 		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
 		{"/p/nope", 404, nil},
 		{"/p/nope/b", 404, nil},

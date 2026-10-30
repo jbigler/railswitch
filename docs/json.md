@@ -57,6 +57,7 @@ suggested addon that is missing from `[image] addons`.
 | `steps[].name` | string | `base`, `addon <name>` for an `[image] addons` entry, a tool's name (`nvim`), `agent-base`, `agent <pkg>` for an agent package (`agent claude`), or a standalone option image's name (`playwright`). |
 | `steps[].file` | string | The Containerfile, relative to the workspace: `containerfiles/Containerfile.<name>`; `containerfiles/Containerfile.agent-base` for `agent-base` and `containerfiles/Containerfile.<pkg>` for `agent <pkg>`. |
 | `steps[].tag` | string | The image tag it builds: `localhost/<prefix>/<repo>:<version>-<hash8>` (D9). |
+| `steps[].default_changed` | boolean | The file carries an eject header and the default it was ejected from (as the project's `stack.lock` accepts it) has changed since: compare it with `containerfile show`, reset it with `containerfile eject --force`. |
 | `steps[].from` | array of strings | The file's `FROM` images with build args expanded, without `${BASE_IMAGE}`, `scratch` and stage names (D36). Empty for an addon that only builds on the previous step. |
 | `warnings` | array of strings | Non-fatal findings; empty when there are none. |
 
@@ -692,6 +693,7 @@ row.
 | `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
 | `template` | object or null | The template the project started from, as `project.toml` `[template]` records it: `ref`, `sha256` (lowercase hex, no prefix). `null` when it records none. |
 | `template_update` | boolean | `template.ref` resolves to content with another hash than `template.sha256` (a library fetch changed it, D111). [`template check`](#template-check) shows the diff; nothing is applied. `false` without a template or when the ref doesn't resolve. |
+| `defaults_changed` | array of strings | The `<name>` of each `containerfiles/Containerfile.<name>` ejected from a default that changed since (as `containerfile list`'s `default_changed`), sorted; `[]` for none. A package update changes a default only once accepted. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
@@ -737,6 +739,7 @@ of a `changed` package is the store's copy of what the lock accepted.
 | `files[].diff` | string | Unified diff, 3 lines of context (`--- a/<path>`/`+++ b/<path>`, `/dev/null` for an added or removed side). Every file is diffed as text: a NUL or invalid UTF-8 byte is shown as `\xNN` (and the file carries a `runs-here` flag); `""` only for an empty file added or removed. |
 | `files[].flags` | array | `{check, line, text}`, `[]` when none. `check` is one of `firewall`, `runs-here`, `image`, `host-mount`, `port`, `privilege`. `line` is the 1-based line in the new file (map it through the hunks' `+N,M` ranges); `0` for a manifest field flag (listed above the diff) or a file-level flag. A removed file has no flags. `text` is the flagged line as `+ <line>`, or a sentence for a line-0 flag. |
 | `restart` | array | Running worktrees whose units or mounted package assets the accept changes (as in [`settings preview`](#settings-preview)); `[]` when none or nothing to review. |
+| `ejected` | array of strings | The `<name>` of each of the project's ejected `containerfiles/Containerfile.<name>` whose default a package in this review changes: accepting updates the default, not the copy (`overview`'s `defaults_changed` then lists it). `lock --review` only; `[]` elsewhere. |
 
 ## `pr ls`
 

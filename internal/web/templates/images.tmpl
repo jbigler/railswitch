@@ -17,7 +17,7 @@
 <table class="set-table chain">
 <thead><tr><th>Step</th><th>Kind</th><th>File</th><th>From</th><th>Tag</th><th></th></tr></thead>
 <tbody>
-{{range .Steps}}<tr><td>{{.Name}}</td><td><span class="chip">{{.Kind}}</span></td><td class="mono">{{.File}}</td><td class="mono">{{.From}}</td><td class="mono tag-cell">{{.Tag}}</td><td>{{if .EditURL}}<a class="ln" href="{{.EditURL}}">Edit</a>{{end}}</td></tr>
+{{range .Steps}}<tr><td>{{.Name}}</td><td><span class="chip">{{.Kind}}</span></td><td class="mono">{{.File}}{{if .DefaultChanged}} <a class="chip yellow" href="{{.EditURL}}" title="The default this file was ejected from changed since. Compare or reset in the editor.">default changed</a>{{end}}</td><td class="mono">{{.From}}</td><td class="mono tag-cell">{{.Tag}}</td><td>{{if .EditURL}}<a class="ln" href="{{.EditURL}}">Edit</a>{{end}}</td></tr>
 {{else}}<tr><td colspan="6" class="muted">No images.</td></tr>
 {{end}}</tbody>
 </table>

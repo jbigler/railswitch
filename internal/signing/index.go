@@ -63,7 +63,7 @@ type Index struct {
 }
 
 // IndexPackage is one published package: its ref, its kind (pack.KindPack,
-// KindOption or KindAgent) and its pack.ContentHash.
+// KindOption, KindAgent or KindTemplate) and its pack.ContentHash.
 type IndexPackage struct {
 	Ref    string `toml:"ref"`
 	Kind   string `toml:"kind"`

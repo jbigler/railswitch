@@ -189,7 +189,7 @@ type Share struct {
 
 // Firewall is the [firewall] table.
 type Firewall struct {
-	Mode  string              // "log" (default) | "enforce" | "off"
+	Mode  string              // "log" | "enforce" | "off"; "": enforce with agents, else log (D119)
 	Allow map[string][]string // profile → extra hosts
 }
 

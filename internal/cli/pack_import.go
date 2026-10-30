@@ -351,9 +351,8 @@ func readIncomingPackage(root, dir, as string) (*incomingPackage, error) {
 	table := tableHeaderRe.FindIndex(mf.Data)
 	if loc == nil || table != nil && table[0] < loc[0] || !manifestNameIs(mf.Data[loc[0]:loc[1]], m.Name) {
 		return nil, fmt.Errorf("%s/%s: its top-level name must be one line name = \"<name>\", before any [table]", dir, in.manifest)
-	} else {
-		mf.Data = slices.Concat(mf.Data[:loc[0]], []byte(fmt.Sprintf("name = %q", name)), mf.Data[loc[1]:])
 	}
+	mf.Data = slices.Concat(mf.Data[:loc[0]], []byte(fmt.Sprintf("name = %q", name)), mf.Data[loc[1]:])
 	in.ref = pack.Ref{Local: true, Name: name, Version: m.Version}
 	in.dir = in.top + "/" + name
 	if in.sha, err = pack.ContentHash(in.files); err != nil {

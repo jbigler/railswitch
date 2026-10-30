@@ -638,11 +638,10 @@ type agentView struct{ Name, Glyph, Label, Class, Message string }
 
 type actionView struct{ Label, URL string }
 
-// newDetail is the selected worktree. Links: App (the main button), the
-// project's, the stack's, all greyed while the stack is stopped; then PR
-// and Logs, quieter.
 // newDetail is row r's detail; repo is the project's PR URL prefix
-// (projectPRRepo), which the stack's PR numbers link through.
+// (projectPRRepo), which the stack's PR numbers link through. Links: App
+// (the main button), the project's, the stack's, all greyed while the
+// stack is stopped; then PR, Review app and Logs, quieter.
 func newDetail(prefix string, r row, repo string) detailView {
 	wt := r.WT
 	path := "/p/" + prefix + "/" + wt.Slug

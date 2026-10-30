@@ -671,7 +671,7 @@ func (s *Server) cancelJob(w http.ResponseWriter, r *http.Request) {
 	s.accepted(w, r, id, "cancel", "/")
 }
 
-// colorsMode is the form's mode as a flag: none for light, --dark.
+// colorsModeArgs is the form's mode as a flag: none for light, --dark.
 func colorsModeArgs(mode string) ([]string, bool) {
 	switch mode {
 	case "light":

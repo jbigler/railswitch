@@ -10,6 +10,22 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
 const projectStore = "railswitch.project";
+
+// recall and remember read and write this browser's local storage, which a
+// private window or blocked site data makes throw: the page works without.
+function recall(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function remember(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
 const noticeStore = "railswitch.notice";
 
 // Events.
@@ -157,7 +173,7 @@ document.addEventListener("click", (e) => {
   const t = e.target;
   const sortLink = t.closest("a[data-sort]");
   if (sortLink) {
-    localStorage.setItem(sortStore, new URL(sortLink.href).searchParams.get("sort") || "name");
+    remember(sortStore, new URL(sortLink.href).searchParams.get("sort") || "name");
     return;
   }
   const row = t.closest("#list tbody tr");
@@ -312,18 +328,14 @@ async function openPalette() {
   if (!url || !body.dataset.sel) return toast("No worktree selected.", true);
   const d = await loadDialog("palette", url);
   if (!d) return;
-  try {
-    if (localStorage.getItem(termKey) === "0") $(".pal-term", d).checked = false;
-  } catch {}
+  if (recall(termKey) === "0") $(".pal-term", d).checked = false;
   $(".pal-filter", d).focus();
   filterPalette();
 }
 
 document.addEventListener("change", (e) => {
   if (!e.target.matches("#palette .pal-term")) return;
-  try {
-    localStorage.setItem(termKey, e.target.checked ? "1" : "0");
-  } catch {}
+  remember(termKey, e.target.checked ? "1" : "0");
 });
 
 function paletteItems() {
@@ -898,7 +910,7 @@ function startEditor() {
   ready();
 }
 
-// Job forms of the images, library and editor pages: an optional
+// Job forms of the images, library, editor and machine pages: an optional
 // confirm, then the job; when it ends ok the page goes on to the file it
 // made (data-next) or reloads.
 
@@ -944,8 +956,8 @@ if (view === "images" || view === "library" || view === "editor" || view === "ma
 
 // Review update: Accept waits for the acknowledgement of the flagged
 // items. The job ending ok goes to the project page; so does a failed
-// restart (exit 3: the update was accepted), with a notice. A template
-// import (view import) is the same form, going to the machine page.
+// restart (exit 3: the update was accepted), with a notice. An import
+// (view import) is the same form, going back to its data-next page.
 if (view === "review" || view === "import") {
   const f = $("#accept");
   if (f) {
@@ -979,10 +991,11 @@ if (view === "review" || view === "import") {
 // New project: Read the repository posts repo and branch (with the
 // picked pack, when one is picked) to /new/detect and swaps in the Stack
 // card; Start from a template swaps in that template's questions instead
-// (and Read waits until no template is picked); Next: review posts the whole form to /new/review and swaps in
-// step 2; Create starts project new as a job of the new prefix and
-// follows it on that prefix's stream. Any change after a review marks it
-// stale and turns Create off until the next review.
+// (and Read waits until no template is picked); Next: review posts the
+// whole form to /new/review and swaps in step 2; Create starts project
+// new as a job of the new prefix and follows it on that prefix's stream.
+// Any change after a review marks it stale and turns Create off until the
+// next review.
 
 function startNew() {
   const form = $("#new-form");
@@ -1255,14 +1268,14 @@ function startNew() {
     return;
   }
   const nav = performance.getEntriesByType("navigation")[0];
-  const last = localStorage.getItem(projectStore);
+  const last = recall(projectStore);
   if (nav && nav.redirectCount > 0 && last && last !== prefix && $$("#projects .proj-item").some((li) => li.dataset.filter === last)) {
     location.replace("/p/" + encodeURIComponent(last));
     return;
   }
-  localStorage.setItem(projectStore, prefix);
+  remember(projectStore, prefix);
   const params = new URLSearchParams(location.search);
-  const saved = localStorage.getItem(sortStore);
+  const saved = recall(sortStore);
   if (!params.has("sort") && saved && saved !== "name") {
     params.set("sort", saved);
     location.replace(location.pathname + "?" + params);

@@ -118,7 +118,7 @@ type packFileDoc struct {
 }
 
 // railswitch pack file show <ref> <path>: a file of a local package, or of
-// a built-in pack or option (read-only).
+// a built-in pack, option or agent (read-only).
 func packFileShow(e *env, args []string) int {
 	fset := e.flags("pack file show")
 	a, code, ok := parseArgs(e, fset, args, 2, "usage: railswitch pack file show <ref> <path>")

@@ -248,7 +248,6 @@ type editResult struct {
 // secretRow is one `secret ls` row; it never holds a value.
 type secretRow struct {
 	Name     string   `json:"name"`
-	Scope    string   `json:"scope"`
 	Delivery string   `json:"delivery"`
 	Set      bool     `json:"set"`
 	Created  *string  `json:"created"`

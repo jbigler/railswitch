@@ -22,7 +22,8 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-// packNameRe is a package name: its directory under packs/ or options/.
+// packNameRe is a package name: its directory under packs/, options/ or
+// agents/.
 var packNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 // manifestNameRe is a manifest's top-level name line.
@@ -53,9 +54,10 @@ func cmdPack(ctx context.Context, e *env, args []string) int {
 	return e.usageErr("pack: unknown subcommand %q\n%s", args[0], usage)
 }
 
-// railswitch pack eject <ref> [--as <name>]: copy a built-in pack or option
-// to the workspace's packs/<name>/ or options/<name>/, a local package the
-// project uses once its ref says local:<name>@N.
+// railswitch pack eject <ref> [--as <name>]: copy a built-in pack, option
+// or agent to the workspace's packs/<name>/, options/<name>/ or
+// agents/<name>/, a local package the project uses once its ref says
+// local:<name>@N.
 func packEject(e *env, args []string) int {
 	fset := e.flags("pack eject")
 	as := fset.String("as", "", "the local package's name (default: the built-in's)")
@@ -429,7 +431,7 @@ Changes the app needs to run under railswitch (railswitch pack show prints this 
 // packDoc is railswitch --json pack show (docs/json.md).
 type packDoc struct {
 	Ref      string          `json:"ref"`
-	Kind     string          `json:"kind"`   // "pack" or "option"
+	Kind     string          `json:"kind"`   // "pack", "option" or "agent"
 	Source   string          `json:"source"` // "built in" or "local"
 	Path     string          `json:"path"`   // the local package's directory; "" for a built-in
 	App      *packAppDoc     `json:"app,omitempty"`
@@ -467,8 +469,8 @@ type portDoc struct {
 	Container int    `json:"container"` // 0 with same_port
 }
 
-// railswitch pack show <ref>: a pack's or option's manifest summary and its
-// README.md. Built-ins need no workspace.
+// railswitch pack show <ref>: a pack's, option's or agent's manifest
+// summary and its README.md. Built-ins need no workspace.
 func packShow(e *env, args []string) int {
 	fset := e.flags("pack show")
 	arg, code, ok := parseNamed(e, fset, args, "usage: railswitch pack show <ref>")
@@ -652,7 +654,7 @@ type packLsOption struct {
 
 // libraryPackage is one package of a library on this machine that
 // resolves now: listed in libraries.toml, in its verified checkout, its
-// files still hashing to the signed index. Option is set for an option.
+// files still hashing to the signed index. option is set for an option.
 type libraryPackage struct {
 	kind   string
 	ref    pack.Ref
@@ -705,8 +707,9 @@ func libraryPackages(cat *pack.Catalog) ([]libraryPackage, error) {
 	return out, nil
 }
 
-// railswitch pack ls: every pack and option a new or current project can
-// use, for the dashboard's pickers. In a workspace its local packages too.
+// railswitch pack ls: every pack, option and agent a new or current
+// project can use, for the dashboard's pickers. In a workspace its local
+// packages too.
 func packLs(e *env, args []string) int {
 	fset := e.flags("pack ls")
 	if code, ok := parse(fset, args); !ok {

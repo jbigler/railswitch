@@ -42,12 +42,11 @@ func (l *L) Nvim(ctx context.Context, slug string) error {
 	if err != nil {
 		return err
 	}
-	var port render.Port
-	if i := slices.IndexFunc(s.Publish, func(p render.Port) bool { return p.Env == nvimPort }); i >= 0 {
-		port = s.Publish[i]
-	} else {
+	i := slices.IndexFunc(s.Publish, func(p render.Port) bool { return p.Env == nvimPort })
+	if i < 0 {
 		return fmt.Errorf("%s: the nvim tool publishes no %s", m.Prefix, nvimPort)
 	}
+	port := s.Publish[i]
 	server := "127.0.0.1:" + in.Values[nvimPort]
 	l.nvimHook(ctx, "nvim-attach", server)
 	if l.LookPath != nil {

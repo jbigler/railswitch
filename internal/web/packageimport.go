@@ -14,7 +14,7 @@ import (
 // runs `pack export <ref> --to <dir>`.
 
 // packImportArgs is `pack import` of the posted or queried folder and
-// name for project p's workspace; ok false for a bad path or name.
+// name in workspace ws; ok false for a bad path or name.
 func packImportArgs(ws, rawDir, as string) ([]string, string, bool) {
 	dir, ok := importDir(rawDir)
 	if !ok || as != "" && !packNameRe.MatchString(as) {

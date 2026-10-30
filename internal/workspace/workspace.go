@@ -205,9 +205,9 @@ func Hash(data []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-// lockEntries is the lock's pack, option and agent entries for st. Packs and
-// options are keyed by name, agents by ref string ("local:probe@1"); a
-// workspace-local package's source is "local" (D43).
+// lockEntries is the lock's package entries for st. Packs, options and
+// tools are keyed by name, agents by ref string ("local:probe@1"), the agent
+// base by baseKey; a workspace-local package's source is "local" (D43).
 func lockEntries(st *pack.Stack) (*config.Lock, error) {
 	l := &config.Lock{}
 	for _, sp := range stackPackages(st) {
@@ -362,13 +362,12 @@ func LibraryID(e config.LockEntry) (id string, ok bool) {
 // stack.lock differs from the resolved stack.
 var ErrStaleLock = errors.New("stack.lock is out of date")
 
-// CheckLock refuses a stack.lock whose packs, options or agents differ from
-// the resolved stack by version, content hash or where it comes from (a
+// CheckLock refuses a stack.lock whose package entries differ from the
+// resolved stack by version, content hash or where it comes from (a
 // built-in, a local and a library copy of it are different packages, even
-// byte for byte), or that
-// lacks or has an extra one: the hash exists to stop unreviewed package
-// content (HANDOFF §3.11). The built-in source text, which carries the
-// railswitch version, is not compared.
+// byte for byte), or that lacks or has an extra one: the hash exists to
+// stop unreviewed package content (HANDOFF §3.11). The built-in source
+// text, which carries the railswitch version, is not compared.
 func (w *Workspace) CheckLock() error {
 	want, err := lockEntries(w.Stack)
 	if err != nil {

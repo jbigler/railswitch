@@ -336,9 +336,6 @@ func (m *Model) envLayerValues(values, gen map[string]string) map[string]string 
 // value that expands to an unset {env.X} is dropped.
 func (m *Model) expandEnv(in *Instance) error {
 	gen := m.Inputs.Generated
-	if gen == nil {
-		gen = map[string]string{}
-	}
 	file := filepath.Join(m.Inputs.Workspace, config.GeneratedFile)
 	missing := func(name string) error {
 		return fmt.Errorf("%s is not set (or empty) in %s (railswitch project new generates it; restore it under [env])", name, file)

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 )
 
 // HookLists are the [hooks] lists (D126), in the order they run.
@@ -28,11 +27,7 @@ func SetHooks(data, list string, cmds []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	q := make([]string, len(cmds))
-	for i, c := range cmds {
-		q[i] = QuoteString(c)
-	}
-	value := "[" + strings.Join(q, ", ") + "]"
+	value := stringArray(cmds)
 	s := d.find([]string{"hooks"}, list)
 	switch {
 	case s != nil && len(cmds) == 0:
@@ -88,18 +83,14 @@ func SetAgentSetup(data, name string, cmds []string) (string, error) {
 	if !plain {
 		return "", &BlockedError{1, "agents." + name + " has no [agents." + name + "] table (it is written inline or as dotted keys)"}
 	}
-	q := make([]string, len(cmds))
-	for i, c := range cmds {
-		q[i] = QuoteString(c)
-	}
 	s := d.find(table, "setup")
 	switch {
 	case s != nil && len(cmds) == 0:
 		return d.removeStmt(s), nil
 	case s != nil:
-		return d.setValue(s, "["+strings.Join(q, ", ")+"]"), nil
+		return d.setValue(s, stringArray(cmds)), nil
 	case len(cmds) == 0:
 		return data, nil
 	}
-	return d.insertKey(table, "setup", "["+strings.Join(q, ", ")+"]"), nil
+	return d.insertKey(table, "setup", stringArray(cmds)), nil
 }

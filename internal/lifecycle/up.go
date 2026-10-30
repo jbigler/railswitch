@@ -25,7 +25,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-// traefikUnit is the shared proxy's unit file and service.
+// The shared proxy's and Dozzle's unit files, services and containers.
 const (
 	traefikUnit      = machine.ProxyUnitName
 	traefikService   = machine.ProxyService
@@ -266,7 +266,7 @@ func (l *L) up(ctx context.Context, slug string, route bool) error {
 			if err != nil {
 				return err
 			}
-			restartTraefik = restartTraefik || stale
+			restartTraefik = stale
 		case u == dozzleService:
 			stale, err := l.staleContainer(ctx, dozzleContainer, dozzleUnit, unithash.Key("railswitch"))
 			if err != nil {

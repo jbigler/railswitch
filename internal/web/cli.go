@@ -90,12 +90,13 @@ type prRow struct {
 }
 
 type pr struct {
-	Number int    `json:"number"`
-	Title  string `json:"title"`
-	URL    string `json:"url"`
-	State  string `json:"state"`
-	Checks string `json:"checks"`
-	Review string `json:"review"`
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	URL       string `json:"url"`
+	State     string `json:"state"`
+	Checks    string `json:"checks"`
+	Review    string `json:"review"`
+	ReviewApp string `json:"review_app"` // its review app's URL (a GitHub deployment), "" for none
 }
 
 // ghStackDoc is `stack ls`: each worktree's branch's gh-stack stack.

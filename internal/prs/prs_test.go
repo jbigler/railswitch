@@ -78,14 +78,14 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []PR{
-		{1, "Draft", "https://github.com/o/n/pull/1", "draft", "", "draft", "pass", "none"},
-		{2, "Approved", "https://github.com/o/n/pull/2", "approved", "", "open", "pass", "approved"},
-		{3, "Changes", "https://github.com/o/n/pull/3", "changes", "", "open", "fail", "changes_requested"},
-		{4, "Running", "https://github.com/o/n/pull/4", "running", "", "open", "pending", "pending"},
-		{5, "Status pending", "https://github.com/o/n/pull/5", "status", "", "open", "pending", "none"},
-		{6, "Merged", "https://github.com/o/n/pull/6", "merged", "", "merged", "pass", "approved"},
-		{7, "Closed", "https://github.com/o/n/pull/7", "closed", "", "closed", "fail", "none"},
-		{8, "No checks", "https://github.com/o/n/pull/8", "nochecks", "", "open", "none", "none"},
+		{1, "Draft", "https://github.com/o/n/pull/1", "draft", "", "draft", "pass", "none", ""},
+		{2, "Approved", "https://github.com/o/n/pull/2", "approved", "", "open", "pass", "approved", ""},
+		{3, "Changes", "https://github.com/o/n/pull/3", "changes", "", "open", "fail", "changes_requested", ""},
+		{4, "Running", "https://github.com/o/n/pull/4", "running", "", "open", "pending", "pending", ""},
+		{5, "Status pending", "https://github.com/o/n/pull/5", "status", "", "open", "pending", "none", ""},
+		{6, "Merged", "https://github.com/o/n/pull/6", "merged", "", "merged", "pass", "approved", ""},
+		{7, "Closed", "https://github.com/o/n/pull/7", "closed", "", "closed", "fail", "none", ""},
+		{8, "No checks", "https://github.com/o/n/pull/8", "nochecks", "", "open", "none", "none", ""},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)
@@ -137,5 +137,41 @@ func TestListError(t *testing.T) {
 	_, err := List(context.Background(), f, "o/n", []string{"main"})
 	if err == nil || !strings.Contains(err.Error(), "not logged in") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// TestReviewApps: one GraphQL query for the open and draft PRs; each takes
+// the newest active, successful deployment's http(s) URL; an inactive or
+// failed one, or a javascript: URL, is no review app.
+func TestReviewApps(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(`{"data":{"repository":{
+		"p1":{"commits":{"nodes":[{"commit":{"deployments":{"nodes":[
+			{"state":"ACTIVE","latestStatus":{"state":"SUCCESS","environmentUrl":"https://old.example.dev"}},
+			{"state":"ACTIVE","latestStatus":{"state":"SUCCESS","environmentUrl":"https://app-pr-1.example.dev"}}]}}}]}},
+		"p2":{"commits":{"nodes":[{"commit":{"deployments":{"nodes":[
+			{"state":"INACTIVE","latestStatus":{"state":"SUCCESS","environmentUrl":"https://gone.example.dev"}},
+			{"state":"ACTIVE","latestStatus":{"state":"FAILURE","environmentUrl":"https://broken.example.dev"}}]}}}]}},
+		"p3":{"commits":{"nodes":[{"commit":{"deployments":{"nodes":[
+			{"state":"ACTIVE","latestStatus":{"state":"SUCCESS","environmentUrl":"javascript:alert(1)"}}]}}}]}}}}}`)}, nil)
+	one, two, three := &PR{Number: 1, State: "open"}, &PR{Number: 2, State: "draft"}, &PR{Number: 3, State: "open"}
+	merged := &PR{Number: 4, State: "merged"}
+	if err := ReviewApps(context.Background(), f, "o/n", []*PR{one, two, three, merged, nil, one}); err != nil {
+		t.Fatal(err)
+	}
+	if one.ReviewApp != "https://app-pr-1.example.dev" || two.ReviewApp != "" || three.ReviewApp != "" || merged.ReviewApp != "" {
+		t.Errorf("review apps: %q %q %q %q", one.ReviewApp, two.ReviewApp, three.ReviewApp, merged.ReviewApp)
+	}
+	if len(f.Calls) != 1 {
+		t.Fatalf("%d gh calls; want 1", len(f.Calls))
+	}
+	q := strings.Join(f.Calls[0], " ")
+	for _, want := range []string{"owner=o", "name=n", "p1: pullRequest(number: 1)", "p3: pullRequest(number: 3)"} {
+		if !strings.Contains(q, want) {
+			t.Errorf("query lacks %q: %s", want, q)
+		}
+	}
+	if strings.Contains(q, "number: 4") {
+		t.Error("a merged PR was queried")
 	}
 }

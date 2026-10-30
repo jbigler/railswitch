@@ -119,6 +119,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 ## CLI (Stage 9u additions)
 - claude@1 memory: the entrypoint runs the package's `memory.sh` (mounted at `/usr/local/bin/railswitch-memory`): the package's CLAUDE.md is copied to `~/.claude/railswitch.md` every start and `~/.claude/CLAUDE.md` keeps one `@railswitch.md` line, otherwise the user's (a home without `railswitch.md` yet keeps only its `@` lines of the old copy); `.claude/CLAUDE.md` is in `[config] paths`.
 
+## CLI (Stage 9v additions)
+- `pr ls --json` `pr.review_app` (`prs.ReviewApps`: one `gh api graphql` for the open/draft PRs, the newest ACTIVE deployment of the head commit whose latest status is SUCCESS, http(s) `environmentUrl` only); dashboard Links **Review app**.
+
 ## Global constraints
 - Every Quadlet unit railswitch writes ends with `[Quadlet] DefaultDependencies=false` (D130, `machine.NoNetworkWait`, appended after the unit-hash stamp so it changes no hash): podman's implicit wait for `network-online.target` held each start 90 s where that target never comes. Every render also adds it to older railswitch units of a registered project or the machine (`machine.AddNoNetworkWait`; a failure is a render warning); `up` reloads when a loaded unit's `After=` still names the wait. podman ≥ 5.3 (`doctor`).
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.

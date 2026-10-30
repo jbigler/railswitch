@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,6 +26,86 @@ type PR struct {
 	State  string `json:"state"`  // "draft", "open", "merged", "closed"
 	Checks string `json:"checks"` // "pass", "fail", "pending", "none"
 	Review string `json:"review"` // "approved", "changes_requested", "pending", "none"
+	// ReviewApp is the URL of the PR's review app, "" for none: ReviewApps.
+	ReviewApp string `json:"review_app"`
+}
+
+// ReviewApps fills in ReviewApp of each open or draft PR of prs: the
+// environment URL of the newest active GitHub deployment of the PR's head
+// commit whose latest status is a success (how Fly, Heroku, Render and
+// most hosts announce a review app), http(s) only. One GraphQL query for
+// them all.
+func ReviewApps(ctx context.Context, r sys.Runner, repo string, prs []*PR) error {
+	owner, name, _ := strings.Cut(repo, "/")
+	var q strings.Builder
+	var live []*PR
+	for _, p := range prs {
+		if p == nil || !(p.State == "open" || p.State == "draft") || slices.Contains(live, p) {
+			continue
+		}
+		live = append(live, p)
+		fmt.Fprintf(&q, "p%d: pullRequest(number: %d) { commits(last: 1) { nodes { commit { deployments(last: 10) { nodes { state latestStatus { state environmentUrl } } } } } } }\n", p.Number, p.Number)
+	}
+	if len(live) == 0 {
+		return nil
+	}
+	res, err := r.Run(ctx, sys.Cmd{
+		Name: "gh",
+		Args: []string{"api", "graphql", "-F", "owner=" + owner, "-F", "name=" + name,
+			"-f", "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {\n" + q.String() + "} }"},
+		Dir:     NeutralDir,
+		Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
+		Timeout: 30 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
+	var doc struct {
+		Data struct {
+			Repository map[string]*struct {
+				Commits struct {
+					Nodes []struct {
+						Commit struct {
+							Deployments struct {
+								Nodes []struct {
+									State        string `json:"state"`
+									LatestStatus *struct {
+										State          string `json:"state"`
+										EnvironmentURL string `json:"environmentUrl"`
+									} `json:"latestStatus"`
+								} `json:"nodes"`
+							} `json:"deployments"`
+						} `json:"commit"`
+					} `json:"nodes"`
+				} `json:"commits"`
+			} `json:"repository"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(res.Stdout, &doc); err != nil {
+		return fmt.Errorf("gh api graphql: %w", err)
+	}
+	for _, p := range live {
+		pr := doc.Data.Repository[fmt.Sprintf("p%d", p.Number)]
+		if pr == nil || len(pr.Commits.Nodes) == 0 {
+			continue
+		}
+		ds := pr.Commits.Nodes[0].Commit.Deployments.Nodes
+		for i := len(ds) - 1; i >= 0; i-- { // newest last
+			d := ds[i]
+			if d.State == "ACTIVE" && d.LatestStatus != nil && d.LatestStatus.State == "SUCCESS" && webURL(d.LatestStatus.EnvironmentURL) {
+				p.ReviewApp = d.LatestStatus.EnvironmentURL
+				break
+			}
+		}
+	}
+	return nil
+}
+
+// webURL reports whether s is an absolute http or https URL with a host:
+// what a page may link to (never javascript: or data:).
+func webURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
 
 // Repo returns "owner/name" for a GitHub remote URL (https, scp-style or

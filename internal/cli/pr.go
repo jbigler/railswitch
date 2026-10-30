@@ -65,6 +65,13 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 		}
 		rows = append(rows, r)
 	}
+	var found []*prs.PR
+	for _, r := range rows {
+		found = append(found, r.PR)
+	}
+	if err := prs.ReviewApps(ctx, e.run, repo, found); err != nil {
+		fmt.Fprintf(e.stderr, "warning: review apps: %v\n", err)
+	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(rows); err != nil {
 			return e.fail(err)

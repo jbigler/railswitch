@@ -667,6 +667,10 @@ func newDetail(prefix string, r row, repo string) detailView {
 	if v.PR != nil && v.PR.URL != "" {
 		v.Links = append(v.Links, linkView{Label: "PR", URL: v.PR.URL, Class: "ln quiet" + dim})
 	}
+	if r.PR != nil && r.PR.ReviewApp != "" {
+		// Deployed by the PR's own CI, not this stack: never greyed.
+		v.Links = append(v.Links, linkView{Label: "Review app", URL: r.PR.ReviewApp, Class: "ln quiet"})
+	}
 	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln quiet"})
 	for _, s := range wt.Services {
 		g, c, word := serviceLook(s.State)

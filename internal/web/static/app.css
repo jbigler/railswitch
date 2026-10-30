@@ -236,3 +236,9 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .gh-stack li{padding:1px 0}
 .gh-stack details ol{list-style:none;margin:0 0 0 1.5em;padding:0}
 .stack-head{margin-bottom:2px}
+.br a.pr-line{text-decoration:none}
+.br a.pr-line:hover{text-decoration:underline}
+.stack-switch{display:inline}
+.stack-switch button{font:inherit;color:var(--blue);background:none;border:0;padding:0;cursor:pointer}
+.stack-switch button:hover{text-decoration:underline}
+.stack-actions{margin-top:4px}

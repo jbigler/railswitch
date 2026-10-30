@@ -361,6 +361,10 @@ func (s *Server) jobEvent(ev jobs.Event) {
 	if p := s.state[j.Spec.Project]; p != nil && j.State != jobs.StateRunning {
 		p.ovAt = time.Time{}
 		wake(s.wakeOV)
+		if strings.HasPrefix(j.Spec.Label, "stack ") { // the stacks changed
+			p.prNow = true
+			wake(s.wakePR)
+		}
 	}
 }
 

@@ -141,13 +141,7 @@ func (e *env) agentNewTerm(ctx context.Context, root, slug, name string, argv []
 	if len(argv) > 0 {
 		cmd = append(append(cmd, "--"), argv...)
 	}
-	if err := launchTerm(ctx, e, title, filepath.Join(root, slug), cmd); err != nil {
-		if x, ok := errors.AsType[*term.ExitError](err); ok {
-			return x.Code
-		}
-		return e.failCommand(err)
-	}
-	return 0
+	return e.launchIn(ctx, title, filepath.Join(root, slug), cmd)
 }
 
 // printAgents prints agent ls: JSON with --json, else a table whose RUNNING

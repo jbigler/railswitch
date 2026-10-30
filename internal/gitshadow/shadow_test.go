@@ -180,3 +180,90 @@ func TestShadowSkipsWorktreeGhStack(t *testing.T) {
 		t.Errorf("the worktree's HEAD wasn't: %v", err)
 	}
 }
+
+// TestWritable: through a writable shadow, commits, a switch, reflogs and
+// packed refs reach the real repository; Commit carries back gh-stack's
+// catalog and the upstream a tool set, never another key.
+func TestWritable(t *testing.T) {
+	base, feat := repo(t)
+	real := filepath.Join(base, ".git")
+	if err := os.WriteFile(filepath.Join(real, "gh-stack"), []byte(`{"stacks":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s, err := NewWritable(ctx, sys.Exec{}, real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Remove()
+	env := s.Env(os.Environ())
+	git(t, feat, env, "-c", "user.email=x@x", "-c", "user.name=x", "commit", "-q", "--allow-empty", "-m", "two")
+	git(t, base, env, "switch", "-q", "-c", "next")
+	git(t, base, env, "config", "branch.next.remote", "origin")
+	git(t, base, env, "config", "alias.st", "!touch /tmp/pwned")
+	git(t, base, env, "pack-refs", "--all")
+	if err := os.WriteFile(filepath.Join(s.Dir, "gh-stack"), []byte(`{"stacks":[1]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Commit(ctx, sys.Exec{}); err != nil {
+		t.Fatal(err)
+	}
+	// The real config's planted include breaks plain git: read through a
+	// fresh shadow, whose links are the real repository.
+	after, err := New(ctx, sys.Exec{}, real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer after.Remove()
+	plain := after.Env(os.Environ())
+	if got := git(t, feat, plain, "log", "-1", "--format=%s", "feat"); got != "two" {
+		t.Errorf("feat's commit = %q", got)
+	}
+	if got := git(t, base, plain, "symbolic-ref", "--short", "HEAD"); got != "next" {
+		t.Errorf("base HEAD = %q", got)
+	}
+	if got := git(t, base, plain, "reflog", "-1", "--format=%gs", "feat"); !strings.Contains(got, "two") {
+		t.Errorf("feat's reflog = %q", got)
+	}
+	if data, _ := os.ReadFile(filepath.Join(real, "packed-refs")); !strings.Contains(string(data), "refs/heads/feat") {
+		t.Errorf("packed-refs not carried back:\n%s", data)
+	}
+	if data, _ := os.ReadFile(filepath.Join(real, "gh-stack")); string(data) != `{"stacks":[1]}` {
+		t.Errorf("gh-stack = %s", data)
+	}
+	cfg, _ := os.ReadFile(filepath.Join(real, "config"))
+	if got := git(t, base, plain, "config", "branch.next.remote"); got != "origin" {
+		t.Errorf("upstream not carried back:\n%s", cfg)
+	}
+	if strings.Contains(string(cfg), "/tmp/pwned\n") || !strings.Contains(string(cfg), "pwned-filter") {
+		t.Errorf("config: an alias carried back, or the rest not kept:\n%s", cfg)
+	}
+}
+
+// TestWritableConflict: a catalog changed in the real repository meanwhile
+// is kept, and Commit says so.
+func TestWritableConflict(t *testing.T) {
+	base, _ := repo(t)
+	real := filepath.Join(base, ".git", "gh-stack")
+	if err := os.WriteFile(real, []byte("one"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	s, err := NewWritable(ctx, sys.Exec{}, filepath.Join(base, ".git"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Remove()
+	if err := os.WriteFile(filepath.Join(s.Dir, "gh-stack"), []byte("ours"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(real, []byte("theirs"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Commit(ctx, sys.Exec{}); err == nil || !strings.Contains(err.Error(), "changed meanwhile") {
+		t.Errorf("Commit = %v", err)
+	}
+	if data, _ := os.ReadFile(real); string(data) != "theirs" {
+		t.Errorf("gh-stack = %s", data)
+	}
+}

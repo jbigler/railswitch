@@ -383,10 +383,30 @@ type Agent struct {
 	Env        map[string]string `toml:"env"`
 	Secrets    []AgentSecret     `toml:"secrets"`
 	Unit       Unit              `toml:"unit"`
+	Config     AgentConfig       `toml:"config"`
 
 	Files  fs.FS          `toml:"-"` // the package's directory
 	Origin *LibraryOrigin `toml:"-"` // as Pack.Origin
 }
+
+// AgentConfig is the agent's own configuration in its home (D135): the
+// paths, relative to the home, that `agent default promote` copies into
+// the project's default for the agent. The package's entrypoint applies
+// that default (mounted at AgentDefaultMount) to a home holding
+// AgentDefaultRequest.
+type AgentConfig struct {
+	Paths []string `toml:"paths"`
+}
+
+const (
+	// AgentDefaultMount is where an agent with [config] paths finds the
+	// project's default for it, read-only.
+	AgentDefaultMount = "/opt/railswitch/agent-default"
+	// AgentDefaultRequest, a file in an agent's home, asks its entrypoint
+	// to apply the default at the next start (and remove the file): a new
+	// home has it, `agent default apply` adds it.
+	AgentDefaultRequest = ".railswitch-apply-default"
+)
 
 // AgentImage is an agent package's Containerfile, built on the agent base image.
 type AgentImage struct {

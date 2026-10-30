@@ -21,3 +21,21 @@
 <label>Type <b>{{.Slug}}</b> to confirm <input name="confirm" required autocomplete="off" class="mono"></label>
 {{end}}<div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln danger">Remove</button></div>
 </form>{{end}}
+
+{{/* An agent's project default config (D135): promote this worktree's,
+or have homes take the default at their agent's next start. */}}
+{{define "agentdefault"}}<div class="agentdefault">
+<h2>Agent config in {{.Slug}}</h2>
+{{range .Agents}}<section class="agent-default">
+<h3>{{.Name}}</h3>
+{{if .Default}}<p>Default: from <b>{{.Default.From}}</b>, {{.Promoted}}.</p>{{else}}<p class="muted">No default yet: a new worktree's {{.Name}} starts with an empty config.</p>{{end}}
+<form method="post" action="{{$.PromoteURL}}" data-post data-close><input type="hidden" name="name" value="{{.Name}}">
+<label class="check"><input type="checkbox" name="all" value="1"> and apply it to every other worktree</label>
+<div class="btns"><button class="ln main">Make {{$.Slug}}'s {{.Name}} config the default</button></div></form>
+{{if .Default}}<form method="post" action="{{$.ApplyURL}}" data-post data-close><input type="hidden" name="name" value="{{.Name}}">
+<div class="btns"><button class="ln">Apply the default here</button><button class="ln" name="all" value="1">Apply the default to every worktree</button></div></form>{{end}}
+</section>
+{{else}}<p class="muted">No agent of this project has a config to share: its package lists no <code>[config] paths</code>.</p>
+{{end}}<p class="note">The default holds the files the agent's package lists as its config, copied from one worktree's agent home. A worktree's agent takes it the next time it starts (stop a running one first), keeping what it replaces in <code>~/.railswitch-default-backup</code>; a new worktree starts from it.</p>
+<div class="btns"><button type="button" class="ln" data-cancel>Close</button></div>
+</div>{{end}}

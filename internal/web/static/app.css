@@ -242,3 +242,7 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .stack-switch button{font:inherit;color:var(--blue);background:none;border:0;padding:0;cursor:pointer}
 .stack-switch button:hover{text-decoration:underline}
 .stack-actions{margin-top:4px}
+.lbl a.quiet-link{font-weight:400;margin-left:8px;color:var(--muted);text-decoration:none}
+.lbl a.quiet-link:hover{color:var(--blue);text-decoration:underline}
+.agent-default{margin:8px 0 12px}
+.agent-default h3{margin:0 0 4px}

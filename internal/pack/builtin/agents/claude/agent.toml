@@ -35,6 +35,11 @@ source = "CLAUDE.md"
 target = "/opt/railswitch/agent/CLAUDE.md"
 options = "ro,z"
 
+[[mounts]]                    # run by the entrypoint for a home that asks for the default (D135)
+source = "apply-default.sh"
+target = "/usr/local/bin/railswitch-apply-default"
+options = "ro,z"
+
 [[mounts]]                    # registered as a hook by the entrypoint (D58)
 source = "claude-status-hook.sh"
 target = "/usr/local/bin/claude-status-hook.sh"
@@ -43,6 +48,22 @@ options = "ro,z"
 [[secrets]]                   # claude setup-token
 name = "token"
 env = "CLAUDE_CODE_OAUTH_TOKEN"
+
+[config]                      # what `railswitch agent default promote` copies (D135)
+paths = [
+  ".claude/settings.json",      # theme, enabled plugins, permissions, hooks
+  ".claude/keybindings.json",
+  ".claude/statusline-command.sh",
+  ".claude/CLAUDE.local.md",
+  ".claude/agents",
+  ".claude/commands",
+  ".claude/hooks",
+  ".claude/skills",
+  ".claude/output-styles",
+  ".claude/plugins/known_marketplaces.json",
+  ".claude/plugins/installed_plugins.json",
+  ".claude.json",               # onboarding and preferences; the entrypoint keeps each home's projects
+]
 
 [env]
 DISABLE_AUTOUPDATER = "1"

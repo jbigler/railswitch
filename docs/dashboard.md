@@ -696,6 +696,13 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 Every action is a job (below).
 
 - **up, stop, restart** run `railswitch up|stop|restart` in the worktree.
+- **default config…** (next to the detail's Agent label) opens a dialog
+  that reads `agent ls` for the worktree: per agent with `[config]
+  paths`, where its default came from, **Make <worktree>'s <agent> config
+  the default** (`agent default promote <agent> [--all]`, the box "and
+  apply it to every other worktree" adding `--all`), and, with a default,
+  **Apply the default here** / **to every worktree** (`agent default apply
+  <agent> [--all]`).
 - **terminal** runs `railswitch term`: a new terminal tab or window on
   the host with your shell in the worktree's folder.
 - **Stack** (with a gh stack): **push**, **up**, **down** run

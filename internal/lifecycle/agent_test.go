@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -319,11 +320,77 @@ func TestAgentList(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []AgentRow{
-		{Name: "claude", Package: "claude@1", Run: "on-demand", State: "done", Message: "Ship it?", TS: 7, Reply: true},
+		{Name: "claude", Package: "claude@1", Run: "on-demand", State: "done", Message: "Ship it?", TS: 7, Reply: true, Config: true},
 		{Name: "probe", Package: "local:probe@1", Run: "service", State: "off"},
 	}
 	if !slices.Equal(rows, want) {
 		t.Fatalf("rows %+v; want %+v", rows, want)
+	}
+}
+
+// TestAgentDefault: promote copies the [config] paths of one worktree's
+// home (no symlink, nothing else) into the project's default; apply, or
+// promote --all, asks the other homes to take it at their next start.
+func TestAgentDefault(t *testing.T) {
+	e := setup(t)
+	e.render(t)
+	homes := filepath.Join(e.ws, ".railswitch", "agent-home")
+	feat, master := filepath.Join(homes, "feat", "claude"), filepath.Join(homes, "master", "claude")
+	for _, h := range []string{feat, master} {
+		if err := os.Remove(filepath.Join(h, pack.AgentDefaultRequest)); err != nil {
+			t.Fatalf("a new home should ask for the default: %v", err)
+		}
+	}
+	write := func(p, s string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(feat, ".claude", "settings.json"), `{"theme":"dark"}`)
+	write(filepath.Join(feat, ".claude", "skills", "s", "SKILL.md"), "skill")
+	write(filepath.Join(feat, ".claude", "history.jsonl"), "private")
+	if err := os.Symlink("/etc/passwd", filepath.Join(feat, ".claude", "skills", "s", "leak")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := e.l.ApplyAgentDefault(ctx, "feat", "claude", false); err == nil {
+		t.Error("apply without a default")
+	}
+	if _, err := e.l.PromoteAgentDefault(ctx, "feat", "probe", false); err == nil {
+		t.Error("promote of an agent without [config]")
+	}
+	if _, err := e.l.PromoteAgentDefault(ctx, "feat", "", true); err == nil {
+		t.Fatal("no name with two agents")
+	}
+	r, err := e.l.PromoteAgentDefault(ctx, "feat", "claude", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	def := filepath.Join(e.ws, ".railswitch", "agent-default", "claude")
+	if data, err := os.ReadFile(filepath.Join(def, ".claude", "settings.json")); err != nil || string(data) != `{"theme":"dark"}` {
+		t.Errorf("settings.json: %q %v", data, err)
+	}
+	for _, p := range []string{".claude/history.jsonl", ".claude/skills/s/leak"} {
+		if _, err := os.Lstat(filepath.Join(def, p)); !os.IsNotExist(err) {
+			t.Errorf("%s promoted: %v", p, err)
+		}
+	}
+	if !slices.Equal(r.Requested, []string{"master"}) || !slices.Equal(r.Skipped, []string{".claude/skills/s/leak"}) {
+		t.Errorf("result %+v", r)
+	}
+	if _, err := os.Stat(filepath.Join(master, pack.AgentDefaultRequest)); err != nil {
+		t.Errorf("master not asked: %v", err)
+	}
+	rows, _ := e.l.AgentList(ctx, "master")
+	if rows[0].Default == nil || rows[0].Default.From != "feat" {
+		t.Errorf("agent ls default = %+v", rows[0].Default)
+	}
+	if _, slugs, err := e.l.ApplyAgentDefault(ctx, "feat", "claude", false); err != nil || !slices.Equal(slugs, []string{"feat"}) {
+		t.Errorf("apply: %v %v", slugs, err)
 	}
 }
 

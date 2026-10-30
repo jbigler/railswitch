@@ -24,6 +24,10 @@ type AgentRow struct {
 	TS      int64  `json:"ts"`
 	Reply   bool   `json:"reply"`   // agentstatus.Status.Reply: the agent asks the user something
 	Running bool   `json:"running"` // its container runs in the worktree (D62)
+	// Config: its package has [config] paths, so it can have a project
+	// default (D135); Default is where that came from, nil without one.
+	Config  bool          `json:"config"`
+	Default *AgentDefault `json:"default"`
 }
 
 // UsageError is a lifecycle error in how the command was called.
@@ -156,6 +160,7 @@ func agentRows(m *render.Model, in *render.Instance, running []string) []AgentRo
 			Name: a.Name, Package: a.Ref.String(), Run: a.Run,
 			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(),
 			Running: slices.Contains(running, a.Name),
+			Config:  len(a.Agent.Config.Paths) > 0, Default: ReadAgentDefault(m, a.Name),
 		})
 	}
 	return rows

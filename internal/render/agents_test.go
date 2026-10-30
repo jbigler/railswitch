@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/pack"
 )
 
 // noAgents turns the fixture's agents off.
@@ -224,17 +225,28 @@ func TestApplyCreatesHomeSubdirs(t *testing.T) {
 			t.Errorf("%s: %v %v; want a dir", rel, fi, err)
 		}
 	}
+	// A new agent home asks for the project's default (D135); nvim's doesn't.
+	request := filepath.Join(ws, ".railswitch", "agent-home", "feat", "claude", pack.AgentDefaultRequest)
+	if !fileExists(t, request) || fileExists(t, filepath.Join(ws, ".railswitch", "home", "feat", pack.AgentDefaultRequest)) {
+		t.Errorf("default request: agent home %v", fileExists(t, request))
+	}
+	if err := os.Remove(request); err != nil {
+		t.Fatal(err)
+	}
 	kept := filepath.Join(ws, ".railswitch", "agent-home", "feat", "claude", ".claude", "settings.json")
 	writeFile(t, kept, "{}\n")
 	mustApply(t, p, ws, qdir, false)
 	if !fileExists(t, kept) {
 		t.Error("a second Apply removed a file in the agent home")
 	}
+	if fileExists(t, request) {
+		t.Error("an existing home was asked to take the default again")
+	}
 }
 
 func TestPlanStatusDirs(t *testing.T) {
 	p, ws, qdir := filialPlan(t)
-	want := []string{".railswitch/status/master", ".railswitch/status/feat"}
+	want := []string{".railswitch/status/master", ".railswitch/status/feat", ".railswitch/agent-default/claude"}
 	if !slices.Equal(p.StatusDirs, want) {
 		t.Errorf("StatusDirs = %v; want %v", p.StatusDirs, want)
 	}
@@ -271,5 +283,25 @@ func TestServiceAgentNotWanted(t *testing.T) {
 	}
 	if _, ok := units["filial-feat-agent-probe.container"]; !ok {
 		t.Error("no filial-feat-agent-probe.container")
+	}
+}
+
+// TestAgentDefaultMount: an agent with [config] paths sees the project's
+// default for it read-only; one without doesn't.
+func TestAgentDefaultMount(t *testing.T) {
+	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), nil))
+	want := Mount{Source: "{agent.default}/claude", Target: pack.AgentDefaultMount, Options: "ro,z"}
+	for _, s := range m.Services {
+		has := slices.Contains(s.Mounts, want)
+		if has != (s.ID == "agent-claude") {
+			t.Errorf("%s mounts the default: %v", s.ID, has)
+		}
+	}
+	in, err := m.Instance(m.Inputs.Worktrees[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := in.Values["agent.default"]; got != filepath.Join(m.Inputs.Workspace, ".railswitch", "agent-default") {
+		t.Errorf("agent.default = %q", got)
 	}
 }

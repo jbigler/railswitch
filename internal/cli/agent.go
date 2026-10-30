@@ -16,7 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service]"
+const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -37,13 +37,16 @@ var launchTerm = func(ctx context.Context, e *env, title, dir string, argv []str
 // agent (up first), or with --new-term re-run this command in a new
 // terminal tab or window; railswitch agent ls: every agent and its status
 // (D58); railswitch agent stop [<name>]: stop the worktree's running agent
-// (D62); railswitch agent add: see cmdAgentAdd (D63).
+// (D62); railswitch agent add: see cmdAgentAdd (D63); railswitch agent
+// default: see cmdAgentDefault (D135).
 func cmdAgent(ctx context.Context, e *env, args []string) int {
 	switch {
 	case len(args) > 0 && args[0] == "stop":
 		return cmdAgentStop(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "add":
 		return cmdAgentAdd(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "default":
+		return cmdAgentDefault(ctx, e, args[1:])
 	}
 	name, argv, newTerm, code, ok := agentArgs(e, args)
 	if !ok {

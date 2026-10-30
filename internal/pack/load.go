@@ -935,8 +935,22 @@ func (l *loader) checkAgent(dir string, a *Agent) bool {
 			l.add(file, "secrets[%d].env %q is not an env var name", i, s.Env)
 		}
 	}
+	for i, p := range a.Config.Paths {
+		switch {
+		case !configPathRe.MatchString(p) || !fs.ValidPath(p) || p == "." || p == AgentDefaultRequest:
+			l.add(file, "config.paths[%d]: %q is not a path inside the home", i, p)
+		case slices.Index(a.Config.Paths, p) != i:
+			l.add(file, "config.paths[%d]: %q is listed twice", i, p)
+		}
+	}
+	if len(a.Config.Paths) > 0 && a.Entrypoint == "" {
+		l.add(file, "config.paths: an agent without an entrypoint can't apply a default")
+	}
 	return ok && len(l.errs) == n
 }
+
+// configPathRe is an agent [config] path: plain names, hidden ones too.
+var configPathRe = regexp.MustCompile(`^[A-Za-z0-9._+-]+(/[A-Za-z0-9._+-]+)*$`)
 
 func (l *loader) checkTool(dir string, t *Tool) bool {
 	file := path.Join(dir, "tool.toml")

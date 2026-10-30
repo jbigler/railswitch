@@ -217,6 +217,8 @@ const ftestPRs = `[
  {"slug":"b","branch":"jb/b","pr":{"number":2141,"title":"Login <b>","url":"https://github.com/o/r/pull/2141","state":"open","checks":"pass","review":"approved"}}
 ]`
 
+const ftestAgents = `[{"name":"claude","config":true,"default":{"from":"main","promoted":"2026-10-30T12:00:00Z"}},{"name":"probe","config":false,"default":null}]`
+
 const ftestTasks = `[{"name":"console","command":"bin/rails console","source":"pack"},{"name":"test","command":"bin/rails test","source":"project"}]`
 
 const colorsJSON = `{"light":{"base":"flexoki","overrides":{},"colors":{"bg":"#FFFCF0","bg2":"#F2F0E5","text":"#100F0F","muted":"#6F6E69","accent":"#BC5215","blue":"#205EA6","green":"#536907","yellow":"#8E6B01","sel":"#E6E4D9","border":"#CECDC3","purple":"#5E409D","red":"#AF3029"}},
@@ -243,6 +245,7 @@ func newFixture(t *testing.T) *fixture {
 		"--json -C /ws/ftest pr ls":           ftestPRs,
 		"--json -C /ws/hello pr ls":           `[{"slug":"master","branch":"master","pr":null}]`,
 		"--json -C /ws/ftest -w b task ls":    ftestTasks,
+		"--json -C /ws/ftest -w b agent ls":   ftestAgents,
 		"--json -C /ws/ftest -w main task ls": ftestTasks,
 		"--json -C /ws/ftest wt ls":           wtLS,
 		"--json dashboard colors":             colorsJSON,

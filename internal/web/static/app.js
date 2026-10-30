@@ -301,17 +301,30 @@ function filterSwitcher() {
   });
 }
 
-// Task palette: Enter runs the highlighted task as a job, Shift+Enter
-// opens it in a terminal.
+// Task palette: Enter runs the highlighted task in a new terminal or as a
+// job, as "in a new terminal" says (ticked unless this browser last
+// unticked it); Shift+Enter the other way.
+
+const termKey = "railswitch.palette.term";
 
 async function openPalette() {
   const url = $("#detail") && $("#detail").dataset.tasks;
   if (!url || !body.dataset.sel) return toast("No worktree selected.", true);
   const d = await loadDialog("palette", url);
   if (!d) return;
+  try {
+    if (localStorage.getItem(termKey) === "0") $(".pal-term", d).checked = false;
+  } catch {}
   $(".pal-filter", d).focus();
   filterPalette();
 }
+
+document.addEventListener("change", (e) => {
+  if (!e.target.matches("#palette .pal-term")) return;
+  try {
+    localStorage.setItem(termKey, e.target.checked ? "1" : "0");
+  } catch {}
+});
 
 function paletteItems() {
   return $$("#palette .pal-list li[data-filter]").filter((li) => !li.hidden);
@@ -341,7 +354,8 @@ function paletteKey(e) {
     const f = $("#palette form");
     const data = new URLSearchParams(new FormData(f));
     data.set("task", $("button", items[i]).value);
-    if (e.shiftKey) data.set("term", "1");
+    if ($(".pal-term", f).checked !== e.shiftKey) data.set("term", "1");
+    else data.delete("term");
     post(f, data);
   }
 }

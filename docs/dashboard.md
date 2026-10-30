@@ -701,7 +701,7 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 | `:` | the task palette for the selected worktree |
 | Esc | close a dialog or a message |
 | Enter | in the palette: run the highlighted task as a job |
-| Shift+Enter | in the palette: open the task in a new terminal |
+| Shift+Enter | in the palette: run the task the other way from "in a new terminal" |
 
 ## Actions
 
@@ -739,10 +739,12 @@ Every action is a job (below).
 - **Refresh PRs** runs `pr ls` now instead of waiting for the next minute.
 - **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
   filtered as you type, with an "args" field split like a shell (quotes and
-  backslash, no expansion). Enter runs `railswitch task <name> <args…>` as
-  a job with its output in the page; Shift+Enter runs `railswitch task
-  --new-term <name> <args…>`, a terminal window for interactive tasks such
-  as `console`.
+  backslash, no expansion), and "in a new terminal", ticked unless this
+  browser last unticked it (kept in its local storage). Enter or a click
+  runs the task as the box says: ticked, `railswitch task --new-term
+  <name> <args…>`, a terminal window (interactive tasks such as
+  `console` need one); unticked, `railswitch task <name> <args…>` as a
+  job with its output under Jobs. Shift+Enter runs it the other way.
 - **Cancel** on a running job stops it.
 
 ## Jobs

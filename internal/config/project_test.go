@@ -119,6 +119,9 @@ func TestValidate(t *testing.T) {
 		{"service env newline", func(p *Project) {
 			p.Services["rails"].Env["HEADLESS_SYSTEM_TESTS"] = "0\n1"
 		}, []string{"services.rails.env.HEADLESS_SYSTEM_TESTS", "newline"}},
+		{"memory guidance too long", func(p *Project) {
+			p.Memory = &SharedMemory{Guidance: strings.Repeat("x", 4097)}
+		}, []string{"memory.guidance", "4097"}},
 		{"link placeholder", func(p *Project) { p.Links[0].URL = "{worktree.hots}/admin" }, []string{"links[0].url", "worktree.hots"}},
 		{"worktree slug", func(p *Project) {
 			p.Worktrees["Bad Slug"] = WorktreeOverride{}
@@ -439,5 +442,31 @@ func TestHooksRoundTrip(t *testing.T) {
 	}
 	if strings.Contains(LinesTOML(&Project{}), "[hooks]") {
 		t.Error("[hooks] written without hooks")
+	}
+}
+
+func TestMemoryTable(t *testing.T) {
+	base := "schema = 1\n[project]\nprefix = \"demo\"\n"
+	p, err := Parse([]byte(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Memory != nil {
+		t.Fatalf("no [memory]: Memory = %+v; want nil", p.Memory)
+	}
+	if p, err = Parse([]byte(base + "[memory]\n")); err != nil {
+		t.Fatal(err)
+	}
+	if p.Memory == nil || p.Memory.MemoryGuidance() != DefaultMemoryGuidance {
+		t.Fatalf("empty [memory]: Memory = %+v; want enabled with the default guidance", p.Memory)
+	}
+	if p, err = Parse([]byte(base + "[memory]\nguidance = \"No PHI.\"\n")); err != nil {
+		t.Fatal(err)
+	}
+	if got := p.Memory.MemoryGuidance(); got != "No PHI." {
+		t.Errorf("guidance = %q", got)
+	}
+	if _, err := Parse([]byte(base + "[memory]\nguidence = \"x\"\n")); err == nil || !strings.Contains(err.Error(), "memory.guidence") {
+		t.Errorf("unknown key: %v; want an error naming memory.guidence", err)
 	}
 }

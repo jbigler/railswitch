@@ -46,7 +46,28 @@ type Project struct {
 	Image     ImageConfig                 `toml:"image"`
 	Agents    map[string]Agent            `toml:"agents"` // agent name → its package and settings
 	Hooks     Hooks                       `toml:"hooks"`
+	Memory    *SharedMemory               `toml:"memory"` // [memory]; nil = agents share no memory (D136)
 	Template  *TemplateRef                `toml:"template"`
+}
+
+// SharedMemory is the [memory] table (D136): its presence gives the
+// project's agents one shared beads store on a project-wide Dolt server.
+type SharedMemory struct {
+	// Guidance replaces DefaultMemoryGuidance in what agents read at start
+	// (railswitch-prime); "" keeps the default.
+	Guidance string `toml:"guidance"`
+}
+
+// DefaultMemoryGuidance is what agents are told about shared memory when
+// [memory] guidance is unset.
+const DefaultMemoryGuidance = "Never store secrets, credentials, tokens, personal data or patient data in shared memory: every agent of this project reads it, and it is kept until deleted."
+
+// MemoryGuidance is p's [memory] guidance, or the default.
+func (m *SharedMemory) MemoryGuidance() string {
+	if m.Guidance != "" {
+		return m.Guidance
+	}
+	return DefaultMemoryGuidance
 }
 
 // Hooks is the [hooks] table (D126): shell commands railswitch runs at
@@ -205,6 +226,9 @@ var (
 	routeNameRe     = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`) // a DNS label: <name>.<slug>.<prefix>.localhost
 )
 
+// maxGuidance caps [memory] guidance: every agent reads it at start.
+const maxGuidance = 4096
+
 // LocalPrefix marks a workspace-local package ref, "local:<name>@N" (D43):
 // [stack] pack, [options] and [agents.<n>] use take one.
 const LocalPrefix = "local:"
@@ -311,6 +335,9 @@ func (p *Project) Validate() error {
 	}
 	v.env("env", p.Env)
 	v.env("share.env", p.Share.Env)
+	if m := p.Memory; m != nil && len(m.Guidance) > maxGuidance {
+		v.add("memory.guidance", "%d bytes is over %d", len(m.Guidance), maxGuidance)
+	}
 
 	for _, id := range sortedKeys(p.Services) {
 		path := "services." + key(id)

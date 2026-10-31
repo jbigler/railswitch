@@ -51,6 +51,11 @@ var ops = map[string]opSpec{
 	// key is an agent's name; values its setup commands in order, none
 	// removes them (D133).
 	"agent.setup": {required: []string{"key"}},
+	// Shared agent memory (D136): on, off, and its guidance ("" the
+	// default; setting one turns memory on).
+	"memory.on":       {},
+	"memory.off":      {},
+	"memory.guidance": {optional: []string{"value"}},
 }
 
 func (e Edit) fields() map[string]string {
@@ -122,6 +127,10 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.SetHooks(data, e.Key, e.Values)
 	case "agent.setup":
 		return config.SetAgentSetup(data, e.Key, e.Values)
+	case "memory.on", "memory.off":
+		return config.SetMemory(data, e.Op == "memory.on")
+	case "memory.guidance":
+		return config.SetMemoryGuidance(data, e.Value)
 	}
 	return "", fmt.Errorf("unknown op %q", e.Op)
 }

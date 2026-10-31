@@ -134,7 +134,8 @@ Each worktree's agent starts from nothing: what one agent learned, or
 planned, the next one doesn't know. Shared memory gives every agent of the
 project, in every worktree, one task tracker and notebook:
 [beads](https://github.com/gastownhall/beads) (`bd`). It is off until you
-turn it on in `project.toml`:
+turn it on in `project.toml` (or with the `memory.on` and
+`memory.guidance` Settings edits, `railswitch settings apply`):
 
 ```toml
 [memory]

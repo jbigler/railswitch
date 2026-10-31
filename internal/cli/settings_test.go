@@ -333,3 +333,40 @@ func TestProjectWriteNoLockLeftOnFailure(t *testing.T) {
 		t.Errorf("stack.lock left behind: %v", err)
 	}
 }
+
+// memory.guidance turns shared memory on (D136): project.toml gains
+// [memory], render writes the server's units, project show reports it;
+// memory.off takes it all back.
+func TestSettingsMemory(t *testing.T) {
+	ws, dirs := lockedWS(t)
+	mustRun(t, "-C", ws, "render")
+	path := filepath.Join(ws, "project.toml")
+	unit := filepath.Join(dirs.Quadlet, "filial-memory.container")
+	apply := func(edits string) {
+		t.Helper()
+		hash := workspace.Hash([]byte(readFile(t, path)))
+		if code, _, errs := runStdin(t, unitsFake(), edits, "-C", ws, "settings", "apply", "--if-hash", hash); code != 0 {
+			t.Fatalf("settings apply %s: exit %d: %s", edits, code, errs)
+		}
+	}
+	apply(`[{"op":"memory.guidance","value":"No PHI."}]`)
+	if !strings.Contains(readFile(t, path), "[memory]\nguidance = \"No PHI.\"\n") || !exists(unit) {
+		t.Fatalf("after memory.guidance: unit %v, project.toml:\n%s", exists(unit), readFile(t, path))
+	}
+	var d struct {
+		Memory struct {
+			Enabled             bool
+			Guidance, Effective string
+		}
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "project", "show")), &d); err != nil {
+		t.Fatal(err)
+	}
+	if !d.Memory.Enabled || d.Memory.Guidance != "No PHI." || d.Memory.Effective != "No PHI." {
+		t.Errorf("project show memory %+v", d.Memory)
+	}
+	apply(`[{"op":"memory.off"}]`)
+	if strings.Contains(readFile(t, path), "memory") || exists(unit) {
+		t.Errorf("after memory.off: unit %v, project.toml:\n%s", exists(unit), readFile(t, path))
+	}
+}

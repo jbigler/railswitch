@@ -209,6 +209,11 @@ Review), stop every running agent, run `railswitch agent` once in a
 worktree to build the new images, then `railswitch memory migrate` once
 (bd won't migrate a shared database by itself).
 
+A project made before shared memory existed has an agent base without
+the bd lines: accept the agent base update (Review update), and when its
+`Containerfile.agent-base` is its own copy, take the new default in
+Settings → Images. Until then `railswitch doctor` fails `memory version`.
+
 ### Turning it off
 
 Remove `[memory]`: the next render drops the server's unit and the agents'

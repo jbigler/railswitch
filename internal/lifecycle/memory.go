@@ -98,7 +98,7 @@ func (l *L) memoryInit(ctx context.Context, m *render.Model) error {
 	_, err = l.bd(ctx, m, nil, "init", "--server", "--stealth", "--non-interactive", "--skip-hooks", "--skip-agents",
 		"-p", m.Prefix, "--database", render.MemoryDatabase)
 	if err != nil {
-		return fmt.Errorf("creating the shared memory database: %w", err)
+		return fmt.Errorf("creating the shared memory database: %w (an agent base from before D138 installs no bd: railswitch doctor)", err)
 	}
 	fmt.Fprintf(l.Out, "created the shared memory database of %s\n", m.Prefix)
 	return nil

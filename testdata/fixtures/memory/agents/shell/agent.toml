@@ -1,0 +1,10 @@
+# A test agent (D136): a shell, for driving bd from inside a real agent
+# container through `railswitch agent shell -- <command>`. No AI, no
+# credentials, no hosts beyond the agents' defaults.
+name = "shell"
+version = 1
+run = "on-demand"
+entrypoint = "entrypoints/entrypoint-shell.sh"
+
+[image]
+file = "Containerfile.shell"

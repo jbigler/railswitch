@@ -59,6 +59,9 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 	if err != nil {
 		return err
 	}
+	if err := l.MemoryUp(ctx, m); err != nil { // D136: before any agent reads it
+		return err
+	}
 	s, err := service(m, id)
 	if err != nil {
 		return err

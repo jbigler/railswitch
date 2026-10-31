@@ -52,9 +52,12 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 		if err := put(naming.MemoryUnit(m.Prefix)+".network", memoryNetwork(m)); err != nil {
 			return nil, err
 		}
-		if err := put(naming.MemoryUnit(m.Prefix)+".container", memoryServer(m)); err != nil {
+		name := naming.MemoryUnit(m.Prefix) + ".container"
+		if err := put(name, memoryServer(m)); err != nil {
 			return nil, err
 		}
+		// Its own hash, so a changed server unit (a new image) restarts it.
+		out[name] = unithash.Stamp(out[name], unithash.Key(m.Prefix))
 	}
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)

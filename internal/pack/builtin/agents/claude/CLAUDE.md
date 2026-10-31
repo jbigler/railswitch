@@ -19,6 +19,22 @@ CDP bridge on 127.0.0.1:9222). Without a browser the server is not configured.
 - The human can watch and use the same browser, so it suits cooperative
   debugging (e.g. ask them to log in by hand).
 
+# Shared memory (beads)
+
+When the project turns on shared memory, `bd` is installed and every
+session starts with its context (the "Shared memory (railswitch)" section,
+then `bd prime`). Without it there is no `bd`: ignore this section.
+
+- The store is shared by the agents of every worktree of the project. Label
+  each issue you create `worktree:$WORKTREE_SLUG`; filter your own work with
+  `bd ready -l worktree:$WORKTREE_SLUG`.
+- Claim before you start (`bd update <id> --claim`): when it fails, another
+  agent has it; pick something else.
+- Follow the project's guidance printed at the top of that context: never
+  store secrets, credentials, or personal or patient data.
+- `bd` never runs git here (its config sets no-git-ops). Never run
+  `bd init`.
+
 # Network egress is allowlisted from the host
 
 Outbound traffic is filtered by a firewall the host applies to this container

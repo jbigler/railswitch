@@ -99,6 +99,10 @@ func ProjectRemove(ctx context.Context, r sys.Runner, dirs machine.Dirs, out io.
 				return fmt.Errorf("down %s: %w", wt.Slug, err)
 			}
 		}
+		// The shared memory server (D136) belongs to no worktree.
+		if err := sd.StopLoaded(ctx, memoryService(prefix)); err != nil {
+			return err
+		}
 		if purge {
 			m, err := l.model(ctx)
 			if err != nil {

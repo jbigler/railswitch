@@ -79,6 +79,21 @@ jq '
 ' "$SETTINGS_JSON" > "$tmp"
 if cmp -s "$tmp" "$SETTINGS_JSON"; then rm -f "$tmp"; else mv "$tmp" "$SETTINGS_JSON"; fi
 
+# Shared memory (railswitch D136): in a project with [memory], every
+# session (a new one, and after a compaction) starts with railswitch-prime's
+# output: the project's guidance, then `bd prime`. Without it the hook goes.
+PRIME=/usr/local/bin/railswitch-prime
+tmp="${SETTINGS_JSON}.tmp.$$"
+jq --arg prime "$PRIME" --argjson on "$([ -x "$PRIME" ] && echo true || echo false)" '
+  def runs_prime: any(.hooks[]?; .command == $prime);
+  if $on then
+    if any(.hooks.SessionStart[]?; runs_prime) then .
+    else .hooks.SessionStart = ((.hooks.SessionStart // []) + [{hooks: [{type: "command", command: $prime, timeout: 30}]}]) end
+  elif .hooks.SessionStart then .hooks.SessionStart |= map(select(runs_prime | not))
+  else . end
+' "$SETTINGS_JSON" > "$tmp"
+if cmp -s "$tmp" "$SETTINGS_JSON"; then rm -f "$tmp"; else mv "$tmp" "$SETTINGS_JSON"; fi
+
 # Refresh railswitch's instructions as ~/.claude/railswitch.md, imported by
 # one line of ~/.claude/CLAUDE.md, which otherwise stays the user's (rtk
 # init's @RTK.md survives restarts).

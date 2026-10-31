@@ -216,10 +216,10 @@ Settings → Images. Until then `railswitch doctor` fails `memory version`.
 
 ### Turning it off
 
-Remove `[memory]`: the next render drops the server's unit and the agents'
-bd setup. Stop the server that is still running with `systemctl --user stop
-<prefix>-memory.service`; its volume stays until `project rm --purge` or
-`podman volume rm <prefix>_memory`.
+Remove `[memory]` (or the `memory.off` Settings edit): the next render
+drops the server's unit, stops the server and drops the agents' bd setup.
+Its volume stays, so turning it on again finds every memory; it goes with
+`project rm --purge` or `podman volume rm <prefix>_memory`.
 
 ## Your own agent
 

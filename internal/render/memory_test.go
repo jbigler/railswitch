@@ -24,6 +24,8 @@ func TestMemoryUnits(t *testing.T) {
 		"Network=filial-memory.network:alias=memory",
 		"Volume=filial_memory:/var/lib/dolt",
 		"Environment=DOLT_ROOT_HOST=%%",
+		"Entrypoint=tini",
+		"Exec=-- dolt sql-server --host=0.0.0.0 --port=3306",
 		"DropCapability=all",
 		"NoNewPrivileges=true",
 		"Notify=healthy",

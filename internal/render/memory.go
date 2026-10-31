@@ -117,7 +117,8 @@ func memoryNetwork(m *Model) *unit {
 }
 
 // memoryServer is the project's Dolt server: a data service of no
-// worktree, on the memory network only, with its volume; root without a
+// worktree, on the memory network only, with its volume (the image's
+// working dir, /var/lib/dolt, holds the databases); root without a
 // password from the network (DOLT_ROOT_HOST=%), which only the project's
 // agents join. Nothing is published.
 func memoryServer(m *Model) *unit {
@@ -130,6 +131,13 @@ func memoryServer(m *Model) *unit {
 	u.add(c, "Network", naming.MemoryUnit(m.Prefix)+".network:alias="+MemoryHost)
 	u.add(c, "Volume", name+":/var/lib/dolt")
 	u.add(c, "Environment", "DOLT_ROOT_HOST=%")
+	// The server itself, under the image's tini, not the image's entrypoint:
+	// that script answers SIGTERM with `kill` and `exit 1` at once, so dolt
+	// got no time to close and every stop left the unit failed
+	// (docker-entrypoint.sh:350). dolt sql-server creates root@%
+	// from DOLT_ROOT_HOST itself (the same script, :403).
+	u.add(c, "Entrypoint", "tini")
+	u.add(c, "Exec", "-- dolt sql-server --host=0.0.0.0 --port="+strconv.Itoa(MemoryPort))
 	u.add(c, "DropCapability", "all")
 	u.add(c, "NoNewPrivileges", "true")
 	u.add(c, "Memory", "1g")

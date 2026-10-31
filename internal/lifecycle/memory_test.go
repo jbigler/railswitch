@@ -39,7 +39,7 @@ func TestMemoryUpStartsAndCreates(t *testing.T) {
 	for _, want := range []string{
 		" --read-only ", " --cap-drop all ", " --security-opt no-new-privileges ",
 		" --userns keep-id:uid=1000,gid=1000 ", " --entrypoint bd ",
-		" --env BEADS_DIR=/tmp/init/.beads ", " --env BEADS_DOLT_SERVER_HOST=memory ", " --env BD_DISABLE_METRICS=1 ",
+		" --env BEADS_DIR=/tmp/.beads ", " --env BEADS_DOLT_SERVER_HOST=memory ", " --env BD_DISABLE_METRICS=1 ",
 		" init --server --stealth --non-interactive --skip-hooks --skip-agents -p filial --database beads ",
 	} {
 		if !strings.Contains(j, want) {
@@ -155,5 +155,16 @@ func TestMemoryFill(t *testing.T) {
 	err := r.fill([]byte("status null\nmemories {\"data\":{}}\nready not-json\n"))
 	if err == nil || !strings.Contains(err.Error(), "status, ready, claimed, blocked, activity") {
 		t.Errorf("fill of failures: %v", err)
+	}
+}
+
+func TestSchemaVersion(t *testing.T) {
+	for in, want := range map[string]int{`{"rows": [{"v":"66"}]}`: 66, `{"rows":[{"v":7}]}`: 7} {
+		if got, err := schemaVersion([]byte(in)); err != nil || got != want {
+			t.Errorf("schemaVersion(%s) = %d, %v; want %d", in, got, err, want)
+		}
+	}
+	if _, err := schemaVersion([]byte(`{"rows":[]}`)); err == nil {
+		t.Error("no rows: no error")
 	}
 }

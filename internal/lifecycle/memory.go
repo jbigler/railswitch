@@ -180,7 +180,7 @@ func (l *L) memoryRunArgs(ctx context.Context, m *render.Model, entrypoint strin
 	env["HOME"] = "/tmp"
 	env["BD_JSON_ENVELOPE"] = "1"
 	if entrypoint == "bd" && len(args) > 0 && args[0] == "init" {
-		env["BEADS_DIR"] = "/tmp/init/.beads" // init writes; the agents' stays as railswitch wrote it
+		env["BEADS_DIR"] = "/tmp/.beads" // init writes; the agents' stays as railswitch wrote it
 	}
 	for _, k := range slices.Sorted(maps.Keys(env)) {
 		run = append(run, "--env", k+"="+env[k])
@@ -435,17 +435,20 @@ func (l *L) Memory(ctx context.Context, since int64) (*MemoryReport, error) {
 	return r, nil
 }
 
-// schemaVersion reads `dolt sql -r json`'s {"rows":[{"v":N}]}.
+// schemaVersion reads `dolt sql -r json`'s {"rows":[{"v":N}]}; dolt
+// 2.2.0 quotes the number.
 func schemaVersion(out []byte) (int, error) {
 	var doc struct {
 		Rows []struct {
-			V int `json:"v"`
+			V json.RawMessage `json:"v"`
 		} `json:"rows"`
 	}
-	if err := json.Unmarshal(out, &doc); err != nil || len(doc.Rows) != 1 {
-		return 0, fmt.Errorf("the memory database's schema version: unexpected answer %q", bytes.TrimSpace(out))
+	if err := json.Unmarshal(out, &doc); err == nil && len(doc.Rows) == 1 {
+		if v, err := strconv.Atoi(strings.Trim(string(doc.Rows[0].V), `"`)); err == nil {
+			return v, nil
+		}
 	}
-	return doc.Rows[0].V, nil
+	return 0, fmt.Errorf("the memory database's schema version: unexpected answer %q", bytes.TrimSpace(out))
 }
 
 func lastLine(s string) string {

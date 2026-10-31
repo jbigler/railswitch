@@ -7,7 +7,19 @@
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Memory</h1>
-<p class="note">What the project's agents share: beads issues and memories on the project's own server. Read-only; <a class="ln" href="/p/{{.Prefix}}/memory">refresh</a>.</p>
+<p class="note">What the project's agents share: beads issues and memories on the project's own server. Read-only, read again every 15 seconds while this page is shown.</p>
+{{template "memory-live" .Live}}
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>{{end}}
+
+
+{{define "memory-live"}}<div id="memory-live" data-src="{{.URL}}" data-cursor="{{.Doc.Cursor}}">
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{with .Doc}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}<section class="card">
@@ -32,16 +44,9 @@
 <table class="set-table">
 <thead><tr><th>#</th><th>When</th><th>Who</th><th>What</th><th>Issue</th></tr></thead>
 <tbody>
-{{range .Activity}}<tr><td class="mono">{{.Seq}}</td><td class="mono">{{.TS}}</td><td class="mono">{{.Actor}}</td><td>{{.Op}}</td><td class="mono">{{.Issue}}</td></tr>
+{{range .Activity}}<tr{{if .New}} class="fresh"{{end}}><td class="mono">{{.Seq}}</td><td class="mono">{{.TS}}</td><td class="mono">{{.Actor}}</td><td>{{.Op}}</td><td class="mono">{{.Issue}}</td></tr>
 {{else}}<tr><td colspan="5" class="muted">Nothing recorded in the last 7 days.</td></tr>
 {{end}}</tbody>
 </table>
 </section>
-</section>
-<section class="pane">
-{{template "jobs" .Jobs}}
-</section>
-</main>
-{{template "common-dialogs" .}}
-</body>
-</html>{{end}}
+</div>{{end}}

@@ -54,7 +54,7 @@ deserve a D number.
 | Backups in `<workspace>/memory-backups/`, 0600 in a 0700 dir | Beside `db-dumps/`, but private: agents' notes |
 | `memory restore` asks, as `db restore` does; `--yes` without a terminal | Same command shape as `db restore` (D121) |
 | Settings ops `memory.on`, `memory.off`, `memory.guidance`; no dashboard Settings card | The JSON ops are the settings flow; a card is UI work beyond the brief's "where the patterns call for it" |
-| The Memory page is read-once, not SSE-polled | A read costs a container run; polling it at overview's 2 s would be exactly what D140 avoids |
+| The Memory page re-reads its live part every 15 s while shown (a `fetch` of a fragment, as Settings → Firewall's blocked list loads), not through the SSE pollers | A read costs a container run; a page-driven timer runs only while someone looks, never at overview's 2 s (D140); rows after the page's load cursor are highlighted |
 | `[memory]` without a schema bump | Optional tables have never bumped `schema` here; an older railswitch refuses the unknown table by name |
 | Didn't fix `TestE2EAgents` (fails at `lock` on `main` too) | Pre-existing and outside the brief; noted in PROGRESS.md |
 | Left the stale `rhdemo` registry entry (another session's) alone | Not mine; nothing of it runs |

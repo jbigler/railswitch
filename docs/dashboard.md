@@ -512,13 +512,16 @@ accepted until the update is accepted.
 
 `/p/<prefix>/memory`, linked from the header (**memory**) when the
 project has `[memory]` (overview's `memory`, read from `project.toml`
-only). Read-only, read once per load from `railswitch --json memory`
-(D136; a load costs one container run, so it is not polled; **refresh**
-reads it again): the server's container, state and schema version; bd's
+only). Read-only, from `railswitch --json memory` (D136, D140): read on
+load, then every 15 seconds while the tab is shown, never two reads at
+once (`GET /p/<prefix>/memory/live?since=<cursor>`, the page's live part
+alone; each read is a container run, so it is not on overview's timer).
+It shows the server's container, state and schema version; bd's
 counts and the number of memories; each worktree's claimed, ready and
 blocked issues (by their `worktree:<slug>` label, with who claimed them);
 and the newest 50 records of the activity journal (`seq`, time, actor
-`<worktree>/<agent>`, operation, issue). A stopped server shows only its
+`<worktree>/<agent>`, operation, issue; records after the cursor the
+page loaded with are highlighted). A stopped server shows only its
 state: the page never starts it. Everything bd returns is the agents'
 text, escaped like any other.
 
@@ -853,7 +856,8 @@ working blue, your turn yellow, idle and off muted.
 The commands the dashboard reads and runs. Their `--json` output is in
 docs/json.md.
 
-- `railswitch --json -C <ws> memory` (project): the Memory page, on load.
+- `railswitch --json -C <ws> memory` (project): the Memory page, on load
+  and every 15 seconds while it is shown.
 
 - `railswitch --json signer ls` (machine): each library's trusted keys and
   revoked fingerprints. `signer add <library> -` (key on stdin),

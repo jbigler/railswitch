@@ -45,3 +45,24 @@ func TestMemoryPage(t *testing.T) {
 	}
 	noCSPViolation(t, "memory", body)
 }
+
+func TestMemoryLive(t *testing.T) {
+	f := newFixture(t)
+	f.cli.set("--json -C /ws/ftest overview", withMemory(ftestOverview("jb/b", "up", agentJSON("idle", "", false))))
+	f.cli.set("--json -C /ws/ftest memory", memoryJSON)
+	contains(t, "memory page", f.do(req("GET", "/p/ftest/memory", nil)).Body.String(),
+		`<div id="memory-live" data-src="/p/ftest/memory/live" data-cursor="5">`)
+	w := f.do(req("GET", "/p/ftest/memory/live?since=4", nil))
+	if w.Code != 200 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	body := w.Body.String()
+	if !strings.HasPrefix(body, `<div id="memory-live"`) {
+		t.Errorf("not the fragment alone: %.80s", body)
+	}
+	contains(t, "live", body, `<tr class="fresh"><td class="mono">5</td>`, `<tr><td class="mono">4</td>`, "2 memories")
+	// Without a cursor (the page's own load) nothing is new.
+	if body := f.do(req("GET", "/p/ftest/memory/live", nil)).Body.String(); strings.Contains(body, "fresh") {
+		t.Error("rows marked new without a cursor")
+	}
+}

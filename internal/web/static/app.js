@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine, memory or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -967,6 +967,27 @@ if (view === "images" || view === "library" || view === "editor" || view === "ma
 // items. The job ending ok goes to the project page; so does a failed
 // restart (exit 3: the update was accepted), with a notice. An import
 // (view import) is the same form, going back to its data-next page.
+// The memory page reads its live part again every memoryPoll while it is
+// shown, never two reads at once: each is a container run (D140). Activity
+// after the cursor the page loaded with is marked new.
+const memoryPoll = 15000;
+const memorySince = $("#memory-live")?.dataset.cursor || "";
+
+async function pollMemory() {
+  const el = $("#memory-live[data-src]");
+  if (el && !document.hidden) {
+    try {
+      const r = await fetch(el.dataset.src + "?since=" + encodeURIComponent(memorySince), { credentials: "same-origin" });
+      if (r.ok) swap("memory-live", await r.text());
+    } catch {
+      // the dashboard went away: what was read stays
+    }
+  }
+  setTimeout(pollMemory, memoryPoll);
+}
+
+if (view === "memory") setTimeout(pollMemory, memoryPoll);
+
 if (view === "review" || view === "import") {
   const f = $("#accept");
   if (f) {

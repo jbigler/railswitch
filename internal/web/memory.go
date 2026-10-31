@@ -46,7 +46,8 @@ type memoryIssue struct {
 	Priority int    `json:"priority"`
 }
 
-// memoryView is the memory page: read-only, read once per load.
+// memoryView is the memory page: read-only; its live part is read again
+// every memoryPoll while the page is shown.
 type memoryView struct {
 	Title, Prefix string
 	Header        headerView
@@ -55,6 +56,12 @@ type memoryView struct {
 	Banner        bannerView
 	Jobs          jobsView
 
+	Live memoryLive
+}
+
+// memoryLive is the page's live part, also served alone by memoryLivePage.
+type memoryLive struct {
+	URL      string // the fragment's own URL, without the cursor
 	Doc      memoryDoc
 	Error    string
 	Activity []memoryEvent // newest first, at most memoryActivity
@@ -63,6 +70,7 @@ type memoryView struct {
 type memoryEvent struct {
 	Seq                  string
 	TS, Op, Issue, Actor string
+	New                  bool // after the cursor the page loaded with
 }
 
 // memoryActivity is how much activity the page lists.
@@ -82,15 +90,37 @@ func (s *Server) memoryPage(w http.ResponseWriter, r *http.Request) {
 	v := memoryView{
 		Title: "Memory · " + p.Prefix, Prefix: p.Prefix,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
+		Live: s.memoryLive(r, p.Prefix, p.Workspace, -1),
 	}
-	doc, err := readJSON[memoryDoc](r.Context(), s.c.CLI, "-C", p.Workspace, "memory")
+	s.html(w, http.StatusOK, "memory", v)
+}
+
+// memoryLivePage is the memory page's live part, which the page fetches
+// every memoryPoll while it is shown (each read is a container run, so not
+// on overview's timer, D140). since is the cursor the page loaded with:
+// activity after it is marked new.
+func (s *Server) memoryLivePage(w http.ResponseWriter, r *http.Request) {
+	p, _, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	since, err := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+	if err != nil {
+		since = -1
+	}
+	s.html(w, http.StatusOK, "memory-live", s.memoryLive(r, p.Prefix, p.Workspace, since))
+}
+
+func (s *Server) memoryLive(r *http.Request, prefix, ws string, since int64) memoryLive {
+	v := memoryLive{URL: "/p/" + prefix + "/memory/live"}
+	doc, err := readJSON[memoryDoc](r.Context(), s.c.CLI, "-C", ws, "memory")
 	if err != nil {
 		v.Error = err.Error()
 	}
 	v.Doc = doc
 	for i := len(doc.Activity) - 1; i >= 0 && len(v.Activity) < memoryActivity; i-- {
 		a := doc.Activity[i]
-		v.Activity = append(v.Activity, memoryEvent{Seq: strconv.FormatInt(a.Seq, 10), TS: a.TS, Op: a.Op, Issue: a.IssueID, Actor: a.Actor})
+		v.Activity = append(v.Activity, memoryEvent{Seq: strconv.FormatInt(a.Seq, 10), TS: a.TS, Op: a.Op, Issue: a.IssueID, Actor: a.Actor, New: since >= 0 && a.Seq > since})
 	}
-	s.html(w, http.StatusOK, "memory", v)
+	return v
 }

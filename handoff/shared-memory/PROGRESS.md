@@ -1,6 +1,47 @@
 # Shared agent memory: progress log
 
-(Summary at the top is written last.)
+## Summary (read this first)
+
+All ten milestones are done; the end-to-end acceptance run passes. Branch
+`shared-memory` in `~/railswitch`, 20-odd commits on 12e724b, nothing pushed.
+
+**Review first**
+1. The decisions: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`
+   D136–D145, plus the smaller calls in `DECISIONS.md` here. D137 (the memory
+   network *is* the firewall rule), D138 (bd only for `[memory]` projects) and
+   D141 (root without a password) are the ones to argue with.
+2. `internal/render/memory.go` (units, env, mounts) and
+   `internal/lifecycle/memory.go` (start, init, report, backup, doctor check).
+3. `internal/pack/builtin/agentbase/Containerfile.agent-base`: the download and
+   checksum lines. Every project with agents gets a pending review of the
+   agent base after this lands (any built-in change does).
+
+**Run the end-to-end check**
+```bash
+RAILSWITCH_E2E_REPO=$HOME/rs-demo/src/demo RAILSWITCH_E2E_PREFIX=s9mem \
+  go test -tags integration ./internal/lifecycle/ -run E2EMemory -timeout 60m -v
+```
+(`~/rs-demo/src/demo` is a `rails new -d postgresql` app; any Rails repo
+works. About 5 minutes with images cached.) The hand-driven demo is
+`~/rs-demo/ws` (prefix `rsmem`, worktree `main`; `cd ~/rs-demo/ws/main &&
+railswitch agent shell`).
+
+**What I'd do next**
+1. Poll the dashboard's Memory page (SSE, on its own slower timer than
+   `overview`) and animate the activity feed from `--since`: the data is
+   there, the page is read-once.
+2. A real model run: Claude with a token in two worktrees, to see whether
+   agents actually follow the label and claim conventions from the prime
+   text, and tune the wording.
+3. Decide on the upgrade story for bd: a `memory migrate` dry run in doctor,
+   and stopping a running server when `[memory]` is removed (today: a manual
+   `systemctl --user stop`).
+
+Not done or not verified: `memory migrate` never ran against a real newer bd;
+the arm64 checksum is taken from `checksums.txt` but its tarball was never
+downloaded; the bd backup is JSONL (no Dolt history, no activity journal,
+D142); a guidance edit restarts every running worktree (the existing
+asset rule).
 
 ## M1: environment, repo, conventions (2026-10-31)
 
@@ -92,3 +133,61 @@
   every bd query; 1.4 s on the demo. Activity from `bd_events_journal`
   (`BD_EVENTS_JOURNAL=1` in every agent) with a `--since` cursor. VERIFIED.
 - `overview` is unchanged: nothing about memory there (see D140).
+
+## M6: the end-to-end run, reproducible
+
+- `internal/lifecycle/e2e_memory_integration_test.go` (`TestE2EMemory`), the
+  repo's form for acceptance runs (see DECISIONS.md). **PASS** in 271 s on a
+  fresh project (`s9mem`), cleanup by `project rm --purge` leaves nothing:
+  - without `[memory]`: no units, no network, no `bd`/`BEADS_DIR`/`railswitch-prime`
+    in the agent; the hook allows exactly the dev and proxy subnets;
+  - A's memory and issue show in B's prime and `bd list` (`created_by` A);
+  - the hook allows exactly dev, proxy and the memory subnet; the memory
+    network is internal; the app can't resolve `memory`; nothing published;
+  - two agents claim one issue at the same second: exactly one exits 0, the
+    other says "already claimed";
+  - `memory --json`: counts, the claim, activity with worktree/agent; `--since`
+    the cursor returns nothing new;
+  - `wt rm --force` of B: everything still there;
+  - backup (0600), stop, `podman volume rm`, restore: 2 issues, 1 in
+    progress, 1 memory.
+- The first run failed one assertion of mine (it read B's hook line as A's);
+  fixed in the test, not the code.
+
+## M8: doctor version check, backup and restore
+
+- `doctor` → `memory version` (D145). VERIFIED on the demo: ok normally; with a
+  `schema_migrations` row one past bd 1.3.2's it fails with bd's own line
+  ("schema version mismatch: database is at v67, binary knows up to v66") and
+  the fix; the row was removed after. A pin change can't leave stale *built*
+  images (the tag covers the Containerfile), so the check looks at running
+  agent containers and at whether the pin is installed at all.
+- Backup/restore: see M6. `memory migrate` (`bd migrate schema`) is unit-tested
+  only: there was no newer bd to migrate to.
+
+## M9: docs and tests
+
+- Docs: `docs/guide/agents.md` (Shared memory), `docs/json.md` (`memory`,
+  `doctor`'s new check, the Settings ops, `project show`'s and `overview`'s new
+  fields), `docs/firewall.md`, `docs/packs.md` (what an agent package does with
+  `railswitch-prime`), `docs/dashboard.md` (Memory page), AGENTS.md (Stage 9w),
+  roadmap D136–D145.
+- Settings: `memory.on`, `memory.off`, `memory.guidance` (preview/apply),
+  `project show --json` `memory`. VERIFIED through the real `settings preview`.
+- `make check` (gofmt, vet, staticcheck, all unit tests): green.
+- `doctor` after: every check ok in the demo workspace (two unrelated
+  warnings as before: dashboard not enabled, linger off).
+- Real Claude Code (2.1.316, a dummy token for `--version`) in the demo
+  registered `railswitch-prime` as its SessionStart hook. Claude itself was
+  never run against a model (no credentials, by design).
+- Regression: `TestE2EAgents` fails at its `lock` step, **on `main` too**
+  (checked in a worktree at 12e724b): since D97 a plain `lock` refuses a new
+  package and prints the review. Pre-existing, not touched. Its cleanup left
+  projects `s4a`/`s4b` registered; removed by hand.
+
+## M10 (stretch): dashboard Memory page
+
+- `/p/<prefix>/memory`, read-only, one `memory --json` per load (not polled,
+  D140); header link only for `[memory]` projects, from a new `overview`
+  boolean read from project.toml. VERIFIED: served from this build against the
+  demo (then the VM's own dashboard unit, v0.1.6, was started again).

@@ -138,7 +138,22 @@ func TestE2EMemory(t *testing.T) {
 	if _, _, err := run(ctx, 30*time.Second, "podman", "network", "exists", naming.MemoryNetwork(prefix)); err == nil {
 		t.Errorf("without [memory]: network %s exists", naming.MemoryNetwork(prefix))
 	}
-	before := agentLocal(t, ws)
+	subnet := func(net string) string {
+		return strings.TrimSpace(podman(ctx, t, "network", "inspect", net, "--format", "{{range .Subnets}}{{.Subnet}}{{end}}"))
+	}
+	// The hook allows the subnets of the agent's own networks, nothing else.
+	wantLocal := func(nets ...string) {
+		t.Helper()
+		var want []string
+		for _, n := range nets {
+			want = append(want, subnet(n))
+		}
+		slices.Sort(want)
+		if got := agentLocal(t, ws); !slices.Equal(got, want) {
+			t.Errorf("the agent's firewall allows %v; want the subnets of %v: %v", got, nets, want)
+		}
+	}
+	wantLocal(naming.DevNetwork(prefix, a), naming.ProxyNetwork(prefix))
 
 	// With [memory].
 	appendFile(t, filepath.Join(ws, "project.toml"), "\n[memory]\nguidance = \"No patient data, ever.\"\n")
@@ -162,14 +177,11 @@ func TestE2EMemory(t *testing.T) {
 		t.Errorf("B's bd list lacks %s by %s/shell:\n%s", id, a, list)
 	}
 
-	// The firewall: A's agent gains exactly the memory network's subnet.
-	after := agentLocal(t, ws)
-	sub := strings.TrimSpace(podman(ctx, t, "network", "inspect", naming.MemoryNetwork(prefix), "--format", "{{range .Subnets}}{{.Subnet}} {{end}}"))
+	// The firewall: the newest agent run, B's, gained exactly the memory
+	// network's subnet.
+	wantLocal(naming.DevNetwork(prefix, b), naming.ProxyNetwork(prefix), naming.MemoryNetwork(prefix))
 	if internal := strings.TrimSpace(podman(ctx, t, "network", "inspect", naming.MemoryNetwork(prefix), "--format", "{{.Internal}}")); internal != "true" {
 		t.Errorf("%s internal = %s", naming.MemoryNetwork(prefix), internal)
-	}
-	if added := minus(after, before); !slices.Equal(added, []string{sub}) {
-		t.Errorf("the agent's local subnets went from %v to %v; want only %s added", before, after, sub)
 	}
 	if out, _, _ := run(ctx, 30*time.Second, "podman", "exec", naming.Container(prefix, a, "rails"), "getent", "hosts", "memory"); strings.TrimSpace(out) != "" {
 		t.Errorf("the app resolves the memory server: %s", out)
@@ -269,17 +281,6 @@ func agentLocal(t *testing.T, ws string) []string {
 	f := strings.Fields(local)
 	slices.Sort(f)
 	return f
-}
-
-// minus is what after holds that before doesn't.
-func minus(after, before []string) []string {
-	var out []string
-	for _, s := range after {
-		if !slices.Contains(before, s) {
-			out = append(out, s)
-		}
-	}
-	return out
 }
 
 func appendFile(t *testing.T, path, text string) {

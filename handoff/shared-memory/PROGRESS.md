@@ -3,7 +3,7 @@
 ## Summary (read this first)
 
 All ten milestones are done; the end-to-end acceptance run passes. Branch
-`shared-memory` in `~/railswitch`, 20-odd commits on 12e724b, nothing pushed.
+`shared-memory` in `~/railswitch`, 14 commits on 12e724b, nothing pushed.
 
 **Review first**
 1. The decisions: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`

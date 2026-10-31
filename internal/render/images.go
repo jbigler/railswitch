@@ -459,7 +459,11 @@ func (m *Model) imageValues(in *Instance) error {
 
 	// The agent base on the chain's end, each agent package's image on it.
 	if cf := m.agentBase; cf != nil {
-		agentBase, err := step("agent-base", cf, map[string]string{"BASE_IMAGE": base}, true, "agent-base", ver)
+		args := map[string]string{"BASE_IMAGE": base}
+		if m.Inputs.Project.Memory != nil {
+			args["MEMORY"] = "1" // installs bd (D136); a new tag, so enabling memory rebuilds
+		}
+		agentBase, err := step("agent-base", cf, args, true, "agent-base", ver)
 		if err != nil {
 			return err
 		}

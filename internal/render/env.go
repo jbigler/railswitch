@@ -92,7 +92,10 @@ func optionSource(o *pack.Option) string {
 //     and every agent, plus every service's own published ports (deps
 //     publishes none); an agent also gets RAILSWITCH_AGENT and
 //     RAILSWITCH_STATUS_FILE (D58);
-//   - secret: git wiring for the services of a secret with git_host.
+//   - [memory]: every agent, at layer option, beads' connection to the
+//     project's memory server (MemoryEnv, D136);
+//   - secret: git wiring for the services of a secret with git_host, and
+//     beads.role for every agent of a [memory] project.
 //
 // Layer 7 goes to ShareEnv, never EnvSpec: the pack's [share] env and the
 // options' [share] gives reach app, worker, tool packages and agents, project
@@ -148,6 +151,9 @@ func (b *builder) envSpecs() {
 				add(LayerOption, optionSource(ch.Option)+" [agent_gives]", ch.Service, pk.DBScheme[ch.Option.Name], ch.Option.AgentGives)
 			}
 			add(LayerOption, "agent "+agent.Ref.String()+" [env]", s.ID, s.scheme, agent.Agent.Env)
+			if p.Memory != nil {
+				add(LayerOption, "project.toml [memory]", s.ID, s.scheme, MemoryEnv("{worktree.slug}/"+agent.Name))
+			}
 		}
 		if s.Role != RoleDeps {
 			add(LayerProject, "project.toml [env]", s.ID, s.scheme, p.Env)
@@ -233,6 +239,13 @@ func (b *builder) gitWiring(s *Service) {
 			[2]string{"tag.gpgsign", "true"})
 		srcs = append(srcs, "project.toml [secrets."+name+"]")
 	}
+	identity := len(pairs) > 0
+	if b.in.Project.Memory != nil && s.Role == RoleAgent {
+		// bd asks git for beads.role on most commands and warns when it is
+		// unset (beads routing.go); env config writes nothing in .git.
+		pairs = append(pairs, [2]string{"beads.role", "maintainer"})
+		srcs = append(srcs, "project.toml [memory]")
+	}
 	if len(pairs) == 0 {
 		return
 	}
@@ -244,6 +257,9 @@ func (b *builder) gitWiring(s *Service) {
 	for i, kv := range pairs {
 		env("GIT_CONFIG_KEY_"+strconv.Itoa(i), kv[0], src)
 		env("GIT_CONFIG_VALUE_"+strconv.Itoa(i), kv[1], src)
+	}
+	if !identity {
+		return
 	}
 	h := b.in.Host
 	for _, who := range []string{"AUTHOR", "COMMITTER"} {

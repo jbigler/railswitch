@@ -112,6 +112,18 @@ func ProxyNetworkUnit(prefix string) string {
 	return prefix + "-proxy.network"
 }
 
+// MemoryNetwork is the project's shared memory network (NetworkName=), its
+// Dolt server's container and volume (D136): "demo_memory".
+func MemoryNetwork(prefix string) string {
+	return Shared(prefix, "memory")
+}
+
+// MemoryUnit is the base name of the project's memory unit files:
+// "demo-memory" (.network and .container).
+func MemoryUnit(prefix string) string {
+	return prefix + "-memory"
+}
+
 // GitHost is the host of a git URL: scheme://[user@]host[:port]/…, or the
 // scp-like [user@]host:path; not ok for a local path.
 func GitHost(repo string) (string, bool) {

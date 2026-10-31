@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -48,17 +49,16 @@ func (in *Instance) Networks(s *Service) []string {
 	if s.onProxy() {
 		n = append(n, naming.ProxyNetwork(in.m.Prefix))
 	}
+	if s.onMemory() {
+		n = append(n, naming.MemoryNetwork(in.m.Prefix))
+	}
 	return n
 }
 
-func (s *Service) onProxy() bool {
-	for _, n := range s.Networks {
-		if n == "proxy" {
-			return true
-		}
-	}
-	return false
-}
+func (s *Service) onProxy() bool { return slices.Contains(s.Networks, "proxy") }
+
+// onMemory: s joins the project's memory network (D136).
+func (s *Service) onMemory() bool { return slices.Contains(s.Networks, "memory") }
 
 // AddHosts are the host:ip entries (Quadlet AddHost=, podman --add-host)
 // of s's container: on the proxy network, every routed host of the

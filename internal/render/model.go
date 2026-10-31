@@ -373,6 +373,9 @@ func (b *builder) services() error {
 		case s.Role == RoleApp, s.Role == RoleWorker, s.Role == RoleAgent, b.tools[s.ID] != nil, len(s.Routes) > 0:
 			s.Networks = append(s.Networks, "proxy")
 		}
+		if s.Role == RoleAgent && b.in.Project.Memory != nil {
+			s.Networks = append(s.Networks, "memory") // D136
+		}
 		if s.Worktree {
 			s.Workdir = "/app"
 		}
@@ -627,6 +630,7 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 	for _, v := range ag.Shared {
 		s.Volumes = append(s.Volumes, Volume{Name: v.Name, Mount: v.Mount, Chown: v.Chown, Cache: v.Data == pack.DataCache, Shared: true})
 	}
+	b.memoryAgent(&s)
 	if err := b.entrypoint(&s, pkg, ag.Files, ag.Entrypoint); err != nil {
 		return s, err
 	}

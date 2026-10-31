@@ -48,6 +48,14 @@ func Quadlet(m *Model) (map[string][]byte, error) {
 	if err := put(naming.ProxyNetworkUnit(m.Prefix), proxyNetwork(m)); err != nil {
 		return nil, err
 	}
+	if m.Inputs.Project.Memory != nil {
+		if err := put(naming.MemoryUnit(m.Prefix)+".network", memoryNetwork(m)); err != nil {
+			return nil, err
+		}
+		if err := put(naming.MemoryUnit(m.Prefix)+".container", memoryServer(m)); err != nil {
+			return nil, err
+		}
+	}
 	for _, wt := range m.Inputs.Worktrees {
 		in, err := m.Instance(wt)
 		if err != nil {
@@ -246,6 +254,9 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 	u.add(c, "Network", naming.DevNetworkUnit(prefix, slug)+":alias="+s.ID)
 	if onProxy {
 		u.add(c, "Network", naming.ProxyNetworkUnit(prefix))
+	}
+	if s.onMemory() {
+		u.add(c, "Network", naming.MemoryUnit(prefix)+".network")
 	}
 	if s.Worktree {
 		u.add(c, "UserNS", WorktreeUserNS)

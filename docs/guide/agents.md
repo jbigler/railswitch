@@ -128,6 +128,93 @@ Claude's `.claude.json` is merged instead, keeping each worktree's own
 project entries. Plugins themselves are shared by every worktree already,
 so a promoted plugin list works everywhere at once.
 
+## Shared memory
+
+Each worktree's agent starts from nothing: what one agent learned, or
+planned, the next one doesn't know. Shared memory gives every agent of the
+project, in every worktree, one task tracker and notebook:
+[beads](https://github.com/gastownhall/beads) (`bd`). It is off until you
+turn it on in `project.toml`:
+
+```toml
+[memory]
+# Optional: what agents are told about the store, replacing the default
+# (no secrets, credentials, personal or patient data).
+guidance = "Never store patient data, credentials or customer names. Summarise, don't paste logs."
+```
+
+What happens then (D136–D145):
+
+- **One server per project.** The first `railswitch agent` starts
+  `<prefix>-memory`, a Dolt database server whose data is the volume
+  `<prefix>_memory`. Agents talk to it as clients. It isn't in any worktree:
+  `down` and `wt rm` leave it and its data alone, and `project rm` stops it
+  (`--purge` also deletes the volume). Nothing is pushed anywhere and there
+  is no git sync: the volume and your backups are the only copies.
+- **Only agents reach it.** It sits on its own network, which only the
+  project's agents join and which has no way out. That network is the one
+  thing an agent's firewall gains: the app, workers and installs can't
+  reach it, and nothing is published on your machine.
+- **Agents get `bd`.** The agent images install a pinned bd (the release's
+  checksum is checked), configured for the server and in stealth mode: bd
+  never touches the worktree's git. Usage metrics are off.
+- **They start primed.** At every session start (Claude: a SessionStart
+  hook) the agent reads `railswitch-prime`: your guidance, its worktree's
+  label, then `bd prime` (beads' workflow and every memory).
+- **Work is labelled by worktree.** Agents label what they create
+  `worktree:<slug>` and look for work with `bd ready -l worktree:<slug>`.
+  Claiming (`bd update <id> --claim`) is atomic: when two agents claim one
+  task, one gets it and the other is told it's taken.
+
+**Never put secrets, credentials or personal data in memory**, and in a
+healthcare project no patient data: every agent of the project reads all
+of it, at the start of every session, and it stays until deleted. The
+guidance says so to the agents; it doesn't stop them, so keep the rule in
+your own instructions too.
+
+### Seeing it
+
+```bash
+railswitch memory                # the server, counts, each worktree's ready, claimed and blocked work, recent activity
+railswitch --json memory --since 41   # only the activity after record 41 (docs/json.md)
+```
+
+Activity is who (`<worktree>/<agent>`) wrote what, from beads' own journal,
+kept 7 days.
+
+### Backup and restore
+
+```bash
+railswitch memory backup                     # memory-backups/<prefix>-<time>.jsonl in the workspace
+railswitch memory backup --to ~/memory.jsonl
+railswitch memory restore memory-backups/<file>.jsonl
+```
+
+A backup holds every issue (with its labels, dependencies and comments)
+and every memory, readable only by you. Restoring writes each of them back
+over the one with the same id, asking first; what the file doesn't hold
+stays. It works on an empty volume too: the database is created first. Not
+in a backup: the activity journal and Dolt's own history.
+
+### The bd version
+
+bd refuses a database a newer bd has migrated, so every agent must run the
+same bd. The version is pinned in `containerfiles/Containerfile.agent-base`
+(`ARG BD_VERSION`, with the release checksums), and `railswitch doctor`
+checks it (`memory version`): running agents built before the pin changed,
+and whether the pinned bd opens the server's database. To move to a new bd:
+change the pin and both checksums (or accept the agent base update in
+Review), stop every running agent, run `railswitch agent` once in a
+worktree to build the new images, then `railswitch memory migrate` once
+(bd won't migrate a shared database by itself).
+
+### Turning it off
+
+Remove `[memory]`: the next render drops the server's unit and the agents'
+bd setup. Stop the server that is still running with `systemctl --user stop
+<prefix>-memory.service`; its volume stays until `project rm --purge` or
+`podman volume rm <prefix>_memory`.
+
 ## Your own agent
 
 An agent package is a folder with `agent.toml` (its hosts, mounts, secrets

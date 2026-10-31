@@ -541,6 +541,37 @@ Exit 0; a failed removal is a warning.
 | `bytes` | number | The removed images' size, layers they share with kept images included. |
 | `warnings` | array | A project that doesn't load (nothing of its prefix is removed), a removal that failed. |
 
+## `memory [--since <seq>]`
+
+One project (`-C`): its shared agent memory (D136), read with bd's own
+`--json` in one transient container on the memory network, plus one `dolt
+sql` in the server for the schema version. It never starts the server: a
+stopped one gives `server.state` and nothing else. Exit 1 for a project
+without `[memory]`.
+
+```json
+{"server": {"unit": "shop-memory.service", "container": "shop_memory", "image": "docker.io/dolthub/dolt-sql-server:2.2.0", "volume": "shop_memory", "state": "active"},
+ "schema": 66,
+ "issues": {"total": 3, "open": 2, "in_progress": 1, "blocked": 1, "ready": 1, "closed": 0},
+ "memories": 2,
+ "worktrees": [
+  {"slug": "main", "ready": [{"id": "shop-28i", "title": "Add a health endpoint", "status": "open", "priority": 2, "assignee": "", "labels": ["worktree:main"], "updated_at": "2026-10-31T15:24:25Z"}], "claimed": [], "blocked": []},
+  {"slug": "feat", "ready": [], "claimed": [{"id": "shop-8ps", "title": "Race me", "status": "in_progress", "priority": 2, "assignee": "feat/claude", "labels": ["worktree:feat"], "updated_at": "2026-10-31T15:24:57Z"}], "blocked": []}],
+ "activity": [{"seq": 4, "ts": "2026-10-31T15:24:57Z", "op": "update", "issue_id": "shop-8ps", "actor": "feat/claude", "worktree": "feat", "agent": "claude"}],
+ "cursor": 4, "error": ""}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `server.state` | string | systemd's ActiveState of the server's unit (`active`, `inactive`, `failed`, …); `""` when the unit isn't loaded (no agent has run since `[memory]` was added). Only `active` reads the rest. |
+| `schema` | number | The database's beads schema version (`MAX(version)` of `schema_migrations`); `0` when not read. bd 1.3.2 knows up to 66. |
+| `issues` | object or null | `bd status`'s counts; `null` when the server isn't running or bd couldn't say. |
+| `memories` | number | `bd remember` entries (`bd memories`). |
+| `worktrees` | array | Every registered worktree, in registry order, with the issues labelled `worktree:<slug>` (an issue may have several): `ready` (`bd ready`: open, nothing blocking), `claimed` (`in_progress`) and `blocked` (`bd blocked`). Unlabelled issues are only counted. Each issue: `id`, `title`, `status`, `priority` (0 highest), `assignee` (the claiming agent's `<slug>/<agent>`), `labels`, `updated_at`. |
+| `activity` | array | bd's events journal after `--since`, oldest first, at most 200: `seq` (gapless, the cursor), `ts`, `op` (`create`, `update` (a claim is one), `close`, `delete`, `dep_add`, `dep_remove`, `comment`: beads `internal/eventsjournal/record.go`), `issue_id`, `actor` (`<slug>/<agent>` for an agent, `railswitch` for railswitch's own calls), and `worktree`/`agent` split from it (`""` for another actor). Only writes of bd clients with the journal on are recorded: every agent's, from D136 on; `bd remember` is not an issue write and isn't journaled. The journal keeps 7 days. |
+| `cursor` | number | The last `seq` returned, else `--since`: pass it as `--since` to read only what is new. |
+| `error` | string | Why bd or the server couldn't answer (`""` otherwise); the fields it would have filled stay empty. |
+
 ## `fw show [service]`
 
 The firewall of the worktree's containers (the workspace root: every
@@ -1074,6 +1105,11 @@ is a warning (`warn` true), and `railswitch hooks check` lists them.
 `ssh-keygen -Y` checks that `ssh-keygen` supports `-Y verify` (OpenSSH 8.2
 or newer), which `library verify` and `library sign` need; a failure is a
 warning, since nothing else needs it.
+`memory version` (last, only in a project with `[memory]`, D145) checks
+the agent base's bd pin against every running agent container and every
+built agent image, and, while the memory server runs, that the pinned bd
+opens its database; its fix names `agent stop`, `railswitch memory
+migrate` or a new pin.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.
 
@@ -1088,7 +1124,7 @@ code, and the text output shows it as `warn`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key`, `machine config` or `memory version`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
 | `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |

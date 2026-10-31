@@ -13,9 +13,10 @@ Anything else is decided by the container's profiles and the mode.
 |---|---|---|
 | The app, its workers, `railswitch exec` | `app` | `app.allow`: the pack's `app.allow`, then `[firewall] allow.app` |
 | `deps` (installs) | `deps` | `deps.allow`: the pack's `deps.allow` (its registries), then `[firewall] allow.deps` |
-| An agent | `agent-<name>` | its package's `allow`, `[agents.<name>] allow`, then `[firewall] allow.agent` |
+| An agent | `agent-<name>` | its package's `allow`, `[agents.<name>] allow`, then `[firewall] allow.agent` (with `[memory]`, an agent also joins the project's memory network, so the hook allows that one more subnet: D137) |
 | nvim | `agent`, `deps` | both lists, plus the tool's own `allow` (GitHub's API and raw files, PyPI) and the config repo's host |
 | Data (database, cache, storage) | `none` | nothing: a data container needs no outside access |
+| The memory server (`[memory]`, D136) | no hook | its network is internal: no route out at all, and only the project's agents join it |
 
 Each container gets only its own list. The deps list holds package
 registries and `github.com`, which are also places to send data to; the

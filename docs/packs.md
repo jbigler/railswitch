@@ -584,3 +584,14 @@ with `[config]`) finds `~/.railswitch-apply-default` in a home that should
 take the default (a new home, or one `agent default apply` named), puts
 the default in place and removes the file. The built-in `claude@1` does
 it with its `apply-default.sh`.
+
+In a project with `[memory]` (D136, docs/guide/agents.md), every agent
+container has `bd` (the agent base installs it), beads' server settings in
+its env (`BEADS_DIR`, `BEADS_DOLT_SERVER_*`, `BEADS_ACTOR=<slug>/<agent>`)
+and `/usr/local/bin/railswitch-prime`: the project's guidance and the
+worktree label convention, then `bd prime` (it passes its arguments on).
+Priming is the package's job, as it knows how its agent reads context:
+run `railswitch-prime` when it is there, from a SessionStart-style hook
+(`claude@1` registers it as one, and removes it when the file is gone) or
+from the entrypoint. A package must never run `bd init`: railswitch
+creates the database.

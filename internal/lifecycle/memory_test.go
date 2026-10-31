@@ -131,7 +131,7 @@ func TestMemoryFill(t *testing.T) {
 		`ready {"schema_version":1,"data":[{"id":"d-1","title":"A","status":"open","labels":["worktree:main"]},{"id":"d-9","title":"unlabelled","status":"open"}]}`,
 		`claimed {"schema_version":1,"data":[{"id":"d-2","title":"B","status":"in_progress","assignee":"feat/shell","labels":["x","worktree:feat"]}]}`,
 		`blocked {"schema_version":1,"data":[{"id":"d-3","title":"C","status":"open","labels":["worktree:main","worktree:feat"]}]}`,
-		`activity [{"seq":5,"ts":"t","op":"create","issue_id":"d-1","actor":"main/shell"},{"seq":7,"op":"claim","issue_id":"d-2","actor":"railswitch"}]`,
+		`activity [{"seq":5,"ts":"t","op":"create","issue_id":"d-1","actor":"main/shell"},{"seq":7,"op":"update","issue_id":"d-2","actor":"railswitch"}]`,
 	}, "\n") + "\n"
 	if err := r.fill([]byte(out)); err != nil {
 		t.Fatal(err)

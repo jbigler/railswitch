@@ -1,14 +1,18 @@
 package lifecycle
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,13 +137,31 @@ func (l *L) bdImage(ctx context.Context, m *render.Model) (string, error) {
 	return "", errors.New("no worktree has its agent images built yet: railswitch up (or railswitch agent) first")
 }
 
-// bd runs `bd args…` in a transient container from bdImage on the memory
-// network only (internal: no way out), read-only, every capability
-// dropped, as the agents' user, with the agents' server settings and
-// BEADS_DIR read-only from the workspace; stdin may be nil. bd's
-// --json output comes in its envelope ({"schema_version", "data"}). It
-// returns stdout; a non-zero exit is an error carrying stderr's tail.
+// bd runs `bd args…` in a transient container (inMemory) and returns its
+// stdout; a non-zero exit is an error carrying stderr's tail.
 func (l *L) bd(ctx context.Context, m *render.Model, stdin io.Reader, args ...string) ([]byte, error) {
+	res, err := l.inMemory(ctx, m, stdin, "bd", args...)
+	if err != nil {
+		return nil, fmt.Errorf("bd %s: %w", strings.Join(args, " "), err)
+	}
+	return res.Stdout, nil
+}
+
+// inMemory runs entrypoint with args in a transient container from
+// bdImage on the memory network only (internal: no way out), read-only,
+// every capability dropped, as the agents' user, with the agents' server
+// settings and BEADS_DIR read-only from the workspace; stdin may be nil.
+// bd's --json output comes in its envelope ({"schema_version", "data"}).
+func (l *L) inMemory(ctx context.Context, m *render.Model, stdin io.Reader, entrypoint string, args ...string) (sys.Result, error) {
+	run, err := l.memoryRunArgs(ctx, m, entrypoint, args)
+	if err != nil {
+		return sys.Result{}, err
+	}
+	return l.R.Run(ctx, sys.Cmd{Name: "podman", Args: run, Stdin: stdin, Timeout: bdTimeout})
+}
+
+// memoryRunArgs is inMemory's `podman run` argv.
+func (l *L) memoryRunArgs(ctx context.Context, m *render.Model, entrypoint string, args []string) ([]string, error) {
 	img, err := l.bdImage(ctx, m)
 	if err != nil {
 		return nil, err
@@ -151,22 +173,369 @@ func (l *L) bd(ctx context.Context, m *render.Model, stdin io.Reader, args ...st
 		"--read-only", "--tmpfs", "/tmp", "--workdir", "/tmp",
 		"--cap-drop", "all", "--security-opt", "no-new-privileges", "--memory", "1g", "--pids-limit", "512",
 		"--volume", filepath.Join(m.Inputs.Workspace, render.MemoryDir, "beads") + ":" + dir + ":ro,z",
-		"--entrypoint", "bd",
+		"--entrypoint", entrypoint,
 	}
 	env := render.MemoryEnv("railswitch")
 	env["BEADS_DIR"] = dir
 	env["HOME"] = "/tmp"
 	env["BD_JSON_ENVELOPE"] = "1"
-	if len(args) > 0 && args[0] == "init" {
+	if entrypoint == "bd" && len(args) > 0 && args[0] == "init" {
 		env["BEADS_DIR"] = "/tmp/init/.beads" // init writes; the agents' stays as railswitch wrote it
 	}
 	for _, k := range slices.Sorted(maps.Keys(env)) {
 		run = append(run, "--env", k+"="+env[k])
 	}
-	run = append(append(run, img), args...)
-	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: run, Stdin: stdin, Timeout: bdTimeout})
+	return append(append(run, img), args...), nil
+}
+
+// MemoryBackupDir holds `railswitch memory backup`'s files, 0700.
+const MemoryBackupDir = "memory-backups"
+
+// MemoryBackup exports the project's shared memory with `bd export --all`
+// (JSONL: every issue with its labels, dependencies and comments, and the
+// memories) to path, "" for <workspace>/memory-backups/<prefix>-<UTC
+// time>.jsonl, written whole or not at all, 0600. It starts the server
+// when it isn't running. It returns the path.
+func (l *L) MemoryBackup(ctx context.Context, path string) (string, error) {
+	m, err := l.model(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("bd %s: %w", strings.Join(args, " "), err)
+		return "", err
 	}
-	return res.Stdout, nil
+	if m.Inputs.Project.Memory == nil {
+		return "", errNoMemory(m)
+	}
+	if err := l.MemoryUp(ctx, m); err != nil {
+		return "", err
+	}
+	if path == "" {
+		dir := filepath.Join(m.Inputs.Workspace, MemoryBackupDir)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return "", err
+		}
+		path = filepath.Join(dir, m.Prefix+"-"+time.Now().UTC().Format("20060102T150405Z")+".jsonl")
+	}
+	run, err := l.memoryRunArgs(ctx, m, "bd", []string{"export", "--all"})
+	if err != nil {
+		return "", err
+	}
+	n, err := writeStream(ctx, l.R, path, false, sys.Cmd{Name: "podman", Args: run, Timeout: dumpTimeout})
+	if err != nil {
+		return "", fmt.Errorf("bd export: %w", err)
+	}
+	if err := os.Chmod(path, 0o600); err != nil { // project notes: the user's only
+		return "", err
+	}
+	fmt.Fprintf(l.Out, "wrote %s (%d bytes)\n", path, n)
+	return path, nil
+}
+
+// MemoryRestore imports a MemoryBackup file with `bd import --allow-stale`:
+// every issue and memory in it is written back over the one with its id,
+// older or not; what the file doesn't hold stays. On a new volume the
+// database is created first. It asks first unless yes; without a terminal
+// it refuses.
+func (l *L) MemoryRestore(ctx context.Context, path string, yes bool) error {
+	m, err := l.model(ctx)
+	if err != nil {
+		return err
+	}
+	if m.Inputs.Project.Memory == nil {
+		return errNoMemory(m)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if fi, err := f.Stat(); err != nil {
+		return err
+	} else if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s: not a regular file", path)
+	}
+	if !yes {
+		what := fmt.Sprintf("write every issue and memory in %s over the shared memory of %s", path, m.Prefix)
+		if !l.TTY {
+			return fmt.Errorf("memory restore would %s: pass --yes (no terminal to confirm on)", what)
+		}
+		fmt.Fprintf(l.Out, "This will %s; their current text is lost. Continue? [y/N] ", what)
+		line, _ := bufio.NewReader(l.In).ReadString('\n')
+		if a := strings.ToLower(strings.TrimSpace(line)); a != "y" && a != "yes" {
+			fmt.Fprintln(l.Out, "aborted")
+			return nil
+		}
+	}
+	if err := l.MemoryUp(ctx, m); err != nil {
+		return err
+	}
+	run, err := l.memoryRunArgs(ctx, m, "bd", []string{"import", "--allow-stale", "-"})
+	if err != nil {
+		return err
+	}
+	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: run, Stdin: f, Timeout: dumpTimeout})
+	if err != nil {
+		return fmt.Errorf("bd import: %w", err)
+	}
+	l.Out.Write(res.Stdout)
+	return nil
+}
+
+// MemoryMigrate applies the pending beads schema migrations to the
+// project's database (`bd migrate schema`: the verb is the consent bd
+// asks for before migrating a shared server's database). Run it once every
+// agent image has the new bd: an older one refuses the migrated database.
+func (l *L) MemoryMigrate(ctx context.Context) error {
+	m, err := l.model(ctx)
+	if err != nil {
+		return err
+	}
+	if m.Inputs.Project.Memory == nil {
+		return errNoMemory(m)
+	}
+	if err := l.MemoryUp(ctx, m); err != nil {
+		return err
+	}
+	out, err := l.bd(ctx, m, nil, "migrate", "schema")
+	if err != nil {
+		return err
+	}
+	l.Out.Write(out)
+	return nil
+}
+
+// MemoryReport is `railswitch memory --json` (docs/json.md).
+type MemoryReport struct {
+	Server    MemoryServer     `json:"server"`
+	Schema    int              `json:"schema"` // the database's beads schema version; 0 when the server isn't running
+	Issues    *MemoryCounts    `json:"issues"` // nil when the server isn't running
+	Memories  int              `json:"memories"`
+	Worktrees []MemoryWorktree `json:"worktrees"`
+	Activity  []MemoryEvent    `json:"activity"`
+	Cursor    int64            `json:"cursor"` // pass as --since to read only newer activity
+	Error     string           `json:"error"`
+}
+
+// MemoryServer is the memory server's unit and container.
+type MemoryServer struct {
+	Unit      string `json:"unit"`
+	Container string `json:"container"`
+	Image     string `json:"image"`
+	Volume    string `json:"volume"`
+	State     string `json:"state"` // systemd's ActiveState; "" when the unit isn't loaded
+}
+
+// MemoryCounts are bd status's summary.
+type MemoryCounts struct {
+	Total      int `json:"total"`
+	Open       int `json:"open"`
+	InProgress int `json:"in_progress"`
+	Blocked    int `json:"blocked"`
+	Ready      int `json:"ready"`
+	Closed     int `json:"closed"`
+}
+
+// MemoryWorktree is the work labelled worktree:<slug>.
+type MemoryWorktree struct {
+	Slug    string        `json:"slug"`
+	Ready   []MemoryIssue `json:"ready"`
+	Claimed []MemoryIssue `json:"claimed"`
+	Blocked []MemoryIssue `json:"blocked"`
+}
+
+// MemoryIssue is the part of a bd issue the report keeps.
+type MemoryIssue struct {
+	ID        string   `json:"id"`
+	Title     string   `json:"title"`
+	Status    string   `json:"status"`
+	Priority  int      `json:"priority"`
+	Assignee  string   `json:"assignee"`
+	Labels    []string `json:"labels"`
+	UpdatedAt string   `json:"updated_at"`
+}
+
+// MemoryEvent is one bd_events_journal record (bd events tail).
+type MemoryEvent struct {
+	Seq      int64  `json:"seq"`
+	TS       string `json:"ts"`
+	Op       string `json:"op"`
+	IssueID  string `json:"issue_id"`
+	Actor    string `json:"actor"`
+	Worktree string `json:"worktree"` // the actor's worktree (BEADS_ACTOR <slug>/<agent>); "" for another actor
+	Agent    string `json:"agent"`
+}
+
+// activityLimit caps the activity one report returns: poll again with
+// the cursor for more.
+const activityLimit = 200
+
+// memoryScript runs every query of a report in one container: one line
+// per query, "<tag> <compact JSON>" or "<tag> null" when bd failed (its
+// stderr says why). $1 is the activity cursor.
+var memoryScript = `emit() {
+  tag=$1; shift
+  if out=$("$@"); then printf '%s %s\n' "$tag" "$(printf '%s' "$out" | jq -c .)"; else printf '%s null\n' "$tag"; fi
+}
+emit status bd status --json
+emit memories bd memories --json
+emit ready bd ready -n 0 --json
+emit claimed bd list -s in_progress -n 0 --json
+emit blocked bd blocked --json
+emit activity sh -c 'bd events tail --since "$1" --limit ` + strconv.Itoa(activityLimit) + ` | jq -cs .' sh "$1"
+`
+
+// Memory reads the project's shared memory: its server, and when it runs,
+// bd's counts, each worktree's ready, claimed and blocked work (by its
+// worktree:<slug> label) and the journal's activity after since. It never
+// starts the server. A failure to read is the report's Error.
+func (l *L) Memory(ctx context.Context, since int64) (*MemoryReport, error) {
+	m, err := l.model(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if m.Inputs.Project.Memory == nil {
+		return nil, errNoMemory(m)
+	}
+	r := &MemoryReport{
+		Server: MemoryServer{
+			Unit: memoryService(m.Prefix), Container: naming.MemoryNetwork(m.Prefix),
+			Image: render.MemoryImage, Volume: naming.MemoryNetwork(m.Prefix),
+		},
+		Worktrees: []MemoryWorktree{}, Activity: []MemoryEvent{}, Cursor: since,
+	}
+	for _, wt := range m.Inputs.Worktrees {
+		r.Worktrees = append(r.Worktrees, MemoryWorktree{Slug: wt.Slug, Ready: []MemoryIssue{}, Claimed: []MemoryIssue{}, Blocked: []MemoryIssue{}})
+	}
+	st, err := l.systemd().UnitState(ctx, r.Server.Unit)
+	if err != nil {
+		return nil, err
+	}
+	if st.Load == "loaded" {
+		r.Server.State = st.Active
+	}
+	if r.Server.State != "active" {
+		return r, nil
+	}
+	if out, err := l.doltSQL(ctx, m, "SELECT COALESCE(MAX(version),0) AS v FROM `"+render.MemoryDatabase+"`.schema_migrations"); err != nil {
+		r.Error = err.Error()
+		return r, nil
+	} else if r.Schema, err = schemaVersion(out); err != nil {
+		r.Error = err.Error()
+		return r, nil
+	}
+	res, err := l.inMemory(ctx, m, nil, "sh", "-c", memoryScript, "sh", strconv.FormatInt(since, 10))
+	if err != nil {
+		r.Error = err.Error()
+		return r, nil
+	}
+	if err := r.fill(res.Stdout); err != nil {
+		r.Error = err.Error()
+		if tail := strings.TrimSpace(string(res.Stderr)); tail != "" {
+			r.Error += ": " + lastLine(tail)
+		}
+	}
+	return r, nil
+}
+
+// schemaVersion reads `dolt sql -r json`'s {"rows":[{"v":N}]}.
+func schemaVersion(out []byte) (int, error) {
+	var doc struct {
+		Rows []struct {
+			V int `json:"v"`
+		} `json:"rows"`
+	}
+	if err := json.Unmarshal(out, &doc); err != nil || len(doc.Rows) != 1 {
+		return 0, fmt.Errorf("the memory database's schema version: unexpected answer %q", bytes.TrimSpace(out))
+	}
+	return doc.Rows[0].V, nil
+}
+
+func lastLine(s string) string {
+	if i := strings.LastIndexByte(s, '\n'); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
+
+// fill reads memoryScript's lines into r. bd's output is hostile only in
+// what it says, never in its shape: anything that doesn't decode is an
+// error naming the query.
+func (r *MemoryReport) fill(out []byte) error {
+	byTag := map[string][]byte{}
+	for line := range strings.Lines(string(out)) {
+		tag, js, ok := strings.Cut(strings.TrimRight(line, "\n"), " ")
+		if ok {
+			byTag[tag] = []byte(js)
+		}
+	}
+	var failed []string
+	data := func(tag string, v any) {
+		js := byTag[tag]
+		if len(js) == 0 || string(js) == "null" {
+			failed = append(failed, tag)
+			return
+		}
+		env := struct {
+			Data json.RawMessage `json:"data"`
+		}{}
+		if tag == "activity" { // JSON lines, slurped: no envelope
+			env.Data = js
+		} else if err := json.Unmarshal(js, &env); err != nil {
+			failed = append(failed, tag)
+			return
+		}
+		if err := json.Unmarshal(env.Data, v); err != nil {
+			failed = append(failed, tag)
+		}
+	}
+	var status struct {
+		Summary struct {
+			Total      int `json:"total_issues"`
+			Open       int `json:"open_issues"`
+			InProgress int `json:"in_progress_issues"`
+			Blocked    int `json:"blocked_issues"`
+			Ready      int `json:"ready_issues"`
+			Closed     int `json:"closed_issues"`
+		} `json:"summary"`
+	}
+	data("status", &status)
+	sm := status.Summary
+	r.Issues = &MemoryCounts{Total: sm.Total, Open: sm.Open, InProgress: sm.InProgress, Blocked: sm.Blocked, Ready: sm.Ready, Closed: sm.Closed}
+	var memories map[string]any
+	data("memories", &memories)
+	r.Memories = len(memories)
+	for _, q := range []struct {
+		tag string
+		get func(*MemoryWorktree) *[]MemoryIssue
+	}{
+		{"ready", func(w *MemoryWorktree) *[]MemoryIssue { return &w.Ready }},
+		{"claimed", func(w *MemoryWorktree) *[]MemoryIssue { return &w.Claimed }},
+		{"blocked", func(w *MemoryWorktree) *[]MemoryIssue { return &w.Blocked }},
+	} {
+		var issues []MemoryIssue
+		data(q.tag, &issues)
+		for _, is := range issues {
+			if is.Labels == nil {
+				is.Labels = []string{}
+			}
+			for i := range r.Worktrees {
+				if slices.Contains(is.Labels, "worktree:"+r.Worktrees[i].Slug) {
+					list := q.get(&r.Worktrees[i])
+					*list = append(*list, is)
+				}
+			}
+		}
+	}
+	var events []MemoryEvent
+	data("activity", &events)
+	for _, ev := range events {
+		ev.Worktree, ev.Agent, _ = strings.Cut(ev.Actor, "/")
+		if ev.Agent == "" {
+			ev.Worktree = ""
+		}
+		r.Activity = append(r.Activity, ev)
+		r.Cursor = max(r.Cursor, ev.Seq)
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("bd could not answer: %s", strings.Join(failed, ", "))
+	}
+	return nil
 }

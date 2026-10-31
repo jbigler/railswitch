@@ -27,15 +27,22 @@ works. About 5 minutes with images cached.) The hand-driven demo is
 railswitch agent shell`).
 
 **What I'd do next**
-1. Poll the dashboard's Memory page (SSE, on its own slower timer than
-   `overview`) and animate the activity feed from `--since`: the data is
-   there, the page is read-once.
-2. A real model run: Claude with a token in two worktrees, to see whether
+1. A real model run: Claude with a token in two worktrees, to see whether
    agents actually follow the label and claim conventions from the prime
-   text, and tune the wording.
-3. Decide on the upgrade story for bd: a `memory migrate` dry run in doctor,
-   and stopping a running server when `[memory]` is removed (today: a manual
-   `systemctl --user stop`).
+   text, and tune the wording. (Needs agent credentials, which this VM
+   doesn't have.)
+2. Prime for agents other than claude: every agent of a `[memory]` project
+   gets bd, the env and `/usr/local/bin/railswitch-prime`, but only claude@1
+   runs it at session start; another package needs its own hook or
+   entrypoint line.
+3. A `memory migrate` dry run in doctor, for the first real bd upgrade.
+
+Done since the first handoff (2026-11-01): the Memory page reads its live
+part every 15 s while shown and highlights activity after its load cursor
+(checked in headless Chromium over the DevTools protocol); removing
+`[memory]` already stopped the server through render (D28), so only the
+docs changed (checked on the demo: off stopped it, on brought every
+memory back).
 
 Not done or not verified: `memory migrate` never ran against a real newer bd;
 the arm64 checksum is taken from `checksums.txt` but its tarball was never

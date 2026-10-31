@@ -32,7 +32,7 @@ type memoryDoc struct {
 	} `json:"issues"`
 	Memories  int `json:"memories"`
 	Worktrees []struct {
-		Slug    string `json:"slug"`
+		Slug    string                `json:"slug"`
 		Ready   []struct{ ID string } `json:"ready"`
 		Claimed []struct {
 			ID       string `json:"id"`

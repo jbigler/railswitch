@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/doctor"
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -38,7 +39,13 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	if dirs, err := machine.DefaultDirs(); err == nil {
 		h.Token, h.TokenErr = machine.ReadDashboardToken(dirs) // none: the dashboard can't prove it's yours
 	}
-	return e.printChecks(append(checks, h.Run(ctx, e.run, ws)...))
+	checks = append(checks, h.Run(ctx, e.run, ws)...)
+	if ws != nil && ws.Project.Memory != nil {
+		l := &lifecycle.L{R: e.run, WS: ws, Out: io.Discard, Err: io.Discard, In: e.stdin}
+		ok, detail, fix := l.MemoryCheck(ctx)
+		checks = append(checks, doctor.Check{Name: "memory version", OK: ok, Detail: detail, Fix: fix})
+	}
+	return e.printChecks(checks)
 }
 
 // printChecks prints doctor's checks, as JSON with --json, and returns its

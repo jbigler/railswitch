@@ -1,6 +1,9 @@
 package lifecycle
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -166,5 +169,56 @@ func TestSchemaVersion(t *testing.T) {
 	}
 	if _, err := schemaVersion([]byte(`{"rows":[]}`)); err == nil {
 		t.Error("no rows: no error")
+	}
+}
+
+// labels makes `podman <kind> inspect` of bd's labels answer out.
+func (e *tenv) bdLabels(kind, out string) {
+	e.f.On([]string{"podman", kind, "inspect", "--format", `{{index .Config.Labels "railswitch.memory"}} {{index .Config.Labels "railswitch.bd.version"}}`}, sys.Result{Stdout: []byte(out)}, nil)
+}
+
+func TestMemoryCheck(t *testing.T) {
+	e := setup(t)
+	e.withMemory(t)
+	e.bdLabels("image", "1 1.3.2\n")
+	e.units("LoadState=loaded\nActiveState=inactive\n")
+	if ok, detail, _ := e.l.MemoryCheck(ctx); !ok || !strings.Contains(detail, "bd 1.3.2") || !strings.Contains(detail, "isn't running") {
+		t.Errorf("all current, server stopped: ok %v %q", ok, detail)
+	}
+
+	// A running agent from an image before the pin: stop it.
+	e.f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "filial-feat-agent-probe"}, sys.Result{Stdout: []byte("true\n")}, nil)
+	e.bdLabels("container", "1 1.3.1\n")
+	ok, detail, fix := e.l.MemoryCheck(ctx)
+	if ok || !strings.Contains(detail, "filial-feat-agent-probe runs bd 1.3.1") || !strings.Contains(fix, "railswitch -w feat agent stop probe") {
+		t.Errorf("a running old agent: ok %v %q fix %q", ok, detail, fix)
+	}
+
+	// The server's database was migrated by a newer bd.
+	e = setup(t)
+	e.withMemory(t)
+	e.bdLabels("image", "1 1.3.2\n")
+	e.units("LoadState=loaded\nActiveState=active\n")
+	skew := "{\n  \"data\": {\n    \"error\": \"schema version mismatch: database is at v67, binary knows up to v66 (1 migration ahead)\",\n"
+	e.f.On([]string{"podman", "run", "--rm", "--interactive", "--network", "filial_memory"}, sys.Result{ExitCode: 1, Stderr: []byte(skew)}, fmt.Errorf("podman: %w (exit 1): %s", sys.ErrExit, skew))
+	ok, detail, fix = e.l.MemoryCheck(ctx)
+	if ok || detail != "bd: schema version mismatch: database is at v67, binary knows up to v66 (1 migration ahead)" || !strings.Contains(fix, "newer bd migrated") {
+		t.Errorf("schema skew: ok %v %q fix %q", ok, detail, fix)
+	}
+}
+
+func TestMemoryCheckNoPin(t *testing.T) {
+	e := setup(t)
+	e.withMemory(t)
+	path := filepath.Join(e.ws, "containerfiles", "Containerfile.agent-base")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.ReplaceAll(string(data), "ARG BD_VERSION=", "ARG BD_VERSIONX=")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if ok, detail, _ := e.l.MemoryCheck(ctx); ok || !strings.Contains(detail, "pins no bd") {
+		t.Errorf("no pin: ok %v %q", ok, detail)
 	}
 }

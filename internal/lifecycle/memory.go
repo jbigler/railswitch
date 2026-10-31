@@ -11,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -541,4 +542,115 @@ func (r *MemoryReport) fill(out []byte) error {
 		return fmt.Errorf("bd could not answer: %s", strings.Join(failed, ", "))
 	}
 	return nil
+}
+
+// bdPinRe is the agent base's bd pin (D138).
+var bdPinRe = regexp.MustCompile(`(?m)^ARG BD_VERSION=(\S+)\s*$`)
+
+// MemoryCheck is doctor's "memory version" (D145): every agent container
+// running in the project and every agent image built for its current units
+// must hold the bd the agent base pins (an image's tag covers the
+// Containerfile, so a new pin means new images, which railswitch agent
+// builds before it runs one; a running agent keeps its old image until it
+// stops), and that bd must open the server's database (bd refuses one a
+// newer bd migrated, and won't migrate a shared one on its own). ok with
+// what was checked, else what is wrong and the fix. A server that isn't
+// running, or no image built yet, is not asked.
+func (l *L) MemoryCheck(ctx context.Context) (ok bool, detail, fix string) {
+	m, err := l.model(ctx)
+	if err != nil {
+		return false, err.Error(), "railswitch render"
+	}
+	data, err := os.ReadFile(filepath.Join(m.Inputs.Workspace, "containerfiles", "Containerfile.agent-base"))
+	if err != nil {
+		return false, err.Error(), "railswitch lock --review (the project's agent base)"
+	}
+	pm := bdPinRe.FindSubmatch(data)
+	if pm == nil {
+		return false, "containerfiles/Containerfile.agent-base pins no bd (no ARG BD_VERSION=)",
+			"railswitch lock --review, then accept the agent base's update; an edited copy: railswitch containerfile show agent-base --json shows the default's bd lines"
+	}
+	pin := string(pm[1])
+	// bdOf reads an image's or a container's bd labels (D138).
+	bdOf := func(kind, name string) (string, bool) {
+		res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: []string{kind, "inspect", "--format", `{{index .Config.Labels "railswitch.memory"}} {{index .Config.Labels "railswitch.bd.version"}}`, name}})
+		if err != nil {
+			return "", false // not built, or not running
+		}
+		mem, ver, _ := strings.Cut(strings.TrimSpace(string(res.Stdout)), " ")
+		if mem != "1" {
+			return "no bd", true
+		}
+		return "bd " + ver, true
+	}
+	var stale, fixes []string
+	built := 0
+	checked := map[string]bool{}
+	p := l.podman()
+	for _, wt := range m.Inputs.Worktrees {
+		in, err := m.Instance(wt)
+		if err != nil {
+			return false, err.Error(), "railswitch render"
+		}
+		for _, s := range m.Agents() {
+			ctr := naming.Container(m.Prefix, wt.Slug, s.ID)
+			if running, err := p.Running(ctx, ctr); err == nil && running {
+				if have, ok := bdOf("container", ctr); ok && have != "bd "+pin {
+					stale = append(stale, ctr+" runs "+have)
+					fixes = append(fixes, "railswitch -w "+wt.Slug+" agent stop "+strings.TrimPrefix(s.ID, "agent-"))
+				}
+			}
+			for _, img := range []string{in.Values["image.agent-base"], in.Values["image."+s.ID]} {
+				if img == "" || checked[img] {
+					continue
+				}
+				checked[img] = true
+				have, ok := bdOf("image", img)
+				if !ok {
+					continue
+				}
+				built++
+				if have != "bd "+pin {
+					stale = append(stale, img+" holds "+have)
+					fixes = append(fixes, "the agent base pins bd "+pin+" but doesn't install it: compare containerfiles/Containerfile.agent-base with railswitch containerfile show agent-base --json")
+				}
+			}
+		}
+	}
+	if len(stale) > 0 {
+		slices.Sort(fixes)
+		return false, "the agent base pins bd " + pin + "; " + strings.Join(stale, ", "), strings.Join(slices.Compact(fixes), "; ")
+	}
+	st, err := l.systemd().UnitState(ctx, memoryService(m.Prefix))
+	if err != nil {
+		return false, err.Error(), ""
+	}
+	switch {
+	case built == 0:
+		return true, "the agent base pins bd " + pin + "; no agent image built for it yet (railswitch agent builds it)", ""
+	case st.Load != "loaded" || st.Active != "active":
+		return true, "bd " + pin + " in every built agent image; the memory server isn't running (not asked)", ""
+	}
+	if _, err := l.bd(ctx, m, nil, "status", "--json"); err != nil {
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "schema version mismatch"):
+			return false, lineWith(msg, "schema version mismatch"), "a newer bd migrated the database: pin that bd in containerfiles/Containerfile.agent-base (or accept the agent base's update: railswitch lock --review), then railswitch agent rebuilds the images"
+		case strings.Contains(msg, "refusing to auto-apply"):
+			return false, lineWith(msg, "refusing to auto-apply"), "bd " + pin + " needs the database migrated: stop every older agent, then railswitch memory migrate"
+		}
+		return false, msg, "journalctl --user -u " + memoryService(m.Prefix)
+	}
+	return true, "bd " + pin + " in every built agent image and running agent, and it opens the memory database", ""
+}
+
+// lineWith is the line of s holding phrase, trimmed of JSON quoting: bd's
+// errors come as JSON on stderr.
+func lineWith(s, phrase string) string {
+	for l := range strings.Lines(s) {
+		if i := strings.Index(l, phrase); i >= 0 {
+			return "bd: " + strings.TrimRight(strings.TrimSpace(l[i:]), `",`)
+		}
+	}
+	return s
 }

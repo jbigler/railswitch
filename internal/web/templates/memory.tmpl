@@ -1,0 +1,47 @@
+{{define "memory"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="memory">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Memory</h1>
+<p class="note">What the project's agents share: beads issues and memories on the project's own server. Read-only; <a class="ln" href="/p/{{.Prefix}}/memory">refresh</a>.</p>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{with .Doc}}{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}<section class="card">
+<h2>Server</h2>
+<p><span class="mono">{{.Server.Container}}</span> · {{if .Server.State}}{{.Server.State}}{{else}}not started: the first agent starts it{{end}}{{if .Schema}} · schema v{{.Schema}}{{end}}</p>
+{{with .Issues}}<p>{{.Total}} issues: {{.Open}} open, {{.InProgress}} in progress, {{.Blocked}} blocked, {{.Ready}} ready, {{.Closed}} closed · {{$.Doc.Memories}} memories</p>
+{{end}}</section>
+<section class="card">
+<h2>Work by worktree</h2>
+<table class="set-table">
+<thead><tr><th>Worktree</th><th>State</th><th>Issue</th><th>Title</th><th>Claimed by</th></tr></thead>
+<tbody>
+{{range .Worktrees}}{{$wt := .Slug}}{{range .Claimed}}<tr><td>{{$wt}}</td><td><span class="chip yellow">claimed</span></td><td class="mono">{{.ID}}</td><td>{{.Title}}</td><td class="mono">{{.Assignee}}</td></tr>
+{{end}}{{range .Ready}}<tr><td>{{$wt}}</td><td><span class="chip green">ready</span></td><td class="mono">{{.ID}}</td><td>{{.Title}}</td><td></td></tr>
+{{end}}{{range .Blocked}}<tr><td>{{$wt}}</td><td><span class="chip red">blocked</span></td><td class="mono">{{.ID}}</td><td>{{.Title}}</td><td class="mono">{{.Assignee}}</td></tr>
+{{end}}{{end}}</tbody>
+</table>
+<p class="note">Issues labelled <code>worktree:&lt;slug&gt;</code>; unlabelled ones are only counted.</p>
+</section>
+{{end}}<section class="card">
+<h2>Recent activity</h2>
+<table class="set-table">
+<thead><tr><th>#</th><th>When</th><th>Who</th><th>What</th><th>Issue</th></tr></thead>
+<tbody>
+{{range .Activity}}<tr><td class="mono">{{.Seq}}</td><td class="mono">{{.TS}}</td><td class="mono">{{.Actor}}</td><td>{{.Op}}</td><td class="mono">{{.Issue}}</td></tr>
+{{else}}<tr><td colspan="5" class="muted">Nothing recorded in the last 7 days.</td></tr>
+{{end}}</tbody>
+</table>
+</section>
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>{{end}}

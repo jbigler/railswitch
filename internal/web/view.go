@@ -397,6 +397,7 @@ func title(need int) string {
 type headerView struct {
 	Prefix string
 	Need   int
+	Memory bool // the project has shared memory: link its page
 }
 
 type projectsView struct{ Items []switchItem }

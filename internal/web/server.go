@@ -117,6 +117,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/library/import", s.packImportPage)
 	m.HandleFunc("POST /p/{prefix}/library/import", s.packImport)
 	m.HandleFunc("POST /p/{prefix}/library/export", s.packExport)
+	m.HandleFunc("GET /p/{prefix}/memory", s.memoryPage)
 	m.HandleFunc("GET /p/{prefix}/review", s.reviewPage)
 	m.HandleFunc("POST /p/{prefix}/review/accept", s.reviewAccept)
 	m.HandleFunc("GET /machine", s.machinePage)

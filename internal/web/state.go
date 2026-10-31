@@ -551,6 +551,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		projects.Items = append(projects.Items, item)
 	}
 	var banner bannerView
+	memory := false
 	if p := s.state[prefix]; p != nil {
 		if p.ovErr != "" {
 			banner.Lines = append(banner.Lines, "Status unavailable: "+p.ovErr)
@@ -559,6 +560,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 			banner.Lines = append(banner.Lines, "PRs unavailable: "+p.prErr)
 		}
 		if p.ov != nil {
+			memory = p.ov.Memory
 			if p.ov.ReviewPending {
 				banner.Review = reviewURL(prefix)
 			}
@@ -575,7 +577,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 	}
 	pv := pageView{
 		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(),
-		Header: headerView{Prefix: prefix, Need: need}, Projects: projects, Strip: strip, Banner: banner,
+		Header: headerView{Prefix: prefix, Need: need, Memory: memory}, Projects: projects, Strip: strip, Banner: banner,
 		List:   newList(prefix, rows, sel, k),
 		Detail: detailView{Empty: true},
 		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),

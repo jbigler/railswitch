@@ -65,6 +65,9 @@ type Overview struct {
 	// DefaultsChanged are the project's Containerfiles (by <name>) ejected
 	// from a default that changed since; never nil. The caller fills it.
 	DefaultsChanged []string `json:"defaults_changed"`
+	// Memory: the project has [memory] (D136), read from project.toml only:
+	// overview never asks the memory server (D140).
+	Memory bool `json:"memory"`
 }
 
 // OverviewTemplate is a project's [template].
@@ -148,7 +151,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
-	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust()), DefaultsChanged: []string{}}
+	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust()), DefaultsChanged: []string{}, Memory: l.WS.Project.Memory != nil}
 	if rec := l.WS.Project.Template; rec != nil {
 		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
 		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()

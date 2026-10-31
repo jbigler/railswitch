@@ -38,6 +38,7 @@ type overview struct {
 	TemplateUpdate bool            `json:"template_update"` // that template changed since
 	// DefaultsChanged: Containerfiles (<name>) ejected from a default that changed since.
 	DefaultsChanged []string   `json:"defaults_changed"`
+	Memory          bool       `json:"memory"` // [memory] is set (D136)
 	Worktrees       []worktree `json:"worktrees"`
 }
 

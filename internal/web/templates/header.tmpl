@@ -6,6 +6,8 @@
 <button type="button" class="hb" data-palette title="Run a task (:)">tasks <kbd>:</kbd></button>
 <a class="hb" href="/p/{{.Prefix}}/images">images</a>
 <a class="hb" href="/p/{{.Prefix}}/library">library</a>
+{{if .Memory}}<a class="hb" href="/p/{{.Prefix}}/memory">memory</a>
+{{end}}
 <a class="hb" href="/p/{{.Prefix}}/settings">settings</a>
 {{end}}</nav>
 {{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}

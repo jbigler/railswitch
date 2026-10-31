@@ -508,6 +508,20 @@ accepted until the update is accepted.
   page goes to the project page. When it exits 3 (accepted, restart
   failed) the page goes there too, with a notice.
 
+## Memory
+
+`/p/<prefix>/memory`, linked from the header (**memory**) when the
+project has `[memory]` (overview's `memory`, read from `project.toml`
+only). Read-only, read once per load from `railswitch --json memory`
+(D136; a load costs one container run, so it is not polled; **refresh**
+reads it again): the server's container, state and schema version; bd's
+counts and the number of memories; each worktree's claimed, ready and
+blocked issues (by their `worktree:<slug>` label, with who claimed them);
+and the newest 50 records of the activity journal (`seq`, time, actor
+`<worktree>/<agent>`, operation, issue). A stopped server shows only its
+state: the page never starts it. Everything bd returns is the agents'
+text, escaped like any other.
+
 ## Machine
 
 `/machine` (the header's "machine" link; no project needed) has a
@@ -838,6 +852,8 @@ working blue, your turn yellow, idle and off muted.
 
 The commands the dashboard reads and runs. Their `--json` output is in
 docs/json.md.
+
+- `railswitch --json -C <ws> memory` (project): the Memory page, on load.
 
 - `railswitch --json signer ls` (machine): each library's trusted keys and
   revoked fingerprints. `signer add <library> -` (key on stdin),

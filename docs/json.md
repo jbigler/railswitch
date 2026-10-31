@@ -725,6 +725,7 @@ row.
 | `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
 | `template` | object or null | The template the project started from, as `project.toml` `[template]` records it: `ref`, `sha256` (lowercase hex, no prefix). `null` when it records none. |
 | `template_update` | boolean | `template.ref` resolves to content with another hash than `template.sha256` (a library fetch changed it, D111). [`template check`](#template-check) shows the diff; nothing is applied. `false` without a template or when the ref doesn't resolve. |
+| `memory` | boolean | The project has `[memory]` (D136), from `project.toml` alone: overview never asks the memory server (D140); `railswitch memory` does. |
 | `defaults_changed` | array of strings | The `<name>` of each `containerfiles/Containerfile.<name>` ejected from a default that changed since (as `containerfile list`'s `default_changed`), sorted; `[]` for none. A package update changes a default only once accepted. |
 | `worktrees` | array | One object per registered worktree, by ID; `[]` when none. |
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |

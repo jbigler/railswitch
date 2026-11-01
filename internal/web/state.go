@@ -352,6 +352,10 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		if sub.prefix != j.Spec.Project && (sub.view != "library" || j.Spec.Project != machineKey) {
 			continue
 		}
+		if sub.view == "ship" {
+			s.pushShip(sub)
+			continue
+		}
 		html, err := render("jobs", s.subJobs(sub, s.pageJobs(sub.prefix, sub.view == "library")))
 		if err != nil {
 			log.Printf("dashboard: %v", err)
@@ -417,6 +421,10 @@ func (s *Server) publish() {
 // row on its own while the list's order and selection stay, else the
 // whole list. s.mu is held.
 func (s *Server) push(sub *subscriber) {
+	if sub.view == "ship" {
+		s.pushShip(sub)
+		return
+	}
 	shown := sub.prefix
 	if sub.view == "new" {
 		shown = "" // the header and switcher of no project

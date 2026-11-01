@@ -75,6 +75,13 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /{$}", s.root)
 	m.HandleFunc("GET /p/{prefix}", s.page)
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
+	m.HandleFunc("GET /p/{prefix}/ship", s.shipPage)
+	m.HandleFunc("GET /p/{prefix}/ship/issues", s.shipIssues)
+	m.HandleFunc("GET /p/{prefix}/ship/notes", s.shipNotes)
+	m.HandleFunc("GET /p/{prefix}/ship/notes/{name}", s.shipNote)
+	m.HandleFunc("POST /p/{prefix}/ship/notes/{name}", s.shipNoteWrite)
+	m.HandleFunc("GET /p/{prefix}/ship/agent/{slug}/screen", s.shipAgentScreen)
+	m.HandleFunc("POST /p/{prefix}/ship/agent/{slug}/send", s.shipAgentSend)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/tasks", s.tasksDialog)
@@ -297,7 +304,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	view := q.Get("view")
-	if view != "settings" && view != "new" && view != "library" {
+	if view != "settings" && view != "new" && view != "library" && view != "ship" {
 		view = ""
 	}
 	prefix := q.Get("p")
@@ -502,6 +509,8 @@ var worktreeActions = map[string]struct {
 	"stop":    {"stop", []string{"stop"}},
 	"restart": {"restart", []string{"restart"}},
 	"term":    {"terminal", []string{"term"}},
+	"nvim":    {"nvim", []string{"nvim", "--new-term"}},
+	"agent":   {"agent", []string{"agent", "--new-term"}},
 }
 
 func (s *Server) act(w http.ResponseWriter, r *http.Request) {

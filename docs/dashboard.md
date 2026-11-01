@@ -726,6 +726,8 @@ Every action is a job (below).
   next start", adding "stop it, then start it again" while it runs.
 - **terminal** runs `railswitch term`: a new terminal tab or window on
   the host with your shell in the worktree's folder.
+- **nvim** and **agent** (the starship's desks) run `railswitch nvim
+  --new-term` and `railswitch agent --new-term`.
 - **Stack branch** (with a gh stack): a click on another open branch of
   the stack runs `railswitch stack switch <branch>` (`git switch
   --no-guess` through a private copy of the repository's git config: no
@@ -834,6 +836,52 @@ pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
 working blue, your turn yellow, idle and off muted.
 
+## Starship
+
+**starship** in the header opens `/p/<prefix>/ship`: the project as a
+3D starship (three.js), an optional view beside the 2D pages (D144). It
+costs nothing until you open it: the page is static files in the
+binary, its drawing stops while the tab is hidden, and the server only
+polls the project as for any open page.
+
+- **The bridge** is the project. The viewscreen lists every lab
+  (worktree) with its stack and agent state; the holo table has a beacon
+  per lab (click one to beam there). Stations: **Pull requests** (the
+  worktrees' PRs, as `pr ls` reads them, with Refresh PRs), **Issues**
+  (`issue ls`: open GitHub issues), **Notes** (the agents' shared notes,
+  `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
+  save refused when the note changed since you opened it) and
+  **Engineering** (links to Settings, Images, Library, Machine).
+- **A lab** is a worktree; every lab has the same layout, and its colours,
+  floor, windows and props come from a hash of its name, so a lab always
+  looks the same and labs look different. The **server room** has a rack
+  per service, its lights the service's state; a rack opens the
+  service's state, **Restart this service** (as the 2D page's restart,
+  when it restarts alone), its logs in Dozzle, and the lab's **Start**,
+  **Restart**, **Stop** (`up`, `restart`, `stop`: services start and
+  stop together). **Your desk**'s monitor shows the branch, stack and PR;
+  it opens a **Terminal** (`term`) or **Neovim** (`nvim --new-term`) and
+  the worktree's links. **The agent's desk**: its monitor opens the
+  agent console in a terminal (`agent --new-term`); the agent itself
+  shows its state and message, and for a service agent (D142) its
+  current screen (`agent screen`, read every 1.5 s while open) and a box
+  that types to it (`agent send`: the text, then Enter).
+- **The transporter** (the pad in every room, the bridge's turbolift, or
+  `T`) lists the bridge and every lab. `Esc` closes a panel. Drag to look
+  around, the wheel zooms.
+- Every deck has a cat. It purrs when clicked.
+
+Typing to an agent from the page is the same power as the dashboard's
+other buttons: a page that holds the cookie and passes the Origin check
+can drive the agent, as it can start a job. Nothing else can (Security
+model above). Text from the CLI (PR and issue titles, notes, the agent's
+screen) is shown as text, never as markup.
+
+The models are Kenney's Space Station Kit (CC0,
+`internal/web/static/ship/models/LICENSE.txt`); three.js is MIT
+(`static/ship/three.LICENSE.txt`), vendored as one module by
+`internal/web/static/ship/vendor.sh`.
+
 ## Commands
 
 The commands the dashboard reads and runs. Their `--json` output is in
@@ -930,8 +978,13 @@ Library page connects with `&view=library`: the same, with the
 machine-level jobs (`~machine`) among its `jobs`. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
-project and that prefix's project-level `jobs`. Each `data:` line is one
-JSON object:
+project and that prefix's project-level `jobs`. The starship connects
+with `&view=ship`: it gets one event, `{"type":"ship","id":"state","html":"<JSON>"}`,
+whenever the project's state changes, `html` holding
+`{prefix, error, pr_error, worktrees[]{slug, branch, base, stack,
+services, agent, links, pr}, jobs[]{id, slug, label, state}, banner[]}`
+(the overview's and `pr ls`'s fields; arrays never null). Each `data:`
+line is one JSON object:
 
 ```json
 {"type":"html","id":"list","html":"<div id=\"list\" class=\"list\">…</div>"}

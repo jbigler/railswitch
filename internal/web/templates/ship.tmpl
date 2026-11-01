@@ -1,0 +1,30 @@
+{{/* ship: the starship view (D144), a 3D page drawn by static/ship/. */}}
+{{define "ship"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/ship/ship.css">
+<script type="module" src="/static/ship/ship.js"></script>
+</head>
+<body data-prefix="{{.Prefix}}">
+<div id="scene" aria-hidden="true"></div>
+<header class="hud-top">
+  <a class="hud-btn" href="/p/{{.Prefix}}">◂ dashboard</a>
+  <span class="hud-where" id="where">Boarding…</span>
+  <button class="hud-btn" type="button" id="view">🚶 walk</button>
+  <button class="hud-btn" type="button" id="transport">⚡ transporter <kbd>T</kbd></button>
+</header>
+<div class="hud-tip" id="tip" hidden></div>
+<p class="hud-help" id="help" hidden><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows walk · <kbd>Shift</kbd> runs · drag looks · click acts · <kbd>V</kbd> overview</p>
+<ul class="hud-jobs" id="jobs" aria-live="polite"></ul>
+<p class="hud-banner" id="banner" hidden></p>
+<aside class="panel" id="panel" hidden>
+  <header><h2 id="panel-title"></h2><button type="button" class="hud-btn" id="panel-close" aria-label="Close">✕</button></header>
+  <div id="panel-body"></div>
+</aside>
+<noscript><p class="hud-banner">The starship needs JavaScript and WebGL. <a href="/p/{{.Prefix}}">Back to the dashboard</a>.</p></noscript>
+</body>
+</html>
+{{end}}

@@ -158,7 +158,30 @@ Claude's `.claude.json` is merged instead, keeping each worktree's own
 project entries. Plugins themselves are shared by every worktree already,
 so a promoted plugin list works everywhere at once.
 
-## Shared memory
+## Shared notes
+
+What the project's agents should all know (a command that must be run a
+certain way, a gotcha, a convention) goes in the project's notes: one
+folder, `notes/` in the workspace, which every agent of every kind (Claude,
+your own packages) reads and writes as `~/notes/`, in every worktree.
+
+- **A note is a Markdown file:** first line `# <one-line summary>`, then the
+  details. Agents write them; so can you, with any editor.
+- **Every agent starts with an index:** the rule for using the notes, then
+  one line per note (file and summary), newest first. It reads a whole note
+  when it's relevant. Claude gets this at every session start and after a
+  compaction; a package of your own gets it the way it delivers context
+  (see [the package format](../packs.md)).
+- **Saved notes are for everyone at once:** a note one agent writes is in
+  every other agent's index at its next start, and any agent can read it
+  right away.
+- **They are kept:** `wt rm` and `down` never touch `notes/`; back it up,
+  edit it or commit it somewhere as you like.
+
+Never put secrets, credentials or personal data in a note, and in a
+healthcare project no patient data: every agent reads them.
+
+## Claude's own memory
 
 Claude's memory (what it saves about the project to keep in mind next
 time) is one folder for the whole project, not one per worktree:

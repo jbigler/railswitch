@@ -65,7 +65,10 @@ fi
 
 # Register the status hook (D58) on every event it handles. Per event and
 # idempotent: an event lacking the hook gets it, so older homes pick up new
-# events. settings.json is only rewritten when something changed.
+# events. The project's shared notes (D141) come in through a SessionStart
+# hook: its output (the rule and one line per note) is part of every
+# session's context, a new one and after a compaction. settings.json is
+# only rewritten when something changed.
 SETTINGS_JSON="$CONFIG_DIR/settings.json"
 [ -f "$SETTINGS_JSON" ] || echo '{}' > "$SETTINGS_JSON"
 tmp="${SETTINGS_JSON}.tmp.$$"
@@ -76,6 +79,9 @@ jq '
   .hooks = reduce ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
                    "PermissionRequest", "Stop", "Notification", "SessionEnd") as $e
     (.hooks // {}; if (.[$e] // []) | runs_hook then . else .[$e] = ((.[$e] // []) + [entry]) end)
+  | def notes: "/usr/local/bin/railswitch-notes";
+    if any(.hooks.SessionStart[]?.hooks[]?; .command == notes) then .
+    else .hooks.SessionStart += [{hooks: [{type: "command", command: notes, timeout: 10}]}] end
 ' "$SETTINGS_JSON" > "$tmp"
 if cmp -s "$tmp" "$SETTINGS_JSON"; then rm -f "$tmp"; else mv "$tmp" "$SETTINGS_JSON"; fi
 

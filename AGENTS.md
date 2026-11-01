@@ -134,6 +134,9 @@ Spec: `handoff/HANDOFF.md`; decisions (D1 on): `docs/superpowers/plans/2026-10-2
 ## CLI (Stage 9z additions)
 - Default agent (D140): `[agents.<n>] default = true` (`config.Agent.Default`, at most one); an unnamed agent command (`agentName` with several agents: `agent`, `agent update`, `agent default`) takes it, else the only agent whose package has `default = true` (`defaultAgent`), else asks for a name. `default` and `update` are reserved agent names.
 
+## CLI (Stage 10a additions)
+- Shared notes (D141, `render/notes.go`): every agent mounts `<ws>/notes/` (`render.NotesDir`, a `Plan.StatusDirs` entry: 0700, never removed) writable at `render.NotesMount` (`~/notes`) and `railswitch-notes` (`render.NotesIndex`, the asset `.railswitch/hooks/railswitch-notes.sh`, ro): the rule, then `- <file>: <first line>` per `.md` note, newest first, at most 200. claude@1 registers it as a SessionStart hook; other packages deliver its output themselves.
+
 ## Global constraints
 - Every Quadlet unit railswitch writes ends with `[Quadlet] DefaultDependencies=false` (D130, `machine.NoNetworkWait`, appended after the unit-hash stamp so it changes no hash): podman's implicit wait for `network-online.target` held each start 90 s where that target never comes. Every render also adds it to older railswitch units of a registered project or the machine (`machine.AddNoNetworkWait`; a failure is a render warning); `up` reloads when a loaded unit's `After=` still names the wait. podman ≥ 5.3 (`doctor`).
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.

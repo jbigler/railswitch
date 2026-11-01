@@ -11,6 +11,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 ## Commands
 - `make check` runs `gofmt -l` (must print nothing), `go vet ./...`, `staticcheck ./...`, and `go test ./...`. Staticcheck runs through `go run` at the Makefile's `STATICCHECK_VERSION`, so there is nothing to install.
 - `make build` writes `./railswitch`. `VERSION=` sets `buildinfo.Version`.
+- `--help`: every `e.flags(name)` has a line in `internal/cli/help.go` `synopses` with its arguments (`TestEveryFlagSetHasSynopsis` checks). Flags print with `--`; one dash still parses.
 - Integration tests carry `//go:build integration`. The full end-to-end test needs a systemd user session, so you run it by hand.
 
 ## Every change

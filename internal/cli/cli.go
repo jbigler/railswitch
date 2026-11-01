@@ -121,8 +121,8 @@ func usage(w io.Writer, fs *flag.FlagSet) {
 		names = append(names, n)
 	}
 	sort.Strings(names)
-	fmt.Fprintf(w, "usage: railswitch [-C dir] [-w slug] [--json] <command> [args]\n\ncommands: %s\n\nglobal flags:\n", strings.Join(names, ", "))
-	fs.PrintDefaults()
+	fmt.Fprintf(w, "usage: railswitch [-C <dir>] [-w <worktree>] [--json] <command> [args]\n\ncommands: %s\n\nrailswitch <command> --help shows a command's arguments and flags.\n", strings.Join(names, ", "))
+	printFlags(w, "global flags", fs)
 }
 
 func cmdVersion(_ context.Context, e *env, args []string) int {

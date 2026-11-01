@@ -45,6 +45,7 @@ func (e *env) render(ctx context.Context, w *workspace.Workspace, check bool) (*
 func (e *env) flags(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet("railswitch "+name, flag.ContinueOnError)
 	fs.SetOutput(e.stderr)
+	fs.Usage = func() { printHelp(fs.Output(), name, fs) }
 	return fs
 }
 

@@ -186,6 +186,7 @@ export class World {
     w.pads = walk?.pads ?? [];
     w.onPad = null;
     w.blockN = -1;
+    if (scene.userData.ceiling) scene.userData.ceiling.visible = this.mode === 'walk';
     if (walk) {
       w.pos.set(walk.start.x, 0, walk.start.z);
       w.yaw = walk.start.yaw;
@@ -198,6 +199,7 @@ export class World {
   setMode(m) {
     this.mode = m === 'walk' && this.walk.bounds ? 'walk' : 'orbit';
     this.walk.keys.clear();
+    if (this.scene.userData.ceiling) this.scene.userData.ceiling.visible = this.mode === 'walk';
     return this.mode;
   }
 

@@ -42,7 +42,9 @@ function stars(r, n = 1500) {
 
 // shell builds a room's floor and its back and side walls (the front is
 // open, a diorama): nx × nz tiles centred on the origin.
-async function shell(scene, nx, nz, deco) {
+// shell's walls are k Kenney walls tall (2k units), under a ceiling that
+// shows only in first person (World.setMode).
+async function shell(scene, nx, nz, deco, k = 1.5) {
   const W = (nx * S) / 2;
   const D = (nz * S) / 2;
   const jobs = [];
@@ -59,6 +61,7 @@ async function shell(scene, nx, nz, deco) {
   const wall = (name, x, z, ry) => jobs.push(tinted(name, deco.wallTint).then((w) => {
     w.position.set(x, 0, z);
     w.rotation.y = ry;
+    w.scale.y *= k;
     w.userData.solid = true;
     scene.add(w);
   }));
@@ -68,7 +71,35 @@ async function shell(scene, nx, nz, deco) {
     wall(deco.sideWall(j + 7), W, -D + S / 2 + j * S, -Math.PI / 2);
   }
   await Promise.all(jobs);
-  return { W, D };
+  const H = S * k;
+  const ceiling = new THREE.Group(); // and the front wall: first person only
+  const panel = new THREE.MeshStandardMaterial({ color: deco.wallTint, roughness: 0.9, side: THREE.DoubleSide });
+  panel.color.multiplyScalar(0.45);
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(W * 2 + 1, D * 2 + 1), panel);
+  top.rotation.x = Math.PI / 2;
+  top.position.y = H;
+  ceiling.add(top);
+  const strip = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xdfeaff, emissiveIntensity: 1.4 });
+  for (let x = -W + S; x < W; x += S * 2) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.05, D * 2 - 1.5), strip);
+    s.position.set(x, H - 0.03, 0);
+    ceiling.add(s);
+  }
+  const fronts = [];
+  for (let i = 0; i < nx; i++) {
+    fronts.push(tinted(i % 3 === 1 ? 'wall-window' : 'wall', deco.wallTint).then((w) => {
+      w.position.set(-W + S / 2 + i * S, 0, D);
+      w.rotation.y = Math.PI;
+      w.scale.y *= k;
+      ceiling.add(w);
+    }));
+  }
+  await Promise.all(fronts);
+  ceiling.userData.solid = true;
+  ceiling.visible = false;
+  scene.add(ceiling);
+  scene.userData.ceiling = ceiling;
+  return { W, D, H };
 }
 
 function lights(scene, accent, r) {
@@ -80,8 +111,8 @@ function lights(scene, accent, r) {
   Object.assign(key.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16 });
   scene.add(key);
   for (let i = 0; i < 3; i++) {
-    const p = new THREE.PointLight(accent, 18, 14);
-    p.position.set(-8 + i * 8 + r() * 2, 3.2, -2 + r() * 3);
+    const p = new THREE.PointLight(accent, 10, 12);
+    p.position.set(-8 + i * 8 + r() * 2, 2.3, -2 + r() * 3);
     scene.add(p);
   }
 }
@@ -189,9 +220,108 @@ function transporter(accent, act) {
   return g;
 }
 
-function sky(scene, r) {
-  scene.background = new THREE.Color(0x03050b);
-  scene.add(stars(r));
+// nebulaTexture paints an equirectangular nebula: soft clouds of two
+// hues near the deck's own, dust lanes, and a band of faint stars.
+function nebulaTexture(r, hue) {
+  const c = document.createElement('canvas');
+  c.width = 2048;
+  c.height = 1024;
+  const g = c.getContext('2d');
+  g.fillStyle = '#020309';
+  g.fillRect(0, 0, c.width, c.height);
+  const hues = [hue, (hue + 0.12 + r() * 0.2) % 1, (hue + 0.55) % 1];
+  g.globalCompositeOperation = 'lighter';
+  const cloud = (x, y, rad, h, a) => {
+    const grad = g.createRadialGradient(x, y, 0, x, y, rad);
+    grad.addColorStop(0, `hsla(${h * 360},80%,60%,${a})`);
+    grad.addColorStop(0.4, `hsla(${h * 360},75%,45%,${a * 0.45})`);
+    grad.addColorStop(1, 'hsla(0,0%,0%,0)');
+    g.fillStyle = grad;
+    // the texture wraps at x: draw across the seam too
+    for (const dx of [0, -c.width, c.width]) {
+      g.beginPath();
+      g.arc(x + dx, y, rad, 0, Math.PI * 2);
+      g.fill();
+    }
+  };
+  // The nebula sits along a wavy band, centred towards -z (u = 0.25 in
+  // three's equirectangular mapping), seen through the back windows.
+  for (let i = 0; i < 90; i++) {
+    const u = 0.25 + (r() - 0.5) * 0.7;
+    const x = ((u % 1) + 1) % 1 * c.width;
+    const y = c.height * (0.42 + Math.sin(u * 9) * 0.06 + (r() - 0.5) * 0.18);
+    cloud(x, y, 40 + r() * 240, hues[i % 3 === 2 && r() < 0.5 ? 2 : i % 2], 0.08 + r() * 0.16);
+  }
+  g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 40; i++) { // dark dust lanes
+    const x = (0.25 + (r() - 0.5) * 0.5) * c.width;
+    const y = c.height * (0.42 + (r() - 0.5) * 0.12);
+    const grad = g.createRadialGradient(x, y, 0, x, y, 30 + r() * 90);
+    grad.addColorStop(0, 'rgba(2,3,9,.55)');
+    grad.addColorStop(1, 'rgba(2,3,9,0)');
+    g.fillStyle = grad;
+    g.fillRect(x - 130, y - 130, 260, 260);
+  }
+  for (let i = 0; i < 3000; i++) { // faint background stars, denser in the band
+    const y = r() < 0.6 ? c.height * (0.42 + (r() - 0.5) * 0.3) : r() * c.height;
+    g.fillStyle = `rgba(255,255,255,${0.2 + r() * 0.6})`;
+    g.fillRect(r() * c.width, y, r() < 0.05 ? 2 : 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  return tex;
+}
+
+// planet is a banded gas giant with a ring and an atmosphere glow.
+function planet(r, hue) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const g = c.getContext('2d');
+  const h = (hue + 0.4 + r() * 0.3) % 1;
+  for (let y = 0; y < c.height; y += 2) {
+    const band = Math.sin(y * 0.09 + r() * 0.3) * 0.5 + Math.sin(y * 0.031) * 0.5;
+    g.fillStyle = `hsl(${h * 360 + band * 18},${45 + band * 15}%,${42 + band * 14}%)`;
+    g.fillRect(0, y, c.width, 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const grp = new THREE.Group();
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(28, 48, 32), new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
+  grp.add(ball);
+  const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(h, 0.35, 0.7), transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(36, 52, 96), ringMat);
+  ring.rotation.x = Math.PI / 2 - 0.35;
+  grp.add(ring);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(30.5, 32, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(h, 0.8, 0.6), transparent: true, opacity: 0.12, side: THREE.BackSide, depthWrite: false }));
+  grp.add(glow);
+  const sun = new THREE.DirectionalLight(0xfff1dd, 2.2);
+  sun.position.set(-1, 0.4, 0.6);
+  grp.add(sun);
+  sun.target = ball;
+  grp.position.set(-55 + r() * 110, 18 + r() * 14, -170);
+  grp.rotation.z = (r() - 0.5) * 0.6;
+  grp.tick = (dt) => { ball.rotation.y += dt * 0.01; };
+  return grp;
+}
+
+// sky is the space outside: a nebula in the deck's colours, a planet and
+// stars, turning slowly.
+function sky(scene, r, accent) {
+  const hue = new THREE.Color(accent).getHSL({}).h;
+  const neb = nebulaTexture(r, hue);
+  scene.background = neb;
+  scene.backgroundIntensity = 1;
+  const field = stars(r);
+  scene.add(field);
+  const world = planet(r, hue);
+  scene.add(world);
+  return (dt) => {
+    world.tick(dt);
+    field.rotation.y += dt * 0.002;
+    scene.backgroundRotation.y += dt * 0.002;
+  };
 }
 
 // lab builds a worktree's lab. ui: {transport, service(slug, svc), desk(slug),
@@ -200,20 +330,25 @@ export async function lab(slug, ui) {
   const deco = decor(slug);
   const { r } = deco;
   const scene = new THREE.Scene();
-  sky(scene, r);
+  const drift = sky(scene, r, deco.accent);
   lights(scene, deco.accent, r);
   const { W, D } = await shell(scene, 8, 6, deco);
   const sign = label(slug, { size: 0.6, color: css(deco.accent) });
-  sign.position.set(0, 2.9, -D + 0.3);
+  sign.position.set(0, 2.9, -D + 0.5);
   scene.add(sign);
 
   // Server room: racks along the left wall, behind a rail.
   const racks = new Map();
-  const rackSpot = (i) => ({ x: -W + 1.1 + (i % 2) * 1.6, z: -D + 1.0 + Math.floor(i / 2) * 1.6 });
+  // Racks stand in a row against the left wall, fronts to the aisle
+  // (x from -W+1.1 to the rail); past eight, a second row faces them
+  // with its back to the rail. The way in is past the rail's end.
+  const rackSpot = (i) => (i < 8
+    ? { x: -W + 0.65, z: -D + 0.9 + i * 1.25, ry: Math.PI / 2 }
+    : { x: -W + 3.5, z: -D + 0.9 + (i - 8) * 1.25, ry: -Math.PI / 2 });
   const roomSign = label('Server room', { size: 0.34 });
   roomSign.position.set(-W + 1.9, 3.3, -D + 0.4);
   scene.add(roomSign);
-  for (let j = 0; j < 3; j++) await place(scene, 'rail', -W + 4.2, -D + 1 + j * 2, Math.PI / 2);
+  for (let j = 0; j < 4; j++) await place(scene, 'rail', -W + 4.2, -D + 1 + j * 2, Math.PI / 2);
 
   // The desks: the user's, then the agent's.
   await place(scene, 'table-large', 0, -1.6);
@@ -251,7 +386,7 @@ export async function lab(slug, ui) {
   const pet = cat(r, { x0: -W + 5, x1: W - 3.5, z0: 0.6, z1: D - 1 }, ui.say);
   scene.add(pet);
 
-  const ticks = [partner.tick, pad.tick, pet.tick];
+  const ticks = [partner.tick, pad.tick, pet.tick, drift];
   const update = (st) => {
     const w = st.worktrees.find((x) => x.slug === slug);
     if (!w) return;
@@ -262,6 +397,7 @@ export async function lab(slug, ui) {
         rk = rack(svc);
         const p = rackSpot(i);
         rk.position.set(p.x, 0, p.z);
+        rk.rotation.y = p.ry;
         pickable(rk, `${svc.service}: ${svcState(svc.state)}`, () => ui.service(slug, svc.service));
         rk.userData.block = true;
         racks.set(svc.service, rk);
@@ -315,16 +451,13 @@ export async function bridge(prefix, ui) {
   const deco = decor('bridge:' + prefix);
   const { r } = deco;
   const scene = new THREE.Scene();
-  sky(scene, r);
+  const drift = sky(scene, r, deco.accent);
   lights(scene, 0x7fb7ff, r);
-  const { W, D } = await shell(scene, 10, 7, { ...deco, backWall: (i) => (i >= 2 && i <= 7 ? 'wall-window' : 'wall') });
+  const { W, D } = await shell(scene, 10, 7, { ...deco, backWall: (i) => (i >= 2 && i <= 7 ? 'wall-window' : 'wall') }, 2.4);
 
-  const view = screen(8, 2.2, { size: 30, fg: '#bfe9ff' });
-  view.position.set(0, 3.0, -D + 0.25);
+  const view = screen(7, 1.7, { size: 30, fg: '#bfe9ff' });
+  view.position.set(0, 3.9, -D + 0.45); // above the windows
   scene.add(view);
-  const title = label(`Bridge · ${prefix}`, { size: 0.55, color: '#9fe7ff' });
-  title.position.set(0, 4.5, -D + 0.3);
-  scene.add(title);
 
   await place(scene, 'chair-armrest-headrest', 0, 2.5, Math.PI);
   const holo = await place(scene, 'table-display-planet', 0, 0, 0, 0.6);
@@ -368,7 +501,7 @@ export async function bridge(prefix, ui) {
 
   const pet = cat(r, { x0: -W + 2, x1: W - 2, z0: -D + 2.5, z1: D - 1 }, ui.say);
   scene.add(pet);
-  const ticks = [pad.tick, pet.tick, (dt) => { beacons.rotation.y += dt * 0.2; }];
+  const ticks = [pad.tick, pet.tick, drift, (dt) => { beacons.rotation.y += dt * 0.2; }];
 
   const update = (st) => {
     const lines = st.worktrees.map((w) => ({

@@ -855,7 +855,8 @@ polls the project as for any open page.
 - **A lab** is a worktree; every lab has the same layout, and its colours,
   floor, windows and props come from a hash of its name, so a lab always
   looks the same and labs look different. The **server room** has a rack
-  per service, its lights the service's state; a rack opens the
+  per service in a row along its wall, fronts to the aisle, its lights the
+  service's state; a rack opens the
   service's state, **Restart this service** (as the 2D page's restart,
   when it restarts alone), its logs in Dozzle, and the lab's **Start**,
   **Restart**, **Stop** (`up`, `restart`, `stop`: services start and
@@ -867,8 +868,14 @@ polls the project as for any open page.
   current screen (`agent screen`, read every 1.5 s while open) and a box
   that types to it (`agent send`: the text, then Enter).
 - **The transporter** (the pad in every room, the bridge's turbolift, or
-  `T`) lists the bridge and every lab. `Esc` closes a panel. Drag to look
-  around, the wheel zooms.
+  `T`) lists the bridge and every lab. `Esc` closes a panel.
+- **Two views:** from above (drag turns the room, the wheel zooms) or
+  first person (`V` or **walk**: `W` `A` `S` `D` or the arrows walk,
+  `Shift` runs, drag looks, a click acts; furniture and walls stop you;
+  stepping onto a transporter pad or into the turbolift opens the
+  transporter). First person adds the ceiling and the front wall.
+- **Outside:** each deck looks out on its own nebula, a ringed planet and
+  stars, coloured from the deck's hash like its decor.
 - Every deck has a cat. It purrs when clicked.
 
 Typing to an agent from the page is the same power as the dashboard's

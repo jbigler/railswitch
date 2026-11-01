@@ -852,3 +852,21 @@ func TestFetchTransportAllowlist(t *testing.T) {
 		}
 	}
 }
+
+// D143: a git worktree railswitch didn't register counts only directly in
+// worktrees/; one at the workspace root (the old place) is no worktree.
+func TestUnregisteredGitWorktreeOnlyInWorktrees(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	git(t, e.base, "worktree", "add", "-q", "-b", "stray", filepath.Join(e.ws, "worktrees", "stray"))
+	git(t, e.base, "worktree", "add", "-q", "-b", "old", filepath.Join(e.ws, "old"))
+	if err := e.m.Remove(ctx, "old", false); err == nil || !strings.Contains(err.Error(), "no worktree of this project") {
+		t.Errorf("Remove(old) at the root = %v; want it unknown", err)
+	}
+	if err := e.m.Remove(ctx, "stray", false); err != nil {
+		t.Fatalf("Remove(stray) in worktrees/: %v", err)
+	}
+	if exists(filepath.Join(e.ws, "worktrees", "stray")) || !exists(filepath.Join(e.ws, "old")) {
+		t.Error("removed the wrong git worktree")
+	}
+}

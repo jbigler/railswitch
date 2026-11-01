@@ -40,7 +40,7 @@ type Manager struct {
 	// Proc is the procfs root ("/proc") of the host's listening TCP ports
 	// (machine.Listening): an ID with a port in use is never handed out.
 	Proc      string
-	Base      string   // [project] base_branch; the base worktree is <WS>/<Sanitize(Base)> (D22)
+	Base      string   // [project] base_branch; the base worktree is <WS>/worktrees/<Sanitize(Base)> (D22, D143)
 	Repo      string   // [project] repo: a GitHub URL names the repo for gh pr view
 	SeedFiles []string // [project] seed_files, relative to a worktree
 	In        io.Reader
@@ -65,7 +65,7 @@ type Manager struct {
 	WorktreeVolumes []string
 }
 
-// Add checks out target in a new worktree <WS>/<slug>, registers it,
+// Add checks out target in a new worktree <WS>/worktrees/<slug>, registers it,
 // seeds it and renders. target is a branch, a PR number (its head branch,
 // via gh) or a new branch, created from the base worktree's HEAD. name is
 // the worktree name (--name); when empty, Add prompts for it on a terminal
@@ -223,7 +223,7 @@ func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
 	return errors.Join(errs...)
 }
 
-// baseDir is the base worktree, <WS>/<Sanitize(Base)> (D22).
+// baseDir is the base worktree, <WS>/worktrees/<Sanitize(Base)> (D22, D143).
 func (m *Manager) baseDir() (string, error) {
 	slug, err := m.baseSlug()
 	if err != nil {

@@ -568,8 +568,8 @@ on a machine with one project). It is an array with one object per worktree.
 
 ```json
 [
-  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/master", "dirty": false, "share": null},
-  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/feat", "dirty": true, "share": {"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}}
+  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/worktrees/master", "dirty": false, "share": null},
+  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/worktrees/feat", "dirty": true, "share": {"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}}
 ]
 ```
 
@@ -699,7 +699,7 @@ row.
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
 | `worktrees[].branch` | string | The branch checked out, read from its git files; `""` when detached, unreadable or the directory is gone (the worktree is still listed). |
-| `worktrees[].base` | boolean | It is the base worktree (`<workspace>/<base_branch>`). |
+| `worktrees[].base` | boolean | It is the base worktree (`<workspace>/worktrees/<base_branch>`). |
 | `worktrees[].stack` | string | Over the services with roles `app`, `worker`, `data` (not `deps`, `tool`, `agent`): `failed` if any unit's ActiveState is `failed`, `up` if all are `active`, `stopped` if none is `active` or `activating` (or there are none), else `partial`. |
 | `worktrees[].stale` | boolean | A running container of a stack service (not an on-demand one) was created from an older unit than the one rendered in the Quadlet directory: its `<prefix>.unit-hash` label differs from the unit file's (a missing label counts as different, as in `up`). `up` restarts such a container; the dashboard shows "restart to apply". A container that does not run, or a unit not rendered yet, never makes it `true`. |
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |

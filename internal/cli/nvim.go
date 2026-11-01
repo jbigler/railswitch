@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"github.com/jbigler/railswitch/internal/naming"
 	"os"
 	"os/exec"
 	"path"
@@ -14,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
+	"github.com/jbigler/railswitch/internal/naming"
 )
 
 const nvimUsage = "usage: railswitch nvim [--new-term] [<file>[:<line>[:<col>]]] | railswitch nvim update | railswitch nvim reset-config [--yes]"

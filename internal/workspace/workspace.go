@@ -139,8 +139,9 @@ func load(startDir, slug string, cat *pack.Catalog, keep []pack.Ref) (*Workspace
 	return &Workspace{Root: root, Project: p, Catalog: cat, Stack: st, Lock: lock, Dirs: dirs, Slug: slug, Pending: pending}, nil
 }
 
-// slugAt is the worktree startDir is in: its first path element below root,
-// or "" at the root, in a dot dir or in a dir whose name is not a slug.
+// slugAt is the worktree startDir is in: its first path element below
+// root's worktrees/, or "" anywhere else or in a dir whose name is not a
+// slug.
 func slugAt(root, startDir string) string {
 	start, err := absDir(startDir)
 	if err != nil {
@@ -492,7 +493,7 @@ func (w *Workspace) GitGuard(ctx context.Context, r sys.Runner) ([]gitguard.Find
 	return gitguard.Check(ctx, r, root, naming.WorktreeDir(root, base), linked)
 }
 
-// BaseDir is the base worktree's directory, <root>/<sanitize(base_branch)>.
+// BaseDir is the base worktree's directory, <root>/worktrees/<sanitize(base_branch)>.
 func (w *Workspace) BaseDir() (string, error) {
 	base, err := w.baseSlug()
 	if err != nil {

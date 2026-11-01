@@ -1171,7 +1171,8 @@ func unregister(dirs machine.Dirs, prefix string) error {
 	return nil
 }
 
-// entries are the names in dir; a missing dir has none.
+// entries are the names in workspace dir, and worktrees/<name> for each
+// in its worktrees/ (where the clone goes); a missing dir has none.
 func entries(dir string) (map[string]bool, error) {
 	ents, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -1183,6 +1184,13 @@ func entries(dir string) (map[string]bool, error) {
 	out := map[string]bool{}
 	for _, e := range ents {
 		out[e.Name()] = true
+	}
+	wts, err := os.ReadDir(filepath.Join(dir, naming.WorktreesDir))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	for _, e := range wts {
+		out[naming.WorktreesDir+"/"+e.Name()] = true
 	}
 	return out, nil
 }
@@ -1201,8 +1209,9 @@ func (e *env) failLeft(cmd string, err error, ws string, before map[string]bool)
 			fmt.Fprintf(e.stderr, "railswitch: %v\n", lerr)
 		}
 		for _, n := range slices.Sorted(maps.Keys(now)) {
-			if !before[n] {
-				left = append(left, filepath.Join(ws, n))
+			parent, _, nested := strings.Cut(n, "/")
+			if !before[n] && !(nested && !before[parent]) { // a new worktrees/ is listed whole
+				left = append(left, filepath.Join(ws, filepath.FromSlash(n)))
 			}
 		}
 	}

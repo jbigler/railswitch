@@ -4,12 +4,12 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"github.com/jbigler/railswitch/internal/naming"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/term"
 	"github.com/jbigler/railswitch/internal/workspace"
 )

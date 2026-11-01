@@ -87,7 +87,7 @@ type Model struct {
 	Warnings []string // non-fatal findings, e.g. a suggested option addon missing from [image] addons
 	Assets   []Asset  // every package asset a service mounts; Plan writes them
 
-	baseDir    string                    // <workspace>/<sanitize(base_branch)>
+	baseDir    string                    // <workspace>/worktrees/<sanitize(base_branch)>
 	chain      []*containerfile          // [image] base, then each addon
 	tools      map[string]*containerfile // tool service id → containerfiles/Containerfile.<tool>
 	standalone map[string]*containerfile // option service id → its standalone Containerfile
@@ -229,7 +229,7 @@ func literal(s string) string { return strings.ReplaceAll(s, "{", "{{") }
 func Build(in Inputs) (*Model, error) {
 	p := in.Project
 	if p.Project.BaseBranch == "" {
-		return nil, errors.New("project.base_branch is required: the base worktree is <workspace>/<base_branch>/ (D22)")
+		return nil, errors.New("project.base_branch is required: the base worktree is <workspace>/worktrees/<base_branch>/ (D22, D143)")
 	}
 	base, err := naming.Sanitize(p.Project.BaseBranch)
 	if err != nil {

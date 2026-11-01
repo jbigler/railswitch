@@ -411,6 +411,25 @@ func TestNewRenderFailureUnregisters(t *testing.T) {
 	}
 }
 
+// A failed new in a folder that already had an empty worktrees/ names the
+// clone it left there (D143), and not the worktrees/ that was there before.
+func TestNewFailureNamesCloneInExistingWorktrees(t *testing.T) {
+	newEnv(t)
+	ws := filepath.Join(t.TempDir(), "shop")
+	if err := os.MkdirAll(filepath.Join(ws, "worktrees"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f := &systest.Fake{Passthrough: []string{"git"}} // no podman: render fails
+	code, _, errs := runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "shop")
+	if code == 0 {
+		t.Fatal("new succeeded without podman")
+	}
+	clone := filepath.Join(ws, "worktrees", "main")
+	if !strings.Contains(errs, "  "+clone+"\n") || strings.Contains(errs, "  "+filepath.Join(ws, "worktrees")+"\n") {
+		t.Errorf("stderr should list %s, not worktrees/ itself:\n%s", clone, errs)
+	}
+}
+
 // A render that wrote the shared Traefik unit before failing: unregistering
 // rewrites it without the project's network, for the projects still there.
 func TestNewRenderFailureRefreshesProxy(t *testing.T) {

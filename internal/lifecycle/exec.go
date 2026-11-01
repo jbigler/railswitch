@@ -5,7 +5,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jbigler/railswitch/internal/render"
@@ -103,6 +105,8 @@ type runOpts struct {
 	// Unit adds the unit's --shm-size (an on-demand agent's run stands in
 	// for its unit).
 	Unit bool
+	// Without are project secrets the container doesn't get.
+	Without []string
 }
 
 // transient is the podman argv of a throwaway container of service s
@@ -175,7 +179,12 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	args = append(args, "--security-opt", "no-new-privileges",
 		"--memory", s.Unit.Memory, "--pids-limit", strconv.Itoa(s.Unit.PidsLimit),
 		"--env-file", envFile)
-	args = append(args, in.SecretArgs(s.ID)...)
+	sec := in.SecretArgs(s.ID) // --secret <spec> pairs; a spec starts "<podman secret>,"
+	for i := 0; i+1 < len(sec); i += 2 {
+		if !slices.ContainsFunc(opts.Without, func(n string) bool { return strings.HasPrefix(sec[i+1], in.Values["secret."+n]+",") }) {
+			args = append(args, sec[i], sec[i+1])
+		}
+	}
 	for _, v := range vols {
 		args = append(args, "-v", v)
 	}

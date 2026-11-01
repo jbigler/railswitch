@@ -26,7 +26,7 @@ import (
 // An on-demand agent's secrets are checked when it runs (L.Agent), not here:
 // up starts no on-demand service.
 func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string) error {
-	return checkSecrets(ctx, p, m, slug, func(s *render.Service) bool { return !s.OnDemand })
+	return checkSecrets(ctx, p, m, slug, func(s *render.Service) bool { return !s.OnDemand }, nil)
 }
 
 // UpNeeds reports whether up refuses to start while secret name is unset:
@@ -37,8 +37,9 @@ func UpNeeds(m *render.Model, name string) bool {
 	})
 }
 
-// checkSecrets is CheckSecrets for the services keep reports.
-func checkSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string, keep func(*render.Service) bool) error {
+// checkSecrets is CheckSecrets for the services keep reports, leaving out
+// the secrets without names.
+func checkSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string, keep func(*render.Service) bool, without []string) error {
 	i := slices.IndexFunc(m.Inputs.Worktrees, func(w render.Worktree) bool { return w.Slug == slug })
 	if i < 0 {
 		return fmt.Errorf("worktree %s is not registered for project %s", slug, m.Prefix)
@@ -53,7 +54,7 @@ func checkSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug st
 		received := slices.ContainsFunc(m.Services, func(s render.Service) bool {
 			return keep(&s) && slices.Contains(secrets[name].Services, s.ID)
 		})
-		if !received {
+		if !received || slices.Contains(without, name) {
 			continue
 		}
 		ok, err := p.SecretExists(ctx, in.Values["secret."+name])

@@ -28,13 +28,13 @@ func TestAgentArgs(t *testing.T) {
 		{[]string{"ls"}, "ls", nil},
 		{[]string{"claude", "--", "x", "--", "y"}, "claude", []string{"x", "--", "y"}},
 	} {
-		name, argv, _, code, ok := agentArgs(e, c.args)
+		name, argv, _, _, code, ok := agentArgs(e, c.args)
 		if !ok || code != 0 || name != c.name || !slices.Equal(argv, c.argv) {
 			t.Errorf("%q: name %q argv %q code %d ok %v; want %q %q", c.args, name, argv, code, ok, c.name, c.argv)
 		}
 	}
 	for _, args := range [][]string{{"a", "b"}, {"a", "b", "--", "x"}, {"--bogus"}} {
-		if _, _, _, code, ok := agentArgs(e, args); ok || code != 2 {
+		if _, _, _, _, code, ok := agentArgs(e, args); ok || code != 2 {
 			t.Errorf("%q: code %d ok %v; want a usage error", args, code, ok)
 		}
 	}
@@ -197,5 +197,19 @@ func TestAgentNewTermChecksFirst(t *testing.T) {
 	}
 	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "probe", "--", "x"); code != 2 || !strings.Contains(errs, "[agents.probe]") {
 		t.Errorf("service agent argv: exit %d stderr %q; want a usage error", code, errs)
+	}
+}
+
+// --no-token comes before or after the agent's name, never from its argv.
+func TestAgentArgsNoToken(t *testing.T) {
+	e := &env{stderr: &bytes.Buffer{}}
+	for _, args := range [][]string{{"--no-token", "claude"}, {"claude", "--no-token"}} {
+		name, _, _, noToken, _, ok := agentArgs(e, args)
+		if !ok || name != "claude" || !noToken {
+			t.Errorf("%q: name %q noToken %v ok %v", args, name, noToken, ok)
+		}
+	}
+	if _, argv, _, noToken, _, _ := agentArgs(e, []string{"claude", "--", "--no-token"}); noToken || !slices.Equal(argv, []string{"--no-token"}) {
+		t.Errorf("after --: noToken %v argv %q", noToken, argv)
 	}
 }

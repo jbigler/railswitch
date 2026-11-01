@@ -45,8 +45,10 @@ func (e *UsageError) Error() string { return e.Msg }
 // set; a service agent's unit is started when it is not active, and its
 // container attached to. argv is refused for a service agent. Neither has a
 // deadline: the user drives it. At most one agent runs in a worktree (D62):
-// another one running is an error, never stopped for you.
-func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
+// another one running is an error, never stopped for you. With noToken an
+// on-demand agent runs without its package's secrets (tokenSecrets), so it
+// uses the login kept in its home (D139).
+func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken bool) error {
 	name, err := l.CheckAgent(ctx, name, argv)
 	if err != nil {
 		return err
@@ -77,8 +79,15 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 	case slices.Contains(running, name) && s.OnDemand:
 		return fmt.Errorf("agent %s is already running in %s", name, slug)
 	}
+	var without []string
+	if noToken {
+		if !s.OnDemand {
+			return fmt.Errorf("agent %s runs as a service, with its unit's secrets: --no-token is for an on-demand agent", name)
+		}
+		without = tokenSecrets(m, name)
+	}
 	if s.OnDemand {
-		if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }); err != nil {
+		if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }, without); err != nil {
 			return err
 		}
 		ep, err := pack.Expand(s.Entrypoint, in.Scope(id))
@@ -95,7 +104,7 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 			}
 		}
 		envFile := filepath.Join(m.Inputs.Workspace, ".railswitch", "env", slug, id+".env")
-		args, err := l.transient(m, in, s, envFile, runOpts{Full: true, Name: ctr, Entrypoint: ep, Unit: true}, argv)
+		args, err := l.transient(m, in, s, envFile, runOpts{Full: true, Name: ctr, Entrypoint: ep, Unit: true, Without: without}, argv)
 		if err != nil {
 			return err
 		}
@@ -116,6 +125,25 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string) error {
 		}
 	}
 	return l.interactive(ctx, sys.NoTimeout, "podman", []string{"attach", ctr})
+}
+
+// tokenSecrets are the project's secrets that deliver agent name's package
+// [[secrets]] (its token): those the agent receives into an env var its
+// package declares, whatever they are called.
+func tokenSecrets(m *render.Model, name string) []string {
+	var out []string
+	for _, a := range m.Inputs.Stack.Agents {
+		if a.Name != name {
+			continue
+		}
+		for pname, sec := range m.Inputs.Project.Secrets {
+			if slices.Contains(sec.Services, a.Service) && slices.ContainsFunc(a.Agent.Secrets, func(ps pack.AgentSecret) bool { return ps.Env != "" && ps.Env == sec.Env }) {
+				out = append(out, pname)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // CheckAgent resolves agent name ("": the project's only agent) and refuses

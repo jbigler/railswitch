@@ -2,7 +2,7 @@
 
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
-one pet per floor. 78 glTF files (`.gltf` + `.bin`, textures as PNGs beside
+one pet per floor, androids. 82 glTF files (`.gltf` + `.bin`, textures as PNGs beside
 them) in `internal/web/static/office/models/`, a
 loader in `internal/web/static/office/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
@@ -19,6 +19,12 @@ build them in `tools/office-kit/`.
 - Names are `Category_Name_Variant`: `Arch` (walls, floors, doors, elevator,
   ceiling gear), `Furn`, `Tech` (screens, racks, carts), `Deco`, `Light`, `Pet`,
   `Ext` (outside the windows). A node's mesh has the node's name.
+- Floors and walls are textured: `RS_Floor` (`RS_Trim_Floor.png`: 1 m
+  steel plates, a perforated grate, a tread plate, seams, rivets, scratches,
+  grime) and `RS_Wall` (`RS_Trim_Wall.png`: 1 m × 0.5 m panels, a vent, a
+  hatch, grime streaks), each 2 m per repeat; the export projects their UVs
+  along each face's main axis in the piece's own coordinates, so pieces on
+  the 4 m grid continue each other's pattern.
 - Triangle budgets: walls and floors under 500, small props under 1k, furniture
   under 3k, hero pieces (workstations, monitor walls, pets) under 5k.
 
@@ -64,6 +70,7 @@ them all; `kit.setElevatorDoors(node, 0..1)` opens a landing or the cab.
 | `Jelly_<n>_T1`…`T8` | each tentacle sways on its own and flares as its bell contracts |
 | `CatWalk_Leg_FL`…`_BR`, `DogWalk_Leg_FL`…`_BR` | trot from the root's `userData.gait` and `phase` |
 | `ParrotFly_Wing_L`, `ParrotFly_Wing_R` | spread and beat from the root's `userData.flap` |
+| `<Android>_Head`, `_Arm_L/R`, `_Leg_L/R` | the androids walk (legs and arms in opposite phase) from an ancestor's `userData.gait` and `phase`; arms type while `userData.typing`; heads look around |
 
 ## Roaming
 
@@ -114,6 +121,11 @@ relative to the floor piece.
   `Dog_Lying` (no bed) and `Parrot_Fly`, with `Furn_DogBed` and
   `Furn_ParrotPerch`.
 - **Ext**: `CityBackdrop` (a flat night skyline).
+- **Char**: `Android_Agent` (the agent's partner: its visor
+  `RS_Android_Visor_Agent` and status ring `RS_Android_Status` are for the
+  page to recolour by the agent's state), `Android_A`, `Android_B`,
+  `Android_C` (wanderers in white/orange, black/gold, grey/teal; visors in
+  the accent).
 
 ## Rebuilding
 
@@ -162,6 +174,7 @@ dashboard: from the repository root run `python3 -m http.server` and open
 ## Not done yet
 
 - A 3D city outside the windows (`Ext_CityBackdrop` is a flat image).
-- The material pass: a palette texture for props, a trim sheet for floors and
-  walls, and a CPU ambient-occlusion bake into a second UV channel.
+- The rest of the material pass: a palette texture for props, and a CPU
+  ambient-occlusion bake into a second UV channel (floors and walls are
+  textured).
 - Compression (`gltf-transform`: Meshopt geometry, KTX2 textures).

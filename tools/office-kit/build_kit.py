@@ -40,6 +40,29 @@ def quad_uvs(objs, prefixes=('RS_Screen', 'RS_Poster', 'RS_City')):
                     layer.data[li].uv = c
 
 
+TRIM = ('RS_Floor', 'RS_Wall')
+
+
+def trim_uvs(o):
+    """Planar UVs for the floor and wall textures (2 m per repeat), projected
+    along each face's main axis in the piece's own coordinates, so pieces on
+    the 4 m grid continue each other's pattern."""
+    me = o.data
+    idx = {i for i, m in enumerate(me.materials) if m and m.name in TRIM}
+    if not idx:
+        return
+    layer = me.uv_layers.get('UVMap') or me.uv_layers.new(name='UVMap')
+    for poly in me.polygons:
+        if poly.material_index not in idx:
+            continue
+        n = poly.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        for li in poly.loop_indices:
+            co = me.vertices[me.loops[li].vertex_index].co
+            u, v = ((co.y, co.z), (co.x, co.z), (co.x, co.y))[ax]
+            layer.data[li].uv = (u / 2, v / 2)
+
+
 def export_all(objs):
     for o in objs.values():
         o.data.update()
@@ -48,6 +71,7 @@ def export_all(objs):
             c.select_set(True)
             if c.type == 'MESH':
                 c.data.name = c.name  # glTF mesh names match their nodes
+                trim_uvs(c)
         bpy.context.view_layer.objects.active = o
         o.location = (0, 0, 0)
         # .gltf + .bin with the textures as files beside them: the dashboard's CSP
@@ -194,6 +218,74 @@ def draw_screen(px, w, h):
         px[h - 10 - bh:h - 10, bx:bx + pw // 10 - 5, :3] = 0.45 + r.random() * 0.5
 
 
+def smooth_noise(rng, n, size):
+    """Tileable value noise: an n×n random grid, bilinear up to size×size."""
+    g = rng.random((n, n))
+    t = np.arange(size) * n / size
+    i0 = np.floor(t).astype(int)
+    f = (t - i0)[:, None]
+    i1 = (i0 + 1) % n
+    rows = g[i0] * (1 - f) + g[i1] * f            # (size, n): rows interpolated
+    fx = (t - i0)[None, :]
+    return rows[:, i0] * (1 - fx) + rows[:, i1] * fx
+
+
+def draw_floor(px, w, h):
+    """Floor plates, 2 m square (tiles): four 1 m steel plates with bevelled seams
+    and rivets, one a perforated grate, one diamond tread; scratches and grime."""
+    rng = np.random.default_rng(7)
+    yy, xx = np.mgrid[0:h, 0:w]
+    ppm = w // 2  # pixels per metre
+    px[..., :3] = (0.30, 0.31, 0.34)
+    lx, ly = xx % ppm, yy % ppm
+    qx, qy = xx // ppm, yy // ppm
+    grate = (qx == 1) & (qy == 0) & (lx > 30) & (lx < ppm - 30) & (ly > 30) & (ly < ppm - 30)
+    holes = grate & (((lx % 22) - 11) ** 2 + ((ly % 22) - 11) ** 2 < 42)
+    px[grate, :3] = (0.24, 0.25, 0.27)
+    px[holes, :3] = (0.04, 0.04, 0.05)
+    tread = (qx == 0) & (qy == 1) & (((lx + ly) % 34 < 5) & ((lx - ly) % 34 < 14))
+    px[tread, :3] = (0.40, 0.41, 0.44)
+    for c, v in (((lx < 4) | (ly < 4), 0.07), (((lx >= 4) & (lx < 7)) | ((ly >= 4) & (ly < 7)), 0.42)):
+        px[c, :3] = v
+    for cx in (28, ppm - 28):
+        for cy in (28, ppm - 28):
+            d = (lx - cx) ** 2 + (ly - cy) ** 2
+            px[d < 49, :3] = 0.46
+            px[(d >= 49) & (d < 81), :3] = 0.12
+    for _ in range(140):  # scratches
+        x0, y0 = rng.integers(0, w), rng.integers(0, h)
+        ang, L = rng.random() * np.pi, rng.integers(20, 120)
+        for t in range(L):
+            x, y = int(x0 + np.cos(ang) * t) % w, int(y0 + np.sin(ang) * t) % h
+            px[y, x, :3] = np.minimum(px[y, x, :3] + 0.12, 1)
+    grime = 0.72 + 0.4 * smooth_noise(rng, 8, w) * (0.75 + 0.25 * smooth_noise(rng, 32, w))
+    px[..., :3] *= grime[..., None]
+
+
+def draw_wall(px, w, h):
+    """Wall panels, 2 m square (tiles): 1 m panels with inset bevels and rivets,
+    a vent panel, a hatch; streaks of grime running down."""
+    rng = np.random.default_rng(11)
+    yy, xx = np.mgrid[0:h, 0:w]
+    ppm = w // 2
+    px[..., :3] = (0.27, 0.28, 0.31)
+    lx, ly = xx % ppm, yy % (ppm // 2)  # panels 1 m wide, 0.5 m high
+    qx, qy = xx // ppm, yy // (ppm // 2)
+    px[(lx < 5) | (ly < 4), :3] = 0.06
+    inset = ((lx > 18) & (lx < 24)) | ((ly > 16) & (ly < 21))
+    px[inset & (lx > 18) & (lx < ppm - 18) & (ly > 16) & (ly < ppm // 2 - 16), :3] = 0.36
+    vent = (qx == 1) & (qy == 2) & (lx > 70) & (lx < ppm - 70) & (ly > 50) & (ly < ppm // 2 - 50) & (ly % 22 < 9)
+    px[vent, :3] = 0.04
+    hatch = (qx == 0) & (qy == 1) & (abs(lx - ppm // 2) < 90) & (abs(ly - ppm // 4) < 70)
+    px[hatch & ((abs(lx - ppm // 2) > 84) | (abs(ly - ppm // 4) > 64)), :3] = 0.1
+    for cx in (12, ppm - 12):
+        for cy in (10, ppm // 2 - 10):
+            px[((lx - cx) ** 2 + (ly - cy) ** 2) < 20, :3] = 0.45
+    streak = smooth_noise(rng, 24, w)[0][None, :] * np.ones((h, 1))  # vertical grime streaks
+    grime = 0.75 + 0.3 * smooth_noise(rng, 8, w) - 0.18 * streak * (yy / h)
+    px[..., :3] *= grime[..., None]
+
+
 def draw_city(px, w, h):
     r = random.Random(3)
     g = np.linspace(0, 1, h)[:, None]
@@ -230,8 +322,8 @@ M = dict(
     body=mat('RS_Body', '#16181e', .6, .4),
     dark=mat('RS_BodyDark', '#0b0c10', .4, .55),
     trim=mat('RS_Trim', '#2c3039', .85, .3),
-    wall=mat('RS_Wall', '#121419', .15, .75),
-    floor=mat('RS_Floor', '#101116', .5, .28),
+    wall=mat('RS_Wall', '#ffffff', .2, .7, image=make_image('RS_Trim_Wall', 1024, 1024, draw_wall)),
+    floor=mat('RS_Floor', '#ffffff', .35, .5, image=make_image('RS_Trim_Floor', 1024, 1024, draw_floor)),
     fabric=mat('RS_Fabric', '#1b1c23', 0, .95),
     cushion=mat('RS_Cushion', '#2a2c36', 0, .85),
     pot=mat('RS_Pot', '#d8d8de', .1, .5),
@@ -659,17 +751,7 @@ def window_insert(a, w, h, corner=.2, depth=.15):
 
 
 def wall_trim(a, width, height, windows=(), doors=()):
-    def blocked(x, y):
-        return any(abs(x - o[0]) < o[2] / 2 + .05 and o[1] - .05 < y < o[1] + o[3] + .05 for o in windows) or \
-               any(abs(x - d[0]) < d[1] / 2 + .1 and y < d[2] + .1 for d in doors)
-    x = -width / 2 + 1.2
-    while x < width / 2 - .1:
-        y = .1
-        while y < height - .1:
-            if not blocked(x, y + .1):
-                a.box(.012, .2, .01, M['dark'], x, y + .1, .002)
-            y += .2
-        x += 1.2
+    # the panel seams are in the wall texture (RS_Trim_Wall)
     segs = [(-width / 2, width / 2)]
     for dx, dw, _ in doors:
         for i, (s0, s1) in enumerate(segs):
@@ -730,10 +812,6 @@ def city_backdrop(a, width=30, height=14):
 
 
 def floor_tile(a, size=4.0):
-    a.plane(size, size, M['floor'])  # authored in XY; rotated flat below
-    for i in range(int(size) + 1):
-        o = -size / 2 + i
-        a.box(.02, size, .002, M['dark'], o, 0, .001)
-        a.box(size, .02, .002, M['dark'], 0, o, .001)
+    a.plane(size, size, M['floor'])  # authored in XY; rotated flat below; RS_Trim_Floor draws the plates
 
 

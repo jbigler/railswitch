@@ -58,6 +58,17 @@ export async function loadOfficeKit(baseUrl, names, loader) {
   };
 }
 
+// motion is the nearest ancestor's userData that carries a walker's or flyer's
+// state (createRoamer and createFlyer set it on the object they were given,
+// which may be a wrapper above the model's own root node).
+function motion(o) {
+  for (let p = o.parent; p; p = p.parent) {
+    const u = p.userData;
+    if (u.gait !== undefined || u.flap !== undefined || u.typing !== undefined) return u;
+  }
+  return {};
+}
+
 // Remember each moving node's authored transform once, then offset from it.
 function rest(o) {
   return (o.userData.rest ??= { p: o.position.clone(), r: o.rotation.clone(), s: o.scale.clone() });
@@ -97,16 +108,24 @@ export function animate(root, t) {
       return;
     }
     if (n.endsWith('_Bubbles')) { const r = rest(o); o.position.y = r.p.y + ((t * 0.08) % 0.06); return; }
+    const limb = /_(Leg|Arm)_([LR])$/.exec(n);
+    if (limb) { // androids: legs and arms swing in opposite phase; arms type while userData.typing
+      const r = rest(o), u = motion(o), arm = limb[1] === 'Arm';
+      const swing = Math.sin((u.phase ?? 0) * Math.PI * 2 + (limb[2] === 'L' ? 0 : Math.PI) + (arm ? Math.PI : 0)) * (u.gait ?? 0);
+      if (arm && u.typing) o.rotation.x = r.r.x - 0.95 + Math.sin(t * 14 + (limb[2] === 'L' ? 0 : 1.7)) * 0.05;
+      else o.rotation.x = r.r.x + swing * (arm ? 0.45 : 0.55) + (arm ? Math.sin(t * 1.3 + seed) * 0.03 : 0);
+      return;
+    }
     const leg = /_Leg_([FB])([LR])$/.exec(n);
     if (leg) { // trot: front-left with back-right, front-right with back-left
-      const r = rest(o), u = o.parent?.userData ?? {};
+      const r = rest(o), u = motion(o);
       const off = (leg[1] === 'F') === (leg[2] === 'L') ? 0 : Math.PI;
       o.rotation.x = r.r.x + Math.sin((u.phase ?? 0) * Math.PI * 2 + off) * 0.55 * (u.gait ?? 0);
       return;
     }
     const wing = /_Wing_([LR])$/.exec(n);
     if (wing) { // Wing_L sits at +x; folded at rest, spread and beating in flight
-      const r = rest(o), f = o.parent?.userData.flap ?? 0;
+      const r = rest(o), f = motion(o).flap ?? 0;
       o.rotation.z = r.r.z + (wing[1] === 'L' ? 1 : -1) * f * (1.15 + Math.sin(t * 16) * 0.55);
       return;
     }

@@ -115,6 +115,7 @@ export class World {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.25;
     el.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.05, 400);
     this.scene = new THREE.Scene();
@@ -189,7 +190,7 @@ export class World {
   cutaway() {
     const u = this.scene.userData;
     if (u.ceiling) u.ceiling.visible = this.mode === 'walk';
-    if (u.hemi) u.hemi.intensity = this.mode === 'walk' ? 0.6 : 2.0;
+    if (u.hemi) u.hemi.intensity = this.mode === 'walk' ? 1.1 : 2.4;
     if (this.mode === 'walk') for (const w of u.walls ?? []) w.visible = true;
   }
 
@@ -293,6 +294,7 @@ export class World {
       this.scene.traverse((o) => {
         if (!(IS_COL.test(o.name) || o.userData.block)) return;
         if (/Door_[LR]_COL\d*$/.test(o.name)) return; // the elevator doors move: scene.userData.movingBoxes
+        if (o.name.startsWith('PetKeepOut')) return; // keeps the pets and androids out, not you
         if (!shown(o) && !IS_COL.test(o.name)) return;
         const b = new THREE.Box3().setFromObject(o, true);
         if (b.max.y >= 0.25 && b.min.y <= 1.8) w.boxes.push(b);

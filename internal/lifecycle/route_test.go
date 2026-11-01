@@ -147,7 +147,7 @@ func TestAgentSkipsRoute(t *testing.T) {
 	e := setup(t)
 	ft, url := newFakeTraefik(t, "filial-master-app@docker")
 	e.l.TraefikAPI, e.l.RoutePoll, e.l.RouteTimeout = url, time.Millisecond, 50*time.Millisecond
-	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}, false); err != nil {
 		t.Fatal(err)
 	}
 	if n := ft.polls[featRouter]; n != 0 || strings.Contains(e.errOut(), "no route") {
@@ -163,7 +163,7 @@ func TestAgentSkipsRoute(t *testing.T) {
 	if err := os.WriteFile(marker, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}, false); err != nil {
 		t.Fatal(err)
 	}
 	if n := ft.polls[featRouter]; n != 0 {
@@ -171,7 +171,7 @@ func TestAgentSkipsRoute(t *testing.T) {
 	}
 
 	e.editProject(t, func(s string) string { return s + "\n[hooks]\ncreate = [\"bin/setup\"]\n" })
-	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}, false); err != nil {
 		t.Fatal(err)
 	}
 	if ft.polls[featRouter] == 0 {

@@ -28,7 +28,14 @@ railswitch secret set claude_token
 railswitch agent                    # the only agent, in this terminal
 railswitch agent --new-term claude  # in a new terminal window
 railswitch agent stop
+railswitch agent --no-token         # without the token: it uses the login in its home
 ```
+
+`--no-token` runs an on-demand agent without the secret that holds its
+package's token (for Claude, `claude_token`), so it uses the login kept in
+its home instead: at the first run, log in from inside (Claude: `/login`),
+and that worktree keeps the login. The token stays set; run without the
+flag to use it again.
 
 `railswitch agent` starts the worktree's stack first (`up`), but doesn't
 wait for the app to answer on its URL: an app that is still booting, or

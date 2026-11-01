@@ -16,7 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [--no-token] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -48,11 +48,11 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 	case len(args) > 0 && args[0] == "default":
 		return cmdAgentDefault(ctx, e, args[1:])
 	}
-	name, argv, newTerm, code, ok := agentArgs(e, args)
+	name, argv, newTerm, noToken, code, ok := agentArgs(e, args)
 	if !ok {
 		return code
 	}
-	if name == "ls" && (len(argv) > 0 || newTerm) {
+	if name == "ls" && (len(argv) > 0 || newTerm || noToken) {
 		return e.usageErr("agent ls takes no arguments")
 	}
 	l, slug, code := e.lifecycle(ctx, "agent")
@@ -68,7 +68,7 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 			}
 			return e.fail(err)
 		}
-		return e.agentNewTerm(ctx, l.WS.Root, slug, name, argv)
+		return e.agentNewTerm(ctx, l.WS.Root, slug, name, argv, noToken)
 	}
 	if name == "ls" {
 		rows, err := l.AgentList(ctx, slug)
@@ -80,7 +80,7 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		}
 		return 0
 	}
-	if err := l.Agent(ctx, slug, name, argv); err != nil {
+	if err := l.Agent(ctx, slug, name, argv, noToken); err != nil {
 		var u *lifecycle.UsageError
 		if errors.As(err, &u) {
 			return e.usageErr("%s", u.Msg)
@@ -133,29 +133,37 @@ func cmdAgentStop(ctx context.Context, e *env, args []string) int {
 // agentArgs splits args at the first "--", before any flag parsing: what
 // precedes it is --new-term and at most one agent name ("ls" lists them),
 // what follows it goes to the agent verbatim.
-func agentArgs(e *env, args []string) (name string, argv []string, newTerm bool, code int, ok bool) {
+func agentArgs(e *env, args []string) (name string, argv []string, newTerm, noToken bool, code int, ok bool) {
 	if i := slices.Index(args, "--"); i >= 0 {
 		args, argv = args[:i], args[i+1:]
 	}
 	fs := e.flags("agent")
 	fs.BoolVar(&newTerm, "new-term", false, "open the agent in a new terminal tab or window")
-	if code, ok := parse(fs, args); !ok {
-		return "", nil, false, code, false
+	fs.BoolVar(&noToken, "no-token", false, "run without the agent package's token secret: it uses the login in its home (D139)")
+	rest, code, ok := parseMixed(fs, args) // flags after the name too
+	if !ok {
+		return "", nil, false, false, code, false
 	}
-	if fs.NArg() > 1 {
-		return "", nil, false, e.usageErr("%s", agentUsage), false
+	if len(rest) > 1 {
+		return "", nil, false, false, e.usageErr("%s", agentUsage), false
 	}
-	return fs.Arg(0), argv, newTerm, 0, true
+	if len(rest) == 1 {
+		name = rest[0]
+	}
+	return name, argv, newTerm, noToken, 0, true
 }
 
 // agentNewTerm re-executes `railswitch -C <root> -w <slug> agent [<name>]
 // [-- argv]` in a new terminal tab or window, in the worktree's dir.
-func (e *env) agentNewTerm(ctx context.Context, root, slug, name string, argv []string) int {
+func (e *env) agentNewTerm(ctx context.Context, root, slug, name string, argv []string, noToken bool) int {
 	exe, err := executable()
 	if err != nil {
 		return e.fail(err)
 	}
 	cmd := []string{exe, "-C", root, "-w", slug, "agent"}
+	if noToken {
+		cmd = append(cmd, "--no-token")
+	}
 	title := slug + " agent"
 	if name != "" {
 		cmd = append(cmd, name)

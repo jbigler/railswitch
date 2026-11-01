@@ -55,7 +55,7 @@ func withoutProbe(s string) string {
 
 func TestAgentOnDemandArgv(t *testing.T) {
 	e := setup(t)
-	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}); err != nil {
+	if err := e.l.Agent(ctx, "feat", "claude", []string{"--version"}, false); err != nil {
 		t.Fatal(err)
 	}
 	calls := e.calls()
@@ -142,7 +142,7 @@ func TestAgentServiceAttach(t *testing.T) {
 	e := setup(t)
 	const unit = "filial-feat-agent-probe.service"
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n", unit)
-	if err := e.l.Agent(ctx, "feat", "probe", nil); err != nil {
+	if err := e.l.Agent(ctx, "feat", "probe", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	calls := e.calls()
@@ -154,7 +154,7 @@ func TestAgentServiceAttach(t *testing.T) {
 
 	e.reset()
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", unit)
-	if err := e.l.Agent(ctx, "feat", "probe", nil); err != nil {
+	if err := e.l.Agent(ctx, "feat", "probe", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	calls = e.calls()
@@ -165,7 +165,7 @@ func TestAgentServiceAttach(t *testing.T) {
 		t.Errorf("last call %q; want the attach", last)
 	}
 
-	err := e.l.Agent(ctx, "feat", "probe", []string{"x"})
+	err := e.l.Agent(ctx, "feat", "probe", []string{"x"}, false)
 	var u *UsageError
 	if !errors.As(err, &u) || !strings.Contains(err.Error(), "[agents.probe]") {
 		t.Fatalf("extra argv: got %v; want a usage error naming [agents.probe]", err)
@@ -225,7 +225,7 @@ func TestUpIgnoresOnDemandSecret(t *testing.T) {
 		t.Fatalf("up with an on-demand agent's secret unset: %v", err)
 	}
 	e.reset()
-	err := e.l.Agent(ctx, "feat", "claude", nil)
+	err := e.l.Agent(ctx, "feat", "claude", nil, false)
 	if err == nil || !strings.Contains(err.Error(), "claude_token") {
 		t.Fatalf("agent claude: got %v; want claude_token unset", err)
 	}
@@ -480,7 +480,7 @@ func TestAgentOnDemandUnitSettings(t *testing.T) {
 	})
 	run := func(argv []string) []string {
 		t.Helper()
-		if err := e.l.Agent(ctx, "feat", "probe", argv); err != nil {
+		if err := e.l.Agent(ctx, "feat", "probe", argv, false); err != nil {
 			t.Fatal(err)
 		}
 		calls := e.calls()
@@ -533,7 +533,7 @@ func (e *tenv) agentRunning(ctr string) {
 func TestAgentRefusesOtherRunning(t *testing.T) {
 	e := setup(t)
 	e.agentRunning("filial-feat-agent-probe")
-	err := e.l.Agent(ctx, "feat", "claude", nil)
+	err := e.l.Agent(ctx, "feat", "claude", nil, false)
 	if err == nil || err.Error() != "agent probe is running in feat; one agent per worktree: railswitch agent stop probe" {
 		t.Fatalf("got %v; want the one-agent refusal naming probe", err)
 	}
@@ -543,7 +543,7 @@ func TestAgentRefusesOtherRunning(t *testing.T) {
 
 	e = setup(t)
 	e.agentRunning("filial-master-agent-probe")
-	if err := e.l.Agent(ctx, "feat", "claude", nil); err != nil {
+	if err := e.l.Agent(ctx, "feat", "claude", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	if n := count(e.calls(), "podman --hooks-dir"); n != 1 {
@@ -552,7 +552,7 @@ func TestAgentRefusesOtherRunning(t *testing.T) {
 
 	e = setup(t)
 	e.agentRunning("filial-feat-agent-claude")
-	err = e.l.Agent(ctx, "feat", "claude", nil)
+	err = e.l.Agent(ctx, "feat", "claude", nil, false)
 	if err == nil || err.Error() != "agent claude is already running in feat" {
 		t.Fatalf("got %v; want already running", err)
 	}
@@ -571,7 +571,7 @@ func TestAgentServiceStartsOnRequest(t *testing.T) {
 	e.reset()
 	const unit = "filial-feat-agent-probe.service"
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n", unit)
-	if err := e.l.Agent(ctx, "feat", "probe", nil); err != nil {
+	if err := e.l.Agent(ctx, "feat", "probe", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	wantInOrder(t, e.calls(), "systemctl --user start "+unit, "podman attach filial-feat-agent-probe")
@@ -624,7 +624,7 @@ func TestAgentTwoRunning(t *testing.T) {
 	if len(rows) != 2 || !rows[0].Running || !rows[1].Running {
 		t.Errorf("rows %+v; want both running", rows)
 	}
-	err = e.l.Agent(ctx, "feat", "claude", nil)
+	err = e.l.Agent(ctx, "feat", "claude", nil, false)
 	if err == nil || !strings.Contains(err.Error(), "railswitch agent stop probe") {
 		t.Fatalf("got %v; want the refusal naming probe", err)
 	}
@@ -650,7 +650,7 @@ func TestAgentServiceRunningAttaches(t *testing.T) {
 	const unit = "filial-feat-agent-probe.service"
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", unit)
 	e.agentRunning("filial-feat-agent-probe")
-	if err := e.l.Agent(ctx, "feat", "probe", nil); err != nil {
+	if err := e.l.Agent(ctx, "feat", "probe", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	calls := e.calls()
@@ -684,5 +684,31 @@ func TestAgentUpdate(t *testing.T) {
 	}
 	if err := e.l.AgentUpdate(ctx, "feat", "nope"); err == nil || !strings.Contains(err.Error(), "no agent nope") {
 		t.Errorf("unknown agent: %v", err)
+	}
+}
+
+// --no-token: the secret that delivers the package's token (by its env
+// var, whatever it is called) is neither required nor passed; the agent's
+// other secrets still are (D139). A service agent refuses it.
+func TestAgentNoToken(t *testing.T) {
+	e := setup(t)
+	e.editProject(t, func(s string) string {
+		return s + "\n[secrets.my_token]\nservices = [\"agent-claude\"]\nenv = \"CLAUDE_CODE_OAUTH_TOKEN\"\n" +
+			"\n[secrets.other]\nservices = [\"agent-claude\"]\nenv = \"OTHER\"\n"
+	})
+	e.missing("podman", "secret", "exists", "filial_my_token")
+	if err := e.l.Agent(ctx, "feat", "claude", nil, true); err != nil {
+		t.Fatalf("agent --no-token with the token unset: %v", err)
+	}
+	i := slices.IndexFunc(e.calls(), func(c []string) bool { return strings.HasPrefix(joined(c), "podman --hooks-dir") })
+	if i < 0 {
+		t.Fatal("the agent didn't run")
+	}
+	j := joined(e.calls()[i])
+	if strings.Contains(j, "my_token") || !strings.Contains(j, "filial_other,type=env,target=OTHER") {
+		t.Errorf("secrets in %s", j)
+	}
+	if err := e.l.Agent(ctx, "feat", "probe", nil, true); err == nil || !strings.Contains(err.Error(), "runs as a service") {
+		t.Errorf("service agent --no-token: %v", err)
 	}
 }

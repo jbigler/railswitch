@@ -128,6 +128,30 @@ Claude's `.claude.json` is merged instead, keeping each worktree's own
 project entries. Plugins themselves are shared by every worktree already,
 so a promoted plugin list works everywhere at once.
 
+## Shared memory
+
+Claude's memory (what it saves about the project to keep in mind next
+time) is one folder for the whole project, not one per worktree:
+`.railswitch/agent-memory/claude/` in the workspace, which every
+worktree's Claude sees as its own auto memory. A note one agent saves
+while fixing a bug is there for the next agent in any worktree, and
+`wt rm` doesn't delete it.
+
+It is a plain folder: read, edit or delete its files, and back it up as
+you would any folder. To bring in memory files from earlier runs
+(rails-dev-podman's `.container-config/claude-memory/`, or a worktree's
+`~/.claude/projects/-app/memory/` from before this), copy them in,
+`MEMORY.md` index included:
+
+```bash
+cp -n /path/to/old-memory/* .railswitch/agent-memory/claude/
+```
+
+Claude reads the index at the start of each session, so a note another
+agent saves mid-session reaches a running agent only when it looks. Two
+agents saving at the same moment can, rarely, lose one line of
+`MEMORY.md`; the note files themselves are safe.
+
 ## Your own agent
 
 An agent package is a folder with `agent.toml` (its hosts, mounts, secrets

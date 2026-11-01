@@ -943,6 +943,9 @@ func (l *loader) checkAgent(dir string, a *Agent) bool {
 			l.add(file, "config.paths[%d]: %q is listed twice", i, p)
 		}
 	}
+	if p := a.Memory.Path; p != "" && (!configPathRe.MatchString(p) || !fs.ValidPath(p) || p == "." || slices.Contains(a.Config.Paths, p)) {
+		l.add(file, "memory.path: %q is not a path inside the home outside config.paths", p)
+	}
 	if len(a.Config.Paths) > 0 && a.Entrypoint == "" {
 		l.add(file, "config.paths: an agent without an entrypoint can't apply a default")
 	}

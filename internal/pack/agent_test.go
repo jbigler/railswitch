@@ -206,3 +206,21 @@ func TestDefaultAgentUnique(t *testing.T) {
 		t.Errorf("two defaults: %v, want both named", err)
 	}
 }
+
+func TestAgentMemoryPath(t *testing.T) {
+	fsys := withAgent()
+	fsys["agents/a/agent.toml"] = &fstest.MapFile{Data: []byte(agentToml + "[memory]\npath = \".tool/memory\"\n")}
+	c, err := Load(fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := c.Agents[Ref{Name: "a", Version: 1}]; a.Memory.Path != ".tool/memory" {
+		t.Errorf("memory.path = %q", a.Memory.Path)
+	}
+	for _, bad := range []string{"../memory", "/abs", ".", "a//b"} {
+		fsys["agents/a/agent.toml"] = &fstest.MapFile{Data: []byte(agentToml + "[memory]\npath = \"" + bad + "\"\n")}
+		if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "memory.path") {
+			t.Errorf("%q: err = %v", bad, err)
+		}
+	}
+}

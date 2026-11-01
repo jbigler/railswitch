@@ -30,9 +30,9 @@ type Plan struct {
 	// their parents) as container root, which appuser can't write.
 	HomeDirs []string
 	// StatusDirs are the per-worktree agent status dirs (D58), when the
-	// project has an agent, and the default dirs of agents with [config]
-	// paths (D135): workspace-relative slash paths, created and kept like
-	// Homes.
+	// project has an agent, the default dirs of agents with [config]
+	// paths (D135) and the memory dirs of agents with a [memory] path
+	// (D136): workspace-relative slash paths, created and kept like Homes.
 	StatusDirs []string
 	// DefaultHomes are the agent homes (of Homes) whose agent applies the
 	// project's default config: Apply puts pack.AgentDefaultRequest in one
@@ -66,6 +66,10 @@ const (
 	// default config for an agent with [config] paths (D135), 0700, mounted
 	// read-only into its containers, and <agent>.toml, where it came from.
 	AgentDefaultDir = ".railswitch/agent-default"
+	// AgentMemoryDir holds <AgentMemoryDir>/<agent>, the memory folder every
+	// worktree's agent shares (agent.toml [memory] path, D136), 0700, never
+	// removed: not in a home, so wt rm keeps it.
+	AgentMemoryDir = ".railswitch/agent-memory"
 	// statusDir holds <statusDir>/<slug>, a worktree's agent status files
 	// (D58), 0700, bind-mounted into its agents.
 	statusDir = ".railswitch/status"
@@ -154,6 +158,9 @@ func (m *Model) Plan() (*Plan, error) {
 	for _, a := range m.Inputs.Stack.Agents {
 		if len(a.Agent.Config.Paths) > 0 {
 			status = append(status, path.Join(AgentDefaultDir, a.Name))
+		}
+		if a.Agent.Memory.Path != "" {
+			status = append(status, path.Join(AgentMemoryDir, a.Name))
 		}
 	}
 	for _, a := range m.Assets {

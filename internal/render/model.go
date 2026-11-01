@@ -615,6 +615,9 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 	if len(ag.Config.Paths) > 0 {
 		s.Mounts = append(s.Mounts, Mount{Source: "{agent.default}/" + a.Name, Target: pack.AgentDefaultMount, Options: "ro,z"})
 	}
+	if p := ag.Memory.Path; p != "" {
+		s.Mounts = append(s.Mounts, Mount{Source: "{agent.memory}/" + a.Name, Target: appHome + "/" + p, Options: "z"})
+	}
 	if err := b.packageMounts(&s, pkg, ag.Files, ag.Mounts); err != nil {
 		return s, err
 	}
@@ -874,6 +877,7 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		"dumps":          filepath.Join(m.Inputs.Workspace, "db-dumps"),
 		"status.dir":     filepath.Join(m.Inputs.Workspace, filepath.FromSlash(statusDir), wt.Slug), // D58: the agents' status files
 		"agent.default":  filepath.Join(m.Inputs.Workspace, filepath.FromSlash(AgentDefaultDir)),    // <agent.default>/<agent>: its default config (D135)
+		"agent.memory":   filepath.Join(m.Inputs.Workspace, filepath.FromSlash(AgentMemoryDir)),     // <agent.memory>/<agent>: its memory, shared by every worktree (D136)
 	}
 	in.Values = v
 	override := p.Worktrees[wt.Slug].Versions

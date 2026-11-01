@@ -584,3 +584,12 @@ with `[config]`) finds `~/.railswitch-apply-default` in a home that should
 take the default (a new home, or one `agent default apply` named), puts
 the default in place and removes the file. The built-in `claude@1` does
 it with its `apply-default.sh`.
+
+An agent's `[memory] path` (D136) is the directory in its home where it
+keeps its own memory files, relative to the home (not one of its
+`[config] paths`). railswitch mounts the project's one folder for the
+agent, `<workspace>/.railswitch/agent-memory/<agent>/` (0700, never
+removed), there in every worktree, writable: what one worktree's agent
+saves, the others read, and `wt rm` keeps it. `claude@1` sets
+`.claude/projects/-app/memory`, Claude Code's auto memory for the working
+directory `/app`.

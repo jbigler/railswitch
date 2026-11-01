@@ -141,14 +141,17 @@ func (l *L) render(ctx context.Context) (*render.Diff, error) {
 // the first error; nothing is started after a failure, and running it
 // again resumes.
 func (l *L) Up(ctx context.Context, slug string) error {
-	return l.up(ctx, slug, true)
+	return l.up(ctx, slug, true, true)
 }
 
 // up is Up; without route it skips the wait for the app's route unless
 // the worktree's [hooks] create still wait for it: an agent needs the
 // stack started, not the app routed, and an app that stays unhealthy
-// would hold every agent start for the whole route timeout.
-func (l *L) up(ctx context.Context, slug string, route bool) error {
+// would hold every agent start for the whole route timeout. With
+// agent it also starts the default agent's container when that agent runs
+// as a service and no agent runs in the worktree (D142); railswitch agent
+// starts its own.
+func (l *L) up(ctx context.Context, slug string, route, agent bool) error {
 	if err := l.checkProxySubnet(ctx); err != nil {
 		return err
 	}
@@ -366,7 +369,18 @@ func (l *L) up(ctx context.Context, slug string, route bool) error {
 			others = append(others, unitOf(m, slug, s.ID))
 		}
 	}
-	done := l.busy("starting "+slug+": "+strings.Join(startedServices(m, appActive), ", "), "started "+slug)
+	started := startedServices(m, appActive)
+	if agent {
+		id, err := l.upAgent(ctx, m, slug)
+		if err != nil {
+			return err
+		}
+		if id != "" {
+			others = append(others, unitOf(m, slug, id))
+			started = append([]string{id}, started...)
+		}
+	}
+	done := l.busy("starting "+slug+": "+strings.Join(started, ", "), "started "+slug)
 	err = start(ctx, app)
 	var othersErr error
 	if err == nil && len(others) > 0 {
@@ -393,6 +407,25 @@ func (l *L) up(ctx context.Context, slug string, route bool) error {
 		return err
 	}
 	return l.createHooks(ctx, m, slug, ready)
+}
+
+// upAgent is the service ID of the agent up starts (D142): the default
+// agent's, when it runs as a service and no agent runs in worktree slug;
+// else "".
+func (l *L) upAgent(ctx context.Context, m *render.Model, slug string) (string, error) {
+	name, ok := defaultAgent(m)
+	if !ok {
+		return "", nil
+	}
+	s, err := service(m, "agent-"+name)
+	if err != nil || s.OnDemand {
+		return "", err
+	}
+	running, err := l.RunningAgents(ctx, m, slug)
+	if err != nil || len(running) > 0 {
+		return "", err
+	}
+	return s.ID, nil
 }
 
 // startedServices are the service IDs up starts, the app last: every

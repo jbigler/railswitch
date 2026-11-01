@@ -122,7 +122,8 @@ func TestE2EAgents(t *testing.T) {
 	probe := naming.Container(prefix, slug, "agent-probe")
 	claude := naming.Container(prefix, slug, "agent-claude")
 
-	// up starts no agent (D62); the probe has a unit, the on-demand agent none.
+	// up starts no agent: the default (claude) is on demand (D142); the probe
+	// has a unit, the on-demand agent none.
 	if out, _, _ := run(ctx, 30*time.Second, "systemctl", "--user", "is-active", probe+".service"); strings.TrimSpace(out) == "active" {
 		t.Errorf("after up, %s.service is active; want no agent started", probe)
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [--no-token] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -30,9 +30,10 @@ var launchTerm = func(ctx context.Context, e *env, title, dir string, argv []str
 	return l.Launch(ctx, title, dir, argv)
 }
 
-// railswitch agent [--new-term] [<name>] [-- args…]: run the worktree's
-// agent (up first), or with --new-term re-run this command in a new
-// terminal tab or window; railswitch agent ls: every agent and its status
+// railswitch agent [--new-term] [--watch] [<name>] [-- args…]: run the
+// worktree's agent (up first), join a service agent's session, or watch it
+// (D142); with --new-term re-run this command in a new terminal tab or
+// window; railswitch agent ls: every agent and its status
 // (D58); railswitch agent stop [<name>]: stop the worktree's running agent
 // (D62); railswitch agent update [<name>]: rebuild its image without the
 // cache (D138); railswitch agent add: see cmdAgentAdd (D63); railswitch agent
@@ -48,29 +49,28 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 	case len(args) > 0 && args[0] == "default":
 		return cmdAgentDefault(ctx, e, args[1:])
 	}
-	name, argv, newTerm, noToken, code, ok := agentArgs(e, args)
+	a, code, ok := agentArgs(e, args)
 	if !ok {
 		return code
 	}
-	if name == "ls" && (len(argv) > 0 || newTerm || noToken) {
+	if a.name == "ls" && (len(a.argv) > 0 || a.newTerm || a.noToken || a.watch) {
 		return e.usageErr("agent ls takes no arguments")
+	}
+	if a.watch && (len(a.argv) > 0 || a.noToken) {
+		return e.usageErr("agent --watch takes no arguments and no --no-token: it joins the session as it runs")
 	}
 	l, slug, code := e.lifecycle(ctx, "agent")
 	if code != 0 {
 		return code
 	}
-	if newTerm {
+	if a.newTerm {
 		// Checked here: the new terminal may close before its error is read.
-		if _, err := l.CheckAgent(ctx, name, argv); err != nil {
-			var u *lifecycle.UsageError
-			if errors.As(err, &u) {
-				return e.usageErr("%s", u.Msg)
-			}
+		if _, err := l.CheckAgent(ctx, a.name); err != nil {
 			return e.fail(err)
 		}
-		return e.agentNewTerm(ctx, l.WS.Root, slug, name, argv, noToken)
+		return e.agentNewTerm(ctx, l.WS.Root, slug, a)
 	}
-	if name == "ls" {
+	if a.name == "ls" {
 		rows, err := l.AgentList(ctx, slug)
 		if err != nil {
 			return e.fail(err)
@@ -80,7 +80,13 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		}
 		return 0
 	}
-	if err := l.Agent(ctx, slug, name, argv, noToken); err != nil {
+	if a.watch {
+		if err := l.AgentWatch(ctx, slug, a.name); err != nil {
+			return e.failCommand(err)
+		}
+		return 0
+	}
+	if err := l.Agent(ctx, slug, a.name, a.argv, a.noToken); err != nil {
 		var u *lifecycle.UsageError
 		if errors.As(err, &u) {
 			return e.usageErr("%s", u.Msg)
@@ -133,44 +139,55 @@ func cmdAgentStop(ctx context.Context, e *env, args []string) int {
 // agentArgs splits args at the first "--", before any flag parsing: what
 // precedes it is --new-term and at most one agent name ("ls" lists them),
 // what follows it goes to the agent verbatim.
-func agentArgs(e *env, args []string) (name string, argv []string, newTerm, noToken bool, code int, ok bool) {
+func agentArgs(e *env, args []string) (a agentCall, code int, ok bool) {
 	if i := slices.Index(args, "--"); i >= 0 {
-		args, argv = args[:i], args[i+1:]
+		args, a.argv = args[:i], args[i+1:]
 	}
 	fs := e.flags("agent")
-	fs.BoolVar(&newTerm, "new-term", false, "open the agent in a new terminal tab or window")
-	fs.BoolVar(&noToken, "no-token", false, "run without the agent package's token secret: it uses the login in its home (D139)")
+	fs.BoolVar(&a.newTerm, "new-term", false, "open the agent in a new terminal tab or window")
+	fs.BoolVar(&a.noToken, "no-token", false, "run without the agent package's token secret: it uses the login in its home (D139)")
+	fs.BoolVar(&a.watch, "watch", false, "watch a service agent's session without typing into it (D142)")
 	rest, code, ok := parseMixed(fs, args) // flags after the name too
 	if !ok {
-		return "", nil, false, false, code, false
+		return agentCall{}, code, false
 	}
 	if len(rest) > 1 {
-		return "", nil, false, false, e.usageErr("%s", agentUsage), false
+		return agentCall{}, e.usageErr("%s", agentUsage), false
 	}
 	if len(rest) == 1 {
-		name = rest[0]
+		a.name = rest[0]
 	}
-	return name, argv, newTerm, noToken, 0, true
+	return a, 0, true
+}
+
+// agentCall is a railswitch agent command line.
+type agentCall struct {
+	name                    string
+	argv                    []string
+	newTerm, noToken, watch bool
 }
 
 // agentNewTerm re-executes `railswitch -C <root> -w <slug> agent [<name>]
 // [-- argv]` in a new terminal tab or window, in the worktree's dir.
-func (e *env) agentNewTerm(ctx context.Context, root, slug, name string, argv []string, noToken bool) int {
+func (e *env) agentNewTerm(ctx context.Context, root, slug string, a agentCall) int {
 	exe, err := executable()
 	if err != nil {
 		return e.fail(err)
 	}
 	cmd := []string{exe, "-C", root, "-w", slug, "agent"}
-	if noToken {
+	if a.noToken {
 		cmd = append(cmd, "--no-token")
 	}
-	title := slug + " agent"
-	if name != "" {
-		cmd = append(cmd, name)
-		title = slug + " " + name
+	if a.watch {
+		cmd = append(cmd, "--watch")
 	}
-	if len(argv) > 0 {
-		cmd = append(append(cmd, "--"), argv...)
+	title := slug + " agent"
+	if a.name != "" {
+		cmd = append(cmd, a.name)
+		title = slug + " " + a.name
+	}
+	if len(a.argv) > 0 {
+		cmd = append(append(cmd, "--"), a.argv...)
 	}
 	return e.launchIn(ctx, title, filepath.Join(root, slug), cmd)
 }

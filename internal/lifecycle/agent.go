@@ -2,10 +2,12 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/agentstatus"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -43,18 +45,19 @@ func (e *UsageError) Error() string { return e.Msg }
 // units and preflight are in place. An on-demand agent then runs in a
 // transient container, named as its unit's would be, once its secrets are
 // set; a service agent's unit is started when it is not active, and its
-// container attached to. argv is refused for a service agent. Neither has a
-// deadline: the user drives it. At most one agent runs in a worktree (D62):
-// another one running is an error, never stopped for you. With noToken an
+// session joined, or created with argv (D142). Neither has a deadline:
+// the user drives it. At most one agent runs in a worktree (D62): another
+// one running is an error, never stopped for you, unless it is a service
+// agent without a session (up started it), which is stopped. With noToken an
 // on-demand agent runs without its package's secrets (tokenSecrets), so it
 // uses the login kept in its home (D139).
 func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken bool) error {
-	name, err := l.CheckAgent(ctx, name, argv)
+	name, err := l.CheckAgent(ctx, name)
 	if err != nil {
 		return err
 	}
 	id := "agent-" + name
-	if err := l.up(ctx, slug, false); err != nil {
+	if err := l.up(ctx, slug, false, false); err != nil {
 		return err
 	}
 	m, in, err := l.load(ctx, slug) // up may have re-rendered (new image tags)
@@ -71,6 +74,10 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 		return err
 	}
 	others := slices.DeleteFunc(slices.Clone(running), func(n string) bool { return n == name })
+	idle, others, err := l.idleAgents(ctx, m, slug, others)
+	if err != nil {
+		return err
+	}
 	switch {
 	case len(others) == 1:
 		return fmt.Errorf("agent %s is running in %s; one agent per worktree: railswitch agent stop %s", others[0], slug, others[0])
@@ -88,6 +95,9 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 	}
 	if s.OnDemand {
 		if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }, without); err != nil {
+			return err
+		}
+		if err := l.stopIdleAgents(ctx, m, slug, idle); err != nil {
 			return err
 		}
 		ep, err := pack.Expand(s.Entrypoint, in.Scope(id))
@@ -110,6 +120,77 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 		}
 		return l.inContainer(ctx, args)
 	}
+	if err := l.stopIdleAgents(ctx, m, slug, idle); err != nil {
+		return err
+	}
+	if err := l.startAgentUnit(ctx, slug, ctr); err != nil {
+		return err
+	}
+	live, err := l.agentSession(ctx, ctr)
+	if err != nil {
+		return err
+	}
+	if live && len(argv) > 0 {
+		return fmt.Errorf("agent %s has a session in %s, and arguments start a new one: join it without them, or railswitch agent stop %s first", name, slug, name)
+	}
+	if len(argv) == 0 { // the package's exec words, as for an on-demand agent
+		argv = s.Session.Exec
+	}
+	if s.Session.Entrypoint != "" {
+		argv = append([]string{s.Session.Entrypoint}, argv...)
+	}
+	var session []string
+	for _, a := range argv {
+		w, err := pack.Expand(a, in.Scope(id))
+		if err != nil {
+			return fmt.Errorf("%s: session: %w", id, err)
+		}
+		session = append(session, w)
+	}
+	return l.inContainer(ctx, agentAttach(ctr, append([]string{"new-session", "-A", "-s", render.AgentSession, "-e", "COLORTERM=truecolor", "--"}, session...)))
+}
+
+// AgentWatch joins service agent name's session in worktree slug as a
+// viewer: its screen, live, without typing into it (D142).
+func (l *L) AgentWatch(ctx context.Context, slug, name string) error {
+	m, err := l.model(ctx)
+	if err != nil {
+		return err
+	}
+	if name, err = l.agentName(m, name); err != nil {
+		return err
+	}
+	s, err := service(m, "agent-"+name)
+	if err != nil {
+		return err
+	}
+	if s.OnDemand {
+		return fmt.Errorf("agent %s runs on demand, in one terminal; --watch is for a service agent", name)
+	}
+	ctr := containerOf(m, slug, s.ID)
+	if ok, err := l.podman().Running(ctx, ctr); err != nil {
+		return err
+	} else if !ok {
+		return fmt.Errorf("agent %s is not running in %s", name, slug)
+	}
+	if live, err := l.agentSession(ctx, ctr); err != nil {
+		return err
+	} else if !live {
+		return fmt.Errorf("agent %s has no session in %s to watch: railswitch agent %s starts one", name, slug, name)
+	}
+	return l.inContainer(ctx, agentAttach(ctr, []string{"attach-session", "-r", "-t", "=" + render.AgentSession}))
+}
+
+// agentAttach is the podman exec of a session client on service agent ctr's
+// session server, with args (a new-session or attach-session).
+func agentAttach(ctr string, args []string) []string {
+	return append([]string{"exec", "-it", "--detach-keys=", "-e", render.AgentClientTERM, "--preserve-fds", "1", ctr},
+		hangup(append(slices.Clone(render.AgentTmux), args...))...)
+}
+
+// startAgentUnit starts service agent container ctr's unit when it is not
+// active, then waits for its session server to answer.
+func (l *L) startAgentUnit(ctx context.Context, slug, ctr string) error {
 	sd := l.systemd()
 	unit := ctr + ".service"
 	st, err := sd.UnitState(ctx, unit)
@@ -124,7 +205,77 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 			return l.startFailure(ctx, sd, slug, []string{unit}, err)
 		}
 	}
-	return l.interactive(ctx, sys.NoTimeout, "podman", []string{"attach", ctr})
+	return l.waitAgentServer(ctx, ctr)
+}
+
+// waitAgentServer waits up to 10 s for ctr's session server: list-sessions
+// succeeds once it answers, sessions or none.
+func (l *L) waitAgentServer(ctx context.Context, ctr string) error {
+	var err error
+	for range 50 {
+		if _, err = l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "list-sessions")}); err == nil {
+			return nil
+		}
+		if !errors.Is(err, sys.ErrExit) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+	return fmt.Errorf("%s: its session server does not answer (an agent base image from before D142? railswitch containerfile show agent-base): %w", ctr, err)
+}
+
+// agentSession reports whether service agent container ctr has its
+// agent's session. Only the server's own answer (exit 1) means none: a failed exec
+// must never make a live agent look idle.
+func (l *L) agentSession(ctx context.Context, ctr string) (bool, error) {
+	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "has-session", "-t", "="+render.AgentSession)})
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, sys.ErrExit) && res.ExitCode == 1:
+		return false, nil
+	}
+	return false, fmt.Errorf("%s: can't tell whether its agent has a session: %w", ctr, err)
+}
+
+// idleAgents splits running (agent names in worktree slug) into the
+// service agents without a session (up started them, nothing runs in them)
+// and the rest.
+func (l *L) idleAgents(ctx context.Context, m *render.Model, slug string, running []string) (idle, busy []string, err error) {
+	for _, n := range running {
+		s, err := service(m, "agent-"+n)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !s.OnDemand {
+			live, err := l.agentSession(ctx, containerOf(m, slug, s.ID))
+			if err != nil {
+				return nil, nil, err
+			}
+			if !live {
+				idle = append(idle, n)
+				continue
+			}
+		}
+		busy = append(busy, n)
+	}
+	return idle, busy, nil
+}
+
+// stopIdleAgents stops idle (service agents of worktree slug without a
+// session), saying so: another agent is starting there.
+func (l *L) stopIdleAgents(ctx context.Context, m *render.Model, slug string, idle []string) error {
+	for _, n := range idle {
+		fmt.Fprintf(l.Err, "stopping agent %s in %s: it has no session\n", n, slug)
+		if err := l.systemd().Stop(ctx, containerOf(m, slug, "agent-"+n)+".service"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // defaultAgent is the agent run when none is named (D140): the one
@@ -165,25 +316,14 @@ func tokenSecrets(m *render.Model, name string) []string {
 	return out
 }
 
-// CheckAgent resolves agent name ("": the project's only agent) and refuses
-// argv for a service agent (a *UsageError), as Agent does before up;
-// --new-term calls it before opening a terminal.
-func (l *L) CheckAgent(ctx context.Context, name string, argv []string) (string, error) {
+// CheckAgent resolves agent name ("": the project's only agent), as Agent
+// does before up; --new-term calls it before opening a terminal.
+func (l *L) CheckAgent(ctx context.Context, name string) (string, error) {
 	m, err := l.model(ctx)
 	if err != nil {
 		return "", err
 	}
-	if name, err = l.agentName(m, name); err != nil {
-		return "", err
-	}
-	s, err := service(m, "agent-"+name)
-	if err != nil {
-		return "", err
-	}
-	if !s.OnDemand && len(argv) > 0 {
-		return "", &UsageError{Msg: fmt.Sprintf("agent %s runs as a service; arguments go in its package or [agents.%s]", name, name)}
-	}
-	return name, nil
+	return l.agentName(m, name)
 }
 
 // AgentList is every agent of the project, by name, with its status in

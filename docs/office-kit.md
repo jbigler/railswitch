@@ -2,7 +2,7 @@
 
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
-one pet per floor, androids. 82 glTF files (`.gltf` + `.bin`, textures as PNGs beside
+one pet per floor, androids. 101 glTF files (`.gltf` + `.bin`, textures as PNGs beside
 them) in `internal/web/static/office/models/`, a
 loader in `internal/web/static/office/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
@@ -121,6 +121,17 @@ relative to the floor piece.
   `Dog_Lying` (no bed) and `Parrot_Fly`, with `Furn_DogBed` and
   `Furn_ParrotPerch`.
 - **Ext**: `CityBackdrop` (a flat night skyline).
+- **Lounge and lived-in** (`build_lounge.py`): `Furn_Sofa_Tufted_L` (an
+  L-shaped tufted sectional, metaball cushions whose valleys are the tufts,
+  throw pillows, a blanket), `Furn_Armchair` (leather between wood panels),
+  room dividers `Furn_Divider_Glass` (frosted), `Furn_Divider_Shelf` (books,
+  plants, boxes, a lamp) and `Furn_Divider_Planter` (grasses before a slatted
+  screen), plants in charcoal, terracotta and concrete pots
+  (`Deco_Plant_Snake`, `Monstera`, `Palm`, `Bush`, `Trailing` hanging from
+  the ceiling), `Furn_SideTable`, `Deco_FloorLamp` (arc), `Deco_Rug_Geo`,
+  `Deco_CoatRack` (a jacket, a cap, a scarf), `Deco_Whiteboard` (a diagram,
+  a checklist), `Deco_Backpack`, `Furn_Stool`, `Deco_BookStack`,
+  `Deco_PizzaBoxes`. No plant has a white pot.
 - **Char**: `Android_Agent` (the agent's partner: its visor
   `RS_Android_Visor_Agent` and status ring `RS_Android_Status` are for the
   page to recolour by the agent's state), `Android_A`, `Android_B`,

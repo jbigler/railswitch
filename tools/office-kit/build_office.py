@@ -11,7 +11,7 @@ ASSETS = [
     ('Tech_PCTower', pc_tower, 'aabb'), ('Deco_Mug', mug, None),
     ('Tech_ServerRack', server_rack, 'aabb'), ('Tech_ServerRack_B', lambda a: server_rack(a, seed=7), 'aabb'),
     ('Furn_Sofa', sofa, 'aabb'), ('Furn_Sofa_Short', lambda a: sofa(a, 1.4), 'aabb'), ('Furn_CoffeeTable', coffee_table, 'aabb'),
-    ('Deco_Plant_Floor', plant, 'aabb'), ('Deco_Plant_Floor_B', lambda a: plant(a, True, 5), 'aabb'),
+    ('Deco_Plant_Floor', plant, 'aabb'), ('Deco_Plant_Floor_B', lambda a: plant(a, True, 5, M['terracotta']), 'aabb'),
     ('Deco_Plant_Small', lambda a: plant(a, False, 3), None),
     ('Deco_HangingPlanter', hanging_planter, None), ('Furn_Bookshelf', bookshelf, 'aabb'), ('Deco_NeonSign', neon_sign, None),
     ('Arch_Door', door, 'aabb'), ('Light_CeilingPanel', ceiling_panel, None),

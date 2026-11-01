@@ -31,13 +31,13 @@
 			"name":"RS_Pot",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.68668532371521,
-					0.68668532371521,
-					0.7304607629776001,
+					0.024157632142305374,
+					0.026241222396492958,
+					0.03310476616024971,
 					1
 				],
-				"metallicFactor":0.10000000149011612,
-				"roughnessFactor":0.5
+				"metallicFactor":0.20000000298023224,
+				"roughnessFactor":0.550000011920929
 			}
 		},
 		{

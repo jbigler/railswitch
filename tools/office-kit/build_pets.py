@@ -33,76 +33,8 @@ P = dict(
 # Bodies are metaballs (smooth, connected forms) converted to mesh, decimated to a
 # triangle target and colored per face by a rule; ears, eyes, whiskers, beaks are
 # small hand-placed details joined on. Radii below are the visible radii.
-K = 1 / 0.575  # Blender draws a metaball's surface at 0.575 × its radius (stiffness 2, threshold 0.6)
 P.update(white=fur('RS_Fur_White', '#e8e6e0'), gingerDark=fur('RS_Fur_GingerDark', '#7a3a14'),
          whisker=fur('RS_Whisker', '#cfcfcf', .5), feet=fur('RS_Feet', '#3a3a40', .7))
-
-
-def chain(pts, r0, r1):
-    """Balls along a polyline, radius tapering r0 -> r1 (tails)."""
-    V = [Vector(p) for p in pts]
-    total = sum((V[i + 1] - V[i]).length for i in range(len(V) - 1))
-    out, acc = [], 0.0
-    for i in range(len(V) - 1):
-        seg = V[i + 1] - V[i]
-        n = max(1, int(seg.length / (min(r0, r1) * .8)))
-        for k in range(n):
-            t = k / n
-            out.append(('b', tuple(V[i] + seg * t), r0 + (r1 - r0) * (acc + seg.length * t) / total))
-        acc += seg.length
-    out.append(('b', tuple(V[-1]), r1))
-    return out
-
-
-def meta(name, elems, res, mats, color=None, target=2000, details=None):
-    """Mesh object `name` at the origin from metaball elements in three.js coordinates:
-    ('b', p, r) ball, ('e', p, r, (sx, sy, sz)) ellipsoid, ('c', p0, p1, r) capsule."""
-    mb = bpy.data.metaballs.new('MB_' + name)
-    mb.resolution = mb.render_resolution = res
-    mb.threshold = .6
-    for e in elems:
-        if e[0] == 'b':
-            el = mb.elements.new(type='BALL'); el.co = to_bl(*e[1]); el.radius = e[2] * K
-        elif e[0] == 'e':
-            el = mb.elements.new(type='ELLIPSOID'); el.co = to_bl(*e[1]); el.radius = e[2] * K
-            sx, sy, sz = e[3]
-            el.size_x, el.size_y, el.size_z = sx, sz, sy  # three.js Y/Z -> Blender Z/Y
-        else:
-            a_, b_ = to_bl(*e[1]), to_bl(*e[2])
-            el = mb.elements.new(type='CAPSULE'); el.co = (a_ + b_) / 2; el.radius = e[3] * K
-            el.size_x = (b_ - a_).length / 2
-            el.rotation = Vector((1, 0, 0)).rotation_difference((b_ - a_).normalized())
-    tmp = bpy.data.objects.new('MBX_' + name, mb)  # unique base name: its own metaball family
-    coll.objects.link(tmp)
-    bpy.context.view_layer.update()
-    me = bpy.data.meshes.new_from_object(tmp.evaluated_get(bpy.context.evaluated_depsgraph_get()))
-    bpy.data.objects.remove(tmp); bpy.data.metaballs.remove(mb)
-    obj = bpy.data.objects.new(name, me)
-    coll.objects.link(obj)
-    tris = sum(len(p.vertices) - 2 for p in me.polygons)
-    if tris > target:
-        obj.modifiers.new('dec', 'DECIMATE').ratio = target / tris
-        bpy.context.view_layer.update()
-        me2 = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
-        obj.modifiers.clear(); obj.data = me2; bpy.data.meshes.remove(me)
-    obj.data.shade_smooth()
-    for m in mats:
-        obj.data.materials.append(m)
-    if color:
-        for p in obj.data.polygons:
-            c, n = p.center, p.normal
-            p.material_index = color(Vector((c.x, c.z, -c.y)), Vector((n.x, n.z, -n.y)))
-    if details:
-        a = Asset(name + '_det'); details(a)
-        join(obj, [a.build()])
-    return obj
-
-
-def attach(obj, parent, pivot):
-    obj.parent = parent
-    obj.location = to_bl(*pivot)
-    bpy.context.view_layer.update()
-    return obj
 
 
 def ear(a, m, x, y, z, s, tilt=.3, h=.055, r=.026, flat=.5, back=-.15):

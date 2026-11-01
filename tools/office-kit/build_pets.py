@@ -22,7 +22,9 @@ P = dict(
     wood=fur('RS_Wood', '#4a3220', .8), gecko=fur('RS_Gecko', '#c9a33c', .6), spots=fur('RS_GeckoSpot', '#5a3a1a', .6),
     fishO=fur('RS_Fish_Orange', '#ff7a1a', .4, emit='#ff7a1a', strength=.6, cull=False),
     fishB=fur('RS_Fish_Blue', '#3a8bff', .4, emit='#3a8bff', strength=.6, cull=False),
-    jelly=fur('RS_Jelly', '#ff5ad1', .3, emit='#ff5ad1', strength=2.5),
+    jelly=fur('RS_Jelly', '#ff7ad9', .3, emit='#ff5ad1', strength=2.2, alpha=.85, cull=False),
+    jellyCore=fur('RS_JellyCore', '#ff3fb4', .3, emit='#ff3fb4', strength=3.5),
+    tentacle=fur('RS_JellyTentacle', '#ffc2ee', .3, emit='#ff8be0', strength=2.5),
     kibble=fur('RS_Kibble', '#5a3a20'),
 )
 
@@ -176,9 +178,9 @@ def curled_face(a):
 
 
 # --- shiba lying on its bed: cream urajiro underside, curled fluffy tail
-def dog():
+def dog(prefix='Dog', root=None):
     T, C = P['tan'], P['cream']
-    body = meta('Dog_Body', [
+    body = meta(root or f'{prefix}_Body', [
         ('e', (0, .13, .11), .1, (.95, 1, 1)), ('e', (0, .11, -.04), .11, (.9, .85, 1.4)), ('e', (0, .1, -.2), .095, (1, .9, 1)),
         ('e', (.075, .075, -.18), .065, (.6, .9, 1.2)), ('e', (-.075, .075, -.18), .065, (.6, .9, 1.2)),
         ('e', (.085, .02, -.07), .028, (.8, .5, 1.6)), ('e', (-.085, .02, -.07), .028, (.8, .5, 1.6)),
@@ -187,14 +189,14 @@ def dog():
         ('e', (0, .2, .17), .065, (.9, 1, .9))], .005, [T, C],
         color=lambda c, n: 1 if n.y < -.3 or (c.z > .16 and c.y < .17 and abs(c.x) < .06) or c.y < .045 else 0,
         target=1900, details=dog_collar)
-    head = meta('Dog_Head', [
+    head = meta(f'{prefix}_Head', [
         ('e', (0, .04, .025), .07, (1.05, .9, 1)), ('e', (.04, .012, .055), .038, (1, .85, 1)), ('e', (-.04, .012, .055), .038, (1, .85, 1)),
         ('e', (0, .003, .11), .036, (.85, .72, 1.25))], .004, [T, C],
         color=lambda c, n: 1 if (c.z > .06 and c.y < .02) or (abs(c.x) > .03 and c.y < .015 and c.z > .03)
         or min((c - Vector((s * .025, .07, .08))).length for s in (-1, 1)) < .012 else 0,
         target=1100, details=dog_face)
     attach(head, body, (0, .23, .2))
-    tail = meta('Dog_Tail', chain([(0, 0, 0), (0, .06, -.02), (0, .1, .02), (.03, .09, .07), (.04, .06, .06)], .032, .022),
+    tail = meta(f'{prefix}_Tail', chain([(0, 0, 0), (0, .06, -.02), (0, .1, .02), (.03, .09, .07), (.04, .06, .06)], .032, .022),
                 .004, [T, C], color=lambda c, n: 1 if n.y < -.2 else 0, target=450)
     attach(tail, body, (0, .17, -.27))
     return body
@@ -217,16 +219,24 @@ def dog_face(a):
 
 
 # --- macaw on its perch: red body, yellow coverts, blue flight feathers
-def parrot():
+def parrot(prefix='Parrot', root=None, folded=True):
+    """folded: the wings are part of the body; otherwise they are <prefix>_Wing_L/R nodes."""
     def color(c, n):
         if abs(c.x) > .03 and c.z < .02 and c.y > .04:
             return 1 if c.y > .115 else 2
         return 0
-    body = meta('Parrot_Body', [
+    wings = [('e', (.043, .1, -.02), .04, (.42, 1.35, .9)), ('e', (-.043, .1, -.02), .04, (.42, 1.35, .9))] if folded else []
+    body = meta(root or f'{prefix}_Body', [
         ('e', (0, .065, .012), .05, (.9, 1.1, .9)), ('e', (0, .12, .018), .045, (.9, 1, .9)), ('e', (0, .1, -.018), .045, (.85, 1.3, .8)),
-        ('e', (.043, .1, -.02), .04, (.42, 1.35, .9)), ('e', (-.043, .1, -.02), .04, (.42, 1.35, .9)), ('b', (0, .165, .02), .035)],
-        .003, [P['red'], P['yellow'], P['blue']], color=color, target=1800, details=parrot_tail)
-    head = meta('Parrot_Head', [('e', (0, .025, .005), .04, (.95, 1, 1.05)), ('e', (0, .012, .032), .024, (.9, .85, .8))], .0025,
+        *wings, ('b', (0, .165, .02), .035)],
+        .003, [P['red'], P['yellow'], P['blue']], color=color, target=1800 if folded else 1300, details=parrot_tail)
+    if not folded:
+        for s, side in ((1, 'L'), (-1, 'R')):  # Wing_L at +x
+            w = meta(f'{prefix}_Wing_{side}', [('e', (s * .006, -.035, -.008), .04, (.42, 1.35, .9))], .003, [P['yellow'], P['blue']],
+                     color=lambda c, n: 0 if c.y > -.02 else 1, target=350,
+                     details=lambda a, s=s: a.box(.01, .08, .045, P['blue'], s * .008, -.085, -.012))
+            attach(w, body, (s * .037, .135, -.012))
+    head = meta(f'{prefix}_Head', [('e', (0, .025, .005), .04, (.95, 1, 1.05)), ('e', (0, .012, .032), .024, (.9, .85, .8))], .0025,
                 [P['red'], P['eyeW']], color=lambda c, n: 1 if abs(c.x) > .018 and c.z > .005 and c.y < .04 else 0,
                 target=1000, details=parrot_face)
     attach(head, body, (0, .18, .025))
@@ -273,6 +283,64 @@ def gecko_face(a):
         for z in (.04, -.03):
             for k in range(3):
                 a.box(.008, .002, .002, P['gecko'], s * .039, .003, z + (k - 1) * .005, ry=s * (k - 1) * .5)
+
+
+# ---------- walkers: standing poses with leg nodes (<prefix>_Leg_FL/FR/BL/BR, pivot at the hip) ----------
+CAT_LEGS = {'F': [('c', (0, 0, 0), (0, -.17, 0), .02), ('e', (0, -.19, .012), .022, (1, .6, 1.3))],
+            'B': [('e', (0, -.03, -.005), .045, (.6, 1, 1.1)), ('c', (0, -.05, -.02), (0, -.18, 0), .018),
+                  ('e', (0, -.193, .012), .022, (1, .6, 1.3))]}
+DOG_LEGS = {'F': [('c', (0, 0, 0), (0, -.2, 0), .028), ('e', (0, -.222, .015), .032, (1, .6, 1.3))],
+            'B': [('e', (0, -.04, -.01), .06, (.6, 1, 1.15)), ('c', (0, -.07, -.03), (0, -.21, 0), .024),
+                  ('e', (0, -.226, .015), .03, (1, .6, 1.3))]}
+
+
+def legs(body, prefix, shapes, pivots, mats, color=None, target=300, res=.003):
+    for fb, (x, y, z) in pivots.items():
+        for s, side in ((1, 'L'), (-1, 'R')):
+            attach(meta(f'{prefix}_Leg_{fb}{side}', shapes[fb], res, mats, color=color, target=target), body, (s * x, y, z))
+
+
+def cat_walk():
+    B, W = P['black'], P['white']
+    body = meta('Pet_Cat_Walk', [
+        ('e', (0, .215, -.01), .075, (.75, .75, 1.9)), ('e', (0, .22, .08), .068, (.85, .95, 1)),
+        ('e', (0, .215, -.1), .065, (.85, .9, 1)), ('e', (0, .265, .13), .045, (1, 1, 1.1))], .004, [B, W],
+        color=lambda c, n: 1 if c.z > .1 and .17 < c.y < .27 and abs(c.x) < .035 and n.z > .3 else 0, target=1400,
+        details=lambda a: walk_collar(a, (0, .265, .14), .046, -.5))
+    head = meta('CatWalk_Head', [
+        ('e', (0, .035, 0), .055, (1.1, .92, 1)), ('e', (.028, .012, .028), .028, (1, .8, 1)), ('e', (-.028, .012, .028), .028, (1, .8, 1)),
+        ('e', (0, .01, .05), .022, (1.15, .75, .9)), ('b', (0, -.008, .042), .014)], .003, [B], target=1200, details=cat_face)
+    attach(head, body, (0, .29, .165))
+    attach(meta('CatWalk_Tail', chain([(0, 0, 0), (0, .04, -.05), (0, .12, -.08), (0, .19, -.06), (0, .22, -.02)], .013, .009),
+                .003, [B], target=400), body, (0, .225, -.165))
+    legs(body, 'CatWalk', CAT_LEGS, {'F': (.04, .205, .1), 'B': (.045, .205, -.12)}, [B], target=260)
+    return body
+
+
+def walk_collar(a, at, r, tilt):
+    with a.at(*at, rx=tilt):
+        a.torus(r, .007, M['neon'], 24, 6)
+
+
+def dog_walk():
+    T, C = P['tan'], P['cream']
+    body = meta('Pet_Dog_Walk', [
+        ('e', (0, .275, -.02), .11, (.85, .85, 1.75)), ('e', (0, .285, .13), .1, (.95, 1, .95)),
+        ('e', (0, .275, -.18), .095, (.9, .9, 1)), ('e', (0, .345, .19), .065, (.9, 1.1, .9))], .005, [T, C],
+        color=lambda c, n: 1 if n.y < -.3 or (c.z > .17 and c.y < .34 and abs(c.x) < .06) else 0, target=1500,
+        details=lambda a: walk_collar(a, (0, .35, .2), .068, -.7))
+    head = meta('DogWalk_Head', [
+        ('e', (0, .04, .025), .07, (1.05, .9, 1)), ('e', (.04, .012, .055), .038, (1, .85, 1)), ('e', (-.04, .012, .055), .038, (1, .85, 1)),
+        ('e', (0, .003, .11), .036, (.85, .72, 1.25))], .004, [T, C],
+        color=lambda c, n: 1 if (c.z > .06 and c.y < .02) or (abs(c.x) > .03 and c.y < .015 and c.z > .03)
+        or min((c - Vector((s * .025, .07, .08))).length for s in (-1, 1)) < .012 else 0,
+        target=1000, details=dog_face)
+    attach(head, body, (0, .385, .215))
+    attach(meta('DogWalk_Tail', chain([(0, 0, 0), (0, .06, -.02), (0, .1, .02), (.03, .09, .07), (.04, .06, .06)], .032, .022),
+                .004, [T, C], color=lambda c, n: 1 if n.y < -.2 else 0, target=400), body, (0, .33, -.27))
+    legs(body, 'DogWalk', DOG_LEGS, {'F': (.06, .245, .14), 'B': (.065, .25, -.2)}, [T, C],
+         color=lambda c, n: 1 if c.y < -.13 else 0, target=300)
+    return body
 
 
 # ---------- props the animals sit on ----------
@@ -360,30 +428,60 @@ def jelly_tank(a):
     R, Ht, base = JT_R, JT_H, JT_B
     a.cyl(R + .06, R + .08, base, M['dark'], 0, base / 2, 0, 32)
     with a.at(0, base - .02, 0, rx=math.pi / 2):
-        a.torus(R + .065, .012, M['neon'], 48, 6)
+        a.torus(R + .065, .012, M['neon'], 32, 6)
     a.cyl(R, R, Ht, P['water'], 0, base + Ht / 2, 0, 32)
     a.cyl(R + .06, R + .06, .15, M['dark'], 0, base + Ht + .075, 0, 32)
     with a.at(0, base + Ht + .01, 0, rx=math.pi / 2):
-        a.torus(R + .065, .012, M['neon'], 48, 6)
+        a.torus(R + .065, .012, M['neon'], 32, 6)
     for k in range(3):
         ang = k * 2 * math.pi / 3 + .3
         a.box(.03, Ht, .03, M['trim'], (R + .02) * math.cos(ang), base + Ht / 2, (R + .02) * math.sin(ang))
     for s in (-1, 1):
         a.cable([(s * .15, base + Ht + .15, 0), (s * .25, base + Ht + .4, -.1), (s * .2, base + Ht + .7, -.3)], .02, M['dark'])
     with a.at(0, .004, 0, rx=math.pi / 2):
-        a.torus(.65, .008, M['neon2'], 48, 4)  # floor ring
+        a.torus(.65, .008, M['neon2'], 32, 4)  # floor ring
     a.box(.2, .1, .004, M['dark'], 0, .12, R + .07)
     a.box(.15, .02, .002, M['led'], 0, .14, R + .073)
 
 
 def jelly(a, seed):
+    """Open bell with a rippled rim, four gonads and four ruffled oral arms.
+    The tentacles are separate nodes (jelly_tentacle) so they sway on their own."""
     r = random.Random(seed)
-    a.sphere(.07, P['jelly'], 0, 0, 0, s=(1, .6, 1), rings=6)
-    for k in range(6):
-        ang = k * math.pi / 3
-        x, z = .045 * math.cos(ang), .045 * math.sin(ang)
-        a.cable([(x, -.02, z), (x * 1.2 + (r.random() - .5) * .03, -.12, z * 1.2), (x * .8, -.24, z * .8 + (r.random() - .5) * .04), (x * 1.1, -.34, z)],
-                .0035, M['neon2'], seg=4)
+    seg, rings, R, Hb = 16, 5, .07, .045
+    pts, faces = [(0, Hb, 0)], []
+    for i in range(1, rings + 1):
+        th = math.pi / 2 * 1.1 * i / rings  # just past the equator: the rim flares down
+        for k in range(seg):
+            ph = 2 * math.pi * k / seg
+            rr = R * math.sin(th) * (1 + (.07 * math.sin(ph * 9) if i == rings else 0))
+            pts.append((rr * math.cos(ph), Hb * math.cos(th), rr * math.sin(ph)))
+    faces += [(0, 1 + (k + 1) % seg, 1 + k) for k in range(seg)]
+    for i in range(rings - 1):
+        for k in range(seg):
+            a0, a1 = 1 + i * seg + k, 1 + i * seg + (k + 1) % seg
+            faces.append((a0, a1, a1 + seg, a0 + seg))
+    a.raw(pts, faces, P['jelly'], smooth=True)
+    for k in range(4):
+        ang = k * math.pi / 2 + math.pi / 4
+        a.sphere(.012, P['jellyCore'], .02 * math.cos(ang), .018, .02 * math.sin(ang), s=(1, .6, 1), seg=6, rings=3)
+        x, z = .008 * math.cos(ang), .008 * math.sin(ang)
+        L = .13 + r.random() * .05
+        a.cable([(x, 0, z), (x * 2 + .01 * math.sin(ang * 3), -L * .3, z * 2), (x * 1.5, -L * .6, z * 2.5 + .008), (x * 2.5, -L, z * 1.5)],
+                .004, P['jelly'], seg=3)
+
+
+def jelly_tentacle(a, ang, seed):
+    """One tentacle hanging from its root on the rim, wavy, drifting outward."""
+    r = random.Random(seed)
+    L, n, ph = .2 + r.random() * .14, 7, r.random() * 6
+    ox, oz = math.cos(ang), math.sin(ang)
+    pts = []
+    for j in range(n):
+        f = j / (n - 1)
+        wave = math.sin(f * 7 + ph) * .012 * f
+        pts.append((ox * (.01 * f + wave), -L * f, oz * (.01 * f + wave) + math.cos(f * 5 + ph) * .006 * f))
+    a.cable(pts, .0016, P['tentacle'], seg=3)
 
 
 def terrarium(a):
@@ -464,9 +562,22 @@ fish_parts.append(('Aquarium_Bubbles', lambda a: bubbles(a, AQ_T - .2), (.45, AQ
 aq = pet('Pet_Aquarium', aquarium, fish_parts, col='aabb')
 for i in range(6):
     bpy.data.objects[f'Fish_{i + 1}'].rotation_euler.z = fr.random() * math.tau  # Blender Z = three.js Y
+jelly_parts = []
+for i, p in enumerate([(.08, JT_B + 1.3, .05), (-.1, JT_B + .95, -.06), (.05, JT_B + .62, -.1)]):
+    jelly_parts.append((f'Jelly_{i + 1}', lambda a, i=i: jelly(a, i), p, None))
+    for k in range(8):
+        ang = k * 2 * math.pi / 8 + i * .4
+        root = (.064 * math.cos(ang), -.004, .064 * math.sin(ang))
+        jelly_parts.append((f'Jelly_{i + 1}_T{k + 1}', lambda a, ang=ang, i=i, k=k: jelly_tentacle(a, ang, i * 10 + k), root, f'Jelly_{i + 1}'))
 pet('Pet_JellyfishTank', jelly_tank,
-    [(f'Jelly_{i + 1}', lambda a, i=i: jelly(a, i), p, None) for i, p in enumerate([(.08, JT_B + 1.3, .05), (-.1, JT_B + .95, -.06), (.05, JT_B + .62, -.1)])]
-    + [('JellyTank_Bubbles', lambda a: bubbles(a, JT_H - .1, 3), (-.18, JT_B + .05, .1), None)], col='aabb')
+    jelly_parts + [('JellyTank_Bubbles', lambda a: bubbles(a, JT_H - .1, 3), (-.18, JT_B + .05, .1), None)], col='aabb')
+# roaming pets (kit.js createRoamer / createFlyer) and the furniture they use
+pets['Pet_Cat_Walk'] = cat_walk()
+pets['Pet_Dog_Walk'] = dog_walk()
+pets['Pet_Dog_Lying'] = dog('DogLie', 'Pet_Dog_Lying')
+pets['Pet_Parrot_Fly'] = parrot('ParrotFly', 'Pet_Parrot_Fly', folded=False)
+pet('Furn_DogBed', dog_bed)  # no collider: the dog walks onto it
+pet('Furn_ParrotPerch', perch, col=[(.44, .05, .44, 0, .025, 0), (.06, 1.3, .06, 0, .65, 0)])
 pet('Pet_Gecko_Terrarium', terrarium)
 attach(gecko(), pets['Pet_Gecko_Terrarium'], (.1, .118, -.05))
 pet('Deco_PetBowls', pet_bowls)

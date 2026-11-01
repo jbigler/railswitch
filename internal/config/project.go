@@ -62,7 +62,7 @@ type SharedMemory struct {
 // [memory] guidance is unset.
 const DefaultMemoryGuidance = "Never store secrets, credentials, tokens, personal data or patient data in shared memory: every agent of this project reads it, and it is kept until deleted."
 
-// MemoryGuidance is p's [memory] guidance, or the default.
+// MemoryGuidance is m's guidance, or the default.
 func (m *SharedMemory) MemoryGuidance() string {
 	if m.Guidance != "" {
 		return m.Guidance

@@ -166,7 +166,6 @@ What happens then (D136–D146):
   `worktree:<slug>` and look for work with `bd ready -l worktree:<slug>`.
   Claiming (`bd update <id> --claim`) is atomic: when two agents claim one
   task, one gets it and the other is told it's taken.
-
 - **Memories go to bd.** Every agent is told to keep what it learns in
   shared memory (`bd remember`) and not in its own tool's memory files
   (Claude's auto memory), which live in the worktree's agent home and are

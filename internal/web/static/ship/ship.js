@@ -233,9 +233,9 @@ function showAgent(slug) {
     const err = el('p', { class: 'err' });
     body.append(err);
     const box = el('textarea', { class: 'cmd', placeholder: 'Type to your agent. Enter sends; Shift+Enter is a new line.', maxlength: 4096 });
-    const send = async () => {
-      const text = box.value;
-      if (!text.trim()) return;
+    const send = async (enterOnly) => {
+      const text = enterOnly === true ? '' : box.value;
+      if (enterOnly !== true && !text.trim()) return;
       err.textContent = '';
       try {
         await post(`${base}/ship/agent/${encodeURIComponent(slug)}/send?agent=${encodeURIComponent(name)}`, text);
@@ -251,7 +251,7 @@ function showAgent(slug) {
         send();
       }
     });
-    body.append(box, el('div', { class: 'row' }, btn('Send ⏎', send), btn('Open console ▣', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body))));
+    body.append(box, el('div', { class: 'row' }, btn('Send ⏎', send), btn('Enter only', () => send(true), { title: 'Press Enter in the session: accept a prompt' }), btn('Open console ▣', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body))));
     let stop = false;
     let timer = 0;
     async function poll() {

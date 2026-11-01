@@ -48,7 +48,7 @@ func TestShipReads(t *testing.T) {
 		{"screen flag name", "GET", "/p/ftest/ship/agent/b/screen?agent=--all", "", 400, ""},
 		{"screen unknown worktree", "GET", "/p/ftest/ship/agent/nope/screen", "", 404, ""},
 		{"send", "POST", "/p/ftest/ship/agent/b/send?agent=claude", "run the tests", 200, "-C /ws/ftest -w b agent send claude"},
-		{"send empty", "POST", "/p/ftest/ship/agent/b/send", "", 400, ""},
+		{"send Enter", "POST", "/p/ftest/ship/agent/b/send", "", 200, "-C /ws/ftest -w b agent send"},
 		{"send too long", "POST", "/p/ftest/ship/agent/b/send", strings.Repeat("x", sendMax+1), 400, ""},
 	} {
 		f := newFixture(t)

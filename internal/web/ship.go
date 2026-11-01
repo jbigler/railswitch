@@ -180,8 +180,8 @@ func (s *Server) shipAgentSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	text, err := io.ReadAll(io.LimitReader(r.Body, sendMax+1))
-	if err != nil || len(text) == 0 || len(text) > sendMax {
-		http.Error(w, "send 1 to 4096 bytes", http.StatusBadRequest)
+	if err != nil || len(text) > sendMax {
+		http.Error(w, "send at most 4096 bytes (none presses Enter)", http.StatusBadRequest)
 		return
 	}
 	out, err := s.c.CLI.RunInput(r.Context(), text, append([]string{"-C", p.Workspace, "-w", wt.Slug, "agent", "send"}, name...)...)

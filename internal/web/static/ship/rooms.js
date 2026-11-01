@@ -248,10 +248,10 @@ export async function lab(slug, ui) {
   pad.position.set(W - 2.2, 0, D - 2.2);
   scene.add(pad);
 
-  const kitty = cat(r, { x0: -W + 5, x1: W - 3.5, z0: 0.6, z1: D - 1 }, ui.say);
-  scene.add(kitty);
+  const pet = cat(r, { x0: -W + 5, x1: W - 3.5, z0: 0.6, z1: D - 1 }, ui.say);
+  scene.add(pet);
 
-  const ticks = [partner.tick, pad.tick, kitty.tick];
+  const ticks = [partner.tick, pad.tick, pet.tick];
   const update = (st) => {
     const w = st.worktrees.find((x) => x.slug === slug);
     if (!w) return;
@@ -366,9 +366,9 @@ export async function bridge(prefix, ui) {
   pad.position.set(-W + 2.2, 0, D - 2);
   scene.add(pad);
 
-  const kitty = cat(r, { x0: -W + 2, x1: W - 2, z0: -D + 2.5, z1: D - 1 }, ui.say);
-  scene.add(kitty);
-  const ticks = [pad.tick, kitty.tick, (dt) => { beacons.rotation.y += dt * 0.2; }];
+  const pet = cat(r, { x0: -W + 2, x1: W - 2, z0: -D + 2.5, z1: D - 1 }, ui.say);
+  scene.add(pet);
+  const ticks = [pad.tick, pet.tick, (dt) => { beacons.rotation.y += dt * 0.2; }];
 
   const update = (st) => {
     const lines = st.worktrees.map((w) => ({

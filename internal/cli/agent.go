@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"slices"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
@@ -16,7 +18,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -48,6 +50,10 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		return cmdAgentAdd(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "default":
 		return cmdAgentDefault(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "screen":
+		return cmdAgentScreen(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "send":
+		return cmdAgentSend(ctx, e, args[1:])
 	}
 	a, code, ok := agentArgs(e, args)
 	if !ok {
@@ -116,6 +122,68 @@ func cmdAgentUpdate(ctx context.Context, e *env, args []string) int {
 	}
 	if err := l.AgentUpdate(ctx, slug, fs.Arg(0)); err != nil {
 		return e.failCommand(err)
+	}
+	return 0
+}
+
+// railswitch [--json] agent screen [<name>]: the service agent's screen as
+// it shows now (D144).
+func cmdAgentScreen(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("agent screen")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() > 1 {
+		return e.usageErr("%s", agentUsage)
+	}
+	l, slug, code := e.lifecycle(ctx, "agent screen")
+	if code != 0 {
+		return code
+	}
+	sc, err := l.AgentScreen(ctx, slug, fs.Arg(0))
+	if err != nil {
+		return e.fail(err)
+	}
+	if e.json {
+		if err := json.NewEncoder(e.stdout).Encode(sc); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
+	for _, line := range sc.Lines {
+		fmt.Fprintln(e.stdout, line)
+	}
+	return 0
+}
+
+// railswitch agent send [<name>]: type stdin into the service agent's
+// session, then Enter (D144). A CRLF is a line break (a browser form's),
+// and one trailing line break is dropped: Enter ends the text.
+func cmdAgentSend(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("agent send")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() > 1 {
+		return e.usageErr("%s", agentUsage)
+	}
+	data, err := io.ReadAll(io.LimitReader(e.stdin, 2*lifecycle.MaxSend+1))
+	if err != nil {
+		return e.fail(err)
+	}
+	if len(data) > 2*lifecycle.MaxSend {
+		return e.fail(fmt.Errorf("agent send: more than %d bytes", lifecycle.MaxSend))
+	}
+	text := strings.TrimSuffix(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if err := lifecycle.CheckSendText(text); err != nil {
+		return e.fail(err)
+	}
+	l, slug, code := e.lifecycle(ctx, "agent send")
+	if code != 0 {
+		return code
+	}
+	if err := l.AgentSend(ctx, slug, fs.Arg(0), text); err != nil {
+		return e.fail(err)
 	}
 	return 0
 }

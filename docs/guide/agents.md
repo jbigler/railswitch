@@ -41,6 +41,18 @@ a **service** (`railswitch agent` starts its unit if needed and attaches;
 from the terminal; the dashboard shows when one is waiting on you: a
 permission prompt, a question, a finished reply (`◆ N need input`).
 
+**Updating it.** An agent's image holds the agent's version from when it
+was built (Claude Code's own updater is off). To take the latest release:
+
+```bash
+railswitch agent update claude
+```
+
+It rebuilds the image without the build cache, so Claude Code is
+downloaded again. Every worktree uses that image: each agent started
+afterwards runs the new version, and a running one keeps the old version
+until you stop it.
+
 Its home, logins and history included, is a folder per worktree
 (`.railswitch/agent-home/<worktree>/<agent>`), kept across `down` and
 deleted by `wt rm --force`.

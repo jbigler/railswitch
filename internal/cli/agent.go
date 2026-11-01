@@ -16,7 +16,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -34,12 +34,15 @@ var launchTerm = func(ctx context.Context, e *env, title, dir string, argv []str
 // agent (up first), or with --new-term re-run this command in a new
 // terminal tab or window; railswitch agent ls: every agent and its status
 // (D58); railswitch agent stop [<name>]: stop the worktree's running agent
-// (D62); railswitch agent add: see cmdAgentAdd (D63); railswitch agent
+// (D62); railswitch agent update [<name>]: rebuild its image without the
+// cache (D138); railswitch agent add: see cmdAgentAdd (D63); railswitch agent
 // default: see cmdAgentDefault (D135).
 func cmdAgent(ctx context.Context, e *env, args []string) int {
 	switch {
 	case len(args) > 0 && args[0] == "stop":
 		return cmdAgentStop(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "update":
+		return cmdAgentUpdate(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "add":
 		return cmdAgentAdd(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "default":
@@ -82,6 +85,26 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		if errors.As(err, &u) {
 			return e.usageErr("%s", u.Msg)
 		}
+		return e.failCommand(err)
+	}
+	return 0
+}
+
+// railswitch agent update [<name>]: rebuild the agent's image without the
+// build cache, fetching what it downloads again (D138).
+func cmdAgentUpdate(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("agent update")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() > 1 {
+		return e.usageErr("%s", agentUsage)
+	}
+	l, slug, code := e.lifecycle(ctx, "agent")
+	if code != 0 {
+		return code
+	}
+	if err := l.AgentUpdate(ctx, slug, fs.Arg(0)); err != nil {
 		return e.failCommand(err)
 	}
 	return 0

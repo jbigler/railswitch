@@ -661,3 +661,28 @@ func TestAgentServiceRunningAttaches(t *testing.T) {
 		t.Errorf("last call %q; want the attach", last)
 	}
 }
+
+// agent update rebuilds only the named agent's image, without the cache;
+// the images it builds on exist and are not rebuilt (D138).
+func TestAgentUpdate(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"podman", "image", "inspect"}, sys.Result{Stdout: []byte("sha256:same\n")}, nil)
+	if err := e.l.AgentUpdate(ctx, "feat", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	var builds []string
+	for _, c := range e.calls() {
+		if j := strings.Join(c, " "); strings.HasPrefix(j, "podman build") {
+			builds = append(builds, j)
+		}
+	}
+	if len(builds) != 1 || !strings.Contains(builds[0], "Containerfile.claude") || !strings.Contains(builds[0], "--no-cache") {
+		t.Errorf("builds %q; want only the claude image, --no-cache", builds)
+	}
+	if n := containing(e.calls(), "podman rmi"); n != 0 {
+		t.Error("removed an image the build didn't replace")
+	}
+	if err := e.l.AgentUpdate(ctx, "feat", "nope"); err == nil || !strings.Contains(err.Error(), "no agent nope") {
+		t.Errorf("unknown agent: %v", err)
+	}
+}

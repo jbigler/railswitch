@@ -163,21 +163,10 @@ func (l *L) AgentWatch(ctx context.Context, slug, name string) error {
 // CheckWatch returns the container of the agent AgentWatch would watch, or
 // why it can't; --new-term calls it before opening a terminal.
 func (l *L) CheckWatch(ctx context.Context, slug, name string) (string, error) {
-	m, err := l.model(ctx)
+	name, ctr, err := l.serviceAgent(ctx, slug, name, "--watch")
 	if err != nil {
 		return "", err
 	}
-	if name, err = l.agentName(m, name); err != nil {
-		return "", err
-	}
-	s, err := service(m, "agent-"+name)
-	if err != nil {
-		return "", err
-	}
-	if s.OnDemand {
-		return "", fmt.Errorf("agent %s runs on demand, in one terminal; --watch is for a service agent", name)
-	}
-	ctr := containerOf(m, slug, s.ID)
 	if ok, err := l.podman().Running(ctx, ctr); err != nil {
 		return "", err
 	} else if !ok {
@@ -189,6 +178,27 @@ func (l *L) CheckWatch(ctx context.Context, slug, name string) (string, error) {
 		return "", fmt.Errorf("agent %s has no session in %s to watch: railswitch agent %s starts one", name, slug, name)
 	}
 	return ctr, nil
+}
+
+// serviceAgent resolves agent name ("": the default one) and its container
+// in worktree slug; an on-demand agent is refused, as what (the command)
+// needs a service agent's session.
+func (l *L) serviceAgent(ctx context.Context, slug, name, what string) (string, string, error) {
+	m, err := l.model(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if name, err = l.agentName(m, name); err != nil {
+		return "", "", err
+	}
+	s, err := service(m, "agent-"+name)
+	if err != nil {
+		return "", "", err
+	}
+	if s.OnDemand {
+		return "", "", fmt.Errorf("agent %s runs on demand, in one terminal; %s is for a service agent", name, what)
+	}
+	return name, containerOf(m, slug, s.ID), nil
 }
 
 // agentAttach is the podman exec of a session client on service agent ctr's

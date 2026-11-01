@@ -30,28 +30,11 @@
 			"doubleSided":true,
 			"name":"RS_Floor",
 			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.005181516520678997,
-					0.005605391692370176,
-					0.00802319310605526,
-					1
-				],
-				"metallicFactor":0.5,
-				"roughnessFactor":0.2800000011920929
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"RS_BodyDark",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.0033465358428657055,
-					0.0036765073891729116,
-					0.005181516520678997,
-					1
-				],
-				"metallicFactor":0.4000000059604645,
-				"roughnessFactor":0.550000011920929
+				"baseColorTexture":{
+					"index":0
+				},
+				"metallicFactor":0.3499999940395355,
+				"roughnessFactor":0.5
 			}
 		}
 	],
@@ -74,20 +57,26 @@
 				{
 					"attributes":{
 						"POSITION":3,
-						"NORMAL":4
+						"NORMAL":4,
+						"TEXCOORD_0":5
 					},
-					"indices":5,
+					"indices":6,
 					"material":0
-				},
-				{
-					"attributes":{
-						"POSITION":6,
-						"NORMAL":7
-					},
-					"indices":8,
-					"material":1
 				}
 			]
+		}
+	],
+	"textures":[
+		{
+			"sampler":0,
+			"source":0
+		}
+	],
+	"images":[
+		{
+			"mimeType":"image/png",
+			"name":"RS_Trim_Floor",
+			"uri":"RS_Trim_Floor.png"
 		}
 	],
 	"accessors":[
@@ -143,36 +132,14 @@
 		},
 		{
 			"bufferView":5,
-			"componentType":5123,
-			"count":6,
-			"type":"SCALAR"
+			"componentType":5126,
+			"count":4,
+			"type":"VEC2"
 		},
 		{
 			"bufferView":6,
-			"componentType":5126,
-			"count":240,
-			"max":[
-				2.009999990463257,
-				0.0020002396777272224,
-				2.009999990463257
-			],
-			"min":[
-				-2.009999990463257,
-				-2.3961067086020194e-07,
-				-2.009999990463257
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":7,
-			"componentType":5126,
-			"count":240,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":8,
 			"componentType":5123,
-			"count":360,
+			"count":6,
 			"type":"SCALAR"
 		}
 	],
@@ -209,32 +176,26 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":12,
+			"byteLength":32,
 			"byteOffset":744,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":2880,
-			"byteOffset":756,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2880,
-			"byteOffset":3636,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":720,
-			"byteOffset":6516,
+			"byteLength":12,
+			"byteOffset":776,
 			"target":34963
+		}
+	],
+	"samplers":[
+		{
+			"magFilter":9729,
+			"minFilter":9987
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":7236,
+			"byteLength":788,
 			"uri":"Arch_Floor_4m.bin"
 		}
 	]

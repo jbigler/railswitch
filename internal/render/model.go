@@ -618,6 +618,7 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 	if p := ag.Memory.Path; p != "" {
 		s.Mounts = append(s.Mounts, Mount{Source: "{agent.memory}/" + a.Name, Target: appHome + "/" + p, Options: "z"})
 	}
+	b.notesAgent(&s)
 	if err := b.packageMounts(&s, pkg, ag.Files, ag.Mounts); err != nil {
 		return s, err
 	}

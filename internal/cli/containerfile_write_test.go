@@ -331,7 +331,7 @@ func TestCommitRestoresNewLock(t *testing.T) {
 	e := &env{stdout: &out, stderr: &errb, run: f, dir: ws}
 	err := e.commit(context.Background(), ws, []fileChange{
 		{Rel: "project.toml", Data: []byte(before + "# edited\n"), Mode: 0o644},
-		{Rel: "notes/new.txt", Data: []byte("x"), Mode: 0o644},
+		{Rel: "scratch/new.txt", Data: []byte("x"), Mode: 0o644},
 	}, &workspace.Accept{})
 	if err == nil || !strings.Contains(err.Error(), "podman info") {
 		t.Fatalf("err = %v", err)
@@ -342,7 +342,7 @@ func TestCommitRestoresNewLock(t *testing.T) {
 	if fi, err := os.Stat(proj); err != nil || fi.Mode().Perm() != 0o600 {
 		t.Errorf("project.toml mode %v (%v); want 0600 kept", fi.Mode(), err)
 	}
-	for _, p := range []string{lock, filepath.Join(ws, "notes")} {
+	for _, p := range []string{lock, filepath.Join(ws, "scratch")} {
 		if _, err := os.Stat(p); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%s left behind: %v", p, err)
 		}

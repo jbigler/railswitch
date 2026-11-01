@@ -155,6 +155,9 @@ func (m *Model) Plan() (*Plan, error) {
 			status = append(status, path.Join(statusDir, wt.Slug))
 		}
 	}
+	if hasAgents {
+		status = append(status, NotesDir) // D141: the shared notes
+	}
 	for _, a := range m.Inputs.Stack.Agents {
 		if len(a.Agent.Config.Paths) > 0 {
 			status = append(status, path.Join(AgentDefaultDir, a.Name))

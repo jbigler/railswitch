@@ -158,29 +158,45 @@ Claude's `.claude.json` is merged instead, keeping each worktree's own
 project entries. Plugins themselves are shared by every worktree already,
 so a promoted plugin list works everywhere at once.
 
-## Shared memory
+## Shared notes
 
-Claude's memory (what it saves about the project to keep in mind next
-time) is one folder for the whole project, not one per worktree:
-`.railswitch/agent-memory/claude/` in the workspace, which every
-worktree's Claude sees as its own auto memory. A note one agent saves
-while fixing a bug is there for the next agent in any worktree, and
-`wt rm` doesn't delete it.
+What the project's agents should all know (a command that must be run a
+certain way, a gotcha, a convention) goes in the project's notes: one
+folder, `notes/` in the workspace, which every agent of every kind (Claude,
+your own packages) reads and writes as `~/notes/`, in every worktree.
 
-It is a plain folder: read, edit or delete its files, and back it up as
-you would any folder. To bring in memory files from earlier runs
-(rails-dev-podman's `.container-config/claude-memory/`, or a worktree's
-`~/.claude/projects/-app/memory/` from before this), copy them in,
-`MEMORY.md` index included:
+- **A note is a Markdown file named for what it says,** words joined by
+  underscores: `run_db_prepare_after_a_schema_change.md`. Agents write
+  them; so can you, with any editor.
+- **Every agent starts with the list of notes:** the rule for using them,
+  then every note's file name, newest first. Only names: it reads a whole
+  note when its name is relevant (or searches them with `grep`), so the
+  notes' size never costs context. Claude gets this at every session start and after a
+  compaction; a package of your own gets it the way it delivers context
+  (see [the package format](../packs.md)).
+- **Saved notes are for everyone at once:** a note one agent writes is in
+  every other agent's index at its next start, and any agent can read it
+  right away.
+- **They are kept:** `wt rm` and `down` never touch `notes/`; back it up,
+  edit it or commit it somewhere as you like.
+
+Never put secrets, credentials or personal data in a note, and in a
+healthcare project no patient data: every agent reads them.
+
+## Claude's own memory
+
+Claude Code's auto memory is off in railswitch's agents: the project's
+shared notes are Claude's memory, so what it learns reaches every agent
+rather than one tool's private store. Memory files from earlier runs
+(rails-dev-podman's `.container-config/claude-memory/`, a
+`~/.claude/projects/*/memory/` folder) can be copied into `notes/`; give
+each a name that says what it holds (their own names, like
+`feedback_testing.md`, are often too vague for an agent to know when to
+read them). Claude's own `MEMORY.md` index file is left out of the list.
 
 ```bash
-cp -n /path/to/old-memory/* .railswitch/agent-memory/claude/
+cp /path/to/old-memory/project_setup.md notes/ci_caches_gems_per_ruby_version.md
 ```
-
-Claude reads the index at the start of each session, so a note another
-agent saves mid-session reaches a running agent only when it looks. Two
-agents saving at the same moment can, rarely, lose one line of
-`MEMORY.md`; the note files themselves are safe.
 
 ## Your own agent
 

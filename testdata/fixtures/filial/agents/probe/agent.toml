@@ -4,3 +4,6 @@ allow = ["probe.example"]
 
 [image]
 file = "Containerfile.probe"
+
+[memory]                      # the shared memory folder (D136), tested on a package that has one
+path = ".probe-memory"

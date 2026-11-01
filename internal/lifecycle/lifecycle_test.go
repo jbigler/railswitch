@@ -65,7 +65,7 @@ func setup(t *testing.T, slugs ...string) *tenv {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
 	ws := testfixture.Workspace(t, "../../testdata/fixtures/filial")
 	for _, d := range append([]string{"master/.git"}, slugs...) {
-		if err := os.MkdirAll(filepath.Join(ws, d), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(ws, "worktrees", d), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -283,7 +283,7 @@ func TestUpRecordsDigest(t *testing.T) {
 // git-guard (D60): a finding is a warning; up still runs.
 func TestUpWarnsGitGuard(t *testing.T) {
 	e := setup(t)
-	hook := filepath.Join(e.ws, "master", ".git", "hooks", "pre-commit")
+	hook := filepath.Join(e.ws, "worktrees", "master", ".git", "hooks", "pre-commit")
 	if err := os.MkdirAll(filepath.Dir(hook), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -568,7 +568,7 @@ func TestStatusJSON(t *testing.T) {
 func TestPreflightMissingBind(t *testing.T) {
 	e := setup(t)
 	e.render(t)
-	git := filepath.Join(e.ws, "master", ".git")
+	git := filepath.Join(e.ws, "worktrees", "master", ".git")
 	if err := os.Remove(git); err != nil {
 		t.Fatal(err)
 	}

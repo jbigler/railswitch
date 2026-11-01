@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
+	"github.com/jbigler/railswitch/internal/naming"
 )
 
 const nvimUsage = "usage: railswitch nvim [--new-term] [<file>[:<line>[:<col>]]] | railswitch nvim update | railswitch nvim reset-config [--yes]"
@@ -83,7 +84,7 @@ func cmdNvimAttach(ctx context.Context, e *env, args []string) int {
 	if code != 0 {
 		return code
 	}
-	dir := filepath.Join(l.WS.Root, slug)
+	dir := naming.WorktreeDir(l.WS.Root, slug)
 	var target *lifecycle.NvimTarget
 	if len(pos) == 1 {
 		cwd, _ := os.Getwd()

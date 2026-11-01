@@ -7,9 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
+
+// WorktreesDir is the workspace folder that holds every worktree, apart
+// from the project's own files and folders at the root: no worktree name
+// can collide with them (D143).
+const WorktreesDir = "worktrees"
+
+// WorktreeDir is worktree slug's checkout in workspace ws.
+func WorktreeDir(ws, slug string) string { return filepath.Join(ws, WorktreesDir, slug) }
 
 // SlugMaxLen caps a worktree slug: it keeps DNS labels well under 63 chars.
 const SlugMaxLen = 40

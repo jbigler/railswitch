@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"slices"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/term"
 )
@@ -193,7 +193,7 @@ func (e *env) agentNewTerm(ctx context.Context, root, slug string, a agentCall) 
 	if len(a.argv) > 0 {
 		cmd = append(append(cmd, "--"), a.argv...)
 	}
-	return e.launchIn(ctx, title, filepath.Join(root, slug), cmd)
+	return e.launchIn(ctx, title, naming.WorktreeDir(root, slug), cmd)
 }
 
 // printAgents prints agent ls: JSON with --json, else a table whose RUNNING

@@ -31,7 +31,7 @@ const (
 	RoleAgent  = "agent" // an agent package's container (D54)
 )
 
-// Worktree is one registered worktree: <workspace>/<slug>/ (D22). Share is
+// Worktree is one registered worktree: <workspace>/worktrees/<slug>/ (D22, D143). Share is
 // set while it is shared on the tailnet (D46).
 type Worktree struct {
 	Slug        string
@@ -87,7 +87,7 @@ type Model struct {
 	Warnings []string // non-fatal findings, e.g. a suggested option addon missing from [image] addons
 	Assets   []Asset  // every package asset a service mounts; Plan writes them
 
-	baseDir    string                    // <workspace>/<sanitize(base_branch)>
+	baseDir    string                    // <workspace>/worktrees/<sanitize(base_branch)>
 	chain      []*containerfile          // [image] base, then each addon
 	tools      map[string]*containerfile // tool service id → containerfiles/Containerfile.<tool>
 	standalone map[string]*containerfile // option service id → its standalone Containerfile
@@ -229,7 +229,7 @@ func literal(s string) string { return strings.ReplaceAll(s, "{", "{{") }
 func Build(in Inputs) (*Model, error) {
 	p := in.Project
 	if p.Project.BaseBranch == "" {
-		return nil, errors.New("project.base_branch is required: the base worktree is <workspace>/<base_branch>/ (D22)")
+		return nil, errors.New("project.base_branch is required: the base worktree is <workspace>/worktrees/<base_branch>/ (D22, D143)")
 	}
 	base, err := naming.Sanitize(p.Project.BaseBranch)
 	if err != nil {
@@ -237,7 +237,7 @@ func Build(in Inputs) (*Model, error) {
 	}
 	b := &builder{
 		in:     in,
-		m:      &Model{Prefix: p.Project.Prefix, Inputs: in, baseDir: filepath.Join(in.Workspace, base), tools: map[string]*containerfile{}, standalone: map[string]*containerfile{}, agents: map[string]*containerfile{}},
+		m:      &Model{Prefix: p.Project.Prefix, Inputs: in, baseDir: naming.WorktreeDir(in.Workspace, base), tools: map[string]*containerfile{}, standalone: map[string]*containerfile{}, agents: map[string]*containerfile{}},
 		assets: map[string]bool{},
 		opts:   map[string]*pack.Option{},
 		tools:  map[string]*pack.Tool{},

@@ -219,7 +219,7 @@ func TestLockAcceptRestart(t *testing.T) {
 	ws, _ := lockedWS(t)
 	mustRun(t, "-C", ws, "render")
 	for _, slug := range []string{"master", "feat"} {
-		if err := os.MkdirAll(filepath.Join(ws, slug, ".git"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(ws, "worktrees", slug, ".git"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -66,7 +66,7 @@ func setup(t *testing.T) *tenv {
 	if err := os.Mkdir(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	base := filepath.Join(ws, "master")
+	base := filepath.Join(ws, "worktrees", "master")
 	git(t, ws, "clone", "-q", filepath.Join(tmp, "remote.git"), base)
 
 	data := filepath.Join(tmp, "data")
@@ -190,8 +190,8 @@ func exists(path string) bool {
 func TestAddAllocatesAfterGit(t *testing.T) {
 	e := setup(t)
 	w := e.add(t, "feat", "")
-	if w.Slug != "feat" || w.ID != 2 || w.Branch != "feat" || w.Dir != filepath.Join(e.ws, "feat") {
-		t.Errorf("Add = %+v; want slug feat, ID 2, branch feat in %s", w, filepath.Join(e.ws, "feat"))
+	if w.Slug != "feat" || w.ID != 2 || w.Branch != "feat" || w.Dir != filepath.Join(e.ws, "worktrees", "feat") {
+		t.Errorf("Add = %+v; want slug feat, ID 2, branch feat in %s", w, filepath.Join(e.ws, "worktrees", "feat"))
 	}
 	if got := e.registered(t); !slices.Contains(got, machine.WorktreeEntry{Prefix: prefix, Slug: "feat", ID: 2}) {
 		t.Errorf("registry = %+v; want demo/feat ID 2", got)
@@ -291,7 +291,7 @@ func TestAddPrecreatesWorktreeVolumes(t *testing.T) {
 	e := setup(t)
 	e.m.WorktreeVolumes = []string{"node_modules"}
 	e.add(t, "feat", "")
-	if fi, err := os.Stat(filepath.Join(e.ws, "feat", "node_modules")); err != nil || !fi.IsDir() {
+	if fi, err := os.Stat(filepath.Join(e.ws, "worktrees", "feat", "node_modules")); err != nil || !fi.IsDir() {
 		t.Errorf("feat/node_modules: %v", err)
 	}
 }
@@ -327,12 +327,12 @@ func (e *tenv) rolledBack(t *testing.T, slug string) {
 	if got := e.slugs(t); !slices.Equal(got, []string{"master"}) {
 		t.Errorf("registry = %v; want only master", got)
 	}
-	for _, p := range []string{slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug, ".railswitch/agent-home/" + slug, ".railswitch/status/" + slug} {
+	for _, p := range []string{"worktrees/" + slug, ".railswitch/env/" + slug, ".railswitch/home/" + slug, ".railswitch/agent-home/" + slug, ".railswitch/status/" + slug} {
 		if exists(filepath.Join(e.ws, p)) {
 			t.Errorf("%s remains after the failed Add", p)
 		}
 	}
-	if strings.Contains(git(t, e.base, "worktree", "list"), filepath.Join(e.ws, slug)) {
+	if strings.Contains(git(t, e.base, "worktree", "list"), filepath.Join(e.ws, "worktrees", slug)) {
 		t.Errorf("git still lists %s", slug)
 	}
 }
@@ -554,7 +554,7 @@ func TestRemovePrecedence(t *testing.T) {
 	e.add(t, "pathy", "")
 	e.add(t, "topic", "tw")
 	e.add(t, "zz", "nm")
-	for _, target := range []string{filepath.Join(e.ws, "pathy"), "topic", "nm"} {
+	for _, target := range []string{filepath.Join(e.ws, "worktrees", "pathy"), "topic", "nm"} {
 		if err := e.m.Remove(ctx, target, false); err != nil {
 			t.Fatalf("Remove(%q): %v", target, err)
 		}
@@ -563,7 +563,7 @@ func TestRemovePrecedence(t *testing.T) {
 		t.Errorf("registry = %v; want only master", got)
 	}
 	for _, slug := range []string{"pathy", "tw", "nm"} {
-		if exists(filepath.Join(e.ws, slug)) {
+		if exists(filepath.Join(e.ws, "worktrees", slug)) {
 			t.Errorf("%s still exists", slug)
 		}
 	}
@@ -623,7 +623,7 @@ func TestRemovePartialViewAborts(t *testing.T) {
 	e := setup(t)
 	e.add(t, "feat", "")
 	e.add(t, "other", "")
-	if err := os.Rename(filepath.Join(e.ws, "other"), filepath.Join(e.ws, "moved")); err != nil {
+	if err := os.Rename(filepath.Join(e.ws, "worktrees", "other"), filepath.Join(e.ws, "moved")); err != nil {
 		t.Fatal(err)
 	}
 	n := len(e.f.Calls)
@@ -633,7 +633,7 @@ func TestRemovePartialViewAborts(t *testing.T) {
 	if calls := e.f.Calls[n:]; len(calls) != 0 {
 		t.Errorf("calls after a partial view: %q", calls)
 	}
-	if !slices.Contains(e.slugs(t), "feat") || !exists(filepath.Join(e.ws, "feat")) {
+	if !slices.Contains(e.slugs(t), "feat") || !exists(filepath.Join(e.ws, "worktrees", "feat")) {
 		t.Error("feat was touched")
 	}
 }
@@ -703,7 +703,7 @@ func TestRemoveExactNames(t *testing.T) {
 	if exists(filepath.Join(e.ws, ".railswitch", "env", "api")) {
 		t.Error("env/api remains")
 	}
-	for _, p := range []string{".railswitch/env/api-v2", "api-v2"} {
+	for _, p := range []string{".railswitch/env/api-v2", "worktrees/api-v2"} {
 		if !exists(filepath.Join(e.ws, p)) {
 			t.Errorf("%s was removed", p)
 		}
@@ -780,7 +780,7 @@ func TestNeverPrune(t *testing.T) {
 	if err := e.m.Remove(ctx, "feat", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.RemoveAll(filepath.Join(e.ws, "gone")); err != nil {
+	if err := os.RemoveAll(filepath.Join(e.ws, "worktrees", "gone")); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.m.Remove(ctx, "gone", true); err == nil || !strings.Contains(err.Error(), "out of view") {
@@ -850,5 +850,23 @@ func TestFetchTransportAllowlist(t *testing.T) {
 		if err := e.m.fetch(context.Background(), e.base, "master"); err == nil || !strings.Contains(err.Error(), "not allowed") {
 			t.Errorf("fetch from %s: %v; want git's transport refusal", url, err)
 		}
+	}
+}
+
+// D143: a git worktree railswitch didn't register counts only directly in
+// worktrees/; one at the workspace root (the old place) is no worktree.
+func TestUnregisteredGitWorktreeOnlyInWorktrees(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	git(t, e.base, "worktree", "add", "-q", "-b", "stray", filepath.Join(e.ws, "worktrees", "stray"))
+	git(t, e.base, "worktree", "add", "-q", "-b", "old", filepath.Join(e.ws, "old"))
+	if err := e.m.Remove(ctx, "old", false); err == nil || !strings.Contains(err.Error(), "no worktree of this project") {
+		t.Errorf("Remove(old) at the root = %v; want it unknown", err)
+	}
+	if err := e.m.Remove(ctx, "stray", false); err != nil {
+		t.Fatalf("Remove(stray) in worktrees/: %v", err)
+	}
+	if exists(filepath.Join(e.ws, "worktrees", "stray")) || !exists(filepath.Join(e.ws, "old")) {
+		t.Error("removed the wrong git worktree")
 	}
 }

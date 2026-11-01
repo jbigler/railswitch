@@ -49,7 +49,7 @@ func projects(t *testing.T, prefixes ...string) (machine.Dirs, map[string]string
 		if err := os.WriteFile(toml, data, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.MkdirAll(filepath.Join(ws, "master", ".git"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(ws, "worktrees", "master", ".git"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		reg, err := machine.Open(dirs.Data)
@@ -290,7 +290,7 @@ func TestProjectRemovePurgeKeepsRepo(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, ".railswitch")); !os.IsNotExist(err) {
 		t.Errorf(".railswitch: %v", err)
 	}
-	for _, p := range []string{ws, filepath.Join(ws, "master", ".git"), filepath.Join(ws, "project.toml")} {
+	for _, p := range []string{ws, filepath.Join(ws, "worktrees", "master", ".git"), filepath.Join(ws, "project.toml")} {
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("%s: %v", p, err)
 		}

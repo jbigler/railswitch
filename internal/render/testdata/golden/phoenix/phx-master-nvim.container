@@ -5,7 +5,7 @@
 Description=phx nvim of worktree master
 
 [Container]
-Label=phx.unit-hash=f009ef4fcb68
+Label=phx.unit-hash=b099b2d7cbf9
 Image=localhost/phx/nvim:elixir1.18.4-otp27-679b508d
 ContainerName=phx-master-nvim
 Network=phx-master-dev.network:alias=nvim
@@ -15,12 +15,12 @@ User=1000:1000
 EnvironmentFile=/WORKSPACES/phoenix/.railswitch/env/master/nvim.env
 AddHost=master.phx.localhost:10.214.3.2
 PublishPort=127.0.0.1:17001:7777
-Volume=/WORKSPACES/phoenix/master:/app:z
-Volume=/WORKSPACES/phoenix/master:/WORKSPACES/phoenix/master:z
-Volume=/WORKSPACES/phoenix/master/.git:/WORKSPACES/phoenix/master/.git:z
-Volume=/WORKSPACES/phoenix/master/.git/hooks:/WORKSPACES/phoenix/master/.git/hooks:ro,z
-Volume=/WORKSPACES/phoenix/master/.git:/app/.git:z
-Volume=/WORKSPACES/phoenix/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master:/app:z
+Volume=/WORKSPACES/phoenix/worktrees/master:/WORKSPACES/phoenix/worktrees/master:z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git:/WORKSPACES/phoenix/worktrees/master/.git:z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git/hooks:/WORKSPACES/phoenix/worktrees/master/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git:/app/.git:z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/phoenix/.railswitch/home/master:/home/appuser:z
 Volume=/WORKSPACES/phoenix/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh:/usr/local/bin/entrypoint-nvim.sh:ro,z
 Volume=phx-master-deps:/app/deps:U

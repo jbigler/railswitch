@@ -119,7 +119,7 @@ Project commands run in the workspace, worktree commands in a worktree
 ```bash
 cd ~/workspace/shop
 railswitch wt add feature-x --up      # a branch, a PR number, or a new branch
-cd feature-x
+cd worktrees/feature-x
 railswitch up | stop | restart
 railswitch logs -f rails
 railswitch exec bin/rails console

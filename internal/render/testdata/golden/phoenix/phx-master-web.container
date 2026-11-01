@@ -8,7 +8,7 @@ Wants=phx-master-nvim.service railswitch-traefik.service railswitch-dozzle.servi
 After=phx-master-deps.service phx-master-db.service phx-master-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=phx.unit-hash=54dff2e27a05
+Label=phx.unit-hash=80316907fd8d
 Image=localhost/phx/base:elixir1.18.4-otp27-bac86656
 ContainerName=phx-master-web
 Network=phx-master-dev.network:alias=web
@@ -18,10 +18,10 @@ User=1000:1000
 EnvironmentFile=/WORKSPACES/phoenix/.railswitch/env/master/web.env
 AddHost=master.phx.localhost:10.214.3.2
 PublishPort=127.0.0.1:13001:4000
-Volume=/WORKSPACES/phoenix/master:/app:z
-Volume=/WORKSPACES/phoenix/master/.git:/WORKSPACES/phoenix/master/.git:ro,z
-Volume=/WORKSPACES/phoenix/master/.git:/app/.git:ro,z
-Volume=/WORKSPACES/phoenix/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master:/app:z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git:/WORKSPACES/phoenix/worktrees/master/.git:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git:/app/.git:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/phoenix/.railswitch/assets/phoenix/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
 Volume=phx_hex:/home/appuser/.hex:U
 Volume=phx_phoenix_assets:/home/appuser/.cache/phoenix-assets:U

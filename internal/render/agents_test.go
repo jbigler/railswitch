@@ -47,7 +47,7 @@ func TestAgentServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	master := filepath.Join(ws, "master")
+	master := filepath.Join(ws, "worktrees", "master")
 	for _, want := range []string{
 		master + ":/app:z",
 		master + ":" + master + ":z",
@@ -100,7 +100,7 @@ func TestAgentAnnotations(t *testing.T) {
 // at its own host path.
 func TestWorktreeHostPath(t *testing.T) {
 	ws, units := renderUnits(t, fixtureDir, nil)
-	feat := filepath.Join(ws, "feat")
+	feat := filepath.Join(ws, "worktrees", "feat")
 	line := "Volume=" + feat + ":" + feat + ":z"
 	hasLine(t, units, "filial-feat-nvim.container", line)
 	hasLine(t, units, "filial-feat-agent-probe.container", line)

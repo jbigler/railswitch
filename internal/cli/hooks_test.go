@@ -10,7 +10,7 @@ import (
 func TestHooks(t *testing.T) {
 	ws, _ := filialWS(t)
 	mustRun(t, "-C", ws, "lock")
-	hook := filepath.Join(ws, "master", ".git", "hooks", "pre-commit")
+	hook := filepath.Join(ws, "worktrees", "master", ".git", "hooks", "pre-commit")
 	if err := os.MkdirAll(filepath.Dir(hook), 0o755); err != nil {
 		t.Fatal(err)
 	}

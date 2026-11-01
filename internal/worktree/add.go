@@ -40,7 +40,7 @@ type Manager struct {
 	// Proc is the procfs root ("/proc") of the host's listening TCP ports
 	// (machine.Listening): an ID with a port in use is never handed out.
 	Proc      string
-	Base      string   // [project] base_branch; the base worktree is <WS>/<Sanitize(Base)> (D22)
+	Base      string   // [project] base_branch; the base worktree is <WS>/worktrees/<Sanitize(Base)> (D22, D143)
 	Repo      string   // [project] repo: a GitHub URL names the repo for gh pr view
 	SeedFiles []string // [project] seed_files, relative to a worktree
 	In        io.Reader
@@ -65,7 +65,7 @@ type Manager struct {
 	WorktreeVolumes []string
 }
 
-// Add checks out target in a new worktree <WS>/<slug>, registers it,
+// Add checks out target in a new worktree <WS>/worktrees/<slug>, registers it,
 // seeds it and renders. target is a branch, a PR number (its head branch,
 // via gh) or a new branch, created from the base worktree's HEAD. name is
 // the worktree name (--name); when empty, Add prompts for it on a terminal
@@ -95,7 +95,7 @@ func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktr
 	if err != nil {
 		return render.Worktree{}, err
 	}
-	dir := filepath.Join(m.WS, slug)
+	dir := naming.WorktreeDir(m.WS, slug)
 	for _, d := range homeDirs {
 		home := filepath.Join(m.WS, ".railswitch", d, slug)
 		if _, err := os.Lstat(home); errors.Is(err, fs.ErrNotExist) {
@@ -223,13 +223,13 @@ func (m *Manager) rollback(ctx context.Context, u undo, cause error) error {
 	return errors.Join(errs...)
 }
 
-// baseDir is the base worktree, <WS>/<Sanitize(Base)> (D22).
+// baseDir is the base worktree, <WS>/worktrees/<Sanitize(Base)> (D22, D143).
 func (m *Manager) baseDir() (string, error) {
 	slug, err := m.baseSlug()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(m.WS, slug), nil
+	return naming.WorktreeDir(m.WS, slug), nil
 }
 
 func (m *Manager) baseSlug() (string, error) {
@@ -342,7 +342,7 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 		return "", err
 	}
 	isTaken := func(slug string) bool {
-		_, err := os.Lstat(filepath.Join(m.WS, slug))
+		_, err := os.Lstat(naming.WorktreeDir(m.WS, slug))
 		return slices.ContainsFunc(entries, func(e machine.WorktreeEntry) bool { return e.Slug == slug }) || !errors.Is(err, fs.ErrNotExist)
 	}
 	def, err := naming.Sanitize(branch)
@@ -368,7 +368,7 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 		}
 	}
 	if isTaken(slug) {
-		return "", fmt.Errorf("worktree name %s is taken: it is registered or %s exists", slug, filepath.Join(m.WS, slug))
+		return "", fmt.Errorf("worktree name %s is taken: it is registered or %s exists", slug, naming.WorktreeDir(m.WS, slug))
 	}
 	return slug, nil
 }

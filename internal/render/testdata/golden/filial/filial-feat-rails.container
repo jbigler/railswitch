@@ -8,7 +8,7 @@ Wants=filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.se
 After=filial-feat-deps.service filial-feat-db.service filial-feat-cache.service filial-feat-storage.service filial-feat-browser.service filial-feat-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=filial.unit-hash=7a5f6f065799
+Label=filial.unit-hash=ba3904463dc7
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-feat-rails
 Network=filial-feat-dev.network:alias=rails
@@ -22,8 +22,8 @@ AddHost=s3-ui.feat.filial.localhost:10.214.3.2
 AddHost=vnc.feat.filial.localhost:10.214.3.2
 PublishPort=127.0.0.1:33002:33002
 PublishPort=127.0.0.1:13002:3000
-Volume=/WORKSPACES/filial/feat:/app:z
-Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:ro,z
+Volume=/WORKSPACES/filial/worktrees/feat:/app:z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/WORKSPACES/filial/worktrees/master/.git:ro,z
 Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U

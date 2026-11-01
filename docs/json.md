@@ -568,8 +568,8 @@ on a machine with one project). It is an array with one object per worktree.
 
 ```json
 [
-  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/master", "dirty": false, "share": null},
-  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/feat", "dirty": true, "share": {"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}}
+  {"slug": "master", "id": 1, "branch": "master", "dir": "/home/u/src/filial/worktrees/master", "dirty": false, "share": null},
+  {"slug": "feat", "id": 2, "branch": "feat", "dir": "/home/u/src/filial/worktrees/feat", "dirty": true, "share": {"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}}
 ]
 ```
 
@@ -578,7 +578,7 @@ on a machine with one project). It is an array with one object per worktree.
 | `slug` | string | The worktree's name: its directory under the workspace and the `<slug>` in its object names. |
 | `id` | number | Its machine-wide ID; its host ports are derived from it. |
 | `branch` | string | The branch checked out in it; `""` when detached, or when its directory is missing or not a git worktree. |
-| `dir` | string | Its directory, `<workspace>/<slug>`. |
+| `dir` | string | Its directory, `<workspace>/worktrees/<slug>` (D143). |
 | `dirty` | boolean | `git status --porcelain` lists changes or untracked files. `false` when its directory is missing or not a git worktree. |
 | `share` | object or null | Set while the worktree is shared on the tailnet (`railswitch share`): `host` is this machine's tailnet DNS name and `ip` its tailnet IPv4 address. Each port with `share = true` is then served at `https://<host>:<port>/`, the port being its loopback host port. `null` when not shared. |
 
@@ -699,7 +699,7 @@ row.
 | `worktrees[].slug` | string | The worktree's slug, its directory under the workspace. |
 | `worktrees[].id` | number | Its registry ID. |
 | `worktrees[].branch` | string | The branch checked out, read from its git files; `""` when detached, unreadable or the directory is gone (the worktree is still listed). |
-| `worktrees[].base` | boolean | It is the base worktree (`<workspace>/<base_branch>`). |
+| `worktrees[].base` | boolean | It is the base worktree (`<workspace>/worktrees/<base_branch>`). |
 | `worktrees[].stack` | string | Over the services with roles `app`, `worker`, `data` (not `deps`, `tool`, `agent`): `failed` if any unit's ActiveState is `failed`, `up` if all are `active`, `stopped` if none is `active` or `activating` (or there are none), else `partial`. |
 | `worktrees[].stale` | boolean | A running container of a stack service (not an on-demand one) was created from an older unit than the one rendered in the Quadlet directory: its `<prefix>.unit-hash` label differs from the unit file's (a missing label counts as different, as in `up`). `up` restarts such a container; the dashboard shows "restart to apply". A container that does not run, or a unit not rendered yet, never makes it `true`. |
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
@@ -997,7 +997,7 @@ branch (`git ls-remote`).
   },
   "warnings": [],
   "steps": [
-    "Clone https://github.com/acme/shop (main) into /home/me/shop/main",
+    "Clone https://github.com/acme/shop (main) into /home/me/shop/worktrees/main",
     "Write project.toml and stack.lock, generate local passwords",
     "Eject 4 Containerfiles",
     "Register, lock and render",

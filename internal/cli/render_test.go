@@ -178,7 +178,7 @@ func TestRenderNoLock(t *testing.T) {
 func TestEnv(t *testing.T) {
 	ws, _ := filialWS(t)
 	mustRun(t, "-C", ws, "lock")
-	out := mustRun(t, "-C", filepath.Join(ws, "master"), "env", "rails")
+	out := mustRun(t, "-C", filepath.Join(ws, "worktrees", "master"), "env", "rails")
 	lines := strings.Split(out, "\n")
 	has := func(prefix string) bool {
 		for _, l := range lines {

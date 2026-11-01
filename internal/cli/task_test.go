@@ -105,7 +105,7 @@ func TestTaskNewTerm(t *testing.T) {
 		gotTitle, gotDir, gotArgv = title, dir, argv
 		return nil
 	}
-	code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "task", "--new-term", "test", "a")
+	code, _, errs := runIn(t, "-C", filepath.Join(ws, "worktrees", "feat"), "task", "--new-term", "test", "a")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errs)
 	}
@@ -113,13 +113,13 @@ func TestTaskNewTerm(t *testing.T) {
 	if !slices.Equal(gotArgv, want) {
 		t.Errorf("argv %q; want %q", gotArgv, want)
 	}
-	if gotDir != filepath.Join(ws, "feat") || gotTitle != "feat test" {
+	if gotDir != filepath.Join(ws, "worktrees", "feat") || gotTitle != "feat test" {
 		t.Errorf("title %q dir %q", gotTitle, gotDir)
 	}
 
 	// An unknown task fails here, before any terminal opens.
 	gotArgv = nil
-	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "task", "--new-term", "tset"); code != 2 || !strings.Contains(errs, "unknown task tset") || gotArgv != nil {
+	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "worktrees", "feat"), "task", "--new-term", "tset"); code != 2 || !strings.Contains(errs, "unknown task tset") || gotArgv != nil {
 		t.Errorf("unknown task: exit %d stderr %q argv %q", code, errs, gotArgv)
 	}
 }

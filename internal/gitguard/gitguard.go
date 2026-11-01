@@ -26,6 +26,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/tomlfile"
@@ -63,8 +64,8 @@ const pointerLimit = 4096
 //     .git/worktrees/*/config.worktree against ConfigAllowed;
 //   - .git/commondir must not exist;
 //   - each .git/worktrees/<name>/ must have commondir "../.." and gitdir
-//     <ws>/<slug>/.git for one of slugs;
-//   - each linked worktree's pointer <ws>/<slug>/.git must name such a
+//     <ws>/worktrees/<slug>/.git for one of slugs;
+//   - each linked worktree's pointer <ws>/worktrees/<slug>/.git must name such a
 //     <name> (a missing pointer is skipped);
 //   - submodule gitdirs under .git/modules/**: config key names (also
 //     core.worktree allowed), no commondir, and every installed hook (kind
@@ -122,7 +123,7 @@ func noCommondir(gitDir string) []Finding {
 
 // checkWorktrees checks every entry of git/worktrees/ (not only those of
 // slugs: a pointer may name any): commondir must read "../.." and gitdir
-// <ws>/<slug>/.git for one of slugs. good are the entries that pass.
+// <ws>/worktrees/<slug>/.git for one of slugs. good are the entries that pass.
 func checkWorktrees(ws, git string, slugs []string) (out []Finding, good map[string]bool) {
 	good = map[string]bool{}
 	dir := filepath.Join(git, "worktrees")
@@ -130,9 +131,9 @@ func checkWorktrees(ws, git string, slugs []string) (out []Finding, good map[str
 	gitdirs := map[string]bool{}
 	wsReal, _ := filepath.EvalSymlinks(ws)
 	for _, slug := range slugs {
-		gitdirs[filepath.Join(ws, slug, ".git")] = true
+		gitdirs[filepath.Join(naming.WorktreeDir(ws, slug), ".git")] = true
 		if wsReal != "" {
-			gitdirs[filepath.Join(wsReal, slug, ".git")] = true
+			gitdirs[filepath.Join(naming.WorktreeDir(wsReal, slug), ".git")] = true
 		}
 	}
 	for _, e := range entries {
@@ -393,13 +394,13 @@ func printable(s string) string {
 	return s
 }
 
-// checkPointer checks <ws>/<slug>/.git reads exactly
+// checkPointer checks <ws>/worktrees/<slug>/.git reads exactly
 // "gitdir: <base>/.git/worktrees/<name>": anywhere else, host git in that
 // worktree reads a config and hooks the writer chose. <name> must be one of
 // good (checkWorktrees). ok is true when it does, or when the file is
 // missing (no such worktree yet).
 func checkPointer(ws, baseDir, slug string, good map[string]bool) (Finding, bool) {
-	path := filepath.Join(ws, slug, ".git")
+	path := filepath.Join(naming.WorktreeDir(ws, slug), ".git")
 	if _, err := os.Lstat(path); errors.Is(err, fs.ErrNotExist) {
 		return Finding{}, true
 	}

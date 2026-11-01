@@ -8,7 +8,7 @@ Wants=railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.
 After=mini-master-deps.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=mini.unit-hash=245154bbb4d2
+Label=mini.unit-hash=9dedd9681319
 Image=localhost/mini/base:ruby3.3.6-node22.11.0-39fced4e
 ContainerName=mini-master-rails
 Network=mini-master-dev.network:alias=rails
@@ -20,10 +20,10 @@ AddHost=master.mini.localhost:10.214.3.2
 AddHost=vite.master.mini.localhost:10.214.3.2
 PublishPort=127.0.0.1:33001:33001
 PublishPort=127.0.0.1:13001:3000
-Volume=/WORKSPACES/minimal/master:/app:z
-Volume=/WORKSPACES/minimal/master/.git:/WORKSPACES/minimal/master/.git:ro,z
-Volume=/WORKSPACES/minimal/master/.git:/app/.git:ro,z
-Volume=/WORKSPACES/minimal/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/minimal/worktrees/master:/app:z
+Volume=/WORKSPACES/minimal/worktrees/master/.git:/WORKSPACES/minimal/worktrees/master/.git:ro,z
+Volume=/WORKSPACES/minimal/worktrees/master/.git:/app/.git:ro,z
+Volume=/WORKSPACES/minimal/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/minimal/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
 Volume=mini_gems_ruby3.3.6:/usr/local/bundle
 Volume=mini_npm_cache:/home/appuser/.npm:U

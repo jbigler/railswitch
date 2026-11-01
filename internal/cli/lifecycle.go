@@ -17,7 +17,7 @@ func (e *env) lifecycle(ctx context.Context, cmd string) (*lifecycle.L, string, 
 		return nil, "", code
 	}
 	if l.WS.Slug == "" {
-		return nil, "", e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
+		return nil, "", e.usageErr("%s: not in a worktree; run it in <workspace>/worktrees/<worktree>/ or pass -w <worktree>", cmd)
 	}
 	return l, l.WS.Slug, 0
 }

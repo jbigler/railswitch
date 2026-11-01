@@ -166,7 +166,7 @@ func TestEntrypointOverride(t *testing.T) {
 // renamed away), then /app/.git/hooks read-only.
 func TestHooksMountReadOnly(t *testing.T) {
 	ws, units := renderUnits(t, fixtureDir, func(p *config.Project) { p.Options["jobs"] = "sidekiq@1" })
-	git := filepath.Join(ws, "master", ".git")
+	git := filepath.Join(ws, "worktrees", "master", ".git")
 	hooks := filepath.Join(git, "hooks")
 	for _, file := range []string{"filial-feat-nvim.container", "filial-feat-agent-probe.container"} {
 		lines := unitLines(t, units, file)
@@ -304,7 +304,7 @@ func TestWorkspaceWithSpace(t *testing.T) {
 	const rails = "filial-master-rails.container"
 	hasLine(t, units, rails, `EnvironmentFile="`+ws+`/.railswitch/env/master/rails.env"`)
 	hasLine(t, units, rails, `GlobalArgs="--hooks-dir=`+ws+`/.railswitch/firewall/hooks.d"`)
-	hasLine(t, units, rails, "Volume="+ws+"/master:/app:z")
+	hasLine(t, units, rails, "Volume="+ws+"/worktrees/master:/app:z")
 	hasLine(t, units, rails, "Volume="+ws+"/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z")
 	hasLine(t, units, "filial-master-nvim.container", "Volume="+ws+"/.railswitch/home/master:/home/appuser:z")
 }

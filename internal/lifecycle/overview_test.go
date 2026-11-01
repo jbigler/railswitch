@@ -59,10 +59,10 @@ func overviewEnv(t *testing.T, state func(slug, svc string) string) (*tenv, *ren
 	t.Helper()
 	e := setup(t)
 	for _, s := range []string{"master", "feat"} {
-		if err := os.MkdirAll(filepath.Join(e.ws, s, ".git"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(e.ws, "worktrees", s, ".git"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(e.ws, s, ".git", "HEAD"), []byte("ref: refs/heads/jb/"+s+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(e.ws, "worktrees", s, ".git", "HEAD"), []byte("ref: refs/heads/jb/"+s+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.MkdirAll(filepath.Join(e.ws, ".railswitch", "status", s), 0o700); err != nil {
@@ -202,7 +202,7 @@ func TestOverview(t *testing.T) {
 
 func TestOverviewMissingDir(t *testing.T) {
 	e, _ := overviewEnv(t, func(string, string) string { return "inactive/dead" })
-	if err := os.RemoveAll(filepath.Join(e.ws, "feat")); err != nil {
+	if err := os.RemoveAll(filepath.Join(e.ws, "worktrees", "feat")); err != nil {
 		t.Fatal(err)
 	}
 	ov, err := e.l.Overview(ctx)
@@ -280,7 +280,7 @@ func TestOverviewOnDemandRunning(t *testing.T) {
 // table without its control characters; --json keeps it as it is.
 func TestOverviewTextPrintable(t *testing.T) {
 	e, _ := overviewEnv(t, func(string, string) string { return "active/running" })
-	if err := os.WriteFile(filepath.Join(e.ws, "feat", ".git", "HEAD"), []byte("ref: refs/heads/jb/\x1b[31mred\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(e.ws, "worktrees", "feat", ".git", "HEAD"), []byte("ref: refs/heads/jb/\x1b[31mred\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.l.PrintOverview(ctx, false); err != nil {

@@ -484,7 +484,7 @@ func TestDoctorMachineMounts(t *testing.T) {
 // worktree: a git-guard finding.
 func writeHook(t *testing.T, ws *workspace.Workspace) string {
 	t.Helper()
-	hook := filepath.Join(ws.Root, "master", ".git", "hooks", "pre-commit")
+	hook := filepath.Join(ws.Root, "worktrees", "master", ".git", "hooks", "pre-commit")
 	if err := os.MkdirAll(filepath.Dir(hook), 0o755); err != nil {
 		t.Fatal(err)
 	}

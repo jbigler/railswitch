@@ -187,7 +187,7 @@ func TestNewDryRunSummary(t *testing.T) {
 			t.Errorf("env entry %q is not a bare name", n)
 		}
 	}
-	if len(doc.Steps) != 4 || !strings.HasPrefix(doc.Steps[0], "Clone "+gh+" (main) into "+filepath.Join(ws, "main")) {
+	if len(doc.Steps) != 4 || !strings.HasPrefix(doc.Steps[0], "Clone "+gh+" (main) into "+filepath.Join(ws, "worktrees", "main")) {
 		t.Errorf("steps = %q", doc.Steps)
 	}
 
@@ -308,7 +308,7 @@ func TestNewUp(t *testing.T) {
 func TestNewRefusesExistingPaths(t *testing.T) {
 	newEnv(t)
 	repo := bareRepo(t, "main")
-	for _, rel := range []string{"main", ".gitignore", config.GeneratedFile, "stack.lock", "containerfiles/Containerfile.base", "containerfiles/Containerfile.agent-base"} {
+	for _, rel := range []string{"worktrees/main", ".gitignore", config.GeneratedFile, "stack.lock", "containerfiles/Containerfile.base", "containerfiles/Containerfile.agent-base"} {
 		ws := filepath.Join(t.TempDir(), "shop")
 		if err := os.MkdirAll(filepath.Dir(filepath.Join(ws, filepath.FromSlash(rel))), 0o755); err != nil {
 			t.Fatal(err)

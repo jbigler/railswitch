@@ -38,9 +38,12 @@ func projectRoot(t *testing.T) string {
 		t.Fatal(err)
 	}
 	for _, d := range []string{"master/config", "feat"} {
-		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, "worktrees", d), 0o755); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, "notes"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "project.toml"), data, 0o644); err != nil {
 		t.Fatal(err)
@@ -116,8 +119,11 @@ func TestLoadFindsRootAndSlug(t *testing.T) {
 	}
 	for _, c := range []struct{ start, slug, want string }{
 		{root, "", ""},
-		{filepath.Join(root, "master", "config"), "", "master"},
-		{filepath.Join(root, "master"), "feat", "feat"},
+		{filepath.Join(root, "worktrees", "master", "config"), "", "master"},
+		{filepath.Join(root, "worktrees", "master"), "feat", "feat"},
+		// D143: only a folder under worktrees/ is a worktree.
+		{filepath.Join(root, "worktrees"), "", ""},
+		{filepath.Join(root, "notes"), "", ""},
 	} {
 		w, err := Load(ctx, c.start, c.slug)
 		if err != nil {
@@ -443,7 +449,7 @@ func dashboardWS(t *testing.T) (*Workspace, *systest.Fake, machine.Dirs) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
 	root := testfixture.Workspace(t, fixtureDir)
-	if err := os.MkdirAll(filepath.Join(root, "master", ".git"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "worktrees", "master", ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := Lock(ctx, root, Accept{All: true}); err != nil {

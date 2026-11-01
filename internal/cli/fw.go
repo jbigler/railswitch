@@ -55,7 +55,7 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	if sub == "allow" && w.Slug == "" {
-		return e.usageErr("fw allow: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>")
+		return e.usageErr("fw allow: not in a worktree; run it in <workspace>/worktrees/<worktree>/ or pass -w <worktree>")
 	}
 	dir := filepath.Join(w.Root, filepath.FromSlash(firewall.Dir))
 	script := filepath.Join(dir, "firewall.sh")

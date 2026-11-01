@@ -107,7 +107,7 @@ func TestPrLsGhFails(t *testing.T) {
 // git files prints without its control characters.
 func TestPrLsTextPrintable(t *testing.T) {
 	ws, _ := gitWS(t)
-	head := filepath.Join(ws, "master", ".git", "worktrees", "feat", "HEAD")
+	head := filepath.Join(ws, "worktrees", "master", ".git", "worktrees", "feat", "HEAD")
 	if err := os.WriteFile(head, []byte("ref: refs/heads/jb/\x1b[31mred\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestPrLsTextPrintable(t *testing.T) {
 // at that PR's head commit it is.
 func TestPrLsOldPRFromBaseBranch(t *testing.T) {
 	ws, _ := gitWS(t)
-	res, err := (sys.Exec{}).Run(t.Context(), sys.Cmd{Name: "git", Args: []string{"-C", filepath.Join(ws, "master"), "rev-parse", "HEAD"}})
+	res, err := (sys.Exec{}).Run(t.Context(), sys.Cmd{Name: "git", Args: []string{"-C", filepath.Join(ws, "worktrees", "master"), "rev-parse", "HEAD"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestPrLsOldPRFromBaseBranch(t *testing.T) {
 		}
 		// The worktree's git config is the project's: hooks and fsmonitor off.
 		if !slices.ContainsFunc(f.Calls, func(a []string) bool {
-			return slices.Equal(a, []string{"git", "-C", filepath.Join(ws, "master"), "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "rev-parse", "--verify", "-q", "HEAD^{commit}"})
+			return slices.Equal(a, []string{"git", "-C", filepath.Join(ws, "worktrees", "master"), "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "rev-parse", "--verify", "-q", "HEAD^{commit}"})
 		}) {
 			t.Errorf("no safe rev-parse of master: %q", f.Calls)
 		}

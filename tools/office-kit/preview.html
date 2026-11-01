@@ -1,0 +1,169 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Neon Office Floor</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05060a; color: #cfd6e4; font: 13px ui-monospace, monospace; overflow: hidden }
+  #ui { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #0b0d14cc; padding: 8px 10px; border: 1px solid #2c3039 }
+  #err { color: #ff6b6b }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+} }
+</script>
+<div id="ui">
+  <label for="accent">Highlight</label><input id="accent" type="color" value="#22e6ff">
+  <label for="second">Secondary</label><input id="second" type="color" value="#8b5cff">
+  <span>Click to walk · WASD · E elevator doors · Esc releases the mouse</span>
+  <span id="err"></span>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadOfficeKit } from '../../internal/web/static/office/kit.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#05060a');
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.2;
+scene.add(new THREE.HemisphereLight('#8090b0', '#101018', 0.5));
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
+const q = new URLSearchParams(location.search);
+camera.position.set(...(q.get('pos') ?? '1,1.7,4').split(',').map(Number));
+camera.lookAt(...(q.get('look') ?? '-2,1.4,-6').split(',').map(Number));
+const controls = new PointerLockControls(camera, document.body);
+renderer.domElement.addEventListener('click', () => controls.lock());
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.25, 1.2));
+composer.addPass(new OutputPass());
+
+const PI = Math.PI;
+// [asset, x, y, z, rotation about Y]
+const LAYOUT = [
+  ...[-6, -2, 2, 6].flatMap((x) => [-4, 0, 4].map((z) => ['Arch_Floor_4m', x, 0, z, 0])),
+  ['Arch_Wall_Plain_4m', -6, 0, -6, 0], ['Arch_Elevator_Floor', -2, 0, -6, 0], ['Arch_Elevator_Cab', -2, 0, -6.2, 0],
+  ['Arch_Wall_Plain_4m', 2, 0, -6, 0], ['Arch_Wall_Door_4m', 6, 0, -6, 0],
+  ...[-4, 0, 4].map((z) => ['Arch_Wall_Window_4m', 8, 0, z, -PI / 2]),
+  ...[-4, 0, 4].map((z) => ['Arch_Wall_Plain_4m', -8, 0, z, PI / 2]),
+  ['Arch_Wall_Plain_4m', -6, 0, 6, PI], ['Arch_Wall_Plain_4m', -2, 0, 6, PI], ['Arch_Wall_Plain_4m', 2, 0, 6, PI], ['Arch_Wall_Window_4m', 6, 0, 6, PI],
+  ['Ext_CityBackdrop', 30, -4, 0, -PI / 2],
+  // ceiling (y = 4)
+  ['Arch_CeilingDuct_4m', -4, 4, -2.5, 0], ['Arch_CeilingDuct_4m', 0, 4, -2.5, 0],
+  ['Arch_Ceiling_CableTray_4m', -2, 4, 2, 0], ['Arch_Ceiling_CableTray_4m', 2, 4, 2, 0],
+  ['Arch_Ceiling_PipeRun_4m', 2, 4, -4.8, 0], ['Arch_Ceiling_PipeRun_4m', 6, 4, -4.8, 0],
+  ['Arch_Ceiling_LightRun_4m', -4, 4, .3, 0], ['Arch_Ceiling_LightRun_4m', 0, 4, .3, 0], ['Arch_Ceiling_LightRun_4m', 4, 4, -1.5, .5],
+  ['Arch_Ceiling_Fan', 5, 4, 2, 0], ['Arch_Ceiling_Vent', -6, 4, 4, 0], ['Arch_Ceiling_Sprinkler_4m', 4, 4, 4.5, 0],
+  ['Arch_Ceiling_HangingCables', -5.5, 4, -.8, 0], ['Arch_WallPipes_4m', -8, 0, 0, PI / 2],
+  // furniture, tech, clutter
+  ['Furn_Workstation_Lived', -5, 0, -4.4, 0], ['Furn_Workstation_Lived_B', -6.3, 0, 2.2, PI / 2],
+  ['Tech_MonitorWall_A', 3.4, 0, -5.4, 0], ['Tech_MonitorBank', -8, 0, -1.4, PI / 2],
+  ['Tech_ToolCart', 1.2, 0, -4.8, 0], ['Tech_TerminalKiosk', 5.1, 0, -5.4, 0],
+  ['Tech_ServerRack', 1.4, 0, 5.4, PI], ['Tech_ServerRack_B', 2.05, 0, 5.4, PI], ['Tech_ServerRack', 2.7, 0, 5.4, PI],
+  ['Tech_NetworkShelf', -.4, 0, 6, PI], ['Deco_Boxes', 6.8, 0, 5.2, PI], ['Deco_Crate', 6.6, 0, -5.4, 0],
+  ['Deco_MiniFridge', -7.6, 0, 5.2, PI / 2], ['Deco_CorkBoard', -7.98, 1.6, 4.2, PI / 2], ['Deco_Poster', -3.9, 1.7, -5.99, 0],
+  ['Deco_Extinguisher', -.6, 0, -5.9, 0], ['Deco_CableRun', -.5, 0, -1.6, .4], ['Deco_TrashBin', 2.4, 0, -4.6, 0],
+  ['Furn_Sofa', 4.4, 0, .4, PI / 2], ['Furn_CoffeeTable', 5.9, 0, .4, PI / 2], ['Furn_Sofa_Short', 5.9, 0, 2.2, PI],
+  ['Deco_Plant_Floor', 7.4, 0, -2.2, 0], ['Deco_Plant_Floor_B', 7.4, 0, 5.3, 0], ['Deco_HangingPlanter', 7.2, 4, -.6, 0],
+  // pets (one per floor in the real build; several here for review)
+  ['Pet_Aquarium', -7.65, 0, -4.2, PI / 2], ['Pet_JellyfishTank', 0, 0, 3.6, 0], ['Pet_Dog_Bed', 2.6, 0, 2.2, -.6],
+  ['Pet_Cat_Curled', 2.05, 2.0, 5.3, 0], ['Pet_Cat_Sitting', 5.9, .42, .4, -PI / 2], ['Pet_Parrot_Perch', 7.1, 0, -3.6, -PI / 2],
+  ['Deco_PetBowls', 3.6, 0, 3.4, 0],
+];
+
+let kit, floorElevator, cabElevator, doorsOpen = 0, doorsTarget = 0;
+const staticBoxes = [], dynamicCols = [];
+try {
+  kit = await loadOfficeKit('../../internal/web/static/office/models/', [...new Set(LAYOUT.map((l) => l[0]))], new GLTFLoader());
+  for (const [n, x, y, z, ry] of LAYOUT) {
+    const o = kit.spawn(n);
+    o.position.set(x, y, z); o.rotation.y = ry;
+    scene.add(o);
+    if (n === 'Arch_Elevator_Floor') floorElevator = o;
+    if (n === 'Arch_Elevator_Cab') cabElevator = o;
+  }
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(16, 12), new THREE.MeshStandardMaterial({ color: '#0d0e12', roughness: 0.9 }));
+  ceil.rotation.x = PI / 2; ceil.position.y = 4; scene.add(ceil);
+  for (const [x, z] of [[-4, .3], [0, .3], [4, -1.5], [-5, -4], [4, 3]]) {
+    const l = new THREE.PointLight('#dfe8ff', 5, 9); l.position.set(x, 3.2, z); scene.add(l);
+  }
+  scene.updateMatrixWorld(true);
+  for (const c of kit.colliders(scene)) {
+    if (/Door_[LR]_COL\d*$/.test(c.name)) dynamicCols.push(c);
+    else staticBoxes.push(new THREE.Box3().setFromObject(c, true));
+  }
+
+  const a = document.getElementById('accent'), s = document.getElementById('second');
+  a.oninput = () => kit.setAccent(a.value);
+  s.oninput = () => kit.setSecondary(s.value);
+  if (q.get('accent')) { a.value = '#' + q.get('accent'); kit.setAccent(a.value); }
+  if (q.get('doors')) doorsOpen = doorsTarget = Number(q.get('doors'));
+  window.kit = kit; window.dbg = { staticBoxes, dynamicCols, camera, collide };
+} catch (e) {
+  document.getElementById('err').textContent = String(e);
+  console.error(e);
+}
+
+// --- walking: WASD, eye height 1.7, capsule radius 0.3 pushed out of collider boxes ---
+const keys = new Set();
+addEventListener('keydown', (e) => {
+  keys.add(e.code);
+  if (e.code === 'KeyE' && floorElevator && camera.position.distanceTo(floorElevator.position) < 4) doorsTarget = doorsTarget ? 0 : 1;
+});
+addEventListener('keyup', (e) => keys.delete(e.code));
+
+const R = 0.3, tmp = new THREE.Box3();
+function collide(p) {
+  const boxes = [...staticBoxes, ...dynamicCols.map((c) => tmp.clone().setFromObject(c, true))];
+  for (const b of boxes) {
+    if (b.max.y < 0.25 || b.min.y > 1.8) continue; // floor slabs and overhead gear
+    const cx = THREE.MathUtils.clamp(p.x, b.min.x, b.max.x), cz = THREE.MathUtils.clamp(p.z, b.min.z, b.max.z);
+    const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+    if (d >= R) continue;
+    if (d > 1e-6) { p.x = cx + (dx / d) * R; p.z = cz + (dz / d) * R; continue; }
+    const pen = [[p.x - b.min.x + R, -1, 0], [b.max.x - p.x + R, 1, 0], [p.z - b.min.z + R, 0, -1], [b.max.z - p.z + R, 0, 1]].sort((u, v) => u[0] - v[0])[0];
+    p.x += pen[1] * pen[0]; p.z += pen[2] * pen[0];
+  }
+}
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  if (controls.isLocked) {
+    const v = 3.2 * dt;
+    if (keys.has('KeyW')) controls.moveForward(v);
+    if (keys.has('KeyS')) controls.moveForward(-v);
+    if (keys.has('KeyA')) controls.moveRight(-v);
+    if (keys.has('KeyD')) controls.moveRight(v);
+    collide(camera.position);
+    camera.position.y = 1.7;
+  }
+  if (kit) {
+    doorsOpen += THREE.MathUtils.clamp(doorsTarget - doorsOpen, -dt, dt);
+    kit.setElevatorDoors(floorElevator, doorsOpen);
+    kit.setElevatorDoors(cabElevator, doorsOpen);
+    kit.animate(scene, t);
+  }
+  composer.render();
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+</script>

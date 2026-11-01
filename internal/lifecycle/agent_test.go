@@ -178,8 +178,9 @@ func TestAgentNameChoice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.l.agentName(m, ""); err == nil || !strings.Contains(err.Error(), "claude") || !strings.Contains(err.Error(), "probe") {
-		t.Fatalf("two agents: got %v; want an error listing claude and probe", err)
+	// No name: the agent whose package is the built-in default (D140).
+	if n, err := e.l.agentName(m, ""); err != nil || n != "claude" {
+		t.Fatalf("two agents: got %q, %v; want claude, the built-in default", n, err)
 	}
 	if n, err := e.l.agentName(m, "probe"); err != nil || n != "probe" {
 		t.Fatalf("probe: got %q, %v", n, err)
@@ -193,6 +194,32 @@ func TestAgentNameChoice(t *testing.T) {
 	}
 	if n, err := e.l.agentName(m, ""); err != nil || n != "claude" {
 		t.Fatalf("one agent: got %q, %v; want claude", n, err)
+	}
+}
+
+// default = true in project.toml wins over the built-in default; with no
+// mark and two agents of the built-in package, a name is needed (D140).
+func TestAgentNameDefault(t *testing.T) {
+	e := setup(t)
+	e.editProject(t, func(s string) string {
+		return strings.Replace(s, "use = \"local:probe@1\"\n", "use = \"local:probe@1\"\ndefault = true\n", 1)
+	})
+	m, err := e.l.model(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := e.l.agentName(m, ""); err != nil || n != "probe" {
+		t.Fatalf("marked default: got %q, %v; want probe", n, err)
+	}
+	e = setup(t)
+	e.editProject(t, func(s string) string {
+		return withoutProbe(s) + "\n[agents.second]\nuse = \"claude@1\"\n"
+	})
+	if m, err = e.l.model(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.l.agentName(m, ""); err == nil || !strings.Contains(err.Error(), "default = true") {
+		t.Fatalf("two built-in defaults: got %v; want a name asked for", err)
 	}
 }
 
@@ -365,10 +392,8 @@ func TestAgentDefault(t *testing.T) {
 	if _, err := e.l.PromoteAgentDefault(ctx, "feat", "probe", false); err == nil {
 		t.Error("promote of an agent without [config]")
 	}
-	if _, err := e.l.PromoteAgentDefault(ctx, "feat", "", true); err == nil {
-		t.Fatal("no name with two agents")
-	}
-	r, err := e.l.PromoteAgentDefault(ctx, "feat", "claude", true)
+	// No name: the default agent, claude (D140).
+	r, err := e.l.PromoteAgentDefault(ctx, "feat", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

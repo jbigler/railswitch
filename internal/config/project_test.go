@@ -206,6 +206,8 @@ func TestAgentConfigValidate(t *testing.T) {
 		{"base", "base", ok, []string{"agents.base", "reserved"}},
 		{"stop", "stop", ok, []string{"agents.stop", "reserved"}},
 		{"add", "add", ok, []string{"agents.add", "reserved"}},
+		{"default", "default", ok, []string{"agents.default", "reserved"}},
+		{"update", "update", ok, []string{"agents.update", "reserved"}},
 		{"underscore", "a_b", ok, []string{"agents.a_b"}},
 		{"long", strings.Repeat("a", 26), ok, []string{"agents." + strings.Repeat("a", 26)}},
 		{"run", "x", Agent{Use: "claude@1", Run: "always"}, []string{"agents.x.run", "always"}},
@@ -227,6 +229,19 @@ func TestAgentConfigValidate(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// D140: default = true on one agent at most.
+func TestAgentDefaultUnique(t *testing.T) {
+	p := loadFilial(t)
+	p.Agents = map[string]Agent{"a": {Use: "claude@1", Default: true}, "b": {Use: "claude@1"}}
+	if err := p.Validate(); err != nil {
+		t.Fatalf("one default: %v", err)
+	}
+	p.Agents["b"] = Agent{Use: "claude@1", Default: true}
+	if err := p.Validate(); err == nil || !strings.Contains(err.Error(), "a and b") {
+		t.Errorf("two defaults: %v", err)
 	}
 }
 

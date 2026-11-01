@@ -25,7 +25,8 @@ railswitch secret set claude_token
 ## Running it
 
 ```bash
-railswitch agent                    # the only agent, in this terminal
+railswitch agent                    # the default agent, in this terminal
+railswitch agent omp                # another one, by name
 railswitch agent --new-term claude  # in a new terminal window
 railswitch agent stop
 railswitch agent --no-token         # without the token: it uses the login in its home
@@ -36,6 +37,16 @@ package's token (for Claude, `claude_token`), so it uses the login kept in
 its home instead: at the first run, log in from inside (Claude: `/login`),
 and that worktree keeps the login. The token stays set; run without the
 flag to use it again.
+
+With several agents, a command without a name (`agent`, `agent update`,
+`agent default promote`) uses the default: the one you mark in
+`project.toml`, else Claude (the built-in default agent).
+
+```toml
+[agents.omp]
+use = "local:omp@1"
+default = true
+```
 
 `railswitch agent` starts the worktree's stack first (`up`), but doesn't
 wait for the app to answer on its URL: an app that is still booting, or

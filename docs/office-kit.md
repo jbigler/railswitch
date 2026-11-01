@@ -125,18 +125,23 @@ relative to the floor piece.
   L-shaped tufted sectional, metaball cushions whose valleys are the tufts,
   throw pillows, a blanket), `Furn_Armchair` (leather between wood panels),
   room dividers `Furn_Divider_Glass` (frosted), `Furn_Divider_Shelf` (books,
-  plants, boxes, a lamp) and `Furn_Divider_Planter` (grasses before a slatted
-  screen), plants in charcoal, terracotta and concrete pots
+  plants, boxes, a lamp), `Furn_Divider_Planter` (grasses before a slatted
+  screen), and the cyberpunk ones: `Furn_Divider_Neon` (smoked glass, a
+  circuit trace, a neon frame), `Furn_Divider_Mesh` (a wire-mesh cage panel
+  on a hazard kick plate) and `Furn_Divider_Louver` (dark slats, neon
+  edges); `Furn_MeetingTable` (for six), plants in charcoal, terracotta and concrete pots
   (`Deco_Plant_Snake`, `Monstera`, `Palm`, `Bush`, `Trailing` hanging from
   the ceiling), `Furn_SideTable`, `Deco_FloorLamp` (arc), `Deco_Rug_Geo`,
   `Deco_CoatRack` (a jacket, a cap, a scarf), `Deco_Whiteboard` (a diagram,
   a checklist), `Deco_Backpack`, `Furn_Stool`, `Deco_BookStack`,
   `Deco_PizzaBoxes`. No plant has a white pot.
-- **Char**: `Android_Agent` (the agent's partner: its visor
+- **Char**: humanoid androids, simple but anatomical (one smooth shell for
+  chest, waist and hips; a sculpted face with glowing eyes and round ear
+  units; dark glowing joints; neck cables; about 6.7k triangles, over the
+  hero budget). `Android_Agent` (the agent's partner: its eyes
   `RS_Android_Visor_Agent` and status ring `RS_Android_Status` are for the
   page to recolour by the agent's state), `Android_A`, `Android_B`,
-  `Android_C` (wanderers in white/orange, black/gold, grey/teal; visors in
-  the accent).
+  `Android_C` (wanderers in ivory, black chrome and silver).
 
 ## Rebuilding
 

@@ -762,8 +762,8 @@ def wall_trim(a, width, height, windows=(), doors=()):
                 break
     for s0, s1 in segs:
         if s1 - s0 > .05:
-            a.box(s1 - s0, .012, .012, M['neon'], (s0 + s1) / 2, .03, .01)
-    a.box(width, .012, .012, M['neon'], 0, height - .04, .01)
+            a.box(s1 - s0, .026, .018, M['neon'], (s0 + s1) / 2, .03, .009)
+    a.box(width, .026, .018, M['neon'], 0, height - .04, .009)
     for wx, wy, ww, wh, c in windows:
         with a.at(wx, wy + wh / 2, 0):
             window_insert(a, ww, wh, c)

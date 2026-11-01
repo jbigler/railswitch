@@ -61,6 +61,27 @@ export function textCanvas(lines, { w = 512, h = 256, bg = '#03060c', fg = '#9ff
     g.fillText(String(l.text ?? l).slice(0, 64), 14, y);
     y += size * 1.05;
   }
+  // the CRT: scanlines, darker edges, a thin frame with corner ticks
+  g.fillStyle = 'rgba(0,0,0,.28)';
+  for (let s = 0; s < h; s += 3) g.fillRect(0, s, w, 1);
+  const v = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(0,0,0,.55)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, w, h);
+  g.strokeStyle = fg;
+  g.globalAlpha = 0.35;
+  g.lineWidth = 2;
+  g.strokeRect(5, 5, w - 10, h - 10);
+  g.globalAlpha = 0.9;
+  for (const [x, y2, dx, dy] of [[5, 5, 1, 1], [w - 5, 5, -1, 1], [5, h - 5, 1, -1], [w - 5, h - 5, -1, -1]]) {
+    g.beginPath();
+    g.moveTo(x, y2 + dy * 18);
+    g.lineTo(x, y2);
+    g.lineTo(x + dx * 18, y2);
+    g.stroke();
+  }
+  g.globalAlpha = 1;
   return c;
 }
 
@@ -119,7 +140,9 @@ export class World {
     el.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.05, 400);
     this.scene = new THREE.Scene();
-    this.composer = new THREE.EffectComposer(this.renderer);
+    // a multisampled target: without it the bloom pass drops the canvas's
+    // antialiasing and thin lines (the wall neon) break into dashes
+    this.composer = new THREE.EffectComposer(this.renderer, new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType }));
     this.pass = new THREE.RenderPass(this.scene, this.camera);
     this.bloom = new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.28, 0.25, 1.2);
     this.composer.addPass(this.pass);
@@ -169,6 +192,7 @@ export class World {
     w.onPad = null;
     w.boxes = null;
     w.goal = null;
+    w.last = null;
     if (walk) {
       w.pos.set(walk.start.x, 0, walk.start.z);
       w.yaw = walk.start.yaw;
@@ -190,7 +214,10 @@ export class World {
   cutaway() {
     const u = this.scene.userData;
     if (u.ceiling) u.ceiling.visible = this.mode === 'walk';
-    if (u.hemi) u.hemi.intensity = this.mode === 'walk' ? 1.1 : 2.4;
+    const lv = u.levels?.[this.mode === 'walk' ? 'walk' : 'orbit'];
+    if (lv && u.hemi) u.hemi.intensity = lv.hemi;
+    if (lv && this.scene.fog) this.scene.fog.density = lv.fog;
+    if (u.air) u.air.visible = this.mode === 'walk';
     if (this.mode === 'walk') for (const w of u.walls ?? []) w.visible = true;
   }
 
@@ -340,7 +367,12 @@ export class World {
     const pad = w.pads.find((p) => Math.hypot(p.x - w.pos.x, p.z - w.pos.z) < p.r) ?? null;
     if (pad && pad !== w.onPad) pad.act();
     w.onPad = pad;
-    this.camera.position.set(w.pos.x, 1.7, w.pos.z);
+    // a camera operator's step: a slight bob while moving
+    const moved = Math.hypot(w.pos.x - (w.last?.x ?? w.pos.x), w.pos.z - (w.last?.z ?? w.pos.z));
+    w.last = { x: w.pos.x, z: w.pos.z };
+    w.bob = (w.bob ?? 0) + moved * 5.5;
+    w.sway = Math.max(0, Math.min(1, (w.sway ?? 0) + (moved > 1e-4 ? dt * 4 : -dt * 3)));
+    this.camera.position.set(w.pos.x, 1.7 + Math.sin(w.bob) * 0.018 * w.sway, w.pos.z);
     this.camera.rotation.set(-w.pitch, -w.yaw, 0, 'YXZ');
   }
 

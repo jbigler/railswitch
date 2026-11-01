@@ -15,12 +15,12 @@ def elevator_frame(a):
     t, side = .15, (4 - OW) / 2
     for s in (-1, 1):
         a.box(side, H, t, M['wall'], s * (OW / 2 + side / 2), H / 2, -t / 2)
-        a.box(side - .08, .012, .012, M['neon'], s * (OW / 2 + .08 + (side - .08) / 2), .03, .01)
+        a.box(side - .08, .026, .018, M['neon'], s * (OW / 2 + .08 + (side - .08) / 2), .03, .009)
         a.box(.12, OH + .12, .07, M['trim'], s * (OW / 2 + .06), (OH + .12) / 2, .035)
         a.box(.04, H, .08, M['trim'], s * .98, H / 2, -1.2)  # guide rails
         a.box(.15, H, 2.3, M['wall'], s * 1.075, H / 2, -1.3)  # shaft side
     a.box(OW, H - OH, t, M['wall'], 0, OH + (H - OH) / 2, -t / 2)
-    a.box(4, .012, .012, M['neon'], 0, H - .04, .01)
+    a.box(4, .026, .018, M['neon'], 0, H - .04, .009)
     a.box(OW + .24, .12, .07, M['trim'], 0, OH + .06, .035)
     with a.at(0, (OH + .12) / 2, .075):
         a.frame(OW + .26, OH + .14, .012)

@@ -57,6 +57,8 @@ L = dict(
     jacket=mat('RS_Jacket', '#5c1f26', 0, .8),
     denim=mat('RS_Denim', '#2e3f5c', 0, .85),
     leafLight=mat('RS_Leaf_Light', '#4f8f3a', 0, .6),
+    smoked=mat('RS_Glass_Smoked', '#0c1018', .4, .08, alpha=.55),
+    steel=mat('RS_Steel_Dark', '#262a31', .85, .35),
     trunk=mat('RS_Trunk', '#5a4630', 0, .9),
 )
 for k_ in ('leafLight',):
@@ -173,6 +175,61 @@ def divider_planter(a, seed=2):
         L_ = .35 + r.random() * .5
         with a.at(x, .55, (r.random() - .5) * .3, rx=(r.random() - .5) * .5, ry=r.random() * 6, s=(L_ * (.12 if i % 3 else .4), L_, 1)):
             a.leaf(r.choice([M['leaf'], M['leaf2'], L['leafLight']]))
+
+
+def divider_neon(a, seed=5):
+    """Smoked glass in a heavy dark-steel frame, a glowing circuit trace in it,
+    neon along the frame. 2 m wide, 2.3 m high."""
+    r = random.Random(seed)
+    for x in (-1, 1):
+        a.box(.08, 2.3, .08, L['steel'], x, 1.15, 0)
+        a.box(.012, 2.1, .012, M['neon'], x - x * .05, 1.15, .045)
+        a.box(.12, .04, .45, M['dark'], x, .02, 0)
+    a.box(2.08, .1, .08, L['steel'], 0, 2.3, 0)
+    a.box(2.08, .14, .08, L['steel'], 0, .07, 0)
+    a.box(1.92, .012, .012, M['neon'], 0, 2.24, .045)
+    a.box(1.92, 2.06, .02, L['smoked'], 0, 1.17, 0)
+    # the circuit: runs of traces with pads, faint so they read as etched light
+    y = .35
+    while y < 2.1:
+        x0 = -.9 + r.random() * .5
+        x1 = x0 + .3 + r.random() * .9
+        a.box(x1 - x0, .006, .004, M['neon2'], (x0 + x1) / 2, y, .012)
+        a.box(.006, .12 + r.random() * .2, .004, M['neon2'], x1, y + .08, .012)
+        a.box(.03, .03, .005, M['neon2'], x0, y, .012)
+        y += .18 + r.random() * .2
+
+
+def divider_mesh(a):
+    """Server-cage panel: steel wire mesh in a heavy frame, a hazard-striped
+    kick plate, a neon strip. 2 m wide, 2.3 m high."""
+    for x in (-1, 1):
+        a.box(.07, 2.3, .07, L['steel'], x, 1.15, 0)
+        a.box(.14, .04, .4, M['dark'], x, .02, 0)
+    a.box(2.07, .07, .07, L['steel'], 0, 2.27, 0)
+    a.box(2.07, .07, .07, L['steel'], 0, .5, 0)
+    for i in range(1, 20):
+        a.box(.006, 1.74, .006, M['trim'], -1 + i * .1, 1.39, 0)
+    for j in range(1, 18):
+        a.box(1.94, .006, .006, M['trim'], 0, .52 + j * .1, 0)
+    a.box(1.94, .44, .02, M['dark'], 0, .25, 0)                       # kick plate
+    for i in range(10):
+        a.box(.07, .5, .004, M['tape'], -.86 + i * .19, .25, .012, rz=.6)
+    a.box(1.94, .012, .012, M['neon'], 0, 2.2, .04)
+
+
+def divider_louver(a):
+    """Angled dark-metal louvers between steel posts, an LED line every few
+    slats: you half see through it. 2 m wide, 2.2 m high."""
+    for x in (-1, 1):
+        a.box(.06, 2.2, .1, L['steel'], x, 1.1, 0)
+        a.box(.12, .04, .4, M['dark'], x, .02, 0)
+    a.box(2.06, .06, .1, L['steel'], 0, 2.2, 0)
+    for i in range(16):
+        y = .2 + i * .125
+        a.box(1.94, .1, .012, L['steel'], 0, y, 0, rx=.65)
+        if i % 4 == 2:
+            a.box(1.9, .008, .008, M['neon'], 0, y - .06, .03)
 
 
 # ---------- plants in dark pots ----------
@@ -336,6 +393,18 @@ def stool(a):
     a.cyl(.2, .22, .02, M['dark'], 0, .01, 0, 20)
 
 
+def meeting_table(a):
+    """Conference table, 2.4 × 1.1 m, for six: dark top, two slab legs, neon edge."""
+    a.box(2.4, .04, 1.1, L['wood'], 0, .74, 0)
+    a.box(2.36, .008, .008, M['neon'], 0, .715, .55)
+    a.box(2.36, .008, .008, M['neon'], 0, .715, -.55)
+    for x in (-.85, .85):
+        a.box(.08, .7, .8, M['dark'], x, .36, 0)
+        a.box(.5, .03, .9, M['dark'], x, .015, 0)
+    a.box(.3, .02, .14, M['trim'], 0, .77, 0)   # a cable box for laptops
+    a.box(.12, .012, .004, M['led'], 0, .78, .071)
+
+
 def pizza_boxes(a, seed=3):
     r = random.Random(seed)
     for i in range(3):
@@ -351,13 +420,16 @@ for name, fn, col in [
     ('Furn_Divider_Glass', divider_glass, [(2.05, 2.2, .1, 0, 1.1, 0)]),
     ('Furn_Divider_Shelf', divider_shelf, [(2.0, 1.9, .42, 0, .95, 0)]),
     ('Furn_Divider_Planter', divider_planter, [(2.0, 2.25, .5, 0, 1.12, -.02)]),
+    ('Furn_Divider_Neon', divider_neon, [(2.1, 2.3, .12, 0, 1.15, 0)]),
+    ('Furn_Divider_Mesh', divider_mesh, [(2.1, 2.3, .1, 0, 1.15, 0)]),
+    ('Furn_Divider_Louver', divider_louver, [(2.1, 2.2, .14, 0, 1.1, 0)]),
     ('Deco_Plant_Snake', snake_plant, 'aabb'), ('Deco_Plant_Monstera', monstera, 'aabb'),
     ('Deco_Plant_Palm', palm, 'aabb'), ('Deco_Plant_Bush', bush, 'aabb'),
     ('Deco_Plant_Trailing', trailing_planter, None),
     ('Furn_SideTable', side_table, 'aabb'), ('Deco_FloorLamp', floor_lamp, [(.42, 1.9, .42, 0, .95, 0)]),
     ('Deco_Rug_Geo', rug_geo, None), ('Deco_CoatRack', coat_rack, 'aabb'), ('Deco_Whiteboard', whiteboard, 'aabb'),
     ('Deco_Backpack', backpack, None), ('Furn_Stool', stool, 'aabb'), ('Deco_BookStack', book_stack, None),
-    ('Deco_PizzaBoxes', pizza_boxes, None),
+    ('Deco_PizzaBoxes', pizza_boxes, None), ('Furn_MeetingTable', meeting_table, 'aabb'),
 ]:
     a = Asset(name)
     fn(a)

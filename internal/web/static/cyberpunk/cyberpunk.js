@@ -120,6 +120,7 @@ function toggleView() {
   const m = world.setMode(world.mode === 'walk' ? 'orbit' : 'walk');
   $('view').textContent = m === 'walk' ? 'overview' : 'walk';
   $('help').hidden = m !== 'walk';
+  document.body.classList.toggle('walking', m === 'walk');
 }
 $('view').addEventListener('click', toggleView);
 addEventListener('keydown', (e) => {

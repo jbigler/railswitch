@@ -896,31 +896,36 @@ any open page.
   `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
   save refused when the note changed since you opened it) and
   **Engineering** (links to Settings, Images, Library, Machine).
-- **A floor** is a worktree; every floor has the same plan, and its
-  highlight colour, ceiling gear, some furniture and its pet come from a
-  hash of its name, so a floor always looks the same and floors look
-  different. The **server area** (back left, taped off) has a rack per
-  service in two rows across an aisle, its LEDs and edge lights the
-  service's state; a rack opens the service's state,
-  **Restart this service** (as the 2D page's restart, when it restarts
-  alone), its logs in Dozzle, and the floor's **Start**, **Restart**,
-  **Stop** (`up`, `restart`, `stop`). The **work area** (back right, on a
-  rug): **your desk**'s wall screen shows the branch, stack, PR and links;
-  the desk opens a **Terminal** (`term`) or **Neovim** (`nvim --new-term`)
-  and the worktree's links. **The agent's desk** opens the agent console in
-  a terminal (`agent --new-term`); the agent's android stands at it, its
-  visor and ring in the agent's state (pulsing while it waits on you), its
-  hands typing while it works; it opens the agent's state and message, and
-  for a service agent (D142) its current screen (`agent screen`, read every
-  1.5 s while open) and a box that types to it (`agent send`: the text, then
-  Enter). The **PR station** in front of the desks shows the floor's pull
-  request: title, checks, review, review app. The **big screen** on the left
-  wall shows the floor's summary for now (what it shows is yours to choose
-  later); a lounge faces it: a tufted sectional on a rug, an armchair, a
-  side table and an arc lamp. Room dividers (glass, a shelf of books and
-  plants, a slatted planter) set off the server and work areas and the
-  lounge; a meeting nook sits in the middle; plants, a coat rack, a
-  whiteboard and what people leave lying about fill the rest.
+- **A floor** is a worktree; every floor has the same plan, laid out as
+  an office is planned (zones by activity and noise: social by the landing
+  and the main aisles, quiet work deep by the windows, back of house by the
+  core), each zone under a hanging neon sign. Its hue (the starship's way: a
+  hash of the worktree's name seeds the highlight colour, a second neon a
+  third of the wheel or more away, and the pet), ceiling gear and some
+  furniture come from the name, so a floor always looks the same and floors
+  look different. The **server room** (back left, behind wire mesh, entered
+  from the landing) is a data hall: a full-height rack per service, in two
+  rows of seven facing a cold aisle (a stack with more than 14 services
+  shows the first 14), its LEDs and edge lights the service's state; a rack
+  opens the service's state, **Restart this service** (as the 2D page's
+  restart, when it restarts alone), its logs in Dozzle, and the floor's
+  **Start**, **Restart**, **Stop** (`up`, `restart`, `stop`). The **work
+  area** (back right, on a rug, behind neon glass): **your desk**'s wall
+  screen shows the branch, stack, PR and links; the desk opens a
+  **Terminal** (`term`) or **Neovim** (`nvim --new-term`) and the
+  worktree's links. **The agent's desk** opens the agent console in a
+  terminal (`agent --new-term`); the agent's android stands at it, its eyes
+  and ring in the agent's state (pulsing while it waits on you), its hands
+  typing while it works; it opens the agent's state and message, and for a
+  service agent (D142) its current screen (`agent screen`, read every 1.5 s
+  while open) and a box that types to it (`agent send`: the text, then
+  Enter). The **PR station** at the work area's entrance shows the floor's
+  pull request: title, checks, review, review app. The **café** (middle
+  left: counter, stools, the pet's corner), the **lounge** (front left: a
+  tufted sectional facing the **big screen** on the left wall, which shows
+  the floor's summary for now; what it shows is yours to choose later) and
+  the **meeting** room (front right, by the windows, behind louvers) fill
+  the rest, with plants and what people leave lying about.
 - **The elevator** (in the back wall of every floor, or `T`) lists the
   lobby and every floor; its doors open as you walk up, and stepping in
   front of them opens the list. `Esc` closes a panel.
@@ -936,8 +941,16 @@ any open page.
   between two perches, a cat asleep on a crate, an aquarium, a jellyfish
   tank or a gecko; and androids that wander (one or two per floor, two in
   the lobby). Click them.
-- Floors and walls are textured (worn steel plates and grates, paneled
-  walls); ceiling panels, pendants and lamps light the room.
+- **First person is a film set** (after Blade Runner's interiors and
+  KitBash3D's cyberpunk sets), on a modest GPU: no shadows, no pass beyond
+  bloom. Low-key light from practicals, warm where people sit (café, lounge,
+  desk lamp), cool where machines are and from the city through the
+  windows; haze; light shafts through half-drawn blinds striping the floor;
+  dust in the air; cables underfoot and hanging from the ceiling; a server
+  room tube that fails now and then; neon kept for signs (the walls' trim
+  only hints at it); screens with scanlines; a slight step bob and darker
+  lens corners. The overview drops the haze, shafts and dust and lights the
+  floor evenly.
 
 Typing to an agent from the page is the same power as the dashboard's
 other buttons: a page that holds the cookie and passes the Origin check

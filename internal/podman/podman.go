@@ -51,6 +51,7 @@ type BuildArgs struct {
 	Context string            // build context dir
 	Args    map[string]string // --build-arg K=V, emitted sorted by key
 	Prefix  string            // the project's prefix: --label railswitch.prefix=<prefix>
+	NoCache bool              // --no-cache --layers=false: every step runs again (a download of "latest" fetches the current one), and no stage is left behind as an untagged image
 	// Progress, when set, receives the build's stdout and stderr as it
 	// runs, so a long build shows what it is doing; the stderr tail still
 	// ends up in the error.
@@ -88,6 +89,15 @@ func (p Podman) exists(ctx context.Context, args ...string) (bool, error) {
 	return false, err
 }
 
+// ImageID is ref's image ID, "" when there is no such image.
+func (p Podman) ImageID(ctx context.Context, ref string) (string, error) {
+	ok, err := p.ImageExists(ctx, ref)
+	if err != nil || !ok {
+		return "", err
+	}
+	return p.out(ctx, "image", "inspect", "--format", "{{.Id}}", ref)
+}
+
 // ImageExists runs `podman image exists <ref>`.
 func (p Podman) ImageExists(ctx context.Context, ref string) (bool, error) {
 	return p.exists(ctx, "image", "exists", ref)
@@ -114,6 +124,9 @@ func (p Podman) Build(ctx context.Context, b BuildArgs) error {
 	if b.Prefix != "" {
 		// gc knows a removed project's images by it (D120).
 		args = append(args, "--label", PrefixLabel+"="+b.Prefix)
+	}
+	if b.NoCache {
+		args = append(args, "--no-cache", "--layers=false")
 	}
 	keys := make([]string, 0, len(b.Args))
 	for k := range b.Args {

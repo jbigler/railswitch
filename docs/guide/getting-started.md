@@ -124,8 +124,8 @@ railswitch up | stop | restart
 railswitch logs -f rails
 railswitch exec bin/rails console
 railswitch task test                  # the pack's and project's tasks
-railswitch db dump                    # the databases (not Rails' test ones), into <workspace>/db-dumps/
-railswitch db restore                 # put them back into this worktree (asks first)
+railswitch db dump                    # the databases (not Rails' test ones) and storage, into <workspace>/db-dumps/
+railswitch db restore                 # put them back into this worktree (asks first; `db restore storage`: storage only)
 railswitch down                       # stops it AND deletes its volumes (asks first)
 railswitch wt rm feature-x            # --force: even with uncommitted changes (lost)
 ```

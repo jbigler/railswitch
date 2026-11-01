@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const dbUsage = "usage: railswitch db dump | railswitch db restore [--from <dir>] [--yes] [<database>...]"
+const dbUsage = "usage: railswitch db dump | railswitch db restore [--from <dir>] [--yes] [<database>|<service>...]"
 
 // railswitch db dump: dump the worktree's database and its seeded volumes
 // into <workspace>/db-dumps/ (C3). railswitch db restore: put the dumps

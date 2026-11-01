@@ -757,21 +757,31 @@ func (l *L) seedVolumes(ctx context.Context, m *render.Model, in *render.Instanc
 			case !fi.Mode().IsRegular():
 				return fmt.Errorf("seed %s: not a regular file", seed)
 			}
-			if err := p.VolumeCreate(ctx, name); err != nil {
-				return err
-			}
-			if seed == "" {
-				continue
-			}
-			if err := p.VolumeImport(ctx, name, seed); err != nil {
-				// An unseeded volume would never be seeded: the next up re-creates it.
-				// Ctrl-C cancelled ctx; the cleanup still runs, bounded by its own timeout.
-				if rmErr := p.RemoveVolume(context.WithoutCancel(ctx), name); rmErr != nil {
-					return errors.Join(err, fmt.Errorf("removing unseeded volume %s: %w", name, rmErr))
-				}
+			if err := l.seedVolume(ctx, name, seed); err != nil {
 				return err
 			}
 		}
+	}
+	return nil
+}
+
+// seedVolume creates volume name and imports seed into it ("": none). A
+// failed import removes the volume: an unseeded volume would never be
+// seeded, and the next up creates it again.
+func (l *L) seedVolume(ctx context.Context, name, seed string) error {
+	p := l.podman()
+	if err := p.VolumeCreate(ctx, name); err != nil {
+		return err
+	}
+	if seed == "" {
+		return nil
+	}
+	if err := p.VolumeImport(ctx, name, seed); err != nil {
+		// Ctrl-C cancelled ctx; the cleanup still runs, bounded by its own timeout.
+		if rmErr := p.RemoveVolume(context.WithoutCancel(ctx), name); rmErr != nil {
+			return errors.Join(err, fmt.Errorf("removing unseeded volume %s: %w", name, rmErr))
+		}
+		return err
 	}
 	return nil
 }

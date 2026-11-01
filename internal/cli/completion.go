@@ -32,7 +32,7 @@ var completionFiles = map[string]string{
 // ("dashboard colors") nests. A command with completionArgs too (agent)
 // offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":            {"add", "default", "ls", "stop", "update"},
+	"agent":            {"add", "default", "ls", "screen", "send", "stop", "update"},
 	"agent default":    {"apply", "promote"},
 	"containerfile":    {"eject", "list", "new", "show", "write"},
 	"dashboard":        {"colors", "serve"},
@@ -40,8 +40,10 @@ var completionSubs = map[string][]string{
 	"db":               {"dump", "restore"},
 	"fw":               {"allow", "show"},
 	"hooks":            {"backup", "check", "restore"},
+	"issue":            {"ls"},
 	"library":          {"add", "fetch", "index", "ls", "rm", "rotate", "sign", "trust", "verify"},
 	"nvim":             {"reset-config", "update"},
+	"notes":            {"ls", "rm", "show", "write"},
 	"pack":             {"eject", "export", "file", "import", "ls", "new", "show"},
 	"pack file":        {"rm", "show", "write"},
 	"pr":               {"ls"},
@@ -85,6 +87,8 @@ var completionFlags = map[string][]string{
 	"logs":                   {"-f"},
 	"nvim":                   {"--new-term"},
 	"nvim reset-config":      {"--yes"},
+	"notes rm":               {"--if-hash="},
+	"notes write":            {"--if-hash="},
 	"pack eject":             {"--as="},
 	"pack export":            {"--to="},
 	"pack import":            {"--accept=", "--as=", "--restart"},
@@ -132,6 +136,11 @@ var completionArgs = map[string]completer{
 	"agent":               agentCandidates,
 	"agent stop":          agentCandidates,
 	"agent update":        agentCandidates,
+	"agent screen":        agentCandidates,
+	"agent send":          agentCandidates,
+	"notes show":          noteCandidates,
+	"notes write":         noteCandidates,
+	"notes rm":            noteCandidates,
 	"task":                taskCandidates,
 }
 
@@ -389,6 +398,20 @@ func prefixCandidates(context.Context, string) []string {
 	var out []string
 	for _, pe := range reg.Projects {
 		out = append(out, pe.Prefix)
+	}
+	return out
+}
+
+// noteCandidates is the current workspace's note names.
+func noteCandidates(_ context.Context, dir string) []string {
+	root, err := workspace.Root(dir)
+	if err != nil {
+		return nil
+	}
+	rows, _ := notesList(filepath.Join(root, render.NotesDir))
+	var out []string
+	for _, r := range rows {
+		out = append(out, r.Name)
 	}
 	return out
 }

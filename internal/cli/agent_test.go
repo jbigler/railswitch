@@ -126,7 +126,7 @@ func TestAgentStopCLI(t *testing.T) {
 func TestCompleteAgent(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
-	if got, want := complete(t, "agent", ""), []string{"add", "claude", "default", "ls", "probe", "stop", "update"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "agent", ""), []string{"add", "claude", "default", "ls", "probe", "screen", "send", "stop", "update"}; !slices.Equal(got, want) {
 		t.Errorf("agent: %q; want %q", got, want)
 	}
 	if got := complete(t, "agent", "claude", ""); len(got) != 0 {
@@ -205,5 +205,31 @@ func TestAgentArgsNoToken(t *testing.T) {
 	}
 	if a, _, _ := agentArgs(e, []string{"claude", "--", "--no-token"}); a.noToken || !slices.Equal(a.argv, []string{"--no-token"}) {
 		t.Errorf("after --: noToken %v argv %q", a.noToken, a.argv)
+	}
+}
+
+// D144: agent send reads a browser form's CRLF as a line break and drops
+// the trailing one; screen --json is the lifecycle document.
+func TestAgentScreenSendCLI(t *testing.T) {
+	ws, _ := lockedWS(t)
+	mustRun(t, "-C", ws, "render")
+	f := fakeHost()
+	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "filial-feat-agent-probe"}, sys.Result{Stdout: []byte("true\n")}, nil)
+	if code, _, errs := runStdin(t, f, "one\r\ntwo\r\n", "-C", ws, "-w", "feat", "agent", "send", "probe"); code != 0 {
+		t.Fatalf("agent send: exit %d: %s", code, errs)
+	}
+	want := "podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send -- one\ntwo"
+	if !slices.ContainsFunc(f.Calls, func(c []string) bool { return strings.Join(c, " ") == want }) {
+		t.Errorf("no %q in %q", want, f.Calls)
+	}
+	if code, _, _ := runStdin(t, f, "x\x1b", "-C", ws, "-w", "feat", "agent", "send", "probe"); code != 1 {
+		t.Errorf("escape: exit %d; want 1", code)
+	}
+	code, out, errs := runWith(t, f, "-C", ws, "-w", "feat", "--json", "agent", "screen", "probe")
+	if code != 0 || out != `{"agent":"probe","running":true,"session":true,"lines":[]}`+"\n" {
+		t.Errorf("agent screen: exit %d out %q err %q", code, out, errs)
+	}
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "agent", "screen", "claude"); code != 1 || !strings.Contains(errs, "service agent") {
+		t.Errorf("on-demand: exit %d err %q", code, errs)
 	}
 }

@@ -45,6 +45,11 @@ source = "apply-default.sh"
 target = "/usr/local/bin/railswitch-apply-default"
 options = "ro,z"
 
+[[mounts]]                    # the entrypoint's status line for a home without one
+source = "statusline.sh"
+target = "/usr/local/bin/railswitch-statusline"
+options = "ro,z"
+
 [[mounts]]                    # registered as a hook by the entrypoint (D58)
 source = "claude-status-hook.sh"
 target = "/usr/local/bin/claude-status-hook.sh"

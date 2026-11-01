@@ -120,6 +120,15 @@ refreshed on every start as `~/.claude/railswitch.md`, and
 The rest of `CLAUDE.md` is yours: lines a tool adds there (`rtk init`'s
 `@RTK.md`, say) or you write survive restarts.
 
+## Claude's status line
+
+A home without a status line of its own gets railswitch's: the worktree
+(and the folder under it), its git branch, the model, and how much of the
+context window is used (green, yellow from 50%, red from 80%; `ctx -`
+until the first reply). Set your own (`/statusline`, or `statusLine` in
+`~/.claude/settings.json`) and it is kept; promote it to share it with
+every worktree (below).
+
 ## A default config for every worktree
 
 Set an agent up the way you like in one worktree (theme, plugins and

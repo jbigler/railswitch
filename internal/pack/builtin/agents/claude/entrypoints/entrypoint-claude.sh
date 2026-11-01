@@ -65,7 +65,9 @@ fi
 
 # Register the status hook (D58) on every event it handles. Per event and
 # idempotent: an event lacking the hook gets it, so older homes pick up new
-# events. settings.json is only rewritten when something changed.
+# events. A home with no status line gets railswitch's (worktree, branch,
+# model, context used); one of your own is kept. settings.json is only
+# rewritten when something changed.
 SETTINGS_JSON="$CONFIG_DIR/settings.json"
 [ -f "$SETTINGS_JSON" ] || echo '{}' > "$SETTINGS_JSON"
 tmp="${SETTINGS_JSON}.tmp.$$"
@@ -76,6 +78,7 @@ jq '
   .hooks = reduce ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
                    "PermissionRequest", "Stop", "Notification", "SessionEnd") as $e
     (.hooks // {}; if (.[$e] // []) | runs_hook then . else .[$e] = ((.[$e] // []) + [entry]) end)
+  | .statusLine //= {type: "command", command: "/usr/local/bin/railswitch-statusline"}
 ' "$SETTINGS_JSON" > "$tmp"
 if cmp -s "$tmp" "$SETTINGS_JSON"; then rm -f "$tmp"; else mv "$tmp" "$SETTINGS_JSON"; fi
 

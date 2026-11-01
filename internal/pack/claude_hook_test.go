@@ -138,3 +138,64 @@ func TestClaudeBuiltin(t *testing.T) {
 		t.Errorf("env = %v, want DISABLE_AUTOUPDATER=1", a.Env)
 	}
 }
+
+// TestHookUsage: Stop counts the session's tokens from its transcript, one
+// usage per message id; the next events carry the count over.
+func TestHookUsage(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq not on PATH")
+	}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "claude.json")
+	transcript := filepath.Join(t.TempDir(), "session.jsonl")
+	lines := strings.Join([]string{
+		`{"type":"user","message":{"role":"user","content":"hi"}}`,
+		`{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20}}}`,
+		`{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20}}}`,
+		`{"type":"assistant","message":{"id":"m2","usage":{"input_tokens":1,"output_tokens":7}}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(transcript, []byte(lines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(payload string) map[string]any {
+		t.Helper()
+		cmd := exec.Command("bash", claudeHook)
+		cmd.Stdin = strings.NewReader(payload)
+		cmd.Env = append(withoutStatus(os.Environ()), "RAILSWITCH_STATUS_FILE="+file)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+		var s map[string]any
+		data, _ := os.ReadFile(file)
+		if err := json.Unmarshal(data, &s); err != nil {
+			t.Fatalf("%v: %s", err, data)
+		}
+		return s
+	}
+	want := map[string]any{"input": float64(11), "output": float64(12), "cache_read": float64(100), "cache_write": float64(20)}
+	tp, _ := json.Marshal(transcript)
+	s := run(`{"hook_event_name":"Stop","transcript_path":` + string(tp) + `,"last_assistant_message":"done"}`)
+	if u, _ := s["usage"].(map[string]any); !mapsEqual(u, want) {
+		t.Errorf("Stop usage = %v; want %v", s["usage"], want)
+	}
+	s = run(`{"hook_event_name":"UserPromptSubmit"}`)
+	if u, _ := s["usage"].(map[string]any); s["state"] != "working" || !mapsEqual(u, want) {
+		t.Errorf("UserPromptSubmit: %v; want working with the usage carried over", s)
+	}
+	s = run(`{"hook_event_name":"Stop","transcript_path":"/nonexistent","last_assistant_message":"x"}`)
+	if _, ok := s["usage"]; ok {
+		t.Errorf("Stop without a transcript: %v; want no usage", s)
+	}
+}
+
+func mapsEqual(a, b map[string]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range b {
+		if a[k] != v {
+			return false
+		}
+	}
+	return true
+}

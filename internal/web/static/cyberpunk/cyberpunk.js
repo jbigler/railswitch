@@ -4,7 +4,7 @@
 // dashboard's POSTs. Everything from the CLI is text: shown with
 // textContent only.
 import { World } from './world.js';
-import { lobby, lab, svcState } from './rooms.js';
+import { lobby, lab, svcState, tokens } from './rooms.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -60,7 +60,7 @@ async function go(to) {
   const build = ++building;
   closePanel();
   $('where').textContent = 'Elevator…';
-  const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, notes: showNotes, config: showConfig,
+  const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/cyberpunk/issues`), notes: showNotes, config: showConfig,
     service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   let r;
@@ -221,7 +221,7 @@ function showAgent(slug) {
     const status = el('p', {});
     const drawStatus = () => {
       const x = labOf(slug)?.agent;
-      status.replaceChildren(x ? el('span', {}, el('strong', {}, x.name), ' · ', el('span', { class: `state-${x.state}` }, x.state), x.message ? ` · ${x.message}` : '') : el('span', { class: 'muted' }, 'No agent is running here.'));
+      status.replaceChildren(x ? el('span', {}, el('strong', {}, x.name), ' · ', el('span', { class: `state-${x.state}` }, x.state), x.usage ? ` · ${tokens(x.usage)} tokens (${x.usage.input.toLocaleString()} in, ${x.usage.output.toLocaleString()} out, ${x.usage.cache_read.toLocaleString()} cache read, ${x.usage.cache_write.toLocaleString()} cache write)` : '', x.message ? ` · ${x.message}` : '') : el('span', { class: 'muted' }, 'No agent is running here.'));
     };
     drawStatus();
     body.append(status);

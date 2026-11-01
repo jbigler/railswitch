@@ -26,6 +26,9 @@ type AgentRow struct {
 	TS      int64  `json:"ts"`
 	Reply   bool   `json:"reply"`   // agentstatus.Status.Reply: the agent asks the user something
 	Running bool   `json:"running"` // its container runs in the worktree (D62)
+	// Usage: its current (or last) session's tokens, when its package's
+	// status hook counts them; nil otherwise.
+	Usage *agentstatus.Usage `json:"usage"`
 	// Config: its package has [config] paths, so it can have a project
 	// default (D135); Default is where that came from, nil without one.
 	Config  bool          `json:"config"`
@@ -381,7 +384,7 @@ func agentRows(m *render.Model, in *render.Instance, running []string) []AgentRo
 		st := agentstatus.Read(filepath.Join(in.Values["status.dir"], a.Name+".json"))
 		rows = append(rows, AgentRow{
 			Name: a.Name, Package: a.Ref.String(), Run: a.Run,
-			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(),
+			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(), Usage: st.Usage,
 			Running: slices.Contains(running, a.Name),
 			Config:  len(a.Agent.Config.Paths) > 0, Default: ReadAgentDefault(m, a.Name),
 			DefaultPending: defaultPending(filepath.Join(in.Values["agent.home"], a.Name)),

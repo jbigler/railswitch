@@ -66,7 +66,7 @@ fi
 # Register the status hook (D58) on every event it handles. Per event and
 # idempotent: an event lacking the hook gets it, so older homes pick up new
 # events. The project's shared notes (D141) come in through a SessionStart
-# hook: its output (the rule and one line per note) is part of every
+# hook: its output (the rule and the notes' names) is part of every
 # session's context, a new one and after a compaction. settings.json is
 # only rewritten when something changed.
 SETTINGS_JSON="$CONFIG_DIR/settings.json"

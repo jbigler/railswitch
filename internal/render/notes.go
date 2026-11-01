@@ -2,8 +2,8 @@ package render
 
 // Shared notes (D141): one folder of Markdown notes per project, mounted
 // writable into every agent of every worktree. railswitch-notes prints what
-// an agent reads at session start: the rule, then one line per note (its
-// file and first line). Each agent package delivers that output its own way
+// an agent reads at session start: the rule, then the notes' file names,
+// which say what each holds. Each agent package delivers that output its own way
 // (a SessionStart hook, say).
 const (
 	// NotesDir is the workspace folder of the shared notes.
@@ -40,18 +40,21 @@ every note, newest first.
   every agent reads these notes, and they stay until deleted.
 
 RULE
-n=0
-ls -t "$dir" 2>/dev/null | while IFS= read -r f; do
+# Agents write the names: ls -q turns a line break or other control
+# character into "?", so a name can't forge lines of this text, and such a
+# name is no file here and is skipped.
+notes=$(ls -tq "$dir" 2>/dev/null | while IFS= read -r f; do
   case "$f" in MEMORY.md) continue ;; *.md) ;; *) continue ;; esac
-  [ -f "$dir/$f" ] || continue
-  n=$((n + 1))
-  if [ "$n" -gt 200 ]; then
-    echo "- … more notes: ls -t ~/notes"
-    break
-  fi
-  printf -- '- %s\n' "$f"
-done
-[ -n "$(ls "$dir" 2>/dev/null)" ] || echo "(no notes yet)"
+  [ -f "$dir/$f" ] && printf -- '- %s\n' "$f"
+done)
+if [ -z "$notes" ]; then
+  echo "(no notes yet)"
+elif [ "$(printf '%s\n' "$notes" | wc -l)" -gt 200 ]; then
+  printf '%s\n' "$notes" | head -n 200
+  echo "- … more notes: ls -t ~/notes"
+else
+  printf '%s\n' "$notes"
+fi
 `
 
 // notesAgent mounts the shared notes and railswitch-notes into agent s.

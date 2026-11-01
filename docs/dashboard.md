@@ -761,6 +761,8 @@ Every action is a job (below).
   next start", adding "stop it, then start it again" while it runs.
 - **terminal** runs `railswitch term`: a new terminal tab or window on
   the host with your shell in the worktree's folder.
+- **nvim** and **agent** (the cyberpunk office's desks) run `railswitch nvim
+  --new-term` and `railswitch agent --new-term`.
 - **Stack branch** (with a gh stack): a click on another open branch of
   the stack runs `railswitch stack switch <branch>` (`git switch
   --no-guess` through a private copy of the repository's git config: no
@@ -869,6 +871,65 @@ pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
 working blue, your turn yellow, idle and off muted.
 
+## Cyberpunk office
+
+**cyberpunk** in the header opens `/p/<prefix>/cyberpunk`: the project as a
+cyberpunk office tower in 3D (three.js), an optional view beside the 2D
+pages (D146). It is the starship's logic (D144) on the office kit
+(docs/office-kit.md, D145), and costs nothing until you open it: the page
+is static files in the binary, and the server only polls the project as for
+any open page.
+
+- **The lobby** is the project. Its wall screen lists every floor
+  (worktree) with its stack and agent state; the directory in the middle has
+  a beacon per floor (click one to ride there). Kiosks: **Pull requests**
+  (the worktrees' PRs, as `pr ls` reads them, with Refresh PRs), **Issues**
+  (`issue ls`: open GitHub issues), **Notes** (the agents' shared notes,
+  `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
+  save refused when the note changed since you opened it) and
+  **Engineering** (links to Settings, Images, Library, Machine).
+- **A floor** is a worktree; every floor has the same plan, and its
+  highlight colour, ceiling gear, furniture and pet come from a hash of its
+  name, so a floor always looks the same and floors look different. The
+  **server room** along the left wall has a rack per service, its LEDs and
+  edge lights the service's state; a rack opens the service's state,
+  **Restart this service** (as the 2D page's restart, when it restarts
+  alone), its logs in Dozzle, and the floor's **Start**, **Restart**,
+  **Stop** (`up`, `restart`, `stop`). **Your desk**'s wall screen shows the
+  branch, stack, PR and links; the desk opens a **Terminal** (`term`) or
+  **Neovim** (`nvim --new-term`) and the worktree's links. **The agent's
+  desk** opens the agent console in a terminal (`agent --new-term`); the
+  agent beside it shows its state and message, and for a service agent
+  (D142) its current screen (`agent screen`, read every 1.5 s while open)
+  and a box that types to it (`agent send`: the text, then Enter).
+- **The elevator** (in the back wall of every floor, or `T`) lists the
+  lobby and every floor; its doors open as you walk up, and stepping in
+  front of them opens the list. `Esc` closes a panel.
+- **Two views:** the overview (drag turns the floor, the wheel zooms; the
+  ceiling and the walls facing you are cut away) or first person (`V` or
+  **walk**: `W` `A` `S` `D` or the arrows walk, `Shift` runs, drag looks, a
+  click acts on what it hits or walks to that spot; furniture and walls stop
+  you, and you can always walk out of one). Looking follows the pointer's
+  position, never pointer lock, which remote and virtual-machine sessions
+  handle badly.
+- **Outside** the windows is the city at night.
+- Every floor has one pet: a cat or a shiba that roams, a macaw that flies
+  between two perches, a cat asleep on a crate, an aquarium, a jellyfish
+  tank or a gecko. Click it.
+
+Typing to an agent from the page is the same power as the dashboard's
+other buttons: a page that holds the cookie and passes the Origin check
+can drive the agent, as it can start a job. Nothing else can (Security
+model above). Text from the CLI (PR and issue titles, notes, the agent's
+screen) is shown as text, never as markup.
+
+The models are the office kit (`static/office/`, built by
+`tools/office-kit/`), served as glTF with their textures as separate files:
+the content policy (`default-src 'self'`) refuses the `blob:` URLs three.js
+makes for textures embedded in a GLB. three.js is MIT
+(`static/cyberpunk/three.LICENSE.txt`), vendored with its GLTF loader and
+bloom passes as one module by `internal/web/static/cyberpunk/vendor.sh`.
+
 ## Commands
 
 The commands the dashboard reads and runs. Their `--json` output is in
@@ -965,8 +1026,13 @@ Library page connects with `&view=library`: the same, with the
 machine-level jobs (`~machine`) among its `jobs`. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
-project and that prefix's project-level `jobs`. Each `data:` line is one
-JSON object:
+project and that prefix's project-level `jobs`. The cyberpunk office
+connects with `&view=cyberpunk`: it gets one event,
+`{"type":"cyberpunk","id":"state","html":"<JSON>"}`, whenever the project's
+state changes, `html` holding `{prefix, error, pr_error, worktrees[]{slug,
+branch, base, stack, services, agent, links, pr}, jobs[]{id, slug, label,
+state}, banner[]}` (the overview's and `pr ls`'s fields; arrays never
+null). Each `data:` line is one JSON object:
 
 ```json
 {"type":"html","id":"list","html":"<div id=\"list\" class=\"list\">…</div>"}

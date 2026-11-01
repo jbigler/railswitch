@@ -84,6 +84,13 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /{$}", s.root)
 	m.HandleFunc("GET /p/{prefix}", s.page)
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
+	m.HandleFunc("GET /p/{prefix}/cyberpunk", s.cyberPage)
+	m.HandleFunc("GET /p/{prefix}/cyberpunk/issues", s.cyberIssues)
+	m.HandleFunc("GET /p/{prefix}/cyberpunk/notes", s.cyberNotes)
+	m.HandleFunc("GET /p/{prefix}/cyberpunk/notes/{name}", s.cyberNote)
+	m.HandleFunc("POST /p/{prefix}/cyberpunk/notes/{name}", s.cyberNoteWrite)
+	m.HandleFunc("GET /p/{prefix}/cyberpunk/agent/{slug}/screen", s.cyberAgentScreen)
+	m.HandleFunc("POST /p/{prefix}/cyberpunk/agent/{slug}/send", s.cyberAgentSend)
 	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
@@ -307,7 +314,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	view := q.Get("view")
-	if view != "settings" && view != "new" && view != "library" {
+	if view != "settings" && view != "new" && view != "library" && view != "cyberpunk" {
 		view = ""
 	}
 	prefix := q.Get("p")
@@ -512,6 +519,8 @@ var worktreeActions = map[string]struct {
 	"stop":    {"stop", []string{"stop"}},
 	"restart": {"restart", []string{"restart"}},
 	"term":    {"terminal", []string{"term"}},
+	"nvim":    {"nvim", []string{"nvim", "--new-term"}},
+	"agent":   {"agent", []string{"agent", "--new-term"}},
 }
 
 func (s *Server) act(w http.ResponseWriter, r *http.Request) {

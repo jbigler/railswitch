@@ -2,7 +2,8 @@
 
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
-one pet per floor. 78 GLB files in `internal/web/static/office/models/`, a
+one pet per floor. 78 glTF files (`.gltf` + `.bin`, textures as PNGs beside
+them) in `internal/web/static/office/models/`, a
 loader in `internal/web/static/office/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
 
@@ -130,7 +131,9 @@ blender --background --python tools/office-kit/build_all.py
 (or open `build_all.py` in Blender's Text Editor and run it). Blender 4.2 or
 later. Each set clears and rebuilds its own collection (`CyberOfficeKit`,
 `CyberOfficeDecor`, `CyberOfficeArch`, `CyberOfficePets`) and overwrites its
-GLBs; `OFFICE_KIT_OUT` exports elsewhere.
+glTF files; `OFFICE_KIT_OUT` exports elsewhere. The export is glTF with
+separate textures, not GLB: the dashboard's content policy refuses the
+`blob:` URLs three.js makes for images embedded in a GLB.
 
 `tools/office-kit/preview.html` is a sample floor for checking the kit. Like
 every floor it has one pet, chosen with the Pet picker or `?pet=` (`cat`, `dog`

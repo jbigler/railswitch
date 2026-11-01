@@ -1,4 +1,4 @@
-// The virtual office's asset kit: loads the GLBs in ./models/ (built by
+// The virtual office's asset kit: loads the glTF files in ./models/ (built by
 // tools/office-kit/, see docs/office-kit.md), recolors the highlight, and drives
 // the named moving parts. No import of its own: the dashboard's CSP allows no
 // import map, so the caller passes a GLTFLoader from whatever three.js it bundles.
@@ -26,7 +26,7 @@ export async function loadOfficeKit(baseUrl, names, loader) {
   const accentMats = new Set();
   const secondaryMats = new Set();
   await Promise.all(names.map(async (name) => {
-    const gltf = await loader.loadAsync(`${baseUrl}${name}.glb`);
+    const gltf = await loader.loadAsync(`${baseUrl}${name}.gltf`);
     gltf.scene.traverse((o) => {
       if (IS_COL.test(o.name)) o.visible = false;
       for (const m of [o.material].flat().filter(Boolean)) {

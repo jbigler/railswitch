@@ -131,6 +131,9 @@ Spec: `handoff/HANDOFF.md`; decisions (D1 on): `docs/superpowers/plans/2026-10-2
 ## CLI (Stage 9y additions)
 - `agent --no-token [<name>]` (D139, flags before or after the name, `parseMixed`): an on-demand agent runs without `tokenSecrets` (project secrets it receives into an env var its package's `[[secrets]]` declares, whatever their name): not required by `checkSecrets` (its `without`), not passed (`runOpts.Without`), so the agent uses the login in its home; a service agent refuses it.
 
+## CLI (Stage 9z additions)
+- Default agent (D140): `[agents.<n>] default = true` (`config.Agent.Default`, at most one); an unnamed agent command (`agentName` with several agents: `agent`, `agent update`, `agent default`) takes it, else the only agent whose package has `default = true` (`defaultAgent`), else asks for a name. `default` and `update` are reserved agent names.
+
 ## Global constraints
 - Every Quadlet unit railswitch writes ends with `[Quadlet] DefaultDependencies=false` (D130, `machine.NoNetworkWait`, appended after the unit-hash stamp so it changes no hash): podman's implicit wait for `network-online.target` held each start 90 s where that target never comes. Every render also adds it to older railswitch units of a registered project or the machine (`machine.AddNoNetworkWait`; a failure is a render warning); `up` reloads when a loaded unit's `After=` still names the wait. podman ≥ 5.3 (`doctor`).
 - Paths honour `XDG_CONFIG_HOME`/`XDG_DATA_HOME`: config `~/.config/railswitch/`, data `~/.local/share/railswitch/`, Quadlet output `~/.config/containers/systemd/`.

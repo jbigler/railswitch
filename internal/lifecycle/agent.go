@@ -127,6 +127,25 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 	return l.interactive(ctx, sys.NoTimeout, "podman", []string{"attach", ctr})
 }
 
+// defaultAgent is the agent run when none is named (D140): the one
+// project.toml marks default = true, else the only one whose package is the
+// built-in default (the agent project new adds).
+func defaultAgent(m *render.Model) (string, bool) {
+	var builtin []string
+	for _, a := range m.Inputs.Stack.Agents {
+		if m.Inputs.Project.Agents[a.Name].Default {
+			return a.Name, true
+		}
+		if a.Agent.Default {
+			builtin = append(builtin, a.Name)
+		}
+	}
+	if len(builtin) == 1 {
+		return builtin[0], true
+	}
+	return "", false
+}
+
 // tokenSecrets are the project's secrets that deliver agent name's package
 // [[secrets]] (its token): those the agent receives into an env var its
 // package declares, whatever they are called.
@@ -295,7 +314,10 @@ func (l *L) agentName(m *render.Model, name string) (string, error) {
 	case name == "" && len(names) == 1:
 		return names[0], nil
 	case name == "":
-		return "", fmt.Errorf("project %s has several agents: name one of %s", m.Prefix, strings.Join(names, ", "))
+		if n, ok := defaultAgent(m); ok {
+			return n, nil
+		}
+		return "", fmt.Errorf("project %s has several agents: name one of %s (or set default = true on one in project.toml)", m.Prefix, strings.Join(names, ", "))
 	}
 	return "", fmt.Errorf("project %s has no agent %s (agents: %s)", m.Prefix, name, strings.Join(names, ", "))
 }

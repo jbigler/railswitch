@@ -95,6 +95,10 @@ type Agent struct {
 	// it first starts, and again when the list changes (D133): tools the
 	// home keeps, like gh extensions and agent skills.
 	Setup []string `toml:"setup"`
+	// Default: the agent `railswitch agent` (and `agent update`) runs when
+	// no name is given and the project has several (D140), over the
+	// package's built-in default; at most one.
+	Default bool `toml:"default"`
 }
 
 // Secret declares one user-provided secret (D33).
@@ -235,7 +239,7 @@ func LibraryRef(s string) (alias, rest string, ok bool) {
 
 // reservedAgents are names an agent cannot take: they are subcommands or
 // image names of `railswitch agent`.
-var reservedAgents = []string{"ls", "stop", "add", "base"}
+var reservedAgents = []string{"ls", "stop", "add", "base", "default", "update"}
 
 // Load decodes path strictly: a key project.toml does not define is an error
 // naming its dotted path. The schema is read first, on its own, so a file from
@@ -455,8 +459,12 @@ func (p *Project) Validate() error {
 		v.containerfile(fmt.Sprintf("image.addons[%d]", i), a)
 	}
 
+	var defaults []string
 	for _, name := range sortedKeys(p.Agents) {
 		path := "agents." + key(name)
+		if p.Agents[name].Default {
+			defaults = append(defaults, name)
+		}
 		switch {
 		case !agentNameRe.MatchString(name):
 			v.add(path, "agent name must match %s", agentNameRe)
@@ -479,6 +487,9 @@ func (p *Project) Validate() error {
 		for i, c := range a.Setup {
 			v.hook(fmt.Sprintf("%s.setup[%d]", path, i), c)
 		}
+	}
+	if len(defaults) > 1 {
+		v.add("agents", "default = true on %s: one agent at most", strings.Join(defaults, " and "))
 	}
 
 	if t := p.Template; t != nil {

@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Every agent mounts the shared notes and railswitch-notes; nothing else
@@ -22,8 +23,8 @@ func TestNotesMounts(t *testing.T) {
 	}
 }
 
-// railswitch-notes prints the rule, then each .md note's file and first
-// line, newest first; other files are left out.
+// railswitch-notes prints the rule, then each .md note's name, newest
+// first; other files and an agent's MEMORY.md index are left out.
 func TestNotesScript(t *testing.T) {
 	home := t.TempDir()
 	run := func() string {
@@ -39,20 +40,18 @@ func TestNotesScript(t *testing.T) {
 		t.Errorf("no folder:\n%s", out)
 	}
 	dir := filepath.Join(home, "notes")
-	for name, body := range map[string]string{
-		"test-db.md":  "# Run db:prepare after a schema change\ndetails\n",
-		"x.txt":       "not a note\n",
-		"MEMORY.md":   "- [Old](old.md)\n",
-		"imported.md": "---\nname: ci-cache\ndescription: CI caches gems per Ruby version\nmetadata:\n  type: project\n---\n\nbody\n",
-		"named.md":    "---\nname: only-a-name\n---\nbody\n",
-	} {
-		writeFile(t, filepath.Join(dir, name), body)
+	writeFile(t, filepath.Join(dir, "x.txt"), "not a note\n")
+	writeFile(t, filepath.Join(dir, "MEMORY.md"), "- [Old](old.md)\n")
+	writeFile(t, filepath.Join(dir, "older_note.md"), "x\n")
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "older_note.md"), old, old); err != nil {
+		t.Fatal(err)
 	}
+	writeFile(t, filepath.Join(dir, "run_db_prepare_after_a_schema_change.md"), "details\n")
 	out := run()
-	for _, want := range []string{"- test-db.md: Run db:prepare after a schema change\n", "- imported.md: CI caches gems per Ruby version\n", "- named.md: only-a-name\n"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("index lacks %q:\n%s", want, out)
-		}
+	i, j := strings.Index(out, "- run_db_prepare_after_a_schema_change.md\n"), strings.Index(out, "- older_note.md\n")
+	if i < 0 || j < 0 || i > j {
+		t.Errorf("listing not newest first:\n%s", out)
 	}
 	if strings.Contains(out, "x.txt") || strings.Contains(out, "MEMORY.md") || strings.Contains(out, "no notes yet") {
 		t.Errorf("index:\n%s", out)

@@ -24,14 +24,15 @@ cat <<'RULE'
 # Project notes (railswitch)
 
 Every agent of this project, in every worktree, shares ~/notes/: one
-Markdown file per note, first line "# <one-line summary>", then the details.
-Below is one line per note (file, summary), newest first.
+Markdown file per note, named for what it says, words joined by
+underscores (run_db_prepare_after_a_schema_change.md). The listing below is
+every note, newest first.
 
-- Read a note (cat ~/notes/<file>) when its summary is relevant to the task.
+- Read a note (cat ~/notes/<file>) when its name is relevant to the task.
 - To remember something every agent should know about this project, write
-  it there as a note (a short kebab-case file name ending in .md). Update an
-  existing note on the same subject instead of adding another. Keep this
-  worktree's scratch out of it.
+  it there as a note whose name says it. Update an existing note on the
+  same subject instead of adding another, and rename it when what it says
+  changes. Keep this worktree's scratch out of it.
 - These are the project's memory: use them instead of your own memory
   features for anything about the project.
 - Never store secrets, credentials, tokens, personal data or patient data:
@@ -47,15 +48,7 @@ ls -t "$dir" 2>/dev/null | while IFS= read -r f; do
     echo "- … more notes: ls -t ~/notes"
     break
   fi
-  # A note's summary is its first line; a memory file copied in from an
-  # agent's own memory starts with front matter: its description, else name.
-  title=$(head -n 1 "$dir/$f")
-  if [ "$title" = "---" ]; then
-    title=$(sed -n '2,/^---$/s/^description: *//p' "$dir/$f" | head -n 1)
-    [ -n "$title" ] || title=$(sed -n '2,/^---$/s/^name: *//p' "$dir/$f" | head -n 1)
-  fi
-  title=$(printf '%s' "$title" | sed 's/^#* *//' | cut -c1-150)
-  printf -- '- %s: %s\n' "$f" "$title"
+  printf -- '- %s\n' "$f"
 done
 [ -n "$(ls "$dir" 2>/dev/null)" ] || echo "(no notes yet)"
 `

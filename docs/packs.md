@@ -587,8 +587,8 @@ it with its `apply-default.sh`.
 
 Every agent container has the project's shared notes (D141) at `~/notes`
 and `/usr/local/bin/railswitch-notes`, which prints what an agent should
-read at session start: the rule for using the notes, then one line per
-note. Delivering it is the package's job, as it knows how its agent reads
+read at session start: the rule for using the notes, then their file names
+(which say what each holds), newest first. Delivering it is the package's job, as it knows how its agent reads
 context: `claude@1` registers it as a SessionStart hook; a package whose
 agent reads a context file can write its output into that file from its
 entrypoint, between markers it rewrites at every start. An agent whose own

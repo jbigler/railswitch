@@ -165,11 +165,12 @@ certain way, a gotcha, a convention) goes in the project's notes: one
 folder, `notes/` in the workspace, which every agent of every kind (Claude,
 your own packages) reads and writes as `~/notes/`, in every worktree.
 
-- **A note is a Markdown file:** first line `# <one-line summary>`, then the
-  details. Agents write them; so can you, with any editor.
-- **Every agent starts with an index:** the rule for using the notes, then
-  one line per note (file and summary), newest first. It reads a whole note
-  when it's relevant. Claude gets this at every session start and after a
+- **A note is a Markdown file named for what it says,** words joined by
+  underscores: `run_db_prepare_after_a_schema_change.md`. Agents write
+  them; so can you, with any editor.
+- **Every agent starts with the list of notes:** the rule for using them,
+  then every note's file name, newest first. Only names: it reads a whole
+  note when its name is relevant, so the notes' size never costs context. Claude gets this at every session start and after a
   compaction; a package of your own gets it the way it delivers context
   (see [the package format](../packs.md)).
 - **Saved notes are for everyone at once:** a note one agent writes is in
@@ -187,12 +188,13 @@ Claude Code's auto memory is off in railswitch's agents: the project's
 shared notes are Claude's memory, so what it learns reaches every agent
 rather than one tool's private store. Memory files from earlier runs
 (rails-dev-podman's `.container-config/claude-memory/`, a
-`~/.claude/projects/*/memory/` folder) can be copied straight into
-`notes/`: each one's `description` (or `name`) becomes its line in the
-index, and Claude's own `MEMORY.md` index file is left out.
+`~/.claude/projects/*/memory/` folder) can be copied into `notes/`; give
+each a name that says what it holds (their own names, like
+`feedback_testing.md`, are often too vague for an agent to know when to
+read them). Claude's own `MEMORY.md` index file is left out of the list.
 
 ```bash
-cp -n /path/to/old-memory/*.md notes/
+cp /path/to/old-memory/project_setup.md notes/ci_caches_gems_per_ruby_version.md
 ```
 
 ## Your own agent

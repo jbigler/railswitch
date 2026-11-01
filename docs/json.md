@@ -654,6 +654,91 @@ hook writes.
 | `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 | `default_pending` | boolean | Its home in this worktree holds the request to take the default (a new home, or `agent default apply`): its entrypoint applies it at the agent's next start. |
 
+## `agent screen [<name>]`
+
+A service agent's screen in the current worktree, as it shows now (D144):
+`podman exec <ctr> tmux -L agent capture-pane -p -J -t =agent:`, the
+visible pane of the agent's session with wrapped lines joined. Each line
+has its control characters made spaces and its trailing spaces cut;
+trailing blank lines are cut. The name defaults as for `railswitch agent`.
+An on-demand agent is refused (exit 1). The text form prints the lines.
+
+```json
+{"agent": "claude", "running": true, "session": true, "lines": ["> fix the failing spec", "", "● Reading spec/models/user_spec.rb"]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `agent` | string | The agent's name. |
+| `running` | boolean | Its container runs in this worktree. `false`: `session` is `false` and `lines` empty, exit 0. |
+| `session` | boolean | Its session server holds the agent's session. `false` (the container runs, no agent in it): `lines` empty, exit 0. |
+| `lines` | array of strings | The screen, top to bottom; never null. |
+
+## `issue ls`
+
+One project (`-C`): its open GitHub issues (D144), from `gh issue list
+--repo <owner/name> --state open --limit 100 --json
+number,title,url,labels,assignees,updatedAt,author` on the host with
+`GH_PROMPT_DISABLED=1`, in `/`, 30 s timeout: the 100 newest, in gh's
+order (newest created first). The repo comes from `project.toml` as for
+[`pr ls`](#pr-ls); one not on GitHub fails with "issue ls: <url> is not a
+GitHub repo". The text form is a table `ISSUE AUTHOR ASSIGNEES LABELS
+TITLE` (control characters as spaces).
+
+```json
+{"issues": [{"number": 42, "title": "Login times out", "url": "https://github.com/o/n/issues/42", "labels": ["bug"], "assignees": ["ann"], "author": "bob", "updated": "2026-10-31T19:00:32Z"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `issues` | array | Never null. |
+| `number`, `title`, `url` | number, string, string | As GitHub has them. |
+| `labels` | array of strings | Label names; never null. |
+| `assignees` | array of strings | Logins; never null. |
+| `author` | string | The author's login. |
+| `updated` | string | `updatedAt`, RFC 3339. |
+
+## `notes ls`
+
+The workspace's shared notes (D141, D144): each regular file in
+`<workspace>/notes/` whose name matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$`,
+newest first. A symlink, directory or other name is left out. No `notes/`
+folder lists none. No worktree is needed.
+
+```json
+{"notes": [{"name": "run_db_prepare_after_a_schema_change.md", "size": 412, "modified": "2026-10-31T19:00:32Z"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `notes` | array | Never null. |
+| `name` | string | The file name. |
+| `size` | number | Bytes. |
+| `modified` | string | Its modification time, RFC 3339 UTC. |
+
+## `notes show <name>`
+
+One note, read as a hostile file (`safefile.Read`: a regular file, not a
+symlink, at most 1 MiB). The text form prints the note with control
+characters other than line breaks and tabs as spaces.
+
+```json
+{"name": "run_db_prepare_after_a_schema_change.md", "text": "Run bin/rails db:prepare …\n", "hash": "sha256:9f2c…"}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The file name. |
+| `text` | string | Its content. |
+| `hash` | string | `sha256:<hex>` of the bytes: what `notes write` and `notes rm` take as `--if-hash`. |
+
+`notes write <name> --if-hash <h>` replaces the note with stdin (at most
+1 MiB, UTF-8) when it still has hash `h`; `--if-hash ""` creates it and
+refuses an existing one. The file is written 0644 through a temp file
+renamed over the name; `notes/` is created 0700 when missing. `notes rm
+<name> --if-hash <h>` removes it at that hash. A stale hash, a missing
+note or a symlink in its place exits 1 and changes nothing.
+
 ## `overview`
 
 One project (`-C`): every registered worktree, in registry order (by ID),

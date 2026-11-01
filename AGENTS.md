@@ -1,7 +1,7 @@
 # AGENTS.md — railswitch
 
 Go CLI (`railswitch`, module `github.com/jbigler/railswitch`) that runs Rails dev environments on rootless podman via Quadlet.
-Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
+Spec: `handoff/HANDOFF.md`; decisions (D1 on): `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`.
 
 ## Commands
 - `make check` before every commit: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...` (through `go run` at the Makefile's `STATICCHECK_VERSION`: nothing to install), `go test ./...`.
@@ -121,6 +121,9 @@ Spec: `handoff/HANDOFF.md`; decisions D1–D80: `docs/superpowers/plans/2026-10-
 
 ## CLI (Stage 9v additions)
 - `pr ls --json` `pr.review_app` (`prs.ReviewApps`: one `gh api graphql` for the open/draft PRs, the newest ACTIVE deployment of the head commit whose latest status is SUCCESS, http(s) `environmentUrl` only); dashboard Links **Review app**.
+
+## CLI (Stage 9w additions)
+- Shared agent memory (D136): `agent.toml [memory] path` (relative to the home, not in `[config] paths`; `pack.AgentMemory`) mounts `{agent.memory}/<agent>` = `<ws>/.railswitch/agent-memory/<agent>/` (`render.AgentMemoryDir`, a `Plan.StatusDirs` entry: 0700, never removed, kept by `wt rm`) there, writable, in every worktree's agent. claude@1: `.claude/projects/-app/memory` (auto memory for `/app`).
 
 ## Global constraints
 - Every Quadlet unit railswitch writes ends with `[Quadlet] DefaultDependencies=false` (D130, `machine.NoNetworkWait`, appended after the unit-hash stamp so it changes no hash): podman's implicit wait for `network-online.target` held each start 90 s where that target never comes. Every render also adds it to older railswitch units of a registered project or the machine (`machine.AddNoNetworkWait`; a failure is a render warning); `up` reloads when a loaded unit's `After=` still names the wait. podman ≥ 5.3 (`doctor`).

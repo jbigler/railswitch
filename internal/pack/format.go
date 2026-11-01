@@ -384,6 +384,7 @@ type Agent struct {
 	Secrets    []AgentSecret     `toml:"secrets"`
 	Unit       Unit              `toml:"unit"`
 	Config     AgentConfig       `toml:"config"`
+	Memory     AgentMemory       `toml:"memory"`
 
 	Files  fs.FS          `toml:"-"` // the package's directory
 	Origin *LibraryOrigin `toml:"-"` // as Pack.Origin
@@ -396,6 +397,14 @@ type Agent struct {
 // AgentDefaultRequest.
 type AgentConfig struct {
 	Paths []string `toml:"paths"`
+}
+
+// AgentMemory is where the agent keeps its own memory files in its home
+// (D136): render mounts the project's one folder for the agent there in
+// every worktree, so what one worktree's agent saves the others read, and
+// it outlives the worktree.
+type AgentMemory struct {
+	Path string `toml:"path"`
 }
 
 const (

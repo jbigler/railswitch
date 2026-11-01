@@ -246,7 +246,7 @@ func TestApplyCreatesHomeSubdirs(t *testing.T) {
 
 func TestPlanStatusDirs(t *testing.T) {
 	p, ws, qdir := filialPlan(t)
-	want := []string{".railswitch/status/master", ".railswitch/status/feat", ".railswitch/agent-default/claude"}
+	want := []string{".railswitch/status/master", ".railswitch/status/feat", ".railswitch/agent-default/claude", ".railswitch/agent-memory/claude"}
 	if !slices.Equal(p.StatusDirs, want) {
 		t.Errorf("StatusDirs = %v; want %v", p.StatusDirs, want)
 	}
@@ -303,5 +303,28 @@ func TestAgentDefaultMount(t *testing.T) {
 	}
 	if got := in.Values["agent.default"]; got != filepath.Join(m.Inputs.Workspace, ".railswitch", "agent-default") {
 		t.Errorf("agent.default = %q", got)
+	}
+}
+
+// TestAgentMemoryMount: every worktree's agent with a [memory] path mounts
+// the project's one memory folder for it there, writable; other services
+// don't (D136).
+func TestAgentMemoryMount(t *testing.T) {
+	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), nil))
+	want := Mount{Source: "{agent.memory}/claude", Target: "/home/appuser/.claude/projects/-app/memory", Options: "z"}
+	for _, s := range m.Services {
+		has := slices.Contains(s.Mounts, want)
+		if has != (s.ID == "agent-claude") {
+			t.Errorf("%s mounts the memory folder: %v", s.ID, has)
+		}
+	}
+	for _, wt := range m.Inputs.Worktrees {
+		in, err := m.Instance(wt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := in.Values["agent.memory"]; got != filepath.Join(m.Inputs.Workspace, ".railswitch", "agent-memory") {
+			t.Errorf("%s: agent.memory = %q", wt.Slug, got)
+		}
 	}
 }

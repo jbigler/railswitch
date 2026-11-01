@@ -71,11 +71,9 @@ paths = [
   ".claude.json",               # onboarding and preferences; the entrypoint keeps each home's projects
 ]
 
-[memory]                      # every worktree's Claude shares one auto-memory folder (D136)
-path = ".claude/projects/-app/memory"   # Claude keys it by the working dir, /app
-
 [env]
 DISABLE_AUTOUPDATER = "1"
+CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1"   # the project's shared notes are its memory (D141)
 
 [unit]
 tty = true

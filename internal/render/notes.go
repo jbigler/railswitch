@@ -40,14 +40,21 @@ Below is one line per note (file, summary), newest first.
 RULE
 n=0
 ls -t "$dir" 2>/dev/null | while IFS= read -r f; do
-  case "$f" in *.md) ;; *) continue ;; esac
+  case "$f" in MEMORY.md) continue ;; *.md) ;; *) continue ;; esac
   [ -f "$dir/$f" ] || continue
   n=$((n + 1))
   if [ "$n" -gt 200 ]; then
     echo "- … more notes: ls -t ~/notes"
     break
   fi
-  title=$(head -n 1 "$dir/$f" | sed 's/^#* *//' | cut -c1-150)
+  # A note's summary is its first line; a memory file copied in from an
+  # agent's own memory starts with front matter: its description, else name.
+  title=$(head -n 1 "$dir/$f")
+  if [ "$title" = "---" ]; then
+    title=$(sed -n '2,/^---$/s/^description: *//p' "$dir/$f" | head -n 1)
+    [ -n "$title" ] || title=$(sed -n '2,/^---$/s/^name: *//p' "$dir/$f" | head -n 1)
+  fi
+  title=$(printf '%s' "$title" | sed 's/^#* *//' | cut -c1-150)
   printf -- '- %s: %s\n' "$f" "$title"
 done
 [ -n "$(ls "$dir" 2>/dev/null)" ] || echo "(no notes yet)"

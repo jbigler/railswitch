@@ -39,11 +39,22 @@ func TestNotesScript(t *testing.T) {
 		t.Errorf("no folder:\n%s", out)
 	}
 	dir := filepath.Join(home, "notes")
-	for name, body := range map[string]string{"test-db.md": "# Run db:prepare after a schema change\ndetails\n", "x.txt": "not a note\n"} {
+	for name, body := range map[string]string{
+		"test-db.md":  "# Run db:prepare after a schema change\ndetails\n",
+		"x.txt":       "not a note\n",
+		"MEMORY.md":   "- [Old](old.md)\n",
+		"imported.md": "---\nname: ci-cache\ndescription: CI caches gems per Ruby version\nmetadata:\n  type: project\n---\n\nbody\n",
+		"named.md":    "---\nname: only-a-name\n---\nbody\n",
+	} {
 		writeFile(t, filepath.Join(dir, name), body)
 	}
 	out := run()
-	if !strings.Contains(out, "- test-db.md: Run db:prepare after a schema change\n") || strings.Contains(out, "x.txt") || strings.Contains(out, "no notes yet") {
+	for _, want := range []string{"- test-db.md: Run db:prepare after a schema change\n", "- imported.md: CI caches gems per Ruby version\n", "- named.md: only-a-name\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("index lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "x.txt") || strings.Contains(out, "MEMORY.md") || strings.Contains(out, "no notes yet") {
 		t.Errorf("index:\n%s", out)
 	}
 }

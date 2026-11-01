@@ -600,6 +600,5 @@ keeps its own memory files, relative to the home (not one of its
 `[config] paths`). railswitch mounts the project's one folder for the
 agent, `<workspace>/.railswitch/agent-memory/<agent>/` (0700, never
 removed), there in every worktree, writable: what one worktree's agent
-saves, the others read, and `wt rm` keeps it. `claude@1` sets
-`.claude/projects/-app/memory`, Claude Code's auto memory for the working
-directory `/app`.
+saves, the others read, and `wt rm` keeps it. No built-in package sets
+one: `claude@1` turns its auto memory off and uses the shared notes.

@@ -183,27 +183,17 @@ healthcare project no patient data: every agent reads them.
 
 ## Claude's own memory
 
-Claude's memory (what it saves about the project to keep in mind next
-time) is one folder for the whole project, not one per worktree:
-`.railswitch/agent-memory/claude/` in the workspace, which every
-worktree's Claude sees as its own auto memory. A note one agent saves
-while fixing a bug is there for the next agent in any worktree, and
-`wt rm` doesn't delete it.
-
-It is a plain folder: read, edit or delete its files, and back it up as
-you would any folder. To bring in memory files from earlier runs
-(rails-dev-podman's `.container-config/claude-memory/`, or a worktree's
-`~/.claude/projects/-app/memory/` from before this), copy them in,
-`MEMORY.md` index included:
+Claude Code's auto memory is off in railswitch's agents: the project's
+shared notes are Claude's memory, so what it learns reaches every agent
+rather than one tool's private store. Memory files from earlier runs
+(rails-dev-podman's `.container-config/claude-memory/`, a
+`~/.claude/projects/*/memory/` folder) can be copied straight into
+`notes/`: each one's `description` (or `name`) becomes its line in the
+index, and Claude's own `MEMORY.md` index file is left out.
 
 ```bash
-cp -n /path/to/old-memory/* .railswitch/agent-memory/claude/
+cp -n /path/to/old-memory/*.md notes/
 ```
-
-Claude reads the index at the start of each session, so a note another
-agent saves mid-session reaches a running agent only when it looks. Two
-agents saving at the same moment can, rarely, lose one line of
-`MEMORY.md`; the note files themselves are safe.
 
 ## Your own agent
 

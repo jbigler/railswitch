@@ -132,9 +132,22 @@ later. Each set clears and rebuilds its own collection (`CyberOfficeKit`,
 `CyberOfficeDecor`, `CyberOfficeArch`, `CyberOfficePets`) and overwrites its
 GLBs; `OFFICE_KIT_OUT` exports elsewhere.
 
-`tools/office-kit/preview.html` is a walkable sample floor for checking the kit
-(click to walk, WASD, E opens the elevator), with a roaming cat and dog and a
-parrot flying between two perches (`?seed=<n>` makes their choices repeatable). It loads three.js from a CDN
+`tools/office-kit/preview.html` is a sample floor for checking the kit, with a
+roaming cat and dog and a parrot flying between two perches (`?seed=<n>` makes
+their choices repeatable). Two views, switched by their buttons or V:
+
+- **Overview**: drag to orbit, right-drag to pan, wheel to zoom; the ceiling
+  and the walls facing the camera are hidden. Double-click the floor to walk
+  there.
+- **First person**: WASD or the arrow keys move (Shift runs, left/right arrows
+  turn), drag to look; double-click captures the mouse (Esc releases it) but
+  nothing needs it, since pointer lock is unreliable over remote and
+  virtual-machine sessions. E opens the elevator, R goes back to the start.
+  The walker slides along what it touches; inside a collider or a wall it can
+  always walk out.
+
+Collider boxes leave out a piece's floor-level parts (cables, decals, the
+jellyfish tank's floor ring), so they block only what stands up. It loads three.js from a CDN
 through an import map, so it is a development page, not served by the
 dashboard: from the repository root run `python3 -m http.server` and open
 `http://localhost:8000/tools/office-kit/preview.html`.

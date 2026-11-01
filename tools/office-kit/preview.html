@@ -5,6 +5,9 @@
   html, body { margin: 0; height: 100%; background: #05060a; color: #cfd6e4; font: 13px ui-monospace, monospace; overflow: hidden }
   #ui { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #0b0d14cc; padding: 8px 10px; border: 1px solid #2c3039 }
   #err { color: #ff6b6b }
+  #ui button { font: inherit; color: inherit; background: #161a24; border: 1px solid #2c3039; padding: 4px 10px; cursor: pointer }
+  #ui button[aria-pressed="true"] { border-color: #22e6ff; color: #fff }
+  #help { opacity: .8 }
 </style>
 <script type="importmap">
 { "imports": {
@@ -15,12 +18,14 @@
 <div id="ui">
   <label for="accent">Highlight</label><input id="accent" type="color" value="#22e6ff">
   <label for="second">Secondary</label><input id="second" type="color" value="#8b5cff">
-  <span>Click to walk · WASD · E elevator doors · Esc releases the mouse</span>
+  <button id="mode-overview" type="button" aria-pressed="false">Overview</button>
+  <button id="mode-walk" type="button" aria-pressed="true">First person</button>
+  <span id="help"></span>
   <span id="err"></span>
 </div>
 <script type="module">
 import * as THREE from 'three';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -39,14 +44,22 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#05060a');
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.2;
-scene.add(new THREE.HemisphereLight('#8090b0', '#101018', 0.5));
+const hemi = new THREE.HemisphereLight('#8090b0', '#101018', 0.5);
+scene.add(hemi);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
 const q = new URLSearchParams(location.search);
 camera.position.set(...(q.get('pos') ?? '1,1.7,4').split(',').map(Number));
 camera.lookAt(...(q.get('look') ?? '-2,1.4,-6').split(',').map(Number));
-const controls = new PointerLockControls(camera, document.body);
-renderer.domElement.addEventListener('click', () => controls.lock());
+const canvas = renderer.domElement;
+const look = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+// the walker: eye at 1.7 m; yaw/pitch drive the camera in first person
+const START = { x: camera.position.x, z: camera.position.z, yaw: look.y, pitch: look.x };
+const player = { ...START };
+const orbit = new OrbitControls(camera, canvas);
+orbit.enabled = false;
+orbit.maxPolarAngle = 1.45; orbit.minDistance = 3; orbit.maxDistance = 40; orbit.enableDamping = true;
+let mode = 'walk', overviewView = { pos: new THREE.Vector3(1, 10, 10.5), target: new THREE.Vector3(0, 0, -.5) };
 
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
@@ -95,6 +108,7 @@ const PERCHES = [{ x: 7.1, y: 1.284, z: -3.6, ry: -PI / 2 }, { x: -3.2, y: 1.284
 const BOUNDS = { minX: -7.85, maxX: 7.85, minZ: -5.85, maxZ: 5.85, y: 0 };
 
 let kit, floorElevator, cabElevator, doorsOpen = 0, doorsTarget = 0;
+const ceilingObjs = [], walls = [];
 const roamers = [];
 let flyer = null;
 const staticBoxes = [], dynamicCols = [];
@@ -105,11 +119,13 @@ try {
     const o = kit.spawn(n);
     o.position.set(x, y, z); o.rotation.y = ry;
     scene.add(o);
+    if (y >= 3.9) ceilingObjs.push(o); // ceiling gear: hidden in the overview
+    if (n.startsWith('Arch_Wall') || n === 'Arch_Elevator_Floor') walls.push(o);
     if (n === 'Arch_Elevator_Floor') floorElevator = o;
     if (n === 'Arch_Elevator_Cab') cabElevator = o;
   }
   const ceil = new THREE.Mesh(new THREE.PlaneGeometry(16, 12), new THREE.MeshStandardMaterial({ color: '#0d0e12', roughness: 0.9 }));
-  ceil.rotation.x = PI / 2; ceil.position.y = 4; scene.add(ceil);
+  ceil.rotation.x = PI / 2; ceil.position.y = 4; scene.add(ceil); ceilingObjs.push(ceil);
   for (const [x, z] of [[-4, .3], [0, .3], [4, -1.5], [-5, -4], [4, 3]]) {
     const l = new THREE.PointLight('#dfe8ff', 5, 9); l.position.set(x, 3.2, z); scene.add(l);
   }
@@ -134,55 +150,139 @@ try {
   s.oninput = () => kit.setSecondary(s.value);
   if (q.get('accent')) { a.value = '#' + q.get('accent'); kit.setAccent(a.value); }
   if (q.get('doors')) doorsOpen = doorsTarget = Number(q.get('doors'));
-  window.kit = kit; window.dbg = { staticBoxes, dynamicCols, camera, collide, roamers, flyer: () => flyer, BOUNDS };
+  window.kit = kit; window.dbg = { staticBoxes, dynamicCols, camera, player, move, setMode, roamers, flyer: () => flyer, BOUNDS };
 } catch (e) {
   document.getElementById('err').textContent = String(e);
   console.error(e);
 }
 
-// --- walking: WASD, eye height 1.7, capsule radius 0.3 pushed out of collider boxes ---
+// --- controls -------------------------------------------------------------
+// Overview: orbit (drag), pan (right drag), zoom (wheel); ceiling and near walls
+// hidden; double-click the floor to walk there. First person: WASD or arrows,
+// Shift runs, drag to look (double-click captures the mouse, Esc releases it).
+// Nothing needs pointer lock, which some remote or virtual-machine sessions lack.
+const HELP = {
+  overview: 'Drag to orbit · right-drag to pan · wheel to zoom · double-click the floor to walk there · V switches',
+  walk: 'WASD/arrows move · Shift runs · drag to look · double-click captures the mouse · E elevator · R back to start · V switches',
+};
+const marker = new THREE.Mesh(new THREE.CylinderGeometry(.25, .25, .05, 24), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }));
+scene.add(marker);
+
+function setMode(m) {
+  if (m === mode) return;
+  if (mode === 'overview') overviewView = { pos: camera.position.clone(), target: orbit.target.clone() };
+  mode = m;
+  orbit.enabled = m === 'overview';
+  if (m === 'overview') { camera.position.copy(overviewView.pos); orbit.target.copy(overviewView.target); orbit.update(); }
+  else if (document.pointerLockElement) document.exitPointerLock();
+  for (const o of ceilingObjs) o.visible = m === 'walk';
+  if (m === 'walk') for (const w of walls) w.visible = true;
+  marker.visible = m === 'overview';
+  hemi.intensity = m === 'overview' ? 2.2 : 0.5; // the room's lamps light it for eye height, not from above
+  document.getElementById('mode-overview').setAttribute('aria-pressed', m === 'overview');
+  document.getElementById('mode-walk').setAttribute('aria-pressed', m === 'walk');
+  document.getElementById('help').textContent = HELP[m];
+}
+document.getElementById('mode-overview').onclick = () => setMode('overview');
+document.getElementById('mode-walk').onclick = () => setMode('walk');
+document.getElementById('help').textContent = HELP.walk;
+marker.visible = false;
+if (q.get('mode') === 'overview') setMode('overview');
+
 const keys = new Set();
 addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
   keys.add(e.code);
-  if (e.code === 'KeyE' && floorElevator && camera.position.distanceTo(floorElevator.position) < 4) doorsTarget = doorsTarget ? 0 : 1;
+  if (e.code === 'KeyV') setMode(mode === 'walk' ? 'overview' : 'walk');
+  if (e.code === 'KeyR') Object.assign(player, START);
+  if (e.code === 'KeyE' && mode === 'walk' && floorElevator && Math.hypot(player.x - floorElevator.position.x, player.z - floorElevator.position.z) < 4) doorsTarget = doorsTarget ? 0 : 1;
+  if (e.code.startsWith('Arrow')) e.preventDefault();
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
+// a key released while the window had no focus never sends keyup: forget them all
+addEventListener('blur', () => { keys.clear(); dragging = false; });
+
+let dragging = false;
+canvas.addEventListener('pointerdown', (e) => {
+  if (mode !== 'walk' || e.button !== 0) return;
+  dragging = true; canvas.setPointerCapture(e.pointerId);
+});
+const stopDrag = () => { dragging = false; };
+canvas.addEventListener('pointerup', stopDrag);
+canvas.addEventListener('pointercancel', stopDrag);
+canvas.addEventListener('pointermove', (e) => {
+  if (mode !== 'walk' || !(dragging || document.pointerLockElement === canvas)) return;
+  player.yaw -= e.movementX * 0.0035;
+  player.pitch = THREE.MathUtils.clamp(player.pitch - e.movementY * 0.0035, -1.4, 1.4);
+});
+canvas.addEventListener('dblclick', (e) => {
+  if (mode === 'walk') { try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* optional */ } return; }
+  // overview: walk to the double-clicked spot on the floor
+  const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, camera);
+  const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+  if (hit && inBuilding(hit.x, hit.z) && !hits(boxesNow(), hit.x, hit.z)) { player.x = hit.x; player.z = hit.z; setMode('walk'); }
+});
 
 function mulberry(a) { // seeded random for reproducible checks (?seed=1)
   return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
+// --- walking with collision: a 0.3 m circle against the collider boxes ----------
 const R = 0.3, tmp = new THREE.Box3();
-function collide(p) {
-  const boxes = [...staticBoxes, ...dynamicCols.map((c) => tmp.clone().setFromObject(c, true))];
-  for (const b of boxes) {
-    if (b.max.y < 0.25 || b.min.y > 1.8) continue; // floor slabs and overhead gear
-    const cx = THREE.MathUtils.clamp(p.x, b.min.x, b.max.x), cz = THREE.MathUtils.clamp(p.z, b.min.z, b.max.z);
-    const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
-    if (d >= R) continue;
-    if (d > 1e-6) { p.x = cx + (dx / d) * R; p.z = cz + (dz / d) * R; continue; }
-    const pen = [[p.x - b.min.x + R, -1, 0], [b.max.x - p.x + R, 1, 0], [p.z - b.min.z + R, 0, -1], [b.max.z - p.z + R, 0, 1]].sort((u, v) => u[0] - v[0])[0];
-    p.x += pen[1] * pen[0]; p.z += pen[2] * pen[0];
+const boxesNow = () => [...staticBoxes, ...dynamicCols.map((c) => tmp.clone().setFromObject(c, true))]
+  .filter((b) => b.max.y >= 0.25 && b.min.y <= 1.8); // not floor slabs, not overhead gear
+const hits = (boxes, x, z) => boxes.some((b) =>
+  Math.hypot(x - THREE.MathUtils.clamp(x, b.min.x, b.max.x), z - THREE.MathUtils.clamp(z, b.min.z, b.max.z)) < R);
+// the walkable area: the floor plus the elevator shaft behind its doors
+const AREAS = [[BOUNDS.minX, BOUNDS.maxX, BOUNDS.minZ, BOUNDS.maxZ], [-2.95, -1.05, -8.2, BOUNDS.minZ]];
+const outside = (x, z) => Math.min(...AREAS.map(([x0, x1, z0, z1]) =>
+  Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)))); // 0 inside
+const inBuilding = (x, z) => outside(x, z) === 0;
+function move(dx, dz) {
+  const boxes = boxesNow(), { x, z } = player;
+  const ok = (nx, nz) => inBuilding(nx, nz) && !hits(boxes, nx, nz);
+  if (!inBuilding(x, z) || hits(boxes, x, z)) {
+    // stuck inside something or outside the floor: move freely within 0.6 m of the walkable
+    // area (a wall's thickness), or by any step that leads back toward it
+    if (outside(x + dx, z + dz) <= Math.max(outside(x, z), 0.6)) { player.x += dx; player.z += dz; }
+    return;
   }
+  if (ok(x + dx, z + dz)) { player.x += dx; player.z += dz; }
+  else if (ok(x + dx, z)) player.x += dx; // slide along whatever is in the way
+  else if (ok(x, z + dz)) player.z += dz;
 }
 
 const clock = new THREE.Clock();
+const fwd = new THREE.Vector3();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
-  if (controls.isLocked) {
-    const v = 3.2 * dt;
-    if (keys.has('KeyW')) controls.moveForward(v);
-    if (keys.has('KeyS')) controls.moveForward(-v);
-    if (keys.has('KeyA')) controls.moveRight(-v);
-    if (keys.has('KeyD')) controls.moveRight(v);
-    collide(camera.position);
-    camera.position.y = 1.7;
+  if (mode === 'walk') {
+    const turn = (keys.has('ArrowLeft') ? 1 : 0) - (keys.has('ArrowRight') ? 1 : 0);
+    player.yaw += turn * 1.8 * dt;
+    const f = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
+    const r = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+    if (f || r) {
+      const v = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 5 : 2.8) * dt / Math.hypot(f, r);
+      const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+      move((-sy * f + cy * r) * v, (-cy * f - sy * r) * v);
+    }
+    camera.position.set(player.x, 1.7, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  } else {
+    orbit.update();
+    // dollhouse: hide the walls between the camera and the room
+    for (const w of walls) {
+      w.getWorldDirection(fwd); // the wall's front (+Z) faces into the room
+      w.visible = fwd.dot(camera.position.clone().sub(w.position)) > 0;
+    }
+    marker.position.set(player.x, 0.03, player.z);
   }
   if (kit) {
     doorsOpen += THREE.MathUtils.clamp(doorsTarget - doorsOpen, -dt, dt);
     kit.setElevatorDoors(floorElevator, doorsOpen);
     kit.setElevatorDoors(cabElevator, doorsOpen);
-    for (const r of roamers) r.update(dt, camera.position);
+    for (const r of roamers) r.update(dt, player);
     flyer?.update(dt);
     kit.animate(scene, t);
   }

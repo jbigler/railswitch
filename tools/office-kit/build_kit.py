@@ -78,8 +78,11 @@ def add_colliders(root, boxes='aabb'):
     bpy.context.view_layer.update()
     inv = root.matrix_world.inverted()
     if boxes == 'aabb':
-        pts = [inv @ o.matrix_world @ v.co for o in [root, *root.children_recursive]
-               if o.type == 'MESH' and '_COL' not in o.name for v in o.data.vertices]
+        pts = [p for p in (inv @ o.matrix_world @ v.co for o in [root, *root.children_recursive]
+                           if o.type == 'MESH' and '_COL' not in o.name for v in o.data.vertices)
+               if p.z > .04]  # Blender Z = height: floor-level cables, rings and decals don't block
+        if not pts:
+            return None
         lo = Vector((min(p[i] for p in pts) for i in range(3)))
         hi = Vector((max(p[i] for p in pts) for i in range(3)))
         c, d = (lo + hi) / 2, hi - lo

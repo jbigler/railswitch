@@ -239,7 +239,7 @@ func LibraryRef(s string) (alias, rest string, ok bool) {
 
 // reservedAgents are names an agent cannot take: they are subcommands or
 // image names of `railswitch agent`.
-var reservedAgents = []string{"ls", "stop", "add", "base", "default", "update"}
+var reservedAgents = []string{"ls", "stop", "add", "base", "default", "update", "screen", "send"}
 
 // Load decodes path strictly: a key project.toml does not define is an error
 // naming its dotted path. The schema is read first, on its own, so a file from

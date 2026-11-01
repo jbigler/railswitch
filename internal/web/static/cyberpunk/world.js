@@ -29,10 +29,37 @@ export function hash(s) {
 }
 
 // kit loads the office pieces once (names: every piece a room may use).
+// shared holds the kit's geometries, materials and textures, which every
+// copy of a piece shares: leaving a room frees everything else it made.
 let kitP = null;
+const shared = new Set();
 export function kit(names) {
-  kitP ??= loadOfficeKit('/static/office/models/', names, new THREE.GLTFLoader());
+  kitP ??= loadOfficeKit('/static/office/models/', names, new THREE.GLTFLoader()).then((k) => {
+    for (const n of names) {
+      k.spawn(n).traverse((o) => {
+        if (o.geometry) shared.add(o.geometry);
+        for (const m of [o.material].flat().filter(Boolean)) {
+          shared.add(m);
+          for (const v of Object.values(m)) if (v?.isTexture) shared.add(v);
+        }
+      });
+    }
+    return k;
+  });
   return kitP;
+}
+
+// free disposes what a room made for itself: geometries, materials (the
+// hover's copies too) and their textures, never the kit's shared ones.
+function free(scene) {
+  scene.traverse((o) => {
+    if (o.geometry && !o.isSprite && !shared.has(o.geometry)) o.geometry.dispose(); // sprites share three.js's own quad
+    for (const m of [o.material].flat().filter(Boolean)) {
+      if (shared.has(m)) continue;
+      for (const v of Object.values(m)) if (v?.isTexture && !shared.has(v)) v.dispose();
+      m.dispose();
+    }
+  });
 }
 
 // textCanvas draws lines on a canvas: the faces of screens and labels.
@@ -177,10 +204,7 @@ export class World {
   // set replaces the scene; view is where the overview camera looks from;
   // walk is {areas: [[x0, x1, z0, z1]…], start: {x, z, yaw}, pads}.
   set(scene, view, walk) {
-    this.scene.traverse((o) => {
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of mats) if (m?.map?.isCanvasTexture) m.map.dispose();
-    });
+    if (this.scene !== scene) free(this.scene);
     this.tickers.clear();
     this.scene = scene;
     this.pass.scene = scene;
@@ -223,6 +247,13 @@ export class World {
 
   tick(fn) {
     this.tickers.add(fn);
+  }
+
+  // setTicks replaces the room's per-frame work, and forgets the walls and
+  // furniture walking stops at (an update may have added or taken a rack).
+  setTicks(fns) {
+    this.tickers = new Set(fns);
+    this.walk.boxes = null;
   }
 
   input() {
@@ -403,14 +434,18 @@ export class World {
       }
     }
     animate(this.scene, t);
-    const p = this.pointer ? this.pick(this.pointer.x, this.pointer.y) : null;
+    // hover: a raycast over the whole room, so only when the pointer moved,
+    // or every 150 ms while the camera moves under it
+    const due = this.pointer && (this.pointer !== this.pickedAt || t - this.pickTime > 0.15);
+    const p = !this.pointer ? null : due ? this.pick(this.pointer.x, this.pointer.y) : this.hover;
+    if (due) { this.pickedAt = this.pointer; this.pickTime = t; }
     if (p !== this.hover) {
       glow(this.hover, false);
       glow(p, true);
       this.hover = p;
       this.renderer.domElement.style.cursor = p ? 'pointer' : 'grab';
     }
-    this.onTip(p && this.pointer ? { text: p.userData.pick.tip, ...this.pointer } : null);
+    if (due || !this.pointer) this.onTip(p && this.pointer ? { text: p.userData.pick.tip, ...this.pointer } : null);
     this.composer.render();
   }
 }

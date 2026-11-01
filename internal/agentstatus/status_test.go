@@ -88,14 +88,8 @@ func TestStatusUsage(t *testing.T) {
 	if s.Usage == nil || *s.Usage != (Usage{Input: 12, Output: 3400, CacheRead: 56000, CacheWrite: 780}) {
 		t.Fatalf("usage = %+v", s.Usage)
 	}
-	for _, bad := range []string{`{"input":-1}`, `{"output":100000000000000}`, `"lots"`} {
+	for _, bad := range []string{`{"input":-1}`, `{"output":100000000000000}`, `"lots"`, `{"input":1.5}`, `{"input":1e99}`, `null`} {
 		s := read(`{"v":1,"state":"working","message":"","ts":1,"usage":` + bad + `}`)
-		if bad == `"lots"` {
-			if s.State != "off" { // not an object: the file is invalid
-				t.Errorf("usage %s: state %q, want off", bad, s.State)
-			}
-			continue
-		}
 		if s.State != "working" || s.Usage != nil {
 			t.Errorf("usage %s: state %q usage %+v, want working without usage", bad, s.State, s.Usage)
 		}

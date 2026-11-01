@@ -69,3 +69,5 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--cp-edge); bord
 #scene::after { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .4s;
   background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55) 100%); }
 body.walking #scene::after { opacity: 1; }
+.hud-btn.on { border-color: var(--cp-accent); color: var(--cp-accent); }
+.panel h3 { font-size: 13px; margin: 14px 0 6px; color: var(--cp-dim); font-weight: 600; }

@@ -57,12 +57,19 @@ func Read(path string) Status {
 	if err != nil {
 		return off
 	}
-	var s Status
-	if err := json.Unmarshal(data, &s); err != nil || s.V != 1 || !slices.Contains(states, s.State) {
+	// usage is read on its own: a bad one (not an object, a fraction, a
+	// number out of range) must not hide the state.
+	var raw struct {
+		Status
+		Usage json.RawMessage `json:"usage"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil || raw.V != 1 || !slices.Contains(states, raw.State) {
 		return off
 	}
-	if s.Usage != nil && !s.Usage.valid() {
-		s.Usage = nil
+	s := raw.Status
+	var u Usage
+	if len(raw.Usage) > 0 && string(raw.Usage) != "null" && json.Unmarshal(raw.Usage, &u) == nil && u.valid() {
+		s.Usage = &u
 	}
 	return s
 }

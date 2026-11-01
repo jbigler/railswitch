@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/sys"
 )
@@ -101,4 +102,26 @@ func TestCheckSendText(t *testing.T) {
 			t.Errorf("%q: %v", text, err)
 		}
 	}
+}
+
+// AgentPrompt types the text once the screen settles: something shown,
+// unchanged for settle.Still polls.
+func TestAgentPrompt(t *testing.T) {
+	old := settle
+	t.Cleanup(func() { settle = old })
+	settle.Every, settle.Max = time.Millisecond, time.Second
+	e := setup(t)
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", "filial-feat-agent-probe.service")
+	e.agentRunning(probeCtr)
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "capture-pane"}, sys.Result{Stdout: []byte("> ready\n")}, nil)
+	if err := e.l.AgentPrompt(ctx, "feat", "probe", "Work on issue #7"); err != nil {
+		t.Fatal(err)
+	}
+	calls := e.calls()
+	if n := count(calls, "podman exec filial-feat-agent-probe tmux -L agent capture-pane"); n < settle.Still+1 {
+		t.Errorf("typed after %d looks at the screen; want at least %d", n, settle.Still+1)
+	}
+	wantInOrder(t, calls, "podman exec filial-feat-agent-probe tmux -L agent capture-pane",
+		"podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send -- Work on issue #7",
+		"podman exec filial-feat-agent-probe tmux -L agent send-keys")
 }

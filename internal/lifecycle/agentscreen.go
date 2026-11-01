@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -118,4 +119,58 @@ func CheckSendText(text string) error {
 // sessionCmd is the podman exec of args on service agent ctr's session server.
 func sessionCmd(ctr string, args ...string) []string {
 	return append(append([]string{"exec", ctr}, render.AgentTmux...), args...)
+}
+
+// settle is how AgentPrompt waits for an agent to be ready for input: its
+// screen polled every Every, ready once it shows something and stays the
+// same for Still polls in a row, given up after Max.
+var settle = struct {
+	Every time.Duration
+	Still int
+	Max   time.Duration
+}{time.Second, 3, 90 * time.Second}
+
+// AgentPrompt starts service agent name's session in worktree slug in the
+// background (AgentDetached) and types text into it (AgentSend) once its
+// screen settles, so any agent's first input is the text, whatever its
+// command line takes. A session already running is typed into as it is.
+func (l *L) AgentPrompt(ctx context.Context, slug, name, text string) error {
+	if err := CheckSendText(text); err != nil {
+		return err
+	}
+	name, err := l.CheckAgent(ctx, name)
+	if err != nil {
+		return err
+	}
+	if err := l.AgentDetached(ctx, slug, name, nil); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(settle.Max)
+	var last string
+	still := 0
+	for still < settle.Still {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("agent %s in %s: its screen did not settle in %s; type to it with railswitch agent send", name, slug, settle.Max)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(settle.Every):
+		}
+		sc, err := l.AgentScreen(ctx, slug, name)
+		if err != nil {
+			return err
+		}
+		now := strings.Join(sc.Lines, "\n")
+		switch {
+		case !sc.Session:
+			return fmt.Errorf("agent %s in %s: its session ended before it took the text", name, slug)
+		case now == "" || now != last:
+			still = 0
+		default:
+			still++
+		}
+		last = now
+	}
+	return l.AgentSend(ctx, slug, name, text)
 }

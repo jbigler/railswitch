@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/prs"
@@ -41,22 +40,17 @@ func cmdIssue(ctx context.Context, e *env, args []string) int {
 	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(struct {
+			Me     string      `json:"me"`
 			Issues []prs.Issue `json:"issues"`
-		}{issues}); err != nil {
+		}{whoami(ctx, e), issues}); err != nil {
 			return e.fail(err)
 		}
 		return 0
 	}
 	tw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(tw, "ISSUE\tAUTHOR\tASSIGNEES\tLABELS\tTITLE")
-	dash := func(s []string) string {
-		if len(s) == 0 {
-			return "-"
-		}
-		return safefile.Printable(strings.Join(s, ","))
-	}
 	for _, i := range issues {
-		fmt.Fprintf(tw, "#%d\t%s\t%s\t%s\t%s\n", i.Number, safefile.Printable(i.Author), dash(i.Assignees), dash(i.Labels), safefile.Printable(i.Title))
+		fmt.Fprintf(tw, "#%d\t%s\t%s\t%s\t%s\n", i.Number, safefile.Printable(i.Author), logins(i.Assignees), logins(i.Labels), safefile.Printable(i.Title))
 	}
 	if err := tw.Flush(); err != nil {
 		return e.fail(err)

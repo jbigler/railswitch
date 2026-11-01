@@ -14,6 +14,7 @@
 import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer } from './world.js';
 import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
+import { issuesFor, prsFor, whoLabel } from './work.js';
 
 const PI = Math.PI;
 
@@ -510,6 +511,7 @@ export async function lab(slug, n, ui) {
       if (!w.services.some((s) => s.service === name)) {
         scene.remove(rk);
         racks.delete(name);
+        ticks.splice(ticks.indexOf(rk.tick), 1);
       }
     }
     mine.update([
@@ -612,18 +614,35 @@ export async function lobby(prefix, ui) {
   const issues = station(k, scene, -5.6, -5.35, 0, 'Issues', 'GitHub issues', ui.issues, 2.2, 1.25);
   const notes = station(k, scene, -3.85, -5.0, -PI / 2, 'Notes', "The agents' shared notes", ui.notes);
   const eng = station(k, scene, -3.85, -3.75, -PI / 2, 'Engineering', 'Project settings, images, library', ui.config);
-  // the open issues, read when the lobby opens and every two minutes while
-  // it shows (each read asks GitHub)
+  // The work boards: the open issues and PRs of the people the work filter
+  // shows (work.js), read when the lobby opens and every two minutes while it
+  // shows (each read asks GitHub); a filter change redraws them at once.
   issues.update(['reading…'], 'Issues');
-  const readIssues = () => ui.issueList().then((doc) => {
-    issues.update(doc.issues.length ? doc.issues.slice(0, 9).map((i) => ({
-      text: clip(`#${String(i.number).padEnd(5)} ${i.title}`, 34),
-      color: i.assignees.length ? '#c9f6ff' : '#ffe08a',
-    })) : ['no open issues'], `Issues · ${doc.issues.length} open`);
-  }).catch(() => issues.update(['issues unavailable'], 'Issues'));
-  readIssues();
-  let issuesAge = 0;
-  const issuesTick = (dt) => { if ((issuesAge += dt) > 120) { issuesAge = 0; readIssues(); } };
+  board.screen.update(['reading…'], 'Pull requests');
+  let issueDoc = null, prDoc = null, live = true;
+  const drawWork = () => {
+    if (issueDoc) {
+      const list = issuesFor(issueDoc);
+      issues.update(list.length ? list.slice(0, 9).map((i) => ({
+        text: clip(`#${String(i.number).padEnd(5)} ${i.title}`, 34),
+        color: i.assignees.length ? '#c9f6ff' : '#ffe08a',
+      })) : ['nothing open here'], `Issues · ${whoLabel(issueDoc.me)} · ${list.length}`);
+    }
+    if (prDoc) {
+      const list = prsFor(prDoc);
+      board.screen.update(list.length ? list.slice(0, 8).map((x) => ({
+        text: clip(`#${String(x.number).padEnd(5)} ${x.draft ? 'draft ' : ''}${x.review.replace('_', ' ').padEnd(9)} ${x.title}`, 44),
+        color: x.reviewers.some((r) => r.toLowerCase() === prDoc.me.toLowerCase()) ? '#ffe08a' : reviewColor[x.review] ?? '#c9f6ff',
+      })) : ['nothing open here'], `Pull requests · ${whoLabel(prDoc.me)} · ${list.length}`);
+    }
+  };
+  const readWork = () => {
+    ui.issueList().then((d) => { if (live) { issueDoc = d; drawWork(); } }).catch(() => live && issues.update(['issues unavailable'], 'Issues'));
+    ui.prList().then((d) => { if (live) { prDoc = d; drawWork(); } }).catch(() => live && board.screen.update(['PRs unavailable'], 'Pull requests'));
+  };
+  readWork();
+  let workAge = 0;
+  const workTick = (dt) => { if ((workAge += dt) > 120) { workAge = 0; readWork(); } };
   notes.update(['shared agent notes', 'read · edit · add'], 'Notes');
   eng.update(['settings', 'images', 'library'], 'Engineering');
 
@@ -679,7 +698,8 @@ export async function lobby(prefix, ui) {
   const res = residents(k, scene, deco, ui, 2);
   res.start();
 
-  const ticks = [...sh.ticks, ...res.ticks, issuesTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
+  const ticks = [...sh.ticks, ...res.ticks, workTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
+  let beaconKey = '';
   const update = (st) => {
     const lines = st.worktrees.map((w, i) => ({
       text: `${String(i + 1).padStart(2)} ${w.base ? '★' : '·'} ${w.slug.padEnd(18).slice(0, 18)} ${w.stack.padEnd(8)} ${w.agent ? '◆ ' + w.agent.state : ''}`,
@@ -687,12 +707,18 @@ export async function lobby(prefix, ui) {
     }));
     view.update(lines.length ? lines : ['no worktrees'], `${prefix} · ${st.worktrees.length} floors`);
     const open = st.worktrees.filter((w) => w.pr);
-    board.screen.update(open.length ? open.slice(0, 8).map((w) => ({
-      text: `#${String(w.pr.number).padEnd(5)} ${(w.pr.checks || '·').padEnd(8)} ${(w.pr.review || '').replace('_', ' ').padEnd(18).slice(0, 18)} ${w.slug}`,
-      color: checkColor[w.pr.checks] ?? '#c9f6ff',
-    })) : [st.pr_error ? 'PRs unavailable' : 'no open pull requests'], 'Pull requests');
-    beacons.clear();
-    st.worktrees.forEach((w, i) => {
+    // the beacons change with the floors and their stacks only: rebuilt
+    // then, the old ones' GPU buffers freed
+    const key = st.worktrees.map((w) => `${w.slug}:${w.stack}`).join(' ');
+    if (key !== beaconKey) {
+      beaconKey = key;
+      for (const m of beacons.children) {
+        m.geometry.dispose();
+        m.material.dispose();
+      }
+      beacons.clear();
+    }
+    if (!beacons.children.length) st.worktrees.forEach((w, i) => {
       const a = (i / Math.max(1, st.worktrees.length)) * PI * 2;
       const c = new THREE.Color(colorOf(w.stack));
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4 + (w.stack === 'up' ? 0.35 : 0), 8),
@@ -703,7 +729,7 @@ export async function lobby(prefix, ui) {
     });
     big.screen.update([
       `${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.stack === 'up').length} up`,
-      `${open.length} open pull requests`,
+      `${open.length} floors with an open pull request`,
       `${st.worktrees.filter((w) => w.agent).length} agents · ${tokens(st.worktrees.reduce((t, w) => {
         const u = w.agent?.usage;
         return u ? { input: t.input + u.input, output: t.output + u.output, cache_read: t.cache_read + u.cache_read, cache_write: t.cache_write + u.cache_write } : t;
@@ -713,5 +739,6 @@ export async function lobby(prefix, ui) {
     ], prefix);
   };
   const walk = { areas: AREAS, start: { x: LIFT.x, z: LIFT.z + 1.7, yaw: PI }, pads: [sh.pad] };
-  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.15, pitch: 0.8, dist: 18, max: 30 }, walk, update, ticks, name: `Lobby · ${prefix}` };
+  const leave = () => { live = false; };
+  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.15, pitch: 0.8, dist: 18, max: 30 }, walk, update, ticks, name: `Lobby · ${prefix}`, redrawWork: drawWork, leave };
 }

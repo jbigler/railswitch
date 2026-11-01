@@ -687,11 +687,12 @@ GitHub repo". The text form is a table `ISSUE AUTHOR ASSIGNEES LABELS
 TITLE` (control characters as spaces).
 
 ```json
-{"issues": [{"number": 42, "title": "Login times out", "url": "https://github.com/o/n/issues/42", "labels": ["bug"], "assignees": ["ann"], "author": "bob", "updated": "2026-10-31T19:00:32Z"}]}
+{"me": "ann", "issues": [{"number": 42, "title": "Login times out", "url": "https://github.com/o/n/issues/42", "labels": ["bug"], "assignees": ["ann"], "author": "bob", "updated": "2026-10-31T19:00:32Z"}]}
 ```
 
 | Field | Type | Meaning |
 |---|---|---|
+| `me` | string | The login gh signs in as (`gh api user`), for "assigned to me"; `""` with a warning on stderr when gh can't tell. |
 | `issues` | array | Never null. |
 | `number`, `title`, `url` | number, string, string | As GitHub has them. |
 | `labels` | array of strings | Label names; never null. |
@@ -862,6 +863,27 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
 | `pr.checks` | string | `fail` if any check concluded failure, error, timed out, cancelled, action required or startup failure; else `pending` if any is not completed (or a status context is pending or expected); else `pass`; `none` with no checks. |
 | `pr.review` | string | `approved`, `changes_requested`, `pending` (review required) or `none`. |
 | `pr.review_app` | string | An open or draft PR's review app: the `environmentUrl` of the newest `ACTIVE` GitHub deployment of the PR's head commit whose latest status is `SUCCESS` (how most hosting services announce one), http or https only; one `gh api graphql` query for all of them. `""` for none, or when GitHub couldn't be read (a warning on stderr). |
+
+### `pr ls --all`
+
+Every open pull request of the repo (not only the worktrees'), with who
+it is for: `gh pr list --repo <owner/name> --state open --limit 100 --json
+number,title,url,headRefName,isDraft,author,assignees,reviewRequests,reviewDecision,updatedAt`
+(no checks: a repo-wide list with them times out at GitHub), and `me` as
+for [`issue ls`](#issue-ls). PRs from forks are kept. The text form is a
+table `PR AUTHOR ASSIGNEES REVIEWERS REVIEW TITLE` (a draft's title starts
+`[draft]`).
+
+```json
+{"me": "ann", "prs": [{"number": 7, "title": "Add billing", "url": "https://github.com/o/n/pull/7", "branch": "billing", "draft": false, "author": "bob", "assignees": [], "reviewers": ["ann"], "review": "pending", "updated": "2026-11-01T00:00:00Z"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `me` | string | As for `issue ls`. |
+| `prs[].branch` | string | The head branch. |
+| `prs[].author`, `assignees`, `reviewers` | string, arrays of strings | Logins; `reviewers` are the people a review is asked of (teams left out); arrays never null. |
+| `prs[].review` | string | `approved`, `changes_requested`, `pending` or `none`, as `pr ls`. |
 
 ## `stack ls`
 

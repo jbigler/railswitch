@@ -55,6 +55,19 @@ func (e *UsageError) Error() string { return e.Msg }
 // on-demand agent runs without its package's secrets (tokenSecrets), so it
 // uses the login kept in its home (D139).
 func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken bool) error {
+	return l.agent(ctx, slug, name, argv, noToken, false)
+}
+
+// AgentDetached is Agent for a service agent without a terminal: it starts
+// the agent's session in the background with argv and returns, for the
+// dashboard to watch and type to (agent screen, agent send). A session
+// already running is left alone without argv, refused with them; an
+// on-demand agent, which needs a terminal, is refused.
+func (l *L) AgentDetached(ctx context.Context, slug, name string, argv []string) error {
+	return l.agent(ctx, slug, name, argv, false, true)
+}
+
+func (l *L) agent(ctx context.Context, slug, name string, argv []string, noToken, detach bool) error {
 	name, err := l.CheckAgent(ctx, name)
 	if err != nil {
 		return err
@@ -88,6 +101,9 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 		return fmt.Errorf("agents %s are running in %s; one agent per worktree: railswitch agent stop", strings.Join(others, ", "), slug)
 	case slices.Contains(running, name) && s.OnDemand:
 		return fmt.Errorf("agent %s is already running in %s", name, slug)
+	}
+	if detach && s.OnDemand {
+		return fmt.Errorf("agent %s runs on demand, in one terminal; starting it in the background is for a service agent", name)
 	}
 	var without []string
 	if noToken {
@@ -136,6 +152,9 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 	if live && len(argv) > 0 {
 		return fmt.Errorf("agent %s has a session in %s, and arguments start a new one: join it without them, or railswitch agent stop %s first", name, slug, name)
 	}
+	if live && detach {
+		return nil // it runs already
+	}
 	if len(argv) == 0 { // the package's exec words, as for an on-demand agent
 		argv = s.Session.Exec
 	}
@@ -149,6 +168,11 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 			return fmt.Errorf("%s: session: %w", id, err)
 		}
 		session = append(session, w)
+	}
+	if detach { // no client: a fixed size, as a terminal would give it
+		_, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...),
+			append([]string{"new-session", "-d", "-x", "160", "-y", "48", "-s", render.AgentSession, "-e", "COLORTERM=truecolor", "--"}, session...)...)})
+		return err
 	}
 	return l.inContainer(ctx, agentAttach(ctr, append([]string{"new-session", "-A", "-s", render.AgentSession, "-e", "COLORTERM=truecolor", "--"}, session...)))
 }

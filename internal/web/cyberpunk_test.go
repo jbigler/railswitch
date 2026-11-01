@@ -35,6 +35,9 @@ func TestCyberpunkReads(t *testing.T) {
 		key                      string // the CLI call, "" for none
 	}{
 		{"issues", "GET", "/p/ftest/cyberpunk/issues", "", 200, "--json -C /ws/ftest issue ls"},
+		{"prs", "GET", "/p/ftest/cyberpunk/prs", "", 200, "--json -C /ws/ftest pr ls --all"},
+		{"issue start bad", "POST", "/p/ftest/cyberpunk/issues/-1/start", "", 400, ""},
+		{"issue start word", "POST", "/p/ftest/cyberpunk/issues/abc/start", "", 400, ""},
 		{"notes", "GET", "/p/ftest/cyberpunk/notes", "", 200, "--json -C /ws/ftest notes ls"},
 		{"note", "GET", "/p/ftest/cyberpunk/notes/setup_steps.md", "", 200, "--json -C /ws/ftest notes show setup_steps.md"},
 		{"note bad name", "GET", "/p/ftest/cyberpunk/notes/..%2Fsecret.md", "", 400, ""},
@@ -119,5 +122,22 @@ func TestCyberpunkState(t *testing.T) {
 	}
 	if st := f.s.cyberData("nope"); st.Error == "" {
 		t.Error("unknown project has no error")
+	}
+}
+
+// TestCyberpunkIssueStart: work on an issue is one project job: the
+// worktree on the issue's branch, up, the agent on it.
+func TestCyberpunkIssueStart(t *testing.T) {
+	f := newFixture(t)
+	r := httptest.NewRequest("POST", "/p/ftest/cyberpunk/issues/118/start", nil)
+	r.Host = testHost
+	r.AddCookie(req("GET", "/", nil).Cookies()[0])
+	r.Header.Set("Origin", "http://"+testHost)
+	r.Header.Set("Accept", "application/json")
+	if w := f.do(r); w.Code != 202 || !strings.Contains(w.Body.String(), `"label":"work on issue #118"`) {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if got := f.run.wait(t, 1)[0]; !slices.Equal(got, []string{testExe, "-C", "/ws/ftest", "wt", "add", "--issue", "118", "--agent"}) {
+		t.Errorf("job argv %q", got)
 	}
 }

@@ -139,7 +139,7 @@ func TestCompleteTask(t *testing.T) {
 	if got, want := complete(t, "pr", ""), []string{"ls"}; !slices.Equal(got, want) {
 		t.Errorf("pr: %q; want %q", got, want)
 	}
-	if got, want := complete(t, "wt", "add", "--"), []string{"--name", "--up"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "wt", "add", "--"), []string{"--agent", "--issue", "--name", "--up"}; !slices.Equal(got, want) {
 		t.Errorf("wt add --: %q; want %q", got, want)
 	}
 }

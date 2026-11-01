@@ -86,6 +86,8 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
 	m.HandleFunc("GET /p/{prefix}/cyberpunk", s.cyberPage)
 	m.HandleFunc("GET /p/{prefix}/cyberpunk/issues", s.cyberIssues)
+	m.HandleFunc("GET /p/{prefix}/cyberpunk/prs", s.cyberPRs)
+	m.HandleFunc("POST /p/{prefix}/cyberpunk/issues/{n}/start", s.cyberIssueStart)
 	m.HandleFunc("GET /p/{prefix}/cyberpunk/notes", s.cyberNotes)
 	m.HandleFunc("GET /p/{prefix}/cyberpunk/notes/{name}", s.cyberNote)
 	m.HandleFunc("POST /p/{prefix}/cyberpunk/notes/{name}", s.cyberNoteWrite)

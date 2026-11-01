@@ -152,3 +152,24 @@ func TestWtAddUp(t *testing.T) {
 		}
 	}
 }
+
+// wt add --issue: the branch is named after the issue, whose title gh gives;
+// --agent needs --issue, and --issue takes no target.
+func TestWtAddIssue(t *testing.T) {
+	ws, _ := gitWS(t)
+	f := fakeHost()
+	f.Passthrough = []string{"git"}
+	f.On([]string{"gh", "issue", "view", "118"}, sys.Result{Stdout: []byte("Billing page 500s\x1b[2J when declined\n")}, nil)
+	code, out, errs := runWith(t, f, "-C", ws, "wt", "add", "--issue", "118")
+	if code != 0 || !strings.Contains(out, "added worktree issue-118-billing-page-500s-2j (ID 3, branch issue-118-billing-page-500s-2j)") {
+		t.Fatalf("wt add --issue: exit %d\n%s%s", code, out, errs)
+	}
+	if c := f.Calls[slices.IndexFunc(f.Calls, func(c []string) bool { return c[0] == "gh" })]; strings.Join(c, " ") != "gh issue view 118 --repo [ORG]/[REPO] --json title --jq .title" {
+		t.Errorf("gh argv %q", c)
+	}
+	for _, args := range [][]string{{"--issue", "7", "feat-y"}, {"--agent", "feat-y"}, {"--issue", "-3"}} {
+		if code, _, _ := runWith(t, f, append([]string{"-C", ws, "wt", "add"}, args...)...); code != 2 {
+			t.Errorf("wt add %q: exit %d; want 2", args, code)
+		}
+	}
+}

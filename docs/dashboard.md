@@ -891,10 +891,17 @@ any open page.
   a beacon per floor (click one to ride there); an android concierge stands
   at its desk; the big screen faces a lounge. **Pull requests**: a board on
   the left wall lists every open PR with its checks and review, and opens
-  the worktrees' PRs as `pr ls` reads them, with Refresh PRs. Kiosks: **Issues**
-  (`issue ls`: its screen lists the open issues, read when the lobby opens
-  and every two minutes while it shows, unassigned ones in amber; a click
-  opens them all), **Notes** (the agents' shared notes,
+  the worktrees' PRs as `pr ls` reads them, with Refresh PRs. **Your work:** the Issues kiosk and the PR board show
+  the open issues assigned to you and the open PRs you wrote, are assigned
+  or are asked to review (`issue ls`, `pr ls --all`: `me` is who gh signs in
+  as), read when the lobby opens and every two minutes while it shows. Their
+  panels switch between **Mine**, **Following** (GitHub logins you add
+  there: this browser keeps the list) and **All**, and the boards follow.
+  An issue's **▶ Start working** runs `wt add --issue <n> --agent` as a
+  job: a worktree on a branch named after the issue (`issue-<n>-<title
+  words>`), its stack up, and the default agent (a service) started in its
+  session with the issue as its first input; an issue that has a floor
+  already offers that floor instead. Kiosks: **Issues**, **Notes** (the agents' shared notes,
   `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
   save refused when the note changed since you opened it) and
   **Engineering** (links to Settings, Images, Library, Machine).

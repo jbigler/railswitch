@@ -5,6 +5,7 @@
 // textContent only.
 import { World } from './world.js';
 import { lobby, lab, svcState, tokens } from './rooms.js';
+import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -60,7 +61,7 @@ async function go(to) {
   const build = ++building;
   closePanel();
   $('where').textContent = 'Elevator…';
-  const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/cyberpunk/issues`), notes: showNotes, config: showConfig,
+  const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/cyberpunk/issues`), prList: () => getJSON(`${base}/cyberpunk/prs`), notes: showNotes, config: showConfig,
     service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   let r;
@@ -71,12 +72,12 @@ async function go(to) {
     return;
   }
   if (build !== building) return;
+  room?.leave?.();
   world.set(r.scene, r.view, r.walk);
-  for (const t of r.ticks) world.tick(t);
   room = r;
   here = to;
   r.update(state);
-  for (const t of r.ticks) world.tick(t); // racks added by update
+  world.setTicks(r.ticks); // with the racks the update added
   $('where').textContent = r.name;
   history.replaceState(null, '', to.kind === 'floor' ? `#floor/${encodeURIComponent(to.slug)}` : '#lobby');
 }
@@ -288,12 +289,50 @@ function showAgent(slug) {
   });
 }
 
+// whoBar is the work filter (Mine, Following, All) and, under Following,
+// the people followed: changing it redraws the panel (draw) and the lobby's
+// boards.
+function whoBar(me, draw) {
+  const pick = (who, text) => btn(text, () => { setWho(who); room?.redrawWork?.(); draw(); },
+    { 'aria-pressed': String(work.who === who), class: work.who === who ? 'hud-btn on' : 'hud-btn' });
+  const bar = el('div', { class: 'row' }, pick('mine', me ? `Mine (@${me})` : 'Mine'), pick('following', `Following (${work.follow.length})`), pick('all', 'All'));
+  if (work.who !== 'following') return [bar];
+  const input = el('input', { type: 'text', placeholder: 'GitHub login to follow', maxlength: 39, 'aria-label': 'GitHub login to follow' });
+  const err = el('span', { class: 'err' });
+  const add = () => {
+    if (follow(input.value)) { room?.redrawWork?.(); draw(); } else err.textContent = 'Not a GitHub login.';
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') add(); });
+  const people = el('div', { class: 'row' }, work.follow.length ? work.follow.map((l) =>
+    el('span', { class: 'tag' }, `@${l} `, el('button', { type: 'button', class: 'link', 'aria-label': `Unfollow ${l}`, on: { click: () => { unfollow(l); room?.redrawWork?.(); draw(); } } }, '✕')))
+    : el('span', { class: 'muted' }, 'Follow teammates to see their issues and PRs.'));
+  return [bar, el('div', { class: 'row' }, input, btn('Follow', add), err), people];
+}
+
 function showPRs() {
   openPanel('Pull requests', (body) => {
+    let doc = null;
     const draw = () => {
       body.replaceChildren();
-      if (state.pr_error) body.append(el('p', { class: 'err' }, state.pr_error));
+      if (doc) {
+        body.append(...whoBar(doc.me, draw));
+        const mine = prsFor(doc);
+        const list = el('ul', { class: 'items' });
+        for (const p of mine) {
+          const floor = state.worktrees.find((w) => w.branch === p.branch);
+          const asked = p.reviewers.some((r) => r.toLowerCase() === doc.me.toLowerCase());
+          list.append(el('li', {},
+            el('div', {}, ext(`#${p.number} ↗`, safeURL(p.url)), ' ', p.draft ? el('span', { class: 'tag' }, 'draft') : '', p.title),
+            el('div', { class: 'muted' }, `by ${p.author}`, p.assignees.length ? ` → ${p.assignees.join(', ')}` : '',
+              p.reviewers.length ? ` · review asked of ${p.reviewers.join(', ')}` : '', ` · ${p.review.replace('_', ' ')}`),
+            el('div', { class: 'row' }, asked ? el('strong', {}, 'Your review is asked') : '', floor ? btn('Go to the floor', () => go({ kind: 'floor', slug: floor.slug })) : '')));
+        }
+        if (!mine.length) list.append(el('li', { class: 'muted' }, 'No open pull request here.'));
+        body.append(list);
+      } else body.append(el('p', { class: 'muted' }, 'Reading the open pull requests…'));
       const open = state.worktrees.filter((w) => w.pr);
+      body.append(el('h3', {}, 'This project’s floors'));
+      if (state.pr_error) body.append(el('p', { class: 'err' }, state.pr_error));
       const list = el('ul', { class: 'items' });
       for (const w of open) {
         const p = w.pr;
@@ -306,6 +345,7 @@ function showPRs() {
       body.append(list, btn('↻ Refresh PRs', () => job(`${base}/prs/refresh`, body)));
     };
     draw();
+    getJSON(`${base}/cyberpunk/prs`).then((d) => { doc = d; draw(); }).catch((e) => errorTo(body, e));
     redraw = draw;
     return () => { redraw = null; };
   });
@@ -314,17 +354,25 @@ function showPRs() {
 function showIssues() {
   openPanel('GitHub issues', (body) => {
     body.append(el('p', { class: 'muted' }, 'Scanning…'));
-    getJSON(`${base}/cyberpunk/issues`).then((doc) => {
-      body.replaceChildren();
+    let doc = null;
+    const draw = () => {
+      body.replaceChildren(...whoBar(doc.me, draw));
+      const shown = issuesFor(doc);
       const list = el('ul', { class: 'items' });
-      for (const i of doc.issues) {
+      for (const i of shown) {
+        const floor = state.worktrees.find((w) => w.branch.startsWith(`issue-${i.number}-`) || w.branch === `issue-${i.number}`);
         list.append(el('li', {},
           el('div', {}, ext(`#${i.number} ↗`, safeURL(i.url)), ' ', i.title),
-          el('div', { class: 'muted' }, i.labels.map((l) => el('span', { class: 'tag' }, l)), i.assignees.length ? `→ ${i.assignees.join(', ')}` : '', i.author ? ` · by ${i.author}` : '')));
+          el('div', { class: 'muted' }, i.labels.map((l) => el('span', { class: 'tag' }, l)), i.assignees.length ? ` → ${i.assignees.join(', ')}` : ' unassigned', i.author ? ` · by ${i.author}` : ''),
+          el('div', { class: 'row' }, floor
+            ? btn(`Go to its floor (${floor.slug})`, () => go({ kind: 'floor', slug: floor.slug }))
+            : btn('▶ Start working', () => job(`${base}/cyberpunk/issues/${i.number}/start`, body),
+              { title: 'A worktree on a branch named after the issue, its stack up, and the agent working on the issue' }))));
       }
-      if (!doc.issues.length) list.append(el('li', { class: 'muted' }, 'No open issues.'));
+      if (!shown.length) list.append(el('li', { class: 'muted' }, doc.issues.length ? 'Nothing open here: try Following or All.' : 'No open issues.'));
       body.append(list);
-    }).catch((e) => { body.replaceChildren(); errorTo(body, e); });
+    };
+    getJSON(`${base}/cyberpunk/issues`).then((d) => { doc = d; draw(); }).catch((e) => { body.replaceChildren(); errorTo(body, e); });
   });
 }
 
@@ -419,7 +467,7 @@ function apply(next) {
     go(fromHash());
   } else {
     room?.update(state);
-    if (room && here.kind === 'floor') for (const t of room.ticks) world.tick(t);
+    if (room && here.kind === 'floor') world.setTicks(room.ticks);
     if (here?.kind === 'floor' && !labOf(here.slug)) go({ kind: 'lobby' });
   }
   redraw?.();

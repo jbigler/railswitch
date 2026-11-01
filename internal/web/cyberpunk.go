@@ -2,11 +2,15 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+
+	"github.com/jbigler/railswitch/internal/jobs"
 )
 
 // The cyberpunk office (D146): an optional 3D view of a project,
@@ -142,6 +146,29 @@ func (s *Server) cyberIssues(w http.ResponseWriter, r *http.Request) {
 	if p, ok := s.cyberProject(w, r); ok {
 		s.cyberJSON(w, r, nil, "-C", p.Workspace, "issue", "ls")
 	}
+}
+
+func (s *Server) cyberPRs(w http.ResponseWriter, r *http.Request) {
+	if p, ok := s.cyberProject(w, r); ok {
+		s.cyberJSON(w, r, nil, "-C", p.Workspace, "pr", "ls", "--all")
+	}
+}
+
+// cyberIssueStart starts work on issue {n}: a worktree on the issue's
+// branch, up, and the default agent on the issue in the background
+// (`wt add --issue <n> --agent`), as a project job.
+func (s *Server) cyberIssueStart(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.cyberProject(w, r)
+	if !ok {
+		return
+	}
+	n, err := strconv.Atoi(r.PathValue("n"))
+	if err != nil || n <= 0 || n > 1e9 {
+		http.Error(w, "not an issue number", http.StatusBadRequest)
+		return
+	}
+	s.start(w, r, jobs.Spec{Project: p.Prefix, Label: fmt.Sprintf("work on issue #%d", n), Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/cyberpunk")
 }
 
 // agentName is an agent's name as the URL gives it ("" = the default).

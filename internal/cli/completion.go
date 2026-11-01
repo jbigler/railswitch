@@ -102,12 +102,13 @@ var completionFlags = map[string][]string{
 	"render":                 {"--check"},
 	"secret add":             {"--env=", "--git-signing", "--machine", "--service="},
 	"secret set":             {"--restart"},
+	"pr ls":                  {"--all"},
 	"settings apply":         {"--accept-install=", "--if-hash=", "--restart"},
 	"task":                   {"--new-term"},
 	"template check":         {"--accept="},
 	"template import":        {"--accept="},
 	"template export":        {"--description=", "--name=", "--to=", "--version="},
-	"wt add":                 {"--name=", "--up"},
+	"wt add":                 {"--agent", "--issue=", "--name=", "--up"},
 	"wt rm":                  {"--force"},
 }
 

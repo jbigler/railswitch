@@ -24,6 +24,7 @@ postgres = "16"
 
 [agents.claude]
 use = "claude@1"
+run = "on-demand"                          # tests cover the one-shot path; the package runs a service
 
 [image]
 base = "containerfiles/Containerfile.base"

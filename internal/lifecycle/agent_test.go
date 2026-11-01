@@ -225,7 +225,7 @@ func TestAgentNameDefault(t *testing.T) {
 	}
 	e = setup(t)
 	e.editProject(t, func(s string) string {
-		return withoutProbe(s) + "\n[agents.second]\nuse = \"claude@1\"\n"
+		return withoutProbe(s) + "\n[agents.second]\nuse = \"claude@1\"\nrun = \"on-demand\"\n"
 	})
 	if m, err = e.l.model(ctx); err != nil {
 		t.Fatal(err)

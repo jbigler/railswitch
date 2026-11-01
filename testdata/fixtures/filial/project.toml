@@ -53,6 +53,7 @@ config_repo = "https://github.com/[ORG]/nvim-config.git"
 
 [agents.claude]
 use = "claude@1"
+run = "on-demand"                          # tests cover the one-shot path; the package runs a service
 
 [agents.probe]                             # test-only workspace package: agents/probe/
 use = "local:probe@1"

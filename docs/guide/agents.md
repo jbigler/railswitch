@@ -54,18 +54,21 @@ unhealthy, never holds up the agent. (It does wait while the worktree's
 `[hooks] create` haven't run yet, since they need the app.)
 
 An agent runs **on demand** (a container for as long as you use it, in
-one terminal) or as a **service** (below). One agent runs at a time per
+one terminal) or as a **service** (below), as its package says unless
+`[agents.<name>] run` says otherwise. The built-in `claude@1` runs as a
+service, so the dashboard can show its screen and type to it, and `up`
+needs its token (`railswitch secret set claude_token`); for on demand: One agent runs at a time per
 worktree. Agents start from the terminal; the dashboard shows when one is
 waiting on you: a permission prompt, a question, a finished reply (`◆ N
 need input`).
 
-### A service agent: one session, many terminals
-
 ```toml
 [agents.claude]
 use = "claude@1"
-run = "service"
+run = "on-demand"
 ```
+
+### A service agent: one session, many terminals
 
 A service agent's container is its environment, ready before you need it:
 `up` starts the default agent's container when it runs as a service (and

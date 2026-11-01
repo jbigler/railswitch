@@ -132,17 +132,21 @@ later. Each set clears and rebuilds its own collection (`CyberOfficeKit`,
 `CyberOfficeDecor`, `CyberOfficeArch`, `CyberOfficePets`) and overwrites its
 GLBs; `OFFICE_KIT_OUT` exports elsewhere.
 
-`tools/office-kit/preview.html` is a sample floor for checking the kit, with a
-roaming cat and dog and a parrot flying between two perches (`?seed=<n>` makes
-their choices repeatable). Two views, switched by their buttons or V:
+`tools/office-kit/preview.html` is a sample floor for checking the kit. Like
+every floor it has one pet, chosen with the Pet picker or `?pet=` (`cat`, `dog`
+roam; `parrot` flies between two perches; `sleeper`, `aquarium`, `jellyfish`,
+`gecko` stay put); `?seed=<n>` makes a pet's choices repeatable. Two views,
+switched by their buttons or V:
 
 - **Overview**: drag to orbit, right-drag to pan, wheel to zoom; the ceiling
   and the walls facing the camera are hidden. Double-click the floor to walk
   there.
-- **First person**: WASD or the arrow keys move (Shift runs, left/right arrows
-  turn), drag to look; double-click captures the mouse (Esc releases it) but
-  nothing needs it, since pointer lock is unreliable over remote and
-  virtual-machine sessions. E opens the elevator, R goes back to the start.
+- **First person**: click a spot (or a piece of furniture) to walk there, drag
+  to look, WASD or the arrow keys move (Shift runs, left/right arrows turn). E
+  opens the elevator, R goes back to the start. The page uses no pointer lock
+  and no `movementX`: remote and virtual-machine sessions often hand the
+  browser an absolute pointer whose relative motion jumps, so looking follows
+  the pointer's position and ignores a jump.
   The walker slides along what it touches; inside a collider or a wall it can
   always walk out.
 

@@ -30,9 +30,13 @@ const (
 set -g prefix None
 set -g prefix2 None
 unbind-key -a
+unbind-key -a -T root
 set -g status off
-# The wheel scrolls back through the agent's output (shift selects text).
+# The wheel scrolls back through the agent's output (shift selects text);
+# no other mouse binding (tmux's right-click menu can kill the agent).
 set -g mouse on
+bind-key -T root WheelUpPane if-shell -F '#{||:#{pane_in_mode},#{mouse_any_flag}}' 'send-keys -M' 'copy-mode -e'
+bind-key -T root WheelDownPane send-keys -M
 set -g history-limit 50000
 set -g escape-time 0
 set -g default-terminal tmux-256color

@@ -153,32 +153,42 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 // AgentWatch joins service agent name's session in worktree slug as a
 // viewer: its screen, live, without typing into it (D142).
 func (l *L) AgentWatch(ctx context.Context, slug, name string) error {
-	m, err := l.model(ctx)
+	ctr, err := l.CheckWatch(ctx, slug, name)
 	if err != nil {
 		return err
 	}
+	return l.inContainer(ctx, agentAttach(ctr, []string{"attach-session", "-r", "-t", "=" + render.AgentSession}))
+}
+
+// CheckWatch returns the container of the agent AgentWatch would watch, or
+// why it can't; --new-term calls it before opening a terminal.
+func (l *L) CheckWatch(ctx context.Context, slug, name string) (string, error) {
+	m, err := l.model(ctx)
+	if err != nil {
+		return "", err
+	}
 	if name, err = l.agentName(m, name); err != nil {
-		return err
+		return "", err
 	}
 	s, err := service(m, "agent-"+name)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if s.OnDemand {
-		return fmt.Errorf("agent %s runs on demand, in one terminal; --watch is for a service agent", name)
+		return "", fmt.Errorf("agent %s runs on demand, in one terminal; --watch is for a service agent", name)
 	}
 	ctr := containerOf(m, slug, s.ID)
 	if ok, err := l.podman().Running(ctx, ctr); err != nil {
-		return err
+		return "", err
 	} else if !ok {
-		return fmt.Errorf("agent %s is not running in %s", name, slug)
+		return "", fmt.Errorf("agent %s is not running in %s", name, slug)
 	}
 	if live, err := l.agentSession(ctx, ctr); err != nil {
-		return err
+		return "", err
 	} else if !live {
-		return fmt.Errorf("agent %s has no session in %s to watch: railswitch agent %s starts one", name, slug, name)
+		return "", fmt.Errorf("agent %s has no session in %s to watch: railswitch agent %s starts one", name, slug, name)
 	}
-	return l.inContainer(ctx, agentAttach(ctr, []string{"attach-session", "-r", "-t", "=" + render.AgentSession}))
+	return ctr, nil
 }
 
 // agentAttach is the podman exec of a session client on service agent ctr's
@@ -230,8 +240,12 @@ func (l *L) waitAgentServer(ctx context.Context, ctr string) error {
 
 // agentSession reports whether service agent container ctr has its
 // agent's session. Only the server's own answer (exit 1) means none: a failed exec
-// must never make a live agent look idle.
+// or a server that doesn't answer must never make a live agent look idle.
 func (l *L) agentSession(ctx context.Context, ctr string) (bool, error) {
+	// has-session exits 1 for "no server" too: the server must answer first.
+	if _, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "list-sessions")}); err != nil {
+		return false, fmt.Errorf("%s: can't tell whether its agent has a session: its session server does not answer: %w", ctr, err)
+	}
 	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "has-session", "-t", "="+render.AgentSession)})
 	switch {
 	case err == nil:
@@ -270,8 +284,17 @@ func (l *L) idleAgents(ctx context.Context, m *render.Model, slug string, runnin
 // session), saying so: another agent is starting there.
 func (l *L) stopIdleAgents(ctx context.Context, m *render.Model, slug string, idle []string) error {
 	for _, n := range idle {
+		ctr := containerOf(m, slug, "agent-"+n)
+		// Checked again: a session may have started since idleAgents.
+		live, err := l.agentSession(ctx, ctr)
+		if err != nil {
+			return err
+		}
+		if live {
+			return fmt.Errorf("agent %s is running in %s; one agent per worktree: railswitch agent stop %s", n, slug, n)
+		}
 		fmt.Fprintf(l.Err, "stopping agent %s in %s: it has no session\n", n, slug)
-		if err := l.systemd().Stop(ctx, containerOf(m, slug, "agent-"+n)+".service"); err != nil {
+		if err := l.systemd().Stop(ctx, ctr+".service"); err != nil {
 			return err
 		}
 	}

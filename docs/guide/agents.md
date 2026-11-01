@@ -89,6 +89,12 @@ railswitch agent --watch             # watch it, without typing into it
 - **When the agent exits** (`/exit`), its session ends but the container
   stays: the next `railswitch agent` starts a fresh agent at once.
   `railswitch agent stop` stops the container.
+- **Changes wait for the session.** A change to the agent's settings or
+  image doesn't restart a container whose agent has a session (`up` says
+  so); `railswitch agent stop`, then `railswitch agent`, takes it.
+- **Scrolling is shared.** Scrolling back puts the agent's pane into
+  scroll mode for every terminal; type `q` (or scroll to the bottom) to
+  return to the agent.
 - **Another agent.** `railswitch agent omp` stops a service agent that has
   no session (saying so) and starts omp; one with a session is never
   stopped for you.

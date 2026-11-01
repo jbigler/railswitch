@@ -233,6 +233,12 @@ func (l *L) up(ctx context.Context, slug string, route, agent bool) error {
 	key := unithash.Key(m.Prefix)
 	app := unitOf(m, slug, m.Services[0].ID)
 	var appActive bool
+	var agentCtrs []string // service agents' containers
+	for _, a := range m.Inputs.Stack.Agents {
+		if sv, err := service(m, "agent-"+a.Name); err == nil && !sv.OnDemand {
+			agentCtrs = append(agentCtrs, containerOf(m, slug, sv.ID))
+		}
+	}
 	for _, u := range append(names.Units, traefikService, dozzleService, machine.DashboardService) {
 		st, err := sd.UnitState(ctx, u)
 		if err != nil && u == machine.DashboardService { // never blocks a worktree's up
@@ -282,6 +288,17 @@ func (l *L) up(ctx context.Context, slug string, route, agent bool) error {
 			stale, err := l.staleContainer(ctx, ctr, ctr+".container", key)
 			if err != nil {
 				return err
+			}
+			if stale && slices.Contains(agentCtrs, ctr) {
+				// A joining terminal's up must not end the agent it joins (D142).
+				live, err := l.agentSession(ctx, ctr)
+				if err != nil {
+					return err
+				}
+				if live {
+					fmt.Fprintf(l.Err, "warning: %s runs an older unit and keeps it while its agent has a session: railswitch agent stop, then start it again, takes the change\n", ctr)
+					stale = false
+				}
 			}
 			if stale {
 				restart = append(restart, u)

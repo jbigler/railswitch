@@ -840,3 +840,55 @@ func TestUpStartsDefaultServiceAgent(t *testing.T) {
 		t.Errorf("agent claude's up started %s", unit)
 	}
 }
+
+// D142: up never restarts a service agent with a session for an older
+// unit (a terminal joining must not end the agent it joins); without one
+// it does.
+func TestUpKeepsStaleAgentWithSession(t *testing.T) {
+	const unit = "filial-feat-agent-probe.service"
+	for _, live := range []bool{true, false} {
+		e := setup(t)
+		upTwice(t, e)
+		e.units(loadedClean)
+		e.labels(t, "filial-feat-agent-probe")
+		if !live {
+			e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+		}
+		if err := e.l.Up(ctx, "feat"); err != nil {
+			t.Fatal(err)
+		}
+		restarted := count(e.calls(), "systemctl --user restart "+unit) > 0
+		if restarted == live {
+			t.Errorf("session %v: restarted %v\n%s", live, restarted, dump(e.calls()))
+		}
+		if warned := strings.Contains(e.l.Err.(*bytes.Buffer).String(), "keeps it while its agent has a session"); warned != live {
+			t.Errorf("session %v: warned %v", live, warned)
+		}
+	}
+}
+
+// A session that starts after the idle check is seen before the stop.
+func TestStopIdleAgentsRechecks(t *testing.T) {
+	e := setup(t)
+	m, err := e.l.model(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.l.stopIdleAgents(ctx, m, "feat", []string{"probe"}); err == nil || !strings.Contains(err.Error(), "agent probe is running") {
+		t.Fatalf("got %v; want the one-agent refusal", err)
+	}
+	if n := count(e.calls(), "systemctl --user stop filial-feat-agent-probe.service"); n != 0 {
+		t.Errorf("stopped an agent with a session")
+	}
+}
+
+// has-session can't tell "no server" from "no session": a server that
+// doesn't answer is an error, never idle.
+func TestAgentSessionNeedsServer(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "list-sessions"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if live, err := e.l.agentSession(ctx, "filial-feat-agent-probe"); err == nil {
+		t.Fatalf("live %v, no error; want the server's silence reported", live)
+	}
+}

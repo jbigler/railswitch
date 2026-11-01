@@ -81,15 +81,26 @@ const LAYOUT = [
   ['Furn_Sofa', 4.4, 0, .4, PI / 2], ['Furn_CoffeeTable', 5.9, 0, .4, PI / 2], ['Furn_Sofa_Short', 5.9, 0, 2.2, PI],
   ['Deco_Plant_Floor', 7.4, 0, -2.2, 0], ['Deco_Plant_Floor_B', 7.4, 0, 5.3, 0], ['Deco_HangingPlanter', 7.2, 4, -.6, 0],
   // pets (one per floor in the real build; several here for review)
-  ['Pet_Aquarium', -7.65, 0, -4.2, PI / 2], ['Pet_JellyfishTank', 0, 0, 3.6, 0], ['Pet_Dog_Bed', 2.6, 0, 2.2, -.6],
-  ['Pet_Cat_Curled', 2.05, 2.0, 5.3, 0], ['Pet_Cat_Sitting', 5.9, .42, .4, -PI / 2], ['Pet_Parrot_Perch', 7.1, 0, -3.6, -PI / 2],
+  ['Pet_Aquarium', -7.65, 0, -4.2, PI / 2], ['Pet_JellyfishTank', 0, 0, 3.6, 0], ['Furn_DogBed', 2.6, 0, 2.2, -.6],
+  ['Pet_Cat_Curled', 2.05, 2.0, 5.3, 0], ['Furn_ParrotPerch', 7.1, 0, -3.6, -PI / 2], ['Furn_ParrotPerch', -3.2, 0, .6, PI / 2],
   ['Deco_PetBowls', 3.6, 0, 3.4, 0],
 ];
 
+// roaming pets: walking model, resting model, and where they start
+const ROAMERS = [
+  { walk: 'Pet_Cat_Walk', rest: 'Pet_Cat_Sitting', start: { x: 0, z: -1.2, ry: 0 }, speed: 0.5, stride: 0.3 },
+  { walk: 'Pet_Dog_Walk', rest: 'Pet_Dog_Lying', start: { x: 2.6, z: 2.2, ry: -.6 }, homes: [{ x: 2.6, z: 2.2, ry: -.6 }], speed: 0.7, stride: 0.45, height: 0.6 },
+];
+const PERCHES = [{ x: 7.1, y: 1.284, z: -3.6, ry: -PI / 2 }, { x: -3.2, y: 1.284, z: .6, ry: PI / 2 }];
+const BOUNDS = { minX: -7.85, maxX: 7.85, minZ: -5.85, maxZ: 5.85, y: 0 };
+
 let kit, floorElevator, cabElevator, doorsOpen = 0, doorsTarget = 0;
+const roamers = [];
+let flyer = null;
 const staticBoxes = [], dynamicCols = [];
 try {
-  kit = await loadOfficeKit('../../internal/web/static/office/models/', [...new Set(LAYOUT.map((l) => l[0]))], new GLTFLoader());
+  const names = [...LAYOUT.map((l) => l[0]), ...ROAMERS.flatMap((r) => [r.walk, r.rest]), 'Pet_Parrot_Fly'];
+  kit = await loadOfficeKit('../../internal/web/static/office/models/', [...new Set(names)], new GLTFLoader());
   for (const [n, x, y, z, ry] of LAYOUT) {
     const o = kit.spawn(n);
     o.position.set(x, y, z); o.rotation.y = ry;
@@ -103,7 +114,17 @@ try {
     const l = new THREE.PointLight('#dfe8ff', 5, 9); l.position.set(x, 3.2, z); scene.add(l);
   }
   scene.updateMatrixWorld(true);
-  for (const c of kit.colliders(scene)) {
+  const solid = kit.colliders(scene);
+  const rng = q.get('seed') ? mulberry(Number(q.get('seed'))) : Math.random;
+  for (const r of ROAMERS) {
+    const walk = kit.spawn(r.walk), rest = kit.spawn(r.rest);
+    scene.add(walk, rest);
+    roamers.push(kit.createRoamer({ ...r, walk, rest, colliders: solid, bounds: BOUNDS, rng }));
+  }
+  const bird = kit.spawn('Pet_Parrot_Fly');
+  scene.add(bird);
+  flyer = kit.createFlyer({ bird, perches: PERCHES, rng });
+  for (const c of solid) {
     if (/Door_[LR]_COL\d*$/.test(c.name)) dynamicCols.push(c);
     else staticBoxes.push(new THREE.Box3().setFromObject(c, true));
   }
@@ -113,7 +134,7 @@ try {
   s.oninput = () => kit.setSecondary(s.value);
   if (q.get('accent')) { a.value = '#' + q.get('accent'); kit.setAccent(a.value); }
   if (q.get('doors')) doorsOpen = doorsTarget = Number(q.get('doors'));
-  window.kit = kit; window.dbg = { staticBoxes, dynamicCols, camera, collide };
+  window.kit = kit; window.dbg = { staticBoxes, dynamicCols, camera, collide, roamers, flyer: () => flyer, BOUNDS };
 } catch (e) {
   document.getElementById('err').textContent = String(e);
   console.error(e);
@@ -126,6 +147,10 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE' && floorElevator && camera.position.distanceTo(floorElevator.position) < 4) doorsTarget = doorsTarget ? 0 : 1;
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
+
+function mulberry(a) { // seeded random for reproducible checks (?seed=1)
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
 
 const R = 0.3, tmp = new THREE.Box3();
 function collide(p) {
@@ -157,6 +182,8 @@ renderer.setAnimationLoop(() => {
     doorsOpen += THREE.MathUtils.clamp(doorsTarget - doorsOpen, -dt, dt);
     kit.setElevatorDoors(floorElevator, doorsOpen);
     kit.setElevatorDoors(cabElevator, doorsOpen);
+    for (const r of roamers) r.update(dt, camera.position);
+    flyer?.update(dt);
     kit.animate(scene, t);
   }
   composer.render();

@@ -2,7 +2,7 @@
 
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
-one pet per floor. 72 GLB files in `internal/web/static/office/models/`, a
+one pet per floor. 78 GLB files in `internal/web/static/office/models/`, a
 loader in `internal/web/static/office/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
 
@@ -58,10 +58,29 @@ them all; `kit.setElevatorDoors(node, 0..1)` opens a landing or the cab.
 | `Fan_Blades` | spin |
 | `Cat_Head`, `Dog_Head`, `Parrot_Head` | look around; the parrot bobs |
 | `Cat_Tail`, `Dog_Tail` | sway; the dog wags |
-| `CatCurled_Body`, `Dog_Body`, `Gecko` | breathe |
+| `CatCurled_Body`, `Dog_Body`, `Gecko`, `Pet_Dog_Lying` | breathe |
 | `Fish_1`…`Fish_6`, `Jelly_1`…`Jelly_3`, `*_Bubbles` | swim, pulse, rise inside their tanks |
+| `Jelly_<n>_T1`…`T8` | each tentacle sways on its own and flares as its bell contracts |
+| `CatWalk_Leg_FL`…`_BR`, `DogWalk_Leg_FL`…`_BR` | trot from the root's `userData.gait` and `phase` |
+| `ParrotFly_Wing_L`, `ParrotFly_Wing_R` | spread and beat from the root's `userData.flap` |
 
-The pets idle in place; none walks.
+## Roaming
+
+`createRoamer` (in `kit.js`) walks a pet around a floor. It is given two models:
+the walking one (`Pet_Cat_Walk`, `Pet_Dog_Walk`) and the one shown while it rests
+(`Pet_Cat_Sitting`, `Pet_Dog_Lying`). The pet rests a few seconds, picks a free
+spot (or, with `homeChance`, one of its `homes`, such as a `Furn_DogBed`), finds
+a path on a 25 cm grid around every collider lower than its `height` (A*, then
+straightened), turns toward it and walks there; while the player is within
+`shy` meters it stands still. `update(dt, player)` each frame; the roamer sets
+both models' position, rotation and visibility, and the legs' gait and phase.
+The grid is built once, so colliders that move later (elevator doors) count
+where they were.
+
+`createFlyer` moves `Pet_Parrot_Fly` between perches (`Furn_ParrotPerch`: its
+bar is 1.284 m up) in an eased arc, wings spread while it flies and folded on a
+perch. The arc is not checked against colliders: give it perches with a clear
+line between them.
 
 ## The elevator
 
@@ -79,7 +98,7 @@ relative to the floor piece.
   `Ceiling_Sprinkler_4m`, `Ceiling_HangingCables`, `Ceiling_Vent`, `Ceiling_Fan`.
 - **Furn**: `Desk`, `Chair`, `Workstation_2Mon`, `Workstation_3Mon`,
   `Workstation_Lived`, `Workstation_Lived_B`, `Sofa`, `Sofa_Short`,
-  `CoffeeTable`, `Bookshelf`, `CatTree`.
+  `CoffeeTable`, `Bookshelf`, `CatTree`, `DogBed`, `ParrotPerch`.
 - **Tech**: `Monitor`, `WallDisplay`, `MonitorStack` (desk-top), `MonitorWall_A`,
   `MonitorWall_B`, `MonitorBank`, `CRT`, `Laptop`, `DataPad`, `Keyboard`,
   `PCTower`, `ServerRack`, `ServerRack_B`, `NetworkShelf`, `TerminalKiosk`,
@@ -90,7 +109,9 @@ relative to the floor piece.
   `PetBowls`.
 - **Light**: `CeilingPanel`, `PendantBox`, `HexCluster`.
 - **Pet**: `Cat_Sitting`, `Cat_Curled`, `Dog_Bed`, `Parrot_Perch`, `Aquarium`,
-  `JellyfishTank`, `Gecko_Terrarium`.
+  `JellyfishTank`, `Gecko_Terrarium`; for roaming `Cat_Walk`, `Dog_Walk`,
+  `Dog_Lying` (no bed) and `Parrot_Fly`, with `Furn_DogBed` and
+  `Furn_ParrotPerch`.
 - **Ext**: `CityBackdrop` (a flat night skyline).
 
 ## Rebuilding
@@ -112,7 +133,8 @@ later. Each set clears and rebuilds its own collection (`CyberOfficeKit`,
 GLBs; `OFFICE_KIT_OUT` exports elsewhere.
 
 `tools/office-kit/preview.html` is a walkable sample floor for checking the kit
-(click to walk, WASD, E opens the elevator). It loads three.js from a CDN
+(click to walk, WASD, E opens the elevator), with a roaming cat and dog and a
+parrot flying between two perches (`?seed=<n>` makes their choices repeatable). It loads three.js from a CDN
 through an import map, so it is a development page, not served by the
 dashboard: from the repository root run `python3 -m http.server` and open
 `http://localhost:8000/tools/office-kit/preview.html`.

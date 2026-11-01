@@ -170,7 +170,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	if err := clone(ctx, e.run, *repo, pl.p.Project.BaseBranch, filepath.Join(ws, slug)); err != nil {
+	if err := clone(ctx, e.run, *repo, pl.p.Project.BaseBranch, naming.WorktreeDir(ws, slug)); err != nil {
 		return e.fail(err)
 	}
 	secrets, id, err := e.createWorkspace(ctx, pl, accept)
@@ -186,7 +186,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		e.printNext(ws, slug, secrets.unset)
 		return 0
 	}
-	e.dir, e.slug = filepath.Join(ws, slug), slug
+	e.dir, e.slug = naming.WorktreeDir(ws, slug), slug
 	l, slug, code := e.lifecycle(ctx, "up")
 	if code == 0 {
 		if err := l.Up(ctx, slug); err != nil {
@@ -197,7 +197,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 		e.printNext(ws, slug, secrets.unset) // an on-demand agent's, say
 	}
 	if code != 0 {
-		fmt.Fprintf(e.stderr, "railswitch: project %s was created in %s, but up failed; fix the cause and run: cd %s && railswitch up\n", *prefix, ws, shellQuote(filepath.Join(ws, slug)))
+		fmt.Fprintf(e.stderr, "railswitch: project %s was created in %s, but up failed; fix the cause and run: cd %s && railswitch up\n", *prefix, ws, shellQuote(naming.WorktreeDir(ws, slug)))
 		return exitCreatedUpFailed
 	}
 	return 0
@@ -419,7 +419,7 @@ func newPathsFree(ws, slug string, st *pack.Stack, tpl *template.Template, bundl
 	case !fi.IsDir():
 		return fmt.Errorf("%s is not a directory", ws)
 	}
-	rels := []string{slug, ".gitignore", config.GeneratedFile, "stack.lock"}
+	rels := []string{naming.WorktreesDir + "/" + slug, ".gitignore", config.GeneratedFile, "stack.lock"}
 	for _, n := range ejectNames(st) {
 		rels = append(rels, workspaceFile(n))
 	}
@@ -600,7 +600,7 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	if err := clone(ctx, e.run, pm.Repo, pm.BaseBranch, filepath.Join(root, slug)); err != nil {
+	if err := clone(ctx, e.run, pm.Repo, pm.BaseBranch, naming.WorktreeDir(root, slug)); err != nil {
 		return e.fail(err)
 	}
 	err = prepare(root, slug, w.Stack)
@@ -653,7 +653,7 @@ func (e *env) unsetSecrets(ctx context.Context, w *workspace.Workspace) unsetNam
 // printNext prints the next commands: setting each unset secret, else up.
 func (e *env) printNext(ws, slug string, unset []string) {
 	if len(unset) == 0 {
-		fmt.Fprintf(e.stdout, "next: cd %s && railswitch up\n", shellQuote(filepath.Join(ws, slug)))
+		fmt.Fprintf(e.stdout, "next: cd %s && railswitch up\n", shellQuote(naming.WorktreeDir(ws, slug)))
 		return
 	}
 	fmt.Fprintf(e.stdout, "next: cd %s\n", shellQuote(ws))
@@ -1061,7 +1061,7 @@ func prepare(ws, slug string, st *pack.Stack) error {
 	case !errors.Is(err, fs.ErrExist):
 		return err
 	}
-	return worktree.PrecreateVolumes(filepath.Join(ws, slug), worktree.VolumeDirs(st.Pack))
+	return worktree.PrecreateVolumes(naming.WorktreeDir(ws, slug), worktree.VolumeDirs(st.Pack))
 }
 
 // writeGenerated writes <ws>/.railswitch/generated.toml (0600,

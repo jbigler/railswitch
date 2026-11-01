@@ -79,7 +79,8 @@ func absDir(dir string) (string, error) {
 }
 
 // Load finds the workspace from startDir and loads it. The worktree is slug
-// when set (-w), else the first path element of startDir below the root.
+// when set (-w), else the first path element of startDir below the root's
+// worktrees/ folder.
 // stack.lock must exist (an error wrapping config.ErrNoLock otherwise); it
 // may be out of date (see CheckLock), so teardown and diagnosis still work.
 // A package whose content changed under the ref stack.lock pins runs the
@@ -145,8 +146,8 @@ func slugAt(root, startDir string) string {
 	if err != nil {
 		return ""
 	}
-	rel, err := filepath.Rel(root, start)
-	if err != nil || rel == "." {
+	rel, err := filepath.Rel(filepath.Join(root, naming.WorktreesDir), start)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
 		return ""
 	}
 	first, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
@@ -435,7 +436,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 	w.Root = filepath.Clean(pe.Workspace)
 	var wts []render.Worktree
 	for _, e := range reg.WorktreesOf(prefix) {
-		dir := filepath.Join(w.Root, e.Slug)
+		dir := naming.WorktreeDir(w.Root, e.Slug)
 		wts = append(wts, render.Worktree{Slug: e.Slug, ID: e.ID, Dir: dir, Branch: branchOf(dir), Share: e.Share})
 	}
 	gen, err := config.LoadGenerated(w.Root)
@@ -488,7 +489,7 @@ func (w *Workspace) GitGuard(ctx context.Context, r sys.Runner) ([]gitguard.Find
 			}
 		}
 	}
-	return gitguard.Check(ctx, r, root, filepath.Join(root, base), linked)
+	return gitguard.Check(ctx, r, root, naming.WorktreeDir(root, base), linked)
 }
 
 // BaseDir is the base worktree's directory, <root>/<sanitize(base_branch)>.
@@ -497,7 +498,7 @@ func (w *Workspace) BaseDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(w.Root, base), nil
+	return naming.WorktreeDir(w.Root, base), nil
 }
 
 func (w *Workspace) baseSlug() (string, error) {

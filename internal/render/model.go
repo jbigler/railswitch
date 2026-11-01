@@ -31,7 +31,7 @@ const (
 	RoleAgent  = "agent" // an agent package's container (D54)
 )
 
-// Worktree is one registered worktree: <workspace>/<slug>/ (D22). Share is
+// Worktree is one registered worktree: <workspace>/worktrees/<slug>/ (D22, D143). Share is
 // set while it is shared on the tailnet (D46).
 type Worktree struct {
 	Slug        string
@@ -237,7 +237,7 @@ func Build(in Inputs) (*Model, error) {
 	}
 	b := &builder{
 		in:     in,
-		m:      &Model{Prefix: p.Project.Prefix, Inputs: in, baseDir: filepath.Join(in.Workspace, base), tools: map[string]*containerfile{}, standalone: map[string]*containerfile{}, agents: map[string]*containerfile{}},
+		m:      &Model{Prefix: p.Project.Prefix, Inputs: in, baseDir: naming.WorktreeDir(in.Workspace, base), tools: map[string]*containerfile{}, standalone: map[string]*containerfile{}, agents: map[string]*containerfile{}},
 		assets: map[string]bool{},
 		opts:   map[string]*pack.Option{},
 		tools:  map[string]*pack.Tool{},

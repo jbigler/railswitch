@@ -20,10 +20,10 @@ func repo(t *testing.T) (ws, base string) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	ws = t.TempDir()
-	base = filepath.Join(ws, "master")
+	base = filepath.Join(ws, "worktrees", "master")
 	git(t, ws, "init", "-q", "-b", "master", base)
 	git(t, base, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init")
-	git(t, base, "worktree", "add", "-q", "-b", "feat", filepath.Join(ws, "feat"))
+	git(t, base, "worktree", "add", "-q", "-b", "feat", filepath.Join(ws, "worktrees", "feat"))
 	return ws, base
 }
 
@@ -128,7 +128,7 @@ func TestCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pointer := filepath.Join(ws, "feat", ".git")
+	pointer := filepath.Join(ws, "worktrees", "feat", ".git")
 	write(t, pointer, "gitdir: /tmp/evil\n", 0o644)
 	only(t, check(t, ws, base), "pointer", pointer)
 	for _, bad := range []string{
@@ -158,7 +158,7 @@ func TestCheck(t *testing.T) {
 // A missing base .git has nothing to guard.
 func TestCheckNoRepo(t *testing.T) {
 	ws := t.TempDir()
-	got, err := Check(context.Background(), sys.Exec{}, ws, filepath.Join(ws, "master"), []string{"feat"})
+	got, err := Check(context.Background(), sys.Exec{}, ws, filepath.Join(ws, "worktrees", "master"), []string{"feat"})
 	if err != nil || len(got) != 0 {
 		t.Fatalf("Check = %+v, %v", got, err)
 	}
@@ -183,8 +183,8 @@ func TestCheckCommondir(t *testing.T) {
 	feat := filepath.Join(gitDir, "worktrees", "feat")
 
 	cd := filepath.Join(feat, "commondir")
-	write(t, cd, filepath.Join(ws, "feat", "evil")+"\n", 0o644)
-	pointer := filepath.Join(ws, "feat", ".git")
+	write(t, cd, filepath.Join(ws, "worktrees", "feat", "evil")+"\n", 0o644)
+	pointer := filepath.Join(ws, "worktrees", "feat", ".git")
 	// The feat pointer names a worktrees entry that fails: reported too.
 	got := check(t, ws, base)
 	has(t, got, "commondir", cd)
@@ -209,7 +209,7 @@ func TestCheckCommondir(t *testing.T) {
 	gd := filepath.Join(feat, "gitdir")
 	write(t, gd, "/tmp/elsewhere/.git\n", 0o644)
 	has(t, check(t, ws, base), "gitdir", gd)
-	write(t, gd, filepath.Join(ws, "feat", ".git")+"\n", 0o644)
+	write(t, gd, filepath.Join(ws, "worktrees", "feat", ".git")+"\n", 0o644)
 
 	// A pointer to worktrees/evil, which has no commondir: git would use
 	// evil/ itself as the common dir.
@@ -285,10 +285,10 @@ func TestCheckSymlinkedWorktrees(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	move(t, wt, filepath.Join(ws, "feat", "evil-worktrees"))
+	move(t, wt, filepath.Join(ws, "worktrees", "feat", "evil-worktrees"))
 	got := check(t, ws, base)
 	has(t, got, "not-a-dir", wt)
-	has(t, got, "pointer", filepath.Join(ws, "feat", ".git"))
+	has(t, got, "pointer", filepath.Join(ws, "worktrees", "feat", ".git"))
 }
 
 // A symlinked .git/modules, or a symlink anywhere in its name tree, is

@@ -210,7 +210,7 @@ func TestNew(t *testing.T) {
 	if m := mode(t, filepath.Join(ws, "db-dumps")); m != 0o755 {
 		t.Errorf("db-dumps mode = %v; want 0755", m)
 	}
-	if _, err := os.Stat(filepath.Join(ws, "main", "README")); err != nil {
+	if _, err := os.Stat(filepath.Join(ws, "worktrees", "main", "README")); err != nil {
 		t.Errorf("base worktree not cloned: %v", err)
 	}
 
@@ -245,7 +245,7 @@ func TestNew(t *testing.T) {
 		t.Errorf("not rendered: %v", err)
 	}
 
-	code, lout, errs := runWith(t, gitHost(), "-C", filepath.Join(ws, "main"), "containerfile", "list")
+	code, lout, errs := runWith(t, gitHost(), "-C", filepath.Join(ws, "worktrees", "main"), "containerfile", "list")
 	if code != 0 || strings.Contains(lout, "warning") || errs != "" {
 		t.Errorf("containerfile list: exit %d, stderr %q, stdout:\n%s", code, errs, lout)
 	}
@@ -342,7 +342,7 @@ func TestNewDefaultBranch(t *testing.T) {
 	newEnv(t)
 	ws := filepath.Join(t.TempDir(), "shop")
 	mustNew(t, ws, "--repo", bareRepo(t, "trunk"), "--prefix", "shop")
-	if fi, err := os.Stat(filepath.Join(ws, "trunk")); err != nil || !fi.IsDir() {
+	if fi, err := os.Stat(filepath.Join(ws, "worktrees", "trunk")); err != nil || !fi.IsDir() {
 		t.Errorf("base dir %s/trunk: %v", ws, err)
 	}
 	if b := loadProject(t, ws).Project.BaseBranch; b != "trunk" {
@@ -403,7 +403,7 @@ func TestNewRenderFailureUnregisters(t *testing.T) {
 	if !strings.Contains(errs, "rm -rf "+ws) {
 		t.Errorf("stderr does not say how to remove %s:\n%s", ws, errs)
 	}
-	if _, err := os.Stat(filepath.Join(ws, "main", "README")); err != nil {
+	if _, err := os.Stat(filepath.Join(ws, "worktrees", "main", "README")); err != nil {
 		t.Errorf("the clone was removed: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dirs.Quadlet, machine.ProxyUnitName)); !errors.Is(err, fs.ErrNotExist) {
@@ -562,8 +562,8 @@ func TestInitJoin(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("init: exit %d\nstdout: %s\nstderr: %s", code, out, errs)
 	}
-	if _, err := os.Stat(filepath.Join(join, "main", "README")); err != nil {
-		t.Errorf("init did not clone the repo into main/: %v", err)
+	if _, err := os.Stat(filepath.Join(join, "worktrees", "main", "README")); err != nil {
+		t.Errorf("init did not clone the repo into worktrees/main/: %v", err)
 	}
 	if pw := dbPassword(t, join); pw == oldPW {
 		t.Error("init reused the other workspace's DB_PASSWORD")

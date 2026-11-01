@@ -578,7 +578,7 @@ on a machine with one project). It is an array with one object per worktree.
 | `slug` | string | The worktree's name: its directory under the workspace and the `<slug>` in its object names. |
 | `id` | number | Its machine-wide ID; its host ports are derived from it. |
 | `branch` | string | The branch checked out in it; `""` when detached, or when its directory is missing or not a git worktree. |
-| `dir` | string | Its directory, `<workspace>/<slug>`. |
+| `dir` | string | Its directory, `<workspace>/worktrees/<slug>` (D143). |
 | `dirty` | boolean | `git status --porcelain` lists changes or untracked files. `false` when its directory is missing or not a git worktree. |
 | `share` | object or null | Set while the worktree is shared on the tailnet (`railswitch share`): `host` is this machine's tailnet DNS name and `ip` its tailnet IPv4 address. Each port with `share = true` is then served at `https://<host>:<port>/`, the port being its loopback host port. `null` when not shared. |
 
@@ -997,7 +997,7 @@ branch (`git ls-remote`).
   },
   "warnings": [],
   "steps": [
-    "Clone https://github.com/acme/shop (main) into /home/me/shop/main",
+    "Clone https://github.com/acme/shop (main) into /home/me/shop/worktrees/main",
     "Write project.toml and stack.lock, generate local passwords",
     "Eject 4 Containerfiles",
     "Register, lock and render",

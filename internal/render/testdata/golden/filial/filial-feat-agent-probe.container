@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=54364916de1e
+Label=filial.unit-hash=439344569fa1
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-9fa045d8
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
@@ -17,10 +17,10 @@ AddHost=feat.filial.localhost:10.214.3.2
 AddHost=s3.feat.filial.localhost:10.214.3.2
 AddHost=s3-ui.feat.filial.localhost:10.214.3.2
 AddHost=vnc.feat.filial.localhost:10.214.3.2
-Volume=/WORKSPACES/filial/feat:/app:z
-Volume=/WORKSPACES/filial/feat:/WORKSPACES/filial/feat:z
-Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
-Volume=/WORKSPACES/filial/master/.git/hooks:/WORKSPACES/filial/master/.git/hooks:ro,z
+Volume=/WORKSPACES/filial/worktrees/feat:/app:z
+Volume=/WORKSPACES/filial/worktrees/feat:/WORKSPACES/filial/worktrees/feat:z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/WORKSPACES/filial/worktrees/master/.git:z
+Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/WORKSPACES/filial/worktrees/master/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/status/feat:/run/railswitch/status:rw,z
 Volume=/WORKSPACES/filial/.railswitch/agent-home/feat/probe:/home/appuser:z
 Volume=/WORKSPACES/filial/.railswitch/agent-memory/probe:/home/appuser/.probe-memory:z

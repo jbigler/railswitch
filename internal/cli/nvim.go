@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"github.com/jbigler/railswitch/internal/naming"
 	"os"
 	"os/exec"
 	"path"
@@ -83,7 +84,7 @@ func cmdNvimAttach(ctx context.Context, e *env, args []string) int {
 	if code != 0 {
 		return code
 	}
-	dir := filepath.Join(l.WS.Root, slug)
+	dir := naming.WorktreeDir(l.WS.Root, slug)
 	var target *lifecycle.NvimTarget
 	if len(pos) == 1 {
 		cwd, _ := os.Getwd()

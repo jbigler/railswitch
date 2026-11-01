@@ -95,7 +95,7 @@ func (m *Manager) Add(ctx context.Context, target, name string) (w render.Worktr
 	if err != nil {
 		return render.Worktree{}, err
 	}
-	dir := filepath.Join(m.WS, slug)
+	dir := naming.WorktreeDir(m.WS, slug)
 	for _, d := range homeDirs {
 		home := filepath.Join(m.WS, ".railswitch", d, slug)
 		if _, err := os.Lstat(home); errors.Is(err, fs.ErrNotExist) {
@@ -229,7 +229,7 @@ func (m *Manager) baseDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(m.WS, slug), nil
+	return naming.WorktreeDir(m.WS, slug), nil
 }
 
 func (m *Manager) baseSlug() (string, error) {
@@ -342,7 +342,7 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 		return "", err
 	}
 	isTaken := func(slug string) bool {
-		_, err := os.Lstat(filepath.Join(m.WS, slug))
+		_, err := os.Lstat(naming.WorktreeDir(m.WS, slug))
 		return slices.ContainsFunc(entries, func(e machine.WorktreeEntry) bool { return e.Slug == slug }) || !errors.Is(err, fs.ErrNotExist)
 	}
 	def, err := naming.Sanitize(branch)
@@ -368,7 +368,7 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 		}
 	}
 	if isTaken(slug) {
-		return "", fmt.Errorf("worktree name %s is taken: it is registered or %s exists", slug, filepath.Join(m.WS, slug))
+		return "", fmt.Errorf("worktree name %s is taken: it is registered or %s exists", slug, naming.WorktreeDir(m.WS, slug))
 	}
 	return slug, nil
 }

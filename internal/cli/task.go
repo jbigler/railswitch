@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
+	"github.com/jbigler/railswitch/internal/naming"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
@@ -83,7 +83,7 @@ func (e *env) taskNewTerm(ctx context.Context, root, slug, name string, args []s
 		cmd = append(cmd, "--")
 	}
 	cmd = append(cmd, args...)
-	return e.launchIn(ctx, slug+" "+name, filepath.Join(root, slug), cmd)
+	return e.launchIn(ctx, slug+" "+name, naming.WorktreeDir(root, slug), cmd)
 }
 
 // printTasks prints task ls: JSON with --json, else a NAME SOURCE COMMAND

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"github.com/jbigler/railswitch/internal/naming"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,9 +29,9 @@ func cmdTerm(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	if w.Slug == "" {
-		return e.usageErr("term: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>")
+		return e.usageErr("term: not in a worktree; run it in <workspace>/worktrees/<worktree>/ or pass -w <worktree>")
 	}
-	return e.launchIn(ctx, w.Slug, filepath.Join(w.Root, w.Slug), []string{userShell()})
+	return e.launchIn(ctx, w.Slug, naming.WorktreeDir(w.Root, w.Slug), []string{userShell()})
 }
 
 // launchIn opens argv in a new terminal tab or window in dir: 0, or the

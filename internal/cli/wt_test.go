@@ -36,14 +36,14 @@ func gitWS(t *testing.T) (string, machine.Dirs) {
 		t.Setenv(k+"_NAME", "Test")
 		t.Setenv(k+"_EMAIL", "test@example.com")
 	}
-	master := filepath.Join(ws, "master")
+	master := filepath.Join(ws, "worktrees", "master")
 	gitIn(t, master, "init", "-q", "-b", "master")
 	gitIn(t, master, "add", ".")
 	gitIn(t, master, "commit", "-q", "-m", "init")
-	if err := os.RemoveAll(filepath.Join(ws, "feat")); err != nil {
+	if err := os.RemoveAll(filepath.Join(ws, "worktrees", "feat")); err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, master, "worktree", "add", "-q", "-b", "feat", filepath.Join(ws, "feat"))
+	gitIn(t, master, "worktree", "add", "-q", "-b", "feat", filepath.Join(ws, "worktrees", "feat"))
 	return ws, dirs
 }
 
@@ -61,8 +61,8 @@ func TestListJSON(t *testing.T) {
 		t.Fatalf("%v\n%s", err, out)
 	}
 	want := []map[string]any{
-		{"slug": "master", "id": float64(1), "branch": "master", "dir": filepath.Join(ws, "master"), "dirty": false, "share": nil},
-		{"slug": "feat", "id": float64(2), "branch": "feat", "dir": filepath.Join(ws, "feat"), "dirty": false,
+		{"slug": "master", "id": float64(1), "branch": "master", "dir": filepath.Join(ws, "worktrees", "master"), "dirty": false, "share": nil},
+		{"slug": "feat", "id": float64(2), "branch": "feat", "dir": filepath.Join(ws, "worktrees", "feat"), "dirty": false,
 			"share": map[string]any{"host": "box.tail1234.ts.net", "ip": "100.64.0.7"}},
 	}
 	if len(rows) != len(want) {
@@ -91,7 +91,7 @@ func TestWtAddRm(t *testing.T) {
 	if _, err := os.Stat(unit); err != nil {
 		t.Fatalf("wt add rendered no unit: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(ws, "feat-x", "node_modules")); err != nil {
+	if _, err := os.Stat(filepath.Join(ws, "worktrees", "feat-x", "node_modules")); err != nil {
 		t.Errorf("node_modules not pre-created: %v", err)
 	}
 	n := len(f.Calls)

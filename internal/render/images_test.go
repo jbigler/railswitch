@@ -269,7 +269,7 @@ func TestAddonContract(t *testing.T) {
 // tag or build arg; the chain falls back with a warning.
 func TestHostileVersionNeverInTag(t *testing.T) {
 	ws := fixtureWS(t)
-	writeFile(t, filepath.Join(ws, "master", ".ruby-version"), "3.3.6; rm -rf ~\n")
+	writeFile(t, filepath.Join(ws, "worktrees", "master", ".ruby-version"), "3.3.6; rm -rf ~\n")
 	in := mustInstance(t, mustBuild(t, fixtureInputs(t, ws, nil)), "master")
 	base := in.Builds[0]
 	if base.Args["RUBY_VERSION"] != "3.4.2" {

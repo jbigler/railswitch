@@ -73,7 +73,7 @@ func stackFake() *systest.Fake {
 // commands are gh stack's own, not railswitch's.
 func TestStackSwitch(t *testing.T) {
 	ws, _ := gitWS(t)
-	gitIn(t, filepath.Join(ws, "master"), "branch", "next")
+	gitIn(t, filepath.Join(ws, "worktrees", "master"), "branch", "next")
 	if code, _, _ := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", "switch", "-x"); code != 2 {
 		t.Errorf("switch -x: exit %d; want 2", code)
 	}
@@ -85,7 +85,7 @@ func TestStackSwitch(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errs)
 	}
-	head, err := os.ReadFile(filepath.Join(ws, "master", ".git", "worktrees", "feat", "HEAD"))
+	head, err := os.ReadFile(filepath.Join(ws, "worktrees", "master", ".git", "worktrees", "feat", "HEAD"))
 	if got := strings.TrimSpace(string(head)); err != nil || got != "ref: refs/heads/next" {
 		t.Errorf("feat's HEAD = %q", got)
 	}
@@ -118,7 +118,7 @@ func TestTerm(t *testing.T) {
 	if code, _, errs := runWith(t, stackFake(), "-C", ws, "-w", "feat", "term"); code != 0 {
 		t.Fatalf("term: exit %d: %s", code, errs)
 	}
-	if gotDir != filepath.Join(ws, "feat") || !slices.Equal(gotArgv, []string{"/usr/bin/fish"}) {
+	if gotDir != filepath.Join(ws, "worktrees", "feat") || !slices.Equal(gotArgv, []string{"/usr/bin/fish"}) {
 		t.Errorf("term launched %s %q", gotDir, gotArgv)
 	}
 }

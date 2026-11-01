@@ -4,9 +4,23 @@
 
 A **project** is one app repository on this machine. Its **workspace** is
 a folder holding `project.toml` (how the project is set up), `stack.lock`
-(exactly which package content it runs) and one **worktree** per branch:
-`~/workspace/shop/main`, `~/workspace/shop/feature-x`. Every worktree
-runs its own set of containers.
+(exactly which package content it runs) and, under `worktrees/`, one
+**worktree** per branch: `~/workspace/shop/worktrees/main`,
+`~/workspace/shop/worktrees/feature-x`. Every worktree runs its own set of
+containers.
+
+```
+shop/
+  project.toml  stack.lock  .gitignore      the project's setup (the workspace's own git repo)
+  containerfiles/  agents/  packs/  options/ files you edit, committed with it
+  db-dumps/  notes/                          your data: dumps, the agents' shared notes
+  .railswitch/                               railswitch's own files (env, agent homes, firewall)
+  worktrees/
+    main/  feature-x/                        the checkouts
+```
+
+Worktrees live apart from everything else, so a branch can be named
+anything (`notes`, `packs`) without meeting one of the project's folders.
 
 The project's **prefix** (`shop`) names everything it owns: containers
 (`shop-main-rails`), volumes, networks and hostnames

@@ -102,7 +102,7 @@ func TestFwShow(t *testing.T) {
 	}
 
 	f = fakeHost()
-	if code, _, errs := runWith(t, f, "-C", filepath.Join(ws, "master"), "fw", "show", "rails"); code != 0 {
+	if code, _, errs := runWith(t, f, "-C", filepath.Join(ws, "worktrees", "master"), "fw", "show", "rails"); code != 0 {
 		t.Fatalf("fw show rails: exit %d, stderr %q", code, errs)
 	}
 	argv, env = fwCall(t, f)

@@ -5,7 +5,7 @@
 Description=filial nvim of worktree master
 
 [Container]
-Label=filial.unit-hash=a4e0379fb6f7
+Label=filial.unit-hash=a6aed10bc1da
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-c220c5d3
 ContainerName=filial-master-nvim
 Network=filial-master-dev.network:alias=nvim
@@ -18,12 +18,12 @@ AddHost=s3.master.filial.localhost:10.214.3.2
 AddHost=s3-ui.master.filial.localhost:10.214.3.2
 AddHost=vnc.master.filial.localhost:10.214.3.2
 PublishPort=127.0.0.1:17001:7777
-Volume=/WORKSPACES/filial/master:/app:z
-Volume=/WORKSPACES/filial/master:/WORKSPACES/filial/master:z
-Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:z
-Volume=/WORKSPACES/filial/master/.git/hooks:/WORKSPACES/filial/master/.git/hooks:ro,z
-Volume=/WORKSPACES/filial/master/.git:/app/.git:z
-Volume=/WORKSPACES/filial/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/filial/worktrees/master:/app:z
+Volume=/WORKSPACES/filial/worktrees/master:/WORKSPACES/filial/worktrees/master:z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/WORKSPACES/filial/worktrees/master/.git:z
+Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/WORKSPACES/filial/worktrees/master/.git/hooks:ro,z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/app/.git:z
+Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/home/master:/home/appuser:z
 Volume=/WORKSPACES/filial/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh:/usr/local/bin/entrypoint-nvim.sh:ro,z
 Volume=filial-master-node-modules:/app/node_modules:U

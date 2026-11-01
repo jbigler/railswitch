@@ -5,16 +5,16 @@
 Description=phx deps of worktree master
 
 [Container]
-Label=phx.unit-hash=080af883db21
+Label=phx.unit-hash=235dccd929aa
 Image=localhost/phx/base:elixir1.18.4-otp27-bac86656
 ContainerName=phx-master-deps
 Network=phx-master-dev.network:alias=deps
 UserNS=keep-id:uid=1000,gid=1000
 User=1000:1000
 EnvironmentFile=/WORKSPACES/phoenix/.railswitch/env/master/deps.env
-Volume=/WORKSPACES/phoenix/master:/app:z
-Volume=/WORKSPACES/phoenix/master/.git:/app/.git:ro,z
-Volume=/WORKSPACES/phoenix/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master:/app:z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git:/app/.git:ro,z
+Volume=/WORKSPACES/phoenix/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/phoenix/.railswitch/assets/phoenix/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
 Volume=phx_hex:/home/appuser/.hex:U
 Volume=phx_phoenix_assets:/home/appuser/.cache/phoenix-assets:U

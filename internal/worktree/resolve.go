@@ -106,7 +106,7 @@ func (m *Manager) registered() ([]machine.WorktreeEntry, error) {
 func (m *Manager) present(entries []machine.WorktreeEntry) error {
 	var missing []string
 	for _, e := range entries {
-		if _, err := os.Lstat(filepath.Join(m.WS, e.Slug)); err != nil {
+		if _, err := os.Lstat(naming.WorktreeDir(m.WS, e.Slug)); err != nil {
 			missing = append(missing, e.Slug)
 		}
 	}
@@ -117,28 +117,28 @@ func (m *Manager) present(entries []machine.WorktreeEntry) error {
 }
 
 // worktrees are the registered worktrees and every git worktree directly
-// in the workspace, merged by slug.
+// in the workspace's worktrees/, merged by slug.
 func (m *Manager) worktrees(ctx context.Context, base string, entries []machine.WorktreeEntry) ([]worktree, error) {
 	gits, err := m.gitWorktrees(ctx, base)
 	if err != nil {
 		return nil, err
 	}
-	ws := realPath(m.WS)
+	dir := realPath(filepath.Join(m.WS, naming.WorktreesDir))
 	var wts []worktree
 	for _, e := range entries {
-		wts = append(wts, worktree{Slug: e.Slug, ID: e.ID, Dir: filepath.Join(m.WS, e.Slug), Share: e.Share})
+		wts = append(wts, worktree{Slug: e.Slug, ID: e.ID, Dir: naming.WorktreeDir(m.WS, e.Slug), Share: e.Share})
 	}
 	for _, g := range gits {
-		rel, err := filepath.Rel(ws, realPath(g.Dir))
+		rel, err := filepath.Rel(dir, realPath(g.Dir))
 		if err != nil || rel != filepath.Base(rel) {
-			continue // not directly in the workspace
+			continue // not directly in the workspace's worktrees/
 		}
 		if s, err := naming.Sanitize(rel); err != nil || s != rel {
 			continue
 		}
 		i := indexSlug(wts, rel)
 		if i < 0 {
-			wts = append(wts, worktree{Slug: rel, Dir: filepath.Join(m.WS, rel)})
+			wts = append(wts, worktree{Slug: rel, Dir: naming.WorktreeDir(m.WS, rel)})
 			i = len(wts) - 1
 		}
 		wts[i].Branch, wts[i].Git = g.Branch, true

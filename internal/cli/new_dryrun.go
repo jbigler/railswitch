@@ -194,7 +194,7 @@ func dryRunDoc(ctx context.Context, pl *newPlan, up bool) (*newDryRunDoc, error)
 		Warnings:    append(slices.Clone(m.Warnings), in.Warnings...),
 		Install:     install,
 		Steps: []string{
-			fmt.Sprintf("Clone %s (%s) into %s", p.Project.Repo, p.Project.BaseBranch, filepath.Join(pl.ws, slug)),
+			fmt.Sprintf("Clone %s (%s) into %s", p.Project.Repo, p.Project.BaseBranch, naming.WorktreeDir(pl.ws, slug)),
 			"Write project.toml and stack.lock, generate local passwords",
 			fmt.Sprintf("Eject %d Containerfiles", len(ejectNames(pl.st))),
 			"Register, lock and render",

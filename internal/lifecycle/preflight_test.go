@@ -41,7 +41,7 @@ func filialModel(t *testing.T) *render.Model {
 	m, err := render.Build(render.Inputs{
 		Workspace: ws, Project: p, Stack: st, Generated: gen,
 		Machine:   machine.ProjectEntry{Prefix: "filial", Workspace: ws, Subnet: 1},
-		Worktrees: []render.Worktree{{Slug: "master", ID: 1, Dir: filepath.Join(ws, "master"), Branch: "master"}},
+		Worktrees: []render.Worktree{{Slug: "master", ID: 1, Dir: filepath.Join(ws, "worktrees", "master"), Branch: "master"}},
 		Host:      render.Host{CPUs: 8, Home: "/home/u"},
 	})
 	if err != nil {
@@ -85,8 +85,8 @@ func TestPreflightNamesMount(t *testing.T) {
 // git-guard (D60): <base>/.git/hooks is a mount source; Preflight creates it.
 func TestPreflightCreatesHooks(t *testing.T) {
 	m := filialModel(t)
-	git := filepath.Join(m.Inputs.Workspace, "master", ".git")
-	if err := os.Mkdir(git, 0o755); err != nil {
+	git := filepath.Join(m.Inputs.Workspace, "worktrees", "master", ".git")
+	if err := os.MkdirAll(git, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	l := &L{R: &systest.Fake{}}

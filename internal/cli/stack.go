@@ -185,7 +185,7 @@ func cmdStackSwitch(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	if w.Slug == "" {
-		return e.usageErr("stack switch: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>")
+		return e.usageErr("stack switch: not in a worktree; run it in <workspace>/worktrees/<worktree>/ or pass -w <worktree>")
 	}
 	m, err := e.model(ctx, w)
 	if err != nil {

@@ -151,7 +151,7 @@ func TestAgentNewTerm(t *testing.T) {
 		gotTitle, gotDir, gotArgv = title, dir, argv
 		return nil
 	}
-	code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "claude", "--", "-p", "x")
+	code, _, errs := runIn(t, "-C", filepath.Join(ws, "worktrees", "feat"), "agent", "--new-term", "claude", "--", "-p", "x")
 	if code != 0 {
 		t.Fatalf("exit %d: %s", code, errs)
 	}
@@ -159,7 +159,7 @@ func TestAgentNewTerm(t *testing.T) {
 	if !slices.Equal(gotArgv, want) {
 		t.Errorf("argv %q; want %q", gotArgv, want)
 	}
-	if gotDir != filepath.Join(ws, "feat") || gotTitle == "" {
+	if gotDir != filepath.Join(ws, "worktrees", "feat") || gotTitle == "" {
 		t.Errorf("title %q dir %q", gotTitle, gotDir)
 	}
 }
@@ -169,7 +169,7 @@ func TestAgentNewTermExitCode(t *testing.T) {
 	old := launchTerm
 	t.Cleanup(func() { launchTerm = old })
 	launchTerm = func(context.Context, *env, string, string, []string) error { return &term.ExitError{Code: 3} }
-	code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "claude")
+	code, _, errs := runIn(t, "-C", filepath.Join(ws, "worktrees", "feat"), "agent", "--new-term", "claude")
 	if code != 3 || errs != "" {
 		t.Fatalf("exit %d stderr %q; want 3, silent", code, errs)
 	}
@@ -185,10 +185,10 @@ func TestAgentNewTermChecksFirst(t *testing.T) {
 		t.Error("terminal launched")
 		return nil
 	}
-	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "clade"); code == 0 || !strings.Contains(errs, "clade") {
+	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "worktrees", "feat"), "agent", "--new-term", "clade"); code == 0 || !strings.Contains(errs, "clade") {
 		t.Errorf("unknown agent: exit %d stderr %q", code, errs)
 	}
-	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "--watch", "probe", "--", "x"); code != 2 || !strings.Contains(errs, "--watch") {
+	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "worktrees", "feat"), "agent", "--new-term", "--watch", "probe", "--", "x"); code != 2 || !strings.Contains(errs, "--watch") {
 		t.Errorf("--watch with argv: exit %d stderr %q; want a usage error", code, errs)
 	}
 }

@@ -75,7 +75,7 @@ func catalogInputs(t *testing.T, ws string, cat *pack.Catalog, mutate func(*conf
 	}
 	var wts []Worktree
 	for i, slug := range []string{"master", "feat"} {
-		dir := filepath.Join(ws, slug)
+		dir := filepath.Join(ws, "worktrees", slug)
 		if _, err := os.Stat(dir); err == nil {
 			wts = append(wts, Worktree{Slug: slug, ID: i + 1, Dir: dir, Branch: slug})
 		}
@@ -569,7 +569,7 @@ func TestPortsFromID(t *testing.T) {
 	ws := fixtureWS(t)
 	in := fixtureInputs(t, ws, nil)
 	m := mustBuild(t, in)
-	inst, err := m.Instance(Worktree{Slug: "seven", ID: 7, Dir: filepath.Join(ws, "master"), Branch: "seven"})
+	inst, err := m.Instance(Worktree{Slug: "seven", ID: 7, Dir: filepath.Join(ws, "worktrees", "master"), Branch: "seven"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -844,9 +844,9 @@ func TestModelCarriesPackFields(t *testing.T) {
 		mounts[dst] = src + " " + mt.Options
 	}
 	ws := m.Inputs.Workspace
-	git := filepath.Join(ws, "master", ".git")
+	git := filepath.Join(ws, "worktrees", "master", ".git")
 	for target, want := range map[string]string{
-		"/app":                              filepath.Join(ws, "master") + " z",
+		"/app":                              filepath.Join(ws, "worktrees", "master") + " z",
 		git:                                 git + " z",
 		"/home/appuser":                     filepath.Join(ws, ".railswitch", "home", "master") + " z",
 		"/usr/local/bin/entrypoint-nvim.sh": filepath.Join(ws, ".railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh") + " ro,z",
@@ -880,7 +880,7 @@ func TestModelCarriesPackFields(t *testing.T) {
 // another Node gets its own volume, and the app never mounts it.
 func TestNvimNpmGlobalPerNodeVersion(t *testing.T) {
 	ws := fixtureWS(t)
-	writeFile(t, filepath.Join(ws, "feat", ".nvmrc"), "20.18.1\n")
+	writeFile(t, filepath.Join(ws, "worktrees", "feat", ".nvmrc"), "20.18.1\n")
 	m := mustBuild(t, fixtureInputs(t, ws, nil))
 	want := map[string]string{"master": "filial_npm_global_node22.11.0", "feat": "filial_npm_global_node20.18.1"}
 	for slug, name := range want {
@@ -1130,7 +1130,7 @@ func builtinCatalogWith(t *testing.T, ws string, edit func(path string, data []b
 // pack's bun runtime has no fallback.
 func TestEmptyRuntime(t *testing.T) {
 	ws := fixtureWS(t)
-	writeFile(t, filepath.Join(ws, "feat", ".bun-version"), "1.2.3\n")
+	writeFile(t, filepath.Join(ws, "worktrees", "feat", ".bun-version"), "1.2.3\n")
 	m := mustBuild(t, fixtureInputs(t, ws, nil))
 	for slug, want := range map[string]string{"master": "", "feat": "1.2.3"} {
 		in := mustInstance(t, m, slug)
@@ -1287,7 +1287,7 @@ func TestDBTestName(t *testing.T) {
 		t.Errorf("default db_test = %q; want filial_test (from filial_dev)", got)
 	}
 	ws := fixtureWS(t)
-	yml := filepath.Join(ws, "master", "config", "database.yml")
+	yml := filepath.Join(ws, "worktrees", "master", "config", "database.yml")
 	if err := os.WriteFile(yml, []byte("development:\n  database: shop_development\ntest:\n  database: shop_specs\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

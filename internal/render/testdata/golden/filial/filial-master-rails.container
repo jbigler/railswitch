@@ -8,7 +8,7 @@ Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefi
 After=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=filial.unit-hash=59542d54bee8
+Label=filial.unit-hash=4b75d5b4f927
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-master-rails
 Network=filial-master-dev.network:alias=rails
@@ -22,10 +22,10 @@ AddHost=s3-ui.master.filial.localhost:10.214.3.2
 AddHost=vnc.master.filial.localhost:10.214.3.2
 PublishPort=127.0.0.1:33001:33001
 PublishPort=127.0.0.1:13001:3000
-Volume=/WORKSPACES/filial/master:/app:z
-Volume=/WORKSPACES/filial/master/.git:/WORKSPACES/filial/master/.git:ro,z
-Volume=/WORKSPACES/filial/master/.git:/app/.git:ro,z
-Volume=/WORKSPACES/filial/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/filial/worktrees/master:/app:z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/WORKSPACES/filial/worktrees/master/.git:ro,z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/app/.git:ro,z
+Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U

@@ -5,16 +5,16 @@
 Description=filial deps of worktree master
 
 [Container]
-Label=filial.unit-hash=f26ceda5adc3
+Label=filial.unit-hash=8816b94830d7
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-master-deps
 Network=filial-master-dev.network:alias=deps
 UserNS=keep-id:uid=1000,gid=1000
 User=1000:1000
 EnvironmentFile=/WORKSPACES/filial/.railswitch/env/master/deps.env
-Volume=/WORKSPACES/filial/master:/app:z
-Volume=/WORKSPACES/filial/master/.git:/app/.git:ro,z
-Volume=/WORKSPACES/filial/master/.git/hooks:/app/.git/hooks:ro,z
+Volume=/WORKSPACES/filial/worktrees/master:/app:z
+Volume=/WORKSPACES/filial/worktrees/master/.git:/app/.git:ro,z
+Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U

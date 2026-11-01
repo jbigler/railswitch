@@ -137,7 +137,7 @@ func (e *env) instance(ctx context.Context, cmd string) (w *workspace.Workspace,
 		return nil, nil, nil, e.fail(err)
 	}
 	if w.Slug == "" {
-		return nil, nil, nil, e.usageErr("%s: not in a worktree; run it in <workspace>/<worktree>/ or pass -w <worktree>", cmd)
+		return nil, nil, nil, e.usageErr("%s: not in a worktree; run it in <workspace>/worktrees/<worktree>/ or pass -w <worktree>", cmd)
 	}
 	m, err = e.model(ctx, w)
 	if err != nil {

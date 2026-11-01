@@ -909,8 +909,12 @@ any open page.
   1.5 s while open) and a box that types to it (`agent send`: the text, then
   Enter). The **PR station** in front of the desks shows the floor's pull
   request: title, checks, review, review app. The **big screen** on the left
-  wall, a lounge facing it, shows the floor's summary for now; what it
-  shows is yours to choose later.
+  wall shows the floor's summary for now (what it shows is yours to choose
+  later); a lounge faces it: a tufted sectional on a rug, an armchair, a
+  side table and an arc lamp. Room dividers (glass, a shelf of books and
+  plants, a slatted planter) set off the server and work areas and the
+  lounge; a meeting nook sits in the middle; plants, a coat rack, a
+  whiteboard and what people leave lying about fill the rest.
 - **The elevator** (in the back wall of every floor, or `T`) lists the
   lobby and every floor; its doors open as you walk up, and stepping in
   front of them opens the list. `Esc` closes a panel.

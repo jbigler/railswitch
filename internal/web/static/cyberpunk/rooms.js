@@ -44,18 +44,21 @@ function pickable(o, tip, act) {
 
 // The pieces a room may use, loaded once.
 export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Window_4m', 'Arch_Elevator_Floor', 'Arch_Elevator_Cab',
-  'Ext_CityBackdrop', 'Arch_Ceiling_LightRun_4m', 'Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m', 'Arch_Ceiling_CableTray_4m',
+  'Ext_CityBackdrop', 'Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m', 'Arch_Ceiling_CableTray_4m',
   'Arch_Ceiling_Sprinkler_4m', 'Arch_Ceiling_HangingCables', 'Arch_Ceiling_Fan', 'Arch_Ceiling_Vent', 'Arch_WallPipes_4m',
   'Light_CeilingPanel', 'Light_PendantBox', 'Light_HexCluster',
   'Tech_ServerRack', 'Tech_ServerRack_B', 'Tech_NetworkShelf', 'Tech_ToolCart', 'Tech_TerminalKiosk', 'Tech_MonitorBank',
-  'Tech_MonitorStack', 'Tech_Laptop',
-  'Furn_Workstation_Lived', 'Furn_Workstation_Lived_B', 'Furn_Desk', 'Furn_Sofa', 'Furn_CoffeeTable',
+  'Tech_MonitorStack', 'Tech_Laptop', 'Tech_MonitorWall_A',
+  'Furn_Workstation_Lived', 'Furn_Workstation_Lived_B', 'Furn_Desk', 'Furn_CoffeeTable',
   'Deco_Boxes', 'Deco_Crate', 'Deco_MiniFridge', 'Deco_CorkBoard', 'Deco_Poster', 'Deco_NeonSign',
-  'Deco_Plant_Floor', 'Deco_Plant_Floor_B', 'Deco_Plant_Small', 'Deco_HangingPlanter', 'Deco_Extinguisher', 'Deco_CableRun',
-  'Deco_TrashBin', 'Deco_DeskLamp', 'Deco_Mug',
+  'Deco_Plant_Floor', 'Deco_Plant_Floor_B', 'Deco_HangingPlanter', 'Deco_Extinguisher', 'Deco_CableRun', 'Deco_DeskLamp', 'Deco_Mug',
   'Pet_Cat_Walk', 'Pet_Cat_Sitting', 'Pet_Dog_Walk', 'Pet_Dog_Lying', 'Furn_DogBed', 'Deco_PetBowls', 'Pet_Parrot_Fly',
   'Furn_ParrotPerch', 'Pet_Cat_Curled', 'Pet_Aquarium', 'Pet_JellyfishTank', 'Pet_Gecko_Terrarium',
-  'Char_Android_Agent', 'Char_Android_A', 'Char_Android_B', 'Char_Android_C'];
+  'Char_Android_Agent', 'Char_Android_A', 'Char_Android_B', 'Char_Android_C', // the agent's is spawned in actors.js
+  'Furn_Sofa_Tufted_L', 'Furn_Armchair', 'Furn_Divider_Glass', 'Furn_Divider_Shelf', 'Furn_Divider_Planter',
+  'Deco_Plant_Snake', 'Deco_Plant_Monstera', 'Deco_Plant_Palm', 'Deco_Plant_Bush', 'Deco_Plant_Trailing',
+  'Furn_SideTable', 'Deco_FloorLamp', 'Deco_Rug_Geo', 'Deco_CoatRack', 'Deco_Whiteboard', 'Deco_Backpack', 'Furn_Stool',
+  'Deco_BookStack', 'Deco_PizzaBoxes'];
 
 // NEON is the highlight colours a floor takes: cyberpunk's, not any hue.
 const NEON = [0x22e6ff, 0xff2bd6, 0x8b5cff, 0xff7a1a, 0x7dff3a, 0xff2b4a, 0x3a7bff, 0x1affb2];
@@ -147,8 +150,8 @@ function shell(k, scene, deco, ui) {
   moon.position.set(8, 14, 6);
   scene.add(moon);
   for (const [x, z] of [[-5.6, -3.6], [-1.4, 1.2], [3.6, 1.2], [-5.4, 3.4], [2, -1.8], [1.7, -4.4], [5.4, -4.4], [5.5, 4]]) {
-    const l = new THREE.PointLight(0xe4ecff, 9, 11);
-    l.position.set(x, 3.4, z);
+    const l = new THREE.PointLight(0xe4ecff, 7.5, 11);
+    l.position.set(x, 2.8, z); // low enough to light the room, not a hotspot on the ceiling
     scene.add(l);
   }
   for (const [x, z] of [[-7.5, -5.5], [7.5, 5.5]]) {
@@ -320,20 +323,58 @@ function residents(k, scene, deco, ui, androids) {
   return { ticks, start: () => later.forEach((f) => f()) };
 }
 
-// Decor every floor gets, some of it picked by the floor's name.
+// Decor every floor gets, some of it picked by the floor's name: plants in
+// every corner and hanging over the seats, and the odds and ends of a room
+// people work in.
 function furnish(k, scene, deco) {
+  const plants = ['Deco_Plant_Palm', 'Deco_Plant_Monstera', 'Deco_Plant_Snake', 'Deco_Plant_Bush', 'Deco_Plant_Floor', 'Deco_Plant_Floor_B'];
+  put(k, scene, deco.pick(plants), 7.3, 0, -5.3, deco.r() * 6);
+  put(k, scene, deco.pick(plants), -7.3, 0, 5.3, deco.r() * 6);
+  put(k, scene, deco.pick(plants), 7.3, 0, -1.2, deco.r() * 6);
+  put(k, scene, 'Deco_Plant_Snake', -0.7, 0, -5.5, deco.r() * 6);
+  put(k, scene, 'Deco_Plant_Snake', -0.3, 0, 5.45, deco.r() * 6);
+  for (const [x, z] of [[-4.6, 4.6], [3.6, -5.2], [7.3, -3]]) put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', x, 4, z, deco.r() * 6);
+  put(k, scene, 'Deco_HangingPlanter', 7.2, 4, 0.2);
   put(k, scene, 'Deco_MiniFridge', -1.2, 0, 5.45, PI);
-  put(k, scene, deco.pick(['Deco_Boxes', 'Deco_Crate']), -2.6, 0, 5.2, PI + 0.3);
+  put(k, scene, 'Furn_Stool', -2.1, 0, 4.7);
+  put(k, scene, deco.pick(['Deco_Boxes', 'Deco_Crate']), -2.7, 0, 5.3, PI + 0.3);
   put(k, scene, 'Deco_CorkBoard', -6, 1.7, 5.98, PI);
   put(k, scene, 'Deco_Poster', -0.3, 1.8, -5.97);
   put(k, scene, 'Deco_Poster', 7.98, 1.8, -1.9, -PI / 2);
-  put(k, scene, 'Deco_Extinguisher', -3.3, 0, -5.92);
-  put(k, scene, deco.pick(['Deco_Plant_Floor', 'Deco_Plant_Floor_B']), 7.3, 0, -5.3);
-  put(k, scene, deco.pick(['Deco_Plant_Floor', 'Deco_Plant_Floor_B']), -0.4, 0, 5.4);
-  put(k, scene, 'Deco_HangingPlanter', 7.2, 4, 0.2);
-  put(k, scene, 'Deco_HangingPlanter', 7.2, 4, 3.6);
+  put(k, scene, 'Deco_Extinguisher', -0.6, 0, 5.94, PI);
   put(k, scene, 'Deco_CableRun', 0.6, 0, -1.2, 0.3);
-  put(k, scene, 'Deco_TrashBin', 3.4, 0, -3.1);
+  put(k, scene, 'Deco_CoatRack', 0.35, 0, -5.5);
+}
+
+// lounge furnishes the front-left: the tufted sectional facing the big
+// screen on the left wall, on a rug, an armchair, a side table, an arc lamp,
+// and what people leave behind.
+function lounge(k, scene, deco) {
+  put(k, scene, 'Deco_Rug_Geo', -5.6, 0, 2.7, PI / 2);
+  put(k, scene, 'Furn_Sofa_Tufted_L', -4.0, 0, 2.5, -PI / 2);
+  put(k, scene, 'Furn_CoffeeTable', -5.9, 0, 2.0, PI / 2);
+  put(k, scene, 'Deco_BookStack', -5.8, 0.42, 1.8);
+  put(k, scene, 'Furn_Armchair', -5.6, 0, 0.55, 0.25);
+  put(k, scene, 'Furn_SideTable', -3.6, 0, 0.75);
+  put(k, scene, 'Deco_FloorLamp', -3.3, 0, 4.4, -PI / 2);
+  put(k, scene, 'Deco_PizzaBoxes', -3.0, 0, 1.4, deco.r());
+  put(k, scene, 'Deco_Backpack', -3.25, 0, 3.6, -1.2);
+  put(k, scene, 'Furn_Divider_Shelf', -1.6, 0, 3.0, PI / 2);
+}
+
+// nook is a meeting corner in the middle of a floor: two armchairs across a
+// low table on a rug, a laptop left open; and a screen wall by the front
+// windows.
+function nook(k, scene, deco) {
+  put(k, scene, 'Deco_Rug_Geo', 0.9, 0, 2.4, PI / 2);
+  put(k, scene, 'Furn_CoffeeTable', 0.9, 0, 2.4, PI / 2);
+  put(k, scene, 'Furn_Armchair', 0.9, 0, 1.15, deco.r() * 0.4 - 0.2);
+  put(k, scene, 'Furn_Armchair', 0.9, 0, 3.65, PI + deco.r() * 0.4 - 0.2);
+  put(k, scene, 'Tech_Laptop', 0.8, 0.42, 2.3, 0.4);
+  put(k, scene, 'Deco_Mug', 1.1, 0.42, 2.7);
+  put(k, scene, 'Deco_Mug', 0.7, 0.42, 2.0);
+  put(k, scene, 'Tech_MonitorWall_A', 7.25, 0, 4.4, -PI / 2);
+  put(k, scene, 'Deco_Plant_Bush', 2.0, 0, 5.35, deco.r() * 6);
 }
 
 // lab builds a worktree's floor. ui: {transport, service(slug, svc),
@@ -361,15 +402,23 @@ export async function lab(slug, n, ui) {
   keepOut.visible = false;
   keepOut.position.set(-5.75, 1, -3.55);
   scene.add(keepOut);
-  const roomSign = label('Server area', { size: 0.36 });
+  const roomSign = label('Server area', { size: 0.26 });
   roomSign.position.set(-5.75, 3.3, -1.4);
   scene.add(roomSign);
   put(k, scene, 'Tech_NetworkShelf', -5.9, 0, -5.99);
   put(k, scene, 'Deco_CableRun', -5.9, 0, -3.3, PI / 2);
-  put(k, scene, 'Tech_ToolCart', -3.1, 0, -0.6, 0.4);
+  put(k, scene, 'Tech_ToolCart', -3.0, 0, -0.5, 0.4);
+  put(k, scene, 'Furn_Divider_Glass', -3.35, 0, -4.7, PI / 2);  // the server area's side, by the elevator
+  put(k, scene, 'Furn_Divider_Shelf', -3.35, 0, -2.6, PI / 2);
 
-  // Work area (back-right): your desk and the agent's, on a rug.
+  // Work area (back-right): your desk and the agent's, on a rug, between a
+  // glass screen and a planter.
   rug(scene, 0.1, 7.9, -5.95, -2.7, deco.accent);
+  put(k, scene, 'Furn_Divider_Glass', 0.05, 0, -3.95, PI / 2);
+  put(k, scene, 'Furn_Divider_Planter', 6.4, 0, -2.25, PI);
+  put(k, scene, 'Deco_Whiteboard', 7.35, 0, -3.6, -PI / 2);
+  put(k, scene, 'Deco_Backpack', 3.0, 0, -3.7, 0.7);
+  put(k, scene, 'Deco_BookStack', 2.75, 0.75, -4.9, 0.3);
   const desk = put(k, scene, deco.pick(['Furn_Workstation_Lived', 'Furn_Workstation_Lived_B']), 1.7, 0, -4.7);
   pickable(desk, 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
   const mine = pickable(wallScreen(scene, 1.7, 2.65, 2.2, 1.2), 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
@@ -390,12 +439,11 @@ export async function lab(slug, n, ui) {
   const pr = station(k, scene, 3.6, -1.9, 0, 'Pull request', 'Pull request: open it, or all of them', () => ui.prs(), 2.0, 1.1);
   put(k, scene.userData.ceiling, 'Light_HexCluster', 3.6, 4, -1.2);
 
-  // The big screen (left wall, front half) and a lounge facing it.
-  const big = bigScreen(scene, -7.88, 2.2, 2.6, PI / 2, 4.6, 2.4, deco.accent);
+  // The big screen (left wall, front half) and the lounge facing it.
+  const big = bigScreen(scene, -7.88, 2.2, 2.7, PI / 2, 4.6, 2.4, deco.accent);
   pickable(big.screen, 'The big screen', () => ui.say('This screen is yours: what goes up here comes later.', big));
-  put(k, scene, 'Furn_Sofa', -4.1, 0, 2.6, -PI / 2);
-  put(k, scene, 'Furn_CoffeeTable', -5.5, 0, 2.6, PI / 2);
-  put(k, scene, 'Deco_Plant_Small', -5.5, 0.42, 2.9);
+  lounge(k, scene, deco);
+  nook(k, scene, deco);
 
   furnish(k, scene, deco);
   const res = residents(k, scene, deco, ui, 1 + (deco.seed % 2));
@@ -549,8 +597,15 @@ export async function lobby(prefix, ui) {
   // The big screen (front wall) and a lounge facing it; the concierge.
   const big = bigScreen(scene, -3.8, 2.2, 5.88, PI, 4.6, 2.4, deco.accent);
   pickable(big.screen, 'The big screen', () => ui.say('This screen is yours: what goes up here comes later.', big));
-  put(k, scene, 'Furn_Sofa', -3.8, 0, 2.9);
-  put(k, scene, 'Furn_CoffeeTable', -3.8, 0, 4.1);
+  put(k, scene, 'Deco_Rug_Geo', -3.8, 0, 3.6);
+  put(k, scene, 'Furn_Sofa_Tufted_L', -4.2, 0, 2.6);
+  put(k, scene, 'Furn_CoffeeTable', -4.4, 0, 4.3);
+  put(k, scene, 'Furn_Armchair', -6.6, 0, 3.4, 0.5);
+  put(k, scene, 'Furn_SideTable', -6.6, 0, 2.2);
+  put(k, scene, 'Deco_FloorLamp', -2.0, 0, 1.9, -0.6);
+  put(k, scene, 'Furn_Divider_Planter', -3.4, 0, 1.55, PI);
+  put(k, scene, 'Deco_Plant_Palm', 1.4, 0, 5.3);
+  put(k, scene, 'Deco_Plant_Monstera', 6.9, 0, -4.8);
   put(k, scene, 'Furn_Desk', 1.4, 0, -2.4);
   put(k, scene, 'Tech_Laptop', 1.2, 0.75, -2.3);
   const concierge = wanderer(k, 'Char_Android_B', rng(deco.seed + 7), ui.say);

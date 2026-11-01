@@ -5,8 +5,8 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=2bf61322e6b1
-Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-050d10b0
+Label=filial.unit-hash=54364916de1e
+Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-9fa045d8
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
 Network=filial-proxy.network
@@ -26,6 +26,7 @@ Volume=/WORKSPACES/filial/.railswitch/agent-home/feat/probe:/home/appuser:z
 Volume=/WORKSPACES/filial/.railswitch/agent-memory/probe:/home/appuser/.probe-memory:z
 Volume=/WORKSPACES/filial/notes:/home/appuser/notes:z
 Volume=/WORKSPACES/filial/.railswitch/hooks/railswitch-notes.sh:/usr/local/bin/railswitch-notes:ro,z
+Volume=/WORKSPACES/filial/.railswitch/hooks/agent-tmux.conf:/usr/local/share/railswitch/agent-tmux.conf:ro,z
 Volume=filial-feat-node-modules:/app/node_modules:U
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
@@ -42,6 +43,8 @@ Annotation=filial.firewall.mode=enforce
 Annotation=filial.firewall.lists=2367eca40f40
 PodmanArgs=--cpus=4 --tty --interactive
 LogDriver=journald
+Entrypoint=tmux
+Exec=-L agent -f /usr/local/share/railswitch/agent-tmux.conf -D
 
 [Service]
 Restart=on-failure

@@ -28,13 +28,14 @@ func TestAgentArgs(t *testing.T) {
 		{[]string{"ls"}, "ls", nil},
 		{[]string{"claude", "--", "x", "--", "y"}, "claude", []string{"x", "--", "y"}},
 	} {
-		name, argv, _, _, code, ok := agentArgs(e, c.args)
+		a, code, ok := agentArgs(e, c.args)
+		name, argv := a.name, a.argv
 		if !ok || code != 0 || name != c.name || !slices.Equal(argv, c.argv) {
 			t.Errorf("%q: name %q argv %q code %d ok %v; want %q %q", c.args, name, argv, code, ok, c.name, c.argv)
 		}
 	}
 	for _, args := range [][]string{{"a", "b"}, {"a", "b", "--", "x"}, {"--bogus"}} {
-		if _, _, _, _, code, ok := agentArgs(e, args); ok || code != 2 {
+		if _, code, ok := agentArgs(e, args); ok || code != 2 {
 			t.Errorf("%q: code %d ok %v; want a usage error", args, code, ok)
 		}
 	}
@@ -122,14 +123,6 @@ func TestAgentStopCLI(t *testing.T) {
 	}
 }
 
-func TestAgentServiceArgvUsage(t *testing.T) {
-	ws, _ := lockedWS(t)
-	code, _, errs := runIn(t, "-C", ws, "-w", "feat", "agent", "probe", "--", "x")
-	if code != 2 || !strings.Contains(errs, "[agents.probe]") {
-		t.Fatalf("exit %d, stderr %q; want 2 naming [agents.probe]", code, errs)
-	}
-}
-
 func TestCompleteAgent(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
@@ -182,7 +175,7 @@ func TestAgentNewTermExitCode(t *testing.T) {
 	}
 }
 
-// B-M2: a bad name, or arguments for a service agent, fail in this terminal
+// B-M2: a bad name, or --watch with arguments, fail in this terminal
 // before any new one opens.
 func TestAgentNewTermChecksFirst(t *testing.T) {
 	ws, _ := lockedWS(t)
@@ -195,8 +188,8 @@ func TestAgentNewTermChecksFirst(t *testing.T) {
 	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "clade"); code == 0 || !strings.Contains(errs, "clade") {
 		t.Errorf("unknown agent: exit %d stderr %q", code, errs)
 	}
-	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "probe", "--", "x"); code != 2 || !strings.Contains(errs, "[agents.probe]") {
-		t.Errorf("service agent argv: exit %d stderr %q; want a usage error", code, errs)
+	if code, _, errs := runIn(t, "-C", filepath.Join(ws, "feat"), "agent", "--new-term", "--watch", "probe", "--", "x"); code != 2 || !strings.Contains(errs, "--watch") {
+		t.Errorf("--watch with argv: exit %d stderr %q; want a usage error", code, errs)
 	}
 }
 
@@ -204,12 +197,13 @@ func TestAgentNewTermChecksFirst(t *testing.T) {
 func TestAgentArgsNoToken(t *testing.T) {
 	e := &env{stderr: &bytes.Buffer{}}
 	for _, args := range [][]string{{"--no-token", "claude"}, {"claude", "--no-token"}} {
-		name, _, _, noToken, _, ok := agentArgs(e, args)
+		a, _, ok := agentArgs(e, args)
+		name, noToken := a.name, a.noToken
 		if !ok || name != "claude" || !noToken {
 			t.Errorf("%q: name %q noToken %v ok %v", args, name, noToken, ok)
 		}
 	}
-	if _, argv, _, noToken, _, _ := agentArgs(e, []string{"claude", "--", "--no-token"}); noToken || !slices.Equal(argv, []string{"--no-token"}) {
-		t.Errorf("after --: noToken %v argv %q", noToken, argv)
+	if a, _, _ := agentArgs(e, []string{"claude", "--", "--no-token"}); a.noToken || !slices.Equal(a.argv, []string{"--no-token"}) {
+		t.Errorf("after --: noToken %v argv %q", a.noToken, a.argv)
 	}
 }

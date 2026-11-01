@@ -573,6 +573,13 @@ decisions (D30, D55, D62) in the roadmap. Their fields: `name`, `service` or
 `allow`, `worktree`/`home`/`caches` (tools), `[[shared]]`, `[[mounts]]`,
 `[env]`, `[[secrets]]` (agents), `[[ports]]`, `[[links]]`, `[unit]`.
 
+An agent run as a service (D142) runs its `entrypoint`, then its `[unit]
+exec` words (or the user's arguments), in a tmux session inside its
+container, once per session: start-of-session work belongs in the
+entrypoint, which must `exec` the agent last. Such an agent needs an
+`entrypoint` or `[unit] exec`: the image's own `ENTRYPOINT` isn't run in a
+session.
+
 An agent's `[config] paths` (D135) are the files and directories of its
 home, relative to it, that make up its configuration: `railswitch agent
 default promote` copies them (directories and regular files only, no

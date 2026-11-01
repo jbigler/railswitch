@@ -53,11 +53,57 @@ wait for the app to answer on its URL: an app that is still booting, or
 unhealthy, never holds up the agent. (It does wait while the worktree's
 `[hooks] create` haven't run yet, since they need the app.)
 
-An agent runs **on demand** (a container for as long as you use it) or as
-a **service** (`railswitch agent` starts its unit if needed and attaches;
-`up` never starts it). One agent runs at a time per worktree. Agents start
-from the terminal; the dashboard shows when one is waiting on you: a
-permission prompt, a question, a finished reply (`◆ N need input`).
+An agent runs **on demand** (a container for as long as you use it, in
+one terminal) or as a **service** (below). One agent runs at a time per
+worktree. Agents start from the terminal; the dashboard shows when one is
+waiting on you: a permission prompt, a question, a finished reply (`◆ N
+need input`).
+
+### A service agent: one session, many terminals
+
+```toml
+[agents.claude]
+use = "claude@1"
+run = "service"
+```
+
+A service agent's container is its environment, ready before you need it:
+`up` starts the default agent's container when it runs as a service (and
+no agent runs in the worktree). The agent itself runs in a terminal
+session inside it (tmux), which `railswitch agent` starts, or joins when it
+is already running:
+
+```bash
+railswitch agent                     # join the session, or start the agent in one
+railswitch agent -- --resume         # start it with arguments (only when no session runs)
+railswitch agent --watch             # watch it, without typing into it
+```
+
+- **Several terminals at once.** Run `railswitch agent` in as many
+  terminals as you like: each shows the same agent, live, and each can
+  type into it. The window follows whoever typed last.
+- **Leaving.** Close the terminal: the agent keeps running, and
+  `railswitch agent` joins it again. Every key goes to the agent (there is
+  no tmux prefix key). The mouse wheel scrolls back through its output;
+  hold Shift to select text.
+- **When the agent exits** (`/exit`), its session ends but the container
+  stays: the next `railswitch agent` starts a fresh agent at once.
+  `railswitch agent stop` stops the container.
+- **Changes wait for the session.** A change to the agent's settings or
+  image doesn't restart a container whose agent has a session (`up` says
+  so); `railswitch agent stop`, then `railswitch agent`, takes it.
+- **Scrolling is shared.** Scrolling back puts the agent's pane into
+  scroll mode for every terminal; type `q` (or scroll to the bottom) to
+  return to the agent.
+- **Another agent.** `railswitch agent omp` stops a service agent that has
+  no session (saying so) and starts omp; one with a session is never
+  stopped for you.
+- **Cost.** An agent waiting at its prompt spends no tokens; an idle
+  container holds only memory.
+
+A project that ejected `agent-base` before this needs `tmux` added to the
+file's package list (`railswitch containerfile show agent-base` shows the
+default's change).
 
 **Updating it.** An agent's image holds the agent's version from when it
 was built (Claude Code's own updater is off). To take the latest release:

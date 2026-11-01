@@ -132,6 +132,9 @@ type Service struct {
 	// OnDemand: the service has no Quadlet unit and no app wants it; it runs
 	// as a transient container (an on-demand agent).
 	OnDemand bool
+	// Session is a service agent's command, run in its session (D142);
+	// its unit runs the session server. nil for every other service.
+	Session *AgentSessionCmd
 	// Worktree: the service mounts the worktree, so it runs as uid 1000 with
 	// keep-id.
 	Worktree bool
@@ -634,7 +637,13 @@ func (b *builder) agentService(a *pack.ChosenAgent) (Service, error) {
 	if err := b.entrypoint(&s, pkg, ag.Files, ag.Entrypoint); err != nil {
 		return s, err
 	}
-	return s, b.agentSetup(&s, a.Name, b.in.Project.Agents[a.Name].Setup)
+	if err := b.agentSetup(&s, a.Name, b.in.Project.Agents[a.Name].Setup); err != nil {
+		return s, err
+	}
+	if s.OnDemand {
+		return s, nil
+	}
+	return s, b.agentSession(&s, a.Name)
 }
 
 // asset lists the package file rel of pkg as a Model.Assets entry and returns

@@ -7,7 +7,7 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 USER root
 RUN apt-get update -qq && \
-  apt-get install --no-install-recommends -y git curl ca-certificates jq ripgrep fd-find socat openssh-client less procps && \
+  apt-get install --no-install-recommends -y git curl ca-certificates jq ripgrep fd-find socat openssh-client less procps tmux && \
   rm -rf /var/lib/apt/lists/*
 # The GitHub CLI from GitHub's own package repository (Debian's is too old for
 # gh skill): agents get a github.com secret as GH_TOKEN (D133).

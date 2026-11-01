@@ -48,7 +48,9 @@ func TestGenericity(t *testing.T) {
 			if claudeRe.Match(b) && !strings.HasPrefix(rel, "internal/pack/builtin/agents/claude/") {
 				t.Errorf("%s: names claude outside internal/pack/builtin/agents/claude/", rel)
 			}
-			if m := termRe.Find(b); m != nil && !strings.HasPrefix(rel, "internal/term/") {
+			// The agent session (D142) runs tmux inside the container, not as a host terminal.
+			agentSession := rel == "internal/render/agentsession.go" || rel == "internal/pack/builtin/agentbase/Containerfile.agent-base"
+			if m := termRe.Find(b); m != nil && !strings.HasPrefix(rel, "internal/term/") && !agentSession {
 				t.Errorf("%s: names terminal %q outside internal/term/", rel, m)
 			}
 			// Stage 5: Phoenix runs from a user-written pack; core knows

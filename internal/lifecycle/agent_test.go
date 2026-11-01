@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -141,13 +140,18 @@ func TestExecNoName(t *testing.T) {
 func TestAgentServiceAttach(t *testing.T) {
 	e := setup(t)
 	const unit = "filial-feat-agent-probe.service"
+	const join = "tmux -L agent new-session -A -s agent -e COLORTERM=truecolor -- probe"
 	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=inactive\n", unit)
 	if err := e.l.Agent(ctx, "feat", "probe", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	calls := e.calls()
 	wantInOrder(t, calls, "systemctl --user start filial-feat-rails.service",
-		"systemctl --user start "+unit, "podman attach filial-feat-agent-probe")
+		"systemctl --user start "+unit, "podman exec filial-feat-agent-probe tmux -L agent list-sessions")
+	last := joined(calls[len(calls)-1])
+	if !strings.HasPrefix(last, "podman exec -it --detach-keys= -e TERM=xterm-256color --preserve-fds 1 filial-feat-agent-probe sh -c ") || !strings.HasSuffix(last, join) {
+		t.Errorf("last call %q; want the session joined or created", last)
+	}
 	if to := e.f.Cmds[len(e.f.Cmds)-1].Timeout; to != sys.NoTimeout {
 		t.Errorf("attach timeout %v; want NoTimeout", to)
 	}
@@ -161,14 +165,22 @@ func TestAgentServiceAttach(t *testing.T) {
 	if n := count(calls, "systemctl --user start "+unit); n != 0 {
 		t.Errorf("started an active unit:\n%s", dump(calls))
 	}
-	if last := joined(calls[len(calls)-1]); last != "podman attach filial-feat-agent-probe" {
-		t.Errorf("last call %q; want the attach", last)
+	if last := joined(calls[len(calls)-1]); !strings.HasSuffix(last, join) {
+		t.Errorf("last call %q; want the session joined", last)
 	}
 
-	err := e.l.Agent(ctx, "feat", "probe", []string{"x"}, false)
-	var u *UsageError
-	if !errors.As(err, &u) || !strings.Contains(err.Error(), "[agents.probe]") {
-		t.Fatalf("extra argv: got %v; want a usage error naming [agents.probe]", err)
+	// Arguments start a session: refused while one runs, its command without one.
+	if err := e.l.Agent(ctx, "feat", "probe", []string{"x"}, false); err == nil || !strings.Contains(err.Error(), "has a session") {
+		t.Errorf("argv with a live session: %v", err)
+	}
+	e.reset()
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if err := e.l.Agent(ctx, "feat", "probe", []string{"x", "y"}, false); err != nil {
+		t.Fatal(err)
+	}
+	calls = e.calls()
+	if last := joined(calls[len(calls)-1]); !strings.HasSuffix(last, "new-session -A -s agent -e COLORTERM=truecolor -- x y") {
+		t.Errorf("last call %q; want a session running the arguments", last)
 	}
 }
 
@@ -497,6 +509,7 @@ func TestAgentOnDemandUnitSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	data = bytes.Replace(data, []byte("[unit]\nexec = [\"probe\"]\n"), nil, 1)
 	if err := os.WriteFile(pkg, append(data, "\n[unit]\nexec = [\"probe-run\", \"--all\"]\nshm_size = \"256mb\"\nrun_init = true\n"...), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -599,7 +612,7 @@ func TestAgentServiceStartsOnRequest(t *testing.T) {
 	if err := e.l.Agent(ctx, "feat", "probe", nil, false); err != nil {
 		t.Fatal(err)
 	}
-	wantInOrder(t, e.calls(), "systemctl --user start "+unit, "podman attach filial-feat-agent-probe")
+	wantInOrder(t, e.calls(), "systemctl --user start "+unit, "podman exec filial-feat-agent-probe tmux -L agent list-sessions")
 }
 
 func TestAgentStop(t *testing.T) {
@@ -682,8 +695,8 @@ func TestAgentServiceRunningAttaches(t *testing.T) {
 	if n := count(calls, "systemctl --user start "+unit); n != 0 {
 		t.Errorf("started the running agent:\n%s", dump(calls))
 	}
-	if last := joined(calls[len(calls)-1]); last != "podman attach filial-feat-agent-probe" {
-		t.Errorf("last call %q; want the attach", last)
+	if last := joined(calls[len(calls)-1]); !strings.Contains(last, "tmux -L agent new-session -A -s agent") {
+		t.Errorf("last call %q; want the session joined", last)
 	}
 }
 
@@ -735,5 +748,147 @@ func TestAgentNoToken(t *testing.T) {
 	}
 	if err := e.l.Agent(ctx, "feat", "probe", nil, true); err == nil || !strings.Contains(err.Error(), "runs as a service") {
 		t.Errorf("service agent --no-token: %v", err)
+	}
+}
+
+// D142: a service agent without a session gives way to another agent; one
+// with a session doesn't (TestAgentRefusesOtherRunning).
+func TestAgentStopsIdleServiceAgent(t *testing.T) {
+	e := setup(t)
+	e.agentRunning("filial-feat-agent-probe")
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if err := e.l.Agent(ctx, "feat", "claude", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	wantInOrder(t, e.calls(), "systemctl --user stop filial-feat-agent-probe.service", "podman --hooks-dir")
+	if msg := e.l.Err.(*bytes.Buffer).String(); !strings.Contains(msg, "stopping agent probe in feat: it has no session") {
+		t.Errorf("stderr %q; want the stop named", msg)
+	}
+}
+
+// An idle agent stays when the requested one can't start (its secret unset).
+func TestAgentKeepsIdleAgentOnRefusal(t *testing.T) {
+	e := setup(t)
+	e.editProject(t, func(s string) string {
+		return s + "\n[secrets.claude_token]\nservices = [\"agent-claude\"]\nenv = \"CLAUDE_CODE_OAUTH_TOKEN\"\n"
+	})
+	e.missing("podman", "secret", "exists", "filial_claude_token")
+	e.agentRunning("filial-feat-agent-probe")
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if err := e.l.Agent(ctx, "feat", "claude", nil, false); err == nil || !strings.Contains(err.Error(), "claude_token") {
+		t.Fatalf("got %v; want claude_token unset", err)
+	}
+	if n := count(e.calls(), "systemctl --user stop filial-feat-agent-probe.service"); n != 0 {
+		t.Errorf("stopped the idle agent for an agent that can't start:\n%s", dump(e.calls()))
+	}
+}
+
+// A session check that fails (not tmux's "no session") never counts as idle.
+func TestAgentKeepsAgentWhenSessionUnknown(t *testing.T) {
+	e := setup(t)
+	e.agentRunning("filial-feat-agent-probe")
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 127}, fmt.Errorf("podman: %w (exit 127)", sys.ErrExit))
+	if err := e.l.Agent(ctx, "feat", "claude", nil, false); err == nil || !strings.Contains(err.Error(), "can't tell") {
+		t.Fatalf("got %v; want the check's failure", err)
+	}
+	if n := count(e.calls(), "systemctl --user stop filial-feat-agent-probe.service"); n != 0 {
+		t.Errorf("stopped an agent whose session is unknown:\n%s", dump(e.calls()))
+	}
+}
+
+// D142: up starts the default agent's container when it runs as a service
+// and no agent runs in the worktree; railswitch agent's own up doesn't.
+func TestUpStartsDefaultServiceAgent(t *testing.T) {
+	var e *tenv
+	fresh := func() {
+		e = setup(t)
+		e.editProject(t, func(s string) string {
+			return strings.Replace(s, "use = \"local:probe@1\"\nrun = \"service\"", "use = \"local:probe@1\"\nrun = \"service\"\ndefault = true", 1)
+		})
+	}
+	fresh()
+	const unit = "filial-feat-agent-probe.service"
+	started := func() bool {
+		for _, c := range e.calls() {
+			if j := joined(c); strings.HasPrefix(j, "systemctl --user start") && strings.Contains(j, unit) {
+				return true
+			}
+		}
+		return false
+	}
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if !started() {
+		t.Errorf("up did not start %s:\n%s", unit, dump(e.calls()))
+	}
+
+	fresh()
+	e.agentRunning("filial-feat-agent-claude")
+	if err := e.l.Up(ctx, "feat"); err != nil {
+		t.Fatal(err)
+	}
+	if started() {
+		t.Errorf("up started %s beside a running agent", unit)
+	}
+
+	fresh()
+	if err := e.l.Agent(ctx, "feat", "claude", nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if started() {
+		t.Errorf("agent claude's up started %s", unit)
+	}
+}
+
+// D142: up never restarts a service agent with a session for an older
+// unit (a terminal joining must not end the agent it joins); without one
+// it does.
+func TestUpKeepsStaleAgentWithSession(t *testing.T) {
+	const unit = "filial-feat-agent-probe.service"
+	for _, live := range []bool{true, false} {
+		e := setup(t)
+		upTwice(t, e)
+		e.units(loadedClean)
+		e.labels(t, "filial-feat-agent-probe")
+		if !live {
+			e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+		}
+		if err := e.l.Up(ctx, "feat"); err != nil {
+			t.Fatal(err)
+		}
+		restarted := count(e.calls(), "systemctl --user restart "+unit) > 0
+		if restarted == live {
+			t.Errorf("session %v: restarted %v\n%s", live, restarted, dump(e.calls()))
+		}
+		if warned := strings.Contains(e.l.Err.(*bytes.Buffer).String(), "keeps it while its agent has a session"); warned != live {
+			t.Errorf("session %v: warned %v", live, warned)
+		}
+	}
+}
+
+// A session that starts after the idle check is seen before the stop.
+func TestStopIdleAgentsRechecks(t *testing.T) {
+	e := setup(t)
+	m, err := e.l.model(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.l.stopIdleAgents(ctx, m, "feat", []string{"probe"}); err == nil || !strings.Contains(err.Error(), "agent probe is running") {
+		t.Fatalf("got %v; want the one-agent refusal", err)
+	}
+	if n := count(e.calls(), "systemctl --user stop filial-feat-agent-probe.service"); n != 0 {
+		t.Errorf("stopped an agent with a session")
+	}
+}
+
+// has-session can't tell "no server" from "no session": a server that
+// doesn't answer is an error, never idle.
+func TestAgentSessionNeedsServer(t *testing.T) {
+	e := setup(t)
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "list-sessions"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if live, err := e.l.agentSession(ctx, "filial-feat-agent-probe"); err == nil {
+		t.Fatalf("live %v, no error; want the server's silence reported", live)
 	}
 }

@@ -4,3 +4,6 @@ allow = ["example.com"]
 
 [image]
 file = "Containerfile.probe"
+
+[unit]
+exec = ["probe"]

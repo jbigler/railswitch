@@ -644,12 +644,12 @@ hook writes.
 |---|---|---|
 | `name` | string | The agent's name in `[agents]`; its service is `agent-<name>`. |
 | `package` | string | Its package ref: `<name>@<N>` for a built-in package, `local:<name>@<N>` for one under `<workspace>/agents/`. |
-| `run` | string | `on-demand` (a transient container per `railswitch agent` run) or `service` (a unit that only `railswitch agent` starts, never `up`, and then attaches to; it runs until `agent stop`, `stop`/`down` or `wt rm`). |
+| `run` | string | `on-demand` (a transient container per `railswitch agent` run) or `service` (a unit whose container holds the agent's tmux session, D142: `up` starts it for the default agent, `railswitch agent` for any; `railswitch agent` joins or starts the session; it runs until `agent stop`, `stop`/`down` or `wt rm`). |
 | `state` | string | The status file's `state`: `permission`, `question`, `working`, `done`, `idle` or `off`. `off` also when the file is missing, not a regular file (a symlink, a FIFO), larger than 64 KiB, not valid JSON, has `v` other than `1` or an unknown state. |
 | `message` | string | The status file's `message`; `""` when `state` is `off` for one of the reasons above. |
 | `ts` | number | The status file's `ts` (Unix seconds, as the hook wrote it); `0` when unusable. |
 | `reply` | boolean | The agent waits for a reply: `state` is `done` and `message` ends in `?`, maybe followed by spaces, closing brackets, quotes or `*`/`_`/`` ` `` emphasis. The text table shows `reply` as its `STATE`. |
-| `running` | boolean | The agent's container runs in this worktree (podman, not the status file). At most one agent runs per worktree (D62). The text table marks it with `*` in its `RUNNING` column, and shows `running` as its `STATE` when the status file says `off`. |
+| `running` | boolean | The agent's container runs in this worktree (podman, not the status file); for a service agent also while no agent runs in its session (`up` started it, D142). At most one agent runs per worktree (D62). The text table marks it with `*` in its `RUNNING` column, and shows `running` as its `STATE` when the status file says `off`. |
 | `config` | boolean | Its package has `[config] paths`, so it can have a project default (`agent default`, D135). |
 | `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 | `default_pending` | boolean | Its home in this worktree holds the request to take the default (a new home, or `agent default apply`): its entrypoint applies it at the agent's next start. |

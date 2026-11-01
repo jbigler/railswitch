@@ -527,13 +527,13 @@ export async function lab(slug, n, ui) {
     big.screen.update([
       { text: `stack ${w.stack} · ${up}/${w.services.length} services running`, color: css(colorOf(w.stack)) },
       w.pr ? `PR #${w.pr.number} · checks ${w.pr.checks || 'none'} · review ${(w.pr.review || 'none').replace('_', ' ')}` : 'no pull request',
-      w.agent ? `agent ${w.agent.name}: ${w.agent.state}` : 'no agent running',
+      w.agent ? `agent ${w.agent.name}: ${w.agent.state}${w.agent.usage ? ` · ${tokens(w.agent.usage)} tokens` : ''}` : 'no agent running',
       '',
       { text: 'Yours to fill: pin what matters here.', color: '#8b8fb8' },
     ], slug);
     const a = w.agent;
     partner.set(a ? a.state : 'off');
-    theirs.update(a ? [{ text: a.state, color: '#ffe08a' }, ...(a.message ? wrap(a.message, 30, 4) : [])] : ['no agent running'], a ? a.name : 'agent');
+    theirs.update(a ? [{ text: a.state, color: '#ffe08a' }, ...(a.usage ? [{ text: `${tokens(a.usage)} tokens · ${tokens({ ...a.usage, input: 0, cache_read: 0, cache_write: 0 })} out`, color: '#9fc3ff' }] : []), ...(a.message ? wrap(a.message, 30, a.usage ? 3 : 4) : [])] : ['no agent running'], a ? a.name : 'agent');
   };
   const walk = { areas: AREAS, start: { x: LIFT.x, z: LIFT.z + 1.7, yaw: PI }, pads: [sh.pad] };
   return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 17 }, walk, update, ticks, name: `Floor ${n} · ${slug}` };
@@ -563,6 +563,15 @@ function rack(k, svc, i) {
   };
   return g;
 }
+
+// tokens is an agent session's usage in a few characters: 1.2M, 34k, 512.
+export function tokens(u) {
+  const n = u.input + u.output + u.cache_read + u.cache_write;
+  return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n);
+}
+
+// clip cuts text to n characters, an ellipsis marking the cut.
+const clip = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
 
 function wrap(text, n, max) {
   const out = [];
@@ -600,10 +609,21 @@ export async function lobby(prefix, ui) {
   const board = bigScreen(scene, -7.88, 2.3, -4.45, PI / 2, 2.8, 1.6, deco.accent);
   pickable(board.screen, 'Pull requests', ui.prs);
   pickable(put(k, scene, 'Tech_TerminalKiosk', -7.0, 0, -4.45, PI / 2), 'Pull requests', ui.prs);
-  const issues = station(k, scene, -5.6, -5.35, 0, 'Issues', 'GitHub issues', ui.issues);
+  const issues = station(k, scene, -5.6, -5.35, 0, 'Issues', 'GitHub issues', ui.issues, 2.2, 1.25);
   const notes = station(k, scene, -3.85, -5.0, -PI / 2, 'Notes', "The agents' shared notes", ui.notes);
   const eng = station(k, scene, -3.85, -3.75, -PI / 2, 'Engineering', 'Project settings, images, library', ui.config);
-  issues.update(['GitHub issues', 'click to scan'], 'Issues');
+  // the open issues, read when the lobby opens and every two minutes while
+  // it shows (each read asks GitHub)
+  issues.update(['reading…'], 'Issues');
+  const readIssues = () => ui.issueList().then((doc) => {
+    issues.update(doc.issues.length ? doc.issues.slice(0, 9).map((i) => ({
+      text: clip(`#${String(i.number).padEnd(5)} ${i.title}`, 34),
+      color: i.assignees.length ? '#c9f6ff' : '#ffe08a',
+    })) : ['no open issues'], `Issues · ${doc.issues.length} open`);
+  }).catch(() => issues.update(['issues unavailable'], 'Issues'));
+  readIssues();
+  let issuesAge = 0;
+  const issuesTick = (dt) => { if ((issuesAge += dt) > 120) { issuesAge = 0; readIssues(); } };
   notes.update(['shared agent notes', 'read · edit · add'], 'Notes');
   eng.update(['settings', 'images', 'library'], 'Engineering');
 
@@ -659,7 +679,7 @@ export async function lobby(prefix, ui) {
   const res = residents(k, scene, deco, ui, 2);
   res.start();
 
-  const ticks = [...sh.ticks, ...res.ticks, (dt) => { beacons.rotation.y += dt * 0.25; }];
+  const ticks = [...sh.ticks, ...res.ticks, issuesTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
   const update = (st) => {
     const lines = st.worktrees.map((w, i) => ({
       text: `${String(i + 1).padStart(2)} ${w.base ? '★' : '·'} ${w.slug.padEnd(18).slice(0, 18)} ${w.stack.padEnd(8)} ${w.agent ? '◆ ' + w.agent.state : ''}`,
@@ -684,7 +704,10 @@ export async function lobby(prefix, ui) {
     big.screen.update([
       `${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.stack === 'up').length} up`,
       `${open.length} open pull requests`,
-      `${st.worktrees.filter((w) => w.agent).length} agents running`,
+      `${st.worktrees.filter((w) => w.agent).length} agents · ${tokens(st.worktrees.reduce((t, w) => {
+        const u = w.agent?.usage;
+        return u ? { input: t.input + u.input, output: t.output + u.output, cache_read: t.cache_read + u.cache_read, cache_write: t.cache_write + u.cache_write } : t;
+      }, { input: 0, output: 0, cache_read: 0, cache_write: 0 }))} tokens`,
       '',
       { text: 'Yours to fill: pin what matters here.', color: '#8b8fb8' },
     ], prefix);

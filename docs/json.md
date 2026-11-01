@@ -635,8 +635,8 @@ hook writes.
 
 ```json
 [
-  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true, "config": true, "default": {"from": "main", "promoted": "2026-10-30T12:00:00Z"}, "default_pending": false},
-  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false, "config": false, "default": null, "default_pending": false}
+  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true, "config": true, "default": {"from": "main", "promoted": "2026-10-30T12:00:00Z"}, "default_pending": false, "usage": {"input": 1840, "output": 52300, "cache_read": 1250000, "cache_write": 88000}},
+  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false, "config": false, "default": null, "default_pending": false, "usage": null}
 ]
 ```
 
@@ -653,6 +653,7 @@ hook writes.
 | `config` | boolean | Its package has `[config] paths`, so it can have a project default (`agent default`, D135). |
 | `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 | `default_pending` | boolean | Its home in this worktree holds the request to take the default (a new home, or `agent default apply`): its entrypoint applies it at the agent's next start. |
+| `usage` | object or null | The status file's `usage`: the tokens of the agent's current (or last) session, as its package's hook counts them: `input`, `output`, `cache_read`, `cache_write` (integers). `null` when the file has none, or one with a count below 0 or above 10^13. claude@1 counts them from the session's transcript when a turn ends or a session starts. |
 
 ## `agent screen [<name>]`
 

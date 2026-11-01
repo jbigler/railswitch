@@ -892,7 +892,9 @@ any open page.
   at its desk; the big screen faces a lounge. **Pull requests**: a board on
   the left wall lists every open PR with its checks and review, and opens
   the worktrees' PRs as `pr ls` reads them, with Refresh PRs. Kiosks: **Issues**
-  (`issue ls`: open GitHub issues), **Notes** (the agents' shared notes,
+  (`issue ls`: its screen lists the open issues, read when the lobby opens
+  and every two minutes while it shows, unassigned ones in amber; a click
+  opens them all), **Notes** (the agents' shared notes,
   `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
   save refused when the note changed since you opened it) and
   **Engineering** (links to Settings, Images, Library, Machine).
@@ -919,7 +921,9 @@ any open page.
   typing while it works; it opens the agent's state and message, and for a
   service agent (D142) its current screen (`agent screen`, read every 1.5 s
   while open) and a box that types to it (`agent send`: the text, then
-  Enter). The **PR station** at the work area's entrance shows the floor's
+  Enter); with a package that counts them (claude@1), its desk screen, the
+  agent panel and the floor's big screen show its session's tokens, and the
+  lobby's big screen their sum. The **PR station** at the work area's entrance shows the floor's
   pull request: title, checks, review, review app. The **café** (middle
   left: counter, stools, the pet's corner), the **lounge** (front left: a
   tufted sectional facing the **big screen** on the left wall, which shows

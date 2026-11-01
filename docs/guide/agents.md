@@ -170,7 +170,8 @@ your own packages) reads and writes as `~/notes/`, in every worktree.
   them; so can you, with any editor.
 - **Every agent starts with the list of notes:** the rule for using them,
   then every note's file name, newest first. Only names: it reads a whole
-  note when its name is relevant, so the notes' size never costs context. Claude gets this at every session start and after a
+  note when its name is relevant (or searches them with `grep`), so the
+  notes' size never costs context. Claude gets this at every session start and after a
   compaction; a package of your own gets it the way it delivers context
   (see [the package format](../packs.md)).
 - **Saved notes are for everyone at once:** a note one agent writes is in

@@ -29,6 +29,7 @@ underscores (run_db_prepare_after_a_schema_change.md). The listing below is
 every note, newest first.
 
 - Read a note (cat ~/notes/<file>) when its name is relevant to the task.
+  To find notes by what they say, search them: grep -ril <word> ~/notes
 - To remember something every agent should know about this project, write
   it there as a note whose name says it. Update an existing note on the
   same subject instead of adding another, and rename it when what it says

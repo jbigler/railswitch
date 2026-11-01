@@ -36,7 +36,7 @@ func TestNotesScript(t *testing.T) {
 		}
 		return string(out)
 	}
-	if out := run(); !strings.Contains(out, "# Project notes") || !strings.Contains(out, "(no notes yet)") {
+	if out := run(); !strings.Contains(out, "# Project notes") || !strings.Contains(out, "grep -ril") || !strings.Contains(out, "(no notes yet)") {
 		t.Errorf("no folder:\n%s", out)
 	}
 	dir := filepath.Join(home, "notes")

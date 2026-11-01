@@ -39,7 +39,7 @@ func TestDBRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(done, []string{"filial_dev", "filial_queue"}) {
+	if !slices.Equal(done, []string{"filial_dev", "filial_queue", "the storage volume filial-feat-rustfs-data"}) {
 		t.Errorf("restored %v", done)
 	}
 	wantInOrder(t, e.calls(),
@@ -295,11 +295,54 @@ func TestDBRestoreSkipsTestDumps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(done, []string{"filial_dev", "filial_queue"}) {
+	if slices.Contains(done, "filial_test-0") {
 		t.Errorf("restored %v; want no test database", done)
 	}
 	// Naming it says why, not "no dump".
 	if _, err := e.l.DBRestore(ctx, "feat", "", []string{"filial_test-0"}, true); err == nil || !strings.Contains(err.Error(), "dump_skip") {
 		t.Errorf("restore filial_test-0: %v; want the dump_skip reason", err)
+	}
+}
+
+// A seed in the dumps replaces its volume after the databases: the units
+// that ran stop with the storage unit, the volume is removed, created and
+// imported, then they start again (D137). Named alone, only the volume.
+func TestDBRestoreVolumes(t *testing.T) {
+	e := setup(t)
+	e.dbRunning("feat")
+	writeDumps(t, e.ws)
+	e.f.On([]string{"podman", "exec"}, sys.Result{}, nil)
+	e.f.On([]string{"systemctl", "--user", "show"}, sys.Result{Stdout: []byte(
+		"Id=filial-feat-rails.service\nActiveState=active\n\nId=filial-feat-storage.service\nActiveState=active\n\nId=filial-feat-nvim.service\nActiveState=inactive\n")}, nil)
+	done, err := e.l.DBRestore(ctx, "feat", "", []string{"storage"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(done, []string{"the storage volume filial-feat-rustfs-data"}) {
+		t.Errorf("restored %v", done)
+	}
+	if n := containing(e.calls(), "pg_restore"); n != 0 {
+		t.Error("a database was restored when only storage was named")
+	}
+	wantInOrder(t, e.calls(),
+		"systemctl --user stop filial-feat-storage.service",
+		"podman volume rm -f filial-feat-rustfs-data",
+		"podman volume create filial-feat-rustfs-data",
+		"podman volume import filial-feat-rustfs-data "+filepath.Join(e.ws, "db-dumps", "rustfs_data.tar.gz"),
+		"systemctl --user start filial-feat-rails.service filial-feat-storage.service")
+	if n := containing(e.calls(), "start filial-feat-nvim"); n != 0 {
+		t.Error("started a unit that wasn't running")
+	}
+
+	// A failed import removes the volume again, so up seeds it.
+	e = setup(t)
+	e.dbRunning("feat")
+	writeDumps(t, e.ws)
+	e.f.On([]string{"podman", "volume", "import"}, sys.Result{}, errors.New("bad tar"))
+	if _, err := e.l.DBRestore(ctx, "feat", "", []string{"storage"}, true); err == nil || !strings.Contains(err.Error(), "railswitch up creates it again") {
+		t.Errorf("failed import: %v", err)
+	}
+	if n := containing(e.calls(), "podman volume rm -f filial-feat-rustfs-data"); n != 2 {
+		t.Errorf("volume removed %d times; want before and after the failed import", n)
 	}
 }

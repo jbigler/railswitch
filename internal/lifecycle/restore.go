@@ -22,9 +22,10 @@ import (
 // each file in from ("": <workspace>/db-dumps/) that the database option's
 // [dump] file names (one per database with a [dump] list) replaces its
 // database: [dump] prepare empties it, then [dump] restore reads the file
-// on its stdin, both in the database's container. only, when set, limits it
-// to those databases. It asks first (each database by name) unless yes; no
-// terminal and no yes refuses. It returns the databases restored.
+// on its stdin, both in the database's container. Then each volume seed
+// (D18) in from replaces its volume (restoreVolumes, D137). only, when set,
+// limits it to those databases and services. It asks first (each by name)
+// unless yes; no terminal and no yes refuses. It returns what it restored.
 func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes bool) ([]string, error) {
 	m, in, err := l.load(ctx, slug)
 	if err != nil {
@@ -60,8 +61,15 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 	if err != nil {
 		return nil, err
 	}
+	seeds, err := volumeSeeds(m, in, dir)
+	if err != nil {
+		return nil, err
+	}
 	if only != nil {
 		for _, db := range only {
+			if _, ok := seeds[db]; ok {
+				continue
+			}
 			if _, ok := files[db]; !ok {
 				if skipDump(m.Inputs.Stack.Pack.DumpSkip, sc, db) {
 					return nil, fmt.Errorf("%s is a database the pack leaves out of dumps and restores (dump_skip): the framework makes it itself", db)
@@ -74,8 +82,13 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 				delete(files, db)
 			}
 		}
+		for svc := range seeds {
+			if !slices.Contains(only, svc) {
+				delete(seeds, svc)
+			}
+		}
 	}
-	if len(files) == 0 {
+	if len(files) == 0 && len(seeds) == 0 {
 		return nil, fmt.Errorf("no dumps in %s (railswitch db dump writes them)", dir)
 	}
 	dbs := make([]string, 0, len(files))
@@ -89,6 +102,9 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 		for i, db := range dbs {
 			names[i] = label(db)
 		}
+		for _, svc := range sortedSeeds(seeds) {
+			names = append(names, seeds[svc].label())
+		}
 		what := fmt.Sprintf("replace %s of worktree %s with the dumps in %s", strings.Join(names, ", "), slug, dir)
 		if !l.TTY {
 			return nil, fmt.Errorf("db restore would %s: pass --yes (no terminal to confirm on)", what)
@@ -101,12 +117,108 @@ func (l *L) DBRestore(ctx context.Context, slug, from string, only []string, yes
 		}
 	}
 	done, err := l.runRestore(ctx, ctr, o, sc, files, dbs, label)
-	if err == nil {
+	if err != nil {
+		return done, err
+	}
+	if len(dbs) > 0 {
 		// Whatever you restored is the database now: up never restores
 		// over it on a marker an earlier failure left.
 		os.Remove(restorePending(m.Inputs.Workspace, slug))
 	}
-	return done, err
+	vols, err := l.restoreVolumes(ctx, m, slug, seeds)
+	return append(done, vols...), err
+}
+
+// volumeSeed is a seeded volume (D18) of a worktree service and the seed
+// file for it in a dump dir.
+type volumeSeed struct {
+	service, volume, file string
+}
+
+func (v volumeSeed) label() string { return "the " + v.service + " volume " + v.volume }
+
+// volumeSeeds are the seeded volumes of instance in whose seed file dir
+// holds, by service: regular files only.
+func volumeSeeds(m *render.Model, in *render.Instance, dir string) (map[string]volumeSeed, error) {
+	out := map[string]volumeSeed{}
+	for _, s := range m.Services {
+		for _, v := range s.Volumes {
+			if v.Seed == "" {
+				continue
+			}
+			path := filepath.Join(dir, v.Seed)
+			if fi, err := os.Lstat(path); err != nil || !fi.Mode().IsRegular() {
+				continue
+			}
+			name, err := in.VolumeName(s.ID, v)
+			if err != nil {
+				return nil, err
+			}
+			out[s.ID] = volumeSeed{service: s.ID, volume: name, file: path}
+		}
+	}
+	return out, nil
+}
+
+func sortedSeeds(seeds map[string]volumeSeed) []string {
+	svcs := make([]string, 0, len(seeds))
+	for svc := range seeds {
+		svcs = append(svcs, svc)
+	}
+	slices.Sort(svcs)
+	return svcs
+}
+
+// restoreVolumes replaces each seeded volume with its seed (D137): the
+// worktree's units that run are stopped with the volume's service (they
+// Require it), the volume is removed, created again and filled from the
+// seed (seedVolume), and every unit that ran is started again. A failed
+// import leaves no volume, so the next up creates and seeds it from
+// db-dumps/.
+func (l *L) restoreVolumes(ctx context.Context, m *render.Model, slug string, seeds map[string]volumeSeed) ([]string, error) {
+	if len(seeds) == 0 {
+		return nil, nil
+	}
+	sd := l.systemd()
+	var units, containers []string
+	for _, s := range m.Services {
+		units = append(units, unitOf(m, slug, s.ID))
+		containers = append(containers, containerOf(m, slug, s.ID))
+	}
+	states, err := sd.ShowMany(ctx, units, "ActiveState")
+	if err != nil {
+		return nil, err
+	}
+	var running []string
+	for _, u := range units {
+		if states[u]["ActiveState"] == "active" {
+			running = append(running, u)
+		}
+	}
+	var done []string
+	for _, svc := range sortedSeeds(seeds) {
+		v := seeds[svc]
+		if err := sd.Stop(ctx, unitOf(m, slug, svc)); err != nil {
+			return done, err
+		}
+		if err := l.podman().RemoveVolume(ctx, v.volume); err != nil {
+			return done, err
+		}
+		if err := l.seedVolume(ctx, v.volume, v.file); err != nil {
+			return done, fmt.Errorf("%s: %w; railswitch up creates it again from db-dumps/", v.label(), err)
+		}
+		fmt.Fprintf(l.Out, "restored %s from %s\n", v.label(), v.file)
+		done = append(done, v.label())
+	}
+	if len(running) > 0 {
+		if sd.Timeout, err = l.startTimeout(containers); err != nil {
+			return done, err
+		}
+		if err := sd.Start(ctx, running...); err != nil {
+			return done, fmt.Errorf("starting worktree %s again: %w", slug, err)
+		}
+	}
+	return done, nil
 }
 
 // restoreLabel names database db of the option's service: "" (an option

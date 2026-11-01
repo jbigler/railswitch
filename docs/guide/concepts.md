@@ -70,9 +70,11 @@ replaced, the others are left as they are (it asks first, naming each
 one; `--from <dir>` for dumps from elsewhere, `--yes` without asking).
 A dump runs with the database's full rights, so restore only dumps you
 made or trust, and never point `--from` into a worktree an agent can
-write to. It restores databases only: a seeded volume
-(storage) comes back from its dump only when the volume is new
-(`down`, then `up`).
+write to. Storage (RustFS's objects, `rustfs_data.tar.gz`) is restored
+too: its volume is emptied and filled from the dump, which stops the
+storage service and everything that needs it (the app) for the time it
+takes; what was running is started again. Name the service to restore it
+alone (`db restore storage`), or databases to leave storage as it is.
 
 ## What stays on your machine
 

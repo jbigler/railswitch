@@ -135,7 +135,7 @@ func TestMemoryAgent(t *testing.T) {
 			prime = string(a.Data)
 		}
 	}
-	for _, want := range []string{"'No patient data, ever.'", "worktree:%s", `exec bd prime "$@"`} {
+	for _, want := range []string{"'No patient data, ever.'", "worktree:%s", "deleted with it, and no other agent sees them", `exec bd prime "$@"`} {
 		if !strings.Contains(prime, want) {
 			t.Errorf("railswitch-prime.sh lacks %q:\n%s", want, prime)
 		}

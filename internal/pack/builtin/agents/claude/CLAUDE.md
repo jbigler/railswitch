@@ -32,6 +32,12 @@ then `bd prime`). Without it there is no `bd`: ignore this section.
   agent has it; pick something else.
 - Follow the project's guidance printed at the top of that context: never
   store secrets, credentials, or personal or patient data.
+- Memories go to `bd remember`, never to your auto memory
+  (`~/.claude/projects/*/memory/`, `MEMORY.md`): your home is this
+  worktree's and is deleted with it. When asked to remember something,
+  or when you learn something the next agent should know, search
+  `bd memories <word>` first and update that key
+  (`bd remember --key <key> "<text>"`) rather than add another.
 - `bd` never runs git here (its config sets no-git-ops). Never run
   `bd init`.
 

@@ -144,7 +144,7 @@ turn it on in `project.toml` (or with the `memory.on` and
 guidance = "Never store patient data, credentials or customer names. Summarise, don't paste logs."
 ```
 
-What happens then (D136–D145):
+What happens then (D136–D146):
 
 - **One server per project.** The first `railswitch agent` starts
   `<prefix>-memory`, a Dolt database server whose data is the volume
@@ -167,11 +167,35 @@ What happens then (D136–D145):
   Claiming (`bd update <id> --claim`) is atomic: when two agents claim one
   task, one gets it and the other is told it's taken.
 
+- **Memories go to bd.** Every agent is told to keep what it learns in
+  shared memory (`bd remember`) and not in its own tool's memory files
+  (Claude's auto memory), which live in the worktree's agent home and are
+  deleted with it. This replaces rails-dev-podman's shared
+  `claude-memory/` folder. Claude's own memory still works; it is just
+  that worktree's.
+
 **Never put secrets, credentials or personal data in memory**, and in a
 healthcare project no patient data: every agent of the project reads all
 of it, at the start of every session, and it stays until deleted. The
 guidance says so to the agents; it doesn't stop them, so keep the rule in
 your own instructions too.
+
+### Bringing in old memory files
+
+Memory files from earlier agent runs (rails-dev-podman's `claude-memory/`,
+another machine's `~/.claude/projects/*/memory/`) can be reviewed into
+shared memory by an agent. Copy them into a worktree's agent home, outside
+the worktree so they never reach git:
+
+```bash
+mkdir -p .railswitch/agent-home/<worktree>/claude/memory-import
+cp -r /path/to/old-memory/. .railswitch/agent-home/<worktree>/claude/memory-import/
+```
+
+Then ask the agent to read `~/memory-import`, store each file still true
+for every agent with `bd remember` (skipping secrets, personal or patient
+data, and anything about one branch), and list what it skipped. Delete the
+folder afterwards and take a `railswitch memory backup`.
 
 ### Seeing it
 

@@ -594,4 +594,7 @@ Priming is the package's job, as it knows how its agent reads context:
 run `railswitch-prime` when it is there, from a SessionStart-style hook
 (`claude@1` registers it as one, and removes it when the file is gone) or
 from the entrypoint. A package must never run `bd init`: railswitch
-creates the database.
+creates the database. The prime tells every agent to keep memories in bd
+and not in its own tool's memory files (D146); a package whose agent keeps
+such files should say so in its own instructions too (`claude@1`'s
+`CLAUDE.md` does), and must not share them between worktrees itself.

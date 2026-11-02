@@ -71,8 +71,8 @@
 		{
 			"doubleSided":true,
 			"emissiveFactor":[
-				0.01599629409611225,
-				0.7912979125976562,
+				0.2581828534603119,
+				0.10702310502529144,
 				1
 			],
 			"extensions":{
@@ -80,7 +80,7 @@
 					"emissiveStrength":4
 				}
 			},
-			"name":"RS_Neon_Accent",
+			"name":"RS_Neon_Secondary",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,

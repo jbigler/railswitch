@@ -640,7 +640,7 @@ def chair(a):
     with a.at(0, .5, -.24, rx=-.12):
         a.box(.46, .6, .07, M['fabric'], 0, .3, 0)
         a.box(.3, .14, .07, M['fabric'], 0, .7, -.02)
-        a.box(.006, .5, .006, M['neon'], 0, .32, -.04)
+        a.box(.006, .5, .006, M['neon2'], 0, .32, -.04)  # the floor's secondary colour
     a.cyl(.025, .025, .36, M['trim'], 0, .26, 0)
     a.box(.5, .08, .48, M['fabric'], 0, .47, 0)
     for s in (-1, 1):

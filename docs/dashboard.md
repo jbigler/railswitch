@@ -767,6 +767,8 @@ Every action is a job (below).
   next start", adding "stop it, then start it again" while it runs.
 - **terminal** runs `railswitch term`: a new terminal tab or window on
   the host with your shell in the worktree's folder.
+- **nvim** and **agent** (the cyberpunk office's desks) run `railswitch nvim
+  --new-term` and `railswitch agent --new-term`.
 - **Stack branch** (with a gh stack): a click on another open branch of
   the stack runs `railswitch stack switch <branch>` (`git switch
   --no-guess` through a private copy of the repository's git config: no
@@ -875,6 +877,125 @@ pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
 working blue, your turn yellow, idle and off muted.
 
+## Cyberpunk office
+
+**Virtual Office** in the header opens `/p/<prefix>/virtual-office`, which
+shows its set, `/p/<prefix>/virtual-office/cyberpunk` (D150; the set is the
+path's last part): the project as a cyberpunk office tower in 3D (three.js), an optional view beside the 2D
+pages (D146). It is the starship's logic (D144) on the office kit
+(docs/office-kit.md, D145), and costs nothing until you open it: the page
+is static files in the binary, and the server only polls the project as for
+any open page.
+
+- **The lobby** is the project. Its wall screen lists every floor
+  (worktree) with its stack and agent state; the directory in the middle has
+  a beacon per floor (click one to ride there); an android concierge stands
+  at its desk; the big screen faces a lounge. **Pull requests**: a board on
+  the left wall lists every open PR with its checks and review, and opens
+  the worktrees' PRs as `pr ls` reads them, with Refresh PRs. **Your work:** the Issues kiosk and the PR board show
+  the open issues assigned to you and the open PRs you wrote, are assigned
+  or are asked to review (`issue ls`, `pr ls --all`: `me` is who gh signs in
+  as), read when the lobby opens and every two minutes while it shows. Their
+  panels switch between **Mine**, **Following** (GitHub logins you add
+  there: this browser keeps the list) and **All**, and the boards follow.
+  An issue's **▶ Start working** runs `wt add --issue <n> --agent` as a
+  job: a worktree on a branch named after the issue (`issue-<n>-<title
+  words>`), its stack up, and the default agent (a service) started in its
+  session with the issue as its first input; an issue that has a floor
+  already offers that floor instead. Kiosks: **Issues**, **Notes** (the agents' shared notes,
+  `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
+  save refused when the note changed since you opened it) and
+  **Engineering** (links to Settings, Images, Library, Machine).
+- **A floor** is a worktree; every floor has the same plan (24 × 16 m,
+  D150): the elevator in the left wall opens onto a corridor that runs to
+  the windows at the far end, with glass rooms on both sides, each door
+  sliding open as you walk up (pets and androids stay in the corridor and
+  the café nook). Each area hangs a neon sign over the corridor. Its hue
+  (the starship's way: a hash of the worktree's name seeds the highlight
+  colour, a second neon a third of the wheel or more away, and the pet),
+  ceiling gear and some furniture come from the name, so a floor always
+  looks the same and floors look different.
+  - Back side: the **server room** (glass, windowless) is a data hall: a
+    rack per service, 1 m apart in two rows of seven facing a cold aisle (a
+    stack with more than 14 services shows the first 14). Each rack's LEDs
+    and accent bar show the service's state, its display names it, cables
+    loop out of its sides and up into the ceiling's tray, and a hologram
+    floats above it in the floor's second neon (the name, the state, bars
+    that pulse while it runs). A rack opens the service's state, **Restart
+    this service** (as the 2D page's restart, when it restarts alone), its
+    logs in Dozzle, and the floor's **Start**, **Restart**, **Stop** (`up`,
+    `restart`, `stop`). The **café** nook, open to the corridor: a ramen
+    and a drinks vending machine under neon headers, their menus drawn
+    live, the coffee counter, a bistro table, a clock that keeps your
+    browser's time, and the pet's corner. The **lounge** (glass): the
+    sofa facing the **big screen** on the back wall from 4.5 m; the screen
+    shows the floor's summary for now, what it shows is yours to choose
+    later.
+  - Front side, by the windows: **work** (glass): **your desk**'s wall
+    screen shows the branch, stack, PR and links; the desk shows the
+    worktree's links; **Shell** and **Neovim** open a live terminal in the
+    panel (D149, as on the worktree page), **Terminal window** (`term`) and
+    **Neovim window** (`nvim --new-term`) a window on this machine. **The
+    agent's desk** opens the agent console in a terminal (`agent
+    --new-term`); the agent's android stands at it, its eyes and ring in
+    the agent's state (pulsing while it waits on you), its hands typing
+    while it works; it opens the agent's state and message and the agent
+    itself in a live terminal (D149): a running service agent's session at
+    once, else after **Connect** (connecting runs `up`), with **Open
+    console window** beside it; with a package that counts them (claude@1),
+    its desk screen, the agent panel and the floor's big screen show its
+    session's tokens, and the lobby's big screen their sum. The **PR
+    station** by the windows shows the floor's pull request: title, checks,
+    review, review app. A glass board 2.4 m wide stands by the wall. The
+    **meeting** room (glass) holds the **holo-table**: over a chunky
+    console a wireframe terrain rises in the floor's main colour (its trim in
+    the second neon), with a
+    pin per service (in the lobby, per floor) coloured by its state, which
+    opens it, and a halo above with the floor's summary. The **game room**
+    (glass): two bartop arcades on their stands, a sofa facing them.
+- **The elevator** (in the left wall of every floor, or `T`) lists the
+  lobby and every floor; its doors open as you walk up, and stepping in
+  front of them opens the list. `Esc` closes a panel.
+- **Two views:** the overview (drag turns the floor, the wheel zooms; the
+  ceiling and the walls facing you are cut away) or first person (`V` or
+  **walk**: `W` `A` `S` `D` or the arrows walk, `Shift` runs, drag looks, a
+  click acts on what it hits or walks to that spot; furniture and walls stop
+  you, and you can always walk out of one). Walking, a drag locks the
+  pointer, so turning doesn't stop at the window's edge; the lock ends when
+  the button comes up. Where the browser refuses it (some remote and
+  virtual-machine sessions), the drag follows the pointer's position as
+  before.
+- **Outside** the windows is a city at night, seen from high up: tower
+  bands fading into smog, a red horizon, tall flickering ad signs, spinners
+  between the towers (first person only).
+- Every floor has one pet: a cat or a shiba that roams, a macaw that flies
+  between two perches, a cat asleep on a crate, an aquarium, a jellyfish
+  tank or a gecko; and androids that wander (one or two per floor, two in
+  the lobby). Click them.
+- **First person is a film set** (after Blade Runner's interiors and
+  KitBash3D's cyberpunk sets), on a modest GPU: no shadows, no pass beyond
+  bloom. Light from practicals, warm where people sit (café, lounge,
+  desk lamp), cool where machines are and from the city through the
+  windows, and a dim office reflected in every metal surface; haze; light shafts through half-drawn blinds striping the floor;
+  dust in the air; cables underfoot and hanging from the ceiling; a server
+  room tube that fails now and then; neon kept for signs (the walls' trim
+  only hints at it); screens with scanlines; a slight step bob and darker
+  lens corners. The overview drops the haze, shafts and dust and lights the
+  floor evenly.
+
+Typing to an agent from the page is the same power as the dashboard's
+other buttons: a page that holds the cookie and passes the Origin check
+can drive the agent, as it can start a job. Nothing else can (Security
+model above). Text from the CLI (PR and issue titles, notes, the agent's
+screen) is shown as text, never as markup.
+
+The models are the office kit (`static/office/`, built by
+`tools/office-kit/`), served as glTF with their textures as separate files:
+the content policy (`default-src 'self'`) refuses the `blob:` URLs three.js
+makes for textures embedded in a GLB. three.js is MIT
+(`static/cyberpunk/three.LICENSE.txt`), vendored with its GLTF loader and
+bloom passes as one module by `internal/web/static/cyberpunk/vendor.sh`.
+
 ## Commands
 
 The commands the dashboard reads and runs. Their `--json` output is in
@@ -971,8 +1092,13 @@ Library page connects with `&view=library`: the same, with the
 machine-level jobs (`~machine`) among its `jobs`. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
-project and that prefix's project-level `jobs`. Each `data:` line is one
-JSON object:
+project and that prefix's project-level `jobs`. The cyberpunk office
+connects with `&view=cyberpunk`: it gets one event,
+`{"type":"cyberpunk","id":"state","html":"<JSON>"}`, whenever the project's
+state changes, `html` holding `{prefix, error, pr_error, worktrees[]{slug,
+branch, base, stack, services, agent, links, pr}, jobs[]{id, slug, label,
+state}, banner[]}` (the overview's and `pr ls`'s fields; arrays never
+null). Each `data:` line is one JSON object:
 
 ```json
 {"type":"html","id":"list","html":"<div id=\"list\" class=\"list\">…</div>"}

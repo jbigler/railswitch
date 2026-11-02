@@ -349,7 +349,7 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("branch %q: %w", branch, err)
 	}
-	if isTaken(def) {
+	if isTaken(def) || naming.ReservedSlug(def) { // a reserved word: the hashed slug, as for a taken one
 		sum := sha256.Sum256([]byte(branch))
 		def = strings.TrimRight(def[:min(len(def), naming.SlugMaxLen-5)], "-") + "-" + hex.EncodeToString(sum[:2])
 	}
@@ -369,6 +369,9 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 	}
 	if isTaken(slug) {
 		return "", fmt.Errorf("worktree name %s is taken: it is registered or %s exists", slug, naming.WorktreeDir(m.WS, slug))
+	}
+	if naming.ReservedSlug(slug) {
+		return "", fmt.Errorf("worktree name %s is reserved: the dashboard has a page of that name; pick another with --name", slug)
 	}
 	return slug, nil
 }

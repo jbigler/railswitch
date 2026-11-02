@@ -75,6 +75,15 @@ type agent struct {
 	Message string `json:"message"`
 	Reply   bool   `json:"reply"`
 	Running bool   `json:"running"`
+	Usage   *usage `json:"usage"`
+}
+
+// usage is an agent's session tokens (agentstatus.Usage).
+type usage struct {
+	Input      int64 `json:"input"`
+	Output     int64 `json:"output"`
+	CacheRead  int64 `json:"cache_read"`
+	CacheWrite int64 `json:"cache_write"`
 }
 
 type link struct {

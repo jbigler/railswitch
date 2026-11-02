@@ -119,6 +119,7 @@ Project commands run in the workspace, worktree commands in a worktree
 ```bash
 cd ~/workspace/shop
 railswitch wt add feature-x --up      # a branch, a PR number, or a new branch
+railswitch wt add --issue 118 --agent  # a branch named after issue #118, up, and the agent working on it
 cd worktrees/feature-x
 railswitch up | stop | restart
 railswitch logs -f rails
@@ -129,6 +130,11 @@ railswitch db restore                 # put them back into this worktree (asks f
 railswitch down                       # stops it AND deletes its volumes (asks first)
 railswitch wt rm feature-x            # --force: even with uncommitted changes (lost)
 ```
+
+A worktree is named after its branch (`feature/x` becomes `feature-x`).
+The dashboard's own page words (`virtual-office`, `settings`, `images`,
+`library`, `review`, `tty`) are no worktree's name: a branch called one of
+them gets a short hash added, and `--name` refuses them.
 
 `stop` keeps a worktree's data; `down` deletes its volumes, the database
 included. The dashboard does the same from each worktree's row: up, stop,

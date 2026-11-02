@@ -84,6 +84,14 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /{$}", s.root)
 	m.HandleFunc("GET /p/{prefix}", s.page)
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
+	m.HandleFunc("GET /p/{prefix}/virtual-office", s.officeDefault)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/cyberpunk", s.cyberPage)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/issues", s.cyberIssues)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/prs", s.cyberPRs)
+	m.HandleFunc("POST /p/{prefix}/virtual-office/issues/{n}/start", s.cyberIssueStart)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/notes", s.cyberNotes)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/notes/{name}", s.cyberNote)
+	m.HandleFunc("POST /p/{prefix}/virtual-office/notes/{name}", s.cyberNoteWrite)
 	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
@@ -307,7 +315,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	view := q.Get("view")
-	if view != "settings" && view != "new" && view != "library" {
+	if view != "settings" && view != "new" && view != "library" && view != "cyberpunk" {
 		view = ""
 	}
 	prefix := q.Get("p")
@@ -512,6 +520,8 @@ var worktreeActions = map[string]struct {
 	"stop":    {"stop", []string{"stop"}},
 	"restart": {"restart", []string{"restart"}},
 	"term":    {"terminal", []string{"term"}},
+	"nvim":    {"nvim", []string{"nvim", "--new-term"}},
+	"agent":   {"agent", []string{"agent", "--new-term"}},
 }
 
 func (s *Server) act(w http.ResponseWriter, r *http.Request) {

@@ -241,9 +241,10 @@ func TestSecretLsNoValues(t *testing.T) {
 		gh.Delivery != "file" || gh.Set || gh.Created != nil || !slices.Equal(gh.Services, []string{"nvim"}) {
 		t.Errorf("github_token row = %+v", gh)
 	}
-	// up starts nvim and the probe agent, which runs as a service.
-	if !gh.Up || !rows[1].Up || !rows[2].Up {
-		t.Errorf("up = %v %v %v; want all true", gh.Up, rows[1].Up, rows[2].Up)
+	// up starts nvim and the service agent probe, but starts without the
+	// agent's secret (it leaves the agent stopped).
+	if !gh.Up || rows[1].Up || !rows[2].Up {
+		t.Errorf("up = %v %v %v; want true false true", gh.Up, rows[1].Up, rows[2].Up)
 	}
 	editProject(t, ws, `run = "service"`, `run = "on-demand"`)
 	code, out, _ = runStdin(t, f, "", "-C", ws, "--json", "secret", "ls")

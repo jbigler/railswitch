@@ -50,6 +50,8 @@ func TestActions(t *testing.T) {
 		{"stop", "/p/ftest/b/act/stop", form(), 202, append(slices.Clone(wsb), "stop"), ""},
 		{"restart", "/p/ftest/main/act/restart", form(), 202, append(slices.Clone(ws), "-w", "main", "restart"), ""},
 		{"terminal", "/p/ftest/b/act/term", form(), 202, append(slices.Clone(wsb), "term"), ""},
+		{"nvim", "/p/ftest/b/act/nvim", form(), 202, append(slices.Clone(wsb), "nvim", "--new-term"), ""},
+		{"agent console", "/p/ftest/b/act/agent", form(), 202, append(slices.Clone(wsb), "agent", "--new-term"), ""},
 		{"restart a service", "/p/ftest/b/restart/web", form(), 202, append(slices.Clone(wsb), "restart", "web"), ""},
 		{"restart an unknown service", "/p/ftest/b/restart/nope", form(), 404, nil, ""},
 		{"agent default promote", "/p/ftest/b/agent-default/promote", form("name", "claude", "all", "1"), 202, append(slices.Clone(wsb), "agent", "default", "promote", "claude", "--all"), ""},

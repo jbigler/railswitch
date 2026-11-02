@@ -420,6 +420,21 @@ func TestAddNameCollision(t *testing.T) {
 	}
 }
 
+// TestAddReservedName: a slug that is one of the dashboard's own page words
+// would hide the worktree's page behind it: a branch with that name gets
+// the hashed slug a taken one gets, and --name refuses it.
+func TestAddReservedName(t *testing.T) {
+	e := setup(t)
+	w := e.add(t, "settings", "")
+	sum := sha256.Sum256([]byte("settings"))
+	if want := "settings-" + hex.EncodeToString(sum[:])[:4]; w.Slug != want {
+		t.Errorf("slug = %q; want %q", w.Slug, want)
+	}
+	if _, err := e.m.Add(context.Background(), "other", "virtual-office"); err == nil || !strings.Contains(err.Error(), "reserved") {
+		t.Errorf("--name virtual-office: %v; want refused as reserved", err)
+	}
+}
+
 func TestAddPrompt(t *testing.T) {
 	e := setup(t)
 	e.m.TTY = true

@@ -1,7 +1,7 @@
 name = "claude"
 version = 1
 default = true                # railswitch project new adds this agent unless --agent is given
-run = "on-demand"
+run = "service"               # a shared session (D142): `railswitch agent` and the dashboard join it
 entrypoint = "entrypoints/entrypoint-claude.sh"
 
 # Firewall hosts (profile agent-claude, always enforced: D55).

@@ -105,3 +105,16 @@ func TestGitHost(t *testing.T) {
 		}
 	}
 }
+
+func TestReservedSlug(t *testing.T) {
+	for _, s := range []string{"virtual-office", "settings", "images", "library", "review", "tty"} {
+		if !ReservedSlug(s) {
+			t.Errorf("%s not reserved", s)
+		}
+	}
+	for _, s := range []string{"main", "cyberpunk", "virtual-office-2", "feat-settings"} {
+		if ReservedSlug(s) {
+			t.Errorf("%s reserved", s)
+		}
+	}
+}

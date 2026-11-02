@@ -10,12 +10,15 @@ import (
 
 	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/workspace"
 	"github.com/jbigler/railswitch/internal/worktree"
 )
 
 const wtUsage = `usage: railswitch wt add [--name <name>] [--up] <branch|PR number|new branch>
+       railswitch wt add --issue <number> [--name <name>] [--up | --agent]
        railswitch wt rm [--force] <path|branch|name>
        railswitch wt ls`
 
@@ -85,31 +88,81 @@ func (e *env) manager(ctx context.Context) (*worktree.Manager, error) {
 }
 
 // railswitch wt add [--name <name>] [--up] <target>: add a worktree; with
-// --up, then run up in it.
+// --up, then run up in it. --issue <n>: the target is the issue's branch
+// (prs.IssueBranch: new, or the one an earlier add made); --agent then
+// starts the default agent in the background on the issue (up first).
 func wtAdd(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("wt add")
 	name := fs.String("name", "", "the worktree's `name` (default: the branch, sanitized)")
 	up := fs.Bool("up", false, "run up in the new worktree")
+	issue := fs.Int("issue", 0, "a worktree for GitHub issue `number`, on a branch named after it")
+	agent := fs.Bool("agent", false, "with --issue: start the default agent in the background, working on the issue (runs up)")
 	pos, code, ok := parseMixed(fs, args)
 	if !ok {
 		return code
 	}
-	if len(pos) != 1 {
+	if *issue < 0 || (*issue > 0) == (len(pos) == 1) || len(pos) > 1 || (*agent && *issue == 0) {
 		return e.usageErr("%s", wtUsage)
 	}
 	m, err := e.manager(ctx)
 	if err != nil {
 		return e.fail(err)
 	}
-	w, err := m.Add(ctx, pos[0], *name)
-	if err != nil {
-		return e.fail(err)
+	var prompt string
+	if *issue > 0 {
+		w, err := workspace.Load(ctx, e.dir, "")
+		if err != nil {
+			return e.fail(err)
+		}
+		repo, err := prs.Repo(w.Project.Project.Repo)
+		if err != nil {
+			return e.fail(fmt.Errorf("wt add --issue: %w", err))
+		}
+		title, err := prs.IssueTitle(ctx, e.run, repo, *issue)
+		if err != nil {
+			return e.fail(err)
+		}
+		title = safefile.Printable(title)
+		pos = []string{prs.IssueBranch(*issue, title)}
+		prompt = fmt.Sprintf("Work on GitHub issue #%d: %s\nRead it first, with its comments: gh issue view %d --comments. Then plan the change, implement it on this branch and test it.", *issue, title, *issue)
 	}
-	fmt.Fprintf(e.stdout, "added worktree %s (ID %d, branch %s) at %s\n", w.Slug, w.ID, w.Branch, w.Dir)
+	var slug string // the worktree: an issue's existing one, or the new one
+	if *issue > 0 {
+		have, branch, err := m.IssueBranch(ctx, *issue)
+		if err != nil {
+			return e.fail(err)
+		}
+		if branch != "" {
+			pos[0] = branch // its branch, named from the title it had then
+		}
+		if slug = have; slug != "" {
+			fmt.Fprintf(e.stdout, "issue #%d has worktree %s already (branch %s)\n", *issue, slug, safefile.Printable(branch))
+		}
+	}
+	if slug == "" {
+		w, err := m.Add(ctx, pos[0], *name)
+		if err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "added worktree %s (ID %d, branch %s) at %s\n", w.Slug, w.ID, w.Branch, w.Dir)
+		slug = w.Slug
+	}
+	if *agent {
+		e.slug = slug
+		l, slug, code := e.lifecycle(ctx, "agent")
+		if code != 0 {
+			return code
+		}
+		if err := l.AgentPrompt(ctx, slug, "", prompt); err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "the agent works on issue #%d in %s: railswitch -w %s agent joins it\n", *issue, slug, slug)
+		return 0
+	}
 	if !*up {
 		return 0
 	}
-	e.slug = w.Slug // up in the new worktree, wherever -C points
+	e.slug = slug // up in the new worktree, wherever -C points
 	l, slug, code := e.lifecycle(ctx, "up")
 	if code != 0 {
 		return code

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -22,6 +23,15 @@ func WorktreeDir(ws, slug string) string { return filepath.Join(ws, WorktreesDir
 
 // SlugMaxLen caps a worktree slug: it keeps DNS labels well under 63 chars.
 const SlugMaxLen = 40
+
+// reservedSlugs are the dashboard's own words at /p/{prefix}/<word>: a
+// worktree slug among them would hide that worktree's page (or, for tty,
+// its actions) behind the dashboard's.
+var reservedSlugs = []string{"virtual-office", "settings", "images", "library", "review", "tty"}
+
+// ReservedSlug reports whether s is one of the dashboard's own page words,
+// which no worktree may take.
+func ReservedSlug(s string) bool { return slices.Contains(reservedSlugs, s) }
 
 // ErrEmptyName is returned by Sanitize when nothing of the name is left.
 var ErrEmptyName = errors.New("name has no letters or digits")

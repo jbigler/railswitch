@@ -54,18 +54,23 @@ unhealthy, never holds up the agent. (It does wait while the worktree's
 `[hooks] create` haven't run yet, since they need the app.)
 
 An agent runs **on demand** (a container for as long as you use it, in
-one terminal) or as a **service** (below). One agent runs at a time per
+one terminal) or as a **service** (below), as its package says unless
+`[agents.<name>] run` says otherwise. The built-in `claude@1` runs as a
+service, so the dashboard can show its screen and type to it; `up` starts
+it once its token is set (`railswitch secret set claude_token`), and
+starts the rest of the worktree without it until then. For on demand, set
+`[agents.claude] run = "on-demand"`. One agent runs at a time per
 worktree. Agents start from the terminal; the dashboard shows when one is
 waiting on you: a permission prompt, a question, a finished reply (`◆ N
 need input`).
 
-### A service agent: one session, many terminals
-
 ```toml
 [agents.claude]
 use = "claude@1"
-run = "service"
+run = "on-demand"
 ```
+
+### A service agent: one session, many terminals
 
 A service agent's container is its environment, ready before you need it:
 `up` starts the default agent's container when it runs as a service (and
@@ -77,7 +82,14 @@ is already running:
 railswitch agent                     # join the session, or start the agent in one
 railswitch agent -- --resume         # start it with arguments (only when no session runs)
 railswitch agent --watch             # watch it, without typing into it
+railswitch agent screen              # print its screen as it shows now
+echo 'run the specs' | railswitch agent send   # type a line into it, then Enter
 ```
+
+`agent screen` and `agent send` work without a terminal (the dashboard
+uses them). `send` takes its text on stdin, at most 4 KiB, with no
+control characters but line breaks and tabs; a multi-line text is pasted
+as one input. It types only into a running session and never starts one.
 
 - **Several terminals at once.** Run `railswitch agent` in as many
   terminals as you like: each shows the same agent, live, and each can
@@ -233,6 +245,11 @@ your own packages) reads and writes as `~/notes/`, in every worktree.
   right away.
 - **They are kept:** `wt rm` and `down` never touch `notes/`; back it up,
   edit it or commit it somewhere as you like.
+- **From railswitch:** `railswitch notes ls` lists them, `notes show
+  <name>` prints one, `notes write <name> --if-hash <hash>` replaces it
+  with stdin (the hash `notes show --json` printed; `--if-hash ""` adds a
+  new note), and `notes rm <name> --if-hash <hash>` removes it. A note an
+  agent changed since you read it is refused, not overwritten.
 
 Never put secrets, credentials or personal data in a note, and in a
 healthcare project no patient data: every agent reads them.

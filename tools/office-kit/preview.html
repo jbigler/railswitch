@@ -1,0 +1,346 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Neon Office Floor</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05060a; color: #cfd6e4; font: 13px ui-monospace, monospace; overflow: hidden }
+  #ui { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #0b0d14cc; padding: 8px 10px; border: 1px solid #2c3039 }
+  #err { color: #ff6b6b }
+  #ui button { font: inherit; color: inherit; background: #161a24; border: 1px solid #2c3039; padding: 4px 10px; cursor: pointer }
+  #ui select { font: inherit; color: inherit; background: #161a24; border: 1px solid #2c3039; padding: 3px 6px }
+  #ui button[aria-pressed="true"] { border-color: #22e6ff; color: #fff }
+  #help { opacity: .8 }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+} }
+</script>
+<div id="ui">
+  <label for="accent">Highlight</label><input id="accent" type="color" value="#22e6ff">
+  <label for="second">Secondary</label><input id="second" type="color" value="#8b5cff">
+  <button id="mode-overview" type="button" aria-pressed="false">Overview</button>
+  <button id="mode-walk" type="button" aria-pressed="true">First person</button>
+  <label for="pet">Pet</label><select id="pet"></select>
+  <span id="help"></span>
+  <span id="err"></span>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadOfficeKit } from '../../internal/web/static/office/kit.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#05060a');
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.2;
+const hemi = new THREE.HemisphereLight('#8090b0', '#101018', 0.5);
+scene.add(hemi);
+
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
+const q = new URLSearchParams(location.search);
+camera.position.set(...(q.get('pos') ?? '1,1.7,4').split(',').map(Number));
+camera.lookAt(...(q.get('look') ?? '-2,1.4,-6').split(',').map(Number));
+const canvas = renderer.domElement;
+const look = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+// the walker: eye at 1.7 m; yaw/pitch drive the camera in first person
+const START = { x: camera.position.x, z: camera.position.z, yaw: look.y, pitch: look.x };
+const player = { ...START };
+const orbit = new OrbitControls(camera, canvas);
+orbit.enabled = false;
+orbit.maxPolarAngle = 1.45; orbit.minDistance = 3; orbit.maxDistance = 40; orbit.enableDamping = true;
+let mode = 'walk', overviewView = { pos: new THREE.Vector3(1, 10, 10.5), target: new THREE.Vector3(0, 0, -.5) };
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.25, 1.2));
+composer.addPass(new OutputPass());
+
+const PI = Math.PI;
+// [asset, x, y, z, rotation about Y]
+const LAYOUT = [
+  ...[-6, -2, 2, 6].flatMap((x) => [-4, 0, 4].map((z) => ['Arch_Floor_4m', x, 0, z, 0])),
+  ['Arch_Wall_Plain_4m', -6, 0, -6, 0], ['Arch_Elevator_Floor', -2, 0, -6, 0], ['Arch_Elevator_Cab', -2, 0, -6.2, 0],
+  ['Arch_Wall_Plain_4m', 2, 0, -6, 0], ['Arch_Wall_Door_4m', 6, 0, -6, 0],
+  ...[-4, 0, 4].map((z) => ['Arch_Wall_Window_4m', 8, 0, z, -PI / 2]),
+  ...[-4, 0, 4].map((z) => ['Arch_Wall_Plain_4m', -8, 0, z, PI / 2]),
+  ['Arch_Wall_Plain_4m', -6, 0, 6, PI], ['Arch_Wall_Plain_4m', -2, 0, 6, PI], ['Arch_Wall_Plain_4m', 2, 0, 6, PI], ['Arch_Wall_Window_4m', 6, 0, 6, PI],
+  ['Ext_CityBackdrop', 30, -4, 0, -PI / 2],
+  // ceiling (y = 4)
+  ['Arch_CeilingDuct_4m', -4, 4, -2.5, 0], ['Arch_CeilingDuct_4m', 0, 4, -2.5, 0],
+  ['Arch_Ceiling_CableTray_4m', -2, 4, 2, 0], ['Arch_Ceiling_CableTray_4m', 2, 4, 2, 0],
+  ['Arch_Ceiling_PipeRun_4m', 2, 4, -4.8, 0], ['Arch_Ceiling_PipeRun_4m', 6, 4, -4.8, 0],
+  ['Arch_Ceiling_LightRun_4m', -4, 4, .3, 0], ['Arch_Ceiling_LightRun_4m', 0, 4, .3, 0], ['Arch_Ceiling_LightRun_4m', 4, 4, -1.5, .5],
+  ['Arch_Ceiling_Fan', 5, 4, 2, 0], ['Arch_Ceiling_Vent', -6, 4, 4, 0], ['Arch_Ceiling_Sprinkler_4m', 4, 4, 4.5, 0],
+  ['Arch_Ceiling_HangingCables', -5.5, 4, -.8, 0], ['Arch_WallPipes_4m', -8, 0, 0, PI / 2],
+  // furniture, tech, clutter
+  ['Furn_Workstation_Lived', -5, 0, -4.4, 0], ['Furn_Workstation_Lived_B', -6.3, 0, 2.2, PI / 2],
+  ['Tech_MonitorWall_A', 3.4, 0, -5.4, 0], ['Tech_MonitorBank', -8, 0, -1.4, PI / 2],
+  ['Tech_ToolCart', 1.2, 0, -4.8, 0], ['Tech_TerminalKiosk', 5.1, 0, -5.4, 0],
+  ['Tech_ServerRack', 1.4, 0, 5.4, PI], ['Tech_ServerRack_B', 2.05, 0, 5.4, PI], ['Tech_ServerRack', 2.7, 0, 5.4, PI],
+  ['Tech_NetworkShelf', -.4, 0, 6, PI], ['Deco_Boxes', 6.8, 0, 5.2, PI], ['Deco_Crate', 6.6, 0, -5.4, 0],
+  ['Deco_MiniFridge', -7.6, 0, 5.2, PI / 2], ['Deco_CorkBoard', -7.98, 1.6, 4.2, PI / 2], ['Deco_Poster', -3.9, 1.7, -5.99, 0],
+  ['Deco_Extinguisher', -.6, 0, -5.9, 0], ['Deco_CableRun', -.5, 0, -1.6, .4], ['Deco_TrashBin', 2.4, 0, -4.6, 0],
+  ['Furn_Sofa', 4.4, 0, .4, PI / 2], ['Furn_CoffeeTable', 5.9, 0, .4, PI / 2], ['Furn_Sofa_Short', 5.9, 0, 2.2, PI],
+  ['Deco_Plant_Floor', 7.4, 0, -2.2, 0], ['Deco_Plant_Floor_B', 7.4, 0, 5.3, 0], ['Deco_HangingPlanter', 7.2, 4, -.6, 0],
+];
+
+// One pet per floor: ?pet=<key> (or the picker) chooses which. A roamer walks the
+// floor (walking model, resting model), a flyer moves between perches.
+const PETS = {
+  cat: { label: 'Black cat (roams)', layout: [['Deco_PetBowls', 3.6, 0, 3.4, 0]],
+    roamer: { walk: 'Pet_Cat_Walk', rest: 'Pet_Cat_Sitting', start: { x: 0, z: -1.2, ry: 0 }, speed: 0.5, stride: 0.3 } },
+  dog: { label: 'Shiba (roams)', layout: [['Furn_DogBed', 2.6, 0, 2.2, -.6], ['Deco_PetBowls', 3.6, 0, 3.4, 0]],
+    roamer: { walk: 'Pet_Dog_Walk', rest: 'Pet_Dog_Lying', start: { x: 2.6, z: 2.2, ry: -.6 }, homes: [{ x: 2.6, z: 2.2, ry: -.6 }], speed: 0.7, stride: 0.45, height: 0.6 } },
+  parrot: { label: 'Macaw (flies)', layout: [['Furn_ParrotPerch', 7.1, 0, -3.6, -PI / 2], ['Furn_ParrotPerch', -3.2, 0, .6, PI / 2]],
+    perches: [{ x: 7.1, y: 1.284, z: -3.6, ry: -PI / 2 }, { x: -3.2, y: 1.284, z: .6, ry: PI / 2 }] },
+  sleeper: { label: 'Ginger cat (asleep on a rack)', layout: [['Pet_Cat_Curled', 2.05, 2.0, 5.3, 0]] },
+  aquarium: { label: 'Aquarium', layout: [['Pet_Aquarium', -7.65, 0, -4.2, PI / 2]] },
+  jellyfish: { label: 'Jellyfish', layout: [['Pet_JellyfishTank', 0, 0, 3.6, 0]] },
+  gecko: { label: 'Gecko', layout: [['Pet_Gecko_Terrarium', 5.9, .42, .4, PI / 2]] },
+};
+const PET_KEY = PETS[q.get('pet')] ? q.get('pet') : 'cat', PET = PETS[PET_KEY];
+LAYOUT.push(...PET.layout);
+const petPicker = document.getElementById('pet');
+for (const [k, v] of Object.entries(PETS)) petPicker.add(new Option(v.label, k, false, k === PET_KEY));
+petPicker.onchange = () => { q.set('pet', petPicker.value); location.search = q.toString(); };
+const BOUNDS = { minX: -7.85, maxX: 7.85, minZ: -5.85, maxZ: 5.85, y: 0 };
+
+let kit, floorElevator, cabElevator, doorsOpen = 0, doorsTarget = 0;
+const ceilingObjs = [], walls = [];
+const roamers = [];
+let flyer = null;
+const staticBoxes = [], dynamicCols = [];
+try {
+  const names = [...LAYOUT.map((l) => l[0]), ...(PET.roamer ? [PET.roamer.walk, PET.roamer.rest] : []), ...(PET.perches ? ['Pet_Parrot_Fly'] : [])];
+  kit = await loadOfficeKit('../../internal/web/static/office/models/', [...new Set(names)], new GLTFLoader());
+  for (const [n, x, y, z, ry] of LAYOUT) {
+    const o = kit.spawn(n);
+    o.position.set(x, y, z); o.rotation.y = ry;
+    scene.add(o);
+    if (y >= 3.9) ceilingObjs.push(o); // ceiling gear: hidden in the overview
+    if (n.startsWith('Arch_Wall') || n === 'Arch_Elevator_Floor') walls.push(o);
+    if (n === 'Arch_Elevator_Floor') floorElevator = o;
+    if (n === 'Arch_Elevator_Cab') cabElevator = o;
+  }
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(16, 12), new THREE.MeshStandardMaterial({ color: '#0d0e12', roughness: 0.9 }));
+  ceil.rotation.x = PI / 2; ceil.position.y = 4; scene.add(ceil); ceilingObjs.push(ceil);
+  for (const [x, z] of [[-4, .3], [0, .3], [4, -1.5], [-5, -4], [4, 3]]) {
+    const l = new THREE.PointLight('#dfe8ff', 5, 9); l.position.set(x, 3.2, z); scene.add(l);
+  }
+  scene.updateMatrixWorld(true);
+  const solid = kit.colliders(scene);
+  const rng = q.get('seed') ? mulberry(Number(q.get('seed'))) : Math.random;
+  if (PET.roamer) {
+    const walk = kit.spawn(PET.roamer.walk), rest = kit.spawn(PET.roamer.rest);
+    scene.add(walk, rest);
+    roamers.push(kit.createRoamer({ ...PET.roamer, walk, rest, colliders: solid, bounds: BOUNDS, rng }));
+  }
+  if (PET.perches) {
+    const bird = kit.spawn('Pet_Parrot_Fly');
+    scene.add(bird);
+    flyer = kit.createFlyer({ bird, perches: PET.perches, rng });
+  }
+  for (const c of solid) {
+    if (/Door_[LR]_COL\d*$/.test(c.name)) dynamicCols.push(c);
+    else staticBoxes.push(new THREE.Box3().setFromObject(c, true));
+  }
+
+  const a = document.getElementById('accent'), s = document.getElementById('second');
+  a.oninput = () => kit.setAccent(a.value);
+  s.oninput = () => kit.setSecondary(s.value);
+  if (q.get('accent')) { a.value = '#' + q.get('accent'); kit.setAccent(a.value); }
+  if (q.get('doors')) doorsOpen = doorsTarget = Number(q.get('doors'));
+  window.kit = kit; window.dbg = { scene, staticBoxes, dynamicCols, camera, player, move, setMode, roamers, flyer: () => flyer, BOUNDS, goal: () => goal };
+} catch (e) {
+  document.getElementById('err').textContent = String(e);
+  console.error(e);
+}
+
+// --- controls -------------------------------------------------------------
+// Overview: orbit (drag), pan (right drag), zoom (wheel); ceiling and near walls
+// hidden; double-click the floor to walk there. First person: click a spot to
+// walk there, drag to look, WASD or arrows, Shift runs. No pointer lock and no
+// movementX: remote and virtual-machine sessions often give the browser an
+// absolute pointer whose relative motion jumps, so looking reads the pointer's
+// position and ignores jumps.
+const HELP = {
+  overview: 'Drag to orbit · right-drag to pan · wheel to zoom · double-click the floor to walk there · V switches',
+  walk: 'Click to walk there · drag to look · WASD/arrows move · Shift runs · E elevator · R back to start · V switches',
+};
+let drag = null, goal = null; // a look drag in progress; the click-to-walk target
+const marker = new THREE.Mesh(new THREE.CylinderGeometry(.25, .25, .05, 24), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }));
+scene.add(marker);
+
+function setMode(m) {
+  if (m === mode) return;
+  if (mode === 'overview') overviewView = { pos: camera.position.clone(), target: orbit.target.clone() };
+  mode = m;
+  orbit.enabled = m === 'overview';
+  if (m === 'overview') { camera.position.copy(overviewView.pos); orbit.target.copy(overviewView.target); orbit.update(); }
+  for (const o of ceilingObjs) o.visible = m === 'walk';
+  if (m === 'walk') for (const w of walls) w.visible = true;
+  marker.visible = m === 'overview';
+  goal = null;
+  hemi.intensity = m === 'overview' ? 2.2 : 0.5; // the room's lamps light it for eye height, not from above
+  document.getElementById('mode-overview').setAttribute('aria-pressed', m === 'overview');
+  document.getElementById('mode-walk').setAttribute('aria-pressed', m === 'walk');
+  document.getElementById('help').textContent = HELP[m];
+}
+document.getElementById('mode-overview').onclick = () => setMode('overview');
+document.getElementById('mode-walk').onclick = () => setMode('walk');
+document.getElementById('help').textContent = HELP.walk;
+marker.visible = false;
+if (q.get('mode') === 'overview') setMode('overview');
+
+const keys = new Set();
+addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
+  keys.add(e.code);
+  goal = null; // a key takes over from click-to-walk
+  if (e.code === 'KeyV') setMode(mode === 'walk' ? 'overview' : 'walk');
+  if (e.code === 'KeyR') Object.assign(player, START);
+  if (e.code === 'KeyE' && mode === 'walk' && floorElevator && Math.hypot(player.x - floorElevator.position.x, player.z - floorElevator.position.z) < 4) doorsTarget = doorsTarget ? 0 : 1;
+  if (e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', (e) => keys.delete(e.code));
+// a key released while the window had no focus never sends keyup: forget them all
+addEventListener('blur', () => { keys.clear(); drag = null; });
+
+// first person: drag looks, a click (no drag) walks to the clicked spot
+const goalMarker = new THREE.Mesh(new THREE.TorusGeometry(.22, .015, 6, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }));
+goalMarker.rotation.x = PI / 2; goalMarker.visible = false; scene.add(goalMarker);
+canvas.addEventListener('pointerdown', (e) => {
+  if (mode !== 'walk' || e.button !== 0) return;
+  drag = { x: e.clientX, y: e.clientY, moved: 0 };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (mode !== 'walk' || !drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag.x = e.clientX; drag.y = e.clientY;
+  if (Math.abs(dx) > 120 || Math.abs(dy) > 120) return; // the pointer jumped (left and re-entered, or a host hand-off): not a drag
+  drag.moved += Math.abs(dx) + Math.abs(dy);
+  player.yaw -= dx * 0.004;
+  player.pitch = THREE.MathUtils.clamp(player.pitch - dy * 0.004, -1.3, 1.3);
+});
+canvas.addEventListener('pointerup', (e) => {
+  if (drag && drag.moved < 6) walkTo(e.clientX, e.clientY);
+  drag = null;
+});
+canvas.addEventListener('pointercancel', () => { drag = null; });
+canvas.addEventListener('lostpointercapture', () => { drag = null; });
+const raycaster = new THREE.Raycaster();
+function pick(cx, cy) { // the first visible surface under the pointer, else the floor plane
+  raycaster.setFromCamera(new THREE.Vector2((cx / innerWidth) * 2 - 1, -(cy / innerHeight) * 2 + 1), camera);
+  const hit = raycaster.intersectObjects(scene.children, true).find((h) => h.object.visible && h.object.isMesh && h.object !== goalMarker
+    && h.object !== marker && !/_COL\d*$/.test(h.object.name) && (() => { for (let o = h.object; o; o = o.parent) if (!o.visible) return false; return true; })());
+  return hit?.point ?? raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+}
+function walkTo(cx, cy) {
+  const p = pick(cx, cy);
+  if (!p || p.y > 2.2) return; // the ceiling or a wall high up: nowhere to walk
+  goal = { x: p.x, z: p.z, stalled: 0 };
+}
+canvas.addEventListener('dblclick', (e) => {
+  if (mode === 'walk') return;
+  // overview: walk to the double-clicked spot on the floor
+  const ndc = new THREE.Vector2((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, camera);
+  const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+  if (hit && inBuilding(hit.x, hit.z) && !hits(boxesNow(), hit.x, hit.z)) { player.x = hit.x; player.z = hit.z; setMode('walk'); }
+});
+
+function mulberry(a) { // seeded random for reproducible checks (?seed=1)
+  return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+// --- walking with collision: a 0.3 m circle against the collider boxes ----------
+const R = 0.3, tmp = new THREE.Box3();
+const boxesNow = () => [...staticBoxes, ...dynamicCols.map((c) => tmp.clone().setFromObject(c, true))]
+  .filter((b) => b.max.y >= 0.25 && b.min.y <= 1.8); // not floor slabs, not overhead gear
+const hits = (boxes, x, z) => boxes.some((b) =>
+  Math.hypot(x - THREE.MathUtils.clamp(x, b.min.x, b.max.x), z - THREE.MathUtils.clamp(z, b.min.z, b.max.z)) < R);
+// the walkable area: the floor plus the elevator shaft behind its doors
+const AREAS = [[BOUNDS.minX, BOUNDS.maxX, BOUNDS.minZ, BOUNDS.maxZ], [-2.95, -1.05, -8.2, BOUNDS.minZ]];
+const outside = (x, z) => Math.min(...AREAS.map(([x0, x1, z0, z1]) =>
+  Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)))); // 0 inside
+const inBuilding = (x, z) => outside(x, z) === 0;
+function move(dx, dz) {
+  const boxes = boxesNow(), { x, z } = player;
+  const ok = (nx, nz) => inBuilding(nx, nz) && !hits(boxes, nx, nz);
+  if (!inBuilding(x, z) || hits(boxes, x, z)) {
+    // stuck inside something or outside the floor: move freely within 0.6 m of the walkable
+    // area (a wall's thickness), or by any step that leads back toward it
+    if (outside(x + dx, z + dz) <= Math.max(outside(x, z), 0.6)) { player.x += dx; player.z += dz; }
+    return;
+  }
+  if (ok(x + dx, z + dz)) { player.x += dx; player.z += dz; }
+  else if (ok(x + dx, z)) player.x += dx; // slide along whatever is in the way
+  else if (ok(x, z + dz)) player.z += dz;
+}
+
+const clock = new THREE.Clock();
+const fwd = new THREE.Vector3();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  if (mode === 'walk') {
+    const turn = (keys.has('ArrowLeft') ? 1 : 0) - (keys.has('ArrowRight') ? 1 : 0);
+    player.yaw += turn * 1.8 * dt;
+    const f = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
+    const r = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+    if (f || r) {
+      const v = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 5 : 2.8) * dt / Math.hypot(f, r);
+      const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+      move((-sy * f + cy * r) * v, (-cy * f - sy * r) * v);
+    } else if (goal) { // click-to-walk: turn toward the spot and walk until there or blocked
+      const dx = goal.x - player.x, dz = goal.z - player.z, d = Math.hypot(dx, dz);
+      const turn = ((Math.atan2(-dx, -dz) - player.yaw + PI * 3) % (PI * 2)) - PI;
+      player.yaw += THREE.MathUtils.clamp(turn, -4 * dt, 4 * dt);
+      const step = Math.min(d, 2.8 * dt), bx = player.x, bz = player.z;
+      move(dx / d * step, dz / d * step);
+      const moved = Math.hypot(player.x - bx, player.z - bz);
+      goal.stalled = moved < step * 0.3 ? goal.stalled + dt : 0;
+      if (d < 0.35 || goal.stalled > 0.4) goal = null; // there, or something is in the way
+    }
+    goalMarker.visible = !!goal;
+    if (goal) goalMarker.position.set(goal.x, 0.02, goal.z);
+    camera.position.set(player.x, 1.7, player.z);
+    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
+  } else {
+    orbit.update();
+    // dollhouse: hide the walls between the camera and the room
+    for (const w of walls) {
+      w.getWorldDirection(fwd); // the wall's front (+Z) faces into the room
+      w.visible = fwd.dot(camera.position.clone().sub(w.position)) > 0;
+    }
+    marker.position.set(player.x, 0.03, player.z);
+  }
+  if (kit) {
+    doorsOpen += THREE.MathUtils.clamp(doorsTarget - doorsOpen, -dt, dt);
+    kit.setElevatorDoors(floorElevator, doorsOpen);
+    kit.setElevatorDoors(cabElevator, doorsOpen);
+    for (const r of roamers) r.update(dt, player);
+    flyer?.update(dt);
+    kit.animate(scene, t);
+  }
+  composer.render();
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+</script>

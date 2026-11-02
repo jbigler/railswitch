@@ -26,6 +26,9 @@ type AgentRow struct {
 	TS      int64  `json:"ts"`
 	Reply   bool   `json:"reply"`   // agentstatus.Status.Reply: the agent asks the user something
 	Running bool   `json:"running"` // its container runs in the worktree (D62)
+	// Usage: its current (or last) session's tokens, when its package's
+	// status hook counts them; nil otherwise.
+	Usage *agentstatus.Usage `json:"usage"`
 	// Config: its package has [config] paths, so it can have a project
 	// default (D135); Default is where that came from, nil without one.
 	Config  bool          `json:"config"`
@@ -52,6 +55,19 @@ func (e *UsageError) Error() string { return e.Msg }
 // on-demand agent runs without its package's secrets (tokenSecrets), so it
 // uses the login kept in its home (D139).
 func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken bool) error {
+	return l.agent(ctx, slug, name, argv, noToken, false)
+}
+
+// AgentDetached is Agent for a service agent without a terminal: it starts
+// the agent's session in the background with argv and returns, for the
+// dashboard to watch and type to (agent screen, agent send). A session
+// already running is left alone without argv, refused with them; an
+// on-demand agent, which needs a terminal, is refused.
+func (l *L) AgentDetached(ctx context.Context, slug, name string, argv []string) error {
+	return l.agent(ctx, slug, name, argv, false, true)
+}
+
+func (l *L) agent(ctx context.Context, slug, name string, argv []string, noToken, detach bool) error {
 	name, err := l.CheckAgent(ctx, name)
 	if err != nil {
 		return err
@@ -86,6 +102,9 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 	case slices.Contains(running, name) && s.OnDemand:
 		return fmt.Errorf("agent %s is already running in %s", name, slug)
 	}
+	if detach && s.OnDemand {
+		return fmt.Errorf("agent %s runs on demand, in one terminal; starting it in the background is for a service agent", name)
+	}
 	var without []string
 	if noToken {
 		if !s.OnDemand {
@@ -93,10 +112,10 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 		}
 		without = tokenSecrets(m, name)
 	}
+	if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }, without); err != nil {
+		return err
+	}
 	if s.OnDemand {
-		if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }, without); err != nil {
-			return err
-		}
 		if err := l.stopIdleAgents(ctx, m, slug, idle); err != nil {
 			return err
 		}
@@ -133,6 +152,9 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 	if live && len(argv) > 0 {
 		return fmt.Errorf("agent %s has a session in %s, and arguments start a new one: join it without them, or railswitch agent stop %s first", name, slug, name)
 	}
+	if live && detach {
+		return nil // it runs already
+	}
 	if len(argv) == 0 { // the package's exec words, as for an on-demand agent
 		argv = s.Session.Exec
 	}
@@ -146,6 +168,11 @@ func (l *L) Agent(ctx context.Context, slug, name string, argv []string, noToken
 			return fmt.Errorf("%s: session: %w", id, err)
 		}
 		session = append(session, w)
+	}
+	if detach { // no client: a fixed size, as a terminal would give it
+		_, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...),
+			append([]string{"new-session", "-d", "-x", "160", "-y", "48", "-s", render.AgentSession, "-e", "COLORTERM=truecolor", "--"}, session...)...)})
+		return err
 	}
 	return l.inContainer(ctx, agentAttach(ctr, append([]string{"new-session", "-A", "-s", render.AgentSession, "-e", "COLORTERM=truecolor", "--"}, session...)))
 }
@@ -163,21 +190,10 @@ func (l *L) AgentWatch(ctx context.Context, slug, name string) error {
 // CheckWatch returns the container of the agent AgentWatch would watch, or
 // why it can't; --new-term calls it before opening a terminal.
 func (l *L) CheckWatch(ctx context.Context, slug, name string) (string, error) {
-	m, err := l.model(ctx)
+	name, ctr, err := l.serviceAgent(ctx, slug, name, "--watch")
 	if err != nil {
 		return "", err
 	}
-	if name, err = l.agentName(m, name); err != nil {
-		return "", err
-	}
-	s, err := service(m, "agent-"+name)
-	if err != nil {
-		return "", err
-	}
-	if s.OnDemand {
-		return "", fmt.Errorf("agent %s runs on demand, in one terminal; --watch is for a service agent", name)
-	}
-	ctr := containerOf(m, slug, s.ID)
 	if ok, err := l.podman().Running(ctx, ctr); err != nil {
 		return "", err
 	} else if !ok {
@@ -189,6 +205,27 @@ func (l *L) CheckWatch(ctx context.Context, slug, name string) (string, error) {
 		return "", fmt.Errorf("agent %s has no session in %s to watch: railswitch agent %s starts one", name, slug, name)
 	}
 	return ctr, nil
+}
+
+// serviceAgent resolves agent name ("": the default one) and its container
+// in worktree slug; an on-demand agent is refused, as what (the command)
+// needs a service agent's session.
+func (l *L) serviceAgent(ctx context.Context, slug, name, what string) (string, string, error) {
+	m, err := l.model(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if name, err = l.agentName(m, name); err != nil {
+		return "", "", err
+	}
+	s, err := service(m, "agent-"+name)
+	if err != nil {
+		return "", "", err
+	}
+	if s.OnDemand {
+		return "", "", fmt.Errorf("agent %s runs on demand, in one terminal; %s is for a service agent", name, what)
+	}
+	return name, containerOf(m, slug, s.ID), nil
 }
 
 // agentAttach is the podman exec of a session client on service agent ctr's
@@ -238,13 +275,17 @@ func (l *L) waitAgentServer(ctx context.Context, ctr string) error {
 	return fmt.Errorf("%s: its session server does not answer (an agent base image from before D142? railswitch containerfile show agent-base): %w", ctr, err)
 }
 
+// errNoServer is agentSession's error for a session server that does not
+// answer (still starting, or an old image).
+var errNoServer = errors.New("its session server does not answer")
+
 // agentSession reports whether service agent container ctr has its
 // agent's session. Only the server's own answer (exit 1) means none: a failed exec
 // or a server that doesn't answer must never make a live agent look idle.
 func (l *L) agentSession(ctx context.Context, ctr string) (bool, error) {
 	// has-session exits 1 for "no server" too: the server must answer first.
 	if _, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "list-sessions")}); err != nil {
-		return false, fmt.Errorf("%s: can't tell whether its agent has a session: its session server does not answer: %w", ctr, err)
+		return false, fmt.Errorf("%s: can't tell whether its agent has a session: %w: %w", ctr, errNoServer, err)
 	}
 	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "has-session", "-t", "="+render.AgentSession)})
 	switch {
@@ -371,7 +412,7 @@ func agentRows(m *render.Model, in *render.Instance, running []string) []AgentRo
 		st := agentstatus.Read(filepath.Join(in.Values["status.dir"], a.Name+".json"))
 		rows = append(rows, AgentRow{
 			Name: a.Name, Package: a.Ref.String(), Run: a.Run,
-			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(),
+			State: st.State, Message: st.Message, TS: st.TS, Reply: st.Reply(), Usage: st.Usage,
 			Running: slices.Contains(running, a.Name),
 			Config:  len(a.Agent.Config.Paths) > 0, Default: ReadAgentDefault(m, a.Name),
 			DefaultPending: defaultPending(filepath.Join(in.Values["agent.home"], a.Name)),

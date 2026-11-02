@@ -244,7 +244,7 @@ does not read a secret's value back from podman.
 | `created` | string or `null` | When the podman secret was created (RFC 3339); `null` when not set. |
 | `services` | array of strings | The service ids that receive it. |
 | `driver_differs` | boolean | The value is stored with another driver than `config.toml` configures; `railswitch secret set <name>` re-creates it under the configured one. |
-| `up` | boolean | `up` refuses to start while it is unset: a service `up` starts receives it. `false` for a secret only on-demand services (agents) receive, which is checked when they run; `true` for every secret when the services can't be told. |
+| `up` | boolean | `up` refuses to start while it is unset: a service `up` starts receives it. `false` for a secret only agents receive, which is checked when they start (`up` then starts the worktree without its default agent, with a warning); `true` for every secret when the services can't be told. |
 | `git_signing` | boolean | The value is an SSH commit signing key (`git_signing = true`, D61): its services sign commits and tags with it. |
 
 ## `signer ls`
@@ -635,8 +635,8 @@ hook writes.
 
 ```json
 [
-  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true, "config": true, "default": {"from": "main", "promoted": "2026-10-30T12:00:00Z"}, "default_pending": false},
-  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false, "config": false, "default": null, "default_pending": false}
+  {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "done", "message": "Ship it?", "ts": 1792919287, "reply": true, "running": true, "config": true, "default": {"from": "main", "promoted": "2026-10-30T12:00:00Z"}, "default_pending": false, "usage": {"input": 1840, "output": 52300, "cache_read": 1250000, "cache_write": 88000}},
+  {"name": "probe", "package": "local:probe@1", "run": "service", "state": "off", "message": "", "ts": 0, "reply": false, "running": false, "config": false, "default": null, "default_pending": false, "usage": null}
 ]
 ```
 
@@ -653,6 +653,95 @@ hook writes.
 | `config` | boolean | Its package has `[config] paths`, so it can have a project default (`agent default`, D135). |
 | `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 | `default_pending` | boolean | Its home in this worktree holds the request to take the default (a new home, or `agent default apply`): its entrypoint applies it at the agent's next start. |
+| `usage` | object or null | The status file's `usage`: the tokens of the agent's current (or last) session, as its package's hook counts them: `input`, `output`, `cache_read`, `cache_write` (integers). `null` when the file has none, or one with a count below 0 or above 10^13. claude@1 counts them from the session's transcript when a turn ends or a session starts. |
+
+## `agent screen [<name>]`
+
+A service agent's screen in the current worktree, as it shows now (D144):
+`podman exec <ctr> tmux -L agent capture-pane -p -J -t =agent:`, the
+visible pane of the agent's session with wrapped lines joined. Each line
+has its control characters made spaces and its trailing spaces cut;
+trailing blank lines are cut. The name defaults as for `railswitch agent`.
+An on-demand agent is refused (exit 1). The text form prints the lines.
+
+```json
+{"agent": "claude", "running": true, "session": true, "lines": ["> fix the failing spec", "", "● Reading spec/models/user_spec.rb"]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `agent` | string | The agent's name. |
+| `running` | boolean | Its container runs in this worktree. `false`: `session` is `false` and `lines` empty, exit 0. |
+| `session` | boolean | Its session server holds the agent's session. `false` (the container runs, no agent in it): `lines` empty, exit 0. |
+| `lines` | array of strings | The screen, top to bottom; never null. |
+
+## `issue ls`
+
+One project (`-C`): its open GitHub issues (D144), from `gh issue list
+--repo <owner/name> --state open --limit 100 --json
+number,title,url,labels,assignees,updatedAt,author` on the host with
+`GH_PROMPT_DISABLED=1`, in `/`, 30 s timeout: the 100 newest, in gh's
+order (newest created first). The repo comes from `project.toml` as for
+[`pr ls`](#pr-ls); one not on GitHub fails with "issue ls: <url> is not a
+GitHub repo". The text form is a table `ISSUE AUTHOR ASSIGNEES LABELS
+TITLE` (control characters as spaces).
+
+```json
+{"me": "ann", "issues": [{"number": 42, "title": "Login times out", "url": "https://github.com/o/n/issues/42", "labels": ["bug"], "assignees": ["ann"], "author": "bob", "updated": "2026-10-31T19:00:32Z"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `me` | string | The login gh signs in as (`gh api user`), for "assigned to me"; `""` with a warning on stderr when gh can't tell. |
+| `issues` | array | Never null. |
+| `number`, `title`, `url` | number, string, string | As GitHub has them. |
+| `labels` | array of strings | Label names; never null. |
+| `assignees` | array of strings | Logins; never null. |
+| `author` | string | The author's login. |
+| `updated` | string | `updatedAt`, RFC 3339. |
+
+## `notes ls`
+
+The workspace's shared notes (D141, D144): each regular file in
+`<workspace>/notes/` whose name matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$`,
+newest first. A symlink, directory or other name is left out. No `notes/`
+folder lists none. No worktree is needed.
+
+```json
+{"notes": [{"name": "run_db_prepare_after_a_schema_change.md", "size": 412, "modified": "2026-10-31T19:00:32Z"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `notes` | array | Never null. |
+| `name` | string | The file name. |
+| `size` | number | Bytes. |
+| `modified` | string | Its modification time, RFC 3339 UTC. |
+
+## `notes show <name>`
+
+One note, read as a hostile file (`safefile.Read`: a regular file, not a
+symlink, at most 1 MiB). The text form prints the note with control
+characters other than line breaks and tabs as spaces.
+
+```json
+{"name": "run_db_prepare_after_a_schema_change.md", "text": "Run bin/rails db:prepare …\n", "hash": "sha256:9f2c…"}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The file name. |
+| `text` | string | Its content. |
+| `hash` | string | `sha256:<hex>` of the bytes: what `notes write` and `notes rm` take as `--if-hash`. |
+
+`notes write <name> --if-hash <h>` replaces the note with stdin (at most
+1 MiB, UTF-8) when it still has hash `h`; `--if-hash ""` creates it and
+refuses an existing one. The file is written 0644 through a temp file
+renamed over the name; `notes/` is created 0700 when missing. `notes rm
+<name> --if-hash <h>` removes it at that hash. A stale hash, a missing
+note or a symlink in its place exits 1 and changes nothing. With `--json`,
+both print `{"hash": …}`: the note's new hash, the one the next edit passes
+as `--if-hash` (`""` after `rm`).
 
 ## `overview`
 
@@ -776,6 +865,27 @@ The text form is a table `WORKTREE BRANCH PR STATE CHECKS REVIEW TITLE`
 | `pr.checks` | string | `fail` if any check concluded failure, error, timed out, cancelled, action required or startup failure; else `pending` if any is not completed (or a status context is pending or expected); else `pass`; `none` with no checks. |
 | `pr.review` | string | `approved`, `changes_requested`, `pending` (review required) or `none`. |
 | `pr.review_app` | string | An open or draft PR's review app: the `environmentUrl` of the newest `ACTIVE` GitHub deployment of the PR's head commit whose latest status is `SUCCESS` (how most hosting services announce one), http or https only; one `gh api graphql` query for all of them. `""` for none, or when GitHub couldn't be read (a warning on stderr). |
+
+### `pr ls --all`
+
+Every open pull request of the repo (not only the worktrees'), with who
+it is for: `gh pr list --repo <owner/name> --state open --limit 100 --json
+number,title,url,headRefName,isDraft,author,assignees,reviewRequests,reviewDecision,updatedAt`
+(no checks: a repo-wide list with them times out at GitHub), and `me` as
+for [`issue ls`](#issue-ls). PRs from forks are kept. The text form is a
+table `PR AUTHOR ASSIGNEES REVIEWERS REVIEW TITLE` (a draft's title starts
+`[draft]`).
+
+```json
+{"me": "ann", "prs": [{"number": 7, "title": "Add billing", "url": "https://github.com/o/n/pull/7", "branch": "billing", "draft": false, "author": "bob", "assignees": [], "reviewers": ["ann"], "review": "pending", "updated": "2026-11-01T00:00:00Z"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `me` | string | As for `issue ls`. |
+| `prs[].branch` | string | The head branch. |
+| `prs[].author`, `assignees`, `reviewers` | string, arrays of strings | Logins; `reviewers` are the people a review is asked of (teams left out); arrays never null. |
+| `prs[].review` | string | `approved`, `changes_requested`, `pending` or `none`, as `pr ls`. |
 
 ## `stack ls`
 

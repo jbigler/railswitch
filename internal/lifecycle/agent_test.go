@@ -184,6 +184,37 @@ func TestAgentServiceAttach(t *testing.T) {
 	}
 }
 
+// TestAgentDetached: the session starts in the background, with no client
+// and a fixed size; a live one is left alone; an on-demand agent refuses.
+func TestAgentDetached(t *testing.T) {
+	e := setup(t)
+	const unit = "filial-feat-agent-probe.service"
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", unit)
+	e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "has-session"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if err := e.l.AgentDetached(ctx, "feat", "probe", []string{"work on #7"}); err != nil {
+		t.Fatal(err)
+	}
+	calls := e.calls()
+	if last := joined(calls[len(calls)-1]); last != "podman exec filial-feat-agent-probe tmux -L agent new-session -d -x 160 -y 48 -s agent -e COLORTERM=truecolor -- work on #7" {
+		t.Errorf("last call %q; want a detached session running the arguments", last)
+	}
+	if to := e.f.Cmds[len(e.f.Cmds)-1].Timeout; to == sys.NoTimeout {
+		t.Error("a detached start has no deadline")
+	}
+
+	e = setup(t) // has-session answers: a live session
+	e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", unit)
+	if err := e.l.AgentDetached(ctx, "feat", "probe", nil); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(e.calls(), "podman exec filial-feat-agent-probe tmux -L agent new-session"); n != 0 {
+		t.Errorf("a live session got another:\n%s", dump(e.calls()))
+	}
+	if err := e.l.AgentDetached(ctx, "feat", "claude", nil); err == nil || !strings.Contains(err.Error(), "on demand") {
+		t.Errorf("on-demand agent: %v", err)
+	}
+}
+
 func TestAgentNameChoice(t *testing.T) {
 	e := setup(t)
 	m, err := e.l.model(ctx)
@@ -225,7 +256,7 @@ func TestAgentNameDefault(t *testing.T) {
 	}
 	e = setup(t)
 	e.editProject(t, func(s string) string {
-		return withoutProbe(s) + "\n[agents.second]\nuse = \"claude@1\"\n"
+		return withoutProbe(s) + "\n[agents.second]\nuse = \"claude@1\"\nrun = \"on-demand\"\n"
 	})
 	if m, err = e.l.model(ctx); err != nil {
 		t.Fatal(err)

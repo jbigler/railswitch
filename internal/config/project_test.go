@@ -207,6 +207,8 @@ func TestAgentConfigValidate(t *testing.T) {
 		{"stop", "stop", ok, []string{"agents.stop", "reserved"}},
 		{"add", "add", ok, []string{"agents.add", "reserved"}},
 		{"default", "default", ok, []string{"agents.default", "reserved"}},
+		{"screen", "screen", ok, []string{"agents.screen", "reserved"}},
+		{"send", "send", ok, []string{"agents.send", "reserved"}},
 		{"update", "update", ok, []string{"agents.update", "reserved"}},
 		{"underscore", "a_b", ok, []string{"agents.a_b"}},
 		{"long", strings.Repeat("a", 26), ok, []string{"agents." + strings.Repeat("a", 26)}},

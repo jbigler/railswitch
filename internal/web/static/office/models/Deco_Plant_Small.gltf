@@ -3,6 +3,9 @@
 		"generator":"Khronos glTF Blender I/O v5.2.40",
 		"version":"2.0"
 	},
+	"extensionsUsed":[
+		"KHR_materials_emissive_strength"
+	],
 	"scene":0,
 	"scenes":[
 		{
@@ -44,6 +47,30 @@
 					1
 				],
 				"metallicFactor":0
+			}
+		},
+		{
+			"doubleSided":true,
+			"emissiveFactor":[
+				0.2581828534603119,
+				0.10702310502529144,
+				1
+			],
+			"extensions":{
+				"KHR_materials_emissive_strength":{
+					"emissiveStrength":4
+				}
+			},
+			"name":"RS_Neon_Secondary",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
 			}
 		},
 		{
@@ -110,6 +137,14 @@
 					},
 					"indices":11,
 					"material":3
+				},
+				{
+					"attributes":{
+						"POSITION":12,
+						"NORMAL":13
+					},
+					"indices":14,
+					"material":4
 				}
 			]
 		}
@@ -174,6 +209,34 @@
 		{
 			"bufferView":6,
 			"componentType":5126,
+			"count":192,
+			"max":[
+				0.06260000169277191,
+				0.12173205614089966,
+				0.06259999424219131
+			],
+			"min":[
+				-0.06260000169277191,
+				0.11826793849468231,
+				-0.06260000914335251
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":7,
+			"componentType":5126,
+			"count":192,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":8,
+			"componentType":5123,
+			"count":1152,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":9,
+			"componentType":5126,
 			"count":92,
 			"max":[
 				0.07579249143600464,
@@ -188,19 +251,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":7,
+			"bufferView":10,
 			"componentType":5126,
 			"count":92,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":8,
+			"bufferView":11,
 			"componentType":5123,
 			"count":270,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":9,
+			"bufferView":12,
 			"componentType":5126,
 			"count":64,
 			"max":[
@@ -216,13 +279,13 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":10,
+			"bufferView":13,
 			"componentType":5126,
 			"count":64,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":11,
+			"bufferView":14,
 			"componentType":5123,
 			"count":168,
 			"type":"SCALAR"
@@ -267,44 +330,62 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":1104,
+			"byteLength":2304,
 			"byteOffset":3408,
 			"target":34962
 		},
 		{
 			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":5712,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":8016,
+			"target":34963
+		},
+		{
+			"buffer":0,
 			"byteLength":1104,
-			"byteOffset":4512,
+			"byteOffset":10320,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1104,
+			"byteOffset":11424,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":540,
-			"byteOffset":5616,
+			"byteOffset":12528,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":768,
-			"byteOffset":6156,
+			"byteOffset":13068,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":768,
-			"byteOffset":6924,
+			"byteOffset":13836,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":336,
-			"byteOffset":7692,
+			"byteOffset":14604,
 			"target":34963
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":8028,
+			"byteLength":14940,
 			"uri":"Deco_Plant_Small.bin"
 		}
 	]

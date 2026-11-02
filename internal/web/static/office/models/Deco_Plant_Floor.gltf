@@ -3,6 +3,9 @@
 		"generator":"Khronos glTF Blender I/O v5.2.40",
 		"version":"2.0"
 	},
+	"extensionsUsed":[
+		"KHR_materials_emissive_strength"
+	],
 	"scene":0,
 	"scenes":[
 		{
@@ -51,6 +54,30 @@
 					1
 				],
 				"metallicFactor":0
+			}
+		},
+		{
+			"doubleSided":true,
+			"emissiveFactor":[
+				0.2581828534603119,
+				0.10702310502529144,
+				1
+			],
+			"extensions":{
+				"KHR_materials_emissive_strength":{
+					"emissiveStrength":4
+				}
+			},
+			"name":"RS_Neon_Secondary",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
 			}
 		},
 		{
@@ -129,6 +156,14 @@
 					},
 					"indices":14,
 					"material":3
+				},
+				{
+					"attributes":{
+						"POSITION":15,
+						"NORMAL":16
+					},
+					"indices":17,
+					"material":4
 				}
 			]
 		}
@@ -221,6 +256,34 @@
 		{
 			"bufferView":9,
 			"componentType":5126,
+			"count":192,
+			"max":[
+				0.20600000023841858,
+				0.4234641194343567,
+				0.2059999704360962
+			],
+			"min":[
+				-0.20600000023841858,
+				0.4165358543395996,
+				-0.20600003004074097
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":10,
+			"componentType":5126,
+			"count":192,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":11,
+			"componentType":5123,
+			"count":1152,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":12,
+			"componentType":5126,
 			"count":172,
 			"max":[
 				0.30557769536972046,
@@ -235,19 +298,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":10,
+			"bufferView":13,
 			"componentType":5126,
 			"count":172,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":11,
+			"bufferView":14,
 			"componentType":5123,
 			"count":480,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":12,
+			"bufferView":15,
 			"componentType":5126,
 			"count":256,
 			"max":[
@@ -263,13 +326,13 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":13,
+			"bufferView":16,
 			"componentType":5126,
 			"count":256,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":14,
+			"bufferView":17,
 			"componentType":5123,
 			"count":672,
 			"type":"SCALAR"
@@ -332,44 +395,62 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":2064,
+			"byteLength":2304,
 			"byteOffset":4056,
 			"target":34962
 		},
 		{
 			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":6360,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":8664,
+			"target":34963
+		},
+		{
+			"buffer":0,
 			"byteLength":2064,
-			"byteOffset":6120,
+			"byteOffset":10968,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2064,
+			"byteOffset":13032,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":960,
-			"byteOffset":8184,
+			"byteOffset":15096,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":3072,
-			"byteOffset":9144,
+			"byteOffset":16056,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":3072,
-			"byteOffset":12216,
+			"byteOffset":19128,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1344,
-			"byteOffset":15288,
+			"byteOffset":22200,
 			"target":34963
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":16632,
+			"byteLength":23544,
 			"uri":"Deco_Plant_Floor.bin"
 		}
 	]

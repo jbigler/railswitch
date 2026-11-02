@@ -63,13 +63,13 @@ M.update(
     screenTerm=mat('RS_Screen_Term', '#000000', 0, .25, emit='#22e6ff', strength=2, image=make_image('RS_ScreenTerm', 512, 384, draw_term), emit_image=True),
     screenOff=mat('RS_ScreenOff', '#050608', .2, .08),
     poster=mat('RS_Poster', '#000000', 0, .8, emit='#ffffff', strength=0.35, image=make_image('RS_Poster', 256, 384, draw_poster), emit_image=True),
-    beige=mat('RS_BeigePlastic', '#a9a18c', 0, .6),
-    cardboard=mat('RS_Cardboard', '#7d5f3e', 0, .92),
+    beige=mat('RS_BeigePlastic', '#2c2f36', .35, .5),  # retro units in gunmetal, in the family
+    cardboard=mat('RS_Cardboard', '#4a3a28', 0, .95),  # dark and grimy
     orange=mat('RS_Orange', '#b84f1a', .1, .5),
     red=mat('RS_Red', '#7e1b1e', .3, .45),
     note=mat('RS_Note', '#d9c45a', 0, .9),
     tape=mat('RS_Tape', '#b9a24a', 0, .7),
-    cork=mat('RS_Cork', '#6e5236', 0, .95),
+    cork=mat('RS_Cork', '#3d2f22', 0, .95),
     warm=mat('RS_Glow_Warm', emit='#ff7a2a', strength=5),
 )
 # the poster's base color also comes from its image so it reads lit or unlit

@@ -453,13 +453,19 @@ def pet_bowls(a):
 
 
 def cat_tree(a):
-    a.box(.55, .04, .55, M['cushion'], 0, .02, 0)
+    """Cat tree: dark painted posts wrapped in worn rope, charcoal platforms,
+    a cubby, small neon edges on the platforms."""
+    a.box(.55, .04, .55, M['dark'], 0, .02, 0)
     a.box(.36, .3, .36, M['cushion'], -.05, .19, -.05)
     a.cyl(.1, .1, .002, M['dark'], -.05, .19, .131, 16, rx=math.pi / 2)
-    a.cyl(.05, .05, .7, M['cardboard'], .15, .38, .14, 12)
-    a.cyl(.05, .05, .65, M['cardboard'], -.12, .66, -.12, 12)
+    for x, z, h, y in ((.15, .14, .7, .38), (-.12, -.12, .65, .66)):
+        a.cyl(.05, .05, h, M['body'], x, y, z, 12)
+        a.cyl(.056, .056, h * .7, M['cardboard'], x, y, z, 12)    # the rope wrap, worn
     a.cyl(.21, .21, .035, M['cushion'], .12, .74, .1, 20)
     a.cyl(.2, .2, .035, M['cushion'], -.1, 1.0, -.1, 20)
+    for x, y, z, rr in ((.12, .74, .1, .215), (-.1, 1.0, -.1, .205)):
+        with a.at(x, y - .019, z, rx=math.pi / 2):
+            a.torus(rr, .003, M['neon2'], seg=40, tseg=6)
     a.cable([(.3, .74, .2), (.31, .6, .22), (.3, .5, .2)], .003, M['dark'], seg=4)
     a.ico(.025, M['red'], .3, .48, .2, .3, 4)
 

@@ -124,7 +124,7 @@ def snake_plant(a, seed=1):
 
 def monstera(a, seed=2):
     r = random.Random(seed)
-    a.cyl(.21, .16, .4, M['terracotta'], 0, .2, 0, 16)
+    a.cyl(.21, .16, .4, M['concrete'], 0, .2, 0, 16)
     a.cyl(.19, .19, .01, M['soil'], 0, .39, 0, 16)
     for i in range(9):
         ang = i * 2.4 + r.random()
@@ -147,7 +147,7 @@ def palm(a, seed=3):
 
 def bush(a, seed=4):
     r = random.Random(seed)
-    a.cyl(.25, .19, .36, M['terracotta'], 0, .18, 0, 16)
+    a.cyl(.25, .19, .36, M['concrete'], 0, .18, 0, 16)
     a.cyl(.23, .23, .01, M['soil'], 0, .35, 0, 16)
     for i in range(70):
         u, v = r.random() * 2 * math.pi, math.acos(2 * r.random() - 1)
@@ -189,12 +189,15 @@ def book_stack(a, n=4, seed=1):
 
 
 def side_table(a, seed=1):
-    a.cyl(.28, .28, .03, L['wood'], 0, .55, 0, 24)
+    """Round side table in dark metal, a neon ring under its top."""
+    a.cyl(.28, .28, .03, M['body'], 0, .55, 0, 24)
+    with a.at(0, .53, 0, rx=math.pi / 2):
+        a.torus(.24, .005, M['neon2'], seg=40, tseg=6)
     a.cyl(.03, .03, .52, M['trim'], 0, .27, 0, 8)
     a.cyl(.2, .22, .02, M['dark'], 0, .01, 0, 20)
     with a.at(-.08, .565, .02): book_stack(a, 3, seed)
     with a.at(.13, .565, -.06): mug(a)
-    with a.at(.06, .565, .14, s=.9): plant(a, False, seed + 30, M['terracotta'])
+    with a.at(.06, .565, .14, s=.9): plant(a, False, seed + 30, M['concrete'])
 
 
 def floor_lamp(a):

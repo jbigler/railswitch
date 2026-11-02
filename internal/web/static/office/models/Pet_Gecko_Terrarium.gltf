@@ -213,6 +213,30 @@
 		},
 		{
 			"doubleSided":true,
+			"emissiveFactor":[
+				0.2581828534603119,
+				0.10702310502529144,
+				1
+			],
+			"extensions":{
+				"KHR_materials_emissive_strength":{
+					"emissiveStrength":4
+				}
+			},
+			"name":"RS_Neon_Secondary",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
 			"name":"RS_LeafDark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
@@ -412,6 +436,15 @@
 					},
 					"indices":59,
 					"material":15
+				},
+				{
+					"attributes":{
+						"POSITION":60,
+						"NORMAL":61,
+						"TEXCOORD_0":62
+					},
+					"indices":63,
+					"material":16
 				}
 			]
 		}
@@ -851,6 +884,40 @@
 		{
 			"bufferView":48,
 			"componentType":5126,
+			"count":768,
+			"max":[
+				-0.1499200016260147,
+				0.1523856371641159,
+				-0.06992001086473465
+			],
+			"min":[
+				-0.2500799894332886,
+				0.1496143341064453,
+				-0.1700800210237503
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":49,
+			"componentType":5126,
+			"count":768,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":50,
+			"componentType":5126,
+			"count":768,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":51,
+			"componentType":5123,
+			"count":1152,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":52,
+			"componentType":5126,
 			"count":132,
 			"max":[
 				-0.15503089129924774,
@@ -865,25 +932,25 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":49,
+			"bufferView":53,
 			"componentType":5126,
 			"count":132,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":50,
+			"bufferView":54,
 			"componentType":5126,
 			"count":132,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":51,
+			"bufferView":55,
 			"componentType":5123,
 			"count":312,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":52,
+			"bufferView":56,
 			"componentType":5126,
 			"count":48,
 			"max":[
@@ -899,25 +966,25 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":53,
+			"bufferView":57,
 			"componentType":5126,
 			"count":48,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":54,
+			"bufferView":58,
 			"componentType":5126,
 			"count":48,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":55,
+			"bufferView":59,
 			"componentType":5123,
 			"count":126,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":56,
+			"bufferView":60,
 			"componentType":5126,
 			"count":96,
 			"max":[
@@ -933,19 +1000,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":57,
+			"bufferView":61,
 			"componentType":5126,
 			"count":96,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":58,
+			"bufferView":62,
 			"componentType":5126,
 			"count":96,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":59,
+			"bufferView":63,
 			"componentType":5123,
 			"count":180,
 			"type":"SCALAR"
@@ -1242,74 +1309,98 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":1584,
+			"byteLength":9216,
 			"byteOffset":77016,
 			"target":34962
 		},
 		{
 			"buffer":0,
+			"byteLength":9216,
+			"byteOffset":86232,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":6144,
+			"byteOffset":95448,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":101592,
+			"target":34963
+		},
+		{
+			"buffer":0,
 			"byteLength":1584,
-			"byteOffset":78600,
+			"byteOffset":103896,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1584,
+			"byteOffset":105480,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1056,
-			"byteOffset":80184,
+			"byteOffset":107064,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":624,
-			"byteOffset":81240,
+			"byteOffset":108120,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":576,
-			"byteOffset":81864,
+			"byteOffset":108744,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":576,
-			"byteOffset":82440,
+			"byteOffset":109320,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":384,
-			"byteOffset":83016,
+			"byteOffset":109896,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":252,
-			"byteOffset":83400,
+			"byteOffset":110280,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":1152,
-			"byteOffset":83652,
+			"byteOffset":110532,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1152,
-			"byteOffset":84804,
+			"byteOffset":111684,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":768,
-			"byteOffset":85956,
+			"byteOffset":112836,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":360,
-			"byteOffset":86724,
+			"byteOffset":113604,
 			"target":34963
 		}
 	],
@@ -1321,7 +1412,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":87084,
+			"byteLength":113964,
 			"uri":"Pet_Gecko_Terrarium.bin"
 		}
 	]

@@ -160,6 +160,30 @@
 		},
 		{
 			"doubleSided":true,
+			"emissiveFactor":[
+				0.2581828534603119,
+				0.10702310502529144,
+				1
+			],
+			"extensions":{
+				"KHR_materials_emissive_strength":{
+					"emissiveStrength":4
+				}
+			},
+			"name":"RS_Neon_Secondary",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0,
+					0,
+					0,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		},
+		{
+			"doubleSided":true,
 			"name":"RS_LeafDark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
@@ -301,6 +325,15 @@
 					},
 					"indices":43,
 					"material":10
+				},
+				{
+					"attributes":{
+						"POSITION":44,
+						"NORMAL":45,
+						"TEXCOORD_0":46
+					},
+					"indices":47,
+					"material":11
 				}
 			]
 		}
@@ -647,6 +680,40 @@
 		{
 			"bufferView":36,
 			"componentType":5126,
+			"count":768,
+			"max":[
+				0.1825999915599823,
+				0.9717320799827576,
+				0.012599927373230457
+			],
+			"min":[
+				0.057399995625019073,
+				0.9682679772377014,
+				-0.11260007321834564
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":37,
+			"componentType":5126,
+			"count":768,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":38,
+			"componentType":5126,
+			"count":768,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":39,
+			"componentType":5123,
+			"count":1152,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":40,
+			"componentType":5126,
 			"count":68,
 			"max":[
 				0.12649518251419067,
@@ -661,25 +728,25 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":37,
+			"bufferView":41,
 			"componentType":5126,
 			"count":68,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":38,
+			"bufferView":42,
 			"componentType":5126,
 			"count":68,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":39,
+			"bufferView":43,
 			"componentType":5123,
 			"count":144,
 			"type":"SCALAR"
 		},
 		{
-			"bufferView":40,
+			"bufferView":44,
 			"componentType":5126,
 			"count":112,
 			"max":[
@@ -695,19 +762,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":41,
+			"bufferView":45,
 			"componentType":5126,
 			"count":112,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":42,
+			"bufferView":46,
 			"componentType":5126,
 			"count":112,
 			"type":"VEC2"
 		},
 		{
-			"bufferView":43,
+			"bufferView":47,
 			"componentType":5123,
 			"count":294,
 			"type":"SCALAR"
@@ -932,50 +999,74 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":816,
+			"byteLength":9216,
 			"byteOffset":29128,
 			"target":34962
 		},
 		{
 			"buffer":0,
+			"byteLength":9216,
+			"byteOffset":38344,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":6144,
+			"byteOffset":47560,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":53704,
+			"target":34963
+		},
+		{
+			"buffer":0,
 			"byteLength":816,
-			"byteOffset":29944,
+			"byteOffset":56008,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":816,
+			"byteOffset":56824,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":544,
-			"byteOffset":30760,
+			"byteOffset":57640,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":288,
-			"byteOffset":31304,
+			"byteOffset":58184,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":1344,
-			"byteOffset":31592,
+			"byteOffset":58472,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1344,
-			"byteOffset":32936,
+			"byteOffset":59816,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":896,
-			"byteOffset":34280,
+			"byteOffset":61160,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":588,
-			"byteOffset":35176,
+			"byteOffset":62056,
 			"target":34963
 		}
 	],
@@ -987,7 +1078,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":35764,
+			"byteLength":62644,
 			"uri":"Deco_MiniFridge.bin"
 		}
 	]

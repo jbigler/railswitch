@@ -382,13 +382,13 @@ M = dict(
 # worn, lived-in accents shared by every set
 M.update(
     screenOff=mat('RS_ScreenOff', '#050608', .2, .08),
-    beige=mat('RS_BeigePlastic', '#a9a18c', 0, .6),
-    cardboard=mat('RS_Cardboard', '#7d5f3e', 0, .92),
+    beige=mat('RS_BeigePlastic', '#2c2f36', .35, .5),  # retro units in gunmetal, in the family
+    cardboard=mat('RS_Cardboard', '#4a3a28', 0, .95),  # dark and grimy
     orange=mat('RS_Orange', '#b84f1a', .1, .5),
     red=mat('RS_Red', '#7e1b1e', .3, .45),
     note=mat('RS_Note', '#d9c45a', 0, .9),
     tape=mat('RS_Tape', '#b9a24a', 0, .7),
-    cork=mat('RS_Cork', '#6e5236', 0, .95),
+    cork=mat('RS_Cork', '#3d2f22', 0, .95),
     warm=mat('RS_Glow_Warm', emit='#ff7a2a', strength=5),
 )
 for k in ('leaf', 'leaf2'):
@@ -770,6 +770,8 @@ def plant(a, big=True, seed=1, pot=None):
     ph, pr, h = (.42, .2, 1.25) if big else (.12, .06, .3)
     a.cyl(pr, pr * .8, ph, pot or M['pot'], 0, ph / 2, 0)
     a.cyl(pr * .92, pr * .92, .01, M['soil'], 0, ph - .02, 0)
+    with a.at(0, ph, 0, rx=math.pi / 2):
+        a.torus(pr * 1.01, .004 if big else .002, M['neon2'], seg=32, tseg=6)  # a thin neon rim
     k = 1 if big else .5
     a.cyl(.012 * k, .015 * k, h * .6, M['leaf2'], 0, ph + h * .3, 0, 6)
     for _ in range(26 if big else 9):

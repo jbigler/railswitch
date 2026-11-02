@@ -724,7 +724,9 @@ docked under the worktree's details; several can be open at once.
 
 Each panel is a terminal like any other: keys arrive as you type (slash
 suggestions, menus, arrows, Esc), the program follows the panel's size,
-and the dashboard's colours apply. When the program exits the panel shows
+and the dashboard's colours apply. The font is the first installed of Maple
+Mono (its Nerd Font builds first, so icons and prompt glyphs draw) and
+JetBrains Mono, else the system's monospace. When the program exits the panel shows
 `[exited N]` and **Reopen**; if the dashboard restarts (a new railswitch
 binary), **Reconnect**: the agent and nvim pick up where they were, a shell
 starts afresh. railswitch's own refusals (another agent running, unset
@@ -733,14 +735,18 @@ as in a terminal: the agent keeps running and the panel shows `[exited 0]`.
 
 The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
 while a terminal is open, leaving or closing the page asks first.
-**fullscreen** asks the browser to send those keys to the terminal
-(Chromium-based browsers; Firefox only has the question).
+**maximize** (then **restore**) makes the panel fill the window; Esc
+stays in the terminal. To fill the screen as well, use the browser's own
+fullscreen (F11), which Esc doesn't end. The dashboard doesn't use the
+page fullscreen API: Esc always ends it in Firefox.
 
 Limits: 8 terminals open at once across the dashboard (the ninth says so);
 a peer that stops answering pings for 10 s (a dead `ssh -L` tunnel) is
 dropped and its program ended. Nothing a terminal carries is logged. The
-terminal is xterm.js drawn with WebGL (the CSP blocks its other renderer):
-a browser with WebGL turned off says so in the panel.
+terminal is
+xterm.js drawn on a canvas, WebGL its fallback (the CSP blocks its DOM
+renderer; the canvas draws crisper text than WebGL in Firefox-family
+browsers): a browser with neither says so in the panel.
 
 ## Actions
 

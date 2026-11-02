@@ -296,8 +296,8 @@ async function openTermPanel(btn) {
   const full = document.createElement("button");
   full.type = "button";
   full.className = "ln";
-  full.textContent = "fullscreen";
-  full.title = "Fullscreen; in Chromium browsers Ctrl-W and similar keys then reach the terminal";
+  full.textContent = "maximize";
+  full.title = "Fill the window; Esc stays in the terminal (F11 then fills the screen)";
   const x = document.createElement("button");
   x.type = "button";
   x.className = "ln";
@@ -314,11 +314,11 @@ async function openTermPanel(btn) {
   } catch (err) {
     host.textContent = String(err.message || err);
   }
-  full.addEventListener("click", async () => {
-    try {
-      await panel.requestFullscreen();
-      await navigator.keyboard?.lock?.();
-    } catch { /* stays in the page */ }
+  // Fills the window, not the screen: the browser's fullscreen ends on Esc,
+  // which vim needs. F11 (the browser's own) fills the screen and keeps Esc.
+  full.addEventListener("click", () => {
+    const on = panel.classList.toggle("max");
+    full.textContent = on ? "restore" : "maximize";
     t?.focus();
   });
   x.addEventListener("click", () => {

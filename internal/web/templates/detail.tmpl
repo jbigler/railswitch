@@ -1,7 +1,7 @@
 {{define "detail"}}<section id="detail" class="detail" data-slug="{{.Slug}}" data-tasks="{{.TasksURL}}">
 {{if .Empty}}<p class="note">No worktree selected.</p>
 {{else}}<h1>{{.Slug}}</h1>
-<div class="br">⎇ {{.Branch}}{{with .PR}} · {{if .URL}}<a class="pr-line {{.StateClass}}" href="{{.URL}}" target="_blank" rel="noopener" title="{{.Title}}">{{.Line}}</a>{{else}}<span class="{{.StateClass}}">{{.Line}}</span>{{end}}{{end}} · <span class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}</span>{{if .Stale}} · <span class="stale">restart to apply</span>{{end}}</div>
+<div class="br">⎇ {{.Branch}}{{with .PR}} · {{if .URL}}<a class="pr-line {{.StateClass}}" href="{{.URL}}" target="_blank" rel="noopener" title="{{.Title}}">{{.Line}}</a>{{else}}<span class="{{.StateClass}}">{{.Line}}</span>{{end}} <a class="ln" href="{{$.PRPageURL}}" title="Checks, reviews, comments, merge">PR page</a>{{end}} · <span class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}</span>{{if .Stale}} · <span class="stale">restart to apply</span>{{end}}</div>
 {{with .Stacked}}<div class="lbl">Stack</div>
 {{if .Error}}<div class="muted">stack ? {{.Error}}</div>
 {{else}}<div class="stack-head muted">{{if .Number}}◆ {{if .NumberURL}}<a href="{{.NumberURL}}" target="_blank" rel="noopener">Stack #{{.Number}}</a>{{else}}Stack #{{.Number}}{{end}} · {{end}}Base: <span class="mono">{{.Trunk}}</span> · {{.Count}}{{if .Restack}} · <span class="yellow">⚠ restack needed</span>{{end}}</div>

@@ -265,3 +265,19 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .term-panel > div { flex: 1; }
 .term-panel.max { position: fixed; inset: 0; z-index: 50; height: auto; resize: none; }
 body:has(.term-panel.max) { overflow: hidden; }
+/* The PR page (D152). */
+.prpage h2{margin-top:1.4rem}
+.pr-meta,.pr-status{margin:.3rem 0}
+.pr-actions{margin:.8rem 0;flex-wrap:wrap}
+.pr-merge{display:flex;gap:.4rem;align-items:center}
+.pr-body,.pr-note{border:1px solid var(--border);border-radius:6px;padding:.6rem .8rem;margin:.6rem 0;background:var(--bg2)}
+.pr-note>header{margin-bottom:.3rem}
+.md{overflow-wrap:anywhere}
+.md pre{background:var(--bg);border:1px solid var(--border);padding:.5rem;overflow-x:auto}
+.md blockquote{border-left:3px solid var(--border);margin:.3rem 0;padding-left:.6rem;color:var(--muted)}
+.pr-checks,.pr-files{list-style:none;padding:0}
+.pr-checks li,.pr-files li{padding:.15rem 0}
+.pr-pass,.pr-approved,.pr-clean,.pr-open,.pr-merged{color:var(--green)}
+.pr-fail,.pr-changes_requested,.pr-dirty,.pr-closed{color:var(--red)}
+.pr-pending,.pr-blocked,.pr-behind,.pr-unstable,.pr-draft{color:var(--yellow)}
+.pr-skipped,.pr-none,.pr-commented,.pr-dismissed,.pr-unknown{color:var(--muted)}

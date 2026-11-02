@@ -783,7 +783,7 @@ export async function lab(slug, n, ui) {
   put(k, scene, 'Deco_CorkBoard', -11.98, 1.7, 5.25, PI / 2);
   put(k, scene, 'Deco_Plant_Monstera', -4.6, 0, 2.6, deco.r() * 6);
   put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', -10.0, 4, 3.0, deco.r() * 6);
-  const pr = station(k, scene, -7.4, 7.2, PI, 'Pull request', 'Pull request: open it, or all of them', () => ui.prs(), 2.0, 1.1);
+  const pr = station(k, scene, -7.4, 7.2, PI, 'Pull request', 'Pull request: its page (checks, reviews, merge), or all of them', () => ui.prPage(slug), 2.0, 1.1);
 
   const which = deco.pet;
   const cafeTicks = cafe(k, scene, deco, which === 'gecko');

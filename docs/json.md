@@ -915,6 +915,57 @@ table `PR AUTHOR ASSIGNEES REVIEWERS REVIEW TITLE` (a draft's title starts
 | `prs[].author`, `assignees`, `reviewers` | string, arrays of strings | Logins; `reviewers` are the people a review is asked of (teams left out); arrays never null. |
 | `prs[].review` | string | `approved`, `changes_requested`, `pending` or `none`, as `pr ls`. |
 
+
+## `pr show [<number>]`
+
+One pull request (D152): the number given (`7` or `#7`), else the PR of the
+worktree's branch (run it in the worktree or with `-w <slug>`), picked as
+[`pr ls`](#pr-ls) picks one. It runs `gh pr view <n> --repo <owner/name>
+--json …` and one `gh api graphql` query for the repo's merge methods and
+whether the base branch has a merge queue, both as `pr ls` runs gh. Every
+text is GitHub's, written by anyone: the text form prints it with control
+characters as spaces, and a URL that is not GitHub's https web URL (a
+check's `url`, a comment's `url`) is `""`.
+
+```json
+{"number": 2141, "title": "Login", "url": "https://github.com/o/r/pull/2141", "state": "open", "author": "ann",
+ "body": "## Why\n…", "base": "main", "head": "jb/login", "labels": ["ui"], "mergeable": "mergeable", "merge_state": "blocked",
+ "review": "changes_requested", "checks": "fail", "additions": 84, "deletions": 12,
+ "created": "2026-10-30T09:00:00Z", "updated": "2026-11-01T11:00:00Z", "auto_merge": "", "queue": false, "methods": ["merge", "squash", "rebase"],
+ "check_runs": [{"name": "test", "workflow": "ci", "state": "fail", "url": "https://github.com/o/r/actions/runs/41/job/5", "run": 41}],
+ "reviews": [{"author": "bo", "state": "changes_requested", "body": "Rename it", "submitted": "2026-11-01T10:00:00Z"}],
+ "comments": [{"author": "cy", "body": "LGTM", "created": "2026-11-01T11:00:00Z", "url": "https://github.com/o/r/pull/2141#issuecomment-1"}],
+ "files": [{"path": "app/a.rb", "additions": 40, "deletions": 8, "change": "modified"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `number`, `title`, `url`, `author` | | As GitHub has them (`author` a login). |
+| `state`, `review`, `checks` | string | As in `pr ls`. |
+| `body` | string | The description, Markdown. |
+| `base`, `head` | string | The branches: into, from. |
+| `labels` | array | Label names. Never null. |
+| `mergeable` | string | `mergeable`, `conflicting` or `unknown` (GitHub has not computed it yet). |
+| `merge_state` | string | GitHub's `mergeStateStatus`, lower case: `clean`, `blocked` (requirements unmet), `behind`, `dirty` (conflicts), `unstable` (non-required checks fail), `has_hooks`, `draft`, `unknown`. |
+| `additions`, `deletions` | number | Lines, over all files. |
+| `created`, `updated` | string | RFC 3339. |
+| `auto_merge` | string | The method of the PR's auto-merge or merge-queue entry, lower case; `""` without one. |
+| `queue` | boolean | The base branch has a merge queue: merging joins it. |
+| `methods` | array | The merge methods the repo allows, of `merge`, `squash`, `rebase`, in that order. |
+| `check_runs[]` | array | Each check: `name`, `workflow` (`""` for a status), `state` (`pass`, `fail`, `pending`, `skipped`), `url` (its log), `run` (its Actions run ID, 0 when not one). |
+| `reviews[]` | array | Each submitted review: `author`, `state` (`approved`, `changes_requested`, `commented`, `dismissed`), `body`, `submitted`. A pending (unsubmitted) review is left out. |
+| `comments[]` | array | The conversation's comments (not those on a line): `author`, `body`, `created`, `url`. |
+| `files[]` | array | Each changed file: `path`, `additions`, `deletions`, `change` (`added`, `modified`, `deleted`, `renamed`, `copied`, `changed`). |
+
+`pr merge [<number>] [--method merge|squash|rebase] [--auto]` merges the PR
+(`gh pr merge --<method> [--auto]`, 2 minutes' timeout) with one of the
+repo's methods, the first it allows by default; a method it doesn't allow
+exits 1. `--auto` merges once the PR's requirements pass; with a merge
+queue on the base, `gh` adds the PR to the queue. `pr ready [<number>]`
+marks a draft ready for review (`gh pr ready`; a PR that is no draft exits
+1). `pr rerun [<number>]` reruns the failed jobs of each Actions run with a
+failed check (`gh run rerun <id> --failed`), each run once. They print one
+line and have no `--json`: they are writes.
 ## `stack ls`
 
 One project (`-C`): every registered worktree, in registry order, with its

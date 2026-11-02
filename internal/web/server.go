@@ -98,6 +98,8 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/tasks", s.tasksDialog)
+	m.HandleFunc("GET /p/{prefix}/{slug}/pr", s.prPage)
+	m.HandleFunc("POST /p/{prefix}/{slug}/pr/{action}", s.prAction)
 	m.HandleFunc("GET /p/{prefix}/{slug}/agent-default", s.agentDefaultDialog)
 	m.HandleFunc("GET /colors", s.colorsDialog)
 	m.HandleFunc("GET /theme.css", s.theme)

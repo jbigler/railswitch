@@ -3,18 +3,22 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/jbigler/railswitch/internal/prs"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const prUsage = "usage: railswitch [--json] pr ls [--all]"
+const prUsage = "usage: railswitch [--json] pr ls [--all] | [--json] pr show [<number>] | pr merge [<number>] [--method merge|squash|rebase] [--auto] | pr ready [<number>] | pr rerun [<number>]"
 
 // prRow is one worktree's row of pr ls.
 type prRow struct {
@@ -27,7 +31,14 @@ type prRow struct {
 // with its branch's pull request from the host's gh (D75); the repo is
 // project.toml's, never a worktree's git config.
 func cmdPr(ctx context.Context, e *env, args []string) int {
-	if len(args) == 0 || args[0] != "ls" {
+	if len(args) == 0 {
+		return e.usageErr("%s", prUsage)
+	}
+	switch args[0] {
+	case "show", "merge", "ready", "rerun":
+		return prAct(ctx, e, args)
+	case "ls":
+	default:
 		return e.usageErr("%s", prUsage)
 	}
 	fs := e.flags("pr ls")
@@ -164,4 +175,144 @@ func logins(s []string) string {
 		return "-"
 	}
 	return safefile.Printable(strings.Join(s, ","))
+}
+
+// prAct is pr show|merge|ready|rerun (D152): one pull request, the number
+// given or the current worktree's (-w) branch's, as pr ls finds it.
+func prAct(ctx context.Context, e *env, args []string) int {
+	var fs *flag.FlagSet
+	var method *string
+	var auto *bool
+	switch args[0] {
+	case "show":
+		fs = e.flags("pr show")
+	case "merge":
+		fs = e.flags("pr merge")
+		method = fs.String("method", "", "merge, squash or rebase (default: the first the repo allows)")
+		auto = fs.Bool("auto", false, "merge once the PR's requirements pass (with a merge queue on the base: join it)")
+	case "ready":
+		fs = e.flags("pr ready")
+	case "rerun":
+		fs = e.flags("pr rerun")
+	}
+	pos, code, ok := parseMixed(fs, args[1:])
+	if !ok {
+		return code
+	}
+	if len(pos) > 1 {
+		return e.usageErr("%s", prUsage)
+	}
+	w, err := workspace.Load(ctx, e.dir, e.slug)
+	if err != nil {
+		return e.fail(err)
+	}
+	repo, err := prs.Repo(w.Project.Project.Repo)
+	if err != nil {
+		return e.fail(fmt.Errorf("pr %s: %w", args[0], err))
+	}
+	n := 0
+	if len(pos) == 1 {
+		if n, err = strconv.Atoi(strings.TrimPrefix(pos[0], "#")); err != nil || n <= 0 {
+			return e.usageErr("pr %s: %q is not a PR number", args[0], pos[0])
+		}
+	} else if n, err = e.worktreePR(ctx, w, repo); err != nil {
+		return e.fail(fmt.Errorf("pr %s: %w", args[0], err))
+	}
+	v, err := prs.ShowPR(ctx, e.run, repo, n)
+	if err != nil {
+		return e.fail(err)
+	}
+	switch args[0] {
+	case "show":
+		return prShow(e, v)
+	case "merge":
+		m := *method
+		if m == "" && len(v.Methods) > 0 {
+			m = v.Methods[0]
+		}
+		if !slices.Contains(v.Methods, m) {
+			return e.fail(fmt.Errorf("pr merge: %s does not allow %q merges (it allows %s)", repo, m, strings.Join(v.Methods, ", ")))
+		}
+		if err := prs.Merge(ctx, e.run, repo, n, m, *auto); err != nil {
+			return e.fail(err)
+		}
+		switch {
+		case v.Queue:
+			fmt.Fprintf(e.stdout, "#%d joins %s's merge queue\n", n, safefile.Printable(v.Base))
+		case *auto:
+			fmt.Fprintf(e.stdout, "#%d merges (%s) once its requirements pass\n", n, m)
+		default:
+			fmt.Fprintf(e.stdout, "merged #%d (%s)\n", n, m)
+		}
+	case "ready":
+		if v.State != "draft" {
+			return e.fail(fmt.Errorf("pr ready: #%d is %s, not a draft", n, v.State))
+		}
+		if err := prs.Ready(ctx, e.run, repo, n); err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "#%d is ready for review\n", n)
+	case "rerun":
+		runs, err := prs.Rerun(ctx, e.run, repo, v)
+		if err != nil {
+			return e.fail(err)
+		}
+		if len(runs) == 0 {
+			fmt.Fprintf(e.stdout, "#%d has no failed Actions run to rerun\n", n)
+			return 0
+		}
+		fmt.Fprintf(e.stdout, "reran the failed jobs of %d run(s) of #%d\n", len(runs), n)
+	}
+	return 0
+}
+
+// worktreePR is the PR of the current worktree's branch (pr ls's pick).
+func (e *env) worktreePR(ctx context.Context, w *workspace.Workspace, repo string) (int, error) {
+	if w.Slug == "" {
+		return 0, errors.New("not in a worktree: name a PR number, run it in <workspace>/worktrees/<worktree>/, or pass -w <worktree>")
+	}
+	m, err := e.model(ctx, w)
+	if err != nil {
+		return 0, err
+	}
+	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == w.Slug })
+	if i < 0 || m.Inputs.Worktrees[i].Branch == "" {
+		return 0, fmt.Errorf("worktree %s is on no branch", w.Slug)
+	}
+	wt := m.Inputs.Worktrees[i]
+	list, err := prs.List(ctx, e.run, repo, []string{wt.Branch})
+	if err != nil {
+		return 0, err
+	}
+	p := prs.ForBranch(list, wt.Branch, e.headCommit(ctx, wt.Dir))
+	if p == nil {
+		return 0, fmt.Errorf("branch %s of worktree %s has no pull request", safefile.Printable(wt.Branch), w.Slug)
+	}
+	return p.Number, nil
+}
+
+// prShow prints v: with --json as is, else a summary with its checks.
+func prShow(e *env, v *prs.View) int {
+	if e.json {
+		if err := json.NewEncoder(e.stdout).Encode(v); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
+	p := safefile.Printable
+	fmt.Fprintf(e.stdout, "#%d %s\n%s · %s → %s · by %s · +%d −%d\n", v.Number, p(v.Title), v.State, p(v.Head), p(v.Base), p(v.Author), v.Additions, v.Deletions)
+	fmt.Fprintf(e.stdout, "checks %s · review %s · merge %s (%s)", v.Checks, v.Review, v.MergeState, v.Mergeable)
+	if v.AutoMerge != "" {
+		fmt.Fprintf(e.stdout, " · auto-merge %s", v.AutoMerge)
+	}
+	fmt.Fprintln(e.stdout)
+	tw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
+	for _, c := range v.CheckRuns {
+		fmt.Fprintf(tw, "  %s\t%s\n", c.State, p(c.Name))
+	}
+	if err := tw.Flush(); err != nil {
+		return e.fail(err)
+	}
+	fmt.Fprintf(e.stdout, "%d review(s), %d comment(s), %d file(s): %s\n", len(v.Reviews), len(v.Comments), len(v.Files), v.URL)
+	return 0
 }

@@ -77,7 +77,8 @@ def export_all(objs):
         # .gltf + .bin with the textures as files beside them: the dashboard's CSP
         # (default-src 'self') refuses the blob: URLs three.js makes for embedded images
         bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, o.name + '.gltf'), use_selection=True,
-                                  export_format='GLTF_SEPARATE', export_texture_dir='', export_apply=True)
+                                  export_format='GLTF_SEPARATE', export_texture_dir='', export_apply=True,
+                                  use_active_scene=True)  # other scenes' selections stay out
 
 
 def to_bl(x, y, z):

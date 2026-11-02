@@ -163,7 +163,7 @@ export class World {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25;
+    this.renderer.toneMappingExposure = 1.5;
     el.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.05, 400);
     this.scene = new THREE.Scene();
@@ -201,11 +201,37 @@ export class World {
     this.camera.updateProjectionMatrix();
   }
 
+  // officeEnv is a dim, generic office for metal to reflect, built once: a
+  // dark room, rows of ceiling panels, the windows' cool city glow on one
+  // side and a warm lamp on the other.
+  officeEnv() {
+    if (this.env) return this.env;
+    const s = new THREE.Scene();
+    s.add(new THREE.Mesh(new THREE.BoxGeometry(24, 4, 16), new THREE.MeshBasicMaterial({ color: 0x141a28, side: THREE.BackSide })));
+    const glow = (color, w, h, x, y, z, rx, ry) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
+      m.position.set(x, y, z);
+      m.rotation.set(rx, ry, 0);
+      s.add(m);
+    };
+    for (const x of [-8, 0, 8]) for (const z of [-4, 4]) glow(0xb8c6e6, 2.4, 0.6, x, 1.95, z, Math.PI / 2, 0);
+    glow(0x3d6cc4, 14, 2.4, 11.9, 0.4, 0, 0, -Math.PI / 2); // windows
+    glow(0xd08a40, 2, 1.2, -11.9, 0.2, 2, 0, Math.PI / 2); // a warm lamp
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    this.env = pm.fromScene(s, 0.04).texture;
+    pm.dispose();
+    return this.env;
+  }
+
   // set replaces the scene; view is where the overview camera looks from;
   // walk is {areas: [[x0, x1, z0, z1]…], start: {x, z, yaw}, pads}.
   set(scene, view, walk) {
     if (this.scene !== scene) free(this.scene);
     this.tickers.clear();
+    // Metal (the floor plates, frames, racks) reflects what's around it:
+    // without an environment it renders near black whatever the lamps do.
+    scene.environment = this.officeEnv();
+    scene.environmentIntensity = 0.55;
     this.scene = scene;
     this.pass.scene = scene;
     Object.assign(this.orbit, view);
@@ -264,7 +290,15 @@ export class World {
       drag = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, yaw: v.yaw, pitch: v.pitch, moved: false };
       c.setPointerCapture(e.pointerId);
     });
+    // Walking, a drag locks the pointer: it can't leave the window, and
+    // its movement keeps turning the view however far it goes.
+    const locked = () => document.pointerLockElement === c;
     c.addEventListener('pointermove', (e) => {
+      if (drag && locked()) {
+        this.walk.yaw += e.movementX * 0.004;
+        this.walk.pitch = Math.min(1.2, Math.max(-1.2, this.walk.pitch + e.movementY * 0.004));
+        return;
+      }
       if (drag) {
         // a jump of the pointer (remote and virtual-machine sessions) is not a drag
         if (Math.abs(e.clientX - drag.lx) > 120 || Math.abs(e.clientY - drag.ly) > 120) {
@@ -275,7 +309,13 @@ export class World {
         drag.ly = e.clientY;
         const dx = e.clientX - drag.x;
         const dy = e.clientY - drag.y;
-        if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
+        if (Math.abs(dx) + Math.abs(dy) > 5 && !drag.moved) {
+          drag.moved = true;
+          if (this.mode === 'walk' && c.requestPointerLock) {
+            c.releasePointerCapture?.(e.pointerId);
+            Promise.resolve(c.requestPointerLock()).catch(() => {}); // refused: the plain drag goes on
+          }
+        }
         if (this.mode === 'walk') {
           this.walk.yaw = drag.yaw + dx * 0.004;
           this.walk.pitch = Math.min(1.2, Math.max(-1.2, drag.pitch + dy * 0.004));
@@ -289,12 +329,15 @@ export class World {
     c.addEventListener('pointerup', (e) => {
       const click = drag && !drag.moved;
       drag = null;
+      if (locked()) document.exitPointerLock();
       if (!click) return;
       const p = this.pick(e.clientX, e.clientY);
       if (p) p.userData.pick.act();
       else if (this.mode === 'walk') this.walkTo(e.clientX, e.clientY);
     });
-    c.addEventListener('pointercancel', () => { drag = null; });
+    c.addEventListener('pointercancel', () => { drag = null; if (locked()) document.exitPointerLock(); });
+    // Esc or a lost focus ends the lock: end the drag with it.
+    document.addEventListener('pointerlockchange', () => { if (!locked()) drag = null; });
     c.addEventListener('pointerleave', () => {
       this.pointer = null;
     });

@@ -10,6 +10,8 @@ const PI = Math.PI;
 
 // LAMPS are a floor's lights: [x, y, z, colour, intensity, distance]. Warm
 // where people sit, cool where machines are, dim along the corridors.
+// LIFT brightens every lamp at once (the office read too dark).
+const LIFT = 1.3;
 const LAMPS = [
   [-5.6, 2.7, -4.4, 0x7fd8ff, 5, 7], // server room: the tube that flickers
   [-6.2, 2.3, -1.3, 0xffa040, 6, 6], // café counter
@@ -112,18 +114,18 @@ function droop(parent, a, b, sag, mat) {
 // its ceiling light panels, the server room's first.
 export function film(scene, { walls, panels, ceiling, accent, seed }) {
   const r = rng(seed ^ 0x5eed);
-  const fog = new THREE.FogExp2(0x0b0f1c, 0.055);
+  const fog = new THREE.FogExp2(0x0b0f1c, 0.04);
   scene.fog = fog;
   scene.background = new THREE.Color(0x05060c);
-  const hemi = new THREE.HemisphereLight(0x3a4a70, 0x24160e, 0.5);
+  const hemi = new THREE.HemisphereLight(0x4a5c88, 0x2a1c12, 0.5);
   scene.add(hemi);
   scene.userData.hemi = hemi;
-  scene.userData.levels = { walk: { hemi: 1.0, fog: 0.05 }, orbit: { hemi: 9, fog: 0 } };
-  const city = new THREE.DirectionalLight(0x6fa0ff, 0.9); // the city, through the windows
+  scene.userData.levels = { walk: { hemi: 2.4, fog: 0.035 }, orbit: { hemi: 9, fog: 0 } };
+  const city = new THREE.DirectionalLight(0x6fa0ff, 1.1); // the city, through the windows
   city.position.set(14, 6, 10);
   scene.add(city);
   const lamps = LAMPS.map(([x, y, z, c, i, d]) => {
-    const l = new THREE.PointLight(c, i, d);
+    const l = new THREE.PointLight(c, i * LIFT, d);
     l.position.set(x, y, z);
     scene.add(l);
     return l;
@@ -200,7 +202,7 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
     if (next < 0) { off = 0.08 + r() * 0.5; next = 3 + r() * 7; }
     let on = 1;
     if (off > 0) { off -= dt; on = r() < 0.5 ? 0.05 : 0.6; }
-    lamps[0].intensity = 5 * on;
+    lamps[0].intensity = 5 * LIFT * on;
     for (const m of tubeMats) m.emissiveIntensity = 0.12 * on;
   };
   const drift = (dt, t) => { air.children.at(-1).position.y = Math.sin(t * 0.13) * 0.15; air.children.at(-1).rotation.y = t * 0.004; };

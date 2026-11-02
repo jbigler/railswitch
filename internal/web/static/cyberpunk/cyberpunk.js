@@ -6,6 +6,7 @@
 import { World } from './world.js';
 import { lobby, lab, svcState, tokens } from './rooms.js';
 import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
+import { openTerminal } from '../term/term.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -114,7 +115,20 @@ function closePanel() {
   panelClose?.();
   panelClose = null;
   $('panel').hidden = true;
+  $('panel').classList.remove('wide');
 }
+
+// termIn adds a live terminal (D149) to a panel body: url is
+// /p/{prefix}/tty/{slug}/{kind}[?agent=]. The panel's cleanup must call the
+// returned close.
+const officeTheme = { background: '#05080d', foreground: '#c8f7ff', cursor: '#29e7ff', cursorAccent: '#05080d', selectionBackground: '#1d4f63' };
+function termIn(body, url) {
+  $('panel').classList.add('wide');
+  const box = el('div', { class: 'term' });
+  body.append(box);
+  return openTerminal(box, url, { theme: officeTheme });
+}
+const ttyURL = (slug, kind) => `${base}/tty/${encodeURIComponent(slug)}/${kind}`;
 $('panel-close').addEventListener('click', closePanel);
 $('transport').addEventListener('click', transport);
 function toggleView() {
@@ -125,7 +139,7 @@ function toggleView() {
 }
 $('view').addEventListener('click', toggleView);
 addEventListener('keydown', (e) => {
-  if (e.target.closest?.('input, textarea, select')) return;
+  if (e.target.closest?.('input, textarea, select, .term-host')) return; // a focused terminal gets every key, Escape included
   if (e.key === 'Escape') closePanel();
   if (e.key === 't' || e.key === 'T') transport();
   if (e.key === 'v' || e.key === 'V') toggleView();
@@ -190,10 +204,15 @@ function showDesk(slug) {
   openPanel(`Your desk · ${slug}`, (body) => {
     const w = labOf(slug);
     body.append(el('p', {}, '⎇ ', el('strong', {}, w?.branch || slug), ' · ', el('span', { class: `state-${w?.stack}` }, w?.stack || '')));
+    let t = null;
+    const open = (kind) => { t?.close(); body.querySelector('.term')?.remove(); t = termIn(body, ttyURL(slug, kind)); };
+    const hasNvim = w?.services.some((s) => s.service === 'nvim');
     body.append(el('div', { class: 'row' },
-      btn('▣ Terminal', () => job(`${base}/${encodeURIComponent(slug)}/act/term`, body)),
-      btn('✎ Neovim', () => job(`${base}/${encodeURIComponent(slug)}/act/nvim`, body))));
-    body.append(el('p', { class: 'muted' }, 'Both open a window on this machine.'));
+      btn('▣ Shell', () => open('shell'), { title: 'A shell in the app container, here; it ends when this panel closes' }),
+      hasNvim ? btn('✎ Neovim', () => open('nvim'), { title: 'Neovim here; it keeps running when this panel closes' }) : null,
+      btn('Terminal window', () => job(`${base}/${encodeURIComponent(slug)}/act/term`, body)),
+      hasNvim ? btn('Neovim window', () => job(`${base}/${encodeURIComponent(slug)}/act/nvim`, body)) : null));
+    body.append(el('p', { class: 'muted' }, 'The windows open on this machine.'));
     if (w?.links.length) {
       body.append(el('h3', {}, 'Links'));
       body.append(el('div', { class: 'row' }, w.links.map((l) => ext(`${l.label} ↗`, safeURL(l.url)))));
@@ -202,6 +221,7 @@ function showDesk(slug) {
       body.append(el('h3', {}, 'Pull request'));
       body.append(el('p', {}, ext(`#${w.pr.number} ↗`, safeURL(w.pr.url)), ' ', w.pr.title));
     }
+    return () => t?.close();
   });
 }
 
@@ -227,65 +247,30 @@ function showAgent(slug) {
     drawStatus();
     body.append(status);
     const names = w ? serviceAgents(w) : [];
-    if (!names.length) {
-      body.append(el('p', { class: 'muted' }, 'Typing to the agent needs a service agent (`run = "service"`); this floor has none running. Use the agent console instead.'));
-      body.append(btn('▣ Open agent console', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body)));
-      redraw = drawStatus;
-      return () => { redraw = null; };
-    }
-    let name = a && names.includes(a.name) ? a.name : names[0];
+    let name = a && (names.includes(a.name) || !names.length) ? a.name : names[0];
+    let t = null;
+    const open = () => {
+      t?.close();
+      body.querySelector('.term')?.remove();
+      t = termIn(body, ttyURL(slug, 'agent') + (name ? `?agent=${encodeURIComponent(name)}` : ''));
+    };
     if (names.length > 1) {
-      const sel = el('select', { on: { change: (e) => { name = e.target.value; poll(); } } }, names.map((n) => el('option', { value: n, selected: n === name }, n)));
+      const sel = el('select', { on: { change: (e) => { name = e.target.value; open(); } } }, names.map((n) => el('option', { value: n, selected: n === name }, n)));
       body.append(el('div', { class: 'row' }, 'Agent: ', sel));
     }
-    body.append(el('h3', {}, 'Screen'));
-    const pre = el('pre', { class: 'screen' }, '…');
-    body.append(pre);
-    const err = el('p', { class: 'err' });
-    body.append(err);
-    const box = el('textarea', { class: 'cmd', placeholder: 'Type to your agent. Enter sends; Shift+Enter is a new line.', maxlength: 4096 });
-    const send = async (enterOnly) => {
-      const text = enterOnly === true ? '' : box.value;
-      if (enterOnly !== true && !text.trim()) return;
-      err.textContent = '';
-      try {
-        await post(`${base}/cyberpunk/agent/${encodeURIComponent(slug)}/send?agent=${encodeURIComponent(name)}`, text);
-        box.value = '';
-        setTimeout(poll, 300);
-      } catch (e) {
-        err.textContent = e.message;
-      }
-    };
-    box.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        send();
-      }
-    });
-    body.append(box, el('div', { class: 'row' }, btn('Send ⏎', send), btn('Enter only', () => send(true), { title: 'Press Enter in the session: accept a prompt' }), btn('Open console ▣', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body))));
-    let stop = false;
-    let timer = 0;
-    async function poll() {
-      clearTimeout(timer);
-      try {
-        const doc = await getJSON(`${base}/cyberpunk/agent/${encodeURIComponent(slug)}/screen?agent=${encodeURIComponent(name)}`);
-        if (stop) return;
-        if (!doc.running) pre.textContent = '(the agent container is not running: start the floor)';
-        else if (!doc.session) pre.textContent = '(no session yet: send a message or open the console to start the agent)';
-        else {
-          const near = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
-          pre.textContent = doc.lines.join('\n');
-          if (near) pre.scrollTop = pre.scrollHeight;
-        }
-      } catch (e) {
-        if (!stop) pre.textContent = e.message;
-      }
-      if (!stop) timer = setTimeout(poll, document.hidden ? 5000 : 1500);
+    if (!names.length) body.append(el('p', { class: 'muted' }, 'This floor has no service agent: the agent runs for this panel and stops when it closes.'));
+    body.append(el('div', { class: 'row' }, btn('Open console window ▣', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body))));
+    // Connecting runs `railswitch agent`, which starts the floor first: only
+    // a running service agent is joined without asking.
+    const live = name && w?.services.some((x) => x.service === `agent-${name}` && x.state.startsWith('active'));
+    if (live) open();
+    else {
+      const go = btn('▣ Connect', () => { go.remove(); note.remove(); open(); });
+      const note = el('p', { class: 'muted' }, 'Connecting starts the floor first if it is stopped.');
+      body.append(el('div', { class: 'row' }, go), note);
     }
-    poll();
-    box.focus();
     redraw = drawStatus;
-    return () => { stop = true; clearTimeout(timer); redraw = null; };
+    return () => { t?.close(); redraw = null; };
   });
 }
 

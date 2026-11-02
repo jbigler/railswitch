@@ -12,7 +12,7 @@
 //          the lounge
 //   front: work (the lobby's reception) · the meeting room · the game room
 // The pet lives by the café; androids wander the corridor and the nook.
-import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer } from './world.js';
+import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer, textCanvas } from './world.js';
 import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
 import { issuesFor, prsFor, whoLabel } from './work.js';
@@ -462,7 +462,8 @@ export async function lab(slug, n, ui) {
   scene.add(keepOut);
   const racks = new Map();
   // shortcut: room for 14 racks; a stack with more services shows the first 14
-  const rackSpot = (i) => (i < 7 ? { x: -11.3 + i * 0.62, z: -7.45, ry: 0 } : i < 14 ? { x: -11.3 + (i - 7) * 0.62, z: -5.5, ry: PI } : null);
+  // 1 m apart: their cable loops stand out from their sides
+  const rackSpot = (i) => (i < 7 ? { x: -11.2 + i * 1.0, z: -7.45, ry: 0 } : i < 14 ? { x: -11.2 + (i - 7) * 1.0, z: -5.5, ry: PI } : null);
 
   // Work (front-left, behind glass): your desk and the agent's against the
   // left wall, screens above them; the PR station by the windows.
@@ -510,7 +511,7 @@ export async function lab(slug, n, ui) {
       if (!rk) {
         const s = rackSpot(i);
         if (!s) return;
-        rk = rack(k, svc, i);
+        rk = rack(k, svc, i, deco.secondary);
         rk.position.set(s.x, 0, s.z);
         rk.rotation.y = s.ry;
         pickable(rk, '', () => ui.service(slug, svc.service));
@@ -555,27 +556,90 @@ export async function lab(slug, n, ui) {
   return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 24, max: 40 }, walk, update, ticks, name: `Floor ${n} · ${slug}` };
 }
 
-// rack is a server rack for one service: its LEDs and edge lights show the
-// service's state.
-function rack(k, svc, i) {
+// rack is a server rack for one service: its LEDs and accent bar show the
+// service's state, its display names it, and a hologram floats above it in
+// the floor's secondary colour (name, state, bars that pulse while it runs).
+function rack(k, svc, i, secondary) {
   const g = k.spawn(i % 4 < 2 ? 'Tech_ServerRack' : 'Tech_ServerRack_B');
   const lights = new THREE.MeshBasicMaterial({ color: 0x3b4558, toneMapped: false });
+  let display = null;
   g.traverse((o) => {
     const n = o.isMesh ? o.material?.name ?? '' : '';
     if (n.startsWith('RS_LED_') || n === 'RS_Neon_Accent') o.material = lights;
+    if (n === 'RS_RackDisplay') display = o;
   });
-  const tag = label(svc.service, { size: 0.26 });
-  tag.position.set(0, 2.35, 0.2);
-  g.add(tag);
+  // the display: a plane of the blank quad's size, so the text can't come
+  // out mirrored whatever the export did to its UVs
+  const shot = new THREE.CanvasTexture(textCanvas([], { w: 256, h: 96 }));
+  shot.colorSpace = THREE.SRGBColorSpace;
+  if (display) {
+    const b = new THREE.Box3().setFromObject(display);
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(b.max.x - b.min.x, b.max.y - b.min.y), new THREE.MeshBasicMaterial({ map: shot, toneMapped: false }));
+    panel.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, b.max.z + 0.002);
+    g.add(panel);
+  }
+  const holoCv = document.createElement('canvas');
+  holoCv.width = 320;
+  holoCv.height = 160;
+  const holoTex = new THREE.CanvasTexture(holoCv);
+  holoTex.colorSpace = THREE.SRGBColorSpace;
+  const holo = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.45), new THREE.MeshBasicMaterial({
+    map: holoTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+  }));
+  holo.position.set(0, 2.5, 0.35);
+  holo.rotation.x = -0.12;
+  holo.raycast = () => {}; // clicks reach the rack
+  g.add(holo);
+  const tint = css(secondary);
   let state = '';
+  let age = 1;
+  const drawHolo = (t) => {
+    const c = holoCv.getContext('2d');
+    const w = holoCv.width, h = holoCv.height;
+    c.clearRect(0, 0, w, h);
+    c.strokeStyle = tint;
+    c.globalAlpha = 0.55;
+    c.lineWidth = 3;
+    for (const [x, y, dx, dy] of [[4, 4, 1, 1], [w - 4, 4, -1, 1], [4, h - 4, 1, -1], [w - 4, h - 4, -1, -1]]) {
+      c.beginPath();
+      c.moveTo(x + dx * 26, y);
+      c.lineTo(x, y);
+      c.lineTo(x, y + dy * 26);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+    c.fillStyle = tint;
+    c.font = '700 30px ui-monospace, monospace';
+    c.textBaseline = 'top';
+    c.fillText(svc.service.slice(0, 16), 16, 14);
+    c.fillStyle = css(colorOf(state));
+    c.font = '24px ui-monospace, monospace';
+    c.fillText(state || '…', 16, 52);
+    c.fillStyle = tint;
+    for (let b = 0; b < 14; b++) {
+      const v = state === 'running' ? 0.25 + 0.75 * Math.abs(Math.sin(t * 1.6 + b * 0.7 + i)) : 0.12;
+      const bh = v * 50;
+      c.globalAlpha = 0.5 + v * 0.5;
+      c.fillRect(16 + b * 21, h - 14 - bh, 14, bh);
+    }
+    c.globalAlpha = 1;
+    holoTex.needsUpdate = true;
+  };
   const base = new THREE.Color();
   g.set = (s) => {
     state = svcState(s.state);
     base.setHex(colorOf(state)).multiplyScalar(1.6);
     lights.color.copy(base);
+    shot.image = textCanvas([{ text: state, color: css(colorOf(state)) }], { w: 256, h: 96, size: 24, title: svc.service.slice(0, 14) });
+    shot.needsUpdate = true;
+    drawHolo(0);
   };
   g.tick = (dt, t) => {
     if (state === 'running') lights.color.copy(base).multiplyScalar(0.75 + Math.sin(t * 3 + i) * 0.25);
+    if ((age += dt) > 0.15 && state === 'running') {
+      age = 0;
+      drawHolo(t);
+    }
   };
   return g;
 }

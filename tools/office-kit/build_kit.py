@@ -26,7 +26,7 @@ def use_collection(name):
     return coll
 
 
-def quad_uvs(objs, prefixes=('RS_Screen', 'RS_Poster', 'RS_City')):
+def quad_uvs(objs, prefixes=('RS_Screen', 'RS_Poster', 'RS_City', 'RS_RackDisplay')):
     """Map each textured quad (screens, posters, backdrop) to the full 0..1 image."""
     for o in objs.values():
         me = o.data
@@ -359,6 +359,8 @@ M = dict(
     led=mat('RS_LED_Accent', emit=ACCENT, strength=8),
     ledG=mat('RS_LED_Green', emit='#33ff88', strength=8),
     ledA=mat('RS_LED_Amber', emit='#ffaa22', strength=8),
+    rubber=mat('RS_Rubber', '#121316', 0, .55),
+    rackDisplay=mat('RS_RackDisplay', '#000000', 0, .3, emit='#0b1a24', strength=1),  # blank: the page draws on it
     body=mat('RS_Body', '#ffffff', .55, .45, image=make_image('RS_Paint_Body', 512, 512, draw_paint('#1c1f27'))),
     dark=mat('RS_BodyDark', '#ffffff', .35, .6, image=make_image('RS_Paint_Dark', 512, 512, draw_paint('#101116'))),
     violet=mat('RS_PaintViolet', '#ffffff', .3, .5, image=make_image('RS_Paint_Violet', 512, 512, draw_paint('#3b2470'))),
@@ -660,30 +662,79 @@ def workstation(a, monitors=3, width=2.0, seed=1):
     with a.at(0, 0, .75, ry=math.pi + (r.random() - .5) * .4): chair(a)
 
 
-def server_rack(a, width=0.6, height=2.0, depth=1.0, units=16, seed=1):
-    r, t = random.Random(seed), .03
-    a.box(t, height, depth, M['body'], -width / 2 + t / 2, height / 2, 0)
-    a.box(t, height, depth, M['body'], width / 2 - t / 2, height / 2, 0)
-    a.box(width, t, depth, M['body'], 0, height - t / 2, 0)
-    a.box(width, .08, depth, M['dark'], 0, .04, 0)
-    a.box(width, height, t, M['dark'], 0, height / 2, -depth / 2 + t / 2)
-    uh, front = (height - .2) / units, depth / 2 - .06
-    for i in range(units):
-        y = .1 + i * uh + uh / 2
-        if r.random() < .12:
-            continue
-        a.box(width - .08, uh * .86, depth - .12, M['dark'], 0, y, 0)
-        a.box(width - .08, uh * .86, .004, M['trim'], 0, y, front + .002)
-        for k in range(3 + r.randrange(6)):
-            roll = r.random()
-            led = M['led'] if roll < .7 else M['ledG'] if roll < .88 else M['ledA']
-            a.box(.012, .008, .004, led, -width / 2 + .08 + k * .024, y, front + .006)
-        if r.random() < .5:
-            a.box(.1, uh * .4, .004, M['dark'], width / 2 - .12, y, front + .005)
-    a.box(width - .04, height - .1, .006, M['glass'], 0, height / 2, depth / 2)
-    for s in (-1, 1):
-        a.box(.012, height - .12, .012, M['neon'], s * (width / 2 - .012), height / 2, depth / 2 + .006)
-    a.box(width - .06, .012, .012, M['neon2'], 0, height - .05, depth / 2 + .006)
+def server_rack(a, width=0.6, height=2.0, depth=1.0, seed=1):
+    """A stylized rack: a chunky bolted frame in worn paint with a neon edge
+    down each side (the floor's secondary colour), an accent bar on top and
+    a small status display (RS_RackDisplay, blank: the page draws the
+    service on it), then stacked modules: patch panels of ports, LED grids,
+    a vent. The LEDs and the bar are RS_LED_Accent: the page lights them in
+    the service's state. seed reorders the modules."""
+    r = random.Random(seed)
+    fw, zf = .045, depth / 2
+    inner = width - 2 * fw
+    a.box(width - .02, height - .02, depth - .05, M['body'], 0, height / 2, -.025)       # the cabinet
+    for s_ in (-1, 1):
+        x = s_ * (width / 2 - fw / 2)
+        a.box(fw, height, .05, M['dark'], x, height / 2, zf - .025)                        # front posts
+        a.box(.008, height - .12, .012, M['neon2'], s_ * (width / 2 + .003), height / 2, zf - .03)
+        for y in (.1, height * .36, height * .64, height - .1):                             # bolts
+            a.cyl(.01, .01, .012, M['trim'], x, y, zf + .004, 12, rx=math.pi / 2)
+    a.box(width, .08, .05, M['dark'], 0, height - .04, zf - .025)                          # head
+    a.box(width, .1, .05, M['dark'], 0, .05, zf - .025)                                    # plinth
+    a.box(inner - .1, .016, .012, M['led'], 0, height - .04, zf + .004)                    # accent bar
+    y = height - .08 - .13
+    a.box(inner - .02, .22, .012, M['dark'], 0, y, zf - .03)
+    a.box(inner - .08, .16, .004, M['rackDisplay'], 0, y, zf - .022)                       # status display
+    mods = ['ports', 'leds', 'leds', 'ports', 'leds']
+    if seed != 1:
+        r.shuffle(mods)
+    mods.append('vent')
+    size = {'ports': .2, 'leds': .3, 'vent': .26}
+    top = y - .13
+    for m in mods:
+        h = size[m]
+        cy = top - h / 2
+        a.box(inner - .02, h - .02, .012, M['dark'], 0, cy, zf - .03)                       # module face
+        a.box(inner - .02, .004, .004, M['trim'], 0, cy + h / 2 - .012, zf - .022)          # its lip
+        if m == 'ports':
+            for row in (.035, -.035):
+                for k in range(6):
+                    a.box(.028, .022, .006, M['trim'], -inner / 2 + .07 + k * .048, cy + row, zf - .022)
+                    a.box(.018, .012, .004, M['dark'], -inner / 2 + .07 + k * .048, cy + row, zf - .018)
+            a.box(.01, .01, .004, M['led'], inner / 2 - .05, cy + .05, zf - .02)
+        elif m == 'leds':
+            cols, rows = 8, 5
+            for gx in range(cols):
+                for gy in range(rows):
+                    if r.random() < .82:
+                        a.box(.014, .014, .004, M['led'], -inner / 2 + .06 + gx * .042, cy - .085 + gy * .042, zf - .02)
+        else:
+            for k in range(7):
+                a.box(inner - .08, .014, .006, M['trim'], 0, cy - .1 + k * .033, zf - .022)
+        top -= h
+    # armoured sides: raised plates, bolts at their corners, vent slots
+    for s_ in (-1, 1):
+        x = s_ * (width / 2 + .01)
+        for py, ph in ((.55, .9), (1.45, .7)):
+            a.box(.02, ph, depth - .22, M['body'], x, py, -.02)
+            for by in (py - ph / 2 + .05, py + ph / 2 - .05):
+                for bz in (-depth / 2 + .16, depth / 2 - .2):
+                    a.cyl(.012, .012, .014, M['trim'], x + s_ * .011, by, bz, 10, rz=math.pi / 2)
+        for k in range(5):
+            a.box(.006, .012, .3, M['dark'], x + s_ * .011, 1.25 + k * .03, -.1)
+        # cable bundles out of the side, looping down to the floor
+        for k in range(3 + r.randrange(2)):
+            y0, z0 = .9 + k * .28 + r.random() * .1, .1 - k * .14
+            out = .2 + r.random() * .14
+            a.cyl(.032, .032, .05, M['trim'], s_ * (width / 2 + .045), y0, z0, 12, rz=math.pi / 2)   # collar
+            a.cable([(s_ * (width / 2 + .05), y0, z0), (s_ * (width / 2 + out), y0 - .12, z0 + .05),
+                     (s_ * (width / 2 + out * .8), y0 * .45, z0 - .05), (s_ * (width / 2 + .12 + k * .03), .03, z0 - .12)],
+                    .022, M['rubber'], seg=7)
+    # a bundle up from the top into the ceiling's cable tray (4 m up)
+    for k in range(4):
+        x0, z0 = -.18 + k * .12, -.2 + (k % 2) * .12
+        a.cable([(x0, height - .01, z0), (x0 + .05, height + .5, z0 + .15), (x0 * 1.6, height + 1.3, z0 - .1), (x0 * 1.3, 3.98, z0 - .2)],
+                .024, M['rubber'], seg=7)
 
 
 def sofa(a, width=2.2, depth=0.9):

@@ -9,7 +9,7 @@ ASSETS = [
     ('Furn_Desk', desk, 'aabb'), ('Furn_Chair', chair, 'aabb'),
     ('Tech_Monitor', monitor, None), ('Tech_WallDisplay', wall_display, None), ('Tech_Keyboard', keyboard, None),
     ('Tech_PCTower', pc_tower, 'aabb'), ('Deco_Mug', mug, None),
-    ('Tech_ServerRack', server_rack, 'aabb'), ('Tech_ServerRack_B', lambda a: server_rack(a, seed=7), 'aabb'),
+    ('Tech_ServerRack', server_rack, [(.6, 2.0, 1.0, 0, 1.0, 0)]), ('Tech_ServerRack_B', lambda a: server_rack(a, seed=7), [(.6, 2.0, 1.0, 0, 1.0, 0)]),  # the cabinet: not its cables
     ('Furn_Sofa', sofa, 'aabb'), ('Furn_Sofa_Short', lambda a: sofa(a, 1.4), 'aabb'), ('Furn_CoffeeTable', coffee_table, 'aabb'),
     ('Deco_Plant_Floor', plant, 'aabb'), ('Deco_Plant_Floor_B', lambda a: plant(a, True, 5, M['terracotta']), 'aabb'),
     ('Deco_Plant_Small', lambda a: plant(a, False, 3), None),

@@ -1,10 +1,16 @@
 // Terminals (D149): an xterm.js terminal over the dashboard's WebSocket
 // (GET /p/{prefix}/tty/{slug}/{kind}). Binary frames carry keys and output;
 // a text frame {"cols","rows"} resizes; the server's {"exit":N} comes
-// before a normal close. Rendered with WebGL: xterm's DOM renderer adds
-// <style> elements, which the dashboard's CSP blocks.
+// before a normal close. Rendered on a canvas (WebGL as the fallback):
+// xterm's DOM renderer adds <style> elements, which the dashboard's CSP blocks.
 
 const sendMax = 16 << 10; // the server reads at most 64 KiB per frame
+
+// FONT prefers Maple Mono (its Nerd Font builds first: nvim's icons, prompt
+// glyphs), then JetBrains Mono's, then the system's monospace: the first one
+// installed wins.
+const FONT = '"Maple Mono NF", "Maple Mono NF CN", "Maple Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono", ui-monospace, Menlo, monospace';
+const FONT_SIZE = 14;
 
 // open counts live terminals: while any is, leaving the page asks first
 // (Ctrl-W, delete-word in a shell, closes the tab before the terminal
@@ -33,7 +39,9 @@ function load() {
       css.href = href;
       document.head.append(css);
     }
-    loaded = script('/static/term/xterm.js').then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-webgl.js')]));
+    // the font first: the terminal measures its cell once, when it opens
+    const font = document.fonts?.load(`${FONT_SIZE}px ${FONT}`).catch(() => {}) ?? Promise.resolve();
+    loaded = Promise.all([font, script('/static/term/xterm.js')]).then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-canvas.js'), script('/static/term/addon-webgl.js')]));
   }
   return loaded;
 }
@@ -142,19 +150,25 @@ export function openTerminal(el, url, opts = {}) {
     if (closed) return;
     term = new window.Terminal({
       cursorBlink: true, scrollback: 5000, allowProposedApi: false,
-      fontFamily: 'ui-monospace, "JetBrains Mono", Menlo, monospace', fontSize: 13,
+      fontFamily: FONT, fontSize: FONT_SIZE,
       theme: { ...cssTheme(el), ...(opts.theme || {}) },
     });
     fit = new window.FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open(screen);
+    // the canvas renderer: the browser's own text drawing, crisp in Firefox
+    // too (WebGL's glyph atlas comes out soft there); WebGL if it fails
     try {
-      const gl = new window.WebglAddon.WebglAddon();
-      gl.onContextLoss(() => { show('This terminal needs WebGL: its context was lost'); sock?.close(); });
-      term.loadAddon(gl);
+      term.loadAddon(new window.CanvasAddon.CanvasAddon());
     } catch {
-      show('This terminal needs WebGL, which this browser has turned off.');
-      return;
+      try {
+        const gl = new window.WebglAddon.WebglAddon();
+        gl.onContextLoss(() => { show('This terminal lost its WebGL context'); sock?.close(); });
+        term.loadAddon(gl);
+      } catch {
+        show('This terminal needs a canvas or WebGL, which this browser has turned off.');
+        return;
+      }
     }
     fit.fit();
     term.onData(send);

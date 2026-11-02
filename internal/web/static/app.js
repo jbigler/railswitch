@@ -314,12 +314,23 @@ async function openTermPanel(btn) {
   } catch (err) {
     host.textContent = String(err.message || err);
   }
+  // one button: into fullscreen, and out again (with the keyboard locked,
+  // Escape goes to the terminal: leaving takes holding it, or this)
   full.addEventListener("click", async () => {
     try {
-      await panel.requestFullscreen();
-      await navigator.keyboard?.lock?.();
-    } catch { /* stays in the page */ }
+      if (document.fullscreenElement === panel) await document.exitFullscreen();
+      else {
+        await panel.requestFullscreen();
+        await navigator.keyboard?.lock?.();
+      }
+    } catch { /* stays as it was */ }
     t?.focus();
+  });
+  panel.addEventListener("fullscreenchange", () => {
+    const on = document.fullscreenElement === panel;
+    full.textContent = on ? "exit fullscreen" : "fullscreen";
+    full.title = on ? "Back to the page (or hold Esc)" : "Fullscreen; in Chromium browsers Ctrl-W and similar keys then reach the terminal";
+    if (!on) navigator.keyboard?.unlock?.();
   });
   x.addEventListener("click", () => {
     t?.close();

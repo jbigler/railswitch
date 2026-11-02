@@ -18,7 +18,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - Run `make check` before every commit.
 - A behaviour change updates its doc in `docs/`. A new design choice gets a Dnn row in the roadmap.
 - Every read command takes `--json` and prints one JSON document (D40). Its schema goes in `docs/json.md`.
-- Dependencies are the standard library and `github.com/BurntSushi/toml` only. The no-echo prompt uses `syscall` TCGETS and TCSETS.
+- Dependencies are the standard library, `github.com/BurntSushi/toml` and `github.com/coder/websocket` (the dashboard's terminals, D149: a WebSocket parser is security-sensitive); a new one needs as good a reason. The no-echo prompt uses `syscall` TCGETS and TCSETS.
 - Unit tests need no podman, systemd, gh, or network. `git` and `bash` are allowed. Fake commands with `internal/sys/systest`.
 - `project.toml`, `stack.lock`, `registry.toml`, `config.toml`, and `dashboard.toml` carry `schema = 1`. A file with a higher schema is refused as "written by a newer railswitch" (D39).
 
@@ -43,7 +43,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - Never remove a directory in `render.Plan.StatusDirs`. These hold agent status, shared agent memory, and shared notes.
 - Templates hold no personal choices (D112). A template never carries `[tools]`, `[agents]`, or the editor's or agents' Containerfiles.
 - Agent names in `config.reservedAgents` are refused. Add a name there when you add an `agent` subcommand.
-- Only `internal/pack/builtin/agents/claude/` may name `claude`. Only `internal/term/` may name a terminal, except `internal/render/agentsession.go` and `Containerfile.agent-base`, which run tmux inside the container. No non-test code names `filial` or Phoenix. `TestGenericity` in `internal/` enforces this.
+- Only `internal/pack/builtin/agents/claude/` may name `claude`. Only `internal/term/` may name a terminal, except `internal/render/agentsession.go` and `Containerfile.agent-base`, which run tmux inside the container, and the vendored xterm.js in `internal/web/static/term/`. No non-test code names `filial` or Phoenix. `TestGenericity` in `internal/` enforces this.
 - Every Quadlet unit railswitch writes ends with `[Quadlet] DefaultDependencies=false` (D130). The line goes after the unit-hash stamp, so it changes no hash. The minimum podman version is 5.3.
 - Paths honour `XDG_CONFIG_HOME` and `XDG_DATA_HOME`. Config is in `~/.config/railswitch/`, data is in `~/.local/share/railswitch/`, and Quadlet output is in `~/.config/containers/systemd/`.
 - Data services (role `data`: database, cache, and storage) get `StopTimeout=60`, `TimeoutStopSec=90`, and `TimeoutStartSec=300`.
@@ -80,5 +80,6 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - `internal/review` and `internal/textdiff`: review diffs and the D98 flags.
 - `internal/signing` and `internal/libraries`: library signing, trust, and fetches (D99 to D106).
 - `internal/template`: templates (D108 to D113).
-- `internal/term`: `--new-term`, which detects the terminal and opens a window.
+- `internal/term`: `--new-term`, which detects the terminal and opens a window; `BrowserEnv`, the browser terminal's `TERM`.
+- `internal/pty`: Linux pseudo-terminals (`Open`, `Resize`) for the dashboard's terminals (`GET /p/{prefix}/tty/{slug}/{kind}`, `internal/web/terminal.go`; `sys.Cmd.TTY` runs a command on one, in its own session; `docs/dashboard.md` Terminals).
 - Also `internal/placeholder`, `internal/version`, `internal/unithash`, `internal/tailscale`, `internal/podman`, `internal/firewall`, `internal/worktree`, and `internal/doctor`.

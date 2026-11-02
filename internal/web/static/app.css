@@ -254,3 +254,13 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .svc-acts a,.svc-acts button{color:var(--blue);background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:none}
 .svc-acts a:hover,.svc-acts button:hover{text-decoration:underline}
 .list td.br .trunc{display:inline-block;max-width:16rem;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+
+/* Terminal panels (D149). */
+.terms { display: flex; flex-direction: column; gap: 0.75rem; margin: 0.75rem 0; }
+.term-panel { border: 1px solid var(--border); background: var(--bg); resize: vertical; overflow: hidden;
+  height: 24rem; min-height: 12rem; display: flex; flex-direction: column; }
+.term-panel > header { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; background: var(--bg2);
+  border-bottom: 1px solid var(--border); }
+.term-panel > header > span { flex: 1; }
+.term-panel > div { flex: 1; }
+.term-panel:fullscreen { height: 100vh; resize: none; }

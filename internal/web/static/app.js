@@ -182,6 +182,8 @@ document.addEventListener("click", (e) => {
     select(row.dataset.slug, true);
     return;
   }
+  const termBtn = t.closest("[data-term]");
+  if (termBtn) return openTermPanel(termBtn);
   const opener = t.closest("[data-open]");
   if (opener) return openDialog(opener.dataset.open);
   if (t.closest("[data-palette]")) return openPalette();
@@ -278,6 +280,52 @@ function hideToast() {
 }
 
 // Keys.
+
+// Terminal panels (D149): docked in #terms, outside the detail that SSE
+// replaces; each closes its WebSocket when removed.
+async function openTermPanel(btn) {
+  const dock = $("#terms");
+  if (!dock) return;
+  const slug = $("#detail")?.dataset.slug || "";
+  const panel = document.createElement("section");
+  panel.className = "term-panel";
+  const head = document.createElement("header");
+  const title = document.createElement("span");
+  title.className = "mono";
+  title.textContent = slug + " · " + (btn.dataset.termLabel || "terminal");
+  const full = document.createElement("button");
+  full.type = "button";
+  full.className = "ln";
+  full.textContent = "fullscreen";
+  full.title = "Fullscreen; in Chromium browsers Ctrl-W and similar keys then reach the terminal";
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "ln";
+  x.textContent = "✕";
+  x.setAttribute("aria-label", "Close terminal");
+  const host = document.createElement("div");
+  head.append(title, full, x);
+  panel.append(head, host);
+  dock.prepend(panel);
+  let t = null;
+  try {
+    const { openTerminal } = await import("/static/term/term.js");
+    t = openTerminal(host, btn.dataset.term);
+  } catch (err) {
+    host.textContent = String(err.message || err);
+  }
+  full.addEventListener("click", async () => {
+    try {
+      await panel.requestFullscreen();
+      await navigator.keyboard?.lock?.();
+    } catch { /* stays in the page */ }
+    t?.focus();
+  });
+  x.addEventListener("click", () => {
+    t?.close();
+    panel.remove();
+  });
+}
 
 document.addEventListener("keydown", (e) => {
   const d = $("dialog[open]");

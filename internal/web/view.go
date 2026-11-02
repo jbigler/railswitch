@@ -621,8 +621,9 @@ type detailView struct {
 	Services                          []serviceView
 	Agent                             *agentView
 	Actions                           []actionView
-	RemoveURL, TasksURL               string // RemoveURL "" for the base worktree
-	AgentDefaultURL                   string // the agent default config dialog (D135)
+	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
+	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
+	AgentDefaultURL                   string       // the agent default config dialog (D135)
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
 	Merged, Stale                     bool
@@ -702,6 +703,16 @@ func newDetail(prefix string, r row, repo string) detailView {
 	for _, act := range append(acts, "term") {
 		v.Actions = append(v.Actions, actionView{Label: worktreeActions[act].label, URL: path + "/act/" + act})
 	}
+	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
+	agentURL := tty + "agent" // the default agent, or the one the overview names
+	if wt.Agent != nil {
+		agentURL += "?agent=" + url.QueryEscape(wt.Agent.Name)
+	}
+	v.Terms = append(v.Terms, actionView{Label: "agent", URL: agentURL})
+	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Service == "nvim" }) {
+		v.Terms = append(v.Terms, actionView{Label: "nvim", URL: tty + "nvim"})
+	}
+	v.Terms = append(v.Terms, actionView{Label: "shell", URL: tty + "shell"})
 	if v.Stacked != nil && v.Stacked.Error == "" {
 		v.SwitchURL = path + "/stack/switch"
 	}

@@ -16,12 +16,14 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
 	"github.com/jbigler/railswitch/internal/jobs"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
+	"github.com/jbigler/railswitch/internal/sys"
 )
 
 //go:embed static
@@ -36,6 +38,10 @@ type Config struct {
 	Home    string // the user's home: a new project's default folder, its create job's dir
 	Version string
 	Now     func() time.Time
+	// Run and Env start terminals (D149): the runner, and the environment
+	// jobs get (nil = the dashboard's own).
+	Run sys.Runner
+	Env func(context.Context) []string
 }
 
 // Server is the dashboard: its handlers and its pollers.
@@ -45,6 +51,9 @@ type Server struct {
 
 	tick time.Duration // how often the pollers look whether a poll is due
 	ping time.Duration // SSE keep-alive
+
+	ttyN             atomic.Int32  // terminals open
+	ttyPing, ttyPong time.Duration // a terminal's ping interval and its pong deadline
 
 	wakeOV, wakePR chan struct{}
 
@@ -62,7 +71,7 @@ func New(c Config) *Server {
 		c.Now = time.Now
 	}
 	s := &Server{
-		c: c, tick: time.Second, ping: 15 * time.Second,
+		c: c, tick: time.Second, ping: 15 * time.Second, ttyPing: ttyPingDef, ttyPong: ttyPongDef,
 		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1),
 		state: map[string]*projectState{}, subs: map[*subscriber]struct{}{},
 	}
@@ -75,6 +84,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /{$}", s.root)
 	m.HandleFunc("GET /p/{prefix}", s.page)
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
+	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/tasks", s.tasksDialog)

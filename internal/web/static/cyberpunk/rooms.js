@@ -61,7 +61,8 @@ export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plai
   'Arch_GlassWall_4m', 'Arch_GlassWall_2m', 'Arch_GlassWall_Door_4m',
   'Deco_Plant_Snake', 'Deco_Plant_Monstera', 'Deco_Plant_Palm', 'Deco_Plant_Bush', 'Deco_Plant_Trailing',
   'Furn_SideTable', 'Deco_FloorLamp', 'Deco_Rug_Geo', 'Deco_CoatRack', 'Deco_Whiteboard', 'Deco_Backpack', 'Furn_Stool',
-  'Deco_BookStack', 'Deco_PizzaBoxes'];
+  'Deco_BookStack', 'Deco_PizzaBoxes',
+  'Tech_Vending_Ramen', 'Tech_Vending_Drinks', 'Furn_CoffeeCounter', 'Furn_Arcade_Stand', 'Tech_Arcade_Bartop', 'Deco_WallClock'];
 
 // decor is a floor's look, from its name: "randomly consistent", as the
 // starship's decks (D144): the name's hash seeds the floor's hue, its second
@@ -338,7 +339,7 @@ function residents(k, scene, deco, ui, androids) {
       mine(put(k, scene, 'Pet_JellyfishTank', -3.3, 0, -4.0));
       break;
     default: // the gecko's terrarium stands on the café counter
-      mine(put(k, scene, 'Pet_Gecko_Terrarium', 2.9, 0.75, -7.55));
+      mine(put(k, scene, 'Pet_Gecko_Terrarium', 1.15, 0.94, -7.6));
   }
   // the androids: each a roamer that walks wherever the floor is free
   const models = ['Char_Android_A', 'Char_Android_B', 'Char_Android_C'];
@@ -361,23 +362,143 @@ function zoneSign(scene, text, x, z, ry = 0) {
   sign.rods(x, 2.75, z, ry);
 }
 
-// café (the nook at the back, open to the corridor): the counter and the
-// fridge against the back wall, the vending machines' place beside them,
-// a bistro table.
+// café (the nook at the back, open to the corridor): the vending machines
+// by the elevator's side, the coffee counter and the fridge against the
+// back wall, the clock above, a bistro table. Returns its ticks.
 function cafe(k, scene, deco, gecko) {
   zoneSign(scene, 'Café', 0, -1.3);
-  put(k, scene, 'Furn_Desk', 2.0, 0, -7.55);
-  put(k, scene, 'Deco_MiniFridge', 3.4, 0, -7.55);
-  put(k, scene, 'Deco_Mug', 1.6, 0.75, -7.45);
-  put(k, scene, 'Deco_Mug', 1.85, 0.75, -7.6);
-  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 2.5, 0.75, -7.55, 0.2);
-  put(k, scene, 'Furn_Stool', 1.4, 0, -6.6);
-  put(k, scene, 'Furn_Stool', 2.6, 0, -6.6);
+  const ticks = [];
+  for (const [name, x, title, color, kind] of [['Tech_Vending_Ramen', -2.95, 'Ramen', 0xff3fae, 'ramen'], ['Tech_Vending_Drinks', -1.8, 'Drinks', 0x29e7ff, 'drinks']]) {
+    const v = put(k, scene, name, x, 0, -7.55);
+    vendScreen(v, kind, color);
+    const head = neonSign(title, color, null);
+    head.position.set(x, 2.12, -7.25);
+    head.scale.setScalar(0.85);
+    scene.add(head);
+  }
+  const kanji = neonSign('麺', 0xff3fae, null);
+  kanji.position.set(-3.7, 2.6, -7.9);
+  scene.add(kanji);
+  put(k, scene, 'Furn_CoffeeCounter', 2.0, 0, -7.65);
+  put(k, scene, 'Deco_MiniFridge', 3.55, 0, -7.55);
+  put(k, scene, 'Deco_Mug', 2.9, 0.94, -7.5);
+  put(k, scene, 'Deco_Mug', 3.0, 0.94, -7.72);
+  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 1.2, 0.94, -7.6, 0.2);
+  put(k, scene, 'Furn_Stool', 1.4, 0, -6.8);
+  put(k, scene, 'Furn_Stool', 2.6, 0, -6.8);
   put(k, scene, 'Furn_SideTable', 0.4, 0, -4.4);
   put(k, scene, 'Furn_Stool', -0.3, 0, -4.4);
   put(k, scene, 'Furn_Stool', 1.1, 0, -4.4);
   put(k, scene, 'Deco_Plant_Snake', 3.5, 0, -2.6, deco.r() * 6);
   put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 2.0, 4, -7.3, deco.r() * 6);
+  ticks.push(wallClock(k, scene, -0.4, 2.55, -7.97));
+  zoneSign(scene, '◀ Lift', -7.5, 0, PI / 2);
+  return ticks;
+}
+
+// wallClock hangs the clock and turns its hands to the viewer's local time.
+function wallClock(k, scene, x, y, z, ry = 0) {
+  const c = put(k, scene, 'Deco_WallClock', x, y, z, ry);
+  const hands = ['Clock_Hour', 'Clock_Minute', 'Clock_Second'].map((n) => c.getObjectByName(n));
+  return () => {
+    const d = new Date();
+    const sec = d.getSeconds() + d.getMilliseconds() / 1000;
+    const min = d.getMinutes() + sec / 60;
+    const hr = (d.getHours() % 12) + min / 60;
+    // clockwise, seen from the front (+z): negative turns about z
+    if (hands[0]) hands[0].rotation.z = -(hr / 12) * PI * 2;
+    if (hands[1]) hands[1].rotation.z = -(min / 60) * PI * 2;
+    if (hands[2]) hands[2].rotation.z = -(Math.floor(sec) / 60) * PI * 2;
+  };
+}
+
+// vendScreen draws a vending machine's menu on its blank screen: eight
+// items in two columns, prices, a credit line and a BUY button.
+function vendScreen(machine, kind, color) {
+  const cv = document.createElement('canvas');
+  cv.width = 312;
+  cv.height = 380;
+  const g = cv.getContext('2d');
+  const tint = '#' + new THREE.Color(color).getHexString();
+  g.fillStyle = '#0c0816';
+  g.fillRect(0, 0, cv.width, cv.height);
+  const items = kind === 'ramen'
+    ? [['Chicken', '#ffd27a', 90], ['Veggie', '#d08cff', 100], ['Miso', '#ffb35c', 95], ['Spicy', '#ff4a4a', 110], ['Tomato', '#ff7a6a', 90], ['Curry', '#ffc93c', 99], ['Seafood', '#7ad7ff', 120], ['Extra hot', '#ff2d55', 115]]
+    : [['Cola', '#ff3b3b', 60], ['Neon', '#7dff6a', 70], ['Lemon', '#fff36a', 60], ['Grape', '#b36aff', 70], ['Cold brew', '#c08a5a', 90], ['Water', '#8ad8ff', 40], ['Energy', '#ff8a2a', 95], ['Matcha', '#9ad66a', 85]];
+  items.forEach(([name, c, price], n) => {
+    const x = 14 + (n % 2) * 148, y = 12 + Math.floor(n / 2) * 78;
+    g.strokeStyle = tint;
+    g.globalAlpha = 0.6;
+    g.lineWidth = 2;
+    g.strokeRect(x, y, 136, 70);
+    g.globalAlpha = 1;
+    g.fillStyle = c;
+    if (kind === 'ramen') { g.beginPath(); g.moveTo(x + 12, y + 22); g.lineTo(x + 44, y + 22); g.lineTo(x + 40, y + 60); g.lineTo(x + 16, y + 60); g.closePath(); g.fill(); }
+    else g.fillRect(x + 16, y + 16, 24, 46);
+    g.fillStyle = '#e8e2ff';
+    g.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+    g.fillText(name, x + 52, y + 30);
+    g.fillStyle = tint;
+    g.font = '700 16px ui-monospace, monospace';
+    g.fillText(`${price} ¢`, x + 52, y + 54);
+  });
+  g.fillStyle = tint;
+  g.font = '700 22px ui-monospace, monospace';
+  g.fillText('100 credits', 70, 340);
+  g.strokeStyle = tint;
+  g.lineWidth = 3;
+  g.strokeRect(210, 318, 86, 38);
+  g.fillText('BUY', 230, 345);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false; // the model's UVs are glTF's, top-left origin
+  machine.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_VendScreen') o.material = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }); });
+}
+
+// arcadeScreen draws the bartop's attract screen: a sunburst over a sunset
+// and PRESS START, blinking. Returns its tick.
+function arcadeScreen(cab, seed) {
+  const cv = document.createElement('canvas');
+  cv.width = 256;
+  cv.height = 205;
+  const g = cv.getContext('2d');
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false;
+  cab.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_ArcadeScreen') o.material = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }); });
+  const green = seed % 2 ? '#5dff8a' : '#ff6ad5';
+  let age = 1, on = true;
+  const draw = (t) => {
+    g.fillStyle = '#04100a';
+    g.fillRect(0, 0, cv.width, cv.height);
+    g.strokeStyle = green;
+    g.lineWidth = 2;
+    const cx = 128, cy = 92;
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * PI * 2 + t * 0.3;
+      g.beginPath();
+      g.moveTo(cx + Math.cos(a) * 22, cy + Math.sin(a) * 22);
+      g.lineTo(cx + Math.cos(a) * 62, cy + Math.sin(a) * 62);
+      g.stroke();
+    }
+    g.fillStyle = green;
+    g.beginPath();
+    g.arc(cx, cy, 18, PI, 0);
+    g.fill();
+    for (let k = 0; k < 4; k++) g.fillRect(cx - 18, cy + 4 + k * 6, 36, 2);
+    if (on) {
+      g.font = '700 22px ui-monospace, monospace';
+      g.fillText('PRESS START', 52, 186);
+    }
+    tex.needsUpdate = true;
+  };
+  draw(0);
+  return (dt, t) => {
+    if ((age += dt) < 0.5) return;
+    age = 0;
+    on = !on;
+    draw(t);
+  };
 }
 
 // lounge (back-right, behind glass): the sofa facing the big screen on the
@@ -552,17 +673,22 @@ function holoTable(scene, x, z, color) {
   };
 }
 
-// gameRoom (front-right, behind glass, by the windows): a sofa facing the
-// arcade, a coffee table. shortcut: kiosks stand in for the arcade machines
-// until the kit has them.
+// gameRoom (front-right, behind glass, by the windows): two bartop arcades
+// on their stands along the windows, a sofa facing them, a coffee table.
+// Returns its ticks.
 function gameRoom(k, scene, deco) {
   zoneSign(scene, 'Game room', 5, 1.3);
   rug(scene, 5.5, 11.5, 3.0, 7.6, deco.accent);
-  for (const z of [3.8, 5.0]) put(k, scene, 'Tech_TerminalKiosk', 11.3, 0, z, -PI / 2);
-  put(k, scene, 'Furn_Sofa', 7.0, 0, 4.6, PI / 2);
-  put(k, scene, 'Furn_CoffeeTable', 8.6, 0, 4.6, PI / 2);
+  const ticks = [];
+  [3.8, 5.2].forEach((z, n) => {
+    put(k, scene, 'Furn_Arcade_Stand', 11.3, 0, z, -PI / 2);
+    ticks.push(arcadeScreen(put(k, scene, 'Tech_Arcade_Bartop', 11.3, 0.78, z, -PI / 2), n));
+  });
+  put(k, scene, 'Furn_Sofa', 8.0, 0, 4.5, PI / 2);
+  put(k, scene, 'Furn_CoffeeTable', 9.4, 0, 4.5, PI / 2);
   put(k, scene, 'Deco_Plant_Floor', 11.4, 0, 7.4, deco.r() * 6);
-  put(k, scene, 'Deco_PizzaBoxes', 8.6, 0.42, 4.5, 0.4);
+  put(k, scene, 'Deco_PizzaBoxes', 9.4, 0.42, 4.4, 0.4);
+  return ticks;
 }
 
 // support: what sits at the corridor's far end and by the elevator.
@@ -628,15 +754,15 @@ export async function lab(slug, n, ui) {
   const pr = station(k, scene, -7.4, 7.2, PI, 'Pull request', 'Pull request: open it, or all of them', () => ui.prs(), 2.0, 1.1);
 
   const which = deco.pet;
-  cafe(k, scene, deco, which === 'gecko');
+  const cafeTicks = cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
   const holo = meeting(k, scene, deco);
-  gameRoom(k, scene, deco);
+  const gameTicks = gameRoom(k, scene, deco);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 1 + (deco.seed % 2));
   res.start();
 
-  const ticks = [...sh.ticks, partner.tick, ...res.ticks, holo.tick];
+  const ticks = [...sh.ticks, partner.tick, ...res.ticks, holo.tick, ...cafeTicks, ...gameTicks];
   const update = (st) => {
     const w = st.worktrees.find((x) => x.slug === slug);
     if (!w) return;
@@ -870,9 +996,9 @@ export async function lobby(prefix, ui) {
   view.position.set(-11.9, 3.15, 5.0);
   view.rotation.y = PI / 2;
   scene.add(view);
-  put(k, scene, 'Deco_NeonSign', 0, 2.6, -7.97);
+  put(k, scene, 'Deco_NeonSign', 2.0, 2.6, -7.97);
   const name = label(prefix, { size: 0.5, color: css(deco.accent) });
-  name.position.set(0, 3.5, -7.6);
+  name.position.set(2.0, 3.45, -7.6);
   scene.add(name);
   put(k, scene, 'Furn_Desk', -7.0, 0, 4.0);
   put(k, scene, 'Tech_Laptop', -7.0, 0.75, 4.0, PI);
@@ -906,15 +1032,15 @@ export async function lobby(prefix, ui) {
   scene.add(dirSign);
 
   const which = deco.pet;
-  cafe(k, scene, deco, which === 'gecko');
+  const cafeTicks = cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
   const holo = meeting(k, scene, deco);
-  gameRoom(k, scene, deco);
+  const gameTicks = gameRoom(k, scene, deco);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 2);
   res.start();
 
-  const ticks = [...sh.ticks, ...res.ticks, holo.tick, workTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
+  const ticks = [...sh.ticks, ...res.ticks, holo.tick, ...cafeTicks, ...gameTicks, workTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
   let beaconKey = '';
   const update = (st) => {
     const lines = st.worktrees.map((w, i) => ({

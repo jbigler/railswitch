@@ -10,6 +10,6 @@ except AttributeError:  # --python
     src = __file__
 here = os.path.dirname(os.path.abspath(bpy.path.abspath(src)))
 g = {'__file__': os.path.join(here, 'build_kit.py'), '__name__': 'office_kit'}
-for f in ('build_kit.py', 'build_office.py', 'build_decor.py', 'build_arch.py', 'build_pets.py', 'build_androids.py', 'build_lounge.py', 'build_glass.py'):
+for f in ('build_kit.py', 'build_office.py', 'build_decor.py', 'build_arch.py', 'build_pets.py', 'build_androids.py', 'build_lounge.py', 'build_glass.py', 'build_cafe.py'):
     path = os.path.join(here, f)
     exec(compile(open(path).read(), path, 'exec'), g)

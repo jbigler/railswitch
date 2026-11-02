@@ -12,13 +12,14 @@ def line(px, x0, y0, x1, y1, col, w=3):
 
 
 def draw_whiteboard(px, w, h):
-    """A used whiteboard: a service diagram, a checklist, scribbles, ghosts of old ones."""
+    """A used glass board, dark, in glowing marker: a service diagram, a
+    checklist, scribbles, ghosts of old ones."""
     r = random.Random(4)
-    px[..., :3] = 0.93
+    px[..., :3] = 0.05
     for _ in range(30):  # half-erased ghosts
         x, y = r.randrange(w), r.randrange(h)
-        line(px, x, y, x + r.randrange(-60, 60), y + r.randrange(-20, 20), (0.84, 0.85, 0.87), 4)
-    blue, red, black = (0.12, 0.25, 0.7), (0.75, 0.12, 0.12), (0.1, 0.1, 0.12)
+        line(px, x, y, x + r.randrange(-60, 60), y + r.randrange(-20, 20), (0.1, 0.11, 0.13), 4)
+    blue, red, black = (0.2, 0.85, 1.0), (1.0, 0.3, 0.6), (0.82, 0.88, 0.96)  # cyan, pink, near-white marker
     boxes = [(30, 40, 120, 90), (190, 40, 280, 90), (110, 150, 200, 200)]
     for x0, y0, x1, y1 in boxes:
         for a, b, c, d in ((x0, y0, x1, y0), (x1, y0, x1, y1), (x1, y1, x0, y1), (x0, y1, x0, y0)):
@@ -53,7 +54,7 @@ L = dict(
     rug=mat('RS_Rug_Base', '#25202e', 0, .97),
     rug2=mat('RS_Rug_Line', '#6b3a6e', 0, .95),
     rug3=mat('RS_Rug_Line2', '#2c6c78', 0, .95),
-    board=mat('RS_Whiteboard', '#ffffff', 0, .3, image=make_image('RS_Whiteboard', 512, 320, draw_whiteboard)),
+    board=mat('RS_Whiteboard', '#000000', .2, .15, emit='#ffffff', strength=1.1, image=make_image('RS_Whiteboard', 512, 320, draw_whiteboard), emit_image=True),
     jacket=mat('RS_Jacket', '#5c1f26', 0, .8),
     denim=mat('RS_Denim', '#2e3f5c', 0, .85),
     leafLight=mat('RS_Leaf_Light', '#4f8f3a', 0, .6),
@@ -236,17 +237,20 @@ def coat_rack(a):
 
 
 def whiteboard(a):
-    """Rolling whiteboard covered in diagrams, 1.6 × 1.0 m board."""
+    """Rolling glass board, 2.4 × 1.2 m, covered in glowing diagrams. Its
+    writing surface is one quad of RS_Whiteboard mapped to the full image,
+    so a drawing can replace it later."""
     for s in (-1, 1):
-        a.box(.04, 1.9, .04, M['trim'], s * .85, .97, 0)
-        a.box(.06, .04, .5, M['dark'], s * .85, .05, 0)
-        for z in (-.22, .22):
-            a.cyl(.03, .03, .03, M['dark'], s * .85, .03, z, 8, rz=math.pi / 2)
-    a.box(1.66, 1.06, .03, M['trim'], 0, 1.35, 0)
-    a.plane(1.6, 1.0, L['board'], 0, 1.35, .016)
-    a.box(1.2, .03, .06, M['trim'], 0, .82, .04)  # pen tray
-    for i, m in enumerate((M['red'], L['denim'], M['dark'])):
-        a.cyl(.008, .008, .12, m, -.3 + i * .05, .85, .05, 6, rz=math.pi / 2)
+        a.box(.05, 2.05, .05, M['trim'], s * 1.26, 1.03, 0)
+        a.box(.07, .04, .55, M['dark'], s * 1.26, .05, 0)
+        for z in (-.24, .24):
+            a.cyl(.03, .03, .03, M['dark'], s * 1.26, .03, z, 8, rz=math.pi / 2)
+    a.box(2.48, 1.28, .03, M['trim'], 0, 1.4, 0)
+    a.plane(2.4, 1.2, L['board'], 0, 1.4, .016)
+    a.box(2.4, .006, .006, M['neon2'], 0, 2.045, .016)          # a neon edge on top
+    a.box(1.6, .03, .06, M['trim'], 0, .77, .04)                # pen tray
+    for i, m in enumerate((M['led'], M['neon2'], M['ledG'])):
+        a.cyl(.008, .008, .12, m, -.3 + i * .05, .8, .05, 6, rz=math.pi / 2)
 
 
 def backpack(a):

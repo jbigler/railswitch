@@ -40,13 +40,13 @@ def quad_uvs(objs, prefixes=('RS_Screen', 'RS_Poster', 'RS_City', 'RS_RackDispla
                     layer.data[li].uv = c
 
 
-# TRIM are the tiling textures, metres per repeat: the floor and walls on the
-# 4 m grid, and the worn paint every prop is coated in (scuffs, panel seams).
-TRIM = {'RS_Floor': 2, 'RS_Wall': 2, 'RS_Body': 1, 'RS_BodyDark': 1, 'RS_PaintViolet': 1}
+# TRIM are the tiling textures, metres per repeat: the floor (one sheet per
+# 4 m tile) and walls on the 4 m grid, and the worn paint every prop is coated in (scuffs, panel seams).
+TRIM = {'RS_Floor': 4, 'RS_Wall': 2, 'RS_Body': 1, 'RS_BodyDark': 1, 'RS_PaintViolet': 1}
 
 
 def trim_uvs(o):
-    """Planar UVs for the floor and wall textures (2 m per repeat), projected
+    """Planar UVs for the floor and wall textures (TRIM metres per repeat), projected
     along each face's main axis in the piece's own coordinates, so pieces on
     the 4 m grid continue each other's pattern."""
     me = o.data
@@ -153,11 +153,11 @@ def sock(node, ident):
     return next(s for s in node.inputs if s.identifier == ident)
 
 
-def mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alpha=1.0, image=None, emit_image=False):
+def mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alpha=1.0, image=None, emit_image=False, normal=None):
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
-    for n in [n for n in nt.nodes if n.type == 'TEX_IMAGE']:
+    for n in [n for n in nt.nodes if n.type in ('TEX_IMAGE', 'NORMAL_MAP')]:
         nt.nodes.remove(n)
     b = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
     sock(b, 'Base Color').default_value = (*lin(base), 1)
@@ -173,6 +173,13 @@ def mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alp
         nt.links.new(t.outputs['Color'], sock(b, 'Emission Color' if emit_image else 'Base Color'))
         if emit_image:
             sock(b, 'Emission Strength').default_value = strength
+    if normal:  # glTF's normalTexture: the relief catches the room's lights
+        normal.colorspace_settings.name = 'Non-Color'
+        t = nt.nodes.new('ShaderNodeTexImage')
+        t.image = normal
+        nm = nt.nodes.new('ShaderNodeNormalMap')
+        nt.links.new(t.outputs['Color'], nm.inputs['Color'])
+        nt.links.new(nm.outputs['Normal'], sock(b, 'Normal'))
     if alpha < 1:
         m.surface_render_method = 'BLENDED'
     m.diffuse_color = (*lin(emit or base), 1)
@@ -234,36 +241,146 @@ def smooth_noise(rng, n, size):
     return rows[:, i0] * (1 - fx) + rows[:, i1] * fx
 
 
+# Floor plates: a 4 m sheet of sci-fi deck panels (grates, perforated plates,
+# vent slots, ribs, X-braced mesh, hatches, bolted quarters) drawn as a height
+# field; draw_floor colours it, draw_floor_normal makes its normal map.
+FLOOR_PANELS = [  # (x0, y0, x1, y1) in 0.5 m cells of the 4 m sheet, the kind
+    (0, 0, 2, 4, 'grate'), (2, 0, 6, 2, 'squares'), (6, 0, 8, 4, 'hatch'),
+    (2, 2, 4, 4, 'perf'), (4, 2, 6, 4, 'quarters'),
+    (0, 4, 4, 6, 'slots'), (4, 4, 6, 8, 'xbrace'), (6, 4, 8, 6, 'ribs'),
+    (0, 6, 2, 8, 'quarters'), (2, 6, 4, 8, 'hatch'), (6, 6, 8, 8, 'perf'),
+]
+_floor = {}
+
+
+def inset(X, Y, w, h, c):
+    """Distance inside a w×h rectangle at the origin with corners chamfered by c (px)."""
+    dx, dy = np.minimum(X, w - X), np.minimum(Y, h - Y)
+    return np.minimum(np.minimum(dx, dy), (dx + dy - c) / 1.414)
+
+
+def floor_fields(size):
+    """The height field (0 groove .. 1 bolt head) and a per-pixel shade."""
+    if size in _floor:
+        return _floor[size]
+    rng = np.random.default_rng(11)
+    H = np.zeros((size, size), np.float32)
+    S = np.ones((size, size), np.float32)  # albedo multiplier: holes dark
+    cell = size // 8
+    for x0, y0, x1, y1, kind in FLOOR_PANELS:
+        X0, Y0, X1, Y1 = x0 * cell, y0 * cell, x1 * cell, y1 * cell
+        w, h = X1 - X0, Y1 - Y0
+        Y, X = np.mgrid[0:h, 0:w].astype(np.float32)
+        h_ = H[Y0:Y1, X0:X1]
+        s_ = S[Y0:Y1, X0:X1]
+        d = inset(X, Y, w, h, 26)
+        plate = np.clip((d - 5) / 6, 0, 1) * .55  # seam groove, bevelled edge, plate at .55
+        h_[:] = plate
+        s_[:] = .9 + rng.random() * .2
+        m = 30  # the frame around the panel's feature
+        Xi, Yi, wi, hi = X - m, Y - m, w - 2 * m, h - 2 * m
+        di = inset(Xi, Yi, wi, hi, 16)
+        inner = di > 0
+        if kind == 'grate':  # square holes between bars
+            s = 30
+            hole = inner & ((Xi % s) > 7) & ((Yi % s) > 7)
+            h_[inner] = .5
+            h_[hole] = .08
+            s_[hole] = .25
+        elif kind == 'perf':  # a frame with drilled holes
+            h_[inner] = np.minimum(h_[inner], .48)
+            s = 26
+            r2 = ((Xi % s) - s / 2) ** 2 + ((Yi % s) - s / 2) ** 2
+            hole = (di > 6) & (r2 < 36)
+            h_[hole] = .12
+            s_[hole] = .3
+        elif kind == 'slots':  # rows of rounded vent slots
+            h_[inner] = .5
+            sh, sw = 40, 150
+            ly, lx = Yi % sh, Xi % (sw + 24)
+            cx = np.clip(lx, 12, sw - 12)
+            slot = (di > 4) & ((lx - cx) ** 2 + (ly - sh / 2) ** 2 < 100) & (lx < sw)
+            h_[slot] = .1
+            s_[slot] = .3
+        elif kind == 'ribs':  # raised ribs across the panel
+            t = np.abs(((Yi % 22) / 22) - .5) * 2
+            h_[inner] = (.44 + .14 * np.clip((1 - t) * 2 - .4, 0, 1))[inner]
+        elif kind == 'squares':  # a grid of raised chamfered squares
+            h_[inner] = .42
+            sy = (hi + 18) / 2
+            sx = (wi + 18) / round((wi + 18) / sy)
+            qy, qx = Yi % sy, Xi % sx
+            q = inset(qx, qy, sx - 18, sy - 18, 14)
+            sq = inner & (q > 0)
+            h_[sq] = .42 + np.clip(q[sq] / 5, 0, 1) * .16
+            sm = inner & (q > 22) & (q < 26)
+            h_[sm] -= .06  # an inset line in each square
+        elif kind == 'quarters':  # four plates and a cross seam
+            gx, gy = np.abs(X - w / 2), np.abs(Y - h / 2)
+            seam = (np.minimum(gx, gy) < 4) & (d > 12)
+            h_[seam] = .28
+            for bx, by in ((w / 2, h / 2),):
+                b = (X - bx) ** 2 + (Y - by) ** 2
+                h_[b < 300] = .62
+        elif kind == 'hatch':  # a raised inner plate with a recessed handle
+            q = di
+            h_[inner] = .55 + np.clip(q[inner] / 8, 0, 1) * .12
+            hx, hy, hw, hh = wi / 2 - 70, hi * .2, 140, 36
+            hd = inset(Xi - hx, Yi - hy, hw, hh, 10)
+            hole = hd > 0
+            h_[hole] = .3 + np.clip(hd[hole] / 6, 0, 1) * -.15
+            s_[hole] = .55
+            lines = inner & (np.abs(Yi - hi * .62) < 3)
+            h_[lines] -= .1
+        elif kind == 'xbrace':  # mesh under an X brace with a hub
+            fine = inner & ((Xi % 12) > 3) & ((Yi % 12) > 3)
+            h_[inner] = .4
+            h_[fine] = .18
+            s_[fine] = .4
+            u, v = Xi / wi, Yi / hi
+            bar = inner & ((np.abs(u - v) * min(wi, hi) < 12) | (np.abs(u + v - 1) * min(wi, hi) < 12) |
+                           (np.minimum(di, 99) < 10))
+            h_[bar] = .56
+            s_[bar] = 1
+            hub = (Xi - wi / 2) ** 2 + (Yi - hi / 2) ** 2
+            h_[hub < 900] = .62
+            h_[hub < 200] = .5
+        # bolts in the frame's corners
+        bolts = [(18, 18), (w - 18, 18), (18, h - 18), (w - 18, h - 18)]
+        if max(w, h) > 1.5 * min(w, h):  # long panels: one more each side, midway
+            bolts += [(w / 2, 18), (w / 2, h - 18)] if w > h else [(18, h / 2), (w - 18, h / 2)]
+        for bx, by in bolts:
+            b = (X - bx) ** 2 + (Y - by) ** 2
+            h_[b < 100] = .62
+            h_[b < 64] = .66 + .1 * np.sqrt(np.clip(64 - b[b < 64], 0, 64)) / 8
+            s_[(b >= 64) & (b < 100)] = .5
+    # wear: scuffs lighten, grime darkens the low parts
+    grime = .78 + .35 * smooth_noise(rng, 8, size) * (.7 + .3 * smooth_noise(rng, 48, size))
+    S *= grime * (.55 + .45 * np.clip(H / .55, 0, 1))
+    for _ in range(160):
+        x0, y0 = rng.integers(0, size), rng.integers(0, size)
+        ang, L = rng.random() * np.pi, rng.integers(20, 160)
+        t = np.arange(L)
+        xs, ys = (x0 + np.cos(ang) * t).astype(int) % size, (y0 + np.sin(ang) * t).astype(int) % size
+        S[ys, xs] = np.minimum(S[ys, xs] * 1.15, 1.2)
+    _floor[size] = (H, S)
+    return H, S
+
+
 def draw_floor(px, w, h):
-    """Floor plates, 2 m square (tiles): four 1 m steel plates with bevelled seams
-    and rivets, one a perforated grate, one diamond tread; scratches and grime."""
-    rng = np.random.default_rng(7)
-    yy, xx = np.mgrid[0:h, 0:w]
-    ppm = w // 2  # pixels per metre
-    px[..., :3] = (0.30, 0.31, 0.34)
-    lx, ly = xx % ppm, yy % ppm
-    qx, qy = xx // ppm, yy // ppm
-    grate = (qx == 1) & (qy == 0) & (lx > 30) & (lx < ppm - 30) & (ly > 30) & (ly < ppm - 30)
-    holes = grate & (((lx % 22) - 11) ** 2 + ((ly % 22) - 11) ** 2 < 42)
-    px[grate, :3] = (0.24, 0.25, 0.27)
-    px[holes, :3] = (0.04, 0.04, 0.05)
-    tread = (qx == 0) & (qy == 1) & (((lx + ly) % 34 < 5) & ((lx - ly) % 34 < 14))
-    px[tread, :3] = (0.40, 0.41, 0.44)
-    for c, v in (((lx < 4) | (ly < 4), 0.07), (((lx >= 4) & (lx < 7)) | ((ly >= 4) & (ly < 7)), 0.42)):
-        px[c, :3] = v
-    for cx in (28, ppm - 28):
-        for cy in (28, ppm - 28):
-            d = (lx - cx) ** 2 + (ly - cy) ** 2
-            px[d < 49, :3] = 0.46
-            px[(d >= 49) & (d < 81), :3] = 0.12
-    for _ in range(140):  # scratches
-        x0, y0 = rng.integers(0, w), rng.integers(0, h)
-        ang, L = rng.random() * np.pi, rng.integers(20, 120)
-        for t in range(L):
-            x, y = int(x0 + np.cos(ang) * t) % w, int(y0 + np.sin(ang) * t) % h
-            px[y, x, :3] = np.minimum(px[y, x, :3] + 0.12, 1)
-    grime = 0.72 + 0.4 * smooth_noise(rng, 8, w) * (0.75 + 0.25 * smooth_noise(rng, 32, w))
-    px[..., :3] *= grime[..., None]
+    H, S = floor_fields(w)
+    px[..., :3] = np.array((.29, .30, .33), np.float32) * S[..., None]
+
+
+def draw_floor_normal(px, w, h):
+    """Tangent-space normals of the height field (+Y up the image, as glTF)."""
+    H, _ = floor_fields(w)
+    k = 14.0
+    gx = (np.roll(H, -1, 1) - np.roll(H, 1, 1)) / 2
+    gy = (np.roll(H, -1, 0) - np.roll(H, 1, 0)) / 2  # down the drawn rows
+    n = np.stack([-gx * k, gy * k, np.ones_like(H)], -1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    px[..., :3] = n * .5 + .5
 
 
 def draw_wall(px, w, h):
@@ -366,7 +483,8 @@ M = dict(
     violet=mat('RS_PaintViolet', '#ffffff', .3, .5, image=make_image('RS_Paint_Violet', 512, 512, draw_paint('#3b2470'))),
     trim=mat('RS_Trim', '#2c3039', .85, .3),
     wall=mat('RS_Wall', '#ffffff', .2, .7, image=make_image('RS_Trim_Wall', 1024, 1024, draw_wall)),
-    floor=mat('RS_Floor', '#ffffff', .35, .5, image=make_image('RS_Trim_Floor', 1024, 1024, draw_floor)),
+    floor=mat('RS_Floor', '#ffffff', .35, .5, image=make_image('RS_Trim_Floor', 2048, 2048, draw_floor),
+              normal=make_image('RS_Trim_Floor_Normal', 2048, 2048, draw_floor_normal)),
     fabric=mat('RS_Fabric', '#1b1c23', 0, .95),
     cushion=mat('RS_Cushion', '#2a2c36', 0, .85),
     pot=mat('RS_Pot', '#2b2d33', .2, .55),  # charcoal ceramic

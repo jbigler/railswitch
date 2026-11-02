@@ -171,9 +171,6 @@ func (s *Server) cyberIssueStart(w http.ResponseWriter, r *http.Request) {
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/cyberpunk")
 }
 
-// agentName is an agent's name as the URL gives it ("" = the default).
-var agentName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
-
 func cyberAgentArgs(r *http.Request) ([]string, bool) {
 	n := r.URL.Query().Get("agent")
 	if n == "" {

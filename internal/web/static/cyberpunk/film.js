@@ -146,8 +146,6 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
     if (n === 'RS_Floor') { o.material.roughness = 0.32; o.material.metalness = 0.45; }
     if (n === 'RS_LightPanel') { o.material.emissiveIntensity = 0.12; o.material.color.setHex(0x1a1c22); o.material.roughness = 1; o.material.metalness = 0; } // diffusers: no glare from the lamp below
   });
-  // the city stays clear beyond the haze (its materials are its own)
-  for (const o of scene.children) if (o.userData.kit === 'Ext_CityBackdrop') o.traverse((m) => { if (m.material) m.material.fog = false; });
 
   // What only first person sees: the beams, the dust, the slats.
   const air = new THREE.Group();

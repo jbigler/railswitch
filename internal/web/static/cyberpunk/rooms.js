@@ -15,6 +15,7 @@
 import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer, textCanvas } from './world.js';
 import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
+import { city } from './city.js';
 import { issuesFor, prsFor, whoLabel } from './work.js';
 
 const PI = Math.PI;
@@ -47,7 +48,7 @@ function pickable(o, tip, act) {
 
 // The pieces a room may use, loaded once.
 export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plain_2m', 'Arch_Wall_Window_4m', 'Arch_Elevator_Floor', 'Arch_Elevator_Cab',
-  'Ext_CityBackdrop', 'Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m', 'Arch_Ceiling_CableTray_4m',
+  'Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m', 'Arch_Ceiling_CableTray_4m',
   'Arch_Ceiling_Sprinkler_4m', 'Arch_Ceiling_Fan', 'Arch_Ceiling_Vent', 'Arch_WallPipes_4m',
   'Light_CeilingPanel', 'Light_PendantBox',
   'Tech_ServerRack', 'Tech_ServerRack_B', 'Tech_ToolCart', 'Tech_TerminalKiosk', 'Tech_MonitorBank',
@@ -151,8 +152,8 @@ function shell(k, scene, deco, ui) {
   const lift = wall('Arch_Elevator_Floor', LIFT.x, LIFT.z, PI / 2);
   const cab = put(k, scene, 'Arch_Elevator_Cab', LIFT.x - 0.2, 0, LIFT.z, PI / 2);
   scene.userData.walls = walls;
-  put(k, scene, 'Ext_CityBackdrop', 30, -4, 0, -PI / 2);
-  put(k, scene, 'Ext_CityBackdrop', 4, -4, 28, PI);
+  const cityTick = city(scene, deco.seed);
+  scene.userData.city = scene.children.at(-1);
   put(k, scene, 'Arch_WallPipes_4m', 2, 0, -7.99);
 
   // The glass rooms; each door slides open as the walker comes near.
@@ -222,7 +223,7 @@ function shell(k, scene, deco, ui) {
     setElevatorDoors(lift, open);
     setElevatorDoors(cab, open);
   };
-  return { ticks: [doors, glassTick, ...ticks], pad: { x: LIFT.x + 0.75, z: LIFT.z, r: 0.55, act: ui.transport } };
+  return { ticks: [doors, glassTick, cityTick, ...ticks], pad: { x: LIFT.x + 0.75, z: LIFT.z, r: 0.55, act: ui.transport } };
 }
 
 // rug lays a dark rug with a neon edge.
@@ -392,7 +393,7 @@ function cafe(k, scene, deco, gecko) {
   put(k, scene, 'Deco_Plant_Snake', 3.5, 0, -2.6, deco.r() * 6);
   put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 2.0, 4, -7.3, deco.r() * 6);
   ticks.push(wallClock(k, scene, -0.4, 2.55, -7.97));
-  zoneSign(scene, '◀ Lift', -7.5, 0, PI / 2);
+  zoneSign(scene, 'Lift', -7.5, 0, PI / 2); // both faces read: an arrow would point wrong on one
   return ticks;
 }
 

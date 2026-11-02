@@ -268,6 +268,7 @@ export class World {
     if (lv && u.hemi) u.hemi.intensity = lv.hemi;
     if (lv && this.scene.fog) this.scene.fog.density = lv.fog;
     if (u.air) u.air.visible = this.mode === 'walk';
+    if (u.city) u.city.visible = this.mode === 'walk'; // the overview looks in from where the towers stand
     if (this.mode === 'walk') for (const w of u.walls ?? []) w.visible = true;
   }
 

@@ -233,6 +233,16 @@ func prAct(ctx context.Context, e *env, args []string) int {
 	} else if n, err = e.worktreePR(ctx, w, repo); err != nil {
 		return e.fail(fmt.Errorf("pr %s: %w", args[0], err))
 	}
+	if args[0] == "agent" && len(pos) == 1 {
+		// the agent works on the worktree's branch: another PR's review is not its work
+		own, err := e.worktreePR(ctx, w, repo)
+		if err != nil {
+			return e.fail(fmt.Errorf("pr agent: %w", err))
+		}
+		if own != n {
+			return e.fail(fmt.Errorf("pr agent: #%d is not worktree %s's PR (#%d)", n, w.Slug, own))
+		}
+	}
 	v, err := prs.ShowPR(ctx, e.run, repo, n)
 	if err != nil {
 		return e.fail(err)

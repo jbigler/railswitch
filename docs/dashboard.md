@@ -803,7 +803,8 @@ Every action is a job (below).
   **Reply**, **Resolve** or **Unresolve**, and **Send to agent**, which
   types the thread into the worktree's default agent (`pr agent`: its
   session is started if it has none, then typed into once its screen
-  settles). **Send all unresolved to the agent** does it for every open
+  settles, or at once while it works; an agent waiting on a permission
+  or a question is refused, since the text's Enter would answer it). **Send all unresolved to the agent** does it for every open
   thread, as much as fits in one input (4096 bytes; the rest are counted
   and pointed to on GitHub). The page also adds a **Comment** to the
   conversation and submits a **Review** (comment only, request changes,

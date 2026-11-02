@@ -2,6 +2,8 @@ package lifecycle
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -148,4 +150,37 @@ func TestAgentPrompt(t *testing.T) {
 	wantInOrder(t, calls, "podman exec filial-feat-agent-probe tmux -L agent capture-pane",
 		"podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send-",
 		"podman exec filial-feat-agent-probe tmux -L agent send-keys")
+}
+
+// AgentPrompt refuses an agent waiting on a permission or a question (its
+// Enter would answer it), and types at once into one that is working.
+func TestAgentPromptState(t *testing.T) {
+	old := settle
+	t.Cleanup(func() { settle = old })
+	settle.Every, settle.Max = time.Millisecond, time.Second
+	for state, want := range map[string]string{"permission": "waiting on you", "question": "waiting on you", "working": ""} {
+		e := setup(t)
+		e.units("LoadState=loaded\nNeedDaemonReload=no\nActiveState=active\n", "filial-feat-agent-probe.service")
+		e.agentRunning(probeCtr)
+		e.f.On([]string{"podman", "exec", "filial-feat-agent-probe", "tmux", "-L", "agent", "capture-pane"}, sys.Result{Stdout: []byte("> busy\n")}, nil)
+		dir := filepath.Join(e.ws, ".railswitch", "status", "feat")
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "probe.json"), []byte(`{"v":1,"state":"`+state+`","message":"","ts":1}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		err := e.l.AgentPrompt(ctx, "feat", "probe", "Fix the review")
+		sent := count(e.calls(), "podman exec filial-feat-agent-probe tmux -L agent set-buffer")
+		if want == "" {
+			if err != nil || sent != 1 {
+				t.Errorf("%s: %v, sent %d", state, err, sent)
+			}
+			if n := count(e.calls(), "podman exec filial-feat-agent-probe tmux -L agent capture-pane"); n != 1 {
+				t.Errorf("working: waited %d looks; want 1", n)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), want) || sent != 0 {
+			t.Errorf("%s: %v, sent %d", state, err, sent)
+		}
+	}
 }

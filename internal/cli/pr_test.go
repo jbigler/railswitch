@@ -325,6 +325,11 @@ func TestPrCommentActions(t *testing.T) {
 	if c, _ := last("gh", "api", "graphql"); !strings.Contains(strings.Join(c, " "), "resolveReviewThread(input:{threadId:$id})") {
 		t.Errorf("resolve argv %q", c)
 	}
+	// pr agent types into the worktree's agent: another PR's review is refused
+	f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(ghFixture)}, nil)
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "pr", "agent", "4"); code != 1 || !strings.Contains(errs, "#4 is not worktree feat's PR (#7)") {
+		t.Errorf("agent on another PR: exit %d %s", code, errs)
+	}
 	for _, id := range []string{"-PRRT_x", "PRRT_a b", "7"} {
 		if code, _, _ := runWith(t, f, "-C", ws, "pr", "unresolve", id); code != 2 {
 			t.Errorf("unresolve %q: exit %d; want 2", id, code)

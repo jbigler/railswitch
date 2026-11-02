@@ -982,7 +982,8 @@ threads (default: every unresolved one) into the current worktree's
 default agent, as `agent prompt` does: the PR, then each thread's file,
 line and comments, its control characters made spaces, at most 4096
 bytes (a long comment is cut; threads that don't fit are counted, with
-the PR's URL).
+the PR's URL). A number other than the worktree's PR is refused, and so
+is an agent whose status is `permission` or `question`.
 ## `stack ls`
 
 One project (`-C`): every registered worktree, in registry order, with its

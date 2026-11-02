@@ -18,6 +18,11 @@ var allowedHosts = map[string]bool{
 
 const csp = "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
+// officeCSP is the Virtual Office page's: csp, plus data: images, which
+// the whiteboard's editor draws its icons and pasted pictures from (D151).
+// A data: image runs no code; scripts and styles stay 'self' only.
+const officeCSP = csp + "; img-src 'self' data:"
+
 // denyText is the refusal page's advice.
 const denyText = "Run railswitch dashboard in a terminal and open the link it prints."
 

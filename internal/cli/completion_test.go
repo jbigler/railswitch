@@ -32,8 +32,8 @@ func TestCompleteCommands(t *testing.T) {
 	if got, want := complete(t, ""), slices.Sorted(maps.Keys(commands)); !slices.Equal(got, want) {
 		t.Errorf("top level: %q; want %q", got, want)
 	}
-	if got := complete(t, "w"); !slices.Equal(got, []string{"wt"}) {
-		t.Errorf("w: %q; want [wt]", got)
+	if got := complete(t, "wt"); !slices.Equal(got, []string{"wt"}) {
+		t.Errorf("wt: %q; want [wt]", got)
 	}
 	if got, want := complete(t, "wt", "rm", "--f"), []string{"--force"}; !slices.Equal(got, want) {
 		t.Errorf("wt rm --f: %q; want %q", got, want)

@@ -92,6 +92,8 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/virtual-office/notes", s.cyberNotes)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/notes/{name}", s.cyberNote)
 	m.HandleFunc("POST /p/{prefix}/virtual-office/notes/{name}", s.cyberNoteWrite)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/whiteboard/{slug}", s.cyberBoard)
+	m.HandleFunc("POST /p/{prefix}/virtual-office/whiteboard/{slug}", s.cyberBoardWrite)
 	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)

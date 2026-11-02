@@ -454,6 +454,38 @@ function vendScreen(machine, kind, color) {
   machine.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_VendScreen') o.material = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }); });
 }
 
+// boardFace returns a setter for the board's face (D151): a picture
+// (ImageBitmap) of its drawing, fitted on the glass, or null for the
+// diagrams the model comes with.
+function boardFace(board) {
+  let face = null;
+  board.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_Whiteboard') face = o; });
+  if (!face) return () => {};
+  const kept = face.material;
+  const cv = document.createElement('canvas');
+  cv.width = 2048;
+  cv.height = 1024; // the board is 2.4 × 1.2 m
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false; // the model's UVs are glTF's, top-left origin
+  tex.anisotropy = 4;
+  const drawn = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  return (img) => {
+    if (!img) {
+      face.material = kept;
+      return;
+    }
+    const g = cv.getContext('2d');
+    g.fillStyle = '#121212'; // Excalidraw's dark background
+    g.fillRect(0, 0, cv.width, cv.height);
+    const s = Math.min((cv.width - 64) / img.width, (cv.height - 64) / img.height, 2);
+    const w = img.width * s, h = img.height * s;
+    g.drawImage(img, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+    tex.needsUpdate = true;
+    face.material = drawn;
+  };
+}
+
 // arcadeScreen draws the bartop's attract screen: a sunburst over a sunset
 // and PRESS START, blinking. Returns its tick.
 function arcadeScreen(cab, seed) {
@@ -743,7 +775,8 @@ export async function lab(slug, n, ui) {
   partner.userData.block = true;
   pickable(partner, 'Your agent partner: status, screen, type to it', () => ui.agent(slug));
   scene.add(partner);
-  put(k, scene, 'Deco_Whiteboard', -4.6, 0, 5.0, -PI / 2);
+  const board = pickable(put(k, scene, 'Deco_Whiteboard', -4.6, 0, 5.0, -PI / 2), 'Whiteboard: draw on it', () => ui.whiteboard(slug));
+  const setBoard = boardFace(board);
   put(k, scene, 'Deco_CoatRack', -4.6, 0, 7.5);
   put(k, scene, 'Deco_Backpack', -9.4, 0, 5.0, 0.7);
   put(k, scene, 'Deco_BookStack', -11.0, 0.75, 2.95, 0.3);
@@ -822,7 +855,7 @@ export async function lab(slug, n, ui) {
     theirs.update(a ? [{ text: a.state, color: '#ffe08a' }, ...(a.usage ? [{ text: `${tokens(a.usage)} tokens · ${tokens({ ...a.usage, input: 0, cache_read: 0, cache_write: 0 })} out`, color: '#9fc3ff' }] : []), ...(a.message ? wrap(a.message, 30, a.usage ? 3 : 4) : [])] : ['no agent running'], a ? a.name : 'agent');
   };
   const walk = { areas: AREAS, start: { x: LIFT.x + 1.7, z: LIFT.z, yaw: PI / 2 }, pads: [sh.pad] };
-  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 24, max: 40 }, walk, update, ticks, name: `Floor ${n} · ${slug}` };
+  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 24, max: 40 }, walk, update, ticks, name: `Floor ${n} · ${slug}`, setBoard };
 }
 
 // rack is a server rack for one service: its LEDs and accent bar show the

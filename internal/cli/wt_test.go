@@ -94,9 +94,16 @@ func TestWtAddRm(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, "worktrees", "feat-x", "node_modules")); err != nil {
 		t.Errorf("node_modules not pre-created: %v", err)
 	}
+	board := filepath.Join(ws, ".railswitch", "whiteboard", "feat-x")
+	if err := os.MkdirAll(board, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	n := len(f.Calls)
 	if code, out, errs := runWith(t, f, "-C", ws, "wt", "rm", "feat-x"); code != 0 {
 		t.Fatalf("wt rm: exit %d\n%s%s", code, out, errs)
+	}
+	if _, err := os.Stat(board); err == nil {
+		t.Error("wt rm left the worktree's whiteboard (D151)")
 	}
 	if _, err := os.Stat(unit); err == nil {
 		t.Error("wt rm left the unit")

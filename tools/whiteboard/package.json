@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "description": "Builds the dashboard's vendored Excalidraw bundle (D151): ./build.sh",
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

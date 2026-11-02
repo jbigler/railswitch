@@ -22,7 +22,7 @@ escaped here; data-md bodies get their Markdown as text nodes (app.js). */}}
 {{if and (ne .State "draft") .Methods (not .AutoMerge)}}<form method="post" action="{{$.MergeURL}}" data-job="pr" data-confirm="Merge #{{.Number}} into {{.Base}}? It changes {{.Base}} for everyone." class="pr-merge">
 <input type="hidden" name="number" value="{{.Number}}">
 <select name="method" aria-label="Merge method">{{range .Methods}}<option value="{{.}}">{{.}}</option>{{end}}</select>
-{{if .Queue}}<button class="ln main" name="auto" value="1">Add to merge queue</button>{{else}}<button class="ln" name="auto" value="1" title="GitHub merges it once its checks and reviews pass">Merge when ready</button>
+{{if .Queue}}<button class="ln main" name="auto" value="1">Add to merge queue</button>{{else}}{{if .AutoMergeAllowed}}<button class="ln" name="auto" value="1" title="GitHub merges it once its checks and reviews pass">Merge when ready</button>{{end}}
 <button class="ln main"{{if not (eq .MergeState "clean" "unstable" "has_hooks")}} title="GitHub says {{.MergeState}}: it may refuse"{{end}}>Merge now</button>{{end}}
 </form>{{end}}
 </div>{{end}}

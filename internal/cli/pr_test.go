@@ -174,7 +174,7 @@ const ghViewFixture = `{"number": 7, "title": "Feat\u001b[2J", "url": "https://g
   "files": [{"path": "a.go", "additions": 3, "deletions": 1, "changeType": "MODIFIED"}],
   "additions": 3, "deletions": 1, "createdAt": "2026-10-30T09:00:00Z", "updatedAt": "2026-11-01T11:00:00Z", "autoMergeRequest": null}`
 
-const ghMergeFixture = `{"data":{"repository":{"mergeCommitAllowed":false,"squashMergeAllowed":true,"rebaseMergeAllowed":true,"mergeQueue":null}}}`
+const ghMergeFixture = `{"data":{"repository":{"mergeCommitAllowed":false,"squashMergeAllowed":true,"rebaseMergeAllowed":true,"autoMergeAllowed":true,"mergeQueue":null}}}`
 
 // D152: pr show reads one PR (the worktree's by default) with its checks,
 // reviews, comments, files and the repo's merge settings; links that are
@@ -249,6 +249,15 @@ func TestPrActions(t *testing.T) {
 	if c := calls("gh", "pr", "merge"); len(c) != 1 || !slices.Equal(c[0], []string{"gh", "pr", "merge", "7", "--repo", "[ORG]/[REPO]", "--squash", "--auto"}) {
 		t.Errorf("merge argv %q", c)
 	}
+	// a repo that doesn't allow auto-merge: --auto is refused before gh merges
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(strings.Replace(ghMergeFixture, `"autoMergeAllowed":true`, `"autoMergeAllowed":false`, 1))}, nil)
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "merge", "7", "--auto"); code != 1 || !strings.Contains(errs, "does not allow auto-merge") {
+		t.Errorf("--auto without auto-merge: exit %d %s", code, errs)
+	}
+	if c := calls("gh", "pr", "merge"); len(c) != 1 {
+		t.Errorf("merged anyway: %q", c)
+	}
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(ghMergeFixture)}, nil)
 	if code, _, errs := runWith(t, f, "-C", ws, "pr", "merge", "7", "--method", "merge"); code != 1 || !strings.Contains(errs, "does not allow") {
 		t.Errorf("a refused method: exit %d %s", code, errs)
 	}

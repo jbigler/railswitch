@@ -233,6 +233,9 @@ func prAct(ctx context.Context, e *env, args []string) int {
 		if !slices.Contains(v.Methods, m) {
 			return e.fail(fmt.Errorf("pr merge: %s does not allow %q merges (it allows %s)", repo, m, strings.Join(v.Methods, ", ")))
 		}
+		if *auto && !v.Queue && !v.AutoMergeAllowed {
+			return e.fail(fmt.Errorf("pr merge --auto: %s does not allow auto-merge (Settings → General → Allow auto-merge); merge it once its checks pass", repo))
+		}
 		if err := prs.Merge(ctx, e.run, repo, n, m, *auto); err != nil {
 			return e.fail(err)
 		}

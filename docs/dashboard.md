@@ -795,8 +795,8 @@ Every action is a job (below).
   and the changed files. Its actions run as jobs on the PR number the page
   showed: **Ready for review** (a draft), **Rerun failed checks** (failed
   Actions runs), and, with a method the repo allows, **Merge now** and
-  **Merge when ready** (`--auto`), or **Add to merge queue** when the base
-  has one; merging asks first. The office's PR station and the desk panel
+  **Merge when ready** (`--auto`, when the repo allows auto-merge), or
+  **Add to merge queue** when the base has one; merging asks first. The office's PR station and the desk panel
   open it. Comment actions and sending a comment to the agent come next.
 - **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
   filtered as you type, with an "args" field split like a shell (quotes and

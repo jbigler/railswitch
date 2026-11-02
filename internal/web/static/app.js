@@ -1357,11 +1357,18 @@ function mdInline(parent, text) {
     else if (m[2]) { el = document.createElement("strong"); el.textContent = m[2].slice(2, -2); }
     else if (m[3]) { el = document.createElement("em"); el.textContent = m[3].slice(1, -1); }
     else {
+      // a bare URL leaves the sentence's punctuation after it as text
+      const bare = m[6] ? m[6].replace(/[.,;:!?'"]+$/, "") : "";
       el = document.createElement("a");
-      el.href = m[5] || m[6];
-      el.textContent = m[4] || m[6];
+      el.href = m[5] || bare;
+      el.textContent = m[4] || bare;
       el.target = "_blank";
       el.rel = "noopener noreferrer";
+      if (m[6]) {
+        parent.append(el);
+        at = m.index + bare.length;
+        continue;
+      }
     }
     parent.append(el);
     at = m.index + m[0].length;

@@ -39,6 +39,8 @@ type View struct {
 	AutoMerge string `json:"auto_merge"`
 	// Queue: the base branch has a merge queue, which merging joins.
 	Queue bool `json:"queue"`
+	// AutoMergeAllowed: the repo allows auto-merge (merge when ready).
+	AutoMergeAllowed bool `json:"auto_merge_allowed"`
 	// Methods are the merge methods the repo allows: "merge", "squash", "rebase".
 	Methods   []string   `json:"methods"`
 	CheckRuns []Check    `json:"check_runs"`
@@ -207,7 +209,7 @@ func ShowPR(ctx context.Context, r sys.Runner, repo string, n int) (*View, error
 func repoMerge(ctx context.Context, r sys.Runner, repo string, v *View) error {
 	owner, name, _ := strings.Cut(repo, "/")
 	out, err := gh(ctx, r, "api", "graphql",
-		"-f", "query=query($owner:String!,$name:String!,$base:String!){repository(owner:$owner,name:$name){mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed mergeQueue(branch:$base){id}}}",
+		"-f", "query=query($owner:String!,$name:String!,$base:String!){repository(owner:$owner,name:$name){mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed mergeQueue(branch:$base){id}}}",
 		"-f", "owner="+owner, "-f", "name="+name, "-f", "base="+v.Base)
 	if err != nil {
 		return fmt.Errorf("%s's merge settings: %w", repo, err)
@@ -218,6 +220,7 @@ func repoMerge(ctx context.Context, r sys.Runner, repo string, v *View) error {
 				Merge  bool `json:"mergeCommitAllowed"`
 				Squash bool `json:"squashMergeAllowed"`
 				Rebase bool `json:"rebaseMergeAllowed"`
+				Auto   bool `json:"autoMergeAllowed"`
 				Queue  *struct {
 					ID string `json:"id"`
 				} `json:"mergeQueue"`
@@ -237,6 +240,7 @@ func repoMerge(ctx context.Context, r sys.Runner, repo string, v *View) error {
 		}
 	}
 	v.Queue = rp.Queue != nil
+	v.AutoMergeAllowed = rp.Auto
 	return nil
 }
 

@@ -9,7 +9,7 @@ import (
 
 const prShowJSON = `{"number": 2141, "title": "Login <b>", "url": "https://github.com/o/r/pull/2141", "state": "open", "author": "ann",
  "body": "## Why\n<script>alert(1)</script>", "base": "main", "head": "jb/b", "labels": ["ui"], "mergeable": "mergeable", "merge_state": "clean",
- "review": "approved", "checks": "fail", "additions": 3, "deletions": 1, "created": "", "updated": "", "auto_merge": "", "queue": false,
+ "review": "approved", "checks": "fail", "additions": 3, "deletions": 1, "created": "", "updated": "", "auto_merge": "", "queue": false, "auto_merge_allowed": true,
  "methods": ["squash", "merge"],
  "check_runs": [{"name": "test", "workflow": "ci", "state": "fail", "url": "https://github.com/o/r/actions/runs/41/job/5", "run": 41}],
  "reviews": [{"author": "bo", "state": "approved", "body": "nice", "submitted": "2026-11-01T10:00:00Z"}],
@@ -33,6 +33,11 @@ func TestPRPage(t *testing.T) {
 	}
 	noCSPViolation(t, "pr page", body)
 
+	// a repo without auto-merge: no Merge when ready
+	f.cli.set("--json -C /ws/ftest -w b pr show", strings.Replace(prShowJSON, `"auto_merge_allowed": true`, `"auto_merge_allowed": false`, 1))
+	if body := f.do(req("GET", "/p/ftest/b/pr", nil)).Body.String(); strings.Contains(body, "Merge when ready") || !strings.Contains(body, "Merge now") {
+		t.Errorf("no auto-merge: %s", body)
+	}
 	// a queue on the base: one button joins it
 	f.cli.set("--json -C /ws/ftest -w b pr show", strings.Replace(prShowJSON, `"queue": false`, `"queue": true`, 1))
 	if body := f.do(req("GET", "/p/ftest/b/pr", nil)).Body.String(); !strings.Contains(body, "Add to merge queue") || strings.Contains(body, "Merge now") {

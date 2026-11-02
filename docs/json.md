@@ -924,8 +924,8 @@ worktree's branch (run it in the worktree or with `-w <slug>`), picked as
 --json …` and one `gh api graphql` query for the repo's merge methods and
 whether the base branch has a merge queue, both as `pr ls` runs gh. Every
 text is GitHub's, written by anyone: the text form prints it with control
-characters as spaces, and a URL that is not GitHub's https web URL (a
-check's `url`, a comment's `url`) is `""`.
+characters as spaces, and a URL that is not an absolute http or https URL
+(a check's `url`, a comment's `url`: never `javascript:` or `data:`) is `""`.
 
 ```json
 {"number": 2141, "title": "Login", "url": "https://github.com/o/r/pull/2141", "state": "open", "author": "ann",
@@ -951,6 +951,7 @@ check's `url`, a comment's `url`) is `""`.
 | `created`, `updated` | string | RFC 3339. |
 | `auto_merge` | string | The method of the PR's auto-merge or merge-queue entry, lower case; `""` without one. |
 | `queue` | boolean | The base branch has a merge queue: merging joins it. |
+| `auto_merge_allowed` | boolean | The repo allows auto-merge (Settings → General → Allow auto-merge): `pr merge --auto` without a merge queue needs it. |
 | `methods` | array | The merge methods the repo allows, of `merge`, `squash`, `rebase`, in that order. |
 | `check_runs[]` | array | Each check: `name`, `workflow` (`""` for a status), `state` (`pass`, `fail`, `pending`, `skipped`), `url` (its log), `run` (its Actions run ID, 0 when not one). |
 | `reviews[]` | array | Each submitted review: `author`, `state` (`approved`, `changes_requested`, `commented`, `dismissed`), `body`, `submitted`. A pending (unsubmitted) review is left out. |
@@ -960,8 +961,9 @@ check's `url`, a comment's `url`) is `""`.
 `pr merge [<number>] [--method merge|squash|rebase] [--auto]` merges the PR
 (`gh pr merge --<method> [--auto]`, 2 minutes' timeout) with one of the
 repo's methods, the first it allows by default; a method it doesn't allow
-exits 1. `--auto` merges once the PR's requirements pass; with a merge
-queue on the base, `gh` adds the PR to the queue. `pr ready [<number>]`
+exits 1. `--auto` merges once the PR's requirements pass (the repo must allow
+auto-merge, or the PR exits 1); with a merge queue on the base, `gh` adds
+the PR to the queue. `pr ready [<number>]`
 marks a draft ready for review (`gh pr ready`; a PR that is no draft exits
 1). `pr rerun [<number>]` reruns the failed jobs of each Actions run with a
 failed check (`gh run rerun <id> --failed`), each run once. They print one

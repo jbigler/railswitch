@@ -263,4 +263,5 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
   border-bottom: 1px solid var(--border); }
 .term-panel > header > span { flex: 1; }
 .term-panel > div { flex: 1; }
-.term-panel:fullscreen { height: 100vh; resize: none; }
+.term-panel.max { position: fixed; inset: 0; z-index: 50; height: auto; resize: none; }
+body:has(.term-panel.max) { overflow: hidden; }

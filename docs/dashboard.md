@@ -735,10 +735,10 @@ as in a terminal: the agent keeps running and the panel shows `[exited 0]`.
 
 The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
 while a terminal is open, leaving or closing the page asks first.
-**fullscreen** (then **exit fullscreen**: with the keys locked, Esc goes to
-the terminal, so leaving takes holding Esc or that button) asks the
-browser to send those keys to the terminal
-(Chromium-based browsers; Firefox only has the question).
+**maximize** (then **restore**) makes the panel fill the window; Esc
+stays in the terminal. To fill the screen as well, use the browser's own
+fullscreen (F11), which Esc doesn't end. The dashboard doesn't use the
+page fullscreen API: Esc always ends it in Firefox.
 
 Limits: 8 terminals open at once across the dashboard (the ninth says so);
 a peer that stops answering pings for 10 s (a dead `ssh -L` tunnel) is

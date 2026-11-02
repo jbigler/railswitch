@@ -947,7 +947,8 @@ any open page.
     station** by the windows shows the floor's pull request: title, checks,
     review, review app. A glass board 2.4 m wide stands by the wall. The
     **meeting** room (glass) holds the **holo-table**: over a chunky
-    console a wireframe terrain rises in the floor's second neon, with a
+    console a wireframe terrain rises in the floor's main colour (its trim in
+    the second neon), with a
     pin per service (in the lobby, per floor) coloured by its state, which
     opens it, and a halo above with the floor's summary. The **game room**
     (glass): two bartop arcades on their stands, a sofa facing them.

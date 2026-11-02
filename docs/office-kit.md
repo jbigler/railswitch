@@ -148,7 +148,8 @@ relative to the floor piece.
   `Furn_Armchair` (charcoal leather between painted panels),
   `Furn_HoloTable` (3.0 × 2.0 m: a chunky console, rim panels and corner
   blocks round a recessed `RS_HoloBed`, a control column with a glowing
-  orb, grab rails, angled legs; every glow the secondary neon), plants in
+  orb, grab rails, angled legs; the bed's edges and the orb in the accent
+  neon, the trim strips in the secondary), plants in
   charcoal and concrete pots, each with a thin neon rim
   (`Deco_Plant_Snake`, `Monstera`, `Palm`, `Bush`, `Trailing` hanging from
   the ceiling), `Furn_SideTable`, `Deco_FloorLamp` (arc), `Deco_Rug_Geo`,

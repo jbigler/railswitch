@@ -536,7 +536,7 @@ function meeting(k, scene, deco) {
   put(k, scene, 'Deco_Plant_Palm', 3.4, 0, 7.4, deco.r() * 6);
   put(k, scene, 'Deco_Plant_Snake', 3.4, 0, 2.6, deco.r() * 6);
   put(k, scene, 'Deco_Plant_Bush', -3.4, 0, 7.4, deco.r() * 6);
-  return holoTable(scene, 0.3, 5.0, deco.secondary);
+  return holoTable(scene, 0.3, 5.0, deco.accent); // the floor's main colour; the table's trim keeps the secondary
 }
 
 // holoTable is the hologram over the holo-table at (x, z), in color: a

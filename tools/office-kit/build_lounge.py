@@ -278,10 +278,11 @@ def holo_table(a):
     """The meeting room's holo-table, 3.0 × 2.0 m: a chunky console on a
     plinth, thick bevelled rim panels around a recessed holo bed (dark glass:
     the page draws its grid and the hologram above it), a control column
-    with a glowing orb at the near edge, grab rails, vents. Every glow is
-    RS_Neon_Secondary: the floor's secondary colour. Origin at the floor,
-    the control column at +Z."""
-    n2, bd, dk, tr = M['neon2'], M['body'], M['dark'], M['trim']
+    with a glowing orb at the near edge, grab rails, vents. The bed's edges
+    and the orb glow in the floor's accent (RS_Neon_Accent), as the
+    hologram does; the trim strips in its secondary colour. Origin at the
+    floor, the control column at +Z."""
+    n1, n2, bd, dk, tr = M['neon'], M['neon2'], M['body'], M['dark'], M['trim']
     a.box(3.4, .08, 2.4, dk, 0, .04, 0)                                     # plinth
     for z in (-1.2, 1.2):
         a.box(3.3, .01, .01, n2, 0, .085, z * .985)
@@ -298,10 +299,10 @@ def holo_table(a):
     a.box(2.5, .04, 1.5, L['holoBed'], 0, .86, 0)                           # holo bed
     for x in (-1.22, 1.22):                                                 # dashed bed edges
         for k in range(9):
-            a.box(.008, .006, .1, n2, x, .885, -.64 + k * .16)
+            a.box(.008, .006, .1, n1, x, .885, -.64 + k * .16)
     for z in (-.72, .72):
         for k in range(15):
-            a.box(.1, .006, .008, n2, -1.12 + k * .16, .885, z)
+            a.box(.1, .006, .008, n1, -1.12 + k * .16, .885, z)
     for z in (-1, 1):                                                       # rim: long panels
         a.box(3.0, .16, .26, bd, 0, .9, z * .87)
         a.box(2.9, .05, .2, dk, 0, 1.0, z * .87)
@@ -316,7 +317,7 @@ def holo_table(a):
             a.box(.2, .006, .2, tr, sx * 1.36, 1.042, sz * .86)
     a.box(.46, .26, .34, bd, 0, 1.0, 1.06)                                  # control column
     a.box(.38, .02, .26, dk, 0, 1.14, 1.06)
-    a.sphere(.07, n2, 0, 1.22, 1.04)                                        # the orb
+    a.sphere(.07, n1, 0, 1.22, 1.04)                                        # the orb
     a.cyl(.012, .012, .12, tr, .14, 1.2, 1.1, 10)                           # a stick
     a.sphere(.025, dk, .14, 1.27, 1.1)
     for x in (-.9, .9):                                                     # grab rails

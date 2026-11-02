@@ -212,9 +212,6 @@ function shell(k, scene, deco, ui) {
     }
   };
   pickable(lift, 'Elevator: go to the lobby or another floor', ui.transport);
-  const sign = label('Elevator', { size: 0.3 });
-  sign.position.set(LIFT.x + 0.3, 3.0, LIFT.z);
-  scene.add(sign);
   let open = 0;
   const doors = (dt) => {
     const v = ui.viewer();
@@ -393,7 +390,7 @@ function cafe(k, scene, deco, gecko) {
   put(k, scene, 'Deco_Plant_Snake', 3.5, 0, -2.6, deco.r() * 6);
   put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 2.0, 4, -7.3, deco.r() * 6);
   ticks.push(wallClock(k, scene, -0.4, 2.55, -7.97));
-  zoneSign(scene, 'Lift', -7.5, 0, PI / 2); // both faces read: an arrow would point wrong on one
+  zoneSign(scene, 'Elevator', -7.5, 0, PI / 2); // both faces read: an arrow would point wrong on one
   return ticks;
 }
 

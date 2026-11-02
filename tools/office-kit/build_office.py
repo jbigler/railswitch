@@ -30,10 +30,12 @@ add_colliders(f, [(4, .1, 4, 0, -.05, 0)])
 
 objs['Arch_Wall_Plain_4m'] = make_wall('Arch_Wall_Plain_4m', height=H)
 objs['Arch_Wall_Window_4m'] = make_wall('Arch_Wall_Window_4m', height=H, windows=[(0, .9, 3.2, 2.2, .25)])
+objs['Arch_Wall_Plain_2m'] = make_wall('Arch_Wall_Plain_2m', width=2.0, height=H)  # beside the elevator, on the 4 m grid
 objs['Arch_Wall_Door_4m'] = make_wall('Arch_Wall_Door_4m', height=H, doors=[(0, 1.1, 2.4)])
 for n in ('Arch_Wall_Plain_4m', 'Arch_Wall_Window_4m'):
     add_colliders(objs[n], [(4, H, .15, 0, H / 2, -.075)])
 side = 2 - .55
+add_colliders(objs['Arch_Wall_Plain_2m'], [(2, H, .15, 0, H / 2, -.075)])
 add_colliders(objs['Arch_Wall_Door_4m'], [
     (side, H, .15, -(.55 + side / 2), H / 2, -.075), (side, H, .15, .55 + side / 2, H / 2, -.075),
     (1.1, H - 2.4, .15, 0, 2.4 + (H - 2.4) / 2, -.075)])

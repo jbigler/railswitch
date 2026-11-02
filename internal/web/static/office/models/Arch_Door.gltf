@@ -9,7 +9,7 @@
 	"scene":0,
 	"scenes":[
 		{
-			"name":"Scene",
+			"name":"KitBuild",
 			"nodes":[
 				1
 			]
@@ -33,14 +33,11 @@
 			"doubleSided":true,
 			"name":"RS_BodyDark",
 			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.0033465358428657055,
-					0.0036765073891729116,
-					0.005181516520678997,
-					1
-				],
-				"metallicFactor":0.4000000059604645,
-				"roughnessFactor":0.550000011920929
+				"baseColorTexture":{
+					"index":0
+				},
+				"metallicFactor":0.3499999940395355,
+				"roughnessFactor":0.6000000238418579
 			}
 		},
 		{
@@ -125,36 +122,53 @@
 				{
 					"attributes":{
 						"POSITION":3,
-						"NORMAL":4
+						"NORMAL":4,
+						"TEXCOORD_0":5
 					},
 					"indices":2,
 					"material":0
 				},
 				{
 					"attributes":{
-						"POSITION":5,
-						"NORMAL":6
+						"POSITION":6,
+						"NORMAL":7,
+						"TEXCOORD_0":8
 					},
 					"indices":2,
 					"material":1
 				},
 				{
 					"attributes":{
-						"POSITION":7,
-						"NORMAL":8
+						"POSITION":9,
+						"NORMAL":10,
+						"TEXCOORD_0":11
 					},
 					"indices":2,
 					"material":2
 				},
 				{
 					"attributes":{
-						"POSITION":9,
-						"NORMAL":10
+						"POSITION":12,
+						"NORMAL":13,
+						"TEXCOORD_0":14
 					},
-					"indices":11,
+					"indices":15,
 					"material":3
 				}
 			]
+		}
+	],
+	"textures":[
+		{
+			"sampler":0,
+			"source":0
+		}
+	],
+	"images":[
+		{
+			"mimeType":"image/png",
+			"name":"RS_Paint_Dark",
+			"uri":"RS_Paint_Dark.png"
 		}
 	],
 	"accessors":[
@@ -212,6 +226,12 @@
 			"bufferView":5,
 			"componentType":5126,
 			"count":24,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":6,
+			"componentType":5126,
+			"count":24,
 			"max":[
 				0.004999999888241291,
 				2.25,
@@ -225,13 +245,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":6,
+			"bufferView":7,
 			"componentType":5126,
 			"count":24,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":7,
+			"bufferView":8,
+			"componentType":5126,
+			"count":24,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":9,
 			"componentType":5126,
 			"count":24,
 			"max":[
@@ -247,13 +273,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":8,
+			"bufferView":10,
 			"componentType":5126,
 			"count":24,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":9,
+			"bufferView":11,
+			"componentType":5126,
+			"count":24,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":12,
 			"componentType":5126,
 			"count":120,
 			"max":[
@@ -269,13 +301,19 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":10,
+			"bufferView":13,
 			"componentType":5126,
 			"count":120,
 			"type":"VEC3"
 		},
 		{
-			"bufferView":11,
+			"bufferView":14,
+			"componentType":5126,
+			"count":120,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":15,
 			"componentType":5123,
 			"count":180,
 			"type":"SCALAR"
@@ -314,50 +352,80 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":288,
+			"byteLength":192,
 			"byteOffset":1224,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":288,
-			"byteOffset":1512,
+			"byteOffset":1416,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":288,
-			"byteOffset":1800,
+			"byteOffset":1704,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":1992,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":288,
-			"byteOffset":2088,
+			"byteOffset":2184,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":288,
+			"byteOffset":2472,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":2760,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1440,
-			"byteOffset":2376,
+			"byteOffset":2952,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":1440,
-			"byteOffset":3816,
+			"byteOffset":4392,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":960,
+			"byteOffset":5832,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":360,
-			"byteOffset":5256,
+			"byteOffset":6792,
 			"target":34963
+		}
+	],
+	"samplers":[
+		{
+			"magFilter":9729,
+			"minFilter":9987
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":5616,
+			"byteLength":7152,
 			"uri":"Arch_Door.bin"
 		}
 	]

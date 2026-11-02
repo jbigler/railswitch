@@ -40,7 +40,9 @@ def quad_uvs(objs, prefixes=('RS_Screen', 'RS_Poster', 'RS_City')):
                     layer.data[li].uv = c
 
 
-TRIM = ('RS_Floor', 'RS_Wall')
+# TRIM are the tiling textures, metres per repeat: the floor and walls on the
+# 4 m grid, and the worn paint every prop is coated in (scuffs, panel seams).
+TRIM = {'RS_Floor': 2, 'RS_Wall': 2, 'RS_Body': 1, 'RS_BodyDark': 1, 'RS_PaintViolet': 1}
 
 
 def trim_uvs(o):
@@ -60,7 +62,8 @@ def trim_uvs(o):
         for li in poly.loop_indices:
             co = me.vertices[me.loops[li].vertex_index].co
             u, v = ((co.y, co.z), (co.x, co.z), (co.x, co.y))[ax]
-            layer.data[li].uv = (u / 2, v / 2)
+            sz = TRIM[me.materials[poly.material_index].name]
+            layer.data[li].uv = (u / sz, v / sz)
 
 
 def export_all(objs):
@@ -287,6 +290,42 @@ def draw_wall(px, w, h):
     px[..., :3] *= grime[..., None]
 
 
+def draw_paint(rgb):
+    """Worn paint on metal, 1 m per repeat: the colour mottled a little, sparse
+    panel seams (a dark groove, a lit lip) with screws beside them, scratches
+    and chipped spots down to bare metal, grime. Like the arcade's and the
+    noodle machine's: used, never broken."""
+    base = np.array([int(rgb[i:i + 2], 16) / 255 for i in (1, 3, 5)])  # sRGB, as the images store it
+
+    def draw(px, w, h):
+        rng = np.random.default_rng(int(rgb[1:], 16) % 9973)
+        yy, xx = np.mgrid[0:h, 0:w]
+        mott = 0.9 + 0.2 * smooth_noise(rng, 6, w) * (0.7 + 0.3 * smooth_noise(rng, 24, w))
+        px[..., :3] = base * mott[..., None]
+        bare = np.array((0.30, 0.31, 0.33))
+        # seams: one vertical per metre, horizontals at 0.35 and 0.75 m
+        for c in ((xx % w) < 3, (np.abs(yy - int(h * .35)) < 2), (np.abs(yy - int(h * .75)) < 2)):
+            px[c, :3] *= 0.25
+        for c in (((xx % w) >= 3) & ((xx % w) < 5), (yy - int(h * .35) == 2), (yy - int(h * .75) == 2)):
+            px[c, :3] = np.minimum(px[c, :3] * 1.6 + 0.02, 1)
+        for sx in (10, w - 10):  # screws along the vertical seam
+            for sy in range(24, h, 96):
+                d = (xx - sx) ** 2 + (yy - sy) ** 2
+                px[d < 10, :3] = bare * 1.2
+                px[(d >= 10) & (d < 16), :3] *= 0.4
+        for _ in range(90):  # scratches through the paint
+            x0, y0 = rng.integers(0, w), rng.integers(0, h)
+            ang, L = rng.random() * np.pi, rng.integers(8, 70)
+            for t in range(L):
+                x, y = int(x0 + np.cos(ang) * t) % w, int(y0 + np.sin(ang) * t) % h
+                px[y, x, :3] = px[y, x, :3] * 0.4 + bare * 0.6
+        chips = smooth_noise(rng, 40, w) > 0.86  # chipped spots
+        px[chips, :3] = bare * (0.8 + 0.4 * rng.random((chips.sum(), 1)))
+        grime = 0.78 + 0.3 * smooth_noise(rng, 10, w)
+        px[..., :3] *= grime[..., None]
+    return draw
+
+
 def draw_city(px, w, h):
     r = random.Random(3)
     g = np.linspace(0, 1, h)[:, None]
@@ -320,8 +359,9 @@ M = dict(
     led=mat('RS_LED_Accent', emit=ACCENT, strength=8),
     ledG=mat('RS_LED_Green', emit='#33ff88', strength=8),
     ledA=mat('RS_LED_Amber', emit='#ffaa22', strength=8),
-    body=mat('RS_Body', '#16181e', .6, .4),
-    dark=mat('RS_BodyDark', '#0b0c10', .4, .55),
+    body=mat('RS_Body', '#ffffff', .55, .45, image=make_image('RS_Paint_Body', 512, 512, draw_paint('#1c1f27'))),
+    dark=mat('RS_BodyDark', '#ffffff', .35, .6, image=make_image('RS_Paint_Dark', 512, 512, draw_paint('#101116'))),
+    violet=mat('RS_PaintViolet', '#ffffff', .3, .5, image=make_image('RS_Paint_Violet', 512, 512, draw_paint('#3b2470'))),
     trim=mat('RS_Trim', '#2c3039', .85, .3),
     wall=mat('RS_Wall', '#ffffff', .2, .7, image=make_image('RS_Trim_Wall', 1024, 1024, draw_wall)),
     floor=mat('RS_Floor', '#ffffff', .35, .5, image=make_image('RS_Trim_Floor', 1024, 1024, draw_floor)),

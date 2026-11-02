@@ -5,14 +5,13 @@
 // with the bridge as the lobby, labs as floors and the transporter as the
 // elevator.
 //
-// A floor's plan (24 × 16 m, 4 m high; x right, z towards the front):
-//   back-left   the server room (the lobby's operations), behind glass
-//   back-middle work: your desk and the agent's on a rug; the PR station
-//   back-right  the meeting room, behind glass, by the windows
-//   front-left  the lounge, behind glass: the big screen on the left wall
-//   front-right the café, by the windows
-//   front-mid   the floor's pet
-// The elevator is in the back wall at x = -2; androids wander everywhere.
+// A floor's plan (24 × 16 m, 4 m high; x right, z towards the front): a
+// corridor from the elevator (the left wall's middle) to the windows at the
+// far end, glass rooms on both sides.
+//   back:  the server room (the lobby's operations) · the café nook ·
+//          the lounge
+//   front: work (the lobby's reception) · the meeting room · the game room
+// The pet lives by the café; androids wander the corridor and the nook.
 import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer } from './world.js';
 import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
@@ -47,7 +46,7 @@ function pickable(o, tip, act) {
 }
 
 // The pieces a room may use, loaded once.
-export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Window_4m', 'Arch_Elevator_Floor', 'Arch_Elevator_Cab',
+export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plain_2m', 'Arch_Wall_Window_4m', 'Arch_Elevator_Floor', 'Arch_Elevator_Cab',
   'Ext_CityBackdrop', 'Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m', 'Arch_Ceiling_CableTray_4m',
   'Arch_Ceiling_Sprinkler_4m', 'Arch_Ceiling_Fan', 'Arch_Ceiling_Vent', 'Arch_WallPipes_4m',
   'Light_CeilingPanel', 'Light_PendantBox',
@@ -58,7 +57,7 @@ export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Wind
   'Pet_Cat_Walk', 'Pet_Cat_Sitting', 'Pet_Dog_Walk', 'Pet_Dog_Lying', 'Furn_DogBed', 'Deco_PetBowls', 'Pet_Parrot_Fly',
   'Furn_ParrotPerch', 'Pet_Cat_Curled', 'Pet_Aquarium', 'Pet_JellyfishTank', 'Pet_Gecko_Terrarium',
   'Char_Android_Agent', 'Char_Android_A', 'Char_Android_B', 'Char_Android_C', // the agent's is spawned in actors.js
-  'Furn_Sofa_Tufted_L', 'Furn_Armchair', 'Furn_MeetingTable', 'Furn_Chair',
+  'Furn_Sofa_Tufted_L', 'Furn_Sofa', 'Deco_Plant_Floor', 'Furn_Armchair', 'Furn_MeetingTable', 'Furn_Chair',
   'Arch_GlassWall_4m', 'Arch_GlassWall_2m', 'Arch_GlassWall_Door_4m',
   'Deco_Plant_Snake', 'Deco_Plant_Monstera', 'Deco_Plant_Palm', 'Deco_Plant_Bush', 'Deco_Plant_Trailing',
   'Furn_SideTable', 'Deco_FloorLamp', 'Deco_Rug_Geo', 'Deco_CoatRack', 'Deco_Whiteboard', 'Deco_Backpack', 'Furn_Stool',
@@ -106,30 +105,32 @@ function box(parent, w, h, d, mat, x, y, z) {
 }
 
 const FLOOR = { minX: -11.85, maxX: 11.85, minZ: -7.85, maxZ: 7.85, y: 0 };
-const AREAS = [[FLOOR.minX, FLOOR.maxX, FLOOR.minZ, FLOOR.maxZ], [-2.95, -1.05, -10.2, FLOOR.minZ]];
-const LIFT = { x: -2, z: -8 };
+const AREAS = [[FLOOR.minX, FLOOR.maxX, FLOOR.minZ, FLOOR.maxZ], [-14.2, FLOOR.minX, -0.95, 0.95]];
+const LIFT = { x: -12, z: 0 }; // in the left wall, opening onto the corridor (+x)
 
 // The floor plan (after office space-planning practice: zones by activity and
 // noise; social spaces by the entrance and the main route; quiet work deep in
 // the plan by the windows, screens at right angles to them; meeting near the
 // windows just off the corridor; back of house windowless, by the core):
-//   spine        x -2.8…-1.2, from the elevator to the front wall (1.6 m)
-//   cross aisle  z -2…2, wall to wall
-//   back-left    server room (or the lobby's operations), glass (x -12…-4, z -8…-2)
-//   back-middle  work (or the lobby's reception), open, on a rug (x 0…4)
-//   back-right   meeting, by the windows, glass (x 4…12, z -8…-2)
-//   front-left   lounge: the sofa facing the big screen, glass (x -12…-4, z 2…8)
-//   front-right  café: counter, bistro table, by the windows
-//   front-middle the pet's corner
+//   corridor   z -2…2, from the elevator to the right wall's windows
+//   back-left  server room (or the lobby's operations), glass (x -12…-4, z -8…-2)
+//   back-mid   café nook, open to the corridor: vending, counter, the pet
+//   back-right lounge, glass: the big screen on the back wall
+//   front-left work (or the lobby's reception), glass: the desks, the PR station
+//   front-mid  meeting, glass, by the front windows
+//   front-right game room, glass, by the windows
 // The server room's panel comes first: its tube flickers (film.js).
-const LIGHTS = [[-8, -5], [-8, 5], [1.6, -5.2], [8, -5], [8, 5], [-2, -3.5], [-2, 3.5], [4, 0], [-7.5, 0], [9, 0.2], [1.5, 5]];
+const LIGHTS = [[-8, -5], [8, -5], [0, -5], [-8, 5], [0, 5], [8, 5], [-6, 0], [0, 0], [6, 0], [10, 0]];
 
 // GLASS are the glass rooms' walls: [piece, x, z, ry]. A door piece's
-// opening is its local x 0…2: each faces the spine.
+// opening is its local x 0…2 (ry PI turns it to -2…0 in x): each opens onto
+// the corridor where the plan has it.
 const GLASS = [
-  ['Arch_GlassWall_4m', -10, -2, 0], ['Arch_GlassWall_Door_4m', -6, -2, 0], ['Arch_GlassWall_4m', -4, -6, PI / 2], ['Arch_GlassWall_2m', -4, -3, PI / 2],
-  ['Arch_GlassWall_4m', 10, -2, 0], ['Arch_GlassWall_Door_4m', 6, -2, PI], ['Arch_GlassWall_4m', 4, -6, PI / 2], ['Arch_GlassWall_2m', 4, -3, PI / 2],
-  ['Arch_GlassWall_4m', -10, 2, 0], ['Arch_GlassWall_Door_4m', -6, 2, 0], ['Arch_GlassWall_2m', -4, 3, PI / 2], ['Arch_GlassWall_4m', -4, 6, PI / 2],
+  ['Arch_GlassWall_4m', -10, -2, 0], ['Arch_GlassWall_Door_4m', -6, -2, PI], ['Arch_GlassWall_4m', -4, -6, PI / 2], ['Arch_GlassWall_2m', -4, -3, PI / 2],
+  ['Arch_GlassWall_Door_4m', 6, -2, PI], ['Arch_GlassWall_4m', 10, -2, 0], ['Arch_GlassWall_4m', 4, -6, PI / 2], ['Arch_GlassWall_2m', 4, -3, PI / 2],
+  ['Arch_GlassWall_4m', -10, 2, 0], ['Arch_GlassWall_Door_4m', -6, 2, PI], ['Arch_GlassWall_2m', -4, 3, PI / 2], ['Arch_GlassWall_4m', -4, 6, PI / 2],
+  ['Arch_GlassWall_Door_4m', -2, 2, PI], ['Arch_GlassWall_4m', 2, 2, 0], ['Arch_GlassWall_2m', 4, 3, PI / 2], ['Arch_GlassWall_4m', 4, 6, PI / 2],
+  ['Arch_GlassWall_Door_4m', 6, 2, PI], ['Arch_GlassWall_4m', 10, 2, 0],
 ];
 const DOOR_SLIDE = 1.9; // how far a glass door's leaf slides open (local -x)
 
@@ -139,20 +140,19 @@ function shell(k, scene, deco, ui) {
   for (const x of [-10, -6, -2, 2, 6, 10]) for (const z of [-6, -2, 2, 6]) put(k, scene, 'Arch_Floor_4m', x, 0, z);
   const walls = [];
   const wall = (name, x, z, ry) => { const w = put(k, scene, name, x, 0, z, ry); walls.push(w); return w; };
-  for (const x of [-10, -6, 2, 6, 10]) wall('Arch_Wall_Plain_4m', x, -8, 0);
-  const lift = wall('Arch_Elevator_Floor', LIFT.x, LIFT.z, 0);
-  const cab = put(k, scene, 'Arch_Elevator_Cab', LIFT.x, 0, LIFT.z - 0.2);
-  // windows where people sit by them (meeting, the aisle, the café); the
-  // café's counter stands against the right wall's front half
-  for (const z of [-6, -2]) wall('Arch_Wall_Window_4m', 12, z, -PI / 2);
-  for (const z of [2, 6]) wall('Arch_Wall_Plain_4m', 12, z, -PI / 2);
-  for (const z of [-6, -2, 2, 6]) wall('Arch_Wall_Plain_4m', -12, z, PI / 2);
-  for (const x of [-10, -6, -2]) wall('Arch_Wall_Plain_4m', x, 8, PI);
-  for (const x of [2, 6, 10]) wall('Arch_Wall_Window_4m', x, 8, PI);
+  // the back wall solid (racks, vending, the lounge's screen); windows along
+  // the front rooms and at the corridor's far end; the elevator in the left
+  for (const x of [-10, -6, -2, 2, 6, 10]) wall('Arch_Wall_Plain_4m', x, -8, 0);
+  for (const z of [-6, -2, 2, 6]) wall('Arch_Wall_Window_4m', 12, z, -PI / 2);
+  for (const x of [-10, -6, -2, 2, 6, 10]) wall('Arch_Wall_Window_4m', x, 8, PI);
+  for (const z of [-6, 6]) wall('Arch_Wall_Plain_4m', -12, z, PI / 2);
+  for (const z of [-3, 3]) wall('Arch_Wall_Plain_2m', -12, z, PI / 2);
+  const lift = wall('Arch_Elevator_Floor', LIFT.x, LIFT.z, PI / 2);
+  const cab = put(k, scene, 'Arch_Elevator_Cab', LIFT.x - 0.2, 0, LIFT.z, PI / 2);
   scene.userData.walls = walls;
   put(k, scene, 'Ext_CityBackdrop', 30, -4, 0, -PI / 2);
   put(k, scene, 'Ext_CityBackdrop', 4, -4, 28, PI);
-  put(k, scene, 'Arch_WallPipes_4m', -2, 0, 7.99, PI);
+  put(k, scene, 'Arch_WallPipes_4m', 2, 0, -7.99);
 
   // The glass rooms; each door slides open as the walker comes near.
   const glassDoors = [];
@@ -166,16 +166,16 @@ function shell(k, scene, deco, ui) {
   top.rotation.x = PI / 2;
   top.position.y = 4;
   ceiling.add(top);
-  // a light panel over each zone, pendants over the desks; services run
-  // along the corridors: a cable tray over the server aisle, a duct over the
-  // cross aisle, a sprinkler line down the spine
+  // a light panel over each room and along the corridor, pendants over the
+  // desks; services run along the corridor: a duct, a sprinkler line, a
+  // cable tray over the server aisle
   const panels = LIGHTS.map(([x, z]) => put(k, ceiling, 'Light_CeilingPanel', x, 4, z, PI / 2));
-  for (const x of [0.55, 2.95]) put(k, ceiling, 'Light_PendantBox', x, 4, -6.4);
+  for (const z of [3.9, 6.6]) put(k, ceiling, 'Light_PendantBox', -10.7, 4, z, PI / 2);
   put(k, ceiling, 'Arch_Ceiling_CableTray_4m', -9.6, 4, -6.45);
-  put(k, ceiling, deco.pick(['Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m']), 8, 4, 0);
-  put(k, ceiling, 'Arch_Ceiling_Sprinkler_4m', -2, 4, 2.6, PI / 2);
-  put(k, ceiling, 'Arch_Ceiling_Fan', -8.4, 4, 5.2);
-  put(k, ceiling, 'Arch_Ceiling_Vent', -2, 4, -6.6);
+  put(k, ceiling, deco.pick(['Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m']), 2, 4, 0);
+  put(k, ceiling, 'Arch_Ceiling_Sprinkler_4m', -6, 4, 0);
+  put(k, ceiling, 'Arch_Ceiling_Fan', 8.4, 4, -4.4);
+  put(k, ceiling, 'Arch_Ceiling_Vent', -10.4, 4, 0);
   ceiling.visible = false;
   ceiling.userData.solid = true;
   scene.add(ceiling);
@@ -211,7 +211,7 @@ function shell(k, scene, deco, ui) {
   };
   pickable(lift, 'Elevator: go to the lobby or another floor', ui.transport);
   const sign = label('Elevator', { size: 0.3 });
-  sign.position.set(LIFT.x, 3.0, LIFT.z + 0.3);
+  sign.position.set(LIFT.x + 0.3, 3.0, LIFT.z);
   scene.add(sign);
   let open = 0;
   const doors = (dt) => {
@@ -221,7 +221,7 @@ function shell(k, scene, deco, ui) {
     setElevatorDoors(lift, open);
     setElevatorDoors(cab, open);
   };
-  return { ticks: [doors, glassTick, ...ticks], pad: { x: LIFT.x, z: LIFT.z + 0.75, r: 0.55, act: ui.transport } };
+  return { ticks: [doors, glassTick, ...ticks], pad: { x: LIFT.x + 0.75, z: LIFT.z, r: 0.55, act: ui.transport } };
 }
 
 // rug lays a dark rug with a neon edge.
@@ -250,9 +250,9 @@ function bigScreen(scene, x, y, z, ry, w, h, accent) {
   return g;
 }
 
-// wallScreen is a canvas screen on the back wall above a desk.
-function wallScreen(scene, x, y, w, h) {
-  return bigScreen(scene, x, y, -7.92, 0, w, h, 0x333344).screen;
+// wallScreen is a canvas screen on a wall above a desk; ry faces it out.
+function wallScreen(scene, x, y, z, ry, w, h) {
+  return bigScreen(scene, x, y, z, ry, w, h, 0x333344).screen;
 }
 
 // station is a kiosk with a screen above it and a sign: a place to read
@@ -273,7 +273,7 @@ function station(k, scene, x, z, ry, title, tip, act, w = 1.5, h = 0.85) {
 }
 
 // The pets: one per floor, picked by the floor's name; their corner is the
-// front-middle (x 0…3, z 5…8).
+// café nook's left side (x -4…-2, z -5…-2).
 const PET_NAMES = ['Nova', 'Pixel', 'Quark', 'Biscuit', 'Comet', 'Miso', 'Neon', 'Glitch', 'Mochi', 'Byte', 'Ramen', 'Chrome'];
 const PETS = {
   cat: { kind: 'cat', sound: 'purrrr…' },
@@ -304,21 +304,22 @@ function residents(k, scene, deco, ui, androids) {
     scene.add(walk, rest);
     roam(walk, rest, opts);
   };
-  // the pet's corner is the front-middle (x 0…3, z 5…8); the walkers roam
-  // the whole floor
+  // the pet's corner is the café nook's left side (x -4…-2, z -5…-2); the
+  // walkers roam the corridor and the nook (the glass rooms' doors stay shut
+  // to them)
   switch (which) {
     case 'cat':
-      put(k, scene, 'Deco_PetBowls', 1.9, 0, 7.3);
-      pair('Pet_Cat_Walk', 'Pet_Cat_Sitting', { start: { x: 1.0, z: 6.2, ry: PI / 2 }, speed: 0.5, stride: 0.3 });
+      put(k, scene, 'Deco_PetBowls', -3.4, 0, -2.6);
+      pair('Pet_Cat_Walk', 'Pet_Cat_Sitting', { start: { x: -3.2, z: -3.6, ry: PI / 2 }, speed: 0.5, stride: 0.3 });
       break;
     case 'dog':
-      put(k, scene, 'Furn_DogBed', 1.0, 0, 6.4);
-      put(k, scene, 'Deco_PetBowls', 2.2, 0, 7.3);
-      pair('Pet_Dog_Walk', 'Pet_Dog_Lying', { start: { x: 1.0, z: 6.4, ry: PI / 2 }, homes: [{ x: 1.0, z: 6.4, ry: PI / 2 }], speed: 0.7, stride: 0.45, height: 0.6 });
+      put(k, scene, 'Furn_DogBed', -3.2, 0, -3.8);
+      put(k, scene, 'Deco_PetBowls', -2.4, 0, -2.6);
+      pair('Pet_Dog_Walk', 'Pet_Dog_Lying', { start: { x: -3.2, z: -3.8, ry: PI / 2 }, homes: [{ x: -3.2, z: -3.8, ry: PI / 2 }], speed: 0.7, stride: 0.45, height: 0.6 });
       break;
     case 'parrot': {
-      // a clear line between the perches: across the open middle
-      const perches = [{ x: 0.8, y: 1.284, z: 5.8, ry: PI / 2 }, { x: 8.4, y: 1.284, z: 0.6, ry: -PI / 2 }];
+      // a clear line between the perches: down the corridor
+      const perches = [{ x: -3.2, y: 1.284, z: -3.6, ry: PI / 2 }, { x: 10.6, y: 1.284, z: 0.4, ry: -PI / 2 }];
       for (const p of perches) put(k, scene, 'Furn_ParrotPerch', p.x, 0, p.z, p.ry);
       const bird = mine(k.spawn('Pet_Parrot_Fly'));
       scene.add(bird);
@@ -327,21 +328,21 @@ function residents(k, scene, deco, ui, androids) {
       break;
     }
     case 'sleeper':
-      put(k, scene, 'Deco_Crate', 1.0, 0, 6.6, PI / 2);
-      mine(put(k, scene, 'Pet_Cat_Curled', 1.0, 0.46, 6.6, 0.4));
+      put(k, scene, 'Deco_Crate', -3.3, 0, -3.6, PI / 2);
+      mine(put(k, scene, 'Pet_Cat_Curled', -3.3, 0.46, -3.6, 0.4));
       break;
     case 'aquarium':
-      mine(put(k, scene, 'Pet_Aquarium', 1.4, 0, 7.25));
+      mine(put(k, scene, 'Pet_Aquarium', -3.3, 0, -4.4, PI / 2));
       break;
     case 'jellyfish':
-      mine(put(k, scene, 'Pet_JellyfishTank', 1.4, 0, 7.0));
+      mine(put(k, scene, 'Pet_JellyfishTank', -3.3, 0, -4.0));
       break;
     default: // the gecko's terrarium stands on the café counter
-      mine(put(k, scene, 'Pet_Gecko_Terrarium', 11.45, 0.75, 4.5, -PI / 2));
+      mine(put(k, scene, 'Pet_Gecko_Terrarium', 2.9, 0.75, -7.55));
   }
   // the androids: each a roamer that walks wherever the floor is free
   const models = ['Char_Android_A', 'Char_Android_B', 'Char_Android_C'];
-  const starts = [{ x: -2, z: 0.9 }, { x: 1.5, z: 0.5 }, { x: 6.5, z: 0.5 }]; // on the aisles
+  const starts = [{ x: -6, z: 0 }, { x: 0, z: 0.5 }, { x: 6, z: -0.3 }]; // in the corridor
   for (let i = 0; i < androids; i++) {
     const a = wanderer(k, models[(deco.seed + i) % 3], rng(deco.seed + 31 * i), ui.say);
     scene.add(a);
@@ -360,67 +361,80 @@ function zoneSign(scene, text, x, z, ry = 0) {
   sign.rods(x, 2.75, z, ry);
 }
 
-// café (front-right, by the windows): a counter with stools along the right
-// wall, the fridge at its end, a bistro table by the front windows.
+// café (the nook at the back, open to the corridor): the counter and the
+// fridge against the back wall, the vending machines' place beside them,
+// a bistro table.
 function cafe(k, scene, deco, gecko) {
-  zoneSign(scene, 'Café', 8, 2.4);
-  put(k, scene, 'Furn_Desk', 11.45, 0, 5.2, -PI / 2);
-  put(k, scene, 'Deco_MiniFridge', 11.5, 0, 6.6, -PI / 2);
-  put(k, scene, 'Deco_Mug', 11.35, 0.75, 5.7);
-  put(k, scene, 'Deco_Mug', 11.55, 0.75, 5.9);
-  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 11.45, 0.75, 4.6, 0.2);
-  put(k, scene, 'Furn_Stool', 10.6, 0, 4.6);
-  put(k, scene, 'Furn_Stool', 10.6, 0, 5.8);
-  put(k, scene, 'Furn_SideTable', 7.8, 0, 6.2);
-  put(k, scene, 'Furn_Stool', 7.8, 0, 5.5);
-  put(k, scene, 'Furn_Stool', 7.8, 0, 6.9);
-  put(k, scene, 'Deco_Plant_Snake', 4.6, 0, 7.4, deco.r() * 6);
-  put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 11.2, 4, 5.2, deco.r() * 6);
+  zoneSign(scene, 'Café', 0, -1.3);
+  put(k, scene, 'Furn_Desk', 2.0, 0, -7.55);
+  put(k, scene, 'Deco_MiniFridge', 3.4, 0, -7.55);
+  put(k, scene, 'Deco_Mug', 1.6, 0.75, -7.45);
+  put(k, scene, 'Deco_Mug', 1.85, 0.75, -7.6);
+  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 2.5, 0.75, -7.55, 0.2);
+  put(k, scene, 'Furn_Stool', 1.4, 0, -6.6);
+  put(k, scene, 'Furn_Stool', 2.6, 0, -6.6);
+  put(k, scene, 'Furn_SideTable', 0.4, 0, -4.4);
+  put(k, scene, 'Furn_Stool', -0.3, 0, -4.4);
+  put(k, scene, 'Furn_Stool', 1.1, 0, -4.4);
+  put(k, scene, 'Deco_Plant_Snake', 3.5, 0, -2.6, deco.r() * 6);
+  put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 2.0, 4, -7.3, deco.r() * 6);
 }
 
-// lounge (front-left, behind glass): the sofa facing the big screen on the
-// left wall, on a rug, an armchair across the coffee table, a side table,
+// lounge (back-right, behind glass): the sofa facing the big screen on the
+// back wall from a comfortable 4.5 m, on a rug, an armchair and a side table,
 // an arc lamp.
 function lounge(k, scene, deco, ui, accent) {
-  zoneSign(scene, 'Lounge', -8, 1.4);
-  const big = bigScreen(scene, -11.88, 2.2, 5.75, PI / 2, 4.2, 2.3, accent);
+  zoneSign(scene, 'Lounge', 5, -1.3);
+  const big = bigScreen(scene, 8, 2.2, -7.88, 0, 4.2, 2.3, accent);
   pickable(big.screen, 'The big screen', () => ui.say('This screen is yours: what goes up here comes later.', big));
-  put(k, scene, 'Deco_Rug_Geo', -9.8, 0, 5.7, PI / 2);
-  put(k, scene, 'Furn_Sofa_Tufted_L', -8.3, 0, 5.6, -PI / 2);
-  put(k, scene, 'Furn_CoffeeTable', -10.0, 0, 4.95, PI / 2);
-  put(k, scene, 'Deco_BookStack', -10.0, 0.42, 4.8);
-  put(k, scene, 'Furn_Armchair', -10.0, 0, 3.6);
-  put(k, scene, 'Furn_SideTable', -7.6, 0, 3.4);
-  put(k, scene, 'Deco_FloorLamp', -7.75, 0, 7.4, -PI / 2);
-  put(k, scene, 'Deco_PizzaBoxes', -9.1, 0, 7.5, 0.3);
-  put(k, scene, 'Deco_Backpack', -8.6, 0, 3.4, -1.0);
-  put(k, scene, 'Deco_Plant_Monstera', -11.35, 0, 7.4, deco.r() * 6);
-  put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', -8.8, 4, 6.6, deco.r() * 6);
-  put(k, scene, 'Deco_CorkBoard', -10, 1.7, 7.98, PI);
+  put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
+  put(k, scene, 'Furn_Sofa_Tufted_L', 8.6, 0, -3.3, PI);
+  put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);
+  put(k, scene, 'Deco_BookStack', 8.0, 0.42, -4.7);
+  put(k, scene, 'Furn_Armchair', 5.3, 0, -5.0, PI / 2);
+  put(k, scene, 'Furn_SideTable', 5.2, 0, -3.0);
+  put(k, scene, 'Deco_FloorLamp', 11.4, 0, -2.6, PI);
+  put(k, scene, 'Deco_PizzaBoxes', 5.2, 0, -7.4, 0.3);
+  put(k, scene, 'Deco_Backpack', 6.4, 0, -2.7, -1.0);
+  put(k, scene, 'Deco_Plant_Monstera', 11.4, 0, -7.4, deco.r() * 6);
+  put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 10.4, 4, -6.6, deco.r() * 6);
   return big;
 }
 
-// meeting (back-right, behind glass, by the windows): a table for six facing
-// a screen wall; the way in from the cross aisle.
+// meeting (front-middle, behind glass, by the windows): a table for six
+// facing a screen wall.
 function meeting(k, scene, deco) {
-  zoneSign(scene, 'Meeting', 8, -1.4);
-  put(k, scene, 'Furn_MeetingTable', 8.4, 0, -5.0);
-  for (const x of [7.6, 8.4, 9.2]) {
-    put(k, scene, 'Furn_Chair', x, 0, -5.75);
-    put(k, scene, 'Furn_Chair', x, 0, -4.25, PI);
+  zoneSign(scene, 'Meeting', -3, 1.3);
+  put(k, scene, 'Furn_MeetingTable', 0.3, 0, 5.0);
+  for (const x of [-0.5, 0.3, 1.1]) {
+    put(k, scene, 'Furn_Chair', x, 0, 4.25);
+    put(k, scene, 'Furn_Chair', x, 0, 5.75, PI);
   }
-  put(k, scene, 'Tech_MonitorWall_A', 4.65, 0, -5.0, PI / 2);
-  put(k, scene, 'Tech_Laptop', 8.0, 0.76, -5.15, 0.2);
-  put(k, scene, 'Deco_Mug', 8.8, 0.76, -4.8);
-  put(k, scene, 'Deco_Plant_Palm', 11.35, 0, -7.4, deco.r() * 6);
-  put(k, scene, 'Deco_Plant_Snake', 11.35, 0, -2.6, deco.r() * 6);
-  put(k, scene, 'Deco_Plant_Bush', 4.6, 0, -7.4, deco.r() * 6);
+  put(k, scene, 'Tech_MonitorWall_A', -3.35, 0, 5.0, PI / 2);
+  put(k, scene, 'Tech_Laptop', -0.1, 0.76, 4.85, 0.2);
+  put(k, scene, 'Deco_Mug', 0.7, 0.76, 5.2);
+  put(k, scene, 'Deco_Plant_Palm', 3.4, 0, 7.4, deco.r() * 6);
+  put(k, scene, 'Deco_Plant_Snake', 3.4, 0, 2.6, deco.r() * 6);
+  put(k, scene, 'Deco_Plant_Bush', -3.4, 0, 7.4, deco.r() * 6);
 }
 
-// support: what sits by the spine's end and the landing.
+// gameRoom (front-right, behind glass, by the windows): a sofa facing the
+// arcade, a coffee table. shortcut: kiosks stand in for the arcade machines
+// until the kit has them.
+function gameRoom(k, scene, deco) {
+  zoneSign(scene, 'Game room', 5, 1.3);
+  rug(scene, 5.5, 11.5, 3.0, 7.6, deco.accent);
+  for (const z of [3.8, 5.0]) put(k, scene, 'Tech_TerminalKiosk', 11.3, 0, z, -PI / 2);
+  put(k, scene, 'Furn_Sofa', 7.0, 0, 4.6, PI / 2);
+  put(k, scene, 'Furn_CoffeeTable', 8.6, 0, 4.6, PI / 2);
+  put(k, scene, 'Deco_Plant_Floor', 11.4, 0, 7.4, deco.r() * 6);
+  put(k, scene, 'Deco_PizzaBoxes', 8.6, 0.42, 4.5, 0.4);
+}
+
+// support: what sits at the corridor's far end and by the elevator.
 function support(k, scene, deco) {
-  put(k, scene, deco.pick(['Deco_Boxes', 'Deco_Crate']), -0.5, 0, 7.3, PI);
-  put(k, scene, 'Deco_Extinguisher', -3.0, 0, -7.92);
+  put(k, scene, deco.pick(['Deco_Boxes', 'Deco_Crate']), 11.2, 0, 1.4, -PI / 2);
+  put(k, scene, 'Deco_Extinguisher', -11.92, 0, -2.6, PI / 2);
 }
 
 // lab builds a worktree's floor. ui: {transport, service(slug, svc),
@@ -433,14 +447,14 @@ export async function lab(slug, n, ui) {
   const scene = new THREE.Scene();
   const sh = shell(k, scene, deco, ui);
   const sign = label(`Floor ${n} · ${slug}`, { size: 0.34, color: css(deco.accent) });
-  sign.position.set(1.8, 3.6, -7.6);
+  sign.position.set(-1.5, 3.4, -7.6);
   scene.add(sign);
 
   // Server room (back-left, windowless, behind glass): a data hall's two
   // rows of full-height racks (0.6 × 1 m), fronts facing a cold aisle along
   // the back wall; the way in is the glass door by the landing.
-  zoneSign(scene, 'Server room', -8, -1.4);
-  put(k, scene, 'Tech_ToolCart', -11.4, 0, -4.0, PI / 2);
+  zoneSign(scene, 'Server room', -7, -1.3);
+  put(k, scene, 'Tech_ToolCart', -4.6, 0, -6.6, -PI / 2);
   const keepOut = new THREE.Mesh(new THREE.BoxGeometry(7.8, 2, 5.8), new THREE.MeshBasicMaterial());
   keepOut.name = 'PetKeepOut_COL'; // pets and androids stay out of the server room; you don't
   keepOut.visible = false;
@@ -450,37 +464,39 @@ export async function lab(slug, n, ui) {
   // shortcut: room for 14 racks; a stack with more services shows the first 14
   const rackSpot = (i) => (i < 7 ? { x: -11.3 + i * 0.62, z: -7.45, ry: 0 } : i < 14 ? { x: -11.3 + (i - 7) * 0.62, z: -5.5, ry: PI } : null);
 
-  // Work (back-middle, open, by the landing): your desk and the agent's
-  // against the back wall, on a rug; the PR station faces the cross aisle.
-  zoneSign(scene, 'Work', 1.8, -1.0);
-  rug(scene, -0.9, 3.9, -7.95, -3.0, deco.accent);
-  const desk = put(k, scene, deco.pick(['Furn_Workstation_Lived', 'Furn_Workstation_Lived_B']), 0.55, 0, -6.7);
+  // Work (front-left, behind glass): your desk and the agent's against the
+  // left wall, screens above them; the PR station by the windows.
+  zoneSign(scene, 'Work', -7, 1.3);
+  rug(scene, -11.9, -4.1, 2.1, 7.9, deco.accent);
+  const desk = put(k, scene, deco.pick(['Furn_Workstation_Lived', 'Furn_Workstation_Lived_B']), -10.7, 0, 3.9, PI / 2);
   pickable(desk, 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
-  const mine = pickable(wallScreen(scene, 0.55, 2.65, 2.2, 1.2), 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
-  const agentDesk = put(k, scene, 'Furn_Desk', 2.95, 0, -6.95);
-  put(k, scene, 'Tech_MonitorStack', 2.95, 0.75, -6.75);
-  put(k, scene, 'Deco_DeskLamp', 3.55, 0.75, -7.05, 2.6);
-  put(k, scene, 'Deco_Mug', 2.35, 0.75, -6.7);
+  const mine = pickable(wallScreen(scene, -11.92, 2.65, 3.9, PI / 2, 2.2, 1.2), 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
+  const agentDesk = put(k, scene, 'Furn_Desk', -10.95, 0, 6.6, PI / 2);
+  put(k, scene, 'Tech_MonitorStack', -10.75, 0.75, 6.6, PI / 2);
+  put(k, scene, 'Deco_DeskLamp', -11.05, 0.75, 5.6, 2.6 + PI / 2);
+  put(k, scene, 'Deco_Mug', -10.7, 0.75, 7.4);
   pickable(agentDesk, 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
-  const theirs = pickable(wallScreen(scene, 2.95, 2.7, 1.6, 0.9), 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
+  const theirs = pickable(wallScreen(scene, -11.92, 2.7, 6.6, PI / 2, 1.6, 0.9), 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
   const partner = agentAndroid(k);
-  partner.position.set(2.95, 0, -5.95);
-  partner.rotation.y = PI; // faces its monitors
+  partner.position.set(-9.95, 0, 6.6);
+  partner.rotation.y = -PI / 2; // faces its monitors
   partner.userData.block = true;
   pickable(partner, 'Your agent partner: status, screen, type to it', () => ui.agent(slug));
   scene.add(partner);
-  put(k, scene, 'Deco_Whiteboard', 3.75, 0, -3.6, -PI / 2);
-  put(k, scene, 'Deco_CoatRack', -0.7, 0, -7.5);
-  put(k, scene, 'Deco_Backpack', 1.75, 0, -5.55, 0.7);
-  put(k, scene, 'Deco_BookStack', 1.35, 0.75, -7.0, 0.3);
-  put(k, scene, 'Deco_Plant_Monstera', -0.6, 0, -3.3, deco.r() * 6);
-  put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', 1.75, 4, -7.3, deco.r() * 6);
-  const pr = station(k, scene, 1.8, -2.4, 0, 'Pull request', 'Pull request: open it, or all of them', () => ui.prs(), 2.0, 1.1);
+  put(k, scene, 'Deco_Whiteboard', -4.6, 0, 5.0, -PI / 2);
+  put(k, scene, 'Deco_CoatRack', -4.6, 0, 7.5);
+  put(k, scene, 'Deco_Backpack', -9.4, 0, 5.0, 0.7);
+  put(k, scene, 'Deco_BookStack', -11.0, 0.75, 2.95, 0.3);
+  put(k, scene, 'Deco_CorkBoard', -11.98, 1.7, 5.25, PI / 2);
+  put(k, scene, 'Deco_Plant_Monstera', -4.6, 0, 2.6, deco.r() * 6);
+  put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', -10.0, 4, 3.0, deco.r() * 6);
+  const pr = station(k, scene, -7.4, 7.2, PI, 'Pull request', 'Pull request: open it, or all of them', () => ui.prs(), 2.0, 1.1);
 
   const which = deco.pet;
   cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
   meeting(k, scene, deco);
+  gameRoom(k, scene, deco);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 1 + (deco.seed % 2));
   res.start();
@@ -535,7 +551,7 @@ export async function lab(slug, n, ui) {
     partner.set(a ? a.state : 'off');
     theirs.update(a ? [{ text: a.state, color: '#ffe08a' }, ...(a.usage ? [{ text: `${tokens(a.usage)} tokens · ${tokens({ ...a.usage, input: 0, cache_read: 0, cache_write: 0 })} out`, color: '#9fc3ff' }] : []), ...(a.message ? wrap(a.message, 30, a.usage ? 3 : 4) : [])] : ['no agent running'], a ? a.name : 'agent');
   };
-  const walk = { areas: AREAS, start: { x: LIFT.x, z: LIFT.z + 1.7, yaw: PI }, pads: [sh.pad] };
+  const walk = { areas: AREAS, start: { x: LIFT.x + 1.7, z: LIFT.z, yaw: PI / 2 }, pads: [sh.pad] };
   return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 24, max: 40 }, walk, update, ticks, name: `Floor ${n} · ${slug}` };
 }
 
@@ -588,10 +604,10 @@ function wrap(text, n, max) {
 }
 
 // lobby builds the project's floor on the same plan: operations where a
-// floor has its server room (the PR board and the stations, behind neon
-// glass), reception where a floor works (the concierge facing the landing,
-// the floors board, waiting chairs), the directory where the spine meets the
-// cross aisle, and the same café, lounge and meeting room.
+// floor has its server room (the PR board and the stations), reception where
+// a floor works (the floors board, the concierge, waiting chairs), the
+// directory in the corridor's middle, and the same café, lounge, meeting
+// and game rooms.
 // ui: {transport, toFloor(slug), prs(), issues(), notes(), config(), say(text, obj), viewer()}.
 export async function lobby(prefix, ui) {
   const k = await kit(KIT_NAMES);
@@ -602,7 +618,7 @@ export async function lobby(prefix, ui) {
   const sh = shell(k, scene, deco, ui);
 
   // Operations (back-left, behind glass, where a floor has its server room).
-  zoneSign(scene, 'Operations', -8, -1.4);
+  zoneSign(scene, 'Operations', -7, -1.3);
   const board = bigScreen(scene, -11.88, 2.3, -5.0, PI / 2, 2.8, 1.6, deco.accent);
   pickable(board.screen, 'Pull requests', ui.prs);
   pickable(put(k, scene, 'Tech_TerminalKiosk', -11.0, 0, -5.0, PI / 2), 'Pull requests', ui.prs);
@@ -641,32 +657,34 @@ export async function lobby(prefix, ui) {
   notes.update(['shared agent notes', 'read · edit · add'], 'Notes');
   eng.update(['settings', 'images', 'library'], 'Engineering');
 
-  // Reception (back-middle, where a floor works): the concierge at its desk
-  // facing the landing, the floors board on the back wall, waiting chairs
-  // facing it; the project's name on the front wall, seen from the elevator.
-  zoneSign(scene, 'Reception', 1.8, -1.0);
-  rug(scene, -0.9, 3.9, -7.95, -3.0, deco.accent);
-  put(k, scene, 'Tech_MonitorBank', 1.9, 0, -7.97);
+  // Reception (front-left, where a floor works): the floors board on the
+  // left wall, the concierge at its desk facing the door, waiting chairs
+  // facing the board; the project's name over the café, seen from the
+  // elevator.
+  zoneSign(scene, 'Reception', -7, 1.3);
+  rug(scene, -11.9, -4.1, 2.1, 7.9, deco.accent);
+  put(k, scene, 'Tech_MonitorBank', -11.97, 0, 5.0, PI / 2);
   const view = screen(3.6, 1.4, { size: 30, fg: '#c9f6ff' });
-  view.position.set(1.9, 3.15, -7.9);
+  view.position.set(-11.9, 3.15, 5.0);
+  view.rotation.y = PI / 2;
   scene.add(view);
-  put(k, scene, 'Deco_NeonSign', -2, 2.3, 7.97, PI);
+  put(k, scene, 'Deco_NeonSign', 0, 2.6, -7.97);
   const name = label(prefix, { size: 0.5, color: css(deco.accent) });
-  name.position.set(-2, 3.25, 7.6);
+  name.position.set(0, 3.5, -7.6);
   scene.add(name);
-  put(k, scene, 'Furn_Desk', 0.2, 0, -5.4, -PI / 2);
-  put(k, scene, 'Tech_Laptop', 0.2, 0.75, -5.4, -PI / 2);
+  put(k, scene, 'Furn_Desk', -7.0, 0, 4.0);
+  put(k, scene, 'Tech_Laptop', -7.0, 0.75, 4.0, PI);
   const concierge = wanderer(k, 'Char_Android_B', rng(deco.seed + 7), ui.say);
-  concierge.position.set(1.0, 0, -5.4);
-  concierge.rotation.y = -PI / 2; // behind the desk, facing whoever steps out of the elevator
+  concierge.position.set(-7.0, 0, 4.8);
+  concierge.rotation.y = PI; // behind the desk, facing the door
   concierge.userData.block = true;
   scene.add(concierge);
-  for (const x of [2.2, 3.4]) put(k, scene, 'Furn_Armchair', x, 0, -4.2, PI);
-  put(k, scene, 'Furn_SideTable', 2.8, 0, -3.4);
-  put(k, scene, 'Deco_Plant_Palm', 3.5, 0, -7.45, deco.r() * 6);
-  put(k, scene, 'Deco_CoatRack', -0.7, 0, -7.5);
+  for (const z of [5.4, 6.8]) put(k, scene, 'Furn_Armchair', -9.2, 0, z, -PI / 2);
+  put(k, scene, 'Furn_SideTable', -9.2, 0, 6.1);
+  put(k, scene, 'Deco_Plant_Palm', -4.6, 0, 7.4, deco.r() * 6);
+  put(k, scene, 'Deco_CoatRack', -4.6, 0, 2.6);
 
-  // The directory, where the spine meets the cross aisle.
+  // The directory, in the corridor's middle.
   const pedestal = new THREE.Group();
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 0.9, 32), new THREE.MeshStandardMaterial({ color: 0x16181e, metalness: 0.6, roughness: 0.4 }));
   stand.position.y = 0.45;
@@ -675,20 +693,21 @@ export async function lobby(prefix, ui) {
   rim.rotation.x = PI / 2;
   rim.position.y = 0.9;
   pedestal.add(rim);
-  pedestal.position.set(-2, 0, 1.0);
+  pedestal.position.set(0, 0, 0);
   pedestal.userData.block = true;
   scene.add(pedestal);
   const beacons = new THREE.Group();
-  beacons.position.set(-2, 1.0, 1.0);
+  beacons.position.set(0, 1.0, 0);
   scene.add(beacons);
   const dirSign = label('Directory', { size: 0.3 });
-  dirSign.position.set(-2, 2.1, 1.0);
+  dirSign.position.set(0, 2.1, 0);
   scene.add(dirSign);
 
   const which = deco.pet;
   cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
   meeting(k, scene, deco);
+  gameRoom(k, scene, deco);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 2);
   res.start();
@@ -733,7 +752,7 @@ export async function lobby(prefix, ui) {
       { text: 'Yours to fill: pin what matters here.', color: '#8b8fb8' },
     ], prefix);
   };
-  const walk = { areas: AREAS, start: { x: LIFT.x, z: LIFT.z + 1.7, yaw: PI }, pads: [sh.pad] };
+  const walk = { areas: AREAS, start: { x: LIFT.x + 1.7, z: LIFT.z, yaw: PI / 2 }, pads: [sh.pad] };
   const leave = () => { live = false; };
   return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.15, pitch: 0.8, dist: 25, max: 40 }, walk, update, ticks, name: `Lobby · ${prefix}`, redrawWork: drawWork, leave };
 }

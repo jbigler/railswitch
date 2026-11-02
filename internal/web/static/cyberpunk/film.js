@@ -14,18 +14,18 @@ const PI = Math.PI;
 const LIFT = 1.3;
 const LAMPS = [
   [-9.6, 2.7, -6.4, 0x7fd8ff, 5, 7], // server room: the tube that flickers
-  [10.8, 2.3, 5.2, 0xffa040, 6, 6], // café counter
-  [-7.8, 1.7, 7.2, 0xff9a50, 4, 5], // lounge floor lamp
-  [0.55, 2.5, -6.4, 0xcfe0ff, 5, 6], // your desk's pendant
-  [2.95, 2.5, -6.4, 0xcfe0ff, 4, 6], // the agent's
-  [3.55, 1.1, -7.0, 0xffb060, 2.5, 3.5], // the agent's desk lamp
-  [8.4, 2.6, -5.0, 0xa8c8ff, 5, 6], // meeting
-  [-2, 2.8, 3.0, 0xb0b8d0, 3.5, 6], // spine
-  [-2, 2.8, -4.2, 0xb0b8d0, 3.5, 6], // landing
-  [7.0, 2.8, 0.2, 0xb0b8d0, 3.5, 7], // the aisle by the meeting room
-  [-8.0, 2.8, 0.0, 0xb0b8d0, 3.5, 7], // the aisle between the glass rooms
-  [1.5, 2.8, 5.0, 0xb0b8d0, 3, 6], // the pet's corner
-];
+  [2.2, 2.3, -6.6, 0xffa040, 6, 6], // café counter
+  [11.4, 1.7, -2.8, 0xff9a50, 4, 5], // lounge floor lamp
+  [-10.7, 2.5, 3.9, 0xcfe0ff, 5, 6], // your desk's pendant
+  [-10.7, 2.5, 6.6, 0xcfe0ff, 4, 6], // the agent's
+  [-11.05, 1.1, 5.6, 0xffb060, 2.5, 3.5], // the agent's desk lamp
+  [0.3, 2.6, 5.0, 0xa8c8ff, 5, 6], // meeting
+  [8.0, 2.6, 5.0, 0xd090ff, 4, 6], // game room
+  [-9.6, 2.8, 0.0, 0xb0b8d0, 3.5, 6], // by the elevator
+  [-3.0, 2.8, 0.0, 0xb0b8d0, 3.5, 7], // the corridor
+  [5.0, 2.8, 0.0, 0xb0b8d0, 3.5, 7], // the corridor
+  [-1.5, 2.8, -4.5, 0xb0b8d0, 3, 6], // the café nook
+]
 
 // stripes is the light through a window: open below, blinds above.
 function stripes() {
@@ -134,7 +134,7 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
     return l;
   });
   const spill = new THREE.PointLight(accent, 2.5, 6); // the big screen's glow on the lounge
-  spill.position.set(-11.0, 2.0, 5.75);
+  spill.position.set(8.0, 2.0, -7.0);
   scene.add(spill);
 
   // Neon is for signs: the walls' trim strips only hint at it, and the floor
@@ -183,10 +183,10 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
   // Cables: power and network from the server room to the desks along the
   // back, more hanging between the ceiling's services.
   const rubber = [0x0b0b0d, 0x3a0d12, 0x0d1a33].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55 }));
-  cable(scene, [[-4.2, -6.2], [-3.1, -5.0], [-2.7, -4.75], [-1.2, -4.7], [-0.6, -5.4], [0.2, -6.3], [0.6, -6.9]], rubber);
-  cable(scene, [[1.9, -7.8], [2.3, -7.4], [3.0, -7.6], [3.5, -7.3]], rubber.slice(0, 2));
-  cable(scene, [[-11.7, 4.6], [-11.6, 5.2], [-11.75, 5.9]], rubber.slice(1));
-  for (const [a, b, s] of [[[-9.5, -6.4], [-4.4, -4.4], 0.35], [[-4.2, -4.4], [0.5, -5.0], 0.5], [[1.0, -4.0], [3.6, -4.6], 0.4], [[-9.0, 2.6], [-9.2, 6.4], 0.3]]) {
+  cable(scene, [[-11.6, 3.0], [-11.3, 4.6], [-11.6, 5.8], [-11.4, 6.9]], rubber);
+  cable(scene, [[-3.6, 4.4], [-3.2, 4.9], [-2.6, 5.0]], rubber.slice(0, 2));
+  cable(scene, [[6.6, -7.7], [7.2, -7.6], [7.9, -7.75]], rubber.slice(1));
+  for (const [a, b, s] of [[[-9.5, -6.4], [-8.0, -1.2], 0.35], [[-8.0, -1.2], [-10.0, 3.5], 0.5], [[0.0, -3.0], [0.0, 3.0], 0.4], [[6.0, -4.0], [6.0, 4.0], 0.3]]) {
     droop(ceiling, a, b, s, rubber[0]);
   }
 

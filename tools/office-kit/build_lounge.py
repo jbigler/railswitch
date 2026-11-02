@@ -62,6 +62,7 @@ L = dict(
     trunk=mat('RS_Trunk', '#5a4630', 0, .9),
     leatherDark=mat('RS_Leather_Dark', '#1d1b20', 0, .42),
     oxblood=mat('RS_Oxblood', '#4a1518', 0, .85),
+    holoBed=mat('RS_HoloBed', '#05070c', .3, .15),
 )
 for k_ in ('leafLight',):
     L[k_].use_backface_culling = False
@@ -266,16 +267,53 @@ def stool(a):
     a.cyl(.2, .22, .02, M['dark'], 0, .01, 0, 20)
 
 
-def meeting_table(a):
-    """Conference table, 2.4 × 1.1 m, for six: dark top, two slab legs, neon edge."""
-    a.box(2.4, .04, 1.1, L['wood'], 0, .74, 0)
-    a.box(2.36, .008, .008, M['neon'], 0, .715, .55)
-    a.box(2.36, .008, .008, M['neon'], 0, .715, -.55)
-    for x in (-.85, .85):
-        a.box(.08, .7, .8, M['dark'], x, .36, 0)
-        a.box(.5, .03, .9, M['dark'], x, .015, 0)
-    a.box(.3, .02, .14, M['trim'], 0, .77, 0)   # a cable box for laptops
-    a.box(.12, .012, .004, M['led'], 0, .78, .071)
+def holo_table(a):
+    """The meeting room's holo-table, 3.0 × 2.0 m: a chunky console on a
+    plinth, thick bevelled rim panels around a recessed holo bed (dark glass:
+    the page draws its grid and the hologram above it), a control column
+    with a glowing orb at the near edge, grab rails, vents. Every glow is
+    RS_Neon_Secondary: the floor's secondary colour. Origin at the floor,
+    the control column at +Z."""
+    n2, bd, dk, tr = M['neon2'], M['body'], M['dark'], M['trim']
+    a.box(3.4, .08, 2.4, dk, 0, .04, 0)                                     # plinth
+    for z in (-1.2, 1.2):
+        a.box(3.3, .01, .01, n2, 0, .085, z * .985)
+    for x in (-1.7, 1.7):
+        a.box(.01, .01, 2.3, n2, x * .985, .085, 0)
+    for sx in (-1, 1):                                                      # angled legs
+        for sz in (-1, 1):
+            a.box(.34, .72, .34, bd, sx * 1.05, .44, sz * .58, ry=sx * sz * .4)
+            for k in range(4):
+                a.box(.004, .3, .02, dk, sx * 1.05 + sx * .172, .4 + k * .07 - .1, sz * .58, ry=sx * sz * .4)
+    a.box(1.1, .6, .7, bd, 0, .38, 0)                                       # core
+    for k in range(6):
+        a.box(.9, .015, .004, dk, 0, .2 + k * .06, .352)                    # its vents
+    a.box(2.5, .04, 1.5, L['holoBed'], 0, .86, 0)                           # holo bed
+    for x in (-1.22, 1.22):                                                 # dashed bed edges
+        for k in range(9):
+            a.box(.008, .006, .1, n2, x, .885, -.64 + k * .16)
+    for z in (-.72, .72):
+        for k in range(15):
+            a.box(.1, .006, .008, n2, -1.12 + k * .16, .885, z)
+    for z in (-1, 1):                                                       # rim: long panels
+        a.box(3.0, .16, .26, bd, 0, .9, z * .87)
+        a.box(2.9, .05, .2, dk, 0, 1.0, z * .87)
+        a.box(2.86, .008, .008, n2, 0, .97, z * .74)
+    for x in (-1, 1):                                                       # rim: short panels
+        a.box(.26, .16, 1.48, bd, x * 1.37, .9, 0)
+        a.box(.2, .05, 1.4, dk, x * 1.37, 1.0, 0)
+        a.box(.008, .008, 1.36, n2, x * 1.24, .97, 0)
+    for sx in (-1, 1):                                                      # corner blocks
+        for sz in (-1, 1):
+            a.box(.36, .22, .36, bd, sx * 1.36, .93, sz * .86)
+            a.box(.2, .006, .2, tr, sx * 1.36, 1.042, sz * .86)
+    a.box(.46, .26, .34, bd, 0, 1.0, 1.06)                                  # control column
+    a.box(.38, .02, .26, dk, 0, 1.14, 1.06)
+    a.sphere(.07, n2, 0, 1.22, 1.04)                                        # the orb
+    a.cyl(.012, .012, .12, tr, .14, 1.2, 1.1, 10)                           # a stick
+    a.sphere(.025, dk, .14, 1.27, 1.1)
+    for x in (-.9, .9):                                                     # grab rails
+        a.cyl(.016, .016, .7, tr, x, 1.07, 1.02, 10, rz=math.pi / 2)
 
 
 def pizza_boxes(a, seed=3):
@@ -296,7 +334,7 @@ for name, fn, col in [
     ('Furn_SideTable', side_table, 'aabb'), ('Deco_FloorLamp', floor_lamp, [(.42, 1.9, .42, 0, .95, 0)]),
     ('Deco_Rug_Geo', rug_geo, None), ('Deco_CoatRack', coat_rack, 'aabb'), ('Deco_Whiteboard', whiteboard, 'aabb'),
     ('Deco_Backpack', backpack, None), ('Furn_Stool', stool, 'aabb'), ('Deco_BookStack', book_stack, None),
-    ('Deco_PizzaBoxes', pizza_boxes, None), ('Furn_MeetingTable', meeting_table, 'aabb'),
+    ('Deco_PizzaBoxes', pizza_boxes, None), ('Furn_HoloTable', holo_table, [(3.0, 1.05, 2.0, 0, .525, 0), (3.4, .1, 2.4, 0, .05, 0)]),
 ]:
     a = Asset(name)
     fn(a)

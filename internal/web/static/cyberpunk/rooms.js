@@ -57,7 +57,7 @@ export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plai
   'Pet_Cat_Walk', 'Pet_Cat_Sitting', 'Pet_Dog_Walk', 'Pet_Dog_Lying', 'Furn_DogBed', 'Deco_PetBowls', 'Pet_Parrot_Fly',
   'Furn_ParrotPerch', 'Pet_Cat_Curled', 'Pet_Aquarium', 'Pet_JellyfishTank', 'Pet_Gecko_Terrarium',
   'Char_Android_Agent', 'Char_Android_A', 'Char_Android_B', 'Char_Android_C', // the agent's is spawned in actors.js
-  'Furn_Sofa_L', 'Furn_Sofa', 'Deco_Plant_Floor', 'Furn_Armchair', 'Furn_MeetingTable', 'Furn_Chair',
+  'Furn_Sofa_L', 'Furn_Sofa', 'Deco_Plant_Floor', 'Furn_Armchair', 'Furn_HoloTable', 'Furn_Chair',
   'Arch_GlassWall_4m', 'Arch_GlassWall_2m', 'Arch_GlassWall_Door_4m',
   'Deco_Plant_Snake', 'Deco_Plant_Monstera', 'Deco_Plant_Palm', 'Deco_Plant_Bush', 'Deco_Plant_Trailing',
   'Furn_SideTable', 'Deco_FloorLamp', 'Deco_Rug_Geo', 'Deco_CoatRack', 'Deco_Whiteboard', 'Deco_Backpack', 'Furn_Stool',
@@ -401,21 +401,155 @@ function lounge(k, scene, deco, ui, accent) {
   return big;
 }
 
-// meeting (front-middle, behind glass, by the windows): a table for six
-// facing a screen wall.
+// meeting (front-middle, behind glass, by the windows): the holo-table,
+// six chairs around it, a screen wall. Returns the table's hologram.
 function meeting(k, scene, deco) {
   zoneSign(scene, 'Meeting', -3, 1.3);
-  put(k, scene, 'Furn_MeetingTable', 0.3, 0, 5.0);
-  for (const x of [-0.5, 0.3, 1.1]) {
-    put(k, scene, 'Furn_Chair', x, 0, 4.25);
-    put(k, scene, 'Furn_Chair', x, 0, 5.75, PI);
+  put(k, scene, 'Furn_HoloTable', 0.3, 0, 5.0);
+  for (const x of [-0.7, 0.3, 1.3]) {
+    put(k, scene, 'Furn_Chair', x, 0, 3.5);
+    put(k, scene, 'Furn_Chair', x, 0, 6.5, PI);
   }
   put(k, scene, 'Tech_MonitorWall_A', -3.35, 0, 5.0, PI / 2);
-  put(k, scene, 'Tech_Laptop', -0.1, 0.76, 4.85, 0.2);
-  put(k, scene, 'Deco_Mug', 0.7, 0.76, 5.2);
   put(k, scene, 'Deco_Plant_Palm', 3.4, 0, 7.4, deco.r() * 6);
   put(k, scene, 'Deco_Plant_Snake', 3.4, 0, 2.6, deco.r() * 6);
   put(k, scene, 'Deco_Plant_Bush', -3.4, 0, 7.4, deco.r() * 6);
+  return holoTable(scene, 0.3, 5.0, deco.secondary);
+}
+
+// holoTable is the hologram over the holo-table at (x, z), in color: a
+// wireframe terrain rising from the bed, a pin per item standing out of it
+// (coloured by state, labelled, clickable), a halo ring above with a HUD
+// panel facing the door, crosshairs drifting in the air. set(items, title,
+// lines): items [{label, color, tip, act}]; tick(dt, t) moves it.
+function holoTable(scene, x, z, color) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const tint = new THREE.Color(color).multiplyScalar(1.3);
+  const glow = (opacity, extra = {}) => new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, ...extra });
+  const BED = { w: 2.3, d: 1.3, y: 0.89 };
+  // the bed's grid
+  const lines = [];
+  for (let i = 0; i <= 23; i++) lines.push(-BED.w / 2 + (i * BED.w) / 23, BED.y, -BED.d / 2, -BED.w / 2 + (i * BED.w) / 23, BED.y, BED.d / 2);
+  for (let i = 0; i <= 13; i++) lines.push(-BED.w / 2, BED.y, -BED.d / 2 + (i * BED.d) / 13, BED.w / 2, BED.y, -BED.d / 2 + (i * BED.d) / 13);
+  const gridGeo = new THREE.BufferGeometry();
+  gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+  g.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({ color: tint, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })));
+  // the terrain: heights from a few slow waves, flattened toward the rim
+  const geo = new THREE.PlaneGeometry(BED.w, BED.d, 30, 17); // sparse: dense lines add up to a solid glow
+  geo.rotateX(-PI / 2);
+  const pos = geo.attributes.position;
+  const height = (px, pz, t) => {
+    const fade = Math.max(0, 1 - (Math.abs(px) / (BED.w / 2)) ** 4) * Math.max(0, 1 - (Math.abs(pz) / (BED.d / 2)) ** 4);
+    const v = 0.1 + 0.08 * Math.sin(px * 2.1 + t * 0.25) * Math.cos(pz * 2.7 - t * 0.18) + 0.05 * Math.sin(px * 5.3 + pz * 3.1 + t * 0.4);
+    return BED.y + 0.01 + Math.max(0, v) * fade;
+  };
+  const terrain = new THREE.Mesh(geo, glow(0.16, { wireframe: true }));
+  terrain.raycast = () => {};
+  g.add(terrain);
+  // the halo and its HUD panel
+  const halo = new THREE.Group();
+  halo.position.y = 2.7;
+  for (const [w, d, hx, hz] of [[2.8, 0.025, 0, -0.8], [2.8, 0.025, 0, 0.8], [0.025, 1.6, -1.4, 0], [0.025, 1.6, 1.4, 0]]) {
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.025, d), glow(0.9));
+    bar.position.set(hx, 0, hz);
+    halo.add(bar);
+  }
+  const hudCv = document.createElement('canvas');
+  hudCv.width = 512;
+  hudCv.height = 160;
+  const hudTex = new THREE.CanvasTexture(hudCv);
+  hudTex.colorSpace = THREE.SRGBColorSpace;
+  const hud = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), glow(1, { map: hudTex, color: 0xffffff }));
+  hud.position.set(0, -0.32, -0.8);
+  hud.rotation.y = PI; // faces the door (-z)
+  hud.raycast = () => {};
+  halo.add(hud);
+  g.add(halo);
+  // crosshairs in the air
+  const plus = document.createElement('canvas');
+  plus.width = plus.height = 32;
+  const pg = plus.getContext('2d');
+  pg.strokeStyle = '#fff';
+  pg.lineWidth = 3;
+  pg.beginPath();
+  pg.moveTo(16, 4); pg.lineTo(16, 28); pg.moveTo(4, 16); pg.lineTo(28, 16);
+  pg.stroke();
+  const r = rng(hash(String(color)));
+  const cross = new Float32Array(40 * 3);
+  for (let i = 0; i < 40; i++) cross.set([(r() - 0.5) * 3.2, 1.2 + r() * 1.4, (r() - 0.5) * 2.0], i * 3);
+  const crossGeo = new THREE.BufferGeometry();
+  crossGeo.setAttribute('position', new THREE.BufferAttribute(cross, 3));
+  const crosses = new THREE.Points(crossGeo, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(plus), color: tint, size: 0.07, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  crosses.raycast = () => {};
+  g.add(crosses);
+
+  const pins = new THREE.Group();
+  g.add(pins);
+  let key = '';
+  const spots = (n) => {
+    const out = [];
+    const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.8)));
+    const rows = Math.ceil(n / cols);
+    for (let i = 0; i < n; i++) {
+      const cx = i % cols, cz = Math.floor(i / cols);
+      out.push([(-0.5 + (cx + 0.5) / cols) * (BED.w - 0.4), (-0.5 + (cz + 0.5) / rows) * (BED.d - 0.3)]);
+    }
+    return out;
+  };
+  const drawHud = (title, rows) => {
+    const c = hudCv.getContext('2d');
+    c.clearRect(0, 0, hudCv.width, hudCv.height);
+    c.strokeStyle = '#' + tint.getHexString();
+    c.lineWidth = 3;
+    c.strokeRect(4, 4, hudCv.width - 8, hudCv.height - 8);
+    c.fillStyle = '#' + tint.getHexString();
+    c.font = '700 34px ui-monospace, monospace';
+    c.textBaseline = 'top';
+    c.fillText(title.slice(0, 24), 18, 14);
+    c.font = '24px ui-monospace, monospace';
+    rows.slice(0, 3).forEach((l, i) => c.fillText(String(l).slice(0, 34), 18, 62 + i * 30));
+    hudTex.needsUpdate = true;
+  };
+  return {
+    set(items, title, rows) {
+      drawHud(title, rows);
+      const k2 = items.map((it) => `${it.label}:${it.color}`).join(' ');
+      if (k2 === key) return;
+      key = k2;
+      for (const p of [...pins.children]) {
+        p.traverse((o) => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); });
+        pins.remove(p);
+      }
+      spots(items.length).forEach(([px, pz], i) => {
+        const it = items[i];
+        const pin = new THREE.Group();
+        const base = height(px, pz, 0);
+        const top = base + 0.55 + (i % 3) * 0.12;
+        const c = new THREE.Color(it.color).multiplyScalar(1.5);
+        const mat = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, top - base, 6), mat);
+        pole.position.set(px, (top + base) / 2, pz);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.01, 6, 24), mat);
+        ring.rotation.x = PI / 2;
+        ring.position.set(px, top, pz);
+        const tag = label(it.label, { size: 0.2, color: '#' + c.getHexString() });
+        tag.position.set(px, top + 0.16, pz);
+        const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, top - base + 0.2, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+        hit.position.copy(pole.position);
+        pin.add(pole, ring, tag, hit);
+        pickable(pin, it.tip, it.act);
+        pins.add(pin);
+      });
+    },
+    tick(dt, t) {
+      for (let i = 0; i < pos.count; i++) pos.setY(i, height(pos.getX(i), pos.getZ(i), t));
+      pos.needsUpdate = true;
+      halo.position.y = 2.7 + Math.sin(t * 0.8) * 0.02;
+      crosses.rotation.y = t * 0.03;
+    },
+  };
 }
 
 // gameRoom (front-right, behind glass, by the windows): a sofa facing the
@@ -496,13 +630,13 @@ export async function lab(slug, n, ui) {
   const which = deco.pet;
   cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
-  meeting(k, scene, deco);
+  const holo = meeting(k, scene, deco);
   gameRoom(k, scene, deco);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 1 + (deco.seed % 2));
   res.start();
 
-  const ticks = [...sh.ticks, partner.tick, ...res.ticks];
+  const ticks = [...sh.ticks, partner.tick, ...res.ticks, holo.tick];
   const update = (st) => {
     const w = st.worktrees.find((x) => x.slug === slug);
     if (!w) return;
@@ -541,6 +675,10 @@ export async function lab(slug, n, ui) {
       ...(w.pr.review_app ? [{ text: '↗ review app', color: '#9fc3ff' }] : []),
     ] : [st.pr_error ? 'PRs unavailable' : 'no pull request for this branch'], w.pr ? `#${w.pr.number} · ${w.pr.state.toLowerCase()}` : 'Pull request');
     const up = w.services.filter((s) => svcState(s.state) === 'running').length;
+    holo.set(w.services.map((svc) => ({
+      label: svc.service, color: colorOf(svcState(svc.state)),
+      tip: `${svc.service}: ${svcState(svc.state)}`, act: () => ui.service(slug, svc.service),
+    })), slug, [`stack ${w.stack} · ${up}/${w.services.length} running`, w.pr ? `PR #${w.pr.number} · ${w.pr.checks || 'no checks'}` : 'no PR', w.agent ? `agent ${w.agent.state}` : 'no agent']);
     big.screen.update([
       { text: `stack ${w.stack} · ${up}/${w.services.length} services running`, color: css(colorOf(w.stack)) },
       w.pr ? `PR #${w.pr.number} · checks ${w.pr.checks || 'none'} · review ${(w.pr.review || 'none').replace('_', ' ')}` : 'no pull request',
@@ -770,13 +908,13 @@ export async function lobby(prefix, ui) {
   const which = deco.pet;
   cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
-  meeting(k, scene, deco);
+  const holo = meeting(k, scene, deco);
   gameRoom(k, scene, deco);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 2);
   res.start();
 
-  const ticks = [...sh.ticks, ...res.ticks, workTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
+  const ticks = [...sh.ticks, ...res.ticks, holo.tick, workTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
   let beaconKey = '';
   const update = (st) => {
     const lines = st.worktrees.map((w, i) => ({
@@ -785,6 +923,9 @@ export async function lobby(prefix, ui) {
     }));
     view.update(lines.length ? lines : ['no worktrees'], `${prefix} · ${st.worktrees.length} floors`);
     const open = st.worktrees.filter((w) => w.pr);
+    holo.set(st.worktrees.map((w) => ({
+      label: w.slug, color: colorOf(w.stack), tip: `${w.slug}: ${w.stack}`, act: () => ui.toFloor(w.slug),
+    })), prefix, [`${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.stack === 'up').length} up`, `${open.length} with an open PR`, `${st.worktrees.filter((w) => w.agent).length} agents`]);
     // the beacons change with the floors and their stacks only: rebuilt
     // then, the old ones' GPU buffers freed
     const key = st.worktrees.map((w) => `${w.slug}:${w.stack}`).join(' ');

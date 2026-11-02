@@ -21,9 +21,9 @@ build them in `tools/office-kit/`.
   `Ext` (outside the windows). A node's mesh has the node's name.
 - Floors and walls are textured: `RS_Floor` (`RS_Trim_Floor.png` and its
   normal map `RS_Trim_Floor_Normal.png`, both from one height field: a 4 m
-  sheet of deck panels, 0.5 m to 2 m, each a bolted, bevelled plate holding
-  a grate, drilled holes, vent slots, ribs, raised squares, a hatch or an
-  X-braced mesh; scratches and grime; 4 m per repeat) and `RS_Wall`
+  sheet of bolted, bevelled deck panels, 1 m to 2 m: mostly plain plates
+  and quarters, one each with a grate, drilled holes, vent slots, a hatch
+  and an X brace; scratches and grime; 4 m per repeat) and `RS_Wall`
   (`RS_Trim_Wall.png`: 1 m × 0.5 m panels, a vent, a hatch, grime streaks,
   2 m per repeat); the export projects their UVs along each face's main
   axis in the piece's own coordinates, so pieces on

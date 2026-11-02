@@ -241,14 +241,13 @@ def smooth_noise(rng, n, size):
     return rows[:, i0] * (1 - fx) + rows[:, i1] * fx
 
 
-# Floor plates: a 4 m sheet of sci-fi deck panels (grates, perforated plates,
-# vent slots, ribs, X-braced mesh, hatches, bolted quarters) drawn as a height
-# field; draw_floor colours it, draw_floor_normal makes its normal map.
-FLOOR_PANELS = [  # (x0, y0, x1, y1) in 0.5 m cells of the 4 m sheet, the kind
-    (0, 0, 2, 4, 'grate'), (2, 0, 6, 2, 'squares'), (6, 0, 8, 4, 'hatch'),
-    (2, 2, 4, 4, 'perf'), (4, 2, 6, 4, 'quarters'),
-    (0, 4, 4, 6, 'slots'), (4, 4, 6, 8, 'xbrace'), (6, 4, 8, 6, 'ribs'),
-    (0, 6, 2, 8, 'quarters'), (2, 6, 4, 8, 'hatch'), (6, 6, 8, 8, 'perf'),
+# Floor plates: a 4 m sheet of sci-fi deck panels, mostly plain and bolted
+# quarters, with a grate, drilled holes, vent slots, a hatch and an X brace,
+# drawn as a height field; draw_floor colours it, draw_floor_normal makes its normal map.
+FLOOR_PANELS = [  # (x0, y0, x1, y1) in 0.5 m cells of the 4 m sheet, the kind; mostly plain plates
+    (0, 0, 4, 4, 'quarters'), (4, 0, 8, 2, 'plain'), (4, 2, 6, 4, 'grate'), (6, 2, 8, 4, 'hatch'),
+    (0, 4, 2, 8, 'plain'), (2, 4, 6, 6, 'slots'), (6, 4, 8, 8, 'quarters'),
+    (2, 6, 4, 8, 'perf'), (4, 6, 6, 8, 'xbrace'),
 ]
 _floor = {}
 
@@ -282,39 +281,29 @@ def floor_fields(size):
         di = inset(Xi, Yi, wi, hi, 16)
         inner = di > 0
         if kind == 'grate':  # square holes between bars
-            s = 30
-            hole = inner & ((Xi % s) > 7) & ((Yi % s) > 7)
+            s = 56
+            hole = inner & ((Xi % s) > 12) & ((Yi % s) > 12)
             h_[inner] = .5
             h_[hole] = .08
             s_[hole] = .25
         elif kind == 'perf':  # a frame with drilled holes
             h_[inner] = np.minimum(h_[inner], .48)
-            s = 26
+            s = 48
             r2 = ((Xi % s) - s / 2) ** 2 + ((Yi % s) - s / 2) ** 2
-            hole = (di > 6) & (r2 < 36)
+            hole = (di > 10) & (r2 < 110)
             h_[hole] = .12
             s_[hole] = .3
         elif kind == 'slots':  # rows of rounded vent slots
             h_[inner] = .5
-            sh, sw = 40, 150
-            ly, lx = Yi % sh, Xi % (sw + 24)
-            cx = np.clip(lx, 12, sw - 12)
-            slot = (di > 4) & ((lx - cx) ** 2 + (ly - sh / 2) ** 2 < 100) & (lx < sw)
+            sh = 72
+            sw = (wi + 40) / max(1, round((wi + 40) / 300)) - 40  # whole slots across
+            ly, lx = Yi % sh, Xi % (sw + 40)
+            cx = np.clip(lx, 18, sw - 18)
+            slot = (di > 8) & ((lx - cx) ** 2 + (ly - sh / 2) ** 2 < 260) & (lx < sw)
             h_[slot] = .1
             s_[slot] = .3
-        elif kind == 'ribs':  # raised ribs across the panel
-            t = np.abs(((Yi % 22) / 22) - .5) * 2
-            h_[inner] = (.44 + .14 * np.clip((1 - t) * 2 - .4, 0, 1))[inner]
-        elif kind == 'squares':  # a grid of raised chamfered squares
-            h_[inner] = .42
-            sy = (hi + 18) / 2
-            sx = (wi + 18) / round((wi + 18) / sy)
-            qy, qx = Yi % sy, Xi % sx
-            q = inset(qx, qy, sx - 18, sy - 18, 14)
-            sq = inner & (q > 0)
-            h_[sq] = .42 + np.clip(q[sq] / 5, 0, 1) * .16
-            sm = inner & (q > 22) & (q < 26)
-            h_[sm] -= .06  # an inset line in each square
+        elif kind == 'plain':  # a plate with one inset line
+            h_[inner & (di < 4)] -= .08
         elif kind == 'quarters':  # four plates and a cross seam
             gx, gy = np.abs(X - w / 2), np.abs(Y - h / 2)
             seam = (np.minimum(gx, gy) < 4) & (d > 12)
@@ -332,11 +321,9 @@ def floor_fields(size):
             s_[hole] = .55
             lines = inner & (np.abs(Yi - hi * .62) < 3)
             h_[lines] -= .1
-        elif kind == 'xbrace':  # mesh under an X brace with a hub
-            fine = inner & ((Xi % 12) > 3) & ((Yi % 12) > 3)
-            h_[inner] = .4
-            h_[fine] = .18
-            s_[fine] = .4
+        elif kind == 'xbrace':  # an X brace and hub over a recessed plate
+            h_[inner] = .36  # a recessed plate under the brace
+            s_[inner] = .7
             u, v = Xi / wi, Yi / hi
             bar = inner & ((np.abs(u - v) * min(wi, hi) < 12) | (np.abs(u + v - 1) * min(wi, hi) < 12) |
                            (np.minimum(di, 99) < 10))
@@ -357,7 +344,7 @@ def floor_fields(size):
     # wear: scuffs lighten, grime darkens the low parts
     grime = .78 + .35 * smooth_noise(rng, 8, size) * (.7 + .3 * smooth_noise(rng, 48, size))
     S *= grime * (.55 + .45 * np.clip(H / .55, 0, 1))
-    for _ in range(160):
+    for _ in range(70):
         x0, y0 = rng.integers(0, size), rng.integers(0, size)
         ang, L = rng.random() * np.pi, rng.integers(20, 160)
         t = np.arange(L)

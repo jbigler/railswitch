@@ -580,6 +580,11 @@ entrypoint, which must `exec` the agent last. Such an agent needs an
 `entrypoint` or `[unit] exec`: the image's own `ENTRYPOINT` isn't run in a
 session.
 
+The session has no tmux prefix key: every key reaches the agent except
+`Ctrl-\`, which detaches the terminal (`railswitch agent` returns to the
+shell, the agent keeps running; `railswitch agent` joins it again). Closing
+the terminal leaves the same way.
+
 An agent's `[config] paths` (D135) are the files and directories of its
 home, relative to it, that make up its configuration: `railswitch agent
 default promote` copies them (directories and regular files only, no

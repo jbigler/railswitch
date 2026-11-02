@@ -621,7 +621,7 @@ func cmdInit(ctx context.Context, e *env, args []string) int {
 }
 
 // unsetNames are a workspace's declared secrets podman doesn't hold, sorted;
-// blocking are those up refuses (lifecycle.UpNeeds), not an on-demand
+// blocking are those up refuses (lifecycle.UpNeeds), not an
 // agent's.
 type unsetNames struct{ unset, blocking []string }
 

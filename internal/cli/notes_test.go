@@ -2,9 +2,11 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -127,5 +129,33 @@ func TestNotesSymlink(t *testing.T) {
 	}
 	if fi, err := os.Lstat(filepath.Join(dir, "evil.md")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
 		t.Errorf("symlink gone: %v", err)
+	}
+}
+
+// Saves at once from the same version: one wins, the others are told the
+// note changed (the hash check and the write hold one lock).
+func TestNotesRace(t *testing.T) {
+	ws, _ := notesWS(t)
+	const n = 8
+	codes := make(chan int, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			code, _, _ := runStdin(t, fakeHost(), fmt.Sprintf("v%d\n", i), "-C", ws, "notes", "write", "r.md", "--if-hash", "")
+			codes <- code
+		}()
+	}
+	wg.Wait()
+	close(codes)
+	won := 0
+	for c := range codes {
+		if c == 0 {
+			won++
+		}
+	}
+	if won != 1 {
+		t.Errorf("%d of %d saves from one version won; want 1", won, n)
 	}
 }

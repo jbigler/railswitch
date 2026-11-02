@@ -23,17 +23,21 @@ import (
 
 // CheckSecrets refuses to start worktree slug while a secret one of its
 // services receives has no podman secret (D33). Every missing one is named.
-// An on-demand agent's secrets are checked when it runs (L.Agent), not here:
-// up starts no on-demand service.
+// An agent's secrets are checked when it starts (L.Agent, and upAgent,
+// which skips the default agent without them), not here: a worktree
+// starts without its agent's token.
 func CheckSecrets(ctx context.Context, p podman.Podman, m *render.Model, slug string) error {
-	return checkSecrets(ctx, p, m, slug, func(s *render.Service) bool { return !s.OnDemand }, nil)
+	return checkSecrets(ctx, p, m, slug, upChecks, nil)
 }
+
+// upChecks reports whether up refuses to start without service s's secrets.
+func upChecks(s *render.Service) bool { return !s.OnDemand && s.Role != render.RoleAgent }
 
 // UpNeeds reports whether up refuses to start while secret name is unset:
 // a service up starts receives it (CheckSecrets).
 func UpNeeds(m *render.Model, name string) bool {
 	return slices.ContainsFunc(m.Services, func(s render.Service) bool {
-		return !s.OnDemand && slices.Contains(m.Inputs.Project.Secrets[name].Services, s.ID)
+		return upChecks(&s) && slices.Contains(m.Inputs.Project.Secrets[name].Services, s.ID)
 	})
 }
 

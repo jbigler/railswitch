@@ -104,6 +104,10 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 	if *issue < 0 || (*issue > 0) == (len(pos) == 1) || len(pos) > 1 || (*agent && *issue == 0) {
 		return e.usageErr("%s", wtUsage)
 	}
+	m, err := e.manager(ctx)
+	if err != nil {
+		return e.fail(err)
+	}
 	var prompt string
 	if *issue > 0 {
 		w, err := workspace.Load(ctx, e.dir, "")
@@ -122,17 +126,29 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 		pos = []string{prs.IssueBranch(*issue, title)}
 		prompt = fmt.Sprintf("Work on GitHub issue #%d: %s\nRead it first, with its comments: gh issue view %d --comments. Then plan the change, implement it on this branch and test it.", *issue, title, *issue)
 	}
-	m, err := e.manager(ctx)
-	if err != nil {
-		return e.fail(err)
+	var slug string // the worktree: an issue's existing one, or the new one
+	if *issue > 0 {
+		have, branch, err := m.IssueBranch(ctx, *issue)
+		if err != nil {
+			return e.fail(err)
+		}
+		if branch != "" {
+			pos[0] = branch // its branch, named from the title it had then
+		}
+		if slug = have; slug != "" {
+			fmt.Fprintf(e.stdout, "issue #%d has worktree %s already (branch %s)\n", *issue, slug, safefile.Printable(branch))
+		}
 	}
-	w, err := m.Add(ctx, pos[0], *name)
-	if err != nil {
-		return e.fail(err)
+	if slug == "" {
+		w, err := m.Add(ctx, pos[0], *name)
+		if err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "added worktree %s (ID %d, branch %s) at %s\n", w.Slug, w.ID, w.Branch, w.Dir)
+		slug = w.Slug
 	}
-	fmt.Fprintf(e.stdout, "added worktree %s (ID %d, branch %s) at %s\n", w.Slug, w.ID, w.Branch, w.Dir)
 	if *agent {
-		e.slug = w.Slug
+		e.slug = slug
 		l, slug, code := e.lifecycle(ctx, "agent")
 		if code != 0 {
 			return code
@@ -146,7 +162,7 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 	if !*up {
 		return 0
 	}
-	e.slug = w.Slug // up in the new worktree, wherever -C points
+	e.slug = slug // up in the new worktree, wherever -C points
 	l, slug, code := e.lifecycle(ctx, "up")
 	if code != 0 {
 		return code

@@ -112,10 +112,10 @@ func (l *L) agent(ctx context.Context, slug, name string, argv []string, noToken
 		}
 		without = tokenSecrets(m, name)
 	}
+	if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }, without); err != nil {
+		return err
+	}
 	if s.OnDemand {
-		if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == id }, without); err != nil {
-			return err
-		}
 		if err := l.stopIdleAgents(ctx, m, slug, idle); err != nil {
 			return err
 		}
@@ -275,13 +275,17 @@ func (l *L) waitAgentServer(ctx context.Context, ctr string) error {
 	return fmt.Errorf("%s: its session server does not answer (an agent base image from before D142? railswitch containerfile show agent-base): %w", ctr, err)
 }
 
+// errNoServer is agentSession's error for a session server that does not
+// answer (still starting, or an old image).
+var errNoServer = errors.New("its session server does not answer")
+
 // agentSession reports whether service agent container ctr has its
 // agent's session. Only the server's own answer (exit 1) means none: a failed exec
 // or a server that doesn't answer must never make a live agent look idle.
 func (l *L) agentSession(ctx context.Context, ctr string) (bool, error) {
 	// has-session exits 1 for "no server" too: the server must answer first.
 	if _, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "list-sessions")}); err != nil {
-		return false, fmt.Errorf("%s: can't tell whether its agent has a session: its session server does not answer: %w", ctr, err)
+		return false, fmt.Errorf("%s: can't tell whether its agent has a session: %w: %w", ctr, errNoServer, err)
 	}
 	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: append(append([]string{"exec", ctr}, render.AgentTmux...), "has-session", "-t", "="+render.AgentSession)})
 	switch {

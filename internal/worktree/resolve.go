@@ -243,3 +243,37 @@ func (m *Manager) List(ctx context.Context) ([]Row, error) {
 	}
 	return rows, nil
 }
+
+// IssueBranch finds issue n's branch (issue-<n>, or issue-<n>-<words>, as
+// prs.IssueBranch names it from a title that may have changed since):
+// slug is the registered worktree on it, if any. Both are "" when there is
+// none; a branch only on the remote is not looked for.
+func (m *Manager) IssueBranch(ctx context.Context, n int) (slug, branch string, err error) {
+	is := func(b string) bool {
+		rest, ok := strings.CutPrefix(b, fmt.Sprintf("issue-%d", n))
+		return ok && (rest == "" || rest[0] == '-')
+	}
+	rows, err := m.List(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	for _, r := range rows {
+		if is(r.Branch) {
+			return r.Slug, r.Branch, nil
+		}
+	}
+	base, err := m.baseDir()
+	if err != nil {
+		return "", "", err
+	}
+	out, err := m.git(ctx, base, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	if err != nil {
+		return "", "", err
+	}
+	for b := range strings.FieldsSeq(out) {
+		if is(b) {
+			return "", b, nil
+		}
+	}
+	return "", "", nil
+}

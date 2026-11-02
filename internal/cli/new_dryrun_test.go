@@ -192,8 +192,8 @@ func TestNewDryRunSummary(t *testing.T) {
 	}
 
 	up := dryRun(t, gitHost(), ws, "--repo", gh, "--prefix", "shop", "--branch", "main", "--up")
-	// The default agent runs as a service (D142): up needs its token.
-	if len(up.Steps) != 5 || up.Steps[4] != "Start main (up), unless a secret is unset: then leave it stopped until it is set (claude_token, github_token)" {
+	// The default agent's token doesn't stop up: up starts without the agent.
+	if len(up.Steps) != 5 || up.Steps[4] != "Start main (up)" {
 		t.Errorf("--up steps = %q", up.Steps)
 	}
 	nvim := dryRun(t, gitHost(), ws, "--repo", gh, "--prefix", "shop", "--branch", "main", "--tool", "nvim", "--agent", "none", "--up")
@@ -255,15 +255,17 @@ func TestNewUp(t *testing.T) {
 		t.Errorf("new --up with a secret up needs: exit %d\n%s%s", code, out, errs)
 	}
 
-	// The default agent runs as a service (D142), so its unset token stops
-	// up as any service's secret does (an on-demand agent's doesn't:
-	// lifecycle's TestUpIgnoresOnDemandSecret).
+	// The default agent runs as a service (D142), but its unset token
+	// doesn't stop up: the worktree starts, the agent stays stopped.
 	f = gitHost()
 	f.On([]string{"podman", "image", "inspect", "--format", "{{.Digest}}"}, sys.Result{Stdout: []byte("sha256:aa\n")}, nil)
 	ws = filepath.Join(t.TempDir(), "agent")
 	code, out, errs = runWith(t, f, "project", "new", "--no-detect", ws, "--repo", bareRepo(t, "main"), "--prefix", "agent", "--up")
-	if code != 0 || slices.ContainsFunc(f.Calls, func(c []string) bool { return c[0] == "systemctl" && slices.Contains(c, "start") }) ||
-		!strings.Contains(out, "not started: main needs its secrets first (claude_token)") || !strings.Contains(out, "next: railswitch secret set claude_token") {
+	if code != 0 || !slices.ContainsFunc(f.Calls, func(c []string) bool { return c[0] == "systemctl" && slices.Contains(c, "start") }) ||
+		slices.ContainsFunc(f.Calls, func(c []string) bool {
+			return c[0] == "systemctl" && slices.Contains(c, "start") && slices.Contains(c, "agent-main-agent-claude.service")
+		}) ||
+		!strings.Contains(errs, "warning: agent claude not started: secret claude_token is not set") || !strings.Contains(out, "next: railswitch secret set claude_token") {
 		t.Errorf("new --up with only the agent's token unset: exit %d\n%s%s", code, out, errs)
 	}
 

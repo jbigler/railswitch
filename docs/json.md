@@ -244,7 +244,7 @@ does not read a secret's value back from podman.
 | `created` | string or `null` | When the podman secret was created (RFC 3339); `null` when not set. |
 | `services` | array of strings | The service ids that receive it. |
 | `driver_differs` | boolean | The value is stored with another driver than `config.toml` configures; `railswitch secret set <name>` re-creates it under the configured one. |
-| `up` | boolean | `up` refuses to start while it is unset: a service `up` starts receives it. `false` for a secret only on-demand services (agents) receive, which is checked when they run; `true` for every secret when the services can't be told. |
+| `up` | boolean | `up` refuses to start while it is unset: a service `up` starts receives it. `false` for a secret only agents receive, which is checked when they start (`up` then starts the worktree without its default agent, with a warning); `true` for every secret when the services can't be told. |
 | `git_signing` | boolean | The value is an SSH commit signing key (`git_signing = true`, D61): its services sign commits and tags with it. |
 
 ## `signer ls`

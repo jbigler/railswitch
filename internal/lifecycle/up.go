@@ -427,8 +427,8 @@ func (l *L) up(ctx context.Context, slug string, route, agent bool) error {
 }
 
 // upAgent is the service ID of the agent up starts (D142): the default
-// agent's, when it runs as a service and no agent runs in worktree slug;
-// else "".
+// agent's, when it runs as a service, no agent runs in worktree slug and
+// its secrets are set; else "".
 func (l *L) upAgent(ctx context.Context, m *render.Model, slug string) (string, error) {
 	name, ok := defaultAgent(m)
 	if !ok {
@@ -441,6 +441,11 @@ func (l *L) upAgent(ctx context.Context, m *render.Model, slug string) (string, 
 	running, err := l.RunningAgents(ctx, m, slug)
 	if err != nil || len(running) > 0 {
 		return "", err
+	}
+	// Without its token the worktree still starts, only not its agent.
+	if err := checkSecrets(ctx, l.podman(), m, slug, func(x *render.Service) bool { return x.ID == s.ID }, nil); err != nil {
+		fmt.Fprintf(l.Err, "warning: agent %s not started: %v\n", name, err)
+		return "", nil
 	}
 	return s.ID, nil
 }

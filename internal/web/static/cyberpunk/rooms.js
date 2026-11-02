@@ -12,7 +12,7 @@
 //          the lounge
 //   front: work (the lobby's reception) · the meeting room · the game room
 // The pet lives by the café; androids wander the corridor and the nook.
-import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer, textCanvas } from './world.js';
+import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer, textCanvas, free } from './world.js';
 import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
 import { city } from './city.js';
@@ -197,7 +197,8 @@ function shell(k, scene, deco, ui) {
   // of them opens the floor list.
   const doorCols = [];
   for (const o of [lift, cab, ...glassDoors]) o.traverse((c) => { if (/(Door_[LR]|GlassDoor)_COL\d*$/.test(c.name)) doorCols.push(c); });
-  scene.userData.movingBoxes = () => doorCols.map((c) => new THREE.Box3().setFromObject(c, true));
+  const doorBoxes = doorCols.map(() => new THREE.Box3()); // refilled each step, not made anew
+  scene.userData.movingBoxes = () => { doorCols.forEach((c, i) => doorBoxes[i].setFromObject(c, true)); return doorBoxes; };
   scene.updateMatrixWorld(true);
   const slides = glassDoors.map((d) => {
     const leaf = d.getObjectByName('GlassDoor');
@@ -788,6 +789,7 @@ export async function lab(slug, n, ui) {
     for (const [name, rk] of racks) {
       if (!w.services.some((s) => s.service === name)) {
         scene.remove(rk);
+        free(rk);
         racks.delete(name);
         ticks.splice(ticks.indexOf(rk.tick), 1);
       }
@@ -894,6 +896,7 @@ function rack(k, svc, i, secondary) {
   };
   const base = new THREE.Color();
   g.set = (s) => {
+    if (svcState(s.state) === state) return; // unchanged: keep the drawn face
     state = svcState(s.state);
     base.setHex(colorOf(state)).multiplyScalar(1.6);
     lights.color.copy(base);
@@ -924,7 +927,7 @@ function wrap(text, n, max) {
   const out = [];
   let line = '';
   for (const w of String(text).split(/\s+/)) {
-    if ((line + ' ' + w).trim().length > n) {
+    if (line && (line + ' ' + w).length > n) {
       out.push(line);
       line = w;
     } else line = (line + ' ' + w).trim();

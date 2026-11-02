@@ -218,8 +218,11 @@ func TestAgentScreenSendCLI(t *testing.T) {
 	if code, _, errs := runStdin(t, f, "one\r\ntwo\r\n", "-C", ws, "-w", "feat", "agent", "send", "probe"); code != 0 {
 		t.Fatalf("agent send: exit %d: %s", code, errs)
 	}
-	want := "podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send -- one\ntwo"
-	if !slices.ContainsFunc(f.Calls, func(c []string) bool { return strings.Join(c, " ") == want }) {
+	want := "podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send-"
+	if !slices.ContainsFunc(f.Calls, func(c []string) bool {
+		j := strings.Join(c, " ")
+		return strings.HasPrefix(j, want) && strings.HasSuffix(j, " -- one\ntwo")
+	}) {
 		t.Errorf("no %q in %q", want, f.Calls)
 	}
 	if code, _, _ := runStdin(t, f, "x\x1b", "-C", ws, "-w", "feat", "agent", "send", "probe"); code != 1 {

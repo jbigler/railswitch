@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 	"time"
 	"unicode"
@@ -217,6 +218,27 @@ func notesRm(e *env, args []string) int {
 	return notesChange(e, a[0], *hash, nil)
 }
 
+// lockFile takes an exclusive flock on path, creating it.
+func lockFile(path string) (unlock func(), err error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		if err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != syscall.EINTR {
+			break
+		}
+	}
+	if err != nil {
+		f.Close()
+		return nil, fmt.Errorf("lock %s: %w", path, err)
+	}
+	return func() { f.Close() }, nil
+}
+
 // notesChange sets note name to data (nil: removes it) when it still holds
 // what the caller read (hash; "": it must not exist). A symlink or other
 // non-regular file in its place is refused. A write goes to a temp file
@@ -230,6 +252,14 @@ func notesChange(e *env, name, hash string, data []byte) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	// Two saves at once (two dashboard tabs) must not both pass the hash
+	// check: the check and the write hold one lock, outside the folder
+	// agents write.
+	unlock, err := lockFile(filepath.Join(filepath.Dir(dir), ".railswitch", "notes.lock"))
+	if err != nil {
+		return e.fail(err)
+	}
+	defer unlock()
 	cur, exists, err := readNote(dir, name)
 	switch {
 	case err != nil:

@@ -65,6 +65,7 @@ async function go(to) {
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
     service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
+  if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;
   try {
     r = to.kind === 'floor' ? await lab(to.slug, n, ui) : await lobby(prefix, ui);

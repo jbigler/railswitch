@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"strings"
@@ -32,8 +33,8 @@ const sessionTarget = "=" + render.AgentSession + ":"
 
 // AgentScreen captures service agent name's screen in worktree slug: the
 // visible pane, wrapped lines joined, trailing spaces and trailing blank
-// lines cut. A stopped container or a server without a session is no
-// error: Running or Session is false and Lines empty.
+// lines cut. A stopped container, a session server not answering yet,
+// or one without a session is no error: Running or Session is false and Lines empty.
 func (l *L) AgentScreen(ctx context.Context, slug, name string) (*AgentScreen, error) {
 	name, ctr, err := l.serviceAgent(ctx, slug, name, "agent screen")
 	if err != nil {
@@ -43,7 +44,9 @@ func (l *L) AgentScreen(ctx context.Context, slug, name string) (*AgentScreen, e
 	if sc.Running, err = l.podman().Running(ctx, ctr); err != nil || !sc.Running {
 		return sc, err
 	}
-	if sc.Session, err = l.agentSession(ctx, ctr); err != nil || !sc.Session {
+	if sc.Session, err = l.agentSession(ctx, ctr); errors.Is(err, errNoServer) {
+		return sc, nil // a container that has just started: no session yet
+	} else if err != nil || !sc.Session {
 		return sc, err
 	}
 	res, err := l.R.Run(ctx, sys.Cmd{Name: "podman", Args: sessionCmd(ctr, "capture-pane", "-p", "-J", "-t", sessionTarget)})
@@ -82,7 +85,8 @@ func (l *L) AgentSend(ctx context.Context, slug, name, text string) error {
 	} else if !live {
 		return fmt.Errorf("agent %s has no session in %s to type into: railswitch agent %s starts one", name, slug, name)
 	}
-	const buf = "railswitch-send"
+	// a buffer of its own, so two sends at once never paste each other's text
+	buf := "railswitch-send-" + rand.Text()
 	var steps [][]string
 	if text != "" {
 		steps = append(steps,

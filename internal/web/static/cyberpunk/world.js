@@ -52,9 +52,11 @@ export function kit(names) {
   return kitP;
 }
 
+const FWD = new THREE.Vector3(), TO = new THREE.Vector3(); // per-frame scratch
+
 // free disposes what a room made for itself: geometries, materials (the
 // hover's copies too) and their textures, never the kit's shared ones.
-function free(scene) {
+export function free(scene) {
   scene.traverse((o) => {
     if (o.geometry && !o.isSprite && !shared.has(o.geometry)) o.geometry.dispose(); // sprites share three.js's own quad
     for (const m of [o.material].flat().filter(Boolean)) {
@@ -122,7 +124,11 @@ export function screen(width, height, opts = {}) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  let last;
   mesh.update = (lines, title) => {
+    const key = JSON.stringify([lines, title]);
+    if (key === last) return; // the poll gave the same: no redraw, no upload
+    last = key;
     const c = textCanvas(lines, { w: canvas.width, h: canvas.height, title, ...opts, size: (opts.size || 28) * px / 256 });
     canvas.getContext('2d').drawImage(c, 0, 0);
     tex.needsUpdate = true;
@@ -408,14 +414,20 @@ export class World {
         if (b.max.y >= 0.25 && b.min.y <= 1.8) w.boxes.push(b);
       });
     }
-    return [...w.boxes, ...(this.scene.userData.movingBoxes?.() ?? [])];
+    return w.boxes;
   }
 
   move(dx, dz) {
     const w = this.walk;
-    const boxes = this.blockers();
-    const outside = (x, z) => Math.min(...w.areas.map(([x0, x1, z0, z1]) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1))));
-    const hit = (x, z) => boxes.some((b) => Math.hypot(x - Math.min(Math.max(x, b.min.x), b.max.x), z - Math.min(Math.max(z, b.min.z), b.max.z)) < 0.3);
+    const fixed = this.blockers();
+    const moving = this.scene.userData.movingBoxes?.() ?? [];
+    const outside = (x, z) => {
+      let d = Infinity;
+      for (const [x0, x1, z0, z1] of w.areas) d = Math.min(d, Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)));
+      return d;
+    };
+    const near = (x, z) => (b) => Math.hypot(x - Math.min(Math.max(x, b.min.x), b.max.x), z - Math.min(Math.max(z, b.min.z), b.max.z)) < 0.3;
+    const hit = (x, z) => fixed.some(near(x, z)) || moving.some(near(x, z));
     const ok = (x, z) => outside(x, z) === 0 && !hit(x, z);
     const { x, z } = w.pos;
     if (outside(x, z) > 0 || hit(x, z)) {
@@ -477,10 +489,9 @@ export class World {
         o.target.z + o.dist * Math.cos(o.pitch) * Math.cos(o.yaw),
       );
       this.camera.lookAt(o.target);
-      const fwd = new THREE.Vector3();
       for (const wall of this.scene.userData.walls ?? []) { // dollhouse: hide the walls facing the camera
-        wall.getWorldDirection(fwd);
-        wall.visible = fwd.dot(this.camera.position.clone().sub(wall.position)) > 0;
+        wall.getWorldDirection(FWD);
+        wall.visible = FWD.dot(TO.subVectors(this.camera.position, wall.position)) > 0;
       }
     }
     animate(this.scene, t);

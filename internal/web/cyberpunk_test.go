@@ -55,13 +55,6 @@ func TestCyberpunkReads(t *testing.T) {
 		{"note create", "POST", "/p/ftest/virtual-office/notes/a.md?if-hash=", "hi", 200, "--json -C /ws/ftest notes write a.md --if-hash "},
 		{"note rm", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1&if-hash=abc", "", 200, "-C /ws/ftest notes rm a.md --if-hash abc"},
 		{"note rm no hash", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1", "", 400, ""},
-		{"screen", "GET", "/p/ftest/virtual-office/agent/b/screen", "", 200, "--json -C /ws/ftest -w b agent screen"},
-		{"screen named", "GET", "/p/ftest/virtual-office/agent/b/screen?agent=claude", "", 200, "--json -C /ws/ftest -w b agent screen claude"},
-		{"screen flag name", "GET", "/p/ftest/virtual-office/agent/b/screen?agent=--all", "", 400, ""},
-		{"screen unknown worktree", "GET", "/p/ftest/virtual-office/agent/nope/screen", "", 404, ""},
-		{"send", "POST", "/p/ftest/virtual-office/agent/b/send?agent=claude", "run the tests", 200, "-C /ws/ftest -w b agent send claude"},
-		{"send Enter", "POST", "/p/ftest/virtual-office/agent/b/send", "", 200, "-C /ws/ftest -w b agent send"},
-		{"send too long", "POST", "/p/ftest/virtual-office/agent/b/send", strings.Repeat("x", sendMax+1), 400, ""},
 	} {
 		f := newFixture(t)
 		if c.key != "" {

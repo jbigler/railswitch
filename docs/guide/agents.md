@@ -56,8 +56,10 @@ unhealthy, never holds up the agent. (It does wait while the worktree's
 An agent runs **on demand** (a container for as long as you use it, in
 one terminal) or as a **service** (below), as its package says unless
 `[agents.<name>] run` says otherwise. The built-in `claude@1` runs as a
-service, so the dashboard can show its screen and type to it, and `up`
-needs its token (`railswitch secret set claude_token`); for on demand: One agent runs at a time per
+service, so the dashboard can show its screen and type to it; `up` starts
+it once its token is set (`railswitch secret set claude_token`), and
+starts the rest of the worktree without it until then. For on demand, set
+`[agents.claude] run = "on-demand"`. One agent runs at a time per
 worktree. Agents start from the terminal; the dashboard shows when one is
 waiting on you: a permission prompt, a question, a finished reply (`◆ N
 need input`).

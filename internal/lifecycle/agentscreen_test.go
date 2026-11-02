@@ -31,6 +31,14 @@ func TestAgentScreen(t *testing.T) {
 		t.Fatalf("no session: %+v, %v", sc, err)
 	}
 
+	// a container just started: its session server not answering yet
+	e = setup(t)
+	e.agentRunning(probeCtr)
+	e.f.On([]string{"podman", "exec", probeCtr, "tmux", "-L", "agent", "list-sessions"}, sys.Result{ExitCode: 1}, fmt.Errorf("podman: %w (exit 1)", sys.ErrExit))
+	if sc, err = e.l.AgentScreen(ctx, "feat", "probe"); err != nil || !sc.Running || sc.Session {
+		t.Fatalf("no server: %+v, %v", sc, err)
+	}
+
 	e = setup(t)
 	e.agentRunning(probeCtr)
 	e.f.On([]string{"podman", "exec", probeCtr, "tmux", "-L", "agent", "capture-pane", "-p", "-J", "-t", "=agent:"},
@@ -69,10 +77,26 @@ func TestAgentSend(t *testing.T) {
 		t.Fatal(err)
 	}
 	pre := "podman exec " + probeCtr + " tmux -L agent "
+	var buf string
+	for _, c := range e.calls() {
+		if j := joined(c); strings.HasPrefix(j, pre+"set-buffer -b railswitch-send-") {
+			buf = c[len(c)-3]
+		}
+	}
+	if buf == "" {
+		t.Fatalf("no set-buffer; calls:\n%s", dump(e.calls()))
+	}
 	wantInOrder(t, e.calls(),
-		pre+"set-buffer -b railswitch-send -- -a\nb",
-		pre+"paste-buffer -p -d -b railswitch-send -t =agent:",
+		pre+"set-buffer -b "+buf+" -- -a\nb",
+		pre+"paste-buffer -p -d -b "+buf+" -t =agent:",
 		pre+"send-keys -t =agent: Enter")
+	// each send its own buffer: two at once never paste each other's text
+	if err := e.l.AgentSend(ctx, "feat", "probe", "c"); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(e.calls(), pre+"set-buffer -b "+buf+" "); n != 1 {
+		t.Errorf("buffer %s used by %d sends", buf, n)
+	}
 
 	e = setup(t)
 	e.agentRunning(probeCtr)
@@ -122,6 +146,6 @@ func TestAgentPrompt(t *testing.T) {
 		t.Errorf("typed after %d looks at the screen; want at least %d", n, settle.Still+1)
 	}
 	wantInOrder(t, calls, "podman exec filial-feat-agent-probe tmux -L agent capture-pane",
-		"podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send -- Work on issue #7",
+		"podman exec filial-feat-agent-probe tmux -L agent set-buffer -b railswitch-send-",
 		"podman exec filial-feat-agent-probe tmux -L agent send-keys")
 }

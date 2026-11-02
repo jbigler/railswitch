@@ -180,54 +180,6 @@ func (s *Server) cyberIssueStart(w http.ResponseWriter, r *http.Request) {
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/virtual-office/cyberpunk")
 }
 
-func cyberAgentArgs(r *http.Request) ([]string, bool) {
-	n := r.URL.Query().Get("agent")
-	if n == "" {
-		return nil, true
-	}
-	return []string{n}, agentName.MatchString(n)
-}
-
-func (s *Server) cyberAgentScreen(w http.ResponseWriter, r *http.Request) {
-	p, wt, ok := s.lookup(w, r)
-	if !ok {
-		return
-	}
-	name, ok := cyberAgentArgs(r)
-	if !ok {
-		http.Error(w, "bad agent name", http.StatusBadRequest)
-		return
-	}
-	s.cyberJSON(w, r, nil, append([]string{"-C", p.Workspace, "-w", wt.Slug, "agent", "screen"}, name...)...)
-}
-
-// sendMax is the most text one agent send carries (the CLI's limit).
-const sendMax = 4096
-
-func (s *Server) cyberAgentSend(w http.ResponseWriter, r *http.Request) {
-	p, wt, ok := s.lookup(w, r)
-	if !ok {
-		return
-	}
-	name, ok := cyberAgentArgs(r)
-	if !ok {
-		http.Error(w, "bad agent name", http.StatusBadRequest)
-		return
-	}
-	text, err := io.ReadAll(io.LimitReader(r.Body, sendMax+1))
-	if err != nil || len(text) > sendMax {
-		http.Error(w, "send at most 4096 bytes (none presses Enter)", http.StatusBadRequest)
-		return
-	}
-	out, err := s.c.CLI.RunInput(r.Context(), text, append([]string{"-C", p.Workspace, "-w", wt.Slug, "agent", "send"}, name...)...)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-		return
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write(out)
-}
-
 // noteName is a shared note's file name (the CLI checks it again).
 var noteName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$`)
 

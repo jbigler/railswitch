@@ -14,7 +14,7 @@ import (
 )
 
 // The cyberpunk office (D146): an optional 3D view of a project,
-// /p/{prefix}/cyberpunk, the starship's logic (D144) on the office kit
+// /p/{prefix}/virtual-office/cyberpunk (the set in the path: D150), the starship's logic (D144) on the office kit
 // (D145). The lobby is the project (its PRs, issues and the agents' shared
 // notes), each worktree a floor of the tower (its services in the server
 // room, the user's desk, the agent's desk, one pet); the elevator goes
@@ -99,6 +99,15 @@ type cyberView struct {
 	Title, Prefix string
 }
 
+// officeDefault sends /p/{prefix}/virtual-office to the built-in set: the
+// set is the path's last part (D150), so sets can sit beside it later.
+func (s *Server) officeDefault(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.cyberProject(w, r); !ok {
+		return
+	}
+	http.Redirect(w, r, "/p/"+r.PathValue("prefix")+"/virtual-office/cyberpunk", http.StatusFound)
+}
+
 func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 	p, ok, err := s.project(r.Context(), r.PathValue("prefix"))
 	if err != nil {
@@ -109,7 +118,7 @@ func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown project", http.StatusNotFound)
 		return
 	}
-	s.html(w, http.StatusOK, "cyberpunk", cyberView{Title: p.Prefix + " · Cyberpunk office · RailSwitch", Prefix: p.Prefix})
+	s.html(w, http.StatusOK, "cyberpunk", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix})
 }
 
 // cyberJSON answers the output of a railswitch --json read as is.
@@ -168,7 +177,7 @@ func (s *Server) cyberIssueStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.start(w, r, jobs.Spec{Project: p.Prefix, Label: fmt.Sprintf("work on issue #%d", n), Dir: p.Workspace,
-		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/cyberpunk")
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/virtual-office/cyberpunk")
 }
 
 func cyberAgentArgs(r *http.Request) ([]string, bool) {

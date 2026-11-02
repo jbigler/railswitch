@@ -879,8 +879,9 @@ working blue, your turn yellow, idle and off muted.
 
 ## Cyberpunk office
 
-**cyberpunk** in the header opens `/p/<prefix>/cyberpunk`: the project as a
-cyberpunk office tower in 3D (three.js), an optional view beside the 2D
+**Virtual Office** in the header opens `/p/<prefix>/virtual-office`, which
+shows its set, `/p/<prefix>/virtual-office/cyberpunk` (D150; the set is the
+path's last part): the project as a cyberpunk office tower in 3D (three.js), an optional view beside the 2D
 pages (D146). It is the starship's logic (D144) on the office kit
 (docs/office-kit.md, D145), and costs nothing until you open it: the page
 is static files in the binary, and the server only polls the project as for

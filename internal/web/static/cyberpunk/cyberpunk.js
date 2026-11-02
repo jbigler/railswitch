@@ -62,7 +62,7 @@ async function go(to) {
   const build = ++building;
   closePanel();
   $('where').textContent = 'Elevator…';
-  const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/cyberpunk/issues`), prList: () => getJSON(`${base}/cyberpunk/prs`), notes: showNotes, config: showConfig,
+  const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
     service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   let r;
@@ -338,7 +338,7 @@ function showPRs() {
       body.append(list, btn('↻ Refresh PRs', () => job(`${base}/prs/refresh`, body)));
     };
     draw();
-    getJSON(`${base}/cyberpunk/prs`).then((d) => { doc = d; draw(); }).catch((e) => errorTo(body, e));
+    getJSON(`${base}/virtual-office/prs`).then((d) => { doc = d; draw(); }).catch((e) => errorTo(body, e));
     redraw = draw;
     return () => { redraw = null; };
   });
@@ -359,13 +359,13 @@ function showIssues() {
           el('div', { class: 'muted' }, i.labels.map((l) => el('span', { class: 'tag' }, l)), i.assignees.length ? ` → ${i.assignees.join(', ')}` : ' unassigned', i.author ? ` · by ${i.author}` : ''),
           el('div', { class: 'row' }, floor
             ? btn(`Go to its floor (${floor.slug})`, () => go({ kind: 'floor', slug: floor.slug }))
-            : btn('▶ Start working', () => job(`${base}/cyberpunk/issues/${i.number}/start`, body),
+            : btn('▶ Start working', () => job(`${base}/virtual-office/issues/${i.number}/start`, body),
               { title: 'A worktree on a branch named after the issue, its stack up, and the agent working on the issue' }))));
       }
       if (!shown.length) list.append(el('li', { class: 'muted' }, doc.issues.length ? 'Nothing open here: try Following or All.' : 'No open issues.'));
       body.append(list);
     };
-    getJSON(`${base}/cyberpunk/issues`).then((d) => { doc = d; draw(); }).catch((e) => { body.replaceChildren(); errorTo(body, e); });
+    getJSON(`${base}/virtual-office/issues`).then((d) => { doc = d; draw(); }).catch((e) => { body.replaceChildren(); errorTo(body, e); });
   });
 }
 
@@ -374,7 +374,7 @@ function showNotes() {
     const list = async () => {
       body.replaceChildren(el('p', { class: 'muted' }, "The agents' shared notes (`notes/` in the workspace). Every agent reads them; keep secrets out."));
       try {
-        const doc = await getJSON(`${base}/cyberpunk/notes`);
+        const doc = await getJSON(`${base}/virtual-office/notes`);
         const ul = el('ul', { class: 'items' });
         for (const n of doc.notes) ul.append(el('li', {}, el('button', { type: 'button', class: 'link', on: { click: () => edit(n.name) } }, n.name), ' ', el('span', { class: 'muted' }, `${n.size} B`)));
         if (!doc.notes.length) ul.append(el('li', { class: 'muted' }, 'No notes yet.'));
@@ -397,7 +397,7 @@ function showNotes() {
       let doc = { text: '', hash: '' };
       if (!fresh) {
         try {
-          doc = await getJSON(`${base}/cyberpunk/notes/${encodeURIComponent(n)}`);
+          doc = await getJSON(`${base}/virtual-office/notes/${encodeURIComponent(n)}`);
         } catch (e) {
           errorTo(body, e);
           return;
@@ -408,7 +408,7 @@ function showNotes() {
       const msg = el('p', { class: 'muted' });
       const save = async () => {
         try {
-          const out = await post(`${base}/cyberpunk/notes/${encodeURIComponent(n)}?if-hash=${encodeURIComponent(doc.hash)}`, ta.value);
+          const out = await post(`${base}/virtual-office/notes/${encodeURIComponent(n)}?if-hash=${encodeURIComponent(doc.hash)}`, ta.value);
           // the saved note's hash, from the write itself: a second read could
           // pick up another writer's change and let the next save erase it
           doc.hash = JSON.parse(out).hash;
@@ -422,7 +422,7 @@ function showNotes() {
       const rm = async () => {
         if (!doc.hash) return list();
         try {
-          await post(`${base}/cyberpunk/notes/${encodeURIComponent(n)}?rm=1&if-hash=${encodeURIComponent(doc.hash)}`, '');
+          await post(`${base}/virtual-office/notes/${encodeURIComponent(n)}?rm=1&if-hash=${encodeURIComponent(doc.hash)}`, '');
           list();
         } catch (e) {
           msg.className = 'err';

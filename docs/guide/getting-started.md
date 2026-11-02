@@ -131,6 +131,11 @@ railswitch down                       # stops it AND deletes its volumes (asks f
 railswitch wt rm feature-x            # --force: even with uncommitted changes (lost)
 ```
 
+A worktree is named after its branch (`feature/x` becomes `feature-x`).
+The dashboard's own page words (`virtual-office`, `settings`, `images`,
+`library`, `review`, `tty`) are no worktree's name: a branch called one of
+them gets a short hash added, and `--name` refuses them.
+
 `stop` keeps a worktree's data; `down` deletes its volumes, the database
 included. The dashboard does the same from each worktree's row: up, stop,
 restart, open the app and its links, and run a task (Shift+Enter runs it

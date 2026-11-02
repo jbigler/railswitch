@@ -337,6 +337,9 @@ func (p *Project) Validate() error {
 		if s, err := naming.Sanitize(slug); err != nil || s != slug {
 			v.add(path, "not a worktree slug (lowercase letters, digits and -, at most %d chars)", naming.SlugMaxLen)
 		}
+		if naming.ReservedSlug(slug) {
+			v.add(path, "a reserved worktree name: the dashboard has a page of that name")
+		}
 		v.oneLines(path+".versions", p.Worktrees[slug].Versions)
 	}
 

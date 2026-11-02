@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
@@ -12,12 +13,20 @@ import (
 // TestCyberpunkPage: the cyberpunk page loads its module, the office kit and its models.
 func TestCyberpunkPage(t *testing.T) {
 	f := newFixture(t)
-	w := f.do(req("GET", "/p/ftest/cyberpunk", nil))
+	w := f.do(req("GET", "/p/ftest/virtual-office/cyberpunk", nil))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `src="/static/cyberpunk/cyberpunk.js"`) || !strings.Contains(w.Body.String(), `data-prefix="ftest"`) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
-	if w := f.do(req("GET", "/p/nope/cyberpunk", nil)); w.Code != 404 {
+	if w := f.do(req("GET", "/p/nope/virtual-office/cyberpunk", nil)); w.Code != 404 {
 		t.Errorf("unknown project: %d", w.Code)
+	}
+	// the feature's own path, the set last (D150): the bare path goes to the
+	// built-in set, and a worktree slug can no longer be the office's word
+	if w := f.do(req("GET", "/p/ftest/virtual-office", nil)); w.Code != http.StatusFound || w.Header().Get("Location") != "/p/ftest/virtual-office/cyberpunk" {
+		t.Errorf("virtual-office: %d %q", w.Code, w.Header().Get("Location"))
+	}
+	if w := f.do(req("GET", "/p/ftest/cyberpunk", nil)); strings.Contains(w.Body.String(), `src="/static/cyberpunk/cyberpunk.js"`) {
+		t.Error("/p/ftest/cyberpunk still serves the office: a worktree named cyberpunk would be hidden")
 	}
 	for _, p := range []string{"/static/cyberpunk/three.js", "/static/office/kit.js", "/static/office/models/Furn_Workstation_Lived.gltf", "/static/office/models/Furn_Workstation_Lived.bin", "/static/office/models/RS_ScreenCode.png"} {
 		if w := f.do(req("GET", p, nil)); w.Code != 200 {
@@ -34,25 +43,25 @@ func TestCyberpunkReads(t *testing.T) {
 		code                     int
 		key                      string // the CLI call, "" for none
 	}{
-		{"issues", "GET", "/p/ftest/cyberpunk/issues", "", 200, "--json -C /ws/ftest issue ls"},
-		{"prs", "GET", "/p/ftest/cyberpunk/prs", "", 200, "--json -C /ws/ftest pr ls --all"},
-		{"issue start bad", "POST", "/p/ftest/cyberpunk/issues/-1/start", "", 400, ""},
-		{"issue start word", "POST", "/p/ftest/cyberpunk/issues/abc/start", "", 400, ""},
-		{"notes", "GET", "/p/ftest/cyberpunk/notes", "", 200, "--json -C /ws/ftest notes ls"},
-		{"note", "GET", "/p/ftest/cyberpunk/notes/setup_steps.md", "", 200, "--json -C /ws/ftest notes show setup_steps.md"},
-		{"note bad name", "GET", "/p/ftest/cyberpunk/notes/..%2Fsecret.md", "", 400, ""},
-		{"note not md", "GET", "/p/ftest/cyberpunk/notes/x.txt", "", 400, ""},
-		{"note write", "POST", "/p/ftest/cyberpunk/notes/a.md?if-hash=abc", "hello", 200, "--json -C /ws/ftest notes write a.md --if-hash abc"},
-		{"note create", "POST", "/p/ftest/cyberpunk/notes/a.md?if-hash=", "hi", 200, "--json -C /ws/ftest notes write a.md --if-hash "},
-		{"note rm", "POST", "/p/ftest/cyberpunk/notes/a.md?rm=1&if-hash=abc", "", 200, "-C /ws/ftest notes rm a.md --if-hash abc"},
-		{"note rm no hash", "POST", "/p/ftest/cyberpunk/notes/a.md?rm=1", "", 400, ""},
-		{"screen", "GET", "/p/ftest/cyberpunk/agent/b/screen", "", 200, "--json -C /ws/ftest -w b agent screen"},
-		{"screen named", "GET", "/p/ftest/cyberpunk/agent/b/screen?agent=claude", "", 200, "--json -C /ws/ftest -w b agent screen claude"},
-		{"screen flag name", "GET", "/p/ftest/cyberpunk/agent/b/screen?agent=--all", "", 400, ""},
-		{"screen unknown worktree", "GET", "/p/ftest/cyberpunk/agent/nope/screen", "", 404, ""},
-		{"send", "POST", "/p/ftest/cyberpunk/agent/b/send?agent=claude", "run the tests", 200, "-C /ws/ftest -w b agent send claude"},
-		{"send Enter", "POST", "/p/ftest/cyberpunk/agent/b/send", "", 200, "-C /ws/ftest -w b agent send"},
-		{"send too long", "POST", "/p/ftest/cyberpunk/agent/b/send", strings.Repeat("x", sendMax+1), 400, ""},
+		{"issues", "GET", "/p/ftest/virtual-office/issues", "", 200, "--json -C /ws/ftest issue ls"},
+		{"prs", "GET", "/p/ftest/virtual-office/prs", "", 200, "--json -C /ws/ftest pr ls --all"},
+		{"issue start bad", "POST", "/p/ftest/virtual-office/issues/-1/start", "", 400, ""},
+		{"issue start word", "POST", "/p/ftest/virtual-office/issues/abc/start", "", 400, ""},
+		{"notes", "GET", "/p/ftest/virtual-office/notes", "", 200, "--json -C /ws/ftest notes ls"},
+		{"note", "GET", "/p/ftest/virtual-office/notes/setup_steps.md", "", 200, "--json -C /ws/ftest notes show setup_steps.md"},
+		{"note bad name", "GET", "/p/ftest/virtual-office/notes/..%2Fsecret.md", "", 400, ""},
+		{"note not md", "GET", "/p/ftest/virtual-office/notes/x.txt", "", 400, ""},
+		{"note write", "POST", "/p/ftest/virtual-office/notes/a.md?if-hash=abc", "hello", 200, "--json -C /ws/ftest notes write a.md --if-hash abc"},
+		{"note create", "POST", "/p/ftest/virtual-office/notes/a.md?if-hash=", "hi", 200, "--json -C /ws/ftest notes write a.md --if-hash "},
+		{"note rm", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1&if-hash=abc", "", 200, "-C /ws/ftest notes rm a.md --if-hash abc"},
+		{"note rm no hash", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1", "", 400, ""},
+		{"screen", "GET", "/p/ftest/virtual-office/agent/b/screen", "", 200, "--json -C /ws/ftest -w b agent screen"},
+		{"screen named", "GET", "/p/ftest/virtual-office/agent/b/screen?agent=claude", "", 200, "--json -C /ws/ftest -w b agent screen claude"},
+		{"screen flag name", "GET", "/p/ftest/virtual-office/agent/b/screen?agent=--all", "", 400, ""},
+		{"screen unknown worktree", "GET", "/p/ftest/virtual-office/agent/nope/screen", "", 404, ""},
+		{"send", "POST", "/p/ftest/virtual-office/agent/b/send?agent=claude", "run the tests", 200, "-C /ws/ftest -w b agent send claude"},
+		{"send Enter", "POST", "/p/ftest/virtual-office/agent/b/send", "", 200, "-C /ws/ftest -w b agent send"},
+		{"send too long", "POST", "/p/ftest/virtual-office/agent/b/send", strings.Repeat("x", sendMax+1), 400, ""},
 	} {
 		f := newFixture(t)
 		if c.key != "" {
@@ -129,7 +138,7 @@ func TestCyberpunkState(t *testing.T) {
 // worktree on the issue's branch, up, the agent on it.
 func TestCyberpunkIssueStart(t *testing.T) {
 	f := newFixture(t)
-	r := httptest.NewRequest("POST", "/p/ftest/cyberpunk/issues/118/start", nil)
+	r := httptest.NewRequest("POST", "/p/ftest/virtual-office/issues/118/start", nil)
 	r.Host = testHost
 	r.AddCookie(req("GET", "/", nil).Cookies()[0])
 	r.Header.Set("Origin", "http://"+testHost)

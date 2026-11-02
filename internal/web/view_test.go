@@ -400,3 +400,37 @@ func TestRowNeedMarker(t *testing.T) {
 		t.Errorf("a working agent marked as needing input:\n%s", html)
 	}
 }
+
+// TestDetailTerminals: the Terminal row opens the agent (named when the
+// overview names one), nvim when the worktree runs it, and a shell; the
+// dock for the panels sits outside the detail, which SSE replaces.
+func TestDetailTerminals(t *testing.T) {
+	r := fixtureRow("up", false, nil)
+	html, err := render("detail", newDetail("ftest", r, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`data-term="/p/ftest/tty/feat-login/agent?agent=bot"`, `data-term="/p/ftest/tty/feat-login/shell"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("detail lacks %s", want)
+		}
+	}
+	if strings.Contains(html, "/tty/feat-login/nvim") {
+		t.Error("an nvim button without an nvim service")
+	}
+	r.WT.Services = append(r.WT.Services, service{Service: "nvim", Role: "tool", State: "active/running"})
+	r.WT.Agent = nil
+	html, _ = render("detail", newDetail("ftest", r, ""))
+	for _, want := range []string{`data-term="/p/ftest/tty/feat-login/nvim"`, `data-term="/p/ftest/tty/feat-login/agent"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("detail lacks %s", want)
+		}
+	}
+	if strings.Contains(html, `id="terms"`) {
+		t.Error("the dock is inside the detail")
+	}
+	f := newFixture(t)
+	if page := f.do(req("GET", "/p/ftest/b", nil)).Body.String(); !strings.Contains(page, `<div id="terms" class="terms"></div>`) {
+		t.Error("the page has no terminal dock")
+	}
+}

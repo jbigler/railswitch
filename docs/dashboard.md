@@ -106,6 +106,10 @@ railswitch dashboard
   `Referrer-Policy: same-origin` (so a form posted without the script
   still carries the page's Origin) and `X-Content-Type-Options: nosniff`;
   pages and events are `Cache-Control: no-store`.
+- **Terminals** (`GET /p/{prefix}/tty/{slug}/{kind}`, a WebSocket, D149)
+  are a GET, which the POST rule above doesn't cover: the upgrade itself
+  refuses an `Origin` other than the request's Host (403 before anything
+  runs), so a page on `*.localhost` can't open one with your cookie.
 - No secret value ever reaches a page, an event, a job log or argv.
 - `/healthz` needs only the Host check and answers `ok <version>`; with
   `?nonce=<32 hex>` it adds the proof, `ok <version> <hmac>` (D127),
@@ -706,6 +710,37 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 | Esc | close a dialog or a message |
 | Enter | in the palette: run the highlighted task as a job |
 | Shift+Enter | in the palette: run the task the other way from "in a new terminal" |
+
+## Terminals
+
+The worktree's **Terminal** row opens a live terminal in the page (D149),
+docked under the worktree's details; several can be open at once.
+
+| Button | Runs | When the panel closes |
+|--------|------|-----------------------|
+| **agent ▣** | `railswitch agent [<name>]` (the agent the overview shows, else the default) | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
+| **nvim ▣** (when the worktree runs nvim) | `railswitch nvim` | nvim keeps running; only this UI goes |
+| **shell ▣** | a login shell in the app container (`railswitch exec`, bash when the image has it, else `sh`) | the shell ends |
+
+Each panel is a terminal like any other: keys arrive as you type (slash
+suggestions, menus, arrows, Esc), the program follows the panel's size,
+and the dashboard's colours apply. When the program exits the panel shows
+`[exited N]` and **Reopen**; if the dashboard restarts (a new railswitch
+binary), **Reconnect**: the agent and nvim pick up where they were, a shell
+starts afresh. railswitch's own refusals (another agent running, unset
+secrets) print in the panel before `[exited 1]`. In a service agent's panel `Ctrl-\` detaches,
+as in a terminal: the agent keeps running and the panel shows `[exited 0]`.
+
+The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
+while a terminal is open, leaving or closing the page asks first.
+**fullscreen** asks the browser to send those keys to the terminal
+(Chromium-based browsers; Firefox only has the question).
+
+Limits: 8 terminals open at once across the dashboard (the ninth says so);
+a peer that stops answering pings for 10 s (a dead `ssh -L` tunnel) is
+dropped and its program ended. Nothing a terminal carries is logged. The
+terminal is xterm.js drawn with WebGL (the CSP blocks its other renderer):
+a browser with WebGL turned off says so in the panel.
 
 ## Actions
 

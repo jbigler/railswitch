@@ -121,6 +121,14 @@ Its home, logins and history included, is a folder per worktree
 (`.railswitch/agent-home/<worktree>/<agent>`), kept across `down` and
 deleted by `wt rm --force`.
 
+### In the browser
+
+The dashboard's worktree page has a **Terminal** row: **agent ▣** opens
+the agent in a live terminal in the page (D149), the same session
+`railswitch agent` joins, so slash suggestions, `/plugin` and other menus
+work as in your terminal. Closing the panel leaves a service agent
+running.
+
 ## Its sandbox
 
 - **Firewall.** An agent's firewall is always enforce: it reaches only its

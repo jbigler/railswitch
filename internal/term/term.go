@@ -272,3 +272,7 @@ func quoteArgv(argv []string) string {
 func quote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
+
+// BrowserEnv is the environment of a program the dashboard runs in a
+// browser terminal (D149): xterm.js speaks xterm-256color, with true colour.
+var BrowserEnv = []string{"TERM=xterm-256color", "COLORTERM=truecolor"}

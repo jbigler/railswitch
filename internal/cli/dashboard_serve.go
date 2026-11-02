@@ -63,9 +63,8 @@ func dashboardServe(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	hub, err := jobs.New(e.run, filepath.Join(dirs.Data, "dashboard", "jobs"), func(ctx context.Context) []string {
-		return sessionEnv(ctx, e.run, os.Environ())
-	})
+	jobEnv := func(ctx context.Context) []string { return sessionEnv(ctx, e.run, os.Environ()) }
+	hub, err := jobs.New(e.run, filepath.Join(dirs.Data, "dashboard", "jobs"), jobEnv)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -91,7 +90,7 @@ func dashboardServe(ctx context.Context, e *env, args []string) int {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Home: home, Version: buildinfo.Version, Now: time.Now})
+	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Home: home, Version: buildinfo.Version, Now: time.Now, Run: e.run, Env: jobEnv})
 	hs := &http.Server{
 		Addr: machine.DashboardAddr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return ctx }, // ends the event streams

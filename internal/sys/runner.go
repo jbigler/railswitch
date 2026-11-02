@@ -53,6 +53,10 @@ type Cmd struct {
 	KillGrace time.Duration
 	// ExtraFiles are the child's fds 3 onward.
 	ExtraFiles []*os.File
+	// TTY, when set, is the child's stdin, stdout and stderr (Stdin,
+	// Stdout and Stderr are ignored) and its controlling terminal: it
+	// starts in its own session, so its group is its pid (D149).
+	TTY *os.File
 }
 
 // Result is the outcome of a command.
@@ -117,11 +121,19 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 	// cmd.Cancel has returned before cmd.Run does.
 	var kill *time.Timer
 	var pgid int
+	// group puts the child in its own process group: a new session on a
+	// terminal (Setpgid after Setsid would fail), else a new group.
+	group := &syscall.SysProcAttr{Setpgid: true}
+	if c.TTY != nil {
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = c.TTY, c.TTY, c.TTY
+		group = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
+		cmd.SysProcAttr = group
+	}
 	switch {
 	case c.KillGrace > 0:
 		// A graceful group: SIGTERM first so the command can clean up, then
 		// SIGKILL for whatever is left of the group after the grace.
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.SysProcAttr = group
 		cmd.Cancel = func() error {
 			pgid = cmd.Process.Pid
 			kill = time.AfterFunc(c.KillGrace, func() { _ = syscall.Kill(-pgid, syscall.SIGKILL) })
@@ -132,7 +144,7 @@ func (Exec) Run(ctx context.Context, c Cmd) (Result, error) {
 		// A timed call gets its own process group so a timeout kills the
 		// whole group. Untimed (interactive) calls stay in the caller's
 		// foreground group so tty reads and Ctrl-C keep working.
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.SysProcAttr = group
 		cmd.Cancel = func() error {
 			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}

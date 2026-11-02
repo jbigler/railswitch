@@ -33,10 +33,27 @@ escaped here; data-md bodies get their Markdown as text nodes (app.js). */}}
 {{if .CheckRuns}}<ul class="pr-checks">{{range .CheckRuns}}<li><span class="pr-{{.State}}">{{if eq .State "pass"}}✓{{else if eq .State "fail"}}✗{{else if eq .State "pending"}}●{{else}}–{{end}}</span> {{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Name}}</a>{{else}}{{.Name}}{{end}}{{if .Workflow}} <span class="muted">{{.Workflow}}</span>{{end}}</li>{{end}}</ul>
 {{else}}<p class="muted">No checks.</p>{{end}}
 
+<h2>Review threads <span class="muted">{{$.Unresolved}} unresolved of {{len $.Threads}}</span></h2>
+{{if $.Unresolved}}<form method="post" action="{{$.ActURL}}/agent" data-job="pr" data-confirm="Type the {{$.Unresolved}} unresolved review thread(s) into {{$.Slug}}'s agent? It starts the agent's session if it has none."><input type="hidden" name="number" value="{{.Number}}"><button class="ln main">Send all unresolved to the agent</button></form>{{end}}
+{{range $.Threads}}<article class="pr-thread{{if .Resolved}} resolved{{end}}">
+<header><code>{{.Path}}{{if .Line}}:{{.Line}}{{end}}</code>{{if .Outdated}} <span class="muted">outdated</span>{{end}}{{if .Resolved}} <span class="green">resolved</span>{{end}}</header>
+{{if .Tail}}<pre class="pr-hunk">{{.Tail}}</pre>{{end}}
+{{range .Comments}}<div class="pr-tc"><b>{{.Author}}</b> <span class="muted">{{.Created}}</span>{{if .URL}} <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">↗</a>{{end}}<div class="md" data-md>{{.Body}}</div></div>{{end}}
+<div class="pr-tactions">
+<form method="post" action="{{$.ActURL}}/agent" data-job="pr"><input type="hidden" name="number" value="{{$.PR.Number}}"><input type="hidden" name="thread" value="{{.ID}}"><button class="ln" title="Type this thread into {{$.Slug}}'s agent">Send to agent</button></form>
+<form method="post" action="{{$.ActURL}}/{{if .Resolved}}unresolve{{else}}resolve{{end}}" data-job="pr"><input type="hidden" name="thread" value="{{.ID}}"><button class="ln">{{if .Resolved}}Unresolve{{else}}Resolve{{end}}</button></form>
+</div>
+<form method="post" action="{{$.ActURL}}/reply" data-job="pr" class="pr-reply"><input type="hidden" name="thread" value="{{.ID}}"><textarea name="body" rows="2" placeholder="Reply…" required></textarea><button class="ln">Reply</button></form>
+</article>
+{{else}}<p class="muted">No review threads.</p>{{end}}
+
 <h2>Conversation <span class="muted">{{len .Reviews}} reviews · {{len .Comments}} comments</span></h2>
 {{range .Reviews}}<article class="pr-note"><header><b>{{.Author}}</b> <span class="pr-{{.State}}">{{.State}}</span> <span class="muted">{{.Submitted}}</span></header>{{if .Body}}<div class="md" data-md>{{.Body}}</div>{{end}}</article>
 {{end}}{{range .Comments}}<article class="pr-note"><header><b>{{.Author}}</b> <span class="muted">{{.Created}}</span>{{if .URL}} <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">↗</a>{{end}}</header><div class="md" data-md>{{.Body}}</div></article>
 {{end}}{{if not (or .Reviews .Comments)}}<p class="muted">No reviews or comments yet.</p>{{end}}
+<form method="post" action="{{$.ActURL}}/comment" data-job="pr" class="pr-reply"><input type="hidden" name="number" value="{{.Number}}"><textarea name="body" rows="3" placeholder="Comment on the PR…" required></textarea><button class="ln">Comment</button></form>
+{{if eq .State "open" "draft"}}<form method="post" action="{{$.ActURL}}/review" data-job="pr" class="pr-reply pr-review"><input type="hidden" name="number" value="{{.Number}}"><textarea name="body" rows="3" placeholder="Review summary (optional to approve)…"></textarea>
+<div class="btns"><span class="muted">Review:</span><button class="ln" name="verdict" value="comment">Comment only</button><button class="ln" name="verdict" value="request-changes">Request changes</button><button class="ln main" name="verdict" value="approve">Approve</button></div></form>{{end}}
 
 <h2>Files <span class="muted">{{len .Files}}</span></h2>
 <ul class="pr-files">{{range .Files}}<li><span class="green">+{{.Additions}}</span> <span class="red">−{{.Deletions}}</span> <code>{{.Path}}</code>{{if ne .Change "modified"}} <span class="muted">{{.Change}}</span>{{end}}</li>{{end}}</ul>

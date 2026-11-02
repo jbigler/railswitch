@@ -797,7 +797,17 @@ Every action is a job (below).
   Actions runs), and, with a method the repo allows, **Merge now** and
   **Merge when ready** (`--auto`, when the repo allows auto-merge), or
   **Add to merge queue** when the base has one; merging asks first. The office's PR station and the desk panel
-  open it. Comment actions and sending a comment to the agent come next.
+  open it.
+  **Review threads** (the conversations on lines of the diff, unresolved
+  first) show the end of their diff hunk and their comments; each has
+  **Reply**, **Resolve** or **Unresolve**, and **Send to agent**, which
+  types the thread into the worktree's default agent (`pr agent`: its
+  session is started if it has none, then typed into once its screen
+  settles). **Send all unresolved to the agent** does it for every open
+  thread, as much as fits in one input (4096 bytes; the rest are counted
+  and pointed to on GitHub). The page also adds a **Comment** to the
+  conversation and submits a **Review** (comment only, request changes,
+  approve). Typed text goes to `gh` on stdin, never in its arguments.
 - **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
   filtered as you type, with an "args" field split like a shell (quotes and
   backslash, no expansion), and "in a new terminal", ticked unless this

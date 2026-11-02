@@ -957,6 +957,7 @@ characters as spaces, and a URL that is not an absolute http or https URL
 | `reviews[]` | array | Each submitted review: `author`, `state` (`approved`, `changes_requested`, `commented`, `dismissed`), `body`, `submitted`. A pending (unsubmitted) review is left out. |
 | `comments[]` | array | The conversation's comments (not those on a line): `author`, `body`, `created`, `url`. |
 | `files[]` | array | Each changed file: `path`, `additions`, `deletions`, `change` (`added`, `modified`, `deleted`, `renamed`, `copied`, `changed`). |
+| `threads[]` | array | The review conversations on lines of the diff, the first 100 (from the same `gh api graphql` query): `id` (the thread's GraphQL ID, `PRRT_…`: what `pr reply`, `resolve`, `unresolve` and `agent --thread` take), `path`, `line` (the line now, or the line it was on when `outdated`), `resolved`, `outdated`, `hunk` (the diff hunk its first comment is on) and `comments[]` (as `comments[]`, the first 50). |
 
 `pr merge [<number>] [--method merge|squash|rebase] [--auto]` merges the PR
 (`gh pr merge --<method> [--auto]`, 2 minutes' timeout) with one of the
@@ -968,6 +969,20 @@ marks a draft ready for review (`gh pr ready`; a PR that is no draft exits
 1). `pr rerun [<number>]` reruns the failed jobs of each Actions run with a
 failed check (`gh run rerun <id> --failed`), each run once. They print one
 line and have no `--json`: they are writes.
+
+`pr comment [<number>]` adds stdin's text to the PR's conversation (`gh pr
+comment --body-file -`). `pr review [<number>] --approve|--request-changes|--comment`
+submits a review with stdin's text (`gh pr review --body-file -`; may be
+empty to approve). `pr reply <thread>` replies to a review thread with
+stdin's text, and `pr resolve|unresolve <thread>` resolves or reopens it
+(`gh api graphql` mutations; the reply is read with `-F body=@-`). The text
+is UTF-8, at most 65536 bytes, never blank where it is needed, and never in
+gh's arguments. `pr agent [<number>] [--thread <id>]...` types the named
+threads (default: every unresolved one) into the current worktree's
+default agent, as `agent prompt` does: the PR, then each thread's file,
+line and comments, its control characters made spaces, at most 4096
+bytes (a long comment is cut; threads that don't fit are counted, with
+the PR's URL).
 ## `stack ls`
 
 One project (`-C`): every registered worktree, in registry order, with its

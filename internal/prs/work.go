@@ -1,6 +1,7 @@
 package prs
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -35,13 +36,17 @@ func gh(ctx context.Context, r sys.Runner, args ...string) ([]byte, error) {
 
 // ghT is gh with its own timeout.
 func ghT(ctx context.Context, r sys.Runner, timeout time.Duration, args ...string) ([]byte, error) {
-	res, err := r.Run(ctx, sys.Cmd{
-		Name:    "gh",
-		Args:    args,
-		Dir:     NeutralDir,
-		Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
-		Timeout: timeout,
-	})
+	return ghRun(ctx, r, sys.Cmd{Args: args, Timeout: timeout})
+}
+
+// ghIn is gh with stdin: text written by the user never goes in argv.
+func ghIn(ctx context.Context, r sys.Runner, stdin []byte, args ...string) ([]byte, error) {
+	return ghRun(ctx, r, sys.Cmd{Args: args, Stdin: bytes.NewReader(stdin), Timeout: 30 * time.Second})
+}
+
+func ghRun(ctx context.Context, r sys.Runner, c sys.Cmd) ([]byte, error) {
+	c.Name, c.Dir, c.Env = "gh", NeutralDir, append(os.Environ(), "GH_PROMPT_DISABLED=1")
+	res, err := r.Run(ctx, c)
 	return res.Stdout, err
 }
 

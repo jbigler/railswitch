@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"unicode/utf8"
 
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
@@ -18,7 +20,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const prUsage = "usage: railswitch [--json] pr ls [--all] | [--json] pr show [<number>] | pr merge [<number>] [--method merge|squash|rebase] [--auto] | pr ready [<number>] | pr rerun [<number>]"
+const prUsage = "usage: railswitch [--json] pr ls [--all] | [--json] pr show [<number>] | pr merge [<number>] [--method merge|squash|rebase] [--auto] | pr ready|rerun [<number>] | pr comment [<number>] | pr review [<number>] --approve|--request-changes|--comment | pr reply <thread> | pr resolve|unresolve <thread> | pr agent [<number>] [--thread <thread>]...  (comment, review and reply read the text on stdin)"
 
 // prRow is one worktree's row of pr ls.
 type prRow struct {
@@ -35,8 +37,10 @@ func cmdPr(ctx context.Context, e *env, args []string) int {
 		return e.usageErr("%s", prUsage)
 	}
 	switch args[0] {
-	case "show", "merge", "ready", "rerun":
+	case "show", "merge", "ready", "rerun", "comment", "review", "agent":
 		return prAct(ctx, e, args)
+	case "reply", "resolve", "unresolve":
+		return prThread(ctx, e, args)
 	case "ls":
 	default:
 		return e.usageErr("%s", prUsage)
@@ -182,7 +186,8 @@ func logins(s []string) string {
 func prAct(ctx context.Context, e *env, args []string) int {
 	var fs *flag.FlagSet
 	var method *string
-	var auto *bool
+	var auto, approve, changes, comment *bool
+	var threads stringList
 	switch args[0] {
 	case "show":
 		fs = e.flags("pr show")
@@ -194,6 +199,16 @@ func prAct(ctx context.Context, e *env, args []string) int {
 		fs = e.flags("pr ready")
 	case "rerun":
 		fs = e.flags("pr rerun")
+	case "comment":
+		fs = e.flags("pr comment")
+	case "review":
+		fs = e.flags("pr review")
+		approve = fs.Bool("approve", false, "approve the PR")
+		changes = fs.Bool("request-changes", false, "ask for changes (the text says which)")
+		comment = fs.Bool("comment", false, "review with a comment only")
+	case "agent":
+		fs = e.flags("pr agent")
+		fs.Var(&threads, "thread", "a review `thread` to send (repeatable; default: every unresolved one)")
 	}
 	pos, code, ok := parseMixed(fs, args[1:])
 	if !ok {
@@ -255,6 +270,37 @@ func prAct(ctx context.Context, e *env, args []string) int {
 			return e.fail(err)
 		}
 		fmt.Fprintf(e.stdout, "#%d is ready for review\n", n)
+	case "comment":
+		body, err := e.prBody(true)
+		if err != nil {
+			return e.fail(err)
+		}
+		if err := prs.AddComment(ctx, e.run, repo, n, body); err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "commented on #%d\n", n)
+	case "review":
+		var verdict string
+		switch {
+		case *approve && !*changes && !*comment:
+			verdict = "approve"
+		case *changes && !*approve && !*comment:
+			verdict = "request-changes"
+		case *comment && !*approve && !*changes:
+			verdict = "comment"
+		default:
+			return e.usageErr("pr review: one of --approve, --request-changes, --comment")
+		}
+		body, err := e.prBody(verdict != "approve")
+		if err != nil {
+			return e.fail(err)
+		}
+		if err := prs.SubmitReview(ctx, e.run, repo, n, verdict, body); err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "reviewed #%d: %s\n", n, verdict)
+	case "agent":
+		return e.prAgent(ctx, v, threads)
 	case "rerun":
 		runs, err := prs.Rerun(ctx, e.run, repo, v)
 		if err != nil {
@@ -317,5 +363,84 @@ func prShow(e *env, v *prs.View) int {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "%d review(s), %d comment(s), %d file(s): %s\n", len(v.Reviews), len(v.Comments), len(v.Files), v.URL)
+	return 0
+}
+
+// maxPRText is GitHub's limit on a comment's length.
+const maxPRText = 65536
+
+// prBody reads a comment's text from stdin: UTF-8, at most maxPRText bytes,
+// and (when needed) not blank.
+func (e *env) prBody(needed bool) ([]byte, error) {
+	body, err := e.readStdin()
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case len(body) > maxPRText:
+		return nil, fmt.Errorf("the text is over %d bytes", maxPRText)
+	case !utf8.Valid(body):
+		return nil, errors.New("the text is not UTF-8")
+	case needed && strings.TrimSpace(string(body)) == "":
+		return nil, errors.New("no text on stdin")
+	}
+	return body, nil
+}
+
+// prThread is pr reply|resolve|unresolve <thread>: one review thread, by
+// its GraphQL ID (pr show --json's threads[].id).
+func prThread(ctx context.Context, e *env, args []string) int {
+	var fs *flag.FlagSet
+	switch args[0] {
+	case "reply":
+		fs = e.flags("pr reply")
+	case "resolve":
+		fs = e.flags("pr resolve")
+	case "unresolve":
+		fs = e.flags("pr unresolve")
+	}
+	pos, code, ok := parseMixed(fs, args[1:])
+	if !ok {
+		return code
+	}
+	if len(pos) != 1 || !prs.ThreadID.MatchString(pos[0]) {
+		return e.usageErr("pr %s: name one review thread (pr show --json: threads[].id)", args[0])
+	}
+	id := pos[0]
+	switch args[0] {
+	case "reply":
+		body, err := e.prBody(true)
+		if err != nil {
+			return e.fail(err)
+		}
+		if err := prs.Reply(ctx, e.run, id, body); err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "replied to %s\n", id)
+	default:
+		if err := prs.Resolve(ctx, e.run, id, args[0] == "unresolve"); err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "%sd %s\n", args[0], id)
+	}
+	return 0
+}
+
+// prAgent types PR v's review threads (the named ones, else every
+// unresolved one) into the worktree's default agent: its session is
+// started when it has none (agent prompt), then typed into once it settles.
+func (e *env) prAgent(ctx context.Context, v *prs.View, threads []string) int {
+	text, n, err := prs.AgentText(v, threads, lifecycle.MaxSend)
+	if err != nil {
+		return e.fail(err)
+	}
+	l, slug, code := e.lifecycle(ctx, "pr agent")
+	if code != 0 {
+		return code
+	}
+	if err := l.AgentPrompt(ctx, slug, "", text); err != nil {
+		return e.fail(err)
+	}
+	fmt.Fprintf(e.stdout, "sent %d review thread(s) of #%d to the agent in %s: railswitch -w %s agent joins it\n", n, v.Number, slug, slug)
 	return 0
 }

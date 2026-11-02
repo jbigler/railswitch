@@ -71,3 +71,6 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--cp-edge); bord
 body.walking #scene::after { opacity: 1; }
 .hud-btn.on { border-color: var(--cp-accent); color: var(--cp-accent); }
 .panel h3 { font-size: 13px; margin: 14px 0 6px; color: var(--cp-dim); font-weight: 600; }
+/* Terminals in a panel (D149). */
+.panel.wide { width: min(960px, calc(100vw - 24px)); }
+.panel .term { flex: 1; min-height: 22rem; border: 1px solid var(--cp-edge); }

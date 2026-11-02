@@ -920,15 +920,17 @@ any open page.
   restart, when it restarts alone), its logs in Dozzle, and the floor's
   **Start**, **Restart**, **Stop** (`up`, `restart`, `stop`). The **work
   area** (back right, on a rug, behind neon glass): **your desk**'s wall
-  screen shows the branch, stack, PR and links; the desk opens a
-  **Terminal** (`term`) or **Neovim** (`nvim --new-term`) and the
-  worktree's links. **The agent's desk** opens the agent console in a
-  terminal (`agent --new-term`); the agent's android stands at it, its eyes
-  and ring in the agent's state (pulsing while it waits on you), its hands
-  typing while it works; it opens the agent's state and message, and for a
-  service agent (D142) its current screen (`agent screen`, read every 1.5 s
-  while open) and a box that types to it (`agent send`: the text, then
-  Enter); with a package that counts them (claude@1), its desk screen, the
+  screen shows the branch, stack, PR and links; the desk shows the
+  worktree's links; **Shell** and **Neovim** open a live terminal in the
+  panel (D149, as on the worktree page), **Terminal window** (`term`) and
+  **Neovim window** (`nvim --new-term`) a window on this machine. **The
+  agent's desk** opens the agent console in a terminal (`agent
+  --new-term`); the agent's android stands at it, its eyes and ring in the
+  agent's state (pulsing while it waits on you), its hands typing while it
+  works; it opens the agent's state and message and the agent itself in a
+  live terminal (D149): a running service agent's session at once, else
+  after **Connect** (connecting runs `up`), with **Open console window**
+  beside it; with a package that counts them (claude@1), its desk screen, the
   agent panel and the floor's big screen show its session's tokens, and the
   lobby's big screen their sum. The **PR station** at the work area's entrance shows the floor's
   pull request: title, checks, review, review app. The **café** (middle

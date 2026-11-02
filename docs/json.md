@@ -739,7 +739,9 @@ characters other than line breaks and tabs as spaces.
 refuses an existing one. The file is written 0644 through a temp file
 renamed over the name; `notes/` is created 0700 when missing. `notes rm
 <name> --if-hash <h>` removes it at that hash. A stale hash, a missing
-note or a symlink in its place exits 1 and changes nothing.
+note or a symlink in its place exits 1 and changes nothing. With `--json`,
+both print `{"hash": …}`: the note's new hash, the one the next edit passes
+as `--if-hash` (`""` after `rm`).
 
 ## `overview`
 

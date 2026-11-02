@@ -43,7 +43,12 @@ func TestNotes(t *testing.T) {
 	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "notes", "show", "a.md")), &doc); err != nil || doc.Text != "old\n" || doc.Hash != workspace.Hash([]byte("old\n")) {
 		t.Fatalf("show: %+v %v", doc, err)
 	}
-	mustRunStdin(t, f, "new", "-C", ws, "notes", "write", "a.md", "--if-hash", doc.Hash)
+	// --json prints the new hash: the editor's next save starts from it, with
+	// no second read in which another writer could slip in
+	var wrote struct{ Hash string }
+	if err := json.Unmarshal([]byte(mustRunStdin(t, f, "new", "-C", ws, "--json", "notes", "write", "a.md", "--if-hash", doc.Hash)), &wrote); err != nil || wrote.Hash != workspace.Hash([]byte("new")) {
+		t.Fatalf("write --json: %+v %v", wrote, err)
+	}
 	if b, _ := os.ReadFile(filepath.Join(dir, "a.md")); string(b) != "new" {
 		t.Errorf("a.md %q", b)
 	}

@@ -45,6 +45,9 @@ export function kit(names) {
       });
     }
     return k;
+  }).catch((e) => {
+    kitP = null; // a failed load (a restart, a blip) is tried again on the next room, not kept
+    throw e;
   });
   return kitP;
 }

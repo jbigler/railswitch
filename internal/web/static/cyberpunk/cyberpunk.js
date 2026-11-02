@@ -85,7 +85,12 @@ async function go(to) {
 
 function fromHash() {
   const m = location.hash.match(/^#floor\/(.+)$/);
-  return m ? { kind: 'floor', slug: decodeURIComponent(m[1]) } : { kind: 'lobby' };
+  if (!m) return { kind: 'lobby' };
+  try {
+    return { kind: 'floor', slug: decodeURIComponent(m[1]) };
+  } catch {
+    return { kind: 'lobby' }; // a broken %-escape (a truncated link): the lobby, not a page stuck arriving
+  }
 }
 
 function transport() {
@@ -106,8 +111,11 @@ let panelClose = null;
 function openPanel(title, fill) {
   closePanel();
   $('panel-title').textContent = title;
-  const body = $('panel-body');
-  body.replaceChildren();
+  // a fresh body per opening: a reply that comes back after this panel
+  // closed (a slow gh call, a job's error) writes into a body no longer on
+  // the page, never into the panel opened since
+  const body = el('div', { class: 'panel-page' });
+  $('panel-body').replaceChildren(body);
   $('panel').hidden = false;
   panelClose = fill(body) || null;
 }
@@ -401,12 +409,9 @@ function showNotes() {
       const save = async () => {
         try {
           const out = await post(`${base}/cyberpunk/notes/${encodeURIComponent(n)}?if-hash=${encodeURIComponent(doc.hash)}`, ta.value);
-          try {
-            doc.hash = JSON.parse(out).hash || doc.hash;
-          } catch {
-            const again = await getJSON(`${base}/cyberpunk/notes/${encodeURIComponent(n)}`);
-            doc.hash = again.hash;
-          }
+          // the saved note's hash, from the write itself: a second read could
+          // pick up another writer's change and let the next save erase it
+          doc.hash = JSON.parse(out).hash;
           msg.className = 'muted';
           msg.textContent = 'Saved.';
         } catch (e) {

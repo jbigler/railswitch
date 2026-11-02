@@ -29,15 +29,17 @@ if [ -f "$file" ]; then
   usage=$(jq -c '.usage // null' "$file" 2>/dev/null || echo null)
 fi
 # The transcript repeats a message's usage on each of its content blocks:
-# one count per message id. A transcript that doesn't read leaves no usage.
+# one count per message id. A transcript that can't be read leaves no usage.
 event=$(jq -r '.hook_event_name // empty' "$in")
 transcript=$(jq -r '.transcript_path // empty' "$in")
 case "$event" in
 Stop | SessionStart)
   usage=null
   if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-    usage=$(jq -cn '
-      reduce (inputs | select(.type == "assistant") | .message | select((.id | type) == "string" and (.usage | type) == "object")) as $m
+    # raw lines, each parsed alone: a line that isn't JSON (a half-written
+    # last one) is skipped instead of losing the whole count
+    usage=$(jq -cnR '
+      reduce (inputs | fromjson? | select(.type == "assistant") | .message | select((.id | type) == "string" and (.usage | type) == "object")) as $m
         ({}; .[$m.id] = $m.usage)
       | [.[]] as $u
       | def sum($k): [$u[] | .[$k] | numbers] | add // 0;

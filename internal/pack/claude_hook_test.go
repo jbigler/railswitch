@@ -182,6 +182,17 @@ func TestHookUsage(t *testing.T) {
 	if u, _ := s["usage"].(map[string]any); s["state"] != "working" || !mapsEqual(u, want) {
 		t.Errorf("UserPromptSubmit: %v; want working with the usage carried over", s)
 	}
+	// a line that isn't JSON (a half-written last line, anything foreign)
+	// costs only that line: the rest still counts
+	broken := filepath.Join(t.TempDir(), "broken.jsonl")
+	if err := os.WriteFile(broken, []byte("not json\n"+lines+`{"type":"assistant","message":{"id":"m3","us`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	bp, _ := json.Marshal(broken)
+	s = run(`{"hook_event_name":"Stop","transcript_path":` + string(bp) + `,"last_assistant_message":"done"}`)
+	if u, _ := s["usage"].(map[string]any); !mapsEqual(u, want) {
+		t.Errorf("Stop with broken lines: usage = %v; want %v", s["usage"], want)
+	}
 	s = run(`{"hook_event_name":"Stop","transcript_path":"/nonexistent","last_assistant_message":"x"}`)
 	if _, ok := s["usage"]; ok {
 		t.Errorf("Stop without a transcript: %v; want no usage", s)

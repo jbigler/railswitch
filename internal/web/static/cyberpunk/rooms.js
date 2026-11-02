@@ -765,17 +765,22 @@ export async function lab(slug, n, ui) {
     const w = st.worktrees.find((x) => x.slug === slug);
     if (!w) return;
     w.services.forEach((svc, i) => {
+      // a rack's spot is its service's place in the list now: a service
+      // removed before it moves it up, never onto another rack
+      const s = rackSpot(i);
       let rk = racks.get(svc.service);
       if (!rk) {
-        const s = rackSpot(i);
         if (!s) return;
         rk = rack(k, svc, i, deco.secondary);
-        rk.position.set(s.x, 0, s.z);
-        rk.rotation.y = s.ry;
         pickable(rk, '', () => ui.service(slug, svc.service));
         racks.set(svc.service, rk);
         scene.add(rk);
         ticks.push(rk.tick);
+      }
+      rk.visible = !!s; // past the 14th spot: hidden until one frees up
+      if (s) {
+        rk.position.set(s.x, 0, s.z);
+        rk.rotation.y = s.ry;
       }
       rk.set(svc);
       rk.userData.pick.tip = `${svc.service}: ${svcState(svc.state)}`;

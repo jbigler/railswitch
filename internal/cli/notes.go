@@ -250,5 +250,16 @@ func notesChange(e *env, name, hash string, data []byte) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	if e.json { // the note's new hash ("": removed), for the next edit's --if-hash
+		h := ""
+		if data != nil {
+			h = workspace.Hash(data)
+		}
+		if err := json.NewEncoder(e.stdout).Encode(struct {
+			Hash string `json:"hash"`
+		}{h}); err != nil {
+			return e.fail(err)
+		}
+	}
 	return 0
 }

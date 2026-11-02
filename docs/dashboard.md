@@ -905,60 +905,76 @@ any open page.
   `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
   save refused when the note changed since you opened it) and
   **Engineering** (links to Settings, Images, Library, Machine).
-- **A floor** is a worktree; every floor has the same plan, laid out as
-  an office is planned (zones by activity and noise: social by the landing
-  and the main aisles, quiet work deep by the windows, back of house by the
-  core), each zone under a hanging neon sign. Its hue (the starship's way: a
-  hash of the worktree's name seeds the highlight colour, a second neon a
-  third of the wheel or more away, and the pet), ceiling gear and some
-  furniture come from the name, so a floor always looks the same and floors
-  look different. The **server room** (back left, behind wire mesh, entered
-  from the landing) is a data hall: a full-height rack per service, in two
-  rows of seven facing a cold aisle (a stack with more than 14 services
-  shows the first 14), its LEDs and edge lights the service's state; a rack
-  opens the service's state, **Restart this service** (as the 2D page's
-  restart, when it restarts alone), its logs in Dozzle, and the floor's
-  **Start**, **Restart**, **Stop** (`up`, `restart`, `stop`). The **work
-  area** (back right, on a rug, behind neon glass): **your desk**'s wall
-  screen shows the branch, stack, PR and links; the desk shows the
-  worktree's links; **Shell** and **Neovim** open a live terminal in the
-  panel (D149, as on the worktree page), **Terminal window** (`term`) and
-  **Neovim window** (`nvim --new-term`) a window on this machine. **The
-  agent's desk** opens the agent console in a terminal (`agent
-  --new-term`); the agent's android stands at it, its eyes and ring in the
-  agent's state (pulsing while it waits on you), its hands typing while it
-  works; it opens the agent's state and message and the agent itself in a
-  live terminal (D149): a running service agent's session at once, else
-  after **Connect** (connecting runs `up`), with **Open console window**
-  beside it; with a package that counts them (claude@1), its desk screen, the
-  agent panel and the floor's big screen show its session's tokens, and the
-  lobby's big screen their sum. The **PR station** at the work area's entrance shows the floor's
-  pull request: title, checks, review, review app. The **café** (middle
-  left: counter, stools, the pet's corner), the **lounge** (front left: a
-  tufted sectional facing the **big screen** on the left wall, which shows
-  the floor's summary for now; what it shows is yours to choose later) and
-  the **meeting** room (front right, by the windows, behind louvers) fill
-  the rest, with plants and what people leave lying about.
-- **The elevator** (in the back wall of every floor, or `T`) lists the
+- **A floor** is a worktree; every floor has the same plan (24 × 16 m,
+  D150): the elevator in the left wall opens onto a corridor that runs to
+  the windows at the far end, with glass rooms on both sides, each door
+  sliding open as you walk up (pets and androids stay in the corridor and
+  the café nook). Each area hangs a neon sign over the corridor. Its hue
+  (the starship's way: a hash of the worktree's name seeds the highlight
+  colour, a second neon a third of the wheel or more away, and the pet),
+  ceiling gear and some furniture come from the name, so a floor always
+  looks the same and floors look different.
+  - Back side: the **server room** (glass, windowless) is a data hall: a
+    rack per service, 1 m apart in two rows of seven facing a cold aisle (a
+    stack with more than 14 services shows the first 14). Each rack's LEDs
+    and accent bar show the service's state, its display names it, cables
+    loop out of its sides and up into the ceiling's tray, and a hologram
+    floats above it in the floor's second neon (the name, the state, bars
+    that pulse while it runs). A rack opens the service's state, **Restart
+    this service** (as the 2D page's restart, when it restarts alone), its
+    logs in Dozzle, and the floor's **Start**, **Restart**, **Stop** (`up`,
+    `restart`, `stop`). The **café** nook, open to the corridor: a ramen
+    and a drinks vending machine under neon headers, their menus drawn
+    live, the coffee counter, a bistro table, a clock that keeps your
+    browser's time, and the pet's corner. The **lounge** (glass): the
+    sofa facing the **big screen** on the back wall from 4.5 m; the screen
+    shows the floor's summary for now, what it shows is yours to choose
+    later.
+  - Front side, by the windows: **work** (glass): **your desk**'s wall
+    screen shows the branch, stack, PR and links; the desk shows the
+    worktree's links; **Shell** and **Neovim** open a live terminal in the
+    panel (D149, as on the worktree page), **Terminal window** (`term`) and
+    **Neovim window** (`nvim --new-term`) a window on this machine. **The
+    agent's desk** opens the agent console in a terminal (`agent
+    --new-term`); the agent's android stands at it, its eyes and ring in
+    the agent's state (pulsing while it waits on you), its hands typing
+    while it works; it opens the agent's state and message and the agent
+    itself in a live terminal (D149): a running service agent's session at
+    once, else after **Connect** (connecting runs `up`), with **Open
+    console window** beside it; with a package that counts them (claude@1),
+    its desk screen, the agent panel and the floor's big screen show its
+    session's tokens, and the lobby's big screen their sum. The **PR
+    station** by the windows shows the floor's pull request: title, checks,
+    review, review app. A glass board 2.4 m wide stands by the wall. The
+    **meeting** room (glass) holds the **holo-table**: over a chunky
+    console a wireframe terrain rises in the floor's second neon, with a
+    pin per service (in the lobby, per floor) coloured by its state, which
+    opens it, and a halo above with the floor's summary. The **game room**
+    (glass): two bartop arcades on their stands, a sofa facing them.
+- **The elevator** (in the left wall of every floor, or `T`) lists the
   lobby and every floor; its doors open as you walk up, and stepping in
   front of them opens the list. `Esc` closes a panel.
 - **Two views:** the overview (drag turns the floor, the wheel zooms; the
   ceiling and the walls facing you are cut away) or first person (`V` or
   **walk**: `W` `A` `S` `D` or the arrows walk, `Shift` runs, drag looks, a
   click acts on what it hits or walks to that spot; furniture and walls stop
-  you, and you can always walk out of one). Looking follows the pointer's
-  position, never pointer lock, which remote and virtual-machine sessions
-  handle badly.
-- **Outside** the windows is the city at night.
+  you, and you can always walk out of one). Walking, a drag locks the
+  pointer, so turning doesn't stop at the window's edge; the lock ends when
+  the button comes up. Where the browser refuses it (some remote and
+  virtual-machine sessions), the drag follows the pointer's position as
+  before.
+- **Outside** the windows is a city at night, seen from high up: tower
+  bands fading into smog, a red horizon, tall flickering ad signs, spinners
+  between the towers (first person only).
 - Every floor has one pet: a cat or a shiba that roams, a macaw that flies
   between two perches, a cat asleep on a crate, an aquarium, a jellyfish
   tank or a gecko; and androids that wander (one or two per floor, two in
   the lobby). Click them.
 - **First person is a film set** (after Blade Runner's interiors and
   KitBash3D's cyberpunk sets), on a modest GPU: no shadows, no pass beyond
-  bloom. Low-key light from practicals, warm where people sit (café, lounge,
+  bloom. Light from practicals, warm where people sit (café, lounge,
   desk lamp), cool where machines are and from the city through the
-  windows; haze; light shafts through half-drawn blinds striping the floor;
+  windows, and a dim office reflected in every metal surface; haze; light shafts through half-drawn blinds striping the floor;
   dust in the air; cables underfoot and hanging from the ceiling; a server
   room tube that fails now and then; neon kept for signs (the walls' trim
   only hints at it); screens with scanlines; a slight step bob and darker

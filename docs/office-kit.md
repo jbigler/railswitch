@@ -2,7 +2,7 @@
 
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
-one pet per floor, androids. 101 glTF files (`.gltf` + `.bin`, textures as PNGs beside
+one pet per floor, androids. 109 glTF files (`.gltf` + `.bin`, textures as PNGs beside
 them) in `internal/web/static/office/models/`, a
 loader in `internal/web/static/office/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
@@ -40,6 +40,10 @@ it changes everywhere at once:
 | `RS_Screen`, `RS_Screen_UI`, `RS_Screen_Term` | screens: a grayscale emissive texture tinted by the emissive color | `setAccent` |
 | `RS_Neon_Secondary` | violet trim, the sign, jellyfish tentacles | `setSecondary` |
 | `RS_FloorDisplay` | the elevator's floor number: blank, for a canvas texture | – |
+| `RS_RackDisplay`, `RS_VendScreen`, `RS_ArcadeScreen` | a rack's status display, a vending machine's menu, an arcade's screen: blank, the page draws on them | – |
+| `RS_Whiteboard` | the glass board's surface: one quad mapped to the full image, for a drawing later | – |
+| `RS_HoloBed` | the holo-table's dark bed: the page draws the hologram above it | – |
+| `RS_Body`, `RS_BodyDark`, `RS_PaintViolet` | worn paint (`draw_paint`): panel seams, screws, scratches and chips to bare metal, grime; 1 m per repeat, projected per face like the walls | – |
 | `RS_ScreenOff`, `RS_Glow_Warm`, `RS_LED_Green`, `RS_LED_Amber`, … | fixed colors | – |
 
 Neon is emissive at strength 4 (LEDs 8): it reads best with a bloom pass at a
@@ -100,17 +104,33 @@ relative to the floor piece.
 
 ## Pieces
 
-- **Arch**: `Wall_Plain_4m`, `Wall_Window_4m`, `Wall_Door_4m`, `Floor_4m`,
+- **Arch**: `Wall_Plain_4m`, `Wall_Plain_2m` (beside the elevator), `Wall_Window_4m`, `Wall_Door_4m`, `Floor_4m`,
   `Door`, `Elevator_Floor`, `Elevator_Cab`, `WallPipes_4m`, `CeilingDuct_4m`,
   `Ceiling_CableTray_4m`, `Ceiling_PipeRun_4m`, `Ceiling_LightRun_4m`,
   `Ceiling_Sprinkler_4m`, `Ceiling_HangingCables`, `Ceiling_Vent`, `Ceiling_Fan`.
+  Glass partitions (`build_glass.py`): `GlassWall_4m` (two 2 m panes),
+  `GlassWall_2m`, `GlassWall_Door_4m` (a fixed pane and a sliding leaf, the
+  node `GlassDoor` with its collider, under a transom); floor-to-ceiling,
+  frames only at the ends, the joints, floor and ceiling; centred on their
+  line, seen from both sides.
 - **Furn**: `Desk`, `Chair`, `Workstation_2Mon`, `Workstation_3Mon`,
   `Workstation_Lived`, `Workstation_Lived_B`, `Sofa`, `Sofa_Short`,
   `CoffeeTable`, `Bookshelf`, `CatTree`, `DogBed`, `ParrotPerch`.
 - **Tech**: `Monitor`, `WallDisplay`, `MonitorStack` (desk-top), `MonitorWall_A`,
   `MonitorWall_B`, `MonitorBank`, `CRT`, `Laptop`, `DataPad`, `Keyboard`,
-  `PCTower`, `ServerRack`, `ServerRack_B`, `NetworkShelf`, `TerminalKiosk`,
-  `ToolCart`.
+  `PCTower`, `ServerRack`, `ServerRack_B` (a bolted cabinet with armoured
+  sides, secondary-neon edges, an accent bar, a status display, patch
+  panels, LED grids and a vent; cable bundles out of its sides and up 4 m
+  into the ceiling's tray; its collider is the cabinet alone),
+  `NetworkShelf`, `TerminalKiosk`, `ToolCart`.
+- **Café and game room** (`build_cafe.py`): `Tech_Vending_Ramen`,
+  `Tech_Vending_Drinks` (worn violet cabinets with a menu screen, card
+  reader, dispenser slot, side vents, a mount for a header sign),
+  `Furn_CoffeeCounter` (an espresso machine, a grinder, cups),
+  `Tech_Arcade_Bartop` on `Furn_Arcade_Stand` (an angled screen, a
+  joystick and six buttons, sunset side art, a cartridge on top; it sits
+  0.78 m up), `Deco_WallClock` (hands `Clock_Hour`, `Clock_Minute`,
+  `Clock_Second`, turned about their local Z by the page).
 - **Deco**: `DeskClutter`, `DeskLamp`, `Headphones`, `Mug`, `CableRun`, `Boxes`,
   `Crate`, `TrashBin`, `Poster`, `CorkBoard`, `Extinguisher`, `MiniFridge`,
   `NeonSign`, `Plant_Floor`, `Plant_Floor_B`, `Plant_Small`, `HangingPlanter`,
@@ -120,20 +140,20 @@ relative to the floor piece.
   `JellyfishTank`, `Gecko_Terrarium`; for roaming `Cat_Walk`, `Dog_Walk`,
   `Dog_Lying` (no bed) and `Parrot_Fly`, with `Furn_DogBed` and
   `Furn_ParrotPerch`.
-- **Ext**: `CityBackdrop` (a flat night skyline).
-- **Lounge and lived-in** (`build_lounge.py`): `Furn_Sofa_Tufted_L` (an
-  L-shaped tufted sectional, metaball cushions whose valleys are the tufts,
-  throw pillows, a blanket), `Furn_Armchair` (leather between wood panels),
-  room dividers `Furn_Divider_Glass` (frosted), `Furn_Divider_Shelf` (books,
-  plants, boxes, a lamp), `Furn_Divider_Planter` (grasses before a slatted
-  screen), and the cyberpunk ones: `Furn_Divider_Neon` (smoked glass, a
-  circuit trace, a neon frame), `Furn_Divider_Mesh` (a wire-mesh cage panel
-  on a hazard kick plate) and `Furn_Divider_Louver` (dark slats, neon
-  edges); `Furn_MeetingTable` (for six), plants in charcoal, terracotta and concrete pots
+- **Ext**: `CityBackdrop` (a flat night skyline; the office draws its city
+  in the page instead, `static/cyberpunk/city.js`).
+- **Lounge and lived-in** (`build_lounge.py`): `Furn_Sofa_L` (an L-shaped
+  sectional in charcoal leather on a painted plinth, a channel-quilted back,
+  an oxblood throw and pillow, a secondary-neon strip along its base),
+  `Furn_Armchair` (charcoal leather between painted panels),
+  `Furn_HoloTable` (3.0 × 2.0 m: a chunky console, rim panels and corner
+  blocks round a recessed `RS_HoloBed`, a control column with a glowing
+  orb, grab rails, angled legs; every glow the secondary neon), plants in
+  charcoal and concrete pots, each with a thin neon rim
   (`Deco_Plant_Snake`, `Monstera`, `Palm`, `Bush`, `Trailing` hanging from
   the ceiling), `Furn_SideTable`, `Deco_FloorLamp` (arc), `Deco_Rug_Geo`,
-  `Deco_CoatRack` (a jacket, a cap, a scarf), `Deco_Whiteboard` (a diagram,
-  a checklist), `Deco_Backpack`, `Furn_Stool`, `Deco_BookStack`,
+  `Deco_CoatRack` (a jacket, a cap, a scarf), `Deco_Whiteboard` (a 2.4 ×
+  1.2 m dark glass board in glowing marker: a diagram, a checklist), `Deco_Backpack`, `Furn_Stool`, `Deco_BookStack`,
   `Deco_PizzaBoxes`. No plant has a white pot.
 - **Char**: humanoid androids, simple but anatomical (one smooth shell for
   chest, waist and hips; a sculpted face with glowing eyes and round ear
@@ -147,7 +167,8 @@ relative to the floor piece.
 
 The pieces are procedural: `tools/office-kit/build_kit.py` holds the shared
 builder and materials, and one script per set builds and exports it
-(`build_office.py`, `build_decor.py`, `build_arch.py`, `build_pets.py`).
+(`build_office.py`, `build_decor.py`, `build_arch.py`, `build_pets.py`,
+`build_androids.py`, `build_lounge.py`, `build_glass.py`, `build_cafe.py`).
 Geometry is written in three.js coordinates and turned to Blender's Z-up at the
 end, so the export lands back exactly as written. Animals are metaballs
 converted to meshes, decimated to their budget and colored per face.
@@ -161,7 +182,10 @@ later. Each set clears and rebuilds its own collection (`CyberOfficeKit`,
 `CyberOfficeDecor`, `CyberOfficeArch`, `CyberOfficePets`) and overwrites its
 glTF files; `OFFICE_KIT_OUT` exports elsewhere. The export is glTF with
 separate textures, not GLB: the dashboard's content policy refuses the
-`blob:` URLs three.js makes for images embedded in a GLB.
+`blob:` URLs three.js makes for images embedded in a GLB. The export takes the active scene only
+(`use_active_scene`): another scene in the same file that holds pieces of
+the same names would otherwise rename the build's to `<name>.001` and
+export those.
 
 `tools/office-kit/preview.html` is a sample floor for checking the kit. Like
 every floor it has one pet, chosen with the Pet picker or `?pet=` (`cat`, `dog`

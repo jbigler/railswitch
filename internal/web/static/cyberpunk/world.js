@@ -296,6 +296,9 @@ export class World {
     const locked = () => document.pointerLockElement === c;
     c.addEventListener('pointermove', (e) => {
       if (drag && locked()) {
+        // remote and virtual-machine sessions can hand over an absolute
+        // pointer whose relative motion jumps: a jump is not a turn
+        if (Math.abs(e.movementX) > 120 || Math.abs(e.movementY) > 120) return;
         this.walk.yaw += e.movementX * 0.004;
         this.walk.pitch = Math.min(1.2, Math.max(-1.2, this.walk.pitch + e.movementY * 0.004));
         return;

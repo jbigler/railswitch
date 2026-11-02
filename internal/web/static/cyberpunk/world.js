@@ -394,7 +394,7 @@ export class World {
       this.scene.updateMatrixWorld(true);
       this.scene.traverse((o) => {
         if (!(IS_COL.test(o.name) || o.userData.block)) return;
-        if (/Door_[LR]_COL\d*$/.test(o.name)) return; // the elevator doors move: scene.userData.movingBoxes
+        if (/(Door_[LR]|GlassDoor)_COL\d*$/.test(o.name)) return; // the elevator's and glass rooms' doors move: scene.userData.movingBoxes
         if (o.name.startsWith('PetKeepOut')) return; // keeps the pets and androids out, not you
         if (!shown(o) && !IS_COL.test(o.name)) return;
         const b = new THREE.Box3().setFromObject(o, true);

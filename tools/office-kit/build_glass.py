@@ -10,7 +10,7 @@ BAR = 0.05    # frame width
 DEEP = 0.07   # frame depth
 PANE = 0.012  # glass thickness
 
-M['partition'] = mat('RS_GlassPartition', '#a9c2d6', .1, .04, alpha=.1)
+M['partition'] = mat('RS_GlassPartition', '#2c3c4a', 0, .04, alpha=.08)  # a dark tint: lit, a pale one reads as a blue panel
 M['frame'] = mat('RS_Frame', '#14161b', .75, .35)
 
 

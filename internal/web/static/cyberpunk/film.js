@@ -13,15 +13,18 @@ const PI = Math.PI;
 // LIFT brightens every lamp at once (the office read too dark).
 const LIFT = 1.3;
 const LAMPS = [
-  [-5.6, 2.7, -4.4, 0x7fd8ff, 5, 7], // server room: the tube that flickers
-  [-6.2, 2.3, -1.3, 0xffa040, 6, 6], // café counter
-  [-3.8, 1.7, 5.2, 0xff9a50, 4, 5], // lounge floor lamp
-  [1.6, 2.5, -4.4, 0xcfe0ff, 5, 6], // your desk's pendant
-  [5.3, 2.5, -4.4, 0xcfe0ff, 4, 6], // the agent's
-  [6.3, 1.1, -5.0, 0xffb060, 2.5, 3.5], // the agent's desk lamp
-  [4.4, 2.6, 3.9, 0xa8c8ff, 5, 6], // meeting
-  [-2, 2.8, 2.0, 0xb0b8d0, 3.5, 6], // spine
-  [-2, 2.8, -2.2, 0xb0b8d0, 3.5, 6], // landing
+  [-9.6, 2.7, -6.4, 0x7fd8ff, 5, 7], // server room: the tube that flickers
+  [10.8, 2.3, 5.2, 0xffa040, 6, 6], // café counter
+  [-7.8, 1.7, 7.2, 0xff9a50, 4, 5], // lounge floor lamp
+  [0.55, 2.5, -6.4, 0xcfe0ff, 5, 6], // your desk's pendant
+  [2.95, 2.5, -6.4, 0xcfe0ff, 4, 6], // the agent's
+  [3.55, 1.1, -7.0, 0xffb060, 2.5, 3.5], // the agent's desk lamp
+  [8.4, 2.6, -5.0, 0xa8c8ff, 5, 6], // meeting
+  [-2, 2.8, 3.0, 0xb0b8d0, 3.5, 6], // spine
+  [-2, 2.8, -4.2, 0xb0b8d0, 3.5, 6], // landing
+  [7.0, 2.8, 0.2, 0xb0b8d0, 3.5, 7], // the aisle by the meeting room
+  [-8.0, 2.8, 0.0, 0xb0b8d0, 3.5, 7], // the aisle between the glass rooms
+  [1.5, 2.8, 5.0, 0xb0b8d0, 3, 6], // the pet's corner
 ];
 
 // stripes is the light through a window: open below, blinds above.
@@ -131,7 +134,7 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
     return l;
   });
   const spill = new THREE.PointLight(accent, 2.5, 6); // the big screen's glow on the lounge
-  spill.position.set(-7.0, 2.0, 3.75);
+  spill.position.set(-11.0, 2.0, 5.75);
   scene.add(spill);
 
   // Neon is for signs: the walls' trim strips only hint at it, and the floor
@@ -162,9 +165,9 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
       air.add(o);
     }
   }
-  const n = 350;
+  const n = 700;
   const dust = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) dust.set([-7.8 + r() * 15.6, 0.2 + r() * 3.6, -5.8 + r() * 11.6], i * 3);
+  for (let i = 0; i < n; i++) dust.set([-11.8 + r() * 23.6, 0.2 + r() * 3.6, -7.8 + r() * 15.6], i * 3);
   const motes = new THREE.BufferGeometry();
   motes.setAttribute('position', new THREE.BufferAttribute(dust, 3));
   const dot = document.createElement('canvas');
@@ -180,10 +183,10 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
   // Cables: power and network from the server room to the desks along the
   // back, more hanging between the ceiling's services.
   const rubber = [0x0b0b0d, 0x3a0d12, 0x0d1a33].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55 }));
-  cable(scene, [[-3.3, -4.2], [-2.95, -3.0], [-2.6, -2.75], [-1.2, -2.7], [-0.6, -3.4], [0.4, -4.3], [1.0, -4.9]], rubber);
-  cable(scene, [[3.0, -5.8], [3.6, -5.4], [4.4, -5.6], [5.0, -5.3]], rubber.slice(0, 2));
-  cable(scene, [[-7.7, 2.6], [-7.6, 3.2], [-7.75, 3.9]], rubber.slice(1));
-  for (const [a, b, s] of [[[-6.5, -4.4], [-3.4, -2.4], 0.35], [[-3.2, -2.4], [0.5, -3.0], 0.5], [[1.0, -2.0], [5.6, -2.6], 0.4], [[-6.0, 0.6], [-6.2, 4.4], 0.3]]) {
+  cable(scene, [[-4.2, -6.2], [-3.1, -5.0], [-2.7, -4.75], [-1.2, -4.7], [-0.6, -5.4], [0.2, -6.3], [0.6, -6.9]], rubber);
+  cable(scene, [[1.9, -7.8], [2.3, -7.4], [3.0, -7.6], [3.5, -7.3]], rubber.slice(0, 2));
+  cable(scene, [[-11.7, 4.6], [-11.6, 5.2], [-11.75, 5.9]], rubber.slice(1));
+  for (const [a, b, s] of [[[-9.5, -6.4], [-4.4, -4.4], 0.35], [[-4.2, -4.4], [0.5, -5.0], 0.5], [[1.0, -4.0], [3.6, -4.6], 0.4], [[-9.0, 2.6], [-9.2, 6.4], 0.3]]) {
     droop(ceiling, a, b, s, rubber[0]);
   }
 

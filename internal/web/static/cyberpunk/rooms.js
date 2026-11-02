@@ -57,7 +57,7 @@ export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plai
   'Pet_Cat_Walk', 'Pet_Cat_Sitting', 'Pet_Dog_Walk', 'Pet_Dog_Lying', 'Furn_DogBed', 'Deco_PetBowls', 'Pet_Parrot_Fly',
   'Furn_ParrotPerch', 'Pet_Cat_Curled', 'Pet_Aquarium', 'Pet_JellyfishTank', 'Pet_Gecko_Terrarium',
   'Char_Android_Agent', 'Char_Android_A', 'Char_Android_B', 'Char_Android_C', // the agent's is spawned in actors.js
-  'Furn_Sofa_Tufted_L', 'Furn_Sofa', 'Deco_Plant_Floor', 'Furn_Armchair', 'Furn_MeetingTable', 'Furn_Chair',
+  'Furn_Sofa_L', 'Furn_Sofa', 'Deco_Plant_Floor', 'Furn_Armchair', 'Furn_MeetingTable', 'Furn_Chair',
   'Arch_GlassWall_4m', 'Arch_GlassWall_2m', 'Arch_GlassWall_Door_4m',
   'Deco_Plant_Snake', 'Deco_Plant_Monstera', 'Deco_Plant_Palm', 'Deco_Plant_Bush', 'Deco_Plant_Trailing',
   'Furn_SideTable', 'Deco_FloorLamp', 'Deco_Rug_Geo', 'Deco_CoatRack', 'Deco_Whiteboard', 'Deco_Backpack', 'Furn_Stool',
@@ -388,7 +388,7 @@ function lounge(k, scene, deco, ui, accent) {
   const big = bigScreen(scene, 8, 2.2, -7.88, 0, 4.2, 2.3, accent);
   pickable(big.screen, 'The big screen', () => ui.say('This screen is yours: what goes up here comes later.', big));
   put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
-  put(k, scene, 'Furn_Sofa_Tufted_L', 8.6, 0, -3.3, PI);
+  put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI);
   put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);
   put(k, scene, 'Deco_BookStack', 8.0, 0.42, -4.7);
   put(k, scene, 'Furn_Armchair', 5.3, 0, -5.0, PI / 2);

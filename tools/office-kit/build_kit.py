@@ -313,13 +313,13 @@ def draw_paint(rgb):
                 d = (xx - sx) ** 2 + (yy - sy) ** 2
                 px[d < 10, :3] = bare * 1.2
                 px[(d >= 10) & (d < 16), :3] *= 0.4
-        for _ in range(90):  # scratches through the paint
+        for _ in range(45):  # scratches through the paint
             x0, y0 = rng.integers(0, w), rng.integers(0, h)
             ang, L = rng.random() * np.pi, rng.integers(8, 70)
             for t in range(L):
                 x, y = int(x0 + np.cos(ang) * t) % w, int(y0 + np.sin(ang) * t) % h
-                px[y, x, :3] = px[y, x, :3] * 0.4 + bare * 0.6
-        chips = smooth_noise(rng, 40, w) > 0.86  # chipped spots
+                px[y, x, :3] = px[y, x, :3] * 0.65 + bare * 0.35
+        chips = smooth_noise(rng, 90, w) > 0.95  # a few small chipped spots
         px[chips, :3] = bare * (0.8 + 0.4 * rng.random((chips.sum(), 1)))
         grime = 0.78 + 0.3 * smooth_noise(rng, 10, w)
         px[..., :3] *= grime[..., None]

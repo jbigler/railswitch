@@ -60,179 +60,52 @@ L = dict(
     smoked=mat('RS_Glass_Smoked', '#0c1018', .4, .08, alpha=.55),
     steel=mat('RS_Steel_Dark', '#262a31', .85, .35),
     trunk=mat('RS_Trunk', '#5a4630', 0, .9),
+    leatherDark=mat('RS_Leather_Dark', '#1d1b20', 0, .42),
+    oxblood=mat('RS_Oxblood', '#4a1518', 0, .85),
 )
 for k_ in ('leafLight',):
     L[k_].use_backface_culling = False
 
 
-# ---------- couches (after the reference: a puffy tufted sectional, a leather armchair) ----------
-def sofa_tufted(name, seed=1):
-    """L-shaped tufted sectional: biscuit-tufted metaball cushions (the valleys
-    between balls are the tufts), a chaise on the right, throw pillows, a blanket,
-    neon underglow. Origin at the floor, seat facing +Z."""
+# ---------- couches: dark leather, the set's worn paint below ----------
+def sofa_l(name):
+    """L-shaped sectional in charcoal leather: a painted plinth with a thin
+    secondary-neon strip along its base, seat cushions, a channel-quilted
+    back (three rolls), an arm at the open end, an oxblood throw on the
+    chaise, two pillows. Origin at the floor, seat facing +Z; the chaise
+    runs forward on the right."""
     a = Asset(name)
-    a.box(2.9, .16, .95, M['dark'], 0, .1, 0)
-    a.box(.95, .16, 1.5, M['dark'], .95, .1, 1.2)
-    a.box(2.8, .006, .006, M['neon'], 0, .02, .48)
-    a.box(.006, .006, 1.4, M['neon'], .47, .02, 1.2)
-    a.box(.6, .05, .42, L['teal'], .95, .49, 1.62, ry=.1)       # folded blanket on the chaise
-    a.box(.62, .32, .03, L['teal'], .95, .32, 1.86, ry=.1)       # its end hanging over
-    root = a.build()
-    el = []
-    # balls overlap well past touching, so they merge into one surface and only
-    # the valleys between them remain: the biscuit tufts
-    for x in np.linspace(-1.2, 1.2, 7):
-        for z in (-.12, .2):
-            el.append(('e', (x, .35, z), .22, (1.15, .45, 1.1)))
-        for y in (.56, .78):
-            el.append(('e', (x, y, -.34), .2, (1.15, 1.1, .55)))
-    for x in (.7, 1.16):
-        for z in (.58, .92, 1.26, 1.6, 1.86):
-            el.append(('e', (x, .35, z), .22, (1.1, .45, 1.15)))
-    el.append(('c', (-1.38, .5, -.38), (-1.38, .5, .42), .13))
-    el.append(('c', (.5, .48, 1.92), (1.42, .48, 1.92), .1))
-    parts = [meta(name + '_Cushions', el, .025, [L['fabric']], target=3600)]
-    for i, (m, p) in enumerate([(L['pink'], (-1.0, .64, -.14)), (L['mustard'], (-.6, .62, -.16)), (L['pink'], (1.0, .62, -.14))]):
-        parts.append(meta(f'{name}_Pillow{i}', [('e', p, .17, (1, 1, .33))], .015, [m], target=260))
-    join(root, parts)
-    return root
+    lth, ox = L['leatherDark'], L['oxblood']
+    a.box(2.9, .12, .95, M['dark'], 0, .08, 0)
+    a.box(.95, .12, 1.5, M['dark'], .95, .08, 1.2)
+    a.box(2.8, .006, .006, M['neon2'], 0, .03, .48)
+    a.box(.006, .006, 1.4, M['neon2'], .47, .03, 1.2)
+    for x in (-.93, -.02):
+        a.box(.88, .16, .62, lth, x, .23, .1)                     # seat cushions
+    a.box(.88, .16, 1.9, lth, .95, .23, .92)                      # the chaise's
+    for y in (.4, .54, .68):
+        a.box(2.8, .12, .17, lth, 0, y, -.37)                     # channel-quilted back
+    a.box(.16, .5, .95, lth, -1.37, .36, 0)                       # arm
+    a.box(.62, .035, .52, ox, .95, .33, 1.42, ry=.1)              # throw over the chaise
+    a.box(.62, .3, .025, ox, .97, .2, 1.9, ry=.1)                 # its end hanging down
+    a.box(.42, .36, .12, lth, -1.0, .5, -.2, rx=-.25, ry=.15)     # pillows
+    a.box(.4, .34, .12, ox, .55, .5, -.2, rx=-.25, ry=-.1)
+    return a.build()
 
 
 def armchair(a):
-    """Leather lounge chair between wooden side panels."""
+    """Charcoal leather lounge chair between painted metal side panels, to
+    match the sectional."""
     for s in (-1, 1):
-        a.box(.12, .62, .8, L['wood'], s * .39, .31, -.03)
-        a.cyl(.06, .06, .62, L['wood'], s * .39, .31, .37, 16)
-    a.box(.66, .16, .78, L['leather'], 0, .26, 0)
-    a.box(.64, .12, .7, L['leather'], 0, .4, .04)
+        a.box(.12, .62, .8, M['dark'], s * .39, .31, -.03)
+        a.cyl(.06, .06, .62, M['dark'], s * .39, .31, .37, 16)
+    a.box(.66, .16, .78, L['leatherDark'], 0, .26, 0)
+    a.box(.64, .12, .7, L['leatherDark'], 0, .4, .04)
     a.box(.6, .004, .004, M['neon2'], 0, .462, .39)  # piping
     with a.at(0, .66, -.33, rx=-.16):
-        a.box(.66, .62, .15, L['leather'], 0, 0, 0)
+        a.box(.66, .62, .15, L['leatherDark'], 0, 0, 0)
 
 
-# ---------- room dividers ----------
-def divider_glass(a):
-    """Frosted-glass screen, 2 m wide, 2.2 m high, neon along the top."""
-    for x in (-1, 0, 1):
-        a.box(.05, 2.2, .05, M['trim'], x, 1.1, 0)
-        a.box(.06, .03, .4, M['dark'], x, .015, 0)
-    for y in (.06, 2.17):
-        a.box(2.05, .05, .05, M['trim'], 0, y, 0)
-    for x in (-.5, .5):
-        a.box(.94, 2.06, .02, L['frosted'], x, 1.11, 0)
-    a.box(2.0, .012, .012, M['neon'], 0, 2.2, .03)
-
-
-def divider_shelf(a, seed=1):
-    """Open shelving, 2 m wide, both sides used: books, plants, boxes, a lamp."""
-    r = random.Random(seed)
-    for x in (-.98, .98):
-        for z in (-.18, .18):
-            a.box(.04, 1.9, .04, M['trim'], x, .95, z)
-    ys = [.05, .5, .95, 1.4, 1.86]
-    for y in ys:
-        a.box(2.0, .03, .4, L['wood'], 0, y, 0)
-    a.box(1.9, .006, .006, M['neon'], 0, 1.84, .2)
-    for y in ys[:-1]:
-        x = -.92
-        while x < .85:
-            roll = r.random()
-            if roll < .12:
-                with a.at(x + .08, y + .015, 0):
-                    plant(a, False, int(r.random() * 100), r.choice([M['pot'], M['terracotta'], M['concrete']]))
-                x += .2
-            elif roll < .2:
-                a.box(.24, .18, .26, M['cardboard'], x + .12, y + .105, 0, ry=r.random() * .3)
-                x += .3
-            elif roll < .26:
-                a.cyl(.05, .07, .05, M['dark'], x + .08, y + .04, 0, 12)
-                a.cyl(.012, .012, .2, M['trim'], x + .08, y + .16, 0, 6)
-                a.cyl(.04, .09, .08, M['orange'], x + .08, y + .28, 0, 12)
-                x += .2
-            elif roll < .34:
-                x += .1 + r.random() * .15
-            else:
-                for _ in range(r.randrange(3, 8)):
-                    bw, bh = .025 + r.random() * .03, .18 + r.random() * .12
-                    if x + bw > .9:
-                        break
-                    a.box(bw, bh, .2 + r.random() * .06, r.choice(BOOKS), x + bw / 2, y + .015 + bh / 2, (r.random() - .5) * .08)
-                    x += bw + .004
-                x += .05
-
-
-def divider_planter(a, seed=2):
-    """A long planter of grasses and leaves in front of a slatted screen."""
-    r = random.Random(seed)
-    a.box(2.0, .55, .45, M['dark'], 0, .275, 0)
-    a.box(1.94, .02, .4, M['soil'], 0, .54, 0)
-    a.box(1.96, .012, .012, M['neon'], 0, .5, .23)
-    for i in range(16):
-        a.box(.045, 1.7, .045, L['wood'], -.94 + i * .125, 1.4, -.2)
-    a.box(2.0, .04, .06, L['wood'], 0, 2.24, -.2)
-    for i in range(40):
-        x = -.9 + r.random() * 1.8
-        L_ = .35 + r.random() * .5
-        with a.at(x, .55, (r.random() - .5) * .3, rx=(r.random() - .5) * .5, ry=r.random() * 6, s=(L_ * (.12 if i % 3 else .4), L_, 1)):
-            a.leaf(r.choice([M['leaf'], M['leaf2'], L['leafLight']]))
-
-
-def divider_neon(a, seed=5):
-    """Smoked glass in a heavy dark-steel frame, a glowing circuit trace in it,
-    neon along the frame. 2 m wide, 2.3 m high."""
-    r = random.Random(seed)
-    for x in (-1, 1):
-        a.box(.08, 2.3, .08, L['steel'], x, 1.15, 0)
-        a.box(.012, 2.1, .012, M['neon'], x - x * .05, 1.15, .045)
-        a.box(.12, .04, .45, M['dark'], x, .02, 0)
-    a.box(2.08, .1, .08, L['steel'], 0, 2.3, 0)
-    a.box(2.08, .14, .08, L['steel'], 0, .07, 0)
-    a.box(1.92, .012, .012, M['neon'], 0, 2.24, .045)
-    a.box(1.92, 2.06, .02, L['smoked'], 0, 1.17, 0)
-    # the circuit: runs of traces with pads, faint so they read as etched light
-    y = .35
-    while y < 2.1:
-        x0 = -.9 + r.random() * .5
-        x1 = x0 + .3 + r.random() * .9
-        a.box(x1 - x0, .006, .004, M['neon2'], (x0 + x1) / 2, y, .012)
-        a.box(.006, .12 + r.random() * .2, .004, M['neon2'], x1, y + .08, .012)
-        a.box(.03, .03, .005, M['neon2'], x0, y, .012)
-        y += .18 + r.random() * .2
-
-
-def divider_mesh(a):
-    """Server-cage panel: steel wire mesh in a heavy frame, a hazard-striped
-    kick plate, a neon strip. 2 m wide, 2.3 m high."""
-    for x in (-1, 1):
-        a.box(.07, 2.3, .07, L['steel'], x, 1.15, 0)
-        a.box(.14, .04, .4, M['dark'], x, .02, 0)
-    a.box(2.07, .07, .07, L['steel'], 0, 2.27, 0)
-    a.box(2.07, .07, .07, L['steel'], 0, .5, 0)
-    for i in range(1, 20):
-        a.box(.006, 1.74, .006, M['trim'], -1 + i * .1, 1.39, 0)
-    for j in range(1, 18):
-        a.box(1.94, .006, .006, M['trim'], 0, .52 + j * .1, 0)
-    a.box(1.94, .44, .02, M['dark'], 0, .25, 0)                       # kick plate
-    for i in range(10):
-        a.box(.07, .5, .004, M['tape'], -.86 + i * .19, .25, .012, rz=.6)
-    a.box(1.94, .012, .012, M['neon'], 0, 2.2, .04)
-
-
-def divider_louver(a):
-    """Angled dark-metal louvers between steel posts, an LED line every few
-    slats: you half see through it. 2 m wide, 2.2 m high."""
-    for x in (-1, 1):
-        a.box(.06, 2.2, .1, L['steel'], x, 1.1, 0)
-        a.box(.12, .04, .4, M['dark'], x, .02, 0)
-    a.box(2.06, .06, .1, L['steel'], 0, 2.2, 0)
-    for i in range(16):
-        y = .2 + i * .125
-        a.box(1.94, .1, .012, L['steel'], 0, y, 0, rx=.65)
-        if i % 4 == 2:
-            a.box(1.9, .008, .008, M['neon'], 0, y - .06, .03)
-
-
-# ---------- plants in dark pots ----------
 def leaf_at(a, m, x, y, z, length, width, tilt, turn):
     with a.at(x, y, z, rx=tilt, ry=turn, order='YXZ', s=(width, length, 1)):
         a.leaf(m)
@@ -413,16 +286,10 @@ def pizza_boxes(a, seed=3):
 
 
 lounge = {}
-lounge['Furn_Sofa_Tufted_L'] = sofa_tufted('Furn_Sofa_Tufted_L')
-add_colliders(lounge['Furn_Sofa_Tufted_L'], [(2.9, .9, .95, 0, .45, 0), (.95, .6, 1.5, .95, .3, 1.2)])
+lounge['Furn_Sofa_L'] = sofa_l('Furn_Sofa_L')
+add_colliders(lounge['Furn_Sofa_L'], [(2.9, .9, .95, 0, .45, 0), (.95, .6, 1.5, .95, .3, 1.2)])
 for name, fn, col in [
     ('Furn_Armchair', armchair, 'aabb'),
-    ('Furn_Divider_Glass', divider_glass, [(2.05, 2.2, .1, 0, 1.1, 0)]),
-    ('Furn_Divider_Shelf', divider_shelf, [(2.0, 1.9, .42, 0, .95, 0)]),
-    ('Furn_Divider_Planter', divider_planter, [(2.0, 2.25, .5, 0, 1.12, -.02)]),
-    ('Furn_Divider_Neon', divider_neon, [(2.1, 2.3, .12, 0, 1.15, 0)]),
-    ('Furn_Divider_Mesh', divider_mesh, [(2.1, 2.3, .1, 0, 1.15, 0)]),
-    ('Furn_Divider_Louver', divider_louver, [(2.1, 2.2, .14, 0, 1.1, 0)]),
     ('Deco_Plant_Snake', snake_plant, 'aabb'), ('Deco_Plant_Monstera', monstera, 'aabb'),
     ('Deco_Plant_Palm', palm, 'aabb'), ('Deco_Plant_Bush', bush, 'aabb'),
     ('Deco_Plant_Trailing', trailing_planter, None),

@@ -6,7 +6,7 @@
 	"scene":0,
 	"scenes":[
 		{
-			"name":"Scene",
+			"name":"KitBuild",
 			"nodes":[
 				1
 			]
@@ -44,14 +44,11 @@
 			"doubleSided":true,
 			"name":"RS_BodyDark",
 			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.0033465358428657055,
-					0.0036765073891729116,
-					0.005181516520678997,
-					1
-				],
-				"metallicFactor":0.4000000059604645,
-				"roughnessFactor":0.550000011920929
+				"baseColorTexture":{
+					"index":0
+				},
+				"metallicFactor":0.3499999940395355,
+				"roughnessFactor":0.6000000238418579
 			}
 		},
 		{
@@ -59,7 +56,7 @@
 			"name":"RS_Whiteboard",
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":0
+					"index":1
 				},
 				"metallicFactor":0,
 				"roughnessFactor":0.30000001192092896
@@ -162,9 +159,18 @@
 		{
 			"sampler":0,
 			"source":0
+		},
+		{
+			"sampler":0,
+			"source":1
 		}
 	],
 	"images":[
+		{
+			"mimeType":"image/png",
+			"name":"RS_Paint_Dark",
+			"uri":"RS_Paint_Dark.png"
+		},
 		{
 			"mimeType":"image/png",
 			"name":"RS_Whiteboard",
@@ -237,7 +243,7 @@
 		{
 			"bufferView":7,
 			"componentType":5126,
-			"count":276,
+			"count":240,
 			"max":[
 				0.8799999952316284,
 				0.8569282293319702,
@@ -253,13 +259,13 @@
 		{
 			"bufferView":8,
 			"componentType":5126,
-			"count":276,
+			"count":240,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":9,
 			"componentType":5126,
-			"count":276,
+			"count":240,
 			"type":"VEC2"
 		},
 		{
@@ -416,98 +422,98 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":3312,
+			"byteLength":2880,
 			"byteOffset":4008,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":3312,
-			"byteOffset":7320,
+			"byteLength":2880,
+			"byteOffset":6888,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":2208,
-			"byteOffset":10632,
+			"byteLength":1920,
+			"byteOffset":9768,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":936,
-			"byteOffset":12840,
+			"byteOffset":11688,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":48,
-			"byteOffset":13776,
+			"byteOffset":12624,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":48,
-			"byteOffset":13824,
+			"byteOffset":12672,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":32,
-			"byteOffset":13872,
+			"byteOffset":12720,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":12,
-			"byteOffset":13904,
+			"byteOffset":12752,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":432,
+			"byteOffset":12764,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":432,
+			"byteOffset":13196,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":288,
+			"byteOffset":13628,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":120,
 			"byteOffset":13916,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":432,
-			"byteOffset":14348,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":288,
-			"byteOffset":14780,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":120,
-			"byteOffset":15068,
 			"target":34963
 		},
 		{
 			"buffer":0,
 			"byteLength":432,
-			"byteOffset":15188,
+			"byteOffset":14036,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":432,
-			"byteOffset":15620,
+			"byteOffset":14468,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":288,
-			"byteOffset":16052,
+			"byteOffset":14900,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":120,
-			"byteOffset":16340,
+			"byteOffset":15188,
 			"target":34963
 		}
 	],
@@ -519,7 +525,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":16460,
+			"byteLength":15308,
 			"uri":"Deco_Whiteboard.bin"
 		}
 	]

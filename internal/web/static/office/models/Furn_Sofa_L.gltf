@@ -18,11 +18,11 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"Furn_Sofa_Tufted_L.001_COL"
+			"name":"Furn_Sofa_L_COL"
 		},
 		{
 			"mesh":1,
-			"name":"Furn_Sofa_Tufted_L.001_COL1"
+			"name":"Furn_Sofa_L_COL1"
 		},
 		{
 			"children":[
@@ -30,7 +30,7 @@
 				1
 			],
 			"mesh":2,
-			"name":"Furn_Sofa_Tufted_L.001"
+			"name":"Furn_Sofa_L"
 		}
 	],
 	"materials":[
@@ -48,8 +48,8 @@
 		{
 			"doubleSided":true,
 			"emissiveFactor":[
-				0.01599629409611225,
-				0.7912979125976562,
+				0.2581828534603119,
+				0.10702310502529144,
 				1
 			],
 			"extensions":{
@@ -57,7 +57,7 @@
 					"emissiveStrength":4
 				}
 			},
-			"name":"RS_Neon_Accent",
+			"name":"RS_Neon_Secondary",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
 					0,
@@ -71,64 +71,36 @@
 		},
 		{
 			"doubleSided":true,
-			"name":"RS_Fabric_Teal",
+			"name":"RS_Leather_Dark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.028426039963960648,
-					0.2746773064136505,
-					0.2541520893573761,
+					0.012286487966775894,
+					0.010960093699395657,
+					0.014443843625485897,
 					1
 				],
 				"metallicFactor":0,
-				"roughnessFactor":0.8999999761581421
+				"roughnessFactor":0.41999998688697815
 			}
 		},
 		{
 			"doubleSided":true,
-			"name":"RS_Fabric_Light",
+			"name":"RS_Oxblood",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.34670406579971313,
-					0.366252601146698,
-					0.41788506507873535,
+					0.06847816705703735,
+					0.007499032188206911,
+					0.009134058840572834,
 					1
 				],
 				"metallicFactor":0,
-				"roughnessFactor":0.949999988079071
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"RS_Fabric_Pink",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.5394794940948486,
-					0.09084171056747437,
-					0.20863686501979828,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.8999999761581421
-			}
-		},
-		{
-			"doubleSided":true,
-			"name":"RS_Fabric_Mustard",
-			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.5520114302635193,
-					0.32314321398735046,
-					0.02518685907125473,
-					1
-				],
-				"metallicFactor":0,
-				"roughnessFactor":0.8999999761581421
+				"roughnessFactor":0.8500000238418579
 			}
 		}
 	],
 	"meshes":[
 		{
-			"name":"Furn_Sofa_Tufted_L.001_COL",
+			"name":"Furn_Sofa_L_COL",
 			"primitives":[
 				{
 					"attributes":{
@@ -140,7 +112,7 @@
 			]
 		},
 		{
-			"name":"Furn_Sofa_Tufted_L.001_COL1",
+			"name":"Furn_Sofa_L_COL1",
 			"primitives":[
 				{
 					"attributes":{
@@ -152,7 +124,7 @@
 			]
 		},
 		{
-			"name":"Furn_Sofa_Tufted_L.001",
+			"name":"Furn_Sofa_L",
 			"primitives":[
 				{
 					"attributes":{
@@ -189,24 +161,6 @@
 					},
 					"indices":19,
 					"material":3
-				},
-				{
-					"attributes":{
-						"POSITION":20,
-						"NORMAL":21,
-						"TEXCOORD_0":22
-					},
-					"indices":23,
-					"material":4
-				},
-				{
-					"attributes":{
-						"POSITION":24,
-						"NORMAL":25,
-						"TEXCOORD_0":26
-					},
-					"indices":27,
-					"material":5
 				}
 			]
 		}
@@ -281,12 +235,12 @@
 			"count":48,
 			"max":[
 				1.4500000476837158,
-				0.1800001561641693,
+				0.1400001496076584,
 				1.9500000476837158
 			],
 			"min":[
 				-1.4500000476837158,
-				0.019999967887997627,
+				0.01999996416270733,
 				-0.4749999940395355
 			],
 			"type":"VEC3"
@@ -315,12 +269,12 @@
 			"count":48,
 			"max":[
 				1.399999976158142,
-				0.023000143468379974,
+				0.033000145107507706,
 				1.9000000953674316
 			],
 			"min":[
 				-1.399999976158142,
-				0.01700003445148468,
+				0.027000034227967262,
 				0.47699999809265137
 			],
 			"type":"VEC3"
@@ -340,137 +294,69 @@
 		{
 			"bufferView":12,
 			"componentType":5126,
-			"count":48,
+			"count":192,
 			"max":[
-				1.2694662809371948,
-				0.5150001049041748,
-				1.905873417854309
+				1.399999976158142,
+				0.7400000095367432,
+				1.8700000047683716
 			],
 			"min":[
-				0.6305336952209473,
-				0.16000013053417206,
-				1.3810991048812866
+				-1.4500000476837158,
+				0.10999997705221176,
+				-0.4750000536441803
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":13,
 			"componentType":5126,
-			"count":48,
+			"count":192,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":14,
 			"componentType":5126,
-			"count":48,
+			"count":192,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":15,
 			"componentType":5123,
-			"count":72,
+			"count":288,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":16,
 			"componentType":5126,
-			"count":5085,
+			"count":72,
 			"max":[
-				1.518384575843811,
-				1.0002899169921875,
-				2.112433433532715
+				1.2844079732894897,
+				0.6844249963760376,
+				1.9433858394622803
 			],
 			"min":[
-				-1.5171490907669067,
-				0.24319231510162354,
-				-0.5089697241783142
+				0.3450091779232025,
+				0.0500001385807991,
+				-0.3192490041255951
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":17,
 			"componentType":5126,
-			"count":5085,
+			"count":72,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":18,
 			"componentType":5126,
-			"count":5085,
+			"count":72,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":19,
 			"componentType":5123,
-			"count":10800,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":20,
-			"componentType":5126,
-			"count":738,
-			"max":[
-				1.1673153638839722,
-				0.8082028031349182,
-				-0.0835883617401123
-			],
-			"min":[
-				-1.1672422885894775,
-				0.44957301020622253,
-				-0.1964128613471985
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":21,
-			"componentType":5126,
-			"count":738,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":22,
-			"componentType":5126,
-			"count":738,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":23,
-			"componentType":5123,
-			"count":1560,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":24,
-			"componentType":5126,
-			"count":374,
-			"max":[
-				-0.43062058091163635,
-				0.7899608016014099,
-				-0.10491317510604858
-			],
-			"min":[
-				-0.7683576941490173,
-				0.4494159519672394,
-				-0.21694432199001312
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":25,
-			"componentType":5126,
-			"count":374,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":26,
-			"componentType":5126,
-			"count":374,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":27,
-			"componentType":5123,
-			"count":780,
+			"count":108,
 			"type":"SCALAR"
 		}
 	],
@@ -549,98 +435,50 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":576,
+			"byteLength":2304,
 			"byteOffset":4440,
 			"target":34962
 		},
 		{
 			"buffer":0,
+			"byteLength":2304,
+			"byteOffset":6744,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":1536,
+			"byteOffset":9048,
+			"target":34962
+		},
+		{
+			"buffer":0,
 			"byteLength":576,
-			"byteOffset":5016,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":384,
-			"byteOffset":5592,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":144,
-			"byteOffset":5976,
+			"byteOffset":10584,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":61020,
-			"byteOffset":6120,
+			"byteLength":864,
+			"byteOffset":11160,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":61020,
-			"byteOffset":67140,
+			"byteLength":864,
+			"byteOffset":12024,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":40680,
-			"byteOffset":128160,
+			"byteLength":576,
+			"byteOffset":12888,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":21600,
-			"byteOffset":168840,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":8856,
-			"byteOffset":190440,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":8856,
-			"byteOffset":199296,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":5904,
-			"byteOffset":208152,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":3120,
-			"byteOffset":214056,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":4488,
-			"byteOffset":217176,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":4488,
-			"byteOffset":221664,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":2992,
-			"byteOffset":226152,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":1560,
-			"byteOffset":229144,
+			"byteLength":216,
+			"byteOffset":13464,
 			"target":34963
 		}
 	],
@@ -652,8 +490,8 @@
 	],
 	"buffers":[
 		{
-			"byteLength":230704,
-			"uri":"Furn_Sofa_Tufted_L.001.bin"
+			"byteLength":13680,
+			"uri":"Furn_Sofa_L.bin"
 		}
 	]
 }

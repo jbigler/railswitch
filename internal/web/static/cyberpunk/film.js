@@ -229,14 +229,16 @@ export function neonSign(text, color, rods) {
   const css = '#' + new THREE.Color(color).getHexString();
   g.shadowColor = css;
   g.lineJoin = 'round';
-  for (const [blur, width, stroke] of [[30, 8, css], [12, 5, css], [0, 2, '#ffffff']]) {
+  // a soft halo, the tube, a pale core: wide blurs filled the letters in
+  const core = '#' + new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.65).getHexString();
+  for (const [blur, width, stroke] of [[8, 6, css], [3, 4, css], [0, 1.5, core]]) {
     g.shadowBlur = blur;
     g.lineWidth = width;
     g.strokeStyle = stroke;
     g.strokeText(text.toUpperCase(), c.width / 2, 78);
   }
-  g.shadowBlur = 16;
-  g.lineWidth = 3;
+  g.shadowBlur = 6;
+  g.lineWidth = 2.5;
   g.strokeStyle = css;
   g.strokeRect(14, 14, c.width - 28, c.height - 28);
   const tex = new THREE.CanvasTexture(c);

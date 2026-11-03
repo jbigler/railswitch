@@ -59,6 +59,22 @@ type worktree struct {
 	Services []service `json:"services"`
 	Agent    *agent    `json:"agent"`
 	Links    []link    `json:"links"`
+	Tests    *tests    `json:"tests"` // nil: the project has no test task
+}
+
+// tests is a worktree's test task's last run (D158): State never, passed
+// or failed; Stale when HEAD moved since.
+type tests struct {
+	State string   `json:"state"`
+	Stale bool     `json:"stale"`
+	Last  *testRun `json:"last"` // nil: never run
+}
+
+type testRun struct {
+	ExitCode  int       `json:"exit_code"`
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+	Commit    string    `json:"commit"` // HEAD at the start, read from git files a container can write
 }
 
 type service struct {

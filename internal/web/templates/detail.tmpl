@@ -16,6 +16,8 @@
 {{with .Agent}}<div><span class="{{.Class}}">{{.Glyph}} {{.Label}}</span> <span class="muted">{{.Name}}</span></div>
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
+{{end}}{{with .Tests}}<div class="lbl">Tests</div>
+<div class="actions"><span class="{{.Class}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}} <span class="muted">{{.Title}}</span><form method="post" action="{{$.TaskURL}}" data-post><input type="hidden" name="task" value="test"><button class="ln">run tests</button></form></div>
 {{end}}<div class="lbl">Terminal</div>
 <div class="actions">{{range .Terms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Label}}">{{.Label}} ▣</button>{{end}}</div>
 <div class="lbl">Actions</div>

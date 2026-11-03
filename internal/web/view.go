@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/jobs"
 )
@@ -39,6 +40,7 @@ type row struct {
 	WT      worktree
 	PR      *pr
 	Stacked *ghStackRow // nil: its branch is in no gh stack (or gh stack is missing)
+	Now     time.Time   // the clock the tests' "5m ago" counts from
 }
 
 // Sorting.
@@ -263,6 +265,52 @@ func serviceLook(state string) (glyph, class, word string) {
 		return "◐", "yellow", "busy"
 	}
 	return "○", "muted", "unknown"
+}
+
+// Tests.
+
+// testsView is a worktree's last test run (D158): "✓ passed 5m ago", "✗
+// failed 2h ago", "— never"; Title its exit code, times and commit.
+type testsView struct {
+	Glyph, Text, Class, Title string
+	Stale                     bool // HEAD moved since the run
+}
+
+// newTests is t's view at now; nil when the project has no test task.
+func newTests(t *tests, now time.Time) *testsView {
+	switch {
+	case t == nil:
+		return nil
+	case t.Last == nil:
+		return &testsView{Glyph: "—", Text: "never", Class: "muted", Title: "The test task hasn't run here"}
+	}
+	v := &testsView{Glyph: "✓", Text: "passed", Class: "green", Stale: t.Stale}
+	if t.State != "passed" {
+		v.Glyph, v.Text, v.Class = "✗", "failed", "red"
+	}
+	v.Text += " " + ago(now.Sub(t.Last.EndedAt))
+	v.Title = fmt.Sprintf("exit %d · %s · took %s", t.Last.ExitCode, t.Last.EndedAt.Local().Format("2006-01-02 15:04"), t.Last.EndedAt.Sub(t.Last.StartedAt).Round(time.Second))
+	if c := t.Last.Commit; len(c) >= 12 {
+		v.Title += " · at " + c[:12]
+	}
+	if t.Stale {
+		v.Title += " · HEAD has moved since"
+	}
+	return v
+}
+
+// ago is d in its largest whole unit: "just now", "5m ago", "3h ago",
+// "2d ago".
+func ago(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return strconv.Itoa(int(d/time.Minute)) + "m ago"
+	case d < 48*time.Hour:
+		return strconv.Itoa(int(d/time.Hour)) + "h ago"
+	}
+	return strconv.Itoa(int(d/(24*time.Hour))) + "d ago"
 }
 
 // PRs.
@@ -590,8 +638,9 @@ type rowView struct {
 	StackGlyph, StackText, StackClass string
 	AgentGlyph, AgentText, AgentClass string
 	AgentTitle                        string
-	Need                              string // the agent waits on you: its label ("permission"), shown by the name
-	Stale                             bool   // runs an older unit: "restart to apply"
+	Need                              string     // the agent waits on you: its label ("permission"), shown by the name
+	Stale                             bool       // runs an older unit: "restart to apply"
+	Tests                             *testsView // nil: no test task
 }
 
 func newRow(prefix string, r row, sel string, k sortKey) rowView {
@@ -601,7 +650,7 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 		Branch: r.WT.Branch, Base: r.WT.Base, Sel: r.WT.Slug == sel, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(r.WT.Stack), StackText: stackText(r.WT), StackClass: stackClass(r.WT.Stack),
 		AgentGlyph: agentGlyph(kind), AgentText: agentLabel(kind), AgentClass: agentClass(kind),
-		Stale: r.WT.Stale, Stacked: stackedRow(r),
+		Stale: r.WT.Stale, Stacked: stackedRow(r), Tests: newTests(r.WT.Tests, r.Now),
 	}
 	if r.WT.Agent != nil {
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
@@ -628,6 +677,8 @@ type detailView struct {
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
 	Merged, Stale                     bool
+	Tests                             *testsView // nil: no test task
+	TaskURL                           string     // posts a task to run as a job
 }
 
 type linkView struct{ Label, URL, Class string }
@@ -651,7 +702,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		Slug: wt.Slug, Branch: wt.Branch, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(wt.Stack), StackText: stackText(wt), StackClass: stackClass(wt.Stack),
 		TasksURL: path + "/tasks", PRPageURL: path + "/pr", AgentDefaultURL: path + "/agent-default", Stale: wt.Stale,
-		Stacked: newStacked(r, repo),
+		Stacked: newStacked(r, repo), Tests: newTests(wt.Tests, r.Now), TaskURL: path + "/task",
 	}
 	dim := ""
 	if wt.Stack == "stopped" {

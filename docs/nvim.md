@@ -295,12 +295,26 @@ optional = true
 ```
 
 A password request is encrypted with kitty's public key, which the
-`nvim-attach` hook above passes to the server (`KITTY_PUBLIC_KEY`). With
-`allow_remote_control password`, a request without a password is not
-accepted unasked, so every program on the host that drives kitty needs the
-host password: `kitten @` finds it in `rc-pass`. `ls` still shows the
-container every kitty window's title, command line and environment, so
+`nvim-attach` hook above passes to the server (`KITTY_PUBLIC_KEY`); without
+it the plugin fails with "Password usage requested but KITTY_PUBLIC_KEY
+environment variable is not available". With `allow_remote_control
+password`, kitty refuses a request that has no password ("Remote control is
+disabled"), so every program on the host that drives kitty needs the host
+password: `kitten @` and `kitty @` (railswitch `--new-term`) both find it in
+`rc-pass`. The container's password gets every other action refused
+("disallowed by remote_control_password"); `send-text` reports nothing,
+since it waits for no answer, but the text never arrives. `ls` still shows
+the container every kitty window's title, command line and environment, so
 keep secrets out of the environment of shells in kitty.
+
+A socket path is at most 107 bytes, and kitty appends `-<pid>` to
+`listen_on`; it ignores a longer one ("Invalid listen_on") and exports no
+`KITTY_LISTEN_ON`, which the hook then skips.
+
+Checked with kitty 0.49.2 and vim-kitty-navigator `c40c7d6`: from a
+container with railswitch's options (keep-id, no capabilities,
+`no-new-privileges`) and these mounts, `ls`, `set-user-vars` and
+`focus-window` work; `get-colors` and `launch` are refused.
 
 ## Firewall (D119)
 

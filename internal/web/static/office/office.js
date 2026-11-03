@@ -8,6 +8,7 @@ import { lobby, lab, svcState, tokens } from './rooms.js';
 import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
 import { openTerminal } from '../term/term.js';
 import { editBoard, picture } from './whiteboard.js';
+import { openArcade } from './arcade/arcade.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -64,7 +65,7 @@ async function go(to) {
   closePanel();
   $('where').textContent = 'Elevator…';
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
-    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer() };
+    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer(), arcade: (n) => { closePanel(); openArcade(n); } };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;

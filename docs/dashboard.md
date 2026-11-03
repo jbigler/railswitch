@@ -196,7 +196,7 @@ is no longer accepted. What the page shows meanwhile may be stale.
   the systemd state is the row's tooltip; while the service runs, `logs`
   opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
   and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message), Actions and Jobs.
+  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it; while it runs, a small bar of its memory against its limit, amber from 80 %, red from 95 %, with memory, CPU and PIDs in its tooltip, D161), Agent (state and message), Actions and Jobs.
 
 ## Settings
 
@@ -863,7 +863,10 @@ above an open dialog too.
   are no desktop notifications without one.
 - Polling: `railswitch --json overview` every 2 s for a project with a page open,
   every 10 s for the others (so their waiting agents reach the strip);
-  `railswitch --json pr ls` every 60 s for a project with a page open.
+  `railswitch --json pr ls` every 60 s for a project with a page open;
+  `railswitch --json stats` of the selected worktree every 10 s, by the
+  page itself (`GET /p/<prefix>/<slug>/stats`) and only while its tab is
+  visible: one `podman stats` per looking tab, not per worktree.
   A request for a prefix the project list lacks reads `project ls` again
   only when the list is 5 s old or older; until then it is a 404.
 

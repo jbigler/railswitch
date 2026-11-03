@@ -290,3 +290,8 @@ body:has(.term-panel.max) { overflow: hidden; }
 .pr-reply textarea{flex:1;font:inherit}
 .pr-review{flex-wrap:wrap}
 .pr-review .btns{display:flex;gap:.4rem}
+/* D161: a running service's memory against its limit (stats.js) */
+.svc .mem{display:inline-block;width:3.5rem;height:6px;margin-left:8px;vertical-align:middle;background:var(--bg2);border:1px solid var(--border);border-radius:3px;overflow:hidden}
+.svc .mem>span{display:block;height:100%;background:var(--green)}
+.svc .mem.warn>span{background:var(--yellow)}
+.svc .mem.crit>span{background:var(--red)}

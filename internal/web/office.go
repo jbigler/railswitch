@@ -269,6 +269,14 @@ func (s *Server) cyberNoteWrite(w http.ResponseWriter, r *http.Request) {
 // scene limit and its picture's, base64 (D151).
 const boardMaxBytes = 12<<20 + 6<<20
 
+// stats is worktree {slug}'s resource use (stats --json, D161): the
+// detail's memory bars poll it while the page is visible.
+func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
+	if p, wt, ok := s.lookup(w, r); ok {
+		s.cyberJSON(w, r, nil, "-C", p.Workspace, "-w", wt.Slug, "stats")
+	}
+}
+
 // cyberBoard is worktree {slug}'s whiteboard (whiteboard show --json).
 func (s *Server) cyberBoard(w http.ResponseWriter, r *http.Request) {
 	if p, wt, ok := s.lookup(w, r); ok {

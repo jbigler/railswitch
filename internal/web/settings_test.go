@@ -95,7 +95,7 @@ func jsonPost(target, body string) *http.Request {
 func noCSPViolation(t *testing.T, what, body string) {
 	t.Helper()
 	if strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") ||
-		strings.Count(body, "<script") != strings.Count(body, `<script src="/static/app.js" defer></script>`) {
+		strings.Count(body, "<script") != strings.Count(body, `<script src="/static/app.js" defer></script>`)+strings.Count(body, `<script src="/static/stats.js" defer></script>`) {
 		t.Errorf("%s: inline style or script (CSP)", what)
 	}
 }

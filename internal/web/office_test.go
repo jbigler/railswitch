@@ -64,6 +64,8 @@ func TestCyberpunkReads(t *testing.T) {
 		{"note rm", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1&if-hash=abc", "", 200, "-C /ws/ftest notes rm a.md --if-hash abc"},
 		{"note rm no hash", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1", "", 400, ""},
 		{"board", "GET", "/p/ftest/virtual-office/whiteboard/b", "", 200, "--json -C /ws/ftest -w b whiteboard show"},
+		{"stats", "GET", "/p/ftest/b/stats", "", 200, "--json -C /ws/ftest -w b stats"},
+		{"stats unknown worktree", "GET", "/p/ftest/nope/stats", "", 404, ""},
 		{"board unknown worktree", "GET", "/p/ftest/virtual-office/whiteboard/nope", "", 404, ""},
 		{"board write", "POST", "/p/ftest/virtual-office/whiteboard/b?if-hash=abc", `{"scene":{}}`, 200, "--json -C /ws/ftest -w b whiteboard write --if-hash abc"},
 		{"board rm", "POST", "/p/ftest/virtual-office/whiteboard/b?rm=1&if-hash=abc", "", 200, "--json -C /ws/ftest -w b whiteboard rm --if-hash abc"},

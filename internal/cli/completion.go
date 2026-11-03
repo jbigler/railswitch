@@ -108,6 +108,7 @@ var completionFlags = map[string][]string{
 	"secret add":             {"--env=", "--git-signing", "--machine", "--service="},
 	"secret set":             {"--restart"},
 	"pr ls":                  {"--all"},
+	"stats":                  {"--all"},
 	"pr merge":               {"--auto", "--method="},
 	"pr review":              {"--approve", "--comment", "--request-changes"},
 	"pr agent":               {"--thread="},

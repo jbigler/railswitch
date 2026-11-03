@@ -397,6 +397,7 @@ type pageView struct {
 	Banner                   bannerView
 	List                     listView
 	Detail                   detailView
+	Usage                    *usageView // nil: no agent usage in the chart's days
 	Jobs                     jobsView
 	Secrets                  *secretsCard // nil: every secret is set
 }
@@ -682,6 +683,8 @@ type detailView struct {
 	Tests                             *testsView // nil: no test task
 	TaskURL                           string     // posts a task to run as a job
 	Queue                             queueList  // the agent work queue (D159)
+	Usage                             string     // its agents' usage (D162); "" for none
+	Runaway                           bool       // that usage is far above its usual day
 }
 
 type linkView struct{ Label, URL, Class string }

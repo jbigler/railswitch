@@ -724,7 +724,59 @@ hook writes.
 | `config` | boolean | Its package has `[config] paths`, so it can have a project default (`agent default`, D135). |
 | `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 | `default_pending` | boolean | Its home in this worktree holds the request to take the default (a new home, or `agent default apply`): its entrypoint applies it at the agent's next start. |
-| `usage` | object or null | The status file's `usage`: the tokens of the agent's current (or last) session, as its package's hook counts them: `input`, `output`, `cache_read`, `cache_write` (integers). `null` when the file has none, or one with a count below 0 or above 10^13. claude@1 counts them from the session's transcript when a turn ends or a session starts. |
+| `usage` | object or null | The status file's `usage`: the tokens of the agent's current (or last) session, as its package's hook counts them: `input`, `output`, `cache_read`, `cache_write` (integers), and `cost` (a number, US dollars) only when the package reports one (D162). `null` when the file has none, or one with a count below 0 or above 10^13, or a cost below 0 or above 10^6. claude@1 counts them from the session's transcript when a turn ends or a session starts; it reports no cost. |
+
+## `agent usage [--days N] [--all]`
+
+The agents' token history (D162): per local day, worktree and agent, the
+growth of each agent's session counter (`agent ls`'s `usage`). Without
+`--all` the current worktree's (`-w <slug>`), with `--all` every
+worktree's of the project. `--days` (1 to 90, default 14) is the window,
+today included.
+
+The history is recorded on the host by the commands that read the status
+files: every `overview` (the dashboard polls it every 2 to 10 s for every
+project) and every `agent usage`, which records before it reports. Each
+reading adds the growth since the last one to the local day of the status
+file's `ts` (today's when `ts` is 0, in the future or past the 90 days
+kept). A count that drops (or a cost that drops) is a new session: all of
+its counter is new, nothing is subtracted. A session that ends between
+two readings loses its growth since the last one, and a new session that
+already passed the last one's counts when first read is taken as growth.
+Each sum is capped at 10^15.
+
+The file is `~/.local/share/railswitch/usage/<prefix>.json` (0600, its
+directory 0700, written atomically under `<prefix>.json.lock`): one JSON
+object, `{"schema": 1, "last": {"<worktree>/<agent>": {...}}, "days":
+[<row>...]}`, `last` each counter as last read. Days older than 90 are
+dropped. A file with a `schema` above 1 is refused as written by a newer
+railswitch (D39); `overview` then records nothing but still answers.
+
+```json
+{"today": "2026-11-04", "days": 2,
+ "daily": [{"day": "2026-11-03", "total": 2100000, "input": 100000, "output": 0, "cache_read": 2000000, "cache_write": 0, "cost": null},
+           {"day": "2026-11-04", "total": 9300000, "input": 300000, "output": 40000, "cache_read": 8900000, "cache_write": 60000, "cost": null}],
+ "rows": [{"day": "2026-11-03", "worktree": "feat", "agent": "claude", "input": 100000, "output": 0, "cache_read": 2000000, "cache_write": 0, "cost": null},
+          {"day": "2026-11-04", "worktree": "feat", "agent": "claude", "input": 300000, "output": 40000, "cache_read": 8900000, "cache_write": 60000, "cost": null}],
+ "worktrees": [{"worktree": "feat", "total": 11400000, "input": 400000, "output": 40000, "cache_read": 10900000, "cache_write": 60000, "cost": null, "today": 9300000, "median": 2100000, "runaway": true}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `today` | string | Today, `YYYY-MM-DD` in local time. |
+| `days` | number | The window, `--days`. |
+| `daily` | array | Every day of the window, oldest first, summed over the worktrees (and agents) reported; days without usage are zeros. Never null. |
+| `rows` | array | The window's days with usage, per worktree and agent: oldest first, then by worktree, then agent. Never null. |
+| `worktrees` | array | Per worktree with usage in the window, by name: its sums over the window. Never null. |
+| `input`, `output`, `cache_read`, `cache_write` | number | Tokens. |
+| `total` | number | The four summed (on `daily` and `worktrees`; `rows` have the four only). |
+| `cost` | number or null | US dollars, summed over the readings whose package reported a cost; `null` when none did. railswitch never prices tokens. |
+| `today` (worktree) | number | Its total today. |
+| `median` | number | The median total of its days with usage among the 14 before today (whatever `--days`). |
+| `runaway` | boolean | Today is far above its usual day: at least 3 days with usage among those 14, today at least 1,000,000 tokens and over 3 times `median`. The text form prints `runaway: <worktree> ...` under the table. |
+
+The text form is a table `DAY WORKTREE AGENT TOTAL INPUT OUTPUT CACHE
+READ CACHE WRITE COST` of `rows` (`-` for no cost).
 
 ## `agent screen [<name>]`
 

@@ -18,7 +18,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch agent queue add|ls|rm|clear|next | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch [--json] agent usage [--days N] [--all] | railswitch agent queue add|ls|rm|clear|next | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -56,6 +56,8 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		return cmdAgentSend(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "queue":
 		return cmdAgentQueue(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "usage":
+		return cmdAgentUsage(ctx, e, args[1:])
 	}
 	a, code, ok := agentArgs(e, args)
 	if !ok {

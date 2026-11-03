@@ -290,3 +290,4 @@ body:has(.term-panel.max) { overflow: hidden; }
 .pr-reply textarea{flex:1;font:inherit}
 .pr-review{flex-wrap:wrap}
 .pr-review .btns{display:flex;gap:.4rem}
+.set-table td.size{white-space:nowrap}

@@ -1,11 +1,14 @@
 {{define "tasks"}}<form method="post" action="{{.URL}}" class="palette" data-post data-close>
-<h2>Task in {{.Slug}}</h2>
-<input type="search" class="pal-filter" placeholder="Filter tasks" autocomplete="off" autofocus>
-<label>args <input name="args" class="pal-args mono" autocomplete="off" placeholder="quotes and \ as in a shell"></label>
+<h2>{{if .Slug}}Commands in {{.Slug}}{{else}}Commands{{end}}</h2>
+<input type="search" class="pal-filter" placeholder="Filter tasks, actions, worktrees and pages" autocomplete="off" autofocus>
+{{if .Slug}}<label>args <input name="args" class="pal-args mono" autocomplete="off" placeholder="quotes and \ as in a shell"></label>
 <label class="check"><input type="checkbox" name="term" value="1" class="pal-term" checked> in a new terminal <span class="muted">(off: a job, its output under Jobs)</span></label>
-<ul class="pal-list">
-{{range .Tasks}}<li data-filter="{{.Name}}"><button name="task" value="{{.Name}}" class="pal-task"><b>{{.Name}}</b> <span class="mono muted">{{.Command}}</span> <span class="muted">{{.Source}}</span></button></li>
-{{else}}<li class="muted">No tasks.</li>
+{{end}}<ul class="pal-list">
+{{range .Tasks}}<li data-filter="task {{.Name}}"><button name="task" value="{{.Name}}" class="pal-task"><span class="pal-kind">task</span> <b>{{.Name}}</b> <span class="mono muted">{{.Command}}</span> <span class="muted">{{.Source}}</span></button></li>
+{{else}}{{if .Slug}}<li class="muted">No tasks.</li>
+{{end}}{{end}}{{range .Actions}}<li data-filter="action {{.Label}}"><button formaction="{{.URL}}" class="pal-task" data-action><span class="pal-kind">action</span> <b>{{.Label}}</b> <span class="muted">{{$.Slug}}</span></button></li>
+{{end}}{{range .Worktrees}}<li data-filter="worktree {{.Label}}"><a href="{{.URL}}" class="pal-task"><span class="pal-kind">worktree</span> <b>{{.Label}}</b></a></li>
+{{end}}{{range .Pages}}<li data-filter="page {{.Label}}"><a href="{{.URL}}" class="pal-task"><span class="pal-kind">page</span> <b>{{.Label}}</b></a></li>
 {{end}}</ul>
-<p class="note">Enter runs the highlighted task as the box says · Shift+Enter the other way · Esc closes</p>
+<p class="note">Enter runs the highlighted line{{if .Slug}}: a task as the box says, Shift+Enter the other way{{end}} · Esc closes</p>
 </form>{{end}}

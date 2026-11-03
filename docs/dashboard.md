@@ -129,8 +129,9 @@ is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch", then two labelled groups. **project**: the
   project button (the prefix, or "choose"; opens the switcher) and, with
-  a project, `worktrees` (its page), `tasks :`, `images`, `library` and
-  `settings` (the project's pages, below). Then `◆ N need input`. On the
+  a project, after a thin divider, `worktrees` (its page), `images`,
+  `library`, `settings`, `notes` and `office` (the Virtual Office; the
+  project's pages, below). Then `◆ N need input`. On the
   right, **machine**: `settings` (the Machine page), `logs` (Dozzle at
   `http://logs.localhost/`), a `notifications` button until the browser
   permission is decided, and `⚙` (dashboard colours). The link of the
@@ -713,9 +714,9 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 | ↑ / ↓ | move the selection; the URL follows |
 | `P` | the project switcher: projects with worktree, running and ◆ counts; typing filters projects and every project's worktrees |
 | `1`–`9` | in the switcher (filter empty): jump to that project |
-| `:` | the task palette for the selected worktree |
+| `:` | the command palette (any project page; the worktree list's hint says so) |
 | Esc | close a dialog or a message |
-| Enter | in the palette: run the highlighted task as a job |
+| Enter | in the palette: run the highlighted line (a task as "in a new terminal" says) |
 | Shift+Enter | in the palette: run the task the other way from "in a new terminal" |
 
 ## Terminals
@@ -823,14 +824,22 @@ Every action is a job (below).
   and pointed to on GitHub). The page also adds a **Comment** to the
   conversation and submits a **Review** (comment only, request changes,
   approve). Typed text goes to `gh` on stdin, never in its arguments.
-- **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
-  filtered as you type, with an "args" field split like a shell (quotes and
-  backslash, no expansion), and "in a new terminal", ticked unless this
-  browser last unticked it (kept in its local storage). Enter or a click
-  runs the task as the box says: ticked, `railswitch task --new-term
-  <name> <args…>`, a terminal window (interactive tasks such as
-  `console` need one); unticked, `railswitch task <name> <args…>` as a
-  job with its output under Jobs. Shift+Enter runs it the other way.
+- **Command palette** (`:`, D155; `/p/<prefix>/<slug>/tasks`, or
+  `/p/<prefix>/palette` on a page with no worktree selected): one list,
+  filtered as you type, each line with its kind: the selected worktree's
+  **tasks** (`railswitch --json task ls`), its **actions** (the Actions
+  buttons of its detail, posting to the same URLs), the project's
+  **worktrees** and its **pages** (worktrees, images, library, settings,
+  notes, office, machine settings). A typed kind word (`task`, `action`,
+  `worktree`, `page`) filters to that kind. Tasks keep the
+  "args" field, split like a shell (quotes and backslash, no expansion),
+  and "in a new terminal", ticked unless this browser last unticked it
+  (kept in its local storage). Enter or a click runs the task as the box
+  says: ticked, `railswitch task --new-term <name> <args…>`, a terminal
+  window (interactive tasks such as `console` need one); unticked,
+  `railswitch task <name> <args…>` as a job with its output under Jobs.
+  Shift+Enter runs it the other way. Enter on an action starts its job;
+  on a worktree or page it opens it.
 - **Cancel** on a running job stops it.
 
 ## Jobs
@@ -913,9 +922,23 @@ pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
 working blue, your turn yellow, idle and off muted.
 
+## Notes
+
+`/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
+notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
+first, and opens one in an editor (`?n=<name>`, `notes show`). **Save**
+posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
+handler the office's Notes kiosk uses, which runs `notes write <name>
+--if-hash <hash>` with the text on stdin: a note changed since you opened
+it is refused, the CLI's message stays under the box, and your text stays
+in it. **Delete** asks first, then runs `notes rm <name> --if-hash
+<hash>`. **New note** takes a name (`[A-Za-z0-9][A-Za-z0-9._-]{0,99}.md`)
+and opens an empty editor (`?new=<name>`) whose Save creates it
+(`--if-hash ""`, refused when the name exists).
+
 ## Virtual Office
 
-**Virtual Office** in the header opens `/p/<prefix>/virtual-office`, which
+`office` in the header opens `/p/<prefix>/virtual-office`, which
 redirects to the active set's page, `/p/<prefix>/virtual-office/<set>/`
 (D150, D153; D150's `/virtual-office/cyberpunk` redirects the same way):
 the project as an office tower in 3D (three.js), an optional view beside

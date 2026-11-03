@@ -133,7 +133,7 @@ railswitch wt rm feature-x            # --force: even with uncommitted changes (
 
 A worktree is named after its branch (`feature/x` becomes `feature-x`).
 The dashboard's own page words (`virtual-office`, `settings`, `images`,
-`library`, `review`, `tty`) are no worktree's name: a branch called one of
+`library`, `review`, `tty`, `notes`, `palette`) are no worktree's name: a branch called one of
 them gets a short hash added, and `--name` refuses them.
 
 `stop` keeps a worktree's data; `down` deletes its volumes, the database

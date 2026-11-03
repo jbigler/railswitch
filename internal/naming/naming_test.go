@@ -107,7 +107,7 @@ func TestGitHost(t *testing.T) {
 }
 
 func TestReservedSlug(t *testing.T) {
-	for _, s := range []string{"virtual-office", "settings", "images", "library", "review", "tty"} {
+	for _, s := range []string{"virtual-office", "settings", "images", "library", "review", "tty", "notes", "palette"} {
 		if !ReservedSlug(s) {
 			t.Errorf("%s not reserved", s)
 		}

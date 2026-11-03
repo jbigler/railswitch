@@ -190,13 +190,14 @@ func TestPages(t *testing.T) {
 		want []string
 	}{
 		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`, `<div id="conn" class="banner conn" hidden></div>`}},
-		{"/p/ftest/images", 200, []string{`<nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>`, `<a class="hb" href="/p/ftest">worktrees</a>`, `<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>`}},
+		{"/p/ftest/images", 200, []string{`<nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>`, `<a class="hb" href="/p/ftest">worktrees</a>`, `<span class="hd-div" aria-hidden="true"></span>`, `href="/p/ftest/notes"`, `>office</a>`, `<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>`}},
 		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
 		{"/p/nope", 404, nil},
 		{"/p/nope/b", 404, nil},
 		{"/p/ftest/b/remove", 200, []string{"Discard changes", `name="confirm"`, "/ws/ftest/b"}},
 		{"/p/ftest/main/remove", 422, nil},
-		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`}},
+		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`, `<button formaction="/p/ftest/b/act/restart" class="pal-task" data-action>`, `<a href="/p/ftest/main" class="pal-task"><span class="pal-kind">worktree</span>`, `<a href="/p/ftest/notes" class="pal-task"><span class="pal-kind">page</span> <b>notes</b>`, `href="/machine"`}},
+		{"/p/ftest/palette", 200, []string{`href="/p/ftest/b"`, `href="/p/ftest/virtual-office"`}},
 		{"/p/ftest/b/agent-default", 200, []string{"<h3>claude</h3>", "from <b>main</b>", `action="/p/ftest/b/agent-default/promote"`, `name="name" value="claude"`, "Apply the default to every worktree", "Pending: b's claude takes the default at its next start (it runs now: stop it, then start it again)."}},
 		{"/colors", 200, []string{`value="#BC5215"`, "paper", "solar", "contrast"}},
 		{"/theme.css", 200, []string{"--accent:#BC5215", "prefers-color-scheme: dark", "--accent:#DA702C"}},

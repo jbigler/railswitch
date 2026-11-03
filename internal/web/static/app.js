@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine, notes or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -186,7 +186,6 @@ document.addEventListener("click", (e) => {
   if (termBtn) return openTermPanel(termBtn);
   const opener = t.closest("[data-open]");
   if (opener) return openDialog(opener.dataset.open);
-  if (t.closest("[data-palette]")) return openPalette();
   if (t.closest("[data-colors]")) return openColors();
   if (t.closest("[data-notify]")) {
     Notification.requestPermission().then(() => afterSwap("header"));
@@ -241,11 +240,12 @@ document.addEventListener("submit", (e) => {
   if (remove && f.elements.confirm && f.elements.confirm.value !== f.dataset.slug) {
     return toast("Type " + f.dataset.slug + " to confirm.", true);
   }
-  post(f, new URLSearchParams(new FormData(f, e.submitter)));
+  const by = e.submitter;
+  post(f, new URLSearchParams(new FormData(f, by)), by && by.hasAttribute("formaction") ? by.formAction : f.action);
 });
 
-async function post(f, data) {
-  const r = await fetch(f.action, {
+async function post(f, data, url = f.action) {
+  const r = await fetch(url, {
     method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" },
   });
   if (r.ok) {
@@ -376,18 +376,21 @@ function filterSwitcher() {
   });
 }
 
-// Task palette: Enter runs the highlighted task in a new terminal or as a
-// job, as "in a new terminal" says (ticked unless this browser last
-// unticked it); Shift+Enter the other way.
+// Command palette: the selected worktree's tasks and actions, the
+// project's worktrees and pages. Enter runs the highlighted task in a new
+// terminal or as a job, as "in a new terminal" says (ticked unless this
+// browser last unticked it), Shift+Enter the other way; it posts an
+// action and follows a link.
 
 const termKey = "railswitch.palette.term";
 
 async function openPalette() {
-  const url = $("#detail") && $("#detail").dataset.tasks;
-  if (!url || !body.dataset.sel) return toast("No worktree selected.", true);
+  if (!prefix) return toast("No project.", true);
+  const url = ($("#detail") && body.dataset.sel && $("#detail").dataset.tasks) || "/p/" + encodeURIComponent(prefix) + "/palette";
   const d = await loadDialog("palette", url);
   if (!d) return;
-  if (recall(termKey) === "0") $(".pal-term", d).checked = false;
+  const term = $(".pal-term", d);
+  if (term && recall(termKey) === "0") term.checked = false;
   $(".pal-filter", d).focus();
   filterPalette();
 }
@@ -423,8 +426,11 @@ function paletteKey(e) {
     e.preventDefault();
     if (i < 0) return;
     const f = $("#palette form");
+    const it = $(".pal-task", items[i]);
+    if (it.tagName === "A") return void (location.href = it.href);
+    if (it.hasAttribute("data-action")) return post(f, new URLSearchParams(), it.formAction);
     const data = new URLSearchParams(new FormData(f));
-    data.set("task", $("button", items[i]).value);
+    data.set("task", it.value);
     if ($(".pal-term", f).checked !== e.shiftKey) data.set("term", "1");
     else data.delete("term");
     post(f, data);
@@ -1301,6 +1307,35 @@ function startNew() {
   ready();
 }
 
+// Notes (D155): Save posts the text with the hash it was opened at, and
+// the CLI refuses it when the note changed since; the refusal stays shown
+// and the text stays in the box.
+
+function startNotes() {
+  const f = $("#note");
+  if (!f) return;
+  const err = $("#note-err");
+  const name = decodeURIComponent(f.action.split("/").pop());
+  async function write(q, text) {
+    const r = await fetch(f.action + "?" + new URLSearchParams(q), {
+      method: "POST", body: text, credentials: "same-origin", headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+    if (r.ok) return true;
+    err.textContent = (await r.text()).trim();
+    err.hidden = false;
+    toast(err.textContent, true);
+    return false;
+  }
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (await write({ "if-hash": f.dataset.hash }, f.elements.text.value)) location.href = f.dataset.back + "?n=" + encodeURIComponent(name);
+  });
+  $("[data-note-rm]", f)?.addEventListener("click", async () => {
+    if (!confirm("Delete " + name + "?")) return;
+    if (await write({ rm: "1", "if-hash": f.dataset.hash }, "")) location.href = f.dataset.back;
+  });
+}
+
 // Start: the remembered project and sort, then the stream.
 
 (function start() {
@@ -1323,6 +1358,7 @@ function startNew() {
     afterSwap("header");
     if (view === "settings") startSettings();
     if (view === "editor") startEditor();
+    if (view === "notes") startNotes();
     connect();
     return;
   }

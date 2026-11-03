@@ -2,7 +2,7 @@ package web
 
 import "net/http"
 
-// The notes page (D154): /p/{prefix}/notes lists the agents' shared notes
+// The notes page (D155): /p/{prefix}/notes lists the agents' shared notes
 // and edits one (?n=<name>) or a new one (?new=<name>). It reads through
 // notes ls and notes show; saves and removals post to cyberNoteWrite at
 // /p/{prefix}/notes/write/{name}, the office kiosk's handler.

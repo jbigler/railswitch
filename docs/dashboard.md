@@ -810,7 +810,7 @@ Every action is a job (below).
   and pointed to on GitHub). The page also adds a **Comment** to the
   conversation and submits a **Review** (comment only, request changes,
   approve). Typed text goes to `gh` on stdin, never in its arguments.
-- **Command palette** (`:`, D154; `/p/<prefix>/<slug>/tasks`, or
+- **Command palette** (`:`, D155; `/p/<prefix>/<slug>/tasks`, or
   `/p/<prefix>/palette` on a page with no worktree selected): one list,
   filtered as you type, each line with its kind: the selected worktree's
   **tasks** (`railswitch --json task ls`), its **actions** (the Actions
@@ -910,7 +910,7 @@ working blue, your turn yellow, idle and off muted.
 
 ## Notes
 
-`/p/<prefix>/notes` (`notes` in the header, D154) lists the agents' shared
+`/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
 notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
 first, and opens one in an editor (`?n=<name>`, `notes show`). **Save**
 posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the

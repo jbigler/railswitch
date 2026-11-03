@@ -1306,7 +1306,7 @@ function startNew() {
   ready();
 }
 
-// Notes (D154): Save posts the text with the hash it was opened at, and
+// Notes (D155): Save posts the text with the hash it was opened at, and
 // the CLI refuses it when the note changed since; the refusal stays shown
 // and the text stays in the box.
 

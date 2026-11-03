@@ -142,6 +142,8 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/settings/file", s.settingsFile)
 	m.HandleFunc("POST /p/{prefix}/settings/template/export", s.templateExport)
 	m.HandleFunc("POST /p/{prefix}/settings/template/accept", s.templateAccept)
+	m.HandleFunc("GET /p/{prefix}/tidy", s.tidyPage)
+	m.HandleFunc("POST /p/{prefix}/tidy", s.tidyRemove)
 	m.HandleFunc("GET /p/{prefix}/images", s.imagesPage)
 	m.HandleFunc("GET /p/{prefix}/images/edit/{name}", s.imagesEditor)
 	m.HandleFunc("POST /p/{prefix}/images/check/{name}", s.imagesCheck)
@@ -427,7 +429,7 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 	base := "/p/" + p.Prefix
 	v := tasksView{Slug: wt.Slug, Pages: []actionView{
 		{"worktrees", base}, {"images", imagesURL(p.Prefix)}, {"library", base + "/library"},
-		{"settings", settingsURL(p.Prefix)}, {"notes", base + "/notes"}, {"office", base + "/virtual-office"},
+		{"settings", settingsURL(p.Prefix)}, {"notes", base + "/notes"}, {"tidy", base + "/tidy"}, {"office", base + "/virtual-office"},
 		{"machine settings", "/machine"},
 	}}
 	if wt.Slug != "" {

@@ -1035,7 +1035,7 @@ function jobNext(f) {
   return "";
 }
 
-if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr") {
+if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr" || view === "tidy") {
   document.addEventListener("submit", (e) => {
     const f = e.target;
     if (f.matches("form[data-add-file]")) {

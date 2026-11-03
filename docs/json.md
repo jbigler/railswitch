@@ -541,6 +541,46 @@ Exit 0; a failed removal is a warning.
 | `bytes` | number | The removed images' size, layers they share with kept images included. |
 | `warnings` | array | A project that doesn't load (nothing of its prefix is removed), a removal that failed. |
 
+## `tidy`
+
+What `railswitch tidy [--all] [--days <n>]` suggests removing (D160):
+the project's (`--all`: every registered project's) worktrees and images.
+It removes nothing; `tidy --rm [--force] <id>...` does (text output only).
+
+```json
+{"days": 14, "bytes": 1390004096,
+ "items": [
+  {"id": "wt:shop/feature-x", "kind": "worktree", "project": "shop", "name": "feature-x", "branch": "feature/x",
+   "reasons": ["pr-merged", "stopped"], "pr": 42, "stack": "stopped",
+   "idle_since": "2026-10-01T09:00:00Z", "idle_from": "systemd", "dirty": false, "bytes": 4096, "partial": false},
+  {"id": "image:localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "kind": "image", "project": "shop",
+   "name": "localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "branch": "", "reasons": ["unused"], "pr": 0,
+   "stack": "", "idle_since": "", "idle_from": "", "dirty": false, "bytes": 1390000000, "partial": false}],
+ "warnings": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `days` | number | `--days`: a stopped stack idle longer is a candidate (default 14). |
+| `items[].id` | string | What `tidy --rm` takes: `wt:<prefix>/<slug>` or `image:<name>`. |
+| `items[].kind` | string | `worktree` or `image`. |
+| `items[].reasons` | array | A worktree: `pr-merged`, `pr-closed` (its branch's PR as `pr ls` picks it), `stopped` (the stack is stopped and idle over `days`). An image: `unused` (no worktree's current render builds it and no container uses it: `gc`'s judgement). The base worktree is never listed. |
+| `items[].pr` | number | The merged or closed PR's number; `0` for none. |
+| `items[].stack` | string | The worktree's stack state, as `overview` has it; `""` for an image. |
+| `items[].idle_since` | string | For a stopped stack, RFC 3339 UTC: the latest time one of its units stopped, as systemd remembers it (`idle_from` `systemd`; forgotten at reboot), else HEAD's commit time (`commit`); `""` when neither is known (never `stopped` then). |
+| `items[].dirty` | boolean | Uncommitted changes or untracked files: `tidy --rm` keeps it unless `--force`. |
+| `items[].bytes` | number | A worktree: its checkout's regular files (apparent size, symlinks not followed). An image: podman's size, shared layers included. |
+| `items[].partial` | boolean | The checkout walk stopped after 200,000 entries: `bytes` is a lower bound. |
+| `bytes` | number | The items' bytes summed. |
+| `warnings` | array | No PR states (gh missing or failing, a repo not on GitHub: no `pr-*` reasons), a project that doesn't load (`--all`), `gc`'s warnings. |
+
+`tidy --rm <id>...` lists again first and removes only the ids still
+listed: worktrees first, by `wt rm`'s path (its checks, exact names), then
+images by `podman rmi <name>`. An id no longer listed, or a dirty worktree
+without `--force`, is refused and kept; the others still go; exit 1 when
+any was refused or failed. `--force` applies only to the dirty worktrees
+named: they go as `wt rm --force` takes them.
+
 ## `fw show [service]`
 
 The firewall of the worktree's containers (the workspace root: every

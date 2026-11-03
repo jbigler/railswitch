@@ -140,6 +140,19 @@ removed, or the old one after a PostgreSQL major upgrade
 It keeps everything any registered project's worktrees use now, running
 or not, and everything of a project that doesn't load.
 
+`railswitch tidy` suggests more: worktrees whose PR is merged or closed
+or whose stack has been stopped over two weeks (`--days <n>`), and the
+project's unused images, with their sizes. It removes nothing until you
+name what goes:
+
+```bash
+railswitch tidy                          # the list, each with an id
+railswitch tidy --rm wt:shop/feature-x   # removes it as wt rm does, if it is still on the list
+```
+
+A dirty worktree stays unless you add `--force`. The dashboard's `tidy`
+page is the same list with checkboxes.
+
 Removing a whole project removes its images too:
 
 ```bash

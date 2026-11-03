@@ -82,34 +82,8 @@ func cmdGC(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	p := podman.Podman{R: e.run}
-	imgs, err := p.Images(ctx)
-	if err != nil {
+	if err := gcImages(ctx, p, keep, &doc); err != nil {
 		return e.fail(err)
-	}
-	// podman lists an image once per tag, each entry with every name.
-	seenName, seenID := map[string]bool{}, map[string]bool{}
-	for _, img := range imgs {
-		if seenID[img.ID] {
-			continue
-		}
-		seenID[img.ID] = true
-		gone := 0
-		for _, name := range img.Names {
-			if seenName[name] {
-				continue
-			}
-			seenName[name] = true
-			switch gcImageVerdict(name, img, keep) {
-			case "remove":
-				doc.Images = append(doc.Images, gcImage{Name: name, Size: img.Size})
-				gone++
-			case "unsure":
-				doc.Unsure = append(doc.Unsure, gcImage{Name: name, Size: img.Size})
-			}
-		}
-		if gone > 0 && gone == len(img.Names) {
-			doc.Bytes += img.Size
-		}
 	}
 	if len(keep.blocked) == 0 {
 		doc.Store = gcStore(dirs, keep)
@@ -166,6 +140,40 @@ func cmdGC(ctx context.Context, e *env, args []string) int {
 	}
 	e.printGC(doc, removeVolumes || *dry && *vols)
 	return 0
+}
+
+// gcImages fills doc's images, unsure and bytes: keep decides each name.
+func gcImages(ctx context.Context, p podman.Podman, keep gcKeep, doc *gcDoc) error {
+	imgs, err := p.Images(ctx)
+	if err != nil {
+		return err
+	}
+	// podman lists an image once per tag, each entry with every name.
+	seenName, seenID := map[string]bool{}, map[string]bool{}
+	for _, img := range imgs {
+		if seenID[img.ID] {
+			continue
+		}
+		seenID[img.ID] = true
+		gone := 0
+		for _, name := range img.Names {
+			if seenName[name] {
+				continue
+			}
+			seenName[name] = true
+			switch gcImageVerdict(name, img, keep) {
+			case "remove":
+				doc.Images = append(doc.Images, gcImage{Name: name, Size: img.Size})
+				gone++
+			case "unsure":
+				doc.Unsure = append(doc.Unsure, gcImage{Name: name, Size: img.Size})
+			}
+		}
+		if gone > 0 && gone == len(img.Names) {
+			doc.Bytes += img.Size
+		}
+	}
+	return nil
 }
 
 // gcKeep loads every registered project and collects what it uses.

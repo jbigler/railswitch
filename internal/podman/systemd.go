@@ -117,11 +117,15 @@ func (s Systemd) Show(ctx context.Context, unit string, props ...string) (map[st
 // its blocks (one per unit, separated by a blank line) into each unit's
 // K=V map, keyed by its Id. No units: no call.
 func (s Systemd) ShowMany(ctx context.Context, units []string, props ...string) (map[string]map[string]string, error) {
+	return s.showMany(ctx, []string{"show"}, units, props)
+}
+
+func (s Systemd) showMany(ctx context.Context, show, units, props []string) (map[string]map[string]string, error) {
 	out := map[string]map[string]string{}
 	if len(units) == 0 {
 		return out, nil
 	}
-	args := append([]string{"show", "-p", strings.Join(append([]string{"Id"}, props...), ",")}, units...)
+	args := append(append(show, "-p", strings.Join(append([]string{"Id"}, props...), ",")), units...)
 	r, err := s.run(ctx, 0, args...)
 	if err != nil {
 		return nil, err
@@ -168,6 +172,32 @@ func (s Systemd) UnitState(ctx context.Context, unit string) (UnitState, error) 
 
 // activeEnterLayout is ActiveEnterTimestamp under --timestamp=us+utc.
 const activeEnterLayout = "Mon 2006-01-02 15:04:05.000000 UTC"
+
+// InactiveSince is the latest time any of units entered the inactive
+// state, read as ActiveSince reads its timestamp, from one `systemctl
+// --user show`; the zero time when none has since the user manager
+// started (a reboot forgets it).
+func (s Systemd) InactiveSince(ctx context.Context, units []string) (time.Time, error) {
+	props, err := s.showMany(ctx, []string{"show", "--timestamp=us+utc"}, units, []string{"InactiveEnterTimestamp"})
+	if err != nil {
+		return time.Time{}, err
+	}
+	var last time.Time
+	for unit, p := range props {
+		v := p["InactiveEnterTimestamp"]
+		if v == "" || v == "n/a" {
+			continue
+		}
+		t, err := time.ParseInLocation(activeEnterLayout, v, time.UTC)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("systemctl show %s: InactiveEnterTimestamp %q: %w", unit, v, err)
+		}
+		if t.After(last) {
+			last = t
+		}
+	}
+	return last, nil
+}
 
 // ActiveSince is when unit last entered the active state, read exactly
 // (microseconds, UTC) with `systemctl --user show --timestamp=us+utc -p

@@ -1,6 +1,6 @@
 # The virtual office's asset kit: shared code for the build_*.py sets.
 # Run build_all.py in Blender (docs/office-kit.md); each set exports one GLB per
-# piece into internal/web/static/office/models/. Geometry is authored in three.js coordinates (Y up, front +Z) and rotated to
+# piece into internal/web/static/office/sets/cyberpunk/. Geometry is authored in three.js coordinates (Y up, front +Z) and rotated to
 # Blender's Z up (front -Y) at the end, so the glTF export lands back in three.js
 # exactly as authored. Neon surfaces all use RS_Neon_Accent: recolor it in three.js
 # by material name (emissive) to change the highlight color.
@@ -10,7 +10,7 @@ from mathutils import Vector, Matrix, Euler
 from contextlib import contextmanager
 
 OUT = os.environ.get('OFFICE_KIT_OUT') or os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', '..', 'internal', 'web', 'static', 'office', 'models'))
+    os.path.join(os.path.dirname(__file__), '..', '..', 'internal', 'web', 'static', 'office', 'sets', 'cyberpunk'))
 os.makedirs(OUT, exist_ok=True)
 
 # ---------- collections: each set builds into its own, cleared on rebuild ----------

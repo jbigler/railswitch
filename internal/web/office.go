@@ -13,17 +13,17 @@ import (
 	"github.com/jbigler/railswitch/internal/jobs"
 )
 
-// The cyberpunk office (D146): an optional 3D view of a project,
+// The Virtual Office (D146): an optional 3D view of a project,
 // /p/{prefix}/virtual-office/cyberpunk (the set in the path: D150), the starship's logic (D144) on the office kit
 // (D145). The lobby is the project (its PRs, issues and the agents' shared
 // notes), each worktree a floor of the tower (its services in the server
 // room, the user's desk, the agent's desk, one pet); the elevator goes
-// between them. The page is static/cyberpunk/; it follows the project
-// through the "cyberpunk" event stream (cyberState as JSON) and acts
+// between them. The page is static/office/; it follows the project
+// through the "office" event stream (cyberState as JSON) and acts
 // through the same POSTs as the 2D pages, plus the JSON reads below.
-// Nothing runs while no cyberpunk page is open.
+// Nothing runs while no office page is open.
 
-// cyberState is what the cyberpunk page draws, sent whole when it changes.
+// cyberState is what the office page draws, sent whole when it changes.
 type cyberState struct {
 	Prefix    string       `json:"prefix"`
 	Error     string       `json:"error,omitempty"` // the overview's error
@@ -85,14 +85,14 @@ func (s *Server) cyberData(prefix string) cyberState {
 	return st
 }
 
-// pushCyber sends a cyberpunk page its state when it changed. s.mu is held.
+// pushCyber sends a office page its state when it changed. s.mu is held.
 func (s *Server) pushCyber(sub *subscriber) {
 	b, err := json.Marshal(s.cyberData(sub.prefix))
 	if err != nil {
 		log.Printf("dashboard: %v", err)
 		return
 	}
-	sub.diff("cyberpunk", "state", string(b), nil)
+	sub.diff("office", "state", string(b), nil)
 }
 
 type cyberView struct {
@@ -119,7 +119,7 @@ func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Security-Policy", officeCSP)
-	s.html(w, http.StatusOK, "cyberpunk", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix})
+	s.html(w, http.StatusOK, "office", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix})
 }
 
 // cyberJSON answers the output of a railswitch --json read as is.
@@ -139,7 +139,7 @@ func (s *Server) cyberJSON(w http.ResponseWriter, r *http.Request, stdin []byte,
 	_, _ = w.Write(out)
 }
 
-// cyberProject is the {prefix} of a cyberpunk read; false: answered.
+// cyberProject is the {prefix} of a office read; false: answered.
 func (s *Server) cyberProject(w http.ResponseWriter, r *http.Request) (projectRow, bool) {
 	p, ok, err := s.project(r.Context(), r.PathValue("prefix"))
 	if err != nil {

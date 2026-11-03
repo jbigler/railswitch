@@ -319,7 +319,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	view := q.Get("view")
-	if view != "settings" && view != "new" && view != "library" && view != "cyberpunk" {
+	if view != "settings" && view != "new" && view != "library" && view != "office" {
 		view = ""
 	}
 	prefix := q.Get("p")

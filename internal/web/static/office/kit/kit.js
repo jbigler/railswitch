@@ -3,7 +3,7 @@
 // the named moving parts. No import of its own: the dashboard's CSP allows no
 // import map, so the caller passes a GLTFLoader from whatever three.js it bundles.
 //
-//   const kit = await loadOfficeKit('/static/office/models/', names, new GLTFLoader());
+//   const kit = await loadOfficeKit('/static/office/sets/cyberpunk/', names, new GLTFLoader());
 //   const tank = kit.spawn('Pet_Aquarium'); scene.add(tank);
 //   kit.setAccent('#ff2b6d');               // neon, accent LEDs, every screen
 //   kit.setSecondary('#ffaa00');            // violet trim, jellyfish tentacles

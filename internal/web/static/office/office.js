@@ -1,6 +1,6 @@
-// The cyberpunk office (D146): the starship's view (D144) as an office
+// The Virtual Office (D146): the starship's view (D144) as an office
 // tower. The lobby is the project, each worktree a floor; the elevator goes
-// between them. State comes from /events?view=cyberpunk; actions are the
+// between them. State comes from /events?view=office; actions are the
 // dashboard's POSTs. Everything from the CLI is text: shown with
 // textContent only.
 import { World } from './world.js';
@@ -511,9 +511,9 @@ function apply(next) {
   jobs.replaceChildren(...state.jobs.slice(0, 4).map((j) => el('li', { class: j.state }, `${j.slug || prefix}: ${j.label} · ${j.state}`)));
 }
 
-const es = new EventSource(`/events?p=${encodeURIComponent(prefix)}&view=cyberpunk`);
+const es = new EventSource(`/events?p=${encodeURIComponent(prefix)}&view=office`);
 es.onmessage = (m) => {
   const ev = JSON.parse(m.data);
-  if (ev.type === 'cyberpunk') apply(JSON.parse(ev.html));
+  if (ev.type === 'office') apply(JSON.parse(ev.html));
 };
 addEventListener('hashchange', () => go(fromHash()));

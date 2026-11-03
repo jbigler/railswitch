@@ -3,8 +3,8 @@
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
 one pet per floor, androids. 109 glTF files (`.gltf` + `.bin`, textures as PNGs beside
-them) in `internal/web/static/office/models/`, a
-loader in `internal/web/static/office/kit.js`, and the Blender scripts that
+them) in `internal/web/static/office/sets/cyberpunk/` (the built-in set), a
+loader in `internal/web/static/office/kit/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
 
 ## Conventions
@@ -144,7 +144,7 @@ relative to the floor piece.
   `Dog_Lying` (no bed) and `Parrot_Fly`, with `Furn_DogBed` and
   `Furn_ParrotPerch`.
 - **Ext**: `CityBackdrop` (a flat night skyline; the office draws its city
-  in the page instead, `static/cyberpunk/city.js`).
+  in the page instead, `static/office/city.js`).
 - **Lounge and lived-in** (`build_lounge.py`): `Furn_Sofa_L` (an L-shaped
   sectional in charcoal leather on a painted plinth, a channel-quilted back,
   an oxblood throw and pillow, a secondary-neon strip along its base),

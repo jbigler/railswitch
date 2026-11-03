@@ -1021,12 +1021,12 @@ can drive the agent, as it can start a job. Nothing else can (Security
 model above). Text from the CLI (PR and issue titles, notes, the agent's
 screen) is shown as text, never as markup.
 
-The models are the office kit (`static/office/`, built by
+The models are the office kit (`static/office/sets/cyberpunk/`, built by
 `tools/office-kit/`), served as glTF with their textures as separate files:
 the content policy (`default-src 'self'`) refuses the `blob:` URLs three.js
 makes for textures embedded in a GLB. three.js is MIT
-(`static/cyberpunk/three.LICENSE.txt`), vendored with its GLTF loader and
-bloom passes as one module by `internal/web/static/cyberpunk/vendor.sh`.
+(`static/office/three.LICENSE.txt`), vendored with its GLTF loader and
+bloom passes as one module by `internal/web/static/office/vendor.sh`.
 
 ## Commands
 
@@ -1124,9 +1124,9 @@ Library page connects with `&view=library`: the same, with the
 machine-level jobs (`~machine`) among its `jobs`. The new page connects when
 Create starts, with `&view=new` and the new prefix, which need not be
 registered: it gets the `header`, `projects`, `strip` and `banner` of no
-project and that prefix's project-level `jobs`. The cyberpunk office
-connects with `&view=cyberpunk`: it gets one event,
-`{"type":"cyberpunk","id":"state","html":"<JSON>"}`, whenever the project's
+project and that prefix's project-level `jobs`. The Virtual Office
+connects with `&view=office`: it gets one event,
+`{"type":"office","id":"state","html":"<JSON>"}`, whenever the project's
 state changes, `html` holding `{prefix, error, pr_error, worktrees[]{slug,
 branch, base, stack, services, agent, links, pr}, jobs[]{id, slug, label,
 state}, banner[]}` (the overview's and `pr ls`'s fields; arrays never

@@ -1,8 +1,8 @@
-// The cyberpunk office's engine: renderer and bloom, camera, picking,
+// The Virtual Office's engine: renderer and bloom, camera, picking,
 // walking, labels and screens. The starship's (D144), on the office kit
 // (static/office/, D145): its pieces carry their own collider boxes.
 import * as THREE from './three.js';
-import { loadOfficeKit, animate, setElevatorDoors, createRoamer, createFlyer } from '../office/kit.js';
+import { loadOfficeKit, animate, setElevatorDoors, createRoamer, createFlyer } from './kit/kit.js';
 
 export { THREE, animate, setElevatorDoors, createRoamer, createFlyer };
 
@@ -34,7 +34,7 @@ export function hash(s) {
 let kitP = null;
 const shared = new Set();
 export function kit(names) {
-  kitP ??= loadOfficeKit('/static/office/models/', names, new THREE.GLTFLoader()).then((k) => {
+  kitP ??= loadOfficeKit('/static/office/sets/cyberpunk/', names, new THREE.GLTFLoader()).then((k) => {
     for (const n of names) {
       k.spawn(n).traverse((o) => {
         if (o.geometry) shared.add(o.geometry);

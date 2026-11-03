@@ -664,6 +664,37 @@ tools, agents). It is an array with one object per service.
 | `state` | string | The unit's systemd state, `<ActiveState>/<SubState>`, e.g. `active/running`, `inactive/dead`, `failed/failed`. An on-demand agent has no unit: `running` while its container runs (`railswitch agent`), else `on-demand`. |
 | `health` | string | podman's health status of the container (`starting`, `healthy`, `unhealthy`) for a service with a health check (the app included, D34); `""` for a service without one, or when its container does not exist. |
 
+## `stats [--all]`
+
+Each service's resource use against its limits (D161): the current
+worktree's (`-w <slug>`, or the worktree the working directory is in), or
+with `--all` every worktree's, in registry then model order. One `podman
+stats --no-stream` samples the running containers; a service whose
+container isn't running has `running` false and zero figures.
+
+```json
+[
+  {"worktree": "feat", "service": "rails", "role": "app", "container": "demo-feat-rails", "running": true,
+   "cpu_percent": 3.5, "mem_used": 3221000000, "mem_limit": 4295000000, "mem_percent": 75.0, "pids": 12, "pids_limit": 4096},
+  {"worktree": "feat", "service": "deps", "role": "deps", "container": "demo-feat-deps", "running": false,
+   "cpu_percent": 0, "mem_used": 0, "mem_limit": 0, "mem_percent": 0, "pids": 0, "pids_limit": 4096}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `worktree` | string | The worktree's slug. |
+| `service` | string | Service id, e.g. `rails`, `db`. |
+| `role` | string | As in `status`. |
+| `container` | string | Its container's exact name. |
+| `running` | boolean | podman sampled it: its container runs. |
+| `cpu_percent` | number | podman's CPU percentage for the sample (100 is one core); 0 when podman printed none. |
+| `mem_used` | number | Memory in use, in bytes, as podman prints it (4 significant figures). |
+| `mem_limit` | number | The container's memory limit in bytes, as podman reports it: the unit's `Memory=` (D34). |
+| `mem_percent` | number | `mem_used` of `mem_limit`, in percent, podman's figure (else computed). |
+| `pids` | number | Processes and threads in the container; 0 when podman printed none. |
+| `pids_limit` | number | The unit's `PidsLimit=` (D34), from the model; known while it is stopped too. |
+
 ## `agent ls`
 
 The project's agents (`project.toml [agents]`), sorted by name, with each

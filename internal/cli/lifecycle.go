@@ -139,6 +139,33 @@ func cmdStatus(ctx context.Context, e *env, args []string) int {
 	return 0
 }
 
+// railswitch stats [--all]: each service's CPU, memory and PIDs against
+// its limits (D161), for the worktree or, with --all, every worktree.
+func cmdStats(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("stats")
+	all := fs.Bool("all", false, "every worktree of the project")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() != 0 {
+		return e.usageErr("stats takes no arguments")
+	}
+	var l *lifecycle.L
+	slug, code := "", 0
+	if *all {
+		l, code = e.projectLifecycle(ctx)
+	} else {
+		l, slug, code = e.lifecycle(ctx, "stats")
+	}
+	if code != 0 {
+		return code
+	}
+	if err := l.Stats(ctx, slug, e.json); err != nil {
+		return e.fail(err)
+	}
+	return 0
+}
+
 // railswitch logs [-f] [service]: a service's logs (default: the app).
 func cmdLogs(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("logs")

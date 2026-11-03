@@ -60,6 +60,7 @@ var commands = map[string]command{
 	"down":          cmdDown,
 	"restart":       cmdRestart,
 	"status":        cmdStatus,
+	"stats":         cmdStats,
 	"overview":      cmdOverview,
 	"share":         cmdShare,
 	"unshare":       cmdUnshare,

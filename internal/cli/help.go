@@ -120,6 +120,7 @@ var synopses = map[string]string{
 	"signer rm":              "signer rm <library> <fingerprint>",
 	"stack ls":               "stack ls",
 	"stack switch":           "stack switch <branch>",
+	"stats":                  "stats [--all]",
 	"status":                 "status",
 	"stop":                   "stop",
 	"task":                   "task [--new-term] <name> [<args>...] | task ls | task set <name> <command> | task rm <name> | task restore <name>",

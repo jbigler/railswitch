@@ -307,3 +307,8 @@ body:has(.term-panel.max) { overflow: hidden; }
 .queue .quiet-link:hover{color:var(--blue);text-decoration:underline}
 .queue-items{margin:2px 0 0;padding-left:1.2em}
 .queue-add textarea{display:block;width:100%;font:inherit}
+/* D161: a running service's memory against its limit (stats.js) */
+.svc .mem{display:inline-block;width:3.5rem;height:6px;margin-left:8px;vertical-align:middle;background:var(--bg2);border:1px solid var(--border);border-radius:3px;overflow:hidden}
+.svc .mem>span{display:block;height:100%;background:var(--green)}
+.svc .mem.warn>span{background:var(--yellow)}
+.svc .mem.crit>span{background:var(--red)}

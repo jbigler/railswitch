@@ -377,7 +377,7 @@ export class World {
   hits(x, y) {
     const r = this.renderer.domElement.getBoundingClientRect();
     this.ray.setFromCamera(new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), this.camera);
-    return this.ray.intersectObjects(this.scene.children, true).filter((h) => !IS_COL.test(h.object.name) && h.object.isMesh !== false && shown(h.object));
+    return this.ray.intersectObjects(this.scene.children, true).filter((h) => !IS_COL.test(h.object.name) && h.object.isMesh !== false && !h.object.isPoints && shown(h.object)); // dust and holo points never catch a click
   }
 
   pick(x, y) {

@@ -35,8 +35,11 @@ type projectState struct {
 	// stacks are the worktrees' gh-stack stacks (by slug), read with the
 	// PRs; a failed read leaves the last ones (gh stack is a nicety).
 	stacks map[string]*ghStackRow
-	kinds  map[string]string // agentKind per slug at the last overview
-	known  bool              // kinds holds a first overview (the baseline)
+	// usage is the agents' usage history (D162), read with the PRs; a
+	// failed read leaves the last one.
+	usage *usageDoc
+	kinds map[string]string // agentKind per slug at the last overview
+	known bool              // kinds holds a first overview (the baseline)
 }
 
 // event is one Server-Sent Event, as JSON.
@@ -230,6 +233,10 @@ func (s *Server) pollPRs(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		usage, uerr := readUsage(ctx, s.c.CLI, j.ws)
+		if ctx.Err() != nil {
+			return
+		}
 		s.mu.Lock()
 		if p := s.state[j.prefix]; p != nil {
 			if err != nil {
@@ -240,6 +247,9 @@ func (s *Server) pollPRs(ctx context.Context) {
 				for _, r := range rows {
 					p.prs[r.Slug] = r.PR
 				}
+			}
+			if uerr == nil {
+				p.usage = &usage
 			}
 			if serr == nil {
 				p.stacks = map[string]*ghStackRow{}
@@ -480,7 +490,7 @@ func (s *Server) push(sub *subscriber) {
 	for _, f := range []struct {
 		id   string
 		data any
-	}{{"detail", pv.Detail}, {"jobs", pv.Jobs}} {
+	}{{"usage", pv.Usage}, {"detail", pv.Detail}, {"jobs", pv.Jobs}} {
 		html, err := render(f.id, f.data)
 		if err != nil {
 			log.Printf("dashboard: %v", err)
@@ -580,6 +590,13 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 				banner.Template = &bannerTemplate{Ref: p.ov.Template.Ref, URL: settingsURL(prefix) + "#template"}
 			}
 		}
+		if p.usage != nil {
+			for _, w := range p.usage.Worktrees {
+				if w.Runaway {
+					banner.Lines = append(banner.Lines, runawayText(w))
+				}
+			}
+		}
 	}
 	pv := pageView{
 		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(),
@@ -588,9 +605,15 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		Detail: detailView{Empty: true},
 		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),
 	}
+	var usage *usageDoc
+	if p := s.state[prefix]; p != nil {
+		usage = p.usage
+	}
+	pv.Usage = newUsage(usage)
 	for _, r := range rows {
 		if r.WT.Slug == sel {
 			pv.Detail = newDetail(prefix, r, projectPRRepo(rows))
+			pv.Detail.Usage, pv.Detail.Runaway = usageLine(usage, sel)
 		}
 	}
 	return pv

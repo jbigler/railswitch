@@ -32,6 +32,7 @@ var synopses = map[string]string{
 	"whiteboard write":       "whiteboard write --if-hash <hash>  ({\"scene\", \"png\"} on stdin)",
 	"whiteboard rm":          "whiteboard rm --if-hash <hash>",
 	"agent update":           "agent update [<name>]",
+	"agent usage":            "agent usage [--days <n>] [--all]",
 	"allow-ports":            "allow-ports",
 	"build":                  "build [--force] [--pull]",
 	"completion":             "completion bash|zsh|fish",

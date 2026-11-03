@@ -141,6 +141,22 @@ the agent in a live terminal in the page (D149), the same session
 work as in your terminal. Closing the panel leaves a service agent
 running.
 
+### Its token usage over time
+
+When the agent's package counts its session's tokens (claude@1 does),
+railswitch keeps a 90-day history per day, worktree and agent:
+
+```bash
+railswitch agent usage               # this worktree, the last 14 days
+railswitch agent usage --all --days 30   # every worktree of the project
+```
+
+The dashboard draws it as a bar chart under the worktree list, shows each
+worktree's total in its Agent area, and warns in the banner when a
+worktree's agents use far more today than on a usual day. The history is
+recorded while the dashboard runs (or whenever you run `overview` or
+`agent usage`). Cost shows only when the package reports one.
+
 ## Its sandbox
 
 - **Firewall.** An agent's firewall is always enforce: it reaches only its

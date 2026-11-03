@@ -349,6 +349,7 @@ type pageView struct {
 	Banner                   bannerView
 	List                     listView
 	Detail                   detailView
+	Usage                    *usageView // nil: no agent usage in the chart's days
 	Jobs                     jobsView
 	Secrets                  *secretsCard // nil: every secret is set
 }
@@ -628,6 +629,8 @@ type detailView struct {
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
 	Merged, Stale                     bool
+	Usage                             string // its agents' usage (D162); "" for none
+	Runaway                           bool   // that usage is far above its usual day
 }
 
 type linkView struct{ Label, URL, Class string }

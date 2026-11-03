@@ -11,7 +11,9 @@ import (
 	"slices"
 	"strings"
 	"text/tabwriter"
+	"time"
 
+	"github.com/jbigler/railswitch/internal/agentusage"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
@@ -153,6 +155,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
 		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()
 	}
+	var samples []agentusage.Sample
 	for _, w := range wts {
 		in, err := m.Instance(w)
 		if err != nil {
@@ -195,9 +198,14 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 				agents = append(agents, a.Name)
 			}
 		}
-		ow.Agent = chooseAgent(agentRows(m, in, agents))
+		rows := agentRows(m, in, agents)
+		samples = usageSamples(samples, w.Slug, rows)
+		ow.Agent = chooseAgent(rows)
 		ov.Worktrees = append(ov.Worktrees, ow)
 	}
+	// The dashboard's poll is the usage history's sampler (D162); a sample
+	// that can't be recorded is lost, never the overview's error.
+	_ = agentusage.Record(l.usagePath(m.Prefix), samples, time.Now())
 	return ov, nil
 }
 

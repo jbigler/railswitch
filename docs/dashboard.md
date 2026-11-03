@@ -149,7 +149,9 @@ is no longer accepted. What the page shows meanwhile may be stale.
   `overview`'s `template_update` is true: "The template <ref> changed
   since this project was made from it. See it in Settings" (the
   Settings page's Template changed notice, below; `<ref>` is
-  `overview`'s `template.ref`).
+  `overview`'s `template.ref`). One line per worktree `agent usage`
+  flags `runaway` (D162): "Agent usage of <worktree> is high today: <n>
+  tokens, over 3 times its usual day (<median>)."
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
@@ -163,6 +165,14 @@ is no longer accepted. What the page shows meanwhile may be stale.
   (`overview`'s `stale`, after a settings change, say) shows "restart to
   apply" next to its stack state, in the row and in the detail; `restart`
   clears it.
+- **Agent usage** (under the list, D162): the project's agents' tokens
+  per day for the last 14 days, one bar per day (today's in the accent
+  colour; a bar's tooltip is its day, its tokens and the cost when the
+  agent's package reports one), headed by the sum. It is `agent usage
+  --all --days 14 --json`, read with the PRs (every 60 s with a page
+  open, and on Refresh PRs); absent while those days have no usage. The
+  chart is SVG drawn by the page's template with attributes and classes
+  only (the CSP allows no inline style).
 - **Secrets to set** (above the detail, only while a secret `up` needs
   is unset: `secret ls`'s `up`, read once per page load with 5 s to
   answer; none when it can't be read): "Set these secrets to start
@@ -196,7 +206,7 @@ is no longer accepted. What the page shows meanwhile may be stale.
   the systemd state is the row's tooltip; while the service runs, `logs`
   opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
   and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message), Actions and Jobs.
+  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message, then the worktree's usage from `agent usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when reported, in yellow with `⚠` while it is `runaway`), Actions and Jobs.
 
 ## Settings
 
@@ -1077,6 +1087,10 @@ docs/json.md.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
+- `railswitch --json agent usage --all --days 14` (project, with the PRs):
+  the agents' usage history (D162). The dashboard's `overview` poll is
+  what records it: every `overview` adds each agent's session counter's
+  growth to the history.
 - `railswitch [--json] pr ls` (project): each worktree's pull request via
   the host's `gh` (`gh pr list --head=<branch>` per worktree branch on the
   repo from `project.toml`, never a worktree's git config, run in `/`, away from any workspace's config files): number, title, url, state (`draft`, `open`,

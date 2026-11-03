@@ -16,6 +16,7 @@
 {{with .Agent}}<div><span class="{{.Class}}">{{.Glyph}} {{.Label}}</span> <span class="muted">{{.Name}}</span></div>
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
+{{end}}{{with .Usage}}<div class="usage-line{{if $.Runaway}} yellow{{else}} muted{{end}}">{{if $.Runaway}}⚠ {{end}}{{.}}</div>
 {{end}}<div class="lbl">Terminal</div>
 <div class="actions">{{range .Terms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Label}}">{{.Label}} ▣</button>{{end}}</div>
 <div class="lbl">Actions</div>

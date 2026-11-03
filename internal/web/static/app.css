@@ -290,3 +290,9 @@ body:has(.term-panel.max) { overflow: hidden; }
 .pr-reply textarea{flex:1;font:inherit}
 .pr-review{flex-wrap:wrap}
 .pr-review .btns{display:flex;gap:.4rem}
+.usage{padding:0 14px 8px}
+.usage-sum{text-transform:none;letter-spacing:0}
+.usage-chart{display:block;width:100%;max-width:420px;height:56px}
+.usage-chart .bar{fill:var(--blue)}
+.usage-chart .bar.today{fill:var(--accent)}
+.usage-line{margin-top:4px}

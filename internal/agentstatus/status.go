@@ -22,16 +22,23 @@ type Status struct {
 }
 
 // Usage is the tokens of the agent's current session, as its package's hook
-// counts them: input, output, and input read from or written to the cache.
+// counts them: input, output, and input read from or written to the cache;
+// Cost is the session's cost in US dollars when the package reports one
+// (D162), nil otherwise.
 type Usage struct {
-	Input      int64 `json:"input"`
-	Output     int64 `json:"output"`
-	CacheRead  int64 `json:"cache_read"`
-	CacheWrite int64 `json:"cache_write"`
+	Input      int64    `json:"input"`
+	Output     int64    `json:"output"`
+	CacheRead  int64    `json:"cache_read"`
+	CacheWrite int64    `json:"cache_write"`
+	Cost       *float64 `json:"cost,omitempty"`
 }
 
-// maxTokens bounds each count: a larger or negative one is no usage.
-const maxTokens = 1e13
+// maxTokens bounds each count, maxCost the cost: a larger or negative one
+// is no usage.
+const (
+	maxTokens = 1e13
+	maxCost   = 1e6
+)
 
 func (u *Usage) valid() bool {
 	for _, n := range []int64{u.Input, u.Output, u.CacheRead, u.CacheWrite} {
@@ -39,7 +46,7 @@ func (u *Usage) valid() bool {
 			return false
 		}
 	}
-	return true
+	return u.Cost == nil || *u.Cost >= 0 && *u.Cost <= maxCost
 }
 
 // maxSize is the largest status file read; a larger one is off.

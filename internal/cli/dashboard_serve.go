@@ -90,7 +90,7 @@ func dashboardServe(ctx context.Context, e *env, args []string) int {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Home: home, Version: buildinfo.Version, Now: time.Now, Run: e.run, Env: jobEnv})
+	srv := web.New(web.Config{Token: tok, CLI: selfCLI{r: e.run, exe: exe}, Jobs: hub, Exe: exe, Home: home, Data: dirs.Data, Version: buildinfo.Version, Now: time.Now, Run: e.run, Env: jobEnv})
 	hs := &http.Server{
 		Addr: machine.DashboardAddr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second,
 		BaseContext: func(net.Listener) context.Context { return ctx }, // ends the event streams

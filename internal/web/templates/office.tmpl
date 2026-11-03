@@ -1,14 +1,14 @@
-{{/* cyberpunk: the cyberpunk office view (D146), a 3D page drawn by static/cyberpunk/. */}}
-{{define "cyberpunk"}}<!doctype html>
+{{/* office: the Virtual Office view (D146, D153), a 3D page drawn by static/office/. */}}
+{{define "office"}}<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
-<link rel="stylesheet" href="/static/cyberpunk/cyberpunk.css">
-<script type="module" src="/static/cyberpunk/cyberpunk.js"></script>
+<link rel="stylesheet" href="/static/office/office.css">
+<script type="module" src="/static/office/office.js"></script>
 </head>
-<body data-prefix="{{.Prefix}}">
+<body data-prefix="{{.Prefix}}" data-set="{{.Set}}">
 <div id="scene" aria-hidden="true"></div>
 <header class="hud-top">
   <a class="hud-btn" href="/p/{{.Prefix}}">◂ dashboard</a>
@@ -24,7 +24,7 @@
   <header><h2 id="panel-title"></h2><button type="button" class="hud-btn" id="panel-close" aria-label="Close">✕</button></header>
   <div id="panel-body"></div>
 </aside>
-<noscript><p class="hud-banner">The cyberpunk office needs JavaScript and WebGL. <a href="/p/{{.Prefix}}">Back to the dashboard</a>.</p></noscript>
+<noscript><p class="hud-banner">The Virtual Office needs JavaScript and WebGL. <a href="/p/{{.Prefix}}">Back to the dashboard</a>.</p></noscript>
 </body>
 </html>
 {{end}}

@@ -29,6 +29,16 @@ import (
 //go:embed static
 var staticFiles embed.FS
 
+// StaticFS is the dashboard's static files (/static/...): the CLI reads the
+// office's piece list and built-in sets from it (D153).
+func StaticFS() fs.FS {
+	s, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // Config is what the dashboard runs with.
 type Config struct {
 	Token   string
@@ -36,6 +46,7 @@ type Config struct {
 	Jobs    *jobs.Hub
 	Exe     string // for job argv[0]
 	Home    string // the user's home: a new project's default folder, its create job's dir
+	Data    string // the machine data dir: installed office sets' files (D153)
 	Version string
 	Now     func() time.Time
 	// Run and Env start terminals (D149): the runner, and the environment
@@ -75,17 +86,17 @@ func New(c Config) *Server {
 		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1),
 		state: map[string]*projectState{}, subs: map[*subscriber]struct{}{},
 	}
-	static, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		panic(err)
-	}
+	static := StaticFS()
 	m := http.NewServeMux()
 	m.HandleFunc("GET /healthz", s.healthz)
 	m.HandleFunc("GET /{$}", s.root)
 	m.HandleFunc("GET /p/{prefix}", s.page)
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
 	m.HandleFunc("GET /p/{prefix}/virtual-office", s.officeDefault)
-	m.HandleFunc("GET /p/{prefix}/virtual-office/cyberpunk", s.cyberPage)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/cyberpunk", s.officeDefault) // D150's link
+	m.HandleFunc("GET /p/{prefix}/virtual-office/{set}/{$}", s.cyberPage)
+	m.HandleFunc("GET /office/set.json", s.officeSetJSON)
+	m.HandleFunc("GET /office/sets/{name}/{path...}", s.officeSetFile)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/issues", s.cyberIssues)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/prs", s.cyberPRs)
 	m.HandleFunc("POST /p/{prefix}/virtual-office/issues/{n}/start", s.cyberIssueStart)
@@ -144,6 +155,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /machine", s.machinePage)
 	m.HandleFunc("GET /machine/templates/import", s.templateImportPage)
 	m.HandleFunc("POST /machine/templates/import", s.templateImport)
+	m.HandleFunc("POST /machine/office/use", s.officeUse)
 	m.HandleFunc("POST /machine/signers/add", s.signerAdd)
 	m.HandleFunc("POST /machine/signers/rm", s.signerRm)
 	m.HandleFunc("POST /machine/signers/revoke", s.signerRevoke)
@@ -319,7 +331,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	view := q.Get("view")
-	if view != "settings" && view != "new" && view != "library" && view != "cyberpunk" {
+	if view != "settings" && view != "new" && view != "library" && view != "office" {
 		view = ""
 	}
 	prefix := q.Get("p")

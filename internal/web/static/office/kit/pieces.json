@@ -1,0 +1,1847 @@
+{
+ "pieces": {
+  "Arch_CeilingDuct_4m": {
+   "extras": [],
+   "max": [
+    2.015,
+    -0.02,
+    0.311
+   ],
+   "min": [
+    -2.015,
+    -0.608,
+    -0.27
+   ]
+  },
+  "Arch_Ceiling_CableTray_4m": {
+   "extras": [],
+   "max": [
+    2.0,
+    0.0,
+    0.21
+   ],
+   "min": [
+    -2.0,
+    -0.858,
+    -0.2
+   ]
+  },
+  "Arch_Ceiling_Fan": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.66,
+    0.0,
+    0.66
+   ],
+   "min": [
+    -0.66,
+    -0.637,
+    -0.66
+   ],
+   "parts": [
+    "Fan_Blades"
+   ]
+  },
+  "Arch_Ceiling_HangingCables": {
+   "extras": [],
+   "max": [
+    1.123,
+    0.0,
+    0.361
+   ],
+   "min": [
+    -1.159,
+    -0.777,
+    -0.315
+   ]
+  },
+  "Arch_Ceiling_LightRun_4m": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    2.0,
+    0.0,
+    0.04
+   ],
+   "min": [
+    -2.0,
+    -0.662,
+    -0.04
+   ]
+  },
+  "Arch_Ceiling_PipeRun_4m": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    2.0,
+    0.0,
+    0.26
+   ],
+   "min": [
+    -2.0,
+    -0.352,
+    -0.24
+   ]
+  },
+  "Arch_Ceiling_Sprinkler_4m": {
+   "extras": [],
+   "max": [
+    2.0,
+    0.0,
+    0.025
+   ],
+   "min": [
+    -2.0,
+    -0.247,
+    -0.025
+   ]
+  },
+  "Arch_Ceiling_Vent": {
+   "extras": [],
+   "max": [
+    0.31,
+    0.0,
+    0.31
+   ],
+   "min": [
+    -0.31,
+    -0.062,
+    -0.31
+   ]
+  },
+  "Arch_Door": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.74,
+    2.321,
+    0.09
+   ],
+   "min": [
+    -0.586,
+    -0.021,
+    -0.035
+   ]
+  },
+  "Arch_Elevator_Cab": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.95,
+    2.86,
+    0.036
+   ],
+   "min": [
+    -0.95,
+    -0.08,
+    -2.0
+   ],
+   "parts": [
+    "CabDoor_L",
+    "CabDoor_R"
+   ]
+  },
+  "Arch_Elevator_Floor": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    2.0,
+    4.0,
+    0.125
+   ],
+   "min": [
+    -2.0,
+    -0.016,
+    -2.45
+   ],
+   "parts": [
+    "Btn_Down",
+    "Btn_Up",
+    "Door_L",
+    "Door_R"
+   ]
+  },
+  "Arch_Floor_4m": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    2.0,
+    0.0,
+    2.0
+   ],
+   "min": [
+    -2.0,
+    0.0,
+    -2.0
+   ]
+  },
+  "Arch_GlassWall_2m": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.025,
+    4.0,
+    0.041
+   ],
+   "min": [
+    -1.025,
+    0.0,
+    -0.041
+   ]
+  },
+  "Arch_GlassWall_4m": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    2.025,
+    4.0,
+    0.041
+   ],
+   "min": [
+    -2.025,
+    0.0,
+    -0.041
+   ]
+  },
+  "Arch_GlassWall_Door_4m": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    2.025,
+    4.0,
+    0.125
+   ],
+   "min": [
+    -2.025,
+    0.0,
+    -0.041
+   ],
+   "parts": [
+    "GlassDoor"
+   ]
+  },
+  "Arch_WallPipes_4m": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    2.02,
+    3.59,
+    0.139
+   ],
+   "min": [
+    -2.02,
+    3.17,
+    0.0
+   ]
+  },
+  "Arch_Wall_Door_4m": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    2.0,
+    4.0,
+    0.018
+   ],
+   "min": [
+    -2.0,
+    -0.021,
+    -0.15
+   ]
+  },
+  "Arch_Wall_Plain_2m": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.0,
+    4.0,
+    0.018
+   ],
+   "min": [
+    -1.0,
+    0.0,
+    -0.15
+   ]
+  },
+  "Arch_Wall_Plain_4m": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    2.0,
+    4.0,
+    0.018
+   ],
+   "min": [
+    -2.0,
+    0.0,
+    -0.15
+   ]
+  },
+  "Arch_Wall_Window_4m": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    2.0,
+    4.0,
+    0.031
+   ],
+   "min": [
+    -2.0,
+    0.0,
+    -0.15
+   ]
+  },
+  "Char_Android_A": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.277,
+    1.839,
+    0.161
+   ],
+   "min": [
+    -0.278,
+    0.004,
+    -0.138
+   ],
+   "parts": [
+    "AndroidA_Arm_L",
+    "AndroidA_Arm_R",
+    "AndroidA_Head",
+    "AndroidA_Leg_L",
+    "AndroidA_Leg_R"
+   ]
+  },
+  "Char_Android_Agent": {
+   "extras": [
+    "parts"
+   ],
+   "max": [
+    0.44,
+    1.839,
+    0.44
+   ],
+   "min": [
+    -0.44,
+    0.003,
+    -0.44
+   ],
+   "parts": [
+    "Agent_Arm_L",
+    "Agent_Arm_R",
+    "Agent_Head",
+    "Agent_Leg_L",
+    "Agent_Leg_R"
+   ]
+  },
+  "Char_Android_B": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.277,
+    1.839,
+    0.161
+   ],
+   "min": [
+    -0.278,
+    0.004,
+    -0.138
+   ],
+   "parts": [
+    "AndroidB_Arm_L",
+    "AndroidB_Arm_R",
+    "AndroidB_Head",
+    "AndroidB_Leg_L",
+    "AndroidB_Leg_R"
+   ]
+  },
+  "Char_Android_C": {
+   "extras": [
+    "parts"
+   ],
+   "max": [
+    0.277,
+    1.839,
+    0.161
+   ],
+   "min": [
+    -0.278,
+    0.004,
+    -0.138
+   ],
+   "parts": [
+    "AndroidC_Arm_L",
+    "AndroidC_Arm_R",
+    "AndroidC_Head",
+    "AndroidC_Leg_L",
+    "AndroidC_Leg_R"
+   ]
+  },
+  "Deco_Backpack": {
+   "extras": [],
+   "max": [
+    0.166,
+    0.478,
+    0.132
+   ],
+   "min": [
+    -0.166,
+    0.01,
+    -0.11
+   ]
+  },
+  "Deco_BookStack": {
+   "extras": [],
+   "max": [
+    0.135,
+    0.169,
+    0.158
+   ],
+   "min": [
+    -0.135,
+    0.0,
+    -0.158
+   ]
+  },
+  "Deco_Boxes": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.807,
+    0.652,
+    0.437
+   ],
+   "min": [
+    -0.25,
+    0.0,
+    -0.211
+   ]
+  },
+  "Deco_CableRun": {
+   "extras": [],
+   "max": [
+    1.253,
+    0.021,
+    0.245
+   ],
+   "min": [
+    -1.255,
+    0.0,
+    -0.123
+   ]
+  },
+  "Deco_CoatRack": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.574,
+    1.775,
+    0.22
+   ],
+   "min": [
+    -0.23,
+    0.0,
+    -0.22
+   ]
+  },
+  "Deco_CorkBoard": {
+   "extras": [],
+   "max": [
+    0.507,
+    0.308,
+    0.034
+   ],
+   "min": [
+    -0.507,
+    -0.308,
+    0.0
+   ]
+  },
+  "Deco_Crate": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.46,
+    0.46,
+    0.29
+   ],
+   "min": [
+    -0.46,
+    0.0,
+    -0.29
+   ],
+   "points": {
+    "top": [
+     0,
+     0.46,
+     0
+    ]
+   }
+  },
+  "Deco_DeskClutter": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.49,
+    0.224,
+    0.25
+   ],
+   "min": [
+    -0.582,
+    -0.003,
+    -0.203
+   ]
+  },
+  "Deco_DeskLamp": {
+   "extras": [],
+   "max": [
+    0.249,
+    0.464,
+    0.075
+   ],
+   "min": [
+    -0.101,
+    0.0,
+    -0.075
+   ]
+  },
+  "Deco_Extinguisher": {
+   "extras": [],
+   "max": [
+    0.11,
+    1.188,
+    0.098
+   ],
+   "min": [
+    -0.1,
+    0.55,
+    -0.095
+   ]
+  },
+  "Deco_FloorLamp": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.2,
+    1.912,
+    1.08
+   ],
+   "min": [
+    -0.2,
+    0.0,
+    -0.2
+   ]
+  },
+  "Deco_HangingPlanter": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.208,
+    0.0,
+    0.147
+   ],
+   "min": [
+    -0.208,
+    -1.304,
+    -0.11
+   ]
+  },
+  "Deco_Headphones": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.135,
+    0.051,
+    0.1
+   ],
+   "min": [
+    -0.135,
+    0.0,
+    -0.045
+   ]
+  },
+  "Deco_MiniFridge": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.25,
+    1.213,
+    0.305
+   ],
+   "min": [
+    -0.25,
+    0.0,
+    -0.275
+   ]
+  },
+  "Deco_Mug": {
+   "extras": [],
+   "max": [
+    0.04,
+    0.1,
+    0.04
+   ],
+   "min": [
+    -0.04,
+    0.0,
+    -0.04
+   ]
+  },
+  "Deco_NeonSign": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.6,
+    0.36,
+    0.06
+   ],
+   "min": [
+    -0.6,
+    -0.36,
+    0.0
+   ]
+  },
+  "Deco_PetBowls": {
+   "extras": [],
+   "max": [
+    0.21,
+    0.053,
+    0.13
+   ],
+   "min": [
+    -0.21,
+    0.0,
+    -0.13
+   ]
+  },
+  "Deco_PizzaBoxes": {
+   "extras": [],
+   "max": [
+    0.228,
+    0.141,
+    0.229
+   ],
+   "min": [
+    -0.233,
+    0.0,
+    -0.219
+   ]
+  },
+  "Deco_Plant_Bush": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.471,
+    1.189,
+    0.521
+   ],
+   "min": [
+    -0.522,
+    0.0,
+    -0.519
+   ]
+  },
+  "Deco_Plant_Floor": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.306,
+    1.317,
+    0.269
+   ],
+   "min": [
+    -0.375,
+    0.0,
+    -0.267
+   ]
+  },
+  "Deco_Plant_Floor_B": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.215,
+    1.383,
+    0.311
+   ],
+   "min": [
+    -0.293,
+    0.0,
+    -0.299
+   ]
+  },
+  "Deco_Plant_Monstera": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.769,
+    1.474,
+    0.602
+   ],
+   "min": [
+    -0.816,
+    0.0,
+    -0.849
+   ]
+  },
+  "Deco_Plant_Palm": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.935,
+    1.876,
+    0.991
+   ],
+   "min": [
+    -0.979,
+    0.0,
+    -0.973
+   ]
+  },
+  "Deco_Plant_Small": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.093,
+    0.398,
+    0.1
+   ],
+   "min": [
+    -0.105,
+    0.0,
+    -0.071
+   ]
+  },
+  "Deco_Plant_Snake": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.16,
+    1.442,
+    0.16
+   ],
+   "min": [
+    -0.16,
+    0.0,
+    -0.16
+   ]
+  },
+  "Deco_Plant_Trailing": {
+   "extras": [],
+   "max": [
+    0.276,
+    0.0,
+    0.241
+   ],
+   "min": [
+    -0.256,
+    -1.921,
+    -0.239
+   ]
+  },
+  "Deco_Poster": {
+   "extras": [],
+   "max": [
+    0.313,
+    0.432,
+    0.007
+   ],
+   "min": [
+    -0.313,
+    -0.432,
+    0.004
+   ]
+  },
+  "Deco_Rug_Geo": {
+   "extras": [],
+   "max": [
+    1.3,
+    0.01,
+    0.9
+   ],
+   "min": [
+    -1.3,
+    0.0,
+    -0.9
+   ]
+  },
+  "Deco_TrashBin": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.297,
+    0.477,
+    0.15
+   ],
+   "min": [
+    -0.274,
+    -0.004,
+    -0.15
+   ]
+  },
+  "Deco_WallClock": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.25,
+    0.25,
+    0.06
+   ],
+   "min": [
+    -0.25,
+    -0.25,
+    -0.008
+   ],
+   "parts": [
+    "Clock_Hour",
+    "Clock_Minute",
+    "Clock_Second"
+   ]
+  },
+  "Deco_Whiteboard": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.295,
+    2.055,
+    0.275
+   ],
+   "min": [
+    -1.295,
+    0.0,
+    -0.275
+   ]
+  },
+  "Ext_CityBackdrop": {
+   "extras": [],
+   "max": [
+    15.0,
+    14.0,
+    0.0
+   ],
+   "min": [
+    -15.0,
+    0.0,
+    0.0
+   ]
+  },
+  "Furn_Arcade_Stand": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.33,
+    0.78,
+    0.28
+   ],
+   "min": [
+    -0.33,
+    0.0,
+    -0.28
+   ],
+   "points": {
+    "top": [
+     0,
+     0.78,
+     0
+    ]
+   }
+  },
+  "Furn_Armchair": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.45,
+    0.978,
+    0.43
+   ],
+   "min": [
+    -0.45,
+    0.0,
+    -0.453
+   ]
+  },
+  "Furn_Bookshelf": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.8,
+    2.28,
+    0.28
+   ],
+   "min": [
+    -0.8,
+    0.427,
+    0.0
+   ]
+  },
+  "Furn_CatTree": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.338,
+    1.018,
+    0.318
+   ],
+   "min": [
+    -0.308,
+    0.0,
+    -0.308
+   ]
+  },
+  "Furn_Chair": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.325,
+    1.266,
+    0.3
+   ],
+   "min": [
+    -0.3,
+    0.005,
+    -0.387
+   ]
+  },
+  "Furn_CoffeeCounter": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.02,
+    1.4,
+    0.35
+   ],
+   "min": [
+    -1.02,
+    0.0,
+    -0.32
+   ],
+   "points": {
+    "top": [
+     0,
+     0.94,
+     0
+    ]
+   }
+  },
+  "Furn_CoffeeTable": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.624,
+    0.52,
+    0.374
+   ],
+   "min": [
+    -0.624,
+    -0.002,
+    -0.374
+   ],
+   "points": {
+    "top": [
+     0,
+     0.42,
+     0
+    ]
+   }
+  },
+  "Furn_Desk": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.0,
+    0.75,
+    0.4
+   ],
+   "min": [
+    -1.0,
+    0.0,
+    -0.4
+   ],
+   "points": {
+    "top": [
+     0,
+     0.75,
+     0
+    ]
+   }
+  },
+  "Furn_DogBed": {
+   "extras": [],
+   "max": [
+    0.42,
+    0.139,
+    0.42
+   ],
+   "min": [
+    -0.42,
+    -0.005,
+    -0.42
+   ]
+  },
+  "Furn_HoloTable": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.7,
+    1.295,
+    1.23
+   ],
+   "min": [
+    -1.7,
+    0.0,
+    -1.2
+   ]
+  },
+  "Furn_ParrotPerch": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.26,
+    1.282,
+    0.22
+   ],
+   "min": [
+    -0.25,
+    0.0,
+    -0.22
+   ],
+   "points": {
+    "bar": [
+     0,
+     1.284,
+     0
+    ]
+   }
+  },
+  "Furn_SideTable": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.28,
+    0.874,
+    0.28
+   ],
+   "min": [
+    -0.28,
+    0.0,
+    -0.28
+   ]
+  },
+  "Furn_Sofa": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.1,
+    0.81,
+    0.45
+   ],
+   "min": [
+    -1.1,
+    0.047,
+    -0.45
+   ]
+  },
+  "Furn_Sofa_L": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.45,
+    0.74,
+    1.95
+   ],
+   "min": [
+    -1.45,
+    0.02,
+    -0.475
+   ]
+  },
+  "Furn_Sofa_Short": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.7,
+    0.81,
+    0.45
+   ],
+   "min": [
+    -0.7,
+    0.047,
+    -0.45
+   ]
+  },
+  "Furn_Stool": {
+   "extras": [
+    "collider"
+   ],
+   "max": [
+    0.22,
+    0.745,
+    0.22
+   ],
+   "min": [
+    -0.22,
+    0.0,
+    -0.22
+   ]
+  },
+  "Furn_Workstation_2Mon": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.214,
+    1.31,
+    1.15
+   ],
+   "min": [
+    -0.9,
+    0.0,
+    -0.4
+   ]
+  },
+  "Furn_Workstation_3Mon": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.314,
+    1.31,
+    1.155
+   ],
+   "min": [
+    -1.0,
+    0.0,
+    -0.4
+   ]
+  },
+  "Furn_Workstation_Lived": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.414,
+    1.715,
+    1.416
+   ],
+   "min": [
+    -1.703,
+    -0.012,
+    -0.473
+   ],
+   "points": {
+    "top": [
+     0,
+     0.75,
+     0
+    ]
+   }
+  },
+  "Furn_Workstation_Lived_B": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.414,
+    1.715,
+    1.416
+   ],
+   "min": [
+    -1.703,
+    -0.012,
+    -0.473
+   ],
+   "points": {
+    "top": [
+     0,
+     0.75,
+     0
+    ]
+   }
+  },
+  "Light_CeilingPanel": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    1.35,
+    0.0,
+    0.75
+   ],
+   "min": [
+    -1.35,
+    -0.055,
+    -0.75
+   ]
+  },
+  "Light_HexCluster": {
+   "extras": [],
+   "max": [
+    0.345,
+    0.0,
+    0.275
+   ],
+   "min": [
+    -0.345,
+    -0.661,
+    -0.374
+   ]
+  },
+  "Light_PendantBox": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.25,
+    0.0,
+    0.154
+   ],
+   "min": [
+    -0.25,
+    -0.926,
+    -0.15
+   ]
+  },
+  "Pet_Aquarium": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.61,
+    1.34,
+    0.245
+   ],
+   "min": [
+    -0.61,
+    0.0,
+    -0.235
+   ],
+   "parts": [
+    "Aquarium_Bubbles",
+    "Fish_1",
+    "Fish_2",
+    "Fish_3",
+    "Fish_4",
+    "Fish_5",
+    "Fish_6"
+   ]
+  },
+  "Pet_Cat_Curled": {
+   "extras": [
+    "parts"
+   ],
+   "max": [
+    0.24,
+    0.177,
+    0.24
+   ],
+   "min": [
+    -0.24,
+    0.0,
+    -0.24
+   ],
+   "parts": [
+    "CatCurled_Body"
+   ]
+  },
+  "Pet_Cat_Sitting": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.181,
+    0.382,
+    0.147
+   ],
+   "min": [
+    -0.097,
+    -0.003,
+    -0.185
+   ],
+   "parts": [
+    "Cat_Head",
+    "Cat_Tail"
+   ]
+  },
+  "Pet_Cat_Walk": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.08,
+    0.453,
+    0.237
+   ],
+   "min": [
+    -0.08,
+    -0.001,
+    -0.257
+   ],
+   "parts": [
+    "CatWalk_Head",
+    "CatWalk_Leg_BL",
+    "CatWalk_Leg_BR",
+    "CatWalk_Leg_FL",
+    "CatWalk_Leg_FR",
+    "CatWalk_Tail"
+   ]
+  },
+  "Pet_Dog_Bed": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.42,
+    0.422,
+    0.42
+   ],
+   "min": [
+    -0.42,
+    -0.005,
+    -0.42
+   ],
+   "parts": [
+    "Dog_Body",
+    "Dog_Head",
+    "Dog_Tail"
+   ]
+  },
+  "Pet_Dog_Lying": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.119,
+    0.362,
+    0.371
+   ],
+   "min": [
+    -0.119,
+    -0.001,
+    -0.321
+   ],
+   "parts": [
+    "DogLie_Head",
+    "DogLie_Tail"
+   ]
+  },
+  "Pet_Dog_Walk": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.104,
+    0.517,
+    0.385
+   ],
+   "min": [
+    -0.103,
+    0.003,
+    -0.321
+   ],
+   "parts": [
+    "DogWalk_Head",
+    "DogWalk_Leg_BL",
+    "DogWalk_Leg_BR",
+    "DogWalk_Leg_FL",
+    "DogWalk_Leg_FR",
+    "DogWalk_Tail"
+   ]
+  },
+  "Pet_Gecko_Terrarium": {
+   "extras": [
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.308,
+    0.49,
+    0.207
+   ],
+   "min": [
+    -0.308,
+    0.0,
+    -0.208
+   ],
+   "parts": [
+    "Gecko"
+   ]
+  },
+  "Pet_JellyfishTank": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.658,
+    2.562,
+    0.658
+   ],
+   "min": [
+    -0.658,
+    -0.004,
+    -0.658
+   ],
+   "parts": [
+    "JellyTank_Bubbles",
+    "Jelly_1",
+    "Jelly_1_T1",
+    "Jelly_1_T2",
+    "Jelly_1_T3",
+    "Jelly_1_T4",
+    "Jelly_1_T5",
+    "Jelly_1_T6",
+    "Jelly_1_T7",
+    "Jelly_1_T8",
+    "Jelly_2",
+    "Jelly_2_T1",
+    "Jelly_2_T2",
+    "Jelly_2_T3",
+    "Jelly_2_T4",
+    "Jelly_2_T5",
+    "Jelly_2_T6",
+    "Jelly_2_T7",
+    "Jelly_2_T8",
+    "Jelly_3",
+    "Jelly_3_T1",
+    "Jelly_3_T2",
+    "Jelly_3_T3",
+    "Jelly_3_T4",
+    "Jelly_3_T5",
+    "Jelly_3_T6",
+    "Jelly_3_T7",
+    "Jelly_3_T8"
+   ]
+  },
+  "Pet_Parrot_Fly": {
+   "extras": [
+    "parts"
+   ],
+   "max": [
+    0.06,
+    0.245,
+    0.098
+   ],
+   "min": [
+    -0.06,
+    -0.157,
+    -0.143
+   ],
+   "parts": [
+    "ParrotFly_Head",
+    "ParrotFly_Wing_L",
+    "ParrotFly_Wing_R"
+   ]
+  },
+  "Pet_Parrot_Perch": {
+   "extras": [
+    "collider",
+    "parts"
+   ],
+   "max": [
+    0.26,
+    1.529,
+    0.22
+   ],
+   "min": [
+    -0.25,
+    0.0,
+    -0.22
+   ],
+   "parts": [
+    "Parrot_Body",
+    "Parrot_Head"
+   ]
+  },
+  "Tech_Arcade_Bartop": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.329,
+    0.71,
+    0.279
+   ],
+   "min": [
+    -0.329,
+    0.0,
+    -0.275
+   ]
+  },
+  "Tech_CRT": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.209,
+    0.342,
+    0.082
+   ],
+   "min": [
+    -0.209,
+    0.0,
+    -0.285
+   ]
+  },
+  "Tech_DataPad": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.1,
+    0.011,
+    0.07
+   ],
+   "min": [
+    -0.1,
+    0.0,
+    -0.07
+   ]
+  },
+  "Tech_Keyboard": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.225,
+    0.028,
+    0.076
+   ],
+   "min": [
+    -0.225,
+    0.0,
+    -0.075
+   ]
+  },
+  "Tech_Laptop": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.17,
+    0.242,
+    0.12
+   ],
+   "min": [
+    -0.17,
+    0.0,
+    -0.177
+   ]
+  },
+  "Tech_Monitor": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.31,
+    0.56,
+    0.05
+   ],
+   "min": [
+    -0.31,
+    0.0,
+    -0.11
+   ]
+  },
+  "Tech_MonitorBank": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    1.355,
+    2.335,
+    0.505
+   ],
+   "min": [
+    -1.355,
+    0.005,
+    -0.25
+   ]
+  },
+  "Tech_MonitorStack": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    1.17,
+    0.965,
+    0.017
+   ],
+   "min": [
+    -0.658,
+    -0.005,
+    -0.473
+   ]
+  },
+  "Tech_MonitorWall_A": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.0,
+    2.245,
+    0.225
+   ],
+   "min": [
+    -1.0,
+    0.0,
+    -0.225
+   ]
+  },
+  "Tech_MonitorWall_B": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    1.0,
+    2.245,
+    0.225
+   ],
+   "min": [
+    -1.0,
+    0.0,
+    -0.225
+   ]
+  },
+  "Tech_NetworkShelf": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.45,
+    1.84,
+    0.653
+   ],
+   "min": [
+    -0.663,
+    0.006,
+    0.0
+   ]
+  },
+  "Tech_PCTower": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.114,
+    0.48,
+    0.229
+   ],
+   "min": [
+    -0.11,
+    0.0,
+    -0.225
+   ]
+  },
+  "Tech_ServerRack": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.603,
+    3.984,
+    0.51
+   ],
+   "min": [
+    -0.66,
+    0.0,
+    -0.5
+   ]
+  },
+  "Tech_ServerRack_B": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.618,
+    3.984,
+    0.51
+   ],
+   "min": [
+    -0.547,
+    0.0,
+    -0.5
+   ]
+  },
+  "Tech_TerminalKiosk": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.251,
+    1.232,
+    0.4
+   ],
+   "min": [
+    -0.251,
+    0.0,
+    -0.225
+   ]
+  },
+  "Tech_ToolCart": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.335,
+    1.045,
+    0.21
+   ],
+   "min": [
+    -0.335,
+    0.0,
+    -0.21
+   ]
+  },
+  "Tech_Vending_Drinks": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.51,
+    1.95,
+    0.48
+   ],
+   "min": [
+    -0.51,
+    0.0,
+    -0.41
+   ]
+  },
+  "Tech_Vending_Ramen": {
+   "extras": [
+    "collider",
+    "accent"
+   ],
+   "max": [
+    0.51,
+    1.95,
+    0.48
+   ],
+   "min": [
+    -0.51,
+    0.0,
+    -0.41
+   ]
+  },
+  "Tech_WallDisplay": {
+   "extras": [
+    "accent"
+   ],
+   "max": [
+    0.8,
+    0.45,
+    0.044
+   ],
+   "min": [
+    -0.8,
+    -0.457,
+    -0.015
+   ]
+  }
+ },
+ "version": 1
+}

@@ -45,6 +45,7 @@ var commands = map[string]command{
 	"pack":          cmdPack,
 	"notes":         cmdNotes,
 	"whiteboard":    cmdWhiteboard,
+	"office":        cmdOffice,
 	"issue":         cmdIssue,
 	"fw":            cmdFw,
 	"gc":            cmdGC,

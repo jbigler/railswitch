@@ -34,7 +34,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { loadOfficeKit } from '../../internal/web/static/office/kit.js';
+import { loadOfficeKit } from '../../internal/web/static/office/kit/kit.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -125,7 +125,9 @@ let flyer = null;
 const staticBoxes = [], dynamicCols = [];
 try {
   const names = [...LAYOUT.map((l) => l[0]), ...(PET.roamer ? [PET.roamer.walk, PET.roamer.rest] : []), ...(PET.perches ? ['Pet_Parrot_Fly'] : [])];
-  kit = await loadOfficeKit('../../internal/web/static/office/models/', [...new Set(names)], new GLTFLoader());
+  const pieces = await (await fetch('../../internal/web/static/office/kit/pieces.json')).json();
+  const set = { name: 'cyberpunk', base: '../../internal/web/static/office/sets/cyberpunk/', have: Object.keys(pieces.pieces) };
+  kit = await loadOfficeKit(set, pieces, [...new Set(names)], new GLTFLoader(), THREE);
   for (const [n, x, y, z, ry] of LAYOUT) {
     const o = kit.spawn(n);
     o.position.set(x, y, z); o.rotation.y = ry;

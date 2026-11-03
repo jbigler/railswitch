@@ -3,8 +3,8 @@
 The 3D pieces the dashboard's virtual office is built from: a worn, lived-in
 cyberpunk office walked in first person, several floors joined by an elevator,
 one pet per floor, androids. 109 glTF files (`.gltf` + `.bin`, textures as PNGs beside
-them) in `internal/web/static/office/models/`, a
-loader in `internal/web/static/office/kit.js`, and the Blender scripts that
+them) in `internal/web/static/office/sets/cyberpunk/` (the built-in set), a
+loader in `internal/web/static/office/kit/kit.js`, and the Blender scripts that
 build them in `tools/office-kit/`.
 
 ## Conventions
@@ -144,7 +144,7 @@ relative to the floor piece.
   `Dog_Lying` (no bed) and `Parrot_Fly`, with `Furn_DogBed` and
   `Furn_ParrotPerch`.
 - **Ext**: `CityBackdrop` (a flat night skyline; the office draws its city
-  in the page instead, `static/cyberpunk/city.js`).
+  in the page instead, `static/office/city.js`).
 - **Lounge and lived-in** (`build_lounge.py`): `Furn_Sofa_L` (an L-shaped
   sectional in charcoal leather on a painted plinth, a channel-quilted back,
   an oxblood throw and pillow, a secondary-neon strip along its base),
@@ -214,6 +214,70 @@ jellyfish tank's floor ring), so they block only what stands up. It loads three.
 through an import map, so it is a development page, not served by the
 dashboard: from the repository root run `python3 -m http.server` and open
 `http://localhost:8000/tools/office-kit/preview.html`.
+
+## Sets
+
+The office's models are a **set** (D153): `cyberpunk` is these, built in
+at `internal/web/static/office/sets/cyberpunk/`; another set is a folder
+of the same pieces in another look, installed on one machine with
+`railswitch office set add <folder>` and chosen on the Machine page or
+with `office set use <name>`.
+
+**The piece list**, `internal/web/static/office/kit/pieces.json`, is the
+contract. `tools/office-kit/pieces.py` writes it from the exported glTFs
+(`build_all.py` runs it last; it also runs alone, plain Python): per piece
+its box (`min` and `max` from its origin, x width, y up, z front,
+colliders left out), its `points` (the heights the layout puts things at,
+from `pieces.py`'s `POINTS`), and its `extras` (`collider`, `parts` with
+the moving nodes' names, `accent`). Its `version` goes up when a piece's
+box moves more than 1 mm or its points change, so sets built for the old
+list show as stale; adding a piece doesn't.
+
+**A set folder**:
+
+```
+cabin/
+  set.toml
+  Furn_Desk.gltf, Furn_Desk.bin, its textures, ... (one .gltf per piece, any subset)
+```
+
+```toml
+schema = 1
+name = "cabin"          # [a-z][a-z0-9-]{0,30}; not issues, prs, notes, whiteboard or a built-in name
+version = 1             # yours
+pieces = 1              # the pieces.json version it was built for
+description = "Pine, wool and lamplight"
+
+[look]                  # each key optional: cyberpunk's value otherwise
+background = "#1b1612"
+fog = "#2a2018"
+fog_density = 0.02      # walking; 0..1
+ambient = "#ffd9a8"     # the hemisphere light
+ambient_intensity = 1.6 # times cyberpunk's levels; 0..10
+key = "#ffb070"         # the light through the windows
+key_intensity = 1.4     # 0..10
+bloom = 0               # 0..3, 0 off
+scanlines = false       # the monitors' CRT lines
+```
+
+The neon colours aren't in the look: each floor has its own, and a set
+takes them by naming materials `RS_Neon_Accent`, `RS_LED_Accent`,
+`RS_Screen*` and `RS_Neon_Secondary` as here. Moving parts work when the
+nodes are named as the list's `parts`; colliders are `<piece>_COL` boxes,
+else one box of the piece's size where the built-in piece has some.
+
+**Building one:** `blender --background --python tools/office-kit/stub_set.py
+-- cabin.blend` makes a scene with a wireframe box per piece (its `min` to
+`max`) and an empty per point; model inside the boxes, keep each origin
+where the box puts it, and export each piece as **glTF Separate**
+(`.gltf` + `.bin` + textures; embedded `data:` URIs are refused: the
+page's CSP blocks fetching them), without compression (Draco, Meshopt
+and KTX2 are refused: the page has no decoder for them). Then `railswitch office set check
+cabin/` reports each piece: `ok`, `missing` (it will be a grey box) or
+`refused` with its box against the list's (±2 cm on every face). It also
+refuses symlinks, special files, more than 1,000 files, a file over
+16 MiB or 256 MiB in all, files no glTF references, and URIs that are
+absolute or leave the folder.
 
 ## Not done yet
 

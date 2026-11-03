@@ -10,11 +10,11 @@ import (
 	"testing"
 )
 
-// TestCyberpunkPage: the cyberpunk page loads its module, the office kit and its models.
+// TestCyberpunkPage: the office page loads its module, the office kit and its models.
 func TestCyberpunkPage(t *testing.T) {
 	f := newFixture(t)
-	w := f.do(req("GET", "/p/ftest/virtual-office/cyberpunk", nil))
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `src="/static/cyberpunk/cyberpunk.js"`) || !strings.Contains(w.Body.String(), `data-prefix="ftest"`) {
+	w := f.do(req("GET", "/p/ftest/virtual-office/cyberpunk/", nil))
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `src="/static/office/office.js"`) || !strings.Contains(w.Body.String(), `data-prefix="ftest" data-set="cyberpunk"`) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	// D151: data: images (the whiteboard's icons, pasted pictures) on this
@@ -25,25 +25,25 @@ func TestCyberpunkPage(t *testing.T) {
 	if got := f.do(req("GET", "/p/ftest", nil)).Header().Get("Content-Security-Policy"); got != wantCSP {
 		t.Errorf("dashboard CSP %q", got)
 	}
-	if w := f.do(req("GET", "/p/nope/virtual-office/cyberpunk", nil)); w.Code != 404 {
+	if w := f.do(req("GET", "/p/nope/virtual-office/cyberpunk/", nil)); w.Code != 404 {
 		t.Errorf("unknown project: %d", w.Code)
 	}
 	// the feature's own path, the set last (D150): the bare path goes to the
 	// built-in set, and a worktree slug can no longer be the office's word
-	if w := f.do(req("GET", "/p/ftest/virtual-office", nil)); w.Code != http.StatusFound || w.Header().Get("Location") != "/p/ftest/virtual-office/cyberpunk" {
+	if w := f.do(req("GET", "/p/ftest/virtual-office", nil)); w.Code != http.StatusFound || w.Header().Get("Location") != "/p/ftest/virtual-office/cyberpunk/" {
 		t.Errorf("virtual-office: %d %q", w.Code, w.Header().Get("Location"))
 	}
-	if w := f.do(req("GET", "/p/ftest/cyberpunk", nil)); strings.Contains(w.Body.String(), `src="/static/cyberpunk/cyberpunk.js"`) {
+	if w := f.do(req("GET", "/p/ftest/cyberpunk", nil)); strings.Contains(w.Body.String(), `src="/static/office/office.js"`) {
 		t.Error("/p/ftest/cyberpunk still serves the office: a worktree named cyberpunk would be hidden")
 	}
-	for _, p := range []string{"/static/cyberpunk/three.js", "/static/office/kit.js", "/static/office/models/Furn_Workstation_Lived.gltf", "/static/office/models/Furn_Workstation_Lived.bin", "/static/office/models/RS_ScreenCode.png"} {
+	for _, p := range []string{"/static/office/three.js", "/static/office/kit/kit.js", "/static/office/sets/cyberpunk/Furn_Workstation_Lived.gltf", "/static/office/sets/cyberpunk/Furn_Workstation_Lived.bin", "/static/office/sets/cyberpunk/RS_ScreenCode.png"} {
 		if w := f.do(req("GET", p, nil)); w.Code != 200 {
 			t.Errorf("%s: %d", p, w.Code)
 		}
 	}
 }
 
-// TestCyberpunkReads: the cyberpunk page's reads and writes run the CLI with exactly
+// TestCyberpunkReads: the office page's reads and writes run the CLI with exactly
 // these arguments, text on stdin; bad names never reach it.
 func TestCyberpunkReads(t *testing.T) {
 	for _, c := range []struct {
@@ -111,7 +111,7 @@ func TestCyberpunkReads(t *testing.T) {
 	}
 }
 
-// TestCyberpunkState: a cyberpunk page's state is the overview's worktrees with
+// TestCyberpunkState: an office page's state is the overview's worktrees with
 // their PRs, arrays never null.
 func TestCyberpunkState(t *testing.T) {
 	f := newFixture(t)

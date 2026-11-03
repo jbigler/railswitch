@@ -728,6 +728,54 @@ first, then the scene, each through a temp file, under a lock.
 document exits 1 and changes nothing. With `--json` both print `{"hash":
 …}`, the next edit's `--if-hash` (`""` after `rm`).
 
+## `office set check <dir>`
+
+A Virtual Office set's folder checked against the piece list (D153,
+`internal/web/static/office/kit/pieces.json`, written by
+`tools/office-kit/pieces.py`); nothing is written. Exit 0 only when
+`errors` is empty and no piece is `refused`.
+
+```json
+{"name": "cabin", "version": 3, "pieces": 1, "look": {"background": "#1b1612", "bloom": 0},
+ "results": [{"piece": "Deco_Mug", "status": "missing"},
+             {"piece": "Furn_Desk", "status": "refused", "reason": "Furn_Desk: x -1.03..1.00, y 0.00..0.75, z -0.40..0.40 m; the list says x -1.00..1.00, y 0.00..0.75, z -0.40..0.40 (±0.02)", "min": [-1.03, 0, -0.4], "max": [1, 0.75, 0.4]}],
+ "errors": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name`, `version`, `pieces`, `look` | | From `set.toml` (empty when it is missing or refused): the set's name, its own version, the piece list version it was built for, its look (each key only when set). |
+| `results[]` | array | One per piece of the list, plus one per `.gltf` the list doesn't have, by name. `status` is `ok`, `missing` (drawn as a box) or `refused` with a `reason`; `min` and `max` are the model's box (colliders left out) when it was read. |
+| `errors[]` | array of strings | Problems with the folder or `set.toml`: a symlink, a special file, more than 1,000 files, a file over 16 MiB or 256 MiB in all, a stray file, a glTF URI with a scheme (`data:` included), absolute or leaving the folder, a `pieces` other than the list's version. A piece is also refused when its glTF requires Draco, Meshopt or KTX2 (`extensionsRequired`): the page sets no decoder for them. |
+
+`office set add <dir>` checks the folder, then copies the files the check
+accepted to `<data>/office/<name>/` (0700/0600) with an `index.json`
+(`{"files": {<path>: {"sha256", "size", "mtime"}}, "pieces": [...], "added": <time>}`) and
+checks the copy again; a refusal, or a built-in name, adds nothing.
+Re-adding a name replaces that set. `office set use <name>` writes
+`dashboard.toml` `[office] set` (refused for an unknown, stale or broken
+set; the built-in default is stored as no key); `office set rm <name>`
+removes an installed set by exact path and, when it was active, the key.
+
+## `office set ls`
+
+The built-in sets, then the installed ones, by name.
+
+```json
+{"active": "cyberpunk", "sets": [
+ {"name": "cyberpunk", "source": "builtin", "version": 1, "pieces": 1, "present": 109, "missing": 0, "status": "ok", "description": "Neon, worn metal and a city in the smog", "look": {…}, "have": ["Arch_CeilingDuct_4m", …]},
+ {"name": "cabin", "source": "installed", "version": 3, "pieces": 1, "present": 12, "missing": 97, "status": "broken", "reason": "Furn_Desk.bin: changed since it was added", "description": "Pine, wool and lamplight", "look": {…}, "have": ["Furn_Desk", …]}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `active` | string | `dashboard.toml` `[office] set`, else `cyberpunk`. It may name a set that is no longer listed (removed by hand). |
+| `source` | string | `builtin` (in the dashboard's static files) or `installed` (`<data>/office/<name>/`). |
+| `version`, `pieces`, `description`, `look` | | From `set.toml`. |
+| `present`, `missing` | integer | Pieces of the list the set has, and doesn't. |
+| `status`, `reason` | string | `ok`; `stale`: built for another piece list version; `broken`: an installed set whose `index.json` or `set.toml` doesn't verify, or a file it lists is missing, not a regular file, or has another size or modification time than when it was added (a stat per file: the dashboard runs `ls` for every office page, so it hashes only `set.toml`). |
+| `have` | array of strings | The pieces of the list the set has, which the page loads (the rest are boxes). |
+
 ## `notes ls`
 
 The workspace's shared notes (D141, D144): each regular file in

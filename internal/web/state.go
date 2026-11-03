@@ -352,7 +352,7 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		if sub.prefix != j.Spec.Project && (sub.view != "library" || j.Spec.Project != machineKey) {
 			continue
 		}
-		if sub.view == "cyberpunk" {
+		if sub.view == "office" {
 			s.pushCyber(sub)
 			continue
 		}
@@ -421,7 +421,7 @@ func (s *Server) publish() {
 // row on its own while the list's order and selection stay, else the
 // whole list. s.mu is held.
 func (s *Server) push(sub *subscriber) {
-	if sub.view == "cyberpunk" {
+	if sub.view == "office" {
 		s.pushCyber(sub)
 		return
 	}

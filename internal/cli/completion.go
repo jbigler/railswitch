@@ -45,6 +45,8 @@ var completionSubs = map[string][]string{
 	"nvim":             {"reset-config", "update"},
 	"notes":            {"ls", "rm", "show", "write"},
 	"whiteboard":       {"rm", "show", "write"},
+	"office":           {"set"},
+	"office set":       {"add", "check", "ls", "rm", "use"},
 	"pack":             {"eject", "export", "file", "import", "ls", "new", "show"},
 	"pack file":        {"rm", "show", "write"},
 	"pr":               {"agent", "comment", "ls", "merge", "ready", "reply", "rerun", "resolve", "review", "show", "unresolve"},

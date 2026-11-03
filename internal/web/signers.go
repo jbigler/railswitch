@@ -63,6 +63,9 @@ type machineView struct {
 	AddURL         string
 	RmURL          string
 	RevokeURL      string
+	OfficeSets     []setEntry // the ones that can be used
+	OfficeActive   string
+	OfficeError    string
 }
 
 type signerLibView struct {
@@ -87,6 +90,16 @@ func (s *Server) machinePage(w http.ResponseWriter, r *http.Request) {
 		Title: "Machine · RailSwitch", Prefix: machineKey,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		AddURL: "/machine/signers/add", RmURL: "/machine/signers/rm", RevokeURL: "/machine/signers/revoke",
+	}
+	if ls, err := readJSON[setLs](r.Context(), s.c.CLI, "office", "set", "ls"); err != nil {
+		v.OfficeError = err.Error()
+	} else {
+		v.OfficeActive = ls.Active
+		for _, e := range ls.Sets {
+			if e.Status == "ok" {
+				v.OfficeSets = append(v.OfficeSets, e)
+			}
+		}
 	}
 	if ls, err := readTemplates(r.Context(), s.c.CLI); err != nil {
 		v.TemplatesError = err.Error()

@@ -188,3 +188,32 @@ func TestContrast(t *testing.T) {
 		t.Errorf("warnings = %q", w)
 	}
 }
+
+// Review focus (D153): the office set and the colours survive each other's saves.
+func TestOfficeSetRoundTrip(t *testing.T) {
+	d := dirs(t)
+	f, err := Load(d)
+	if err != nil || f.OfficeSet != "" {
+		t.Fatalf("no file: %v %q", err, f.OfficeSet)
+	}
+	if err := f.Set(true, "solar", nil); err != nil {
+		t.Fatal(err)
+	}
+	f.OfficeSet = "cabin"
+	if err := f.Save(d); err != nil {
+		t.Fatal(err)
+	}
+	g, err := Load(d)
+	if err != nil || g.OfficeSet != "cabin" || g.Dark.Base != "solar" {
+		t.Fatalf("reload: %v %+v", err, g)
+	}
+	if err := g.Set(false, "paper", nil); err != nil { // the colours editor's save
+		t.Fatal(err)
+	}
+	if err := g.Save(d); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := Load(d); h.OfficeSet != "cabin" || h.Light.Base != "paper" {
+		t.Errorf("after a colours save: %+v", h)
+	}
+}

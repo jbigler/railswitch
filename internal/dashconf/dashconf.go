@@ -1,6 +1,6 @@
-// Package dashconf holds the dashboard's colours: a preset per light and
-// dark mode plus the tokens changed from it, in
-// <config>/dashboard.toml (D39).
+// Package dashconf holds the dashboard's settings in
+// <config>/dashboard.toml (D39): its colours, a preset per light and dark
+// mode plus the tokens changed from it, and the Virtual Office's set (D153).
 package dashconf
 
 import (
@@ -39,7 +39,12 @@ type Mode struct {
 }
 
 // File is dashboard.toml.
-type File struct{ Light, Dark Mode }
+type File struct {
+	Light, Dark Mode
+	// OfficeSet is [office] set: the Virtual Office's set (D153); "" is
+	// the built-in default.
+	OfficeSet string
+}
 
 // Path is <d.Config>/dashboard.toml.
 func Path(d machine.Dirs) string { return filepath.Join(d.Config, "dashboard.toml") }
@@ -63,6 +68,9 @@ func Load(d machine.Dirs) (*File, error) {
 			Light map[string]string `toml:"light"`
 			Dark  map[string]string `toml:"dark"`
 		} `toml:"colors"`
+		Office struct {
+			Set string `toml:"set"`
+		} `toml:"office"`
 	}
 	if err := tomlfile.Decode(data, SchemaVersion, &raw); err != nil {
 		return nil, fmt.Errorf("%s: %w", Path(d), err)
@@ -88,6 +96,7 @@ func Load(d machine.Dirs) (*File, error) {
 			return nil, fmt.Errorf("%s: colors.%s: %w", Path(d), m.name, err)
 		}
 	}
+	f.OfficeSet = raw.Office.Set
 	return f, nil
 }
 
@@ -109,6 +118,9 @@ func (f *File) Save(d machine.Dirs) error {
 				fmt.Fprintf(&b, "%s = %s\n", tok, strconv.Quote(v))
 			}
 		}
+	}
+	if f.OfficeSet != "" {
+		fmt.Fprintf(&b, "\n[office]\nset = %s\n", strconv.Quote(f.OfficeSet))
 	}
 	if err := os.MkdirAll(d.Config, 0o755); err != nil {
 		return err

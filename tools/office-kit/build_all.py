@@ -13,3 +13,8 @@ g = {'__file__': os.path.join(here, 'build_kit.py'), '__name__': 'office_kit'}
 for f in ('build_kit.py', 'build_office.py', 'build_decor.py', 'build_arch.py', 'build_pets.py', 'build_androids.py', 'build_lounge.py', 'build_glass.py', 'build_cafe.py'):
     path = os.path.join(here, f)
     exec(compile(open(path).read(), path, 'exec'), g)
+# The piece list from what was just exported (not for a build to OFFICE_KIT_OUT:
+# pieces.json describes the checked-in models).
+if not os.environ.get('OFFICE_KIT_OUT'):
+    import runpy
+    runpy.run_path(os.path.join(here, 'pieces.py'))['main'](g['OUT'])

@@ -41,7 +41,8 @@ func TestQueueHold(t *testing.T) {
 		{"none", nil, 0, "no agent"},
 		{"settling", row("idle", 998), 0, "less than"},
 		{"since delivery", row("idle", 900), 901, "not reported"},
-		{"reported at delivery", row("done", 901), 901, ""},
+		{"reported in the delivery's second", row("done", 901), 901, "not reported"},
+		{"reported after delivery", row("done", 902), 901, ""},
 	} {
 		got := QueueHold(c.a, c.delivered, now)
 		if (c.want == "") != (got == "") || !strings.Contains(got, c.want) {

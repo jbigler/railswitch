@@ -693,7 +693,7 @@ as spaces).
 | Field | Type | Meaning |
 |---|---|---|
 | `slug` | string | The worktree. |
-| `delivered` | number | When the last delivery started (Unix seconds), `0` for none. `next` waits for an agent status at least as new, so one status never takes two items. |
+| `delivered` | number | When the last delivery started (Unix seconds), `0` for none. `next` waits for an agent status from a later second, so one status never takes two items. |
 | `items` | array | Oldest first; never null. |
 | `items[].id` | number | The item's id in this queue, never reused; `agent queue rm <id>` removes it. |
 | `items[].text` | string | What is typed, as given (UTF-8, line breaks and tabs only). |

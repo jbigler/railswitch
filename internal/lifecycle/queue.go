@@ -28,7 +28,7 @@ func QueueHold(a *AgentRow, delivered int64, now time.Time) string {
 		return fmt.Sprintf("agent %s asks you something", a.Name)
 	case a.State != "idle" && a.State != "done":
 		return fmt.Sprintf("agent %s is %s", a.Name, a.State)
-	case a.TS < delivered:
+	case a.TS <= delivered: // seconds: a status from the delivery's own second may predate the prompt
 		return fmt.Sprintf("agent %s has not reported since the last delivery", a.Name)
 	case now.Sub(time.Unix(a.TS, 0)) < QueueSettle:
 		return fmt.Sprintf("agent %s has been idle for less than %s", a.Name, QueueSettle)

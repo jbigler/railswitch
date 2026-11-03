@@ -804,8 +804,9 @@ func newAgentDefault(prefix, slug string, rows []agentRow) agentDefaultView {
 }
 
 type tasksView struct {
-	Slug, URL string
-	Tasks     []task
+	Slug, URL   string
+	SettingsURL string // the palette's "new task" goes to its Tasks card
+	Tasks       []task
 }
 
 // colorTokens are the editable tokens, in the editor's order.

@@ -5,7 +5,8 @@
 <label class="check"><input type="checkbox" name="term" value="1" class="pal-term" checked> in a new terminal <span class="muted">(off: a job, its output under Jobs)</span></label>
 <ul class="pal-list">
 {{range .Tasks}}<li data-filter="{{.Name}}"><button name="task" value="{{.Name}}" class="pal-task"><b>{{.Name}}</b> <span class="mono muted">{{.Command}}</span> <span class="muted">{{.Source}}</span></button></li>
-{{else}}<li class="muted">No tasks.</li>
-{{end}}</ul>
+{{else}}<li class="muted pal-none">No tasks.</li>
+{{end}}<li class="pal-new" hidden><a class="pal-task" href="{{.SettingsURL}}#tasks" data-base="{{.SettingsURL}}">new task <b class="mono"></b>…</a></li>
+</ul>
 <p class="note">Enter runs the highlighted task as the box says · Shift+Enter the other way · Esc closes</p>
 </form>{{end}}

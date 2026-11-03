@@ -30,6 +30,11 @@ var projectShowJSON = `{"prefix":"ftest","name":"Ftest App","repo":"git@github.c
  "links":[
   {"label":"Flipper","url":"{worktree.host}/flipper","from":"project","hidden":false},
   {"label":"Mailer previews","url":"{worktree.host}/rails/mailers","from":"pack web@1","hidden":true}],
+ "tasks":[
+  {"name":"console","command":"","source":"hidden","pack":"bin/rails console"},
+  {"name":"lint","command":"bin/rubocop","source":"project"},
+  {"name":"test","command":"bin/rspec","source":"project","pack":"bin/rails test"},
+  {"name":"test:system","command":"bin/rails test:system","source":"pack","pack":"bin/rails test:system"}],
  "file":"\n# first line blank\nschema = 1\n"}`
 
 const secretsJSON = `[
@@ -147,6 +152,45 @@ func TestSettingsPageRenders(t *testing.T) {
 	w = f.do(req("GET", "/p/ftest/settings", nil))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), "line 3: bad") || !strings.Contains(w.Body.String(), "Edit project.toml") {
 		t.Errorf("broken project: %d %s", w.Code, w.Body)
+	}
+}
+
+// The Tasks card (D156): each task by where it comes from, with the button
+// its source takes; ?task= fills the Add name (the palette's "new task");
+// task edits stage like any other and title by what they do.
+func TestSettingsTasks(t *testing.T) {
+	f := settingsFixture(t)
+	body := f.do(req("GET", "/p/ftest/settings?task=db:seed", nil)).Body.String()
+	for _, want := range []string{
+		`<section class="card" id="tasks">`,
+		`data-name="console" data-source="hidden" data-command=""`, `<span class="mono muted">bin/rails console</span>`, "pack, hidden", "data-task-restore",
+		`data-name="lint" data-source="project"`, `value="bin/rubocop"`, `<button type="button" class="ln danger" data-task-remove>Remove</button>`,
+		`data-name="test" data-source="project"`, "project, over the pack's", `data-task-remove title="bin/rails test">Back to the pack's</button>`,
+		`data-name="test:system" data-source="pack"`, "data-task-hide",
+		`<form class="add-row" data-stage="task">`, `aria-label="Task name" value="db:seed"`, `aria-label="Task command" autofocus`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
+	noCSPViolation(t, "settings", body)
+	if strings.Contains(f.do(req("GET", "/p/ftest/settings", nil)).Body.String(), `aria-label="Task command" autofocus`) {
+		t.Error("no ?task=, yet the command box takes the focus")
+	}
+
+	f.cli.set(previewKey, `{"hash":"`+testHash+`","diff":"","edits":[`+strings.Repeat(`{"index":0,"impact":"none","reasons":[],"error":""},`, 4)+`{"index":4,"impact":"none","reasons":[],"error":""}],"restart":[]}`)
+	list := `[{"op":"task.set","name":"lint","value":"bin/rubocop -a"},{"op":"task.set","name":"db:seed","value":"bin/rails db:seed"},{"op":"task.set","name":"test:system"},{"op":"task.unset","name":"test"},{"op":"task.unset","name":"console"}]`
+	w := f.do(jsonPost("/p/ftest/settings/preview", list))
+	if in, _ := f.cli.stdinOf(previewKey); w.Code != 200 || string(in) != list {
+		t.Fatalf("%d %s; stdin %s", w.Code, w.Body, in)
+	}
+	for _, want := range []string{
+		"Task lint: &#34;bin/rubocop&#34; → &#34;bin/rubocop -a&#34;", "Task db:seed: added, &#34;bin/rails db:seed&#34;",
+		"Task test:system: hidden", "Task test: back to the pack&#39;s &#34;bin/rails test&#34;", "Task console: back to the pack&#39;s &#34;bin/rails console&#34;",
+	} {
+		if !strings.Contains(w.Body.String(), want) {
+			t.Errorf("panel lacks %q", want)
+		}
 	}
 }
 

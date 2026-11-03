@@ -148,7 +148,8 @@ type ghStackPR struct {
 type task struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
-	Source  string `json:"source"`
+	Source  string `json:"source"` // pack, project, or (project show only) hidden
+	Pack    string `json:"pack"`   // the pack's command for the name, if any
 }
 
 type wtRow struct {
@@ -187,6 +188,7 @@ type projectShow struct {
 	Options    []optionRow   `json:"options"`
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
+	Tasks      []task        `json:"tasks"`
 	AddChoices []string      `json:"add_choices"`
 	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`

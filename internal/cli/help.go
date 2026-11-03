@@ -116,7 +116,7 @@ var synopses = map[string]string{
 	"stack switch":           "stack switch <branch>",
 	"status":                 "status",
 	"stop":                   "stop",
-	"task":                   "task [--new-term] <name> [<args>...] | task ls",
+	"task":                   "task [--new-term] <name> [<args>...] | task ls | task set <name> <command> | task rm <name> | task restore <name>",
 	"template check":         "template check [--accept <sha256>]",
 	"template export":        "template export [--name <name>] [--version <N>] [--description <text>] [--to <dir>]",
 	"template import":        "template import <dir> [--accept <sha256>]",

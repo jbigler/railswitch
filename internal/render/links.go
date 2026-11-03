@@ -24,7 +24,10 @@ type Link struct {
 type Task struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
-	Source  string `json:"source"` // "pack" or "project"
+	Source  string `json:"source"` // "pack", "project" or, only in project show, "hidden"
+	// Pack is the pack's command for this name, "" when the pack has none:
+	// a project task with one overrides it.
+	Pack string `json:"pack,omitempty"`
 }
 
 // stackLinks are the pack's links, then each chosen option's in
@@ -88,19 +91,28 @@ func (m *Model) Links(in *Instance) ([]Link, error) {
 	return out, nil
 }
 
-// Tasks are the pack's [tasks] merged with the project's, sorted by name: a
-// project task overrides the pack's, and a project task "" removes it.
+// Tasks are the tasks that run: MergeTasks without the hidden ones.
 func (m *Model) Tasks() []Task {
+	return slices.DeleteFunc(MergeTasks(m.Inputs.Stack.Pack.Tasks, m.Inputs.Project.Tasks), func(t Task) bool { return t.Source == "hidden" })
+}
+
+// MergeTasks are the pack's [tasks] merged with the project's, sorted by
+// name: a project task overrides the pack's, and a project task "" hides
+// it (source "hidden", no command; D156). A project "" with no pack task
+// is left out.
+func MergeTasks(packTasks, projectTasks map[string]string) []Task {
 	byName := map[string]Task{}
-	for name, cmd := range m.Inputs.Stack.Pack.Tasks {
-		byName[name] = Task{Name: name, Command: cmd, Source: "pack"}
+	for name, cmd := range packTasks {
+		byName[name] = Task{Name: name, Command: cmd, Source: "pack", Pack: cmd}
 	}
-	for name, cmd := range m.Inputs.Project.Tasks {
-		if cmd == "" {
-			delete(byName, name)
-			continue
+	for name, cmd := range projectTasks {
+		t, inPack := byName[name]
+		switch {
+		case cmd != "":
+			byName[name] = Task{Name: name, Command: cmd, Source: "project", Pack: t.Pack}
+		case inPack:
+			byName[name] = Task{Name: name, Source: "hidden", Pack: t.Pack}
 		}
-		byName[name] = Task{Name: name, Command: cmd, Source: "project"}
 	}
 	out := make([]Task, 0, len(byName))
 	for _, t := range byName {

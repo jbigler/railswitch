@@ -45,6 +45,10 @@ var ops = map[string]opSpec{
 	"link.remove":           {required: []string{"label"}},
 	"link.hide":             {required: []string{"label"}},
 	"link.show":             {required: []string{"label"}},
+	// name is a task; value "" hides the pack's task of that name, and
+	// unset takes the project's entry out (D156).
+	"task.set":   {required: []string{"name"}, optional: []string{"value"}},
+	"task.unset": {required: []string{"name"}},
 	// key is a list of config.HookLists; values its commands in order, none
 	// removes it.
 	"hooks.set": {required: []string{"key"}},
@@ -110,6 +114,10 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.SetEnv(data, e.Name, e.Value)
 	case "env.unset":
 		return config.UnsetEnv(data, e.Name)
+	case "task.set":
+		return config.SetTask(data, e.Name, e.Value)
+	case "task.unset":
+		return config.UnsetTask(data, e.Name)
 	case "link.add":
 		return config.AddLink(data, e.Label, e.URL)
 	case "link.remove":

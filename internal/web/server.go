@@ -420,7 +420,7 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.html(w, http.StatusOK, "tasks", tasksView{Slug: wt.Slug, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/task", Tasks: tasks})
+	s.html(w, http.StatusOK, "tasks", tasksView{Slug: wt.Slug, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/task", SettingsURL: settingsURL(p.Prefix), Tasks: tasks})
 }
 
 func (s *Server) agentDefaultDialog(w http.ResponseWriter, r *http.Request) {

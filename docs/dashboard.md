@@ -256,6 +256,16 @@ shows what each one does before anything is written.
   project's own `[[links]]` only. The add form needs both a label and an
   address. Use `{worktree.host}`, `{worktree.slug}` or `{branch}`; they
   are filled in per worktree.
+- **Tasks** (`#tasks`, D156): `project show`'s `tasks`, each with its
+  command and where it comes from: `pack`, `project`, `project, over the
+  pack's`, or `pack, hidden`. Editing a command stages `task.set` when you
+  leave the field (a pack task you change becomes the project's; an
+  emptied box stages nothing). A pack task has Hide (`task.set` with an
+  empty value: `name = ""`); a project task has Remove, or "Back to the
+  pack's" when it overrides one (`task.unset`); a hidden pack task has
+  Restore (`task.unset`). The add form (name, command) stages `task.set`;
+  the staged card names it. `?task=<name>` fills the add form's name and
+  focuses its command: the palette's "new task" opens it.
 - **Secrets:** one row per declared secret: services, delivery (`file` or
   `env <VAR>`), set (with its date) or not set; never the value. "Set
   value" runs `railswitch secret set <name>` as a job; "Add a secret"
@@ -270,7 +280,7 @@ shows what each one does before anything is written.
   already saved. The server refuses (400, no job) another name or
   version.
 - **Edit project.toml** opens the raw editor (below), for everything
-  else: services, routes, tasks, firewall, agents, image, tools, versions.
+  else: services, routes, firewall, agents, image, tools, versions.
 
 **Staged changes**
 
@@ -817,6 +827,9 @@ Every action is a job (below).
   <name> <args…>`, a terminal window (interactive tasks such as
   `console` need one); unticked, `railswitch task <name> <args…>` as a
   job with its output under Jobs. Shift+Enter runs it the other way.
+  When the filter matches no task, the list offers "new task
+  <filter>…" (Enter or a click): the Settings page's Tasks card with that
+  name filled in.
 - **Cancel** on a running job stops it.
 
 ## Jobs
@@ -1093,8 +1106,9 @@ docs/json.md.
   extension, and a failed read keeps the last stacks.
 - `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged
   with the project's `[tasks]` in `project.toml`; a project task replaces a
-  pack task of the same name and `""` removes one; no task may be named
-  `ls`:
+  pack task of the same name and `""` hides one; no task may be named
+  `ls`, `set`, `rm` or `restore`. Each row's `pack` is the pack's command
+  for the name, when there is one:
 
   ```toml
   [tasks]
@@ -1102,6 +1116,15 @@ docs/json.md.
   lint = ""
   ```
 
+- `railswitch task set <name> <command>`, `task rm <name>`, `task restore
+  <name>` (project, D156): edit `project.toml`'s `[tasks]` with the line
+  editor (its comments and other lines stay), then lock and render, as a
+  settings apply does. `set` writes `name = "<command>"` (one argument:
+  quote it). `rm` takes out the project's task, which brings back the
+  pack's of that name if any, and for a pack task the project doesn't set
+  writes `name = ""` to hide it. `restore` takes out that `""`. A name
+  that isn't a task, a hidden one for `rm`, or one not hidden for
+  `restore` is an error.
 - `railswitch task [--new-term] <name> [args…]` (worktree): runs the task
   in the app image as `exec` does, as `sh -c '<command> "$@"' <name>
   <args…>`; stdin and the terminal pass through; the exit code is the

@@ -34,7 +34,7 @@ type edit struct {
 	Values []string `json:"values,omitempty"`
 }
 
-var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "hooks.set", "agent.setup"}
+var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "task.set", "task.unset", "hooks.set", "agent.setup"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -83,6 +83,7 @@ type settingsView struct {
 	AgentSetups  []hookListView // one per agent: Name, its setup as text
 	Options      []optionView
 	Links        []linkRowView
+	NewTask      string // ?task=: the Tasks card's Add name, from the palette
 	Secrets      []secretView
 	SecretsError string
 	Services     []string // for a new secret
@@ -290,6 +291,20 @@ func editTitle(show projectShow, e edit) string {
 		return "Link " + e.Label + ": hidden"
 	case "link.show":
 		return "Link " + e.Label + ": shown"
+	case "task.set":
+		i := slices.IndexFunc(show.Tasks, func(t task) bool { return t.Name == e.Name })
+		switch {
+		case e.Value == "":
+			return "Task " + e.Name + ": hidden"
+		case i >= 0 && show.Tasks[i].Command != "":
+			return fmt.Sprintf("Task %s: %q → %q", e.Name, show.Tasks[i].Command, e.Value)
+		}
+		return fmt.Sprintf("Task %s: added, %q", e.Name, e.Value)
+	case "task.unset":
+		if i := slices.IndexFunc(show.Tasks, func(t task) bool { return t.Name == e.Name }); i >= 0 && show.Tasks[i].Pack != "" {
+			return fmt.Sprintf("Task %s: back to the pack's %q", e.Name, show.Tasks[i].Pack)
+		}
+		return "Task " + e.Name + ": removed"
 	case "agent.setup":
 		switch n := len(e.Values); n {
 		case 0:
@@ -336,7 +351,8 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 		Title: "Settings · " + p.Prefix, Prefix: p.Prefix,
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		PreviewURL: base + "/preview", SecretURL: base + "/secret", FileURL: base + "/file",
-		Staged: newStaged(base+"/apply", projectShow{}, nil, previewDoc{}, nil),
+		NewTask: r.URL.Query().Get("task"),
+		Staged:  newStaged(base+"/apply", projectShow{}, nil, previewDoc{}, nil),
 	}
 	show, err := readProjectShow(r.Context(), s.c.CLI, p.Workspace)
 	if err != nil {

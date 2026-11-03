@@ -125,6 +125,7 @@ railswitch up | stop | restart
 railswitch logs -f rails
 railswitch exec bin/rails console
 railswitch task test                  # the pack's and project's tasks
+railswitch task set lint "bin/rubocop" # add or change a project task; task rm / task restore hide and bring back a pack's
 railswitch db dump                    # the databases (not Rails' test ones) and storage, into <workspace>/db-dumps/
 railswitch db restore                 # put them back into this worktree (asks first; `db restore storage`: storage only)
 railswitch down                       # stops it AND deletes its volumes (asks first)

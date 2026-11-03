@@ -16,7 +16,7 @@
 - `make check` passes before every commit; unit tests need no podman, systemd, gh, network or browser.
 - Every read command takes `--json` (D40), schema in `docs/json.md`; every `e.flags(name)` has a `help.go` synopsis.
 - Set name: `^[a-z][a-z0-9-]{0,30}$`, not `issues`, `prs`, `notes`, `whiteboard`, not a built-in name.
-- Size tolerance ±0.02 m per axis; anchors `floor`, `wall`, `ceiling` per the spec's rules.
+- A piece matches when its box (`min`, `max`, colliders left out) is within ±0.02 m of the list's on every axis (amended spec: today's origins don't follow one anchor rule).
 - Folder limits: ≤1,000 files, each ≤16 MiB, ≤256 MiB in all; no symlinks (the folder included), regular files only; glTF URIs relative, no scheme (`data:` included), never leaving the folder.
 - `set.toml`: `schema = 1`, strict (unknown keys refused), colours `#rrggbb`, intensities 0..10, `fog_density` 0..1, `bloom` 0..3.
 - Installed sets: `<data>/office/<name>/` (`machine.DefaultDirs().Data`), written only by `office set add` (temp dir under `<data>/office/`, renamed over); `index.json` `{files: {<path>: <sha256>}, pieces: [names], added}`.
@@ -50,22 +50,12 @@
 - [ ] **Step 3:** Manual: open `/p/<prefix>/virtual-office/cyberpunk` on the manual server; the lobby and a floor load with no console errors and look as before.
 - [ ] **Step 4: Commit** `Virtual Office: files under static/office/, the models as the cyberpunk set (D153)`
 
-### Task 2: `pieces.json`, points and `set.toml` from the Blender build
+### Task 2: `pieces.json`, points and `set.toml` (done: Blender-free generator)
 
-**Files:**
-- Modify: `tools/office-kit/build_kit.py` (`export_all`), `build_all.py`, the builders that own pieces with points
-- Create: `internal/web/static/office/kit/pieces.json`, `internal/web/static/office/sets/cyberpunk/set.toml`
-- Create: `tools/office-kit/stub_set.py`
+**Files:** `tools/office-kit/pieces.py` (new: reads the exported glTFs, writes `kit/pieces.json` with `min`, `max`, `points` from its `POINTS` table, `extras` [`collider`, `parts`, `accent`] and `parts`; bumps `version` when a shared piece's box (>0.001 m) or points change; a `self_check` of that rule runs every time), `build_all.py` (runs it last unless `OFFICE_KIT_OUT` is set), `tools/office-kit/stub_set.py` (new), `sets/cyberpunk/set.toml` (new, today's look).
 
-**Interfaces:**
-- Produces: `pieces.json` `{"version": 1, "pieces": {<name>: {"size": [x,y,z], "anchor": "floor"|"wall"|"ceiling", "points": {<p>: [x,y,z]}, "screen_size"?: [w,h], "extras": ["collider"|"accent"|"parts"], "parts"?: [<node names>]}}}`: `parts` in `extras` means the piece has moving nodes, listed in its own `parts` key.
-- Points needed today (from `rooms.js` `put(..., y>0)` calls): `Furn_Desk.top`, `Furn_CoffeeCounter.top`, `Furn_CoffeeTable.top`, `Furn_Arcade_Stand.top`, `Furn_ParrotPerch.bar`, the sofa seat the curled cat lies on, the counter under the terrarium/mugs/pizza; confirm each by finding the piece under it in `rooms.js`. Wall-hung heights (2.6, 1.7) and the ceiling (4) are layout, not points.
-
-- [ ] **Step 1:** In the builders, add empties `<piece>_PT_<point>` at those positions; in `export_all`, read and delete them before export; record each piece's evaluated bounding box (three.js frame: x, y up, z front), its anchor (`ceiling` for `Arch_Ceiling_*`, `Arch_CeilingDuct_4m`, `Light_*`, `Deco_HangingPlanter`; `wall` for wall-hung pieces per `docs/office-kit.md`; else `floor`), `_COL` → `collider`, named child parts → `parts`, any `RS_Neon_*`/`RS_LED_Accent`/`RS_Screen*` material → `accent`.
-- [ ] **Step 2:** `build_all.py` writes `pieces.json` sorted by name, 3 decimals; before writing, loads the checked-in file and sets `version = old + 1` if any existing piece's `size` (beyond 0.001), `anchor` or `points` differ, else keeps it; new pieces don't bump.
-- [ ] **Step 3:** Write `set.toml` for cyberpunk with today's look values: `background = "#05060c"`, `fog = "#0b0f1c"`, `fog_density = 0.035` (walk; orbit stays 0), `ambient = "#4a5c88"`, `ambient_intensity = 1` (a multiplier of today's walk 2.4 / orbit 9 levels), `key = "#6fa0ff"`, `key_intensity = 1.1`, `bloom = 0.28`, `scanlines = true` (the monitors' CRT effect), `name = "cyberpunk"`, `version = 1`, `pieces = 1`, a one-line description.
-- [ ] **Step 4:** `stub_set.py <out.blend>`: reads `pieces.json`, makes per piece a wireframe box of its size placed by its anchor and its point empties, in a collection per category.
-- [ ] **Step 5:** Run `build_all.py` in Blender (MCP); `git status` shows only `pieces.json` and `set.toml` new and the glTFs byte-identical or with only the empties gone. Commit `Office kit: pieces.json with sizes, anchors and points; the cyberpunk set.toml (D153)`.
+- Points: `Furn_Desk.top` 0.75, `Furn_CoffeeCounter.top` 0.94, `Furn_CoffeeTable.top` 0.42, `Furn_Arcade_Stand.top` 0.78, `Furn_ParrotPerch.bar` 1.284, `Deco_Crate.top` 0.46 (all at x = z = 0).
+- A rebuild reproduces the models (glTF JSON identical but for the scene name `KitBuild`/`Scene`; `.bin` float noise inside the same bounds), so the models are not re-committed.
 
 ### Task 3: `internal/office`: piece list, glTF bounds, set checks
 
@@ -74,19 +64,19 @@
 - Modify: `internal/web/server.go`: export `func StaticFS() fs.FS` (the embedded `static` sub-FS) so the CLI reads built-ins and `pieces.json` without a second embed.
 
 **Interfaces:**
-- `type Piece struct { Size [3]float64; Anchor string; Points map[string][3]float64; ScreenSize *[2]float64; Extras []string; Parts []string }`
+- `type Piece struct { Min, Max [3]float64; Points map[string][3]float64; Extras, Parts []string }` (JSON `min`, `max`, `points`, `extras`, `parts`)
 - `type Pieces struct { Version int; Pieces map[string]Piece }`; `func LoadPieces(fsys fs.FS) (*Pieces, error)` reads `office/kit/pieces.json`.
 - `type Look struct { Background, Fog, Ambient, Key *string; FogDensity, AmbientIntensity, KeyIntensity, Bloom *float64; Scanlines *bool }` (JSON names snake_case as in `set.toml`)
 - `type Set struct { Schema int; Name string; Version, Pieces int; Description string; Look Look }`; `func ParseSet(data []byte) (*Set, error)`.
-- `func Bounds(gltf []byte) (min, max [3]float64, err error)`: every mesh primitive's POSITION accessor `min`/`max` corners transformed by the node's world matrix (TRS or `matrix`), all scenes' root nodes of the default scene.
-- `type Result struct { Piece, Status, Reason string; Size *[3]float64 }` (`Status` `ok|missing|refused`)
+- `func Bounds(gltf []byte) (min, max [3]float64, err error)`: every mesh primitive's POSITION accessor `min`/`max` corners transformed by the node's world matrix (TRS or `matrix`), from the default scene's root nodes, skipping nodes matching `_COL\d*$` and their subtrees (as `pieces.py` does).
+- `type Result struct { Piece, Status, Reason string; Min, Max *[3]float64 }` (`Status` `ok|missing|refused`)
 - `type Report struct { Name string; Version, Pieces int; Look Look; Results []Result; Errors []string }`; `func (r *Report) OK() bool` (no refused, no errors).
 - `func Check(dir string, list *Pieces) (*Report, error)` reads the folder from disk as hostile (`os.Lstat` each entry; no `safefile.TreeCopy` needed). Error only for an unreadable dir; every problem is in the report.
 - `var ReservedNames = []string{"issues", "prs", "notes", "whiteboard"}`; `func ValidName(s string) error`.
 
 - [ ] **Step 1: Write failing tests**
   - `TestBoundsTransforms`: hand-written glTF JSON with a root node `rotation` (−90° about X), `scale` 2, a nested child `translation`, two meshes; expect exact min/max.
-  - `TestCheck` table: ok piece; 3 cm too wide → `refused` with reason `Furn_Desk: 1.63 × 0.75 × 0.80 m, the list says 1.60 × 0.75 × 0.80 (±0.02)`; floor piece whose origin is 0.1 m above its base → refused naming the anchor; unknown `.gltf` name → refused; piece not present → `missing`; folder refusals each give an error and `!OK()`: symlinked file, the folder itself a symlink, `../x.bin` URI, `/abs.bin`, `data:` URI, `http://` URI, a 17 MiB file, a stray `notes.txt`, 1,001 files (sparse/empty files are fine).
+  - `TestCheck` table: ok piece; 3 cm too wide → `refused` with reason `Furn_Desk: x -1.03..1.00, y 0.00..0.75, z -0.40..0.40 m; the list says x -1.00..1.00, y 0.00..0.75, z -0.40..0.40 (±0.02)`; the origin moved 10 cm (same size) → refused; unknown `.gltf` name → refused; piece not present → `missing`; folder refusals each give an error and `!OK()`: symlinked file, the folder itself a symlink, `../x.bin` URI, `/abs.bin`, `data:` URI, `http://` URI, a 17 MiB file, a stray `notes.txt`, 1,001 files (sparse/empty files are fine).
   - `TestParseSet`: unknown key refused; `#abc` refused; `bloom = 4` refused; `schema = 2` refused as newer; name `notes` refused; valid file parses.
   - `TestCheckDirForms`: same report for `dir`, `dir/`, and a relative path.
   - `TestCyberpunkMatchesPieces` (`pieces_test.go`): `Check` on the real folder `../web/static/office/sets/cyberpunk` (tests run in the package dir) → every piece `ok`, no `missing`, every glTF has a list entry. Built-ins at runtime are copied nowhere: `Store` checks them from `web.StaticFS()` by writing nothing and reading through `fs.FS` only for `Ls`'s counts, never `Check`.
@@ -145,8 +135,8 @@
 
 **Interfaces:**
 - `loadOfficeKit(set, pieces, names, loader)`: `set` is `set.json`; `pieces` is `pieces.json`; loads `set.base + name + '.gltf'` for each name in `set.have`, else a box.
-- `kit.spawn(name)`: model or box (`RS_Placeholder`, light grey `#9aa0a8`, edges `#5a6068` via `EdgesGeometry`), `userData.missing = set.name`; unknown name → red box + `console.error`.
-- `kit.point(piece, name) → [x, y, z]`; `kit.colliders` adds one box of `size` for a box piece whose extras include `collider`.
+- `kit.spawn(name)`: model or box from `min` to `max` (`RS_Placeholder`, light grey `#9aa0a8`, edges `#5a6068` via `EdgesGeometry`), `userData.missing = set.name`; unknown name → red box + `console.error`.
+- `kit.point(piece, name) → [x, y, z]`; `kit.colliders` adds one box from `min` to `max` for a box piece whose extras include `collider`.
 - A model that fails to load → its box + `console.error`.
 - `set.look` drives `film.js` (background, fog colour/density, hemi colour, hemi levels × `ambient_intensity`, city light colour/intensity) and `world.js` (bloom strength; CRT effect on/off).
 

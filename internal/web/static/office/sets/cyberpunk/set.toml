@@ -1,0 +1,17 @@
+# The built-in Virtual Office set (D153): today's look, value for value.
+schema = 1
+name = "cyberpunk"
+version = 1
+pieces = 1
+description = "Neon, worn metal and a city in the smog"
+
+[look]
+background = "#05060c"
+fog = "#0b0f1c"
+fog_density = 0.035     # walking; the overview has no fog
+ambient = "#4a5c88"     # the hemisphere light's sky
+ambient_intensity = 1   # times the walk (2.4) and overview (9) levels
+key = "#6fa0ff"         # the city's light through the windows
+key_intensity = 1.1
+bloom = 0.28
+scanlines = true        # the monitors' CRT effect

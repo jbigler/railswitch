@@ -62,8 +62,8 @@ Decisions taken with the user:
   "version": 1,
   "pieces": {
     "Furn_ParrotPerch": {
-      "size": [0.62, 1.42, 0.48],
-      "anchor": "floor",
+      "min": [-0.25, 0, -0.22],
+      "max": [0.26, 1.28, 0.22],
       "points": { "bar": [0, 1.284, 0] },
       "extras": ["collider"]
     }
@@ -71,30 +71,32 @@ Decisions taken with the user:
 }
 ```
 
-- `size`: the bounding box's x (width), y (height), z (depth) in meters,
-  in the piece's own frame (front +Z).
-- `anchor`: where the origin is. `floor`: on the floor at the footprint's
-  centre (box y from 0 to height, x and z centred). `wall`: at the
-  centre, back against the wall (box centred in x and y, z from 0 to
-  depth). `ceiling`: at the ceiling (box y from -height to 0, x and z
-  centred). These are today's conventions (`docs/office-kit.md`).
+- `min`, `max`: the bounding box's corners in meters, in the piece's own
+  frame (x width, y up, z front), from its origin: its size and where its
+  origin sits in one. Most pieces follow `docs/office-kit.md` (on the
+  floor at the footprint's centre; wall-hung at the centre, back on the
+  wall; ceiling pieces hanging down), but about half of today's don't
+  exactly (a wall's origin is on its face, a workstation's under its
+  desk, a plant is lopsided), and the layout places them by their origin
+  as they are: the box, not a rule, is the contract.
 - `points`: named positions in the piece's frame the layout places things
-  at or on (a desk's `top`, the perch's `bar`, a screen's `screen` as its
-  centre plus a `screen_size` [w, h]). The layout reads these, never
-  literals.
+  at or on (a desk's `top`, the perch's `bar`, a crate's `top`). The
+  layout reads these, never literals.
 - `extras`: what the `cyberpunk` piece has beyond its shape: `collider`,
   `parts` (with the node names, `"parts": ["Door_L", "Door_R"]`), `accent`.
 
 `version` changes only when the list changes in a way that breaks sets
-(a piece's size, anchor or points); adding a piece doesn't change it.
-`build_all.py` bumps it itself: it compares the list it builds with the
-checked-in `pieces.json` and adds one when any piece's size, anchor or
-points differ, so remodelling a cyberpunk piece marks older sets stale.
+(a piece's box or points); adding a piece doesn't change it.
+`tools/office-kit/pieces.py` writes the list from the exported glTFs (the
+boxes and extras) and its own table of points; `build_all.py` runs it
+last, and it runs alone too (plain Python, no Blender). It bumps
+`version` itself: it compares the list with the checked-in `pieces.json`
+and adds one when any piece's box (beyond 0.001 m) or points differ, so
+remodelling a cyberpunk piece marks older sets stale.
 
-A set's piece must match `size` within ±0.02 m per axis and have its
-origin at `anchor` (the box's extent from the origin within ±0.02 m of the
-anchor's rule). `points` are the contract too but can't be read from a
-mesh: they are documented, and the preview (below) draws them.
+A set's piece must match `min` and `max` within ±0.02 m on every axis.
+`points` are the contract too but can't be read from a mesh: they are
+documented, and the preview (below) draws them.
 
 ## A set
 
@@ -150,12 +152,13 @@ written only by `office set add`.
   one of those glTFs, a glTF URI that is absolute, has a scheme (`data:`
   included: three.js fetches those, and the page's CSP allows `fetch`
   only from `'self'`; export as "glTF Separate"), or leaves the folder. Per piece: `ok`, `missing`, or `refused`
-  with a reason naming the numbers (`Furn_Desk: 1.62 × 0.76 × 0.80 m, the
-  list says 1.60 × 0.75 × 0.80 (±0.02)`); a `.gltf` whose name isn't in
+  with a reason naming the numbers (`Furn_Desk: x -1.03..1.00,
+  y 0.00..0.75, z -0.40..0.40 m; the list says x -1.00..1.00,
+  y 0.00..0.75, z -0.40..0.40 (±0.02)`); a `.gltf` whose name isn't in
   the list is refused; a glTF that doesn't parse, has no mesh, or an
   accessor without `min`/`max` is refused. `set.toml` errors are reported
   the same way. Exit 0 only when nothing is refused. `--json`:
-  `{name, version, pieces, look, results[]{piece, status, reason, size}, errors[]}`.
+  `{name, version, pieces, look, results[]{piece, status, reason, min, max}, errors[]}`.
 - `railswitch office set add <dir>`: check; any refusal refuses the add.
   Copies the set to `<data>/office/<name>/` (a temp dir under
   `<data>/office/` renamed over the old one) with `index.json`
@@ -208,20 +211,20 @@ synopsis.
 - `office.js` fetches `/office/set.json`, then `loadOfficeKit(set,
   pieces, names, loader)` (`kit.js`).
 - `kit.spawn(name)`: the set's model when `have` lists it; otherwise a box
-  of the piece's `size`, placed by its `anchor`, material
+  from the piece's `min` to its `max`, material
   `RS_Placeholder` (light grey, darker edges), its `userData.missing`
   set (tooltips say "missing in <set>"). A name not in `pieces.json`: a
   red box and a console error.
 - Colliders: a piece's `_COL` nodes; if it has none and the list's
-  `extras` include `collider`, one box of its `size`.
+  `extras` include `collider`, one box of its `min`..`max`.
 - Parts: `animate`, the roamers and the elevator act on the nodes found;
   missing ones do nothing (a pet glides, an android doesn't type, the
   elevator's doors don't open).
 - Accent: `setAccent`/`setSecondary` change materials named as today
   (`RS_Neon_Accent`, …): a set opts in by naming its materials so.
 - `kit.point(piece, name)` returns a point from `pieces.json`; `rooms.js`
-  uses it for every height today written as a literal (desk and table
-  tops, the perch bars, screens).
+  uses it for every height today written as a literal (desk, counter,
+  table, stand and crate tops, the perch bars).
 - Look: `world.js`/`film.js` take background, fog, ambient, key light,
   bloom and scanlines from `set.look` instead of constants; light
   positions stay.
@@ -230,15 +233,15 @@ With `cyberpunk` the office must look as it does today.
 
 ## Blender
 
-- `build_all.py` writes the models to `static/office/sets/cyberpunk/`
-  and `pieces.json`: each piece's size from its exported bounding box,
-  its anchor from its category (the conventions above), its points from
-  empties named `<piece>_PT_<point>` (dropped from the glTF), its extras
-  from its `_COL` nodes, named parts and `RS_` accent materials.
-- The points the layout needs today become such empties.
-- `stub_set.py <out.blend>`: a scene with a wireframe box of the right
-  size and anchor for every piece and its point empties, to model a new
-  set inside.
+- `build_all.py` writes the models to `static/office/sets/cyberpunk/`,
+  then runs `pieces.py`, which writes `pieces.json`: each piece's box from
+  its exported glTF, its extras from its `_COL` nodes, its other named
+  nodes (`parts`) and its accent materials (`RS_Neon_*`, `RS_LED_Accent`,
+  `RS_Screen*`), and its points from `pieces.py`'s table, which holds the
+  heights the layout needs today.
+- `stub_set.py <out.blend>`: a scene with a wireframe box from `min` to
+  `max` for every piece and an empty `<piece>_PT_<point>` per point, to
+  model a new set inside.
 
 ## Errors
 
@@ -253,10 +256,10 @@ Unit (no podman, network or browser):
 
 - `internal/office`: glTF bounds on hand-written glTFs (node rotation,
   scale, nested nodes, several meshes, an offset origin); folder refusals (symlink, `..` URI, absolute URI, `data:` URI, oversize file,
-  stray file, too many files); per-piece results (ok, off by 3 cm, wrong
-  anchor, unknown name, missing); `set.toml` strictness and ranges.
-- `pieces.json` against the `cyberpunk` set: every piece's bounds and
-  anchor match, every model has an entry (the generator can't drift).
+  stray file, too many files); per-piece results (ok, off by 3 cm, the
+  origin moved 10 cm, unknown name, missing); `set.toml` strictness and ranges.
+- `pieces.json` against the `cyberpunk` set: every piece's box matches
+  (Go's bounds against `pieces.py`'s), every model has an entry (the generator can't drift).
 - The reserved set names equal the fixed paths under
   `/p/{prefix}/virtual-office/`.
 - CLI: `check` exit codes and JSON; `add` (new, replace, built-in name

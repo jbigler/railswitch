@@ -159,3 +159,119 @@ func TestPrLsOldPRFromBaseBranch(t *testing.T) {
 		}
 	}
 }
+
+const ghViewFixture = `{"number": 7, "title": "Feat\u001b[2J", "url": "https://github.com/o/n/pull/7", "state": "OPEN", "isDraft": true,
+  "author": {"login": "ann"}, "body": "## Why\nBecause.", "baseRefName": "main", "headRefName": "feat", "labels": [{"name": "ui"}],
+  "mergeable": "MERGEABLE", "mergeStateStatus": "BLOCKED", "reviewDecision": "CHANGES_REQUESTED",
+  "statusCheckRollup": [
+    {"__typename": "CheckRun", "name": "test", "workflowName": "ci", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "https://github.com/o/n/actions/runs/41/job/5"},
+    {"__typename": "CheckRun", "name": "lint", "workflowName": "ci", "status": "COMPLETED", "conclusion": "FAILURE", "detailsUrl": "https://github.com/o/n/actions/runs/41/job/6"},
+    {"__typename": "CheckRun", "name": "docs", "status": "COMPLETED", "conclusion": "SKIPPED", "detailsUrl": "javascript:alert(1)"},
+    {"__typename": "StatusContext", "context": "deploy", "state": "PENDING", "targetUrl": "https://ci.example.dev/9"}],
+  "reviews": [{"author": {"login": "bo"}, "state": "CHANGES_REQUESTED", "body": "Rename it", "submittedAt": "2026-11-01T10:00:00Z"},
+              {"author": {"login": "bo"}, "state": "PENDING", "body": "draft", "submittedAt": ""}],
+  "comments": [{"author": {"login": "cy"}, "body": "LGTM", "createdAt": "2026-11-01T11:00:00Z", "url": "https://github.com/o/n/pull/7#issuecomment-1"}],
+  "files": [{"path": "a.go", "additions": 3, "deletions": 1, "changeType": "MODIFIED"}],
+  "additions": 3, "deletions": 1, "createdAt": "2026-10-30T09:00:00Z", "updatedAt": "2026-11-01T11:00:00Z", "autoMergeRequest": null}`
+
+const ghMergeFixture = `{"data":{"repository":{"mergeCommitAllowed":false,"squashMergeAllowed":true,"rebaseMergeAllowed":true,"autoMergeAllowed":true,"mergeQueue":null}}}`
+
+// D152: pr show reads one PR (the worktree's by default) with its checks,
+// reviews, comments, files and the repo's merge settings; links that are
+// not GitHub's web URLs are dropped.
+func TestPrShow(t *testing.T) {
+	ws, _ := gitWS(t)
+	f := fakeHost()
+	f.Passthrough = []string{"git"}
+	f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(ghFixture)}, nil)
+	f.On([]string{"gh", "pr", "view", "7"}, sys.Result{Stdout: []byte(ghViewFixture)}, nil)
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(ghMergeFixture)}, nil)
+	code, out, errs := runWith(t, f, "-C", ws, "-w", "feat", "--json", "pr", "show")
+	if code != 0 {
+		t.Fatalf("pr show: exit %d: %s", code, errs)
+	}
+	var v map[string]any
+	if err := json.Unmarshal([]byte(out), &v); err != nil {
+		t.Fatal(err)
+	}
+	for k, want := range map[string]any{"number": float64(7), "state": "draft", "author": "ann", "review": "changes_requested",
+		"checks": "fail", "merge_state": "blocked", "mergeable": "mergeable", "queue": false, "auto_merge": ""} {
+		if v[k] != want {
+			t.Errorf("%s = %v; want %v", k, v[k], want)
+		}
+	}
+	if m := v["methods"].([]any); len(m) != 2 || m[0] != "squash" {
+		t.Errorf("methods %v; want squash, rebase", m)
+	}
+	runs := v["check_runs"].([]any)
+	if len(runs) != 4 || runs[0].(map[string]any)["run"] != float64(41) || runs[2].(map[string]any)["state"] != "skipped" ||
+		runs[2].(map[string]any)["url"] != "" || runs[3].(map[string]any)["name"] != "deploy" || runs[3].(map[string]any)["state"] != "pending" {
+		t.Errorf("check_runs %v", runs)
+	}
+	if r := v["reviews"].([]any); len(r) != 1 {
+		t.Errorf("reviews %v: the pending one is a draft", r)
+	}
+	// the text form makes GitHub's text printable
+	_, out, _ = runWith(t, f, "-C", ws, "-w", "feat", "pr", "show")
+	if strings.ContainsRune(out, 0x1b) || !strings.Contains(out, "#7 Feat") {
+		t.Errorf("text form:\n%s", out)
+	}
+	// a number names any PR, without a worktree
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "show", "#7"); code != 0 {
+		t.Errorf("pr show #7: exit %d %s", code, errs)
+	}
+	if code, _, _ := runWith(t, f, "-C", ws, "pr", "show", "-3"); code != 2 {
+		t.Errorf("pr show -3: exit %d; want 2", code)
+	}
+}
+
+// D152: merge takes one of the repo's methods (the first by default), with
+// --auto; ready refuses a PR that is no draft; rerun reruns each failed
+// Actions run once.
+func TestPrActions(t *testing.T) {
+	ws, _ := gitWS(t)
+	f := fakeHost()
+	f.Passthrough = []string{"git"}
+	f.On([]string{"gh", "pr", "view", "7"}, sys.Result{Stdout: []byte(ghViewFixture)}, nil)
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(ghMergeFixture)}, nil)
+	calls := func(prefix ...string) [][]string {
+		var out [][]string
+		for _, c := range f.Calls {
+			if len(c) >= len(prefix) && slices.Equal(c[:len(prefix)], prefix) {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "merge", "7", "--auto"); code != 0 {
+		t.Fatalf("merge: exit %d %s", code, errs)
+	}
+	if c := calls("gh", "pr", "merge"); len(c) != 1 || !slices.Equal(c[0], []string{"gh", "pr", "merge", "7", "--repo", "[ORG]/[REPO]", "--squash", "--auto"}) {
+		t.Errorf("merge argv %q", c)
+	}
+	// a repo that doesn't allow auto-merge: --auto is refused before gh merges
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(strings.Replace(ghMergeFixture, `"autoMergeAllowed":true`, `"autoMergeAllowed":false`, 1))}, nil)
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "merge", "7", "--auto"); code != 1 || !strings.Contains(errs, "does not allow auto-merge") {
+		t.Errorf("--auto without auto-merge: exit %d %s", code, errs)
+	}
+	if c := calls("gh", "pr", "merge"); len(c) != 1 {
+		t.Errorf("merged anyway: %q", c)
+	}
+	f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(ghMergeFixture)}, nil)
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "merge", "7", "--method", "merge"); code != 1 || !strings.Contains(errs, "does not allow") {
+		t.Errorf("a refused method: exit %d %s", code, errs)
+	}
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "ready", "7"); code != 0 {
+		t.Errorf("ready: exit %d %s", code, errs)
+	}
+	if code, out, errs := runWith(t, f, "-C", ws, "pr", "rerun", "7"); code != 0 || !strings.Contains(out, "1 run(s)") {
+		t.Errorf("rerun: exit %d %s%s", code, out, errs)
+	}
+	if c := calls("gh", "run", "rerun"); len(c) != 1 || !slices.Equal(c[0], []string{"gh", "run", "rerun", "41", "--failed", "--repo", "[ORG]/[REPO]"}) {
+		t.Errorf("rerun argv %q", c)
+	}
+	f.On([]string{"gh", "pr", "view", "7"}, sys.Result{Stdout: []byte(strings.Replace(ghViewFixture, `"isDraft": true`, `"isDraft": false`, 1))}, nil)
+	if code, _, errs := runWith(t, f, "-C", ws, "pr", "ready", "7"); code != 1 || !strings.Contains(errs, "not a draft") {
+		t.Errorf("ready on an open PR: exit %d %s", code, errs)
+	}
+}

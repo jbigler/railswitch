@@ -623,6 +623,7 @@ type detailView struct {
 	Actions                           []actionView
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
+	PRPageURL                         string       // the worktree's PR page (D152)
 	AgentDefaultURL                   string       // the agent default config dialog (D135)
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
@@ -649,7 +650,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 	v := detailView{
 		Slug: wt.Slug, Branch: wt.Branch, PR: newPR(r.PR),
 		StackGlyph: stackGlyph(wt.Stack), StackText: stackText(wt), StackClass: stackClass(wt.Stack),
-		TasksURL: path + "/tasks", AgentDefaultURL: path + "/agent-default", Stale: wt.Stale,
+		TasksURL: path + "/tasks", PRPageURL: path + "/pr", AgentDefaultURL: path + "/agent-default", Stale: wt.Stale,
 		Stacked: newStacked(r, repo),
 	}
 	dim := ""

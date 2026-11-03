@@ -787,6 +787,17 @@ Every action is a job (below).
   "Discard changes" ticked and the worktree name typed →
   `wt rm --force <slug>`.
 - **Refresh PRs** runs `pr ls` now instead of waiting for the next minute.
+- **PR page** (by the PR line, D152; `/p/<prefix>/<slug>/pr`) shows the
+  worktree's PR from `railswitch --json pr show`: title, state, branches,
+  labels, checks (each with its log), review and merge state, the
+  description, reviews and comments (their Markdown made into headings,
+  lists, code, quotes, bold, italics and http(s) links, never into markup),
+  and the changed files. Its actions run as jobs on the PR number the page
+  showed: **Ready for review** (a draft), **Rerun failed checks** (failed
+  Actions runs), and, with a method the repo allows, **Merge now** and
+  **Merge when ready** (`--auto`, when the repo allows auto-merge), or
+  **Add to merge queue** when the base has one; merging asks first. The office's PR station and the desk panel
+  open it. Comment actions and sending a comment to the agent come next.
 - **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
   filtered as you type, with an "args" field split like a shell (quotes and
   backslash, no expansion), and "in a new terminal", ticked unless this

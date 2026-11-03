@@ -30,12 +30,17 @@ type OpenPR struct {
 }
 
 func gh(ctx context.Context, r sys.Runner, args ...string) ([]byte, error) {
+	return ghT(ctx, r, 30*time.Second, args...)
+}
+
+// ghT is gh with its own timeout.
+func ghT(ctx context.Context, r sys.Runner, timeout time.Duration, args ...string) ([]byte, error) {
 	res, err := r.Run(ctx, sys.Cmd{
 		Name:    "gh",
 		Args:    args,
 		Dir:     NeutralDir,
 		Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
-		Timeout: 30 * time.Second,
+		Timeout: timeout,
 	})
 	return res.Stdout, err
 }

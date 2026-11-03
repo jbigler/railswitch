@@ -64,7 +64,7 @@ async function go(to) {
   closePanel();
   $('where').textContent = 'Elevator…';
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
-    service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer() };
+    prPage: showPRPage, service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;
@@ -261,6 +261,7 @@ function showDesk(slug) {
     if (w?.pr) {
       body.append(el('h3', {}, 'Pull request'));
       body.append(el('p', {}, ext(`#${w.pr.number} ↗`, safeURL(w.pr.url)), ' ', w.pr.title));
+      body.append(el('a', { class: 'hud-btn', href: `${base}/${encodeURIComponent(slug)}/pr` }, 'PR page: checks, reviews, merge'));
     }
     return () => t?.close();
   });
@@ -333,6 +334,14 @@ function whoBar(me, draw) {
     el('span', { class: 'tag' }, `@${l} `, el('button', { type: 'button', class: 'link', 'aria-label': `Unfollow ${l}`, on: { click: () => { unfollow(l); room?.redrawWork?.(); draw(); } } }, '✕')))
     : el('span', { class: 'muted' }, 'Follow teammates to see their issues and PRs.'));
   return [bar, el('div', { class: 'row' }, input, btn('Follow', add), err), people];
+}
+
+// showPRPage opens the floor's PR page (D152) in a new tab, or the PR
+// list when the floor has no PR.
+function showPRPage(slug) {
+  const w = state.worktrees.find((x) => x.slug === slug);
+  if (!w?.pr) return showPRs();
+  window.open(`${base}/${encodeURIComponent(slug)}/pr`, '_blank', 'noopener');
 }
 
 function showPRs() {

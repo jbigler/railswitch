@@ -991,7 +991,7 @@ function jobNext(f) {
   return "";
 }
 
-if (view === "images" || view === "library" || view === "editor" || view === "machine") {
+if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr") {
   document.addEventListener("submit", (e) => {
     const f = e.target;
     if (f.matches("form[data-add-file]")) {
@@ -1003,7 +1003,7 @@ if (view === "images" || view === "library" || view === "editor" || view === "ma
     e.preventDefault();
     if (f.dataset.confirm && !confirm(f.dataset.confirm)) return;
     const next = jobNext(f);
-    startJob(f.action, new URLSearchParams(new FormData(f)), (state) => {
+    startJob(f.action, new URLSearchParams(new FormData(f, e.submitter)), (state) => {
       if (state !== "ok") return toast("It did not finish: " + state + ". The output is below.", true);
       if (next) location.href = next;
       else location.reload();
@@ -1342,3 +1342,84 @@ function startNew() {
   connect();
 })();
 
+
+// Markdown from GitHub (D152): each [data-md] element's text, formatted
+// into elements built with textContent only, so nobody's Markdown can add
+// markup: headings, lists, quotes, fenced code, inline code, bold, italics
+// and links (http and https only). Anything else stays text.
+function mdInline(parent, text) {
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()]+)/g;
+  let at = 0;
+  for (const m of text.matchAll(re)) {
+    parent.append(text.slice(at, m.index));
+    let el;
+    if (m[1]) { el = document.createElement("code"); el.textContent = m[1].slice(1, -1); }
+    else if (m[2]) { el = document.createElement("strong"); el.textContent = m[2].slice(2, -2); }
+    else if (m[3]) { el = document.createElement("em"); el.textContent = m[3].slice(1, -1); }
+    else {
+      // a bare URL leaves the sentence's punctuation after it as text
+      const bare = m[6] ? m[6].replace(/[.,;:!?'"]+$/, "") : "";
+      el = document.createElement("a");
+      el.href = m[5] || bare;
+      el.textContent = m[4] || bare;
+      el.target = "_blank";
+      el.rel = "noopener noreferrer";
+      if (m[6]) {
+        parent.append(el);
+        at = m.index + bare.length;
+        continue;
+      }
+    }
+    parent.append(el);
+    at = m.index + m[0].length;
+  }
+  parent.append(text.slice(at));
+}
+
+function mdFormat(box) {
+  const lines = box.textContent.replace(/\r\n?/g, "\n").split("\n");
+  box.textContent = "";
+  let list = null, para = null;
+  const flush = () => { list = null; para = null; };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^```/.test(line)) {
+      flush();
+      const pre = document.createElement("pre");
+      const code = [];
+      for (i++; i < lines.length && !/^```/.test(lines[i]); i++) code.push(lines[i]);
+      pre.textContent = code.join("\n");
+      box.append(pre);
+      continue;
+    }
+    let m;
+    if (!line.trim()) { flush(); continue; }
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+      flush();
+      const h = document.createElement("h" + Math.min(6, m[1].length + 2));
+      mdInline(h, m[2]);
+      box.append(h);
+    } else if ((m = line.match(/^\s*([-*+]|\d+[.)])\s+(?:\[([ xX])\]\s+)?(.*)$/))) {
+      para = null;
+      const ordered = /\d/.test(m[1]);
+      if (!list || (list.tagName === "OL") !== ordered) {
+        list = document.createElement(ordered ? "ol" : "ul");
+        box.append(list);
+      }
+      const li = document.createElement("li");
+      if (m[2]) li.append(m[2] === " " ? "☐ " : "☑ ");
+      mdInline(li, m[3]);
+      list.append(li);
+    } else if ((m = line.match(/^>\s?(.*)$/))) {
+      flush();
+      const q = document.createElement("blockquote");
+      mdInline(q, m[1]);
+      box.append(q);
+    } else {
+      list = null;
+      if (!para) { para = document.createElement("p"); box.append(para); } else para.append(document.createElement("br"));
+      mdInline(para, line);
+    }
+  }
+}
+document.querySelectorAll("[data-md]").forEach(mdFormat);

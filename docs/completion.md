@@ -41,7 +41,7 @@ railswitch completion fish > ~/.config/fish/completions/railswitch.fish
 - `pack`: its subcommands `eject`, `file`, `ls`, `new` and `show`; `pack eject|show`: the built-in packs and options (`rails@1`, `postgres@1`, …); `pack eject`'s flag `--as`; `pack new`'s flags `--dir` and `--option`; `pack file`: `show`, `write` (flags `--if-hash`, `--dry-run`, `--restart`) and `rm` (flag `--if-hash`).
 - `project rm`: every registered project prefix.
 - `project new --agent` takes `name=ref` or `none`; the flag itself completes, its value does not.
-- `pr`: its subcommand `ls`. `task`: its subcommand `ls` together with the tasks `task ls` lists (the pack's `[tasks]` with `project.toml`'s over them), and its flag `--new-term`. `wt add`: flags `--name` and `--up`.
+- `pr`: its subcommands `ls`, `show`, `merge`, `ready` and `rerun`; `pr merge`: flags `--method` and `--auto`. `task`: its subcommand `ls` together with the tasks `task ls` lists (the pack's `[tasks]` with `project.toml`'s over them), and its flag `--new-term`. `wt add`: flags `--name` and `--up`.
 - `dashboard`: its subcommands `colors` and `serve`; `dashboard colors`: its subcommands `set` and `reset`; `dashboard colors set`: flags `--dark` and `--base` (its preset value does not complete); `dashboard colors reset`: flag `--dark`.
 
 Workspace candidates honour `-C <dir>` on the command line. Outside a workspace, or on any error, completion offers nothing and prints nothing to stderr. It reads the registry without locking or creating it, and never runs podman, git or any other command.

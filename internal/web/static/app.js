@@ -282,8 +282,8 @@ function hideToast() {
 
 // Keys.
 
-// Terminal panels (D149): docked in #terms, outside the detail that SSE
-// replaces; each closes its WebSocket when removed.
+// Terminal panels (D149): docked in #terms, under the jobs and outside the
+// detail that SSE replaces; each closes its WebSocket when removed.
 async function openTermPanel(btn) {
   const dock = $("#terms");
   if (!dock) return;
@@ -308,6 +308,7 @@ async function openTermPanel(btn) {
   head.append(title, full, x);
   panel.append(head, host);
   dock.prepend(panel);
+  panel.scrollIntoView({ block: "nearest" }); // the dock sits below the jobs
   let t = null;
   try {
     const { openTerminal } = await import("/static/term/term.js");

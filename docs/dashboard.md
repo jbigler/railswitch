@@ -177,9 +177,13 @@ is no longer accepted. What the page shows meanwhile may be stale.
   turns on. Start selects the base worktree, runs `up` there and
   says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with such secrets opens with this card.
-- **Detail** (the selected worktree): name, `⎇ branch`, the PR line
+- **Detail** (the selected worktree): name, then one line: `⎇ branch`
+  (left out when the branch is the worktree's name), the stack state
+  (and "restart to apply"), the PR line
   (`PR #2141 ready · checks ✓ · approved`, a link to the PR; Links gains
-  **Review app** when `pr ls` finds one, the PR's GitHub deployment), then, when its branch is in a
+  **Review app** when `pr ls` finds one, the PR's GitHub deployment).
+  Right under it the actions (start, restart, stop, `remove…`; see
+  Actions). Then, when its branch is in a
   gh stack (`stack ls`, read with the PRs), Stack, in gh stack view's
   words: `◆ Stack #10350` (linked to the stack on GitHub) · `Base:
   master` · `22 branches (8 merged)`, and `⚠ restack needed` when a
@@ -193,10 +197,13 @@ is no longer accepted. What the page shows meanwhile may be stale.
   glyph, the name and a plain state word, `running`, `starting`,
   `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
   `unknown`, in the glyph's colour;
-  the systemd state is the row's tooltip; while the service runs, `logs`
+  the systemd state is the row's tooltip; a running service's `logs` and
+  `restart` show while the pointer is on its row or the keyboard is in it
+  (always on a touch screen), a service in any other state shows them
+  always; while the service runs, `logs`
   opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
   and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message), Actions and Jobs.
+  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message, and the **default config…** link beside its label), Terminal (below) and Jobs; the terminal panels dock under the jobs.
 
 ## Settings
 
@@ -714,7 +721,9 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 ## Terminals
 
 The worktree's **Terminal** row opens a live terminal in the page (D149),
-docked under the worktree's details; several can be open at once.
+docked under the worktree's jobs; several can be open at once. The row
+ends with **open window ↗**, the `terminal` action below: a window on the
+desktop, not in the page.
 
 | Button | Runs | When the panel closes |
 |--------|------|-----------------------|
@@ -765,8 +774,9 @@ Every action is a job (below).
   while this worktree's home waits for it (`agent ls`'s
   `default_pending`) the dialog says "Pending: … takes the default at its
   next start", adding "stop it, then start it again" while it runs.
-- **terminal** runs `railswitch term`: a new terminal tab or window on
-  the host with your shell in the worktree's folder.
+- **open window ↗** (at the end of the Terminal row) runs `railswitch
+  term`: a new terminal tab or window on the host with your shell in the
+  worktree's folder.
 - **nvim** and **agent** (the cyberpunk office's desks) run `railswitch nvim
   --new-term` and `railswitch agent --new-term`.
 - **Stack branch** (with a gh stack): a click on another open branch of

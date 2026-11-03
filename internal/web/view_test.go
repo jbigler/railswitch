@@ -329,10 +329,10 @@ func TestDetailActions(t *testing.T) {
 		return out
 	}
 	for stack, want := range map[string][]string{
-		"stopped": {"start", "terminal"},
-		"up":      {"restart", "stop", "terminal"},
-		"partial": {"start", "restart", "stop", "terminal"},
-		"failed":  {"start", "restart", "stop", "terminal"},
+		"stopped": {"start"},
+		"up":      {"restart", "stop"},
+		"partial": {"start", "restart", "stop"},
+		"failed":  {"start", "restart", "stop"},
 	} {
 		if got := acts(stack); !slices.Equal(got, want) {
 			t.Errorf("%s: actions %v; want %v", stack, got, want)
@@ -415,7 +415,10 @@ func TestDetailTerminals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`data-term="/p/ftest/tty/feat-login/agent?agent=bot"`, `data-term="/p/ftest/tty/feat-login/shell"`} {
+	for _, want := range []string{`data-term="/p/ftest/tty/feat-login/agent?agent=bot"`, `data-term="/p/ftest/tty/feat-login/shell"`,
+		// the desktop window sits in the Terminal row, after the panels
+		`shell ▣</button><span class="gap"></span><form method="post" action="/p/ftest/feat-login/act/term"`,
+		"⎇ jb/feat-login · "} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %s", want)
 		}
@@ -434,8 +437,15 @@ func TestDetailTerminals(t *testing.T) {
 	if strings.Contains(html, `id="terms"`) {
 		t.Error("the dock is inside the detail")
 	}
+	// a branch named as the slug isn't repeated under it
+	r.WT.Branch = r.WT.Slug
+	if html, _ = render("detail", newDetail("ftest", r, "")); strings.Contains(html, "⎇") {
+		t.Errorf("the branch repeats the slug:\n%s", html)
+	}
+	// the dock comes after the jobs, which stay in view
 	f := newFixture(t)
-	if page := f.do(req("GET", "/p/ftest/b", nil)).Body.String(); !strings.Contains(page, `<div id="terms" class="terms"></div>`) {
-		t.Error("the page has no terminal dock")
+	page := f.do(req("GET", "/p/ftest/b", nil)).Body.String()
+	if !strings.Contains(page, `<div id="terms" class="terms"></div>`) || strings.Index(page, `id="jobs"`) > strings.Index(page, `id="terms"`) {
+		t.Error("the page has no terminal dock under the jobs")
 	}
 }

@@ -622,6 +622,7 @@ type detailView struct {
 	Agent                             *agentView
 	Actions                           []actionView
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
+	TermWindowURL                     string       // the term action: a window on the desktop
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	PRPageURL                         string       // the worktree's PR page (D152)
 	AgentDefaultURL                   string       // the agent default config dialog (D135)
@@ -704,9 +705,10 @@ func newDetail(prefix string, r row, repo string) detailView {
 	case "partial", "failed":
 		acts = []string{"up", "restart", "stop"}
 	}
-	for _, act := range append(acts, "term") {
+	for _, act := range acts {
 		v.Actions = append(v.Actions, actionView{Label: worktreeActions[act].label, URL: path + "/act/" + act})
 	}
+	v.TermWindowURL = path + "/act/term"
 	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
 	agentURL := tty + "agent" // the default agent, or the one the overview names
 	if wt.Agent != nil {

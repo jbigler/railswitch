@@ -70,6 +70,7 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .actions{display:flex;flex-wrap:wrap;align-items:center}
 .actions form,.job-hd form{display:inline;margin-left:6px}
 .gap{width:14px}
+.actions.top{margin:8px 0 2px}
 
 /* Jobs */
 .job{border-top:1px solid var(--sel);padding:6px 0}
@@ -241,8 +242,9 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .stack-switch{display:inline}
 .stack-switch button{font:inherit;color:var(--blue);background:none;border:0;padding:0;cursor:pointer}
 .stack-switch button:hover{text-decoration:underline}
-.lbl a.quiet-link{font-weight:400;margin-left:8px;color:var(--muted);text-decoration:none}
-.lbl a.quiet-link:hover{color:var(--blue);text-decoration:underline}
+/* A link beside a caption: plain small text, not the caption's capitals. */
+.lbl a.quiet-link{font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;margin-left:10px;color:var(--blue);text-decoration:none}
+.lbl a.quiet-link:hover{text-decoration:underline}
 .agent-default{margin:8px 0 12px}
 .agent-default h3{margin:0 0 4px}
 .hd-group{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
@@ -251,6 +253,11 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .chip.yellow{color:var(--yellow);border-color:var(--yellow);text-decoration:none}
 .svc-acts{display:flex;gap:10px;align-items:center;font-size:.85em}
 .svc-acts form{display:inline}
+/* A running service's logs and restart show on hover or focus (opacity, not
+   visibility, so Tab still reaches them); any other state shows them always. */
+.svc:not(.attn) .svc-acts{opacity:0}
+.svc:hover .svc-acts,.svc:focus-within .svc-acts{opacity:1}
+@media (hover:none){.svc:not(.attn) .svc-acts{opacity:1}}
 .svc-acts a,.svc-acts button{color:var(--blue);background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:none}
 .svc-acts a:hover,.svc-acts button:hover{text-decoration:underline}
 .list td.br .trunc{display:inline-block;max-width:16rem;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}

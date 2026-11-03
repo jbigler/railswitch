@@ -113,6 +113,7 @@ var completionFlags = map[string][]string{
 	"pr agent":               {"--thread="},
 	"settings apply":         {"--accept-install=", "--if-hash=", "--restart"},
 	"task":                   {"--new-term"},
+	"tidy":                   {"--all", "--days=", "--force", "--rm"},
 	"template check":         {"--accept="},
 	"template import":        {"--accept="},
 	"template export":        {"--description=", "--name=", "--to=", "--version="},

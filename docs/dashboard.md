@@ -129,7 +129,7 @@ is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch", then two labelled groups. **project**: the
   project button (the prefix, or "choose"; opens the switcher) and, with
-  a project, `worktrees` (its page), `tasks :`, `images`, `library` and
+  a project, `worktrees` (its page), `tasks :`, `images`, `tidy`, `library` and
   `settings` (the project's pages, below). Then `◆ N need input`. On the
   right, **machine**: `settings` (the Machine page), `logs` (Dozzle at
   `http://logs.localhost/`), a `notifications` button until the browser
@@ -373,6 +373,26 @@ a local file into it, in the browser only (1 MiB at most).
   failed" above the job's output. If the file changed
   on disk since the page read it, nothing is written and the page offers
   Reload; your text stays until you reload.
+
+## Tidy
+
+`/p/<prefix>/tidy` (`tidy` in the header, D160) lists what could go, from
+`railswitch --json tidy`: each worktree whose PR is merged or closed or
+whose stack has been stopped over 14 days, and each image of the project
+no stack uses (what `gc` would remove), with why and its size, and the
+total. A worktree's size is its checkout's (a walk that stops after
+200,000 entries shows "≥"); an image's is podman's, shared layers
+included.
+
+- Every clean item is ticked; a **dirty** worktree (uncommitted changes
+  or untracked files) never is.
+- **Remove selected** runs one project-level job, `railswitch tidy --rm
+  <id>...`, which reads the list again and removes only what is still on
+  it: a worktree by `wt rm`'s path, an image by `podman rmi <name>`.
+  Ticking a dirty worktree needs "Discard their changes" too (the server
+  refuses it otherwise, 400), which adds `--force`: that worktree goes as
+  `wt rm --force` takes it, with its nvim and agent homes. The server
+  refuses an id that isn't one of this project's.
 
 ## Library
 
@@ -1111,6 +1131,8 @@ docs/json.md.
   known terminal installed.
 - `railswitch wt add [--name <n>] [--up] <branch>`: `--up` runs `up` in the
   new worktree.
+- `railswitch --json tidy` (project) and `tidy --rm [--force] <id>...`:
+  the Tidy page.
 - `railswitch [--json] pack ls`: the built-in packs, options (with slot
   and `works_with`) and agent packages, for the new page.
 - `railswitch [--json] -w <slug> containerfile list`, `--json containerfile

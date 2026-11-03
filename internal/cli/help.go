@@ -117,6 +117,7 @@ var synopses = map[string]string{
 	"status":                 "status",
 	"stop":                   "stop",
 	"task":                   "task [--new-term] <name> [<args>...] | task ls",
+	"tidy":                   "tidy [--all] [--days <n>] [--rm [--force] <id>...]",
 	"template check":         "template check [--accept <sha256>]",
 	"template export":        "template export [--name <name>] [--version <N>] [--description <text>] [--to <dir>]",
 	"template import":        "template import <dir> [--accept <sha256>]",

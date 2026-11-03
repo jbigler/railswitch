@@ -675,6 +675,37 @@ An on-demand agent is refused (exit 1). The text form prints the lines.
 | `session` | boolean | Its session server holds the agent's session. `false` (the container runs, no agent in it): `lines` empty, exit 0. |
 | `lines` | array of strings | The screen, top to bottom; never null. |
 
+## `agent queue ls`
+
+The current worktree's agent work queue (D159), in order: the prompts
+`agent queue add` queued (or `pr agent --queue`), which `agent queue next`
+types into the worktree's default agent one at a time, as it goes idle.
+Kept host-side in `<workspace>/.railswitch/queue/<slug>/queue.json`
+(0600, no container mounts it; `wt rm` removes it); at most 20 items of at
+most 4096 bytes each, checked as `agent send` checks its text. The text
+form is a table `ID TEXT` with each item's first line (control characters
+as spaces).
+
+```json
+{"slug": "feat-login", "delivered": 1793115142, "items": [{"id": 3, "text": "Fix the failing spec\nthen run the linter", "added": 1793115100}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `slug` | string | The worktree. |
+| `delivered` | number | When the last delivery started (Unix seconds), `0` for none. `next` waits for an agent status from a later second, so one status never takes two items. |
+| `items` | array | Oldest first; never null. |
+| `items[].id` | number | The item's id in this queue, never reused; `agent queue rm <id>` removes it. |
+| `items[].text` | string | What is typed, as given (UTF-8, line breaks and tabs only). |
+| `items[].added` | number | When it was queued (Unix seconds). |
+
+`agent queue next` types the first item when the default agent runs, its
+status is `idle` or `done` without a question to the user (`reply`), at
+least 5 s old and not older than `delivered`; it prints `held: <why>` and
+exits 0 otherwise, and when another delivery of the worktree runs.
+Typing goes through `agent prompt` (D152), whose refusals apply; the item
+is removed only once typed, so a failed delivery keeps it (exit 1).
+
 ## `issue ls`
 
 One project (`-C`): its open GitHub issues (D144), from `gh issue list
@@ -839,7 +870,7 @@ row.
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
-      "stack": "up", "stale": false,
+      "stack": "up", "stale": false, "queue": [],
       "tests": {"state": "failed", "stale": false, "last": {"exit_code": 1, "started_at": "2026-11-04T10:02:11Z", "ended_at": "2026-11-04T10:05:40Z", "commit": "9f2c…"}},
       "services": [{"service": "rails", "role": "app", "state": "active/running"}],
       "agent": {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
@@ -876,6 +907,7 @@ row.
 | `worktrees[].tests.stale` | boolean | The worktree's HEAD is now another commit than the one the run started on. `false` when either commit can't be read (a reftable repo, an unborn branch). The commits come from the worktree's git files, which a container can write: stale is a hint, not proof. |
 | `worktrees[].tests.last` | object or null | `null` for `never`; else `exit_code` (number, the task's own, `0` for passed), `started_at` and `ended_at` (RFC 3339 UTC), `commit` (the full HEAD commit at the start; `""` when unreadable). |
 | `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
+| `worktrees[].queue` | array | Its agent work queue's items (D159), as [`agent queue ls`](#agent-queue-ls)'s `items`; `[]` for none, or when the queue file can't be read (`agent queue ls` says why). |
 | `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
 
 ## `lock --review`

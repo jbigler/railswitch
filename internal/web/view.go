@@ -681,6 +681,7 @@ type detailView struct {
 	Merged, Stale                     bool
 	Tests                             *testsView // nil: no test task
 	TaskURL                           string     // posts a task to run as a job
+	Queue                             queueList  // the agent work queue (D159)
 }
 
 type linkView struct{ Label, URL, Class string }
@@ -748,6 +749,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		kind := agentKind(a)
 		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind), Message: a.Message}
 	}
+	v.Queue = newQueue(prefix, wt)
 	// What the stack's state allows: a stopped one starts, a running one
 	// restarts or stops, a partial or failed one any of the three.
 	acts := []string{"restart", "stop"}

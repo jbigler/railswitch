@@ -1,0 +1,15 @@
+{{/* The agent work queue (D159): the detail's part, under its Agent, and
+the add dialog. The dashboard types the first item into the agent once it
+has been idle a few seconds. */}}
+{{define "queue-detail"}}<div class="queue"><span class="muted">Queue:</span> {{with .Items}}{{len .}}{{else}}empty{{end}} <a class="quiet-link" href="{{.URL}}" data-dialog="agentqueue">add to queue…</a>{{if .Items}} <form method="post" action="{{.ClearURL}}" class="queue-clear" data-post data-confirm="Clear the agent's queue?"><button class="quiet-link">clear</button></form>{{end}}
+{{with .Items}}<ol class="queue-items">{{range .}}<li title="{{.Text}}"><span class="muted">#{{.ID}}</span> {{.Line}} <form method="post" action="{{$.RmURL}}" data-post><input type="hidden" name="id" value="{{.ID}}"><button class="quiet-link" title="Remove #{{.ID}} from the queue">remove</button></form></li>
+{{end}}</ol>{{end}}</div>
+{{end}}
+
+{{define "agentqueue"}}<form method="post" action="{{.AddURL}}" class="queue-add" data-post data-close>
+<h2>Queue for {{.Slug}}'s agent</h2>
+<p class="note">Typed into the agent, in order, each once it has been idle a few seconds; never while it works or waits on you.</p>
+<label>Prompt <textarea name="text" rows="5" maxlength="4096"></textarea></label>
+<label>or GitHub issue # <input name="issue" inputmode="numeric" autocomplete="off" class="mono"></label>
+<div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln main">Queue</button></div>
+</form>{{end}}

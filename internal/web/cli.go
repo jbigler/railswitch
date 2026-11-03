@@ -50,16 +50,17 @@ type signerWarning struct {
 }
 
 type worktree struct {
-	Slug     string    `json:"slug"`
-	ID       int       `json:"id"`
-	Branch   string    `json:"branch"`
-	Base     bool      `json:"base"`
-	Stack    string    `json:"stack"`
-	Stale    bool      `json:"stale"`
-	Services []service `json:"services"`
-	Agent    *agent    `json:"agent"`
-	Links    []link    `json:"links"`
-	Tests    *tests    `json:"tests"` // nil: the project has no test task
+	Slug     string      `json:"slug"`
+	ID       int         `json:"id"`
+	Branch   string      `json:"branch"`
+	Base     bool        `json:"base"`
+	Stack    string      `json:"stack"`
+	Stale    bool        `json:"stale"`
+	Services []service   `json:"services"`
+	Agent    *agent      `json:"agent"`
+	Links    []link      `json:"links"`
+	Tests    *tests      `json:"tests"` // nil: the project has no test task
+	Queue    []queueItem `json:"queue"` // the agent work queue (D159)
 }
 
 // tests is a worktree's test task's last run (D158): State never, passed
@@ -77,6 +78,12 @@ type testRun struct {
 	Commit    string    `json:"commit"` // HEAD at the start, read from git files a container can write
 }
 
+// queueItem is a queued prompt (agentqueue.Item).
+type queueItem struct {
+	ID   int    `json:"id"`
+	Text string `json:"text"`
+}
+
 type service struct {
 	Service     string `json:"service"`
 	Role        string `json:"role"`
@@ -92,6 +99,7 @@ type agent struct {
 	Reply   bool   `json:"reply"`
 	Running bool   `json:"running"`
 	Usage   *usage `json:"usage"`
+	TS      int64  `json:"ts"`
 }
 
 // usage is an agent's session tokens (agentstatus.Usage).

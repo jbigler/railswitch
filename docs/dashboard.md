@@ -801,6 +801,20 @@ Every action is a job (below).
   `db snapshot rm <name>`), and **Take a snapshot** with an optional name
   (`db snapshot [<name>]`, a timestamp by default). The dashboard restores
   or deletes only a name the list it read holds.
+- **Queue** (under the detail's Agent, D159): the worktree's agent work
+  queue from `overview`'s `queue`, each item's first line (the whole text
+  as its tooltip) with **remove** (`agent queue rm <id>`), **clear**
+  (`agent queue clear`, asked first) and **add to queue…**, a dialog with
+  a prompt box and an issue number field (`agent queue add`, the text on
+  stdin, or `agent queue add --issue <n>`). The dashboard delivers the
+  queue: when an overview shows a worktree with a queue whose agent runs
+  and is `idle`, or its turn is over without a question to you, with a
+  status at least 5 s old, it runs `agent queue next` as a job (label
+  `agent queue next`), once per status `ts` (a job of that worktree
+  already running: at the next overview). `next` checks the same again
+  and types the first item through `agent prompt`, removing it only once
+  typed; an agent working, or waiting on a permission or a question, is
+  never typed into. Each delivery shows in Jobs.
 - **open window ↗** (at the end of the Terminal row) runs `railswitch
   term`: a new terminal tab or window on the host with your shell in the
   worktree's folder.
@@ -843,7 +857,9 @@ Every action is a job (below).
   settles, or at once while it works; an agent waiting on a permission
   or a question is refused, since the text's Enter would answer it). **Send all unresolved to the agent** does it for every open
   thread, as much as fits in one input (4096 bytes; the rest are counted
-  and pointed to on GitHub). The page also adds a **Comment** to the
+  and pointed to on GitHub). **Queue for agent**, by each, adds the same
+  text to the worktree's agent queue instead (`pr agent --queue`, D159),
+  typed in once the agent is idle. The page also adds a **Comment** to the
   conversation and submits a **Review** (comment only, request changes,
   approve). Typed text goes to `gh` on stdin, never in its arguments.
 - **Command palette** (`:`, D155; `/p/<prefix>/<slug>/tasks`, or
@@ -1192,6 +1208,9 @@ docs/json.md.
 - `railswitch [--json] db snapshot ls` (worktree), `db snapshot
   [<name>]`, `db snapshot restore --yes <name>` and `db snapshot rm
   <name>`: the snapshots dialog (D157).
+- `railswitch agent queue add [--issue <n>]` (text on stdin), `agent
+  queue rm <id>`, `agent queue clear` and `agent queue next` (worktree):
+  the agent work queue (D159), above; `overview`'s `queue` shows it.
 - `railswitch [--json] pack ls`: the built-in packs, options (with slot
   and `works_with`) and agent packages, for the new page.
 - `railswitch [--json] -w <slug> containerfile list`, `--json containerfile

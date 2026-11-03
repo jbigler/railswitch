@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/jbigler/railswitch/internal/agentqueue"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
@@ -47,6 +48,7 @@ type OverviewWorktree struct {
 	Links    []render.Link     `json:"links"`
 	Stale    bool              `json:"stale"` // a running container was created from an older unit (D85)
 	Tests    *TestStatus       `json:"tests"` // its test task's last run (D158); nil: the project has no test task
+	Queue    []agentqueue.Item `json:"queue"` // its agent work queue, in order (D159); never nil
 }
 
 // Overview is one project's every worktree, as the dashboard polls it
@@ -203,6 +205,10 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 			}
 		}
 		ow.Agent = chooseAgent(agentRows(m, in, agents))
+		ow.Queue = []agentqueue.Item{}
+		if q, err := agentqueue.Read(l.WS.Root, w.Slug); err == nil { // a broken one: agent queue ls says why
+			ow.Queue = q.Items
+		}
 		ov.Worktrees = append(ov.Worktrees, ow)
 	}
 	return ov, nil

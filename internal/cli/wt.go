@@ -124,7 +124,7 @@ func wtAdd(ctx context.Context, e *env, args []string) int {
 		}
 		title = safefile.Printable(title)
 		pos = []string{prs.IssueBranch(*issue, title)}
-		prompt = fmt.Sprintf("Work on GitHub issue #%d: %s\nRead it first, with its comments: gh issue view %d --comments. Then plan the change, implement it on this branch and test it.", *issue, title, *issue)
+		prompt = issuePrompt(*issue, title)
 	}
 	var slug string // the worktree: an issue's existing one, or the new one
 	if *issue > 0 {
@@ -228,4 +228,10 @@ func wtLs(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	return 0
+}
+
+// issuePrompt is the agent's input for GitHub issue n (wt add --issue
+// --agent, agent queue add --issue); title is Printable.
+func issuePrompt(n int, title string) string {
+	return fmt.Sprintf("Work on GitHub issue #%d: %s\nRead it first, with its comments: gh issue view %d --comments. Then plan the change, implement it on this branch and test it.", n, title, n)
 }

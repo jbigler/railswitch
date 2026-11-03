@@ -126,7 +126,7 @@ func TestAgentStopCLI(t *testing.T) {
 func TestCompleteAgent(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
-	if got, want := complete(t, "agent", ""), []string{"add", "claude", "default", "ls", "probe", "screen", "send", "stop", "update"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "agent", ""), []string{"add", "claude", "default", "ls", "probe", "queue", "screen", "send", "stop", "update"}; !slices.Equal(got, want) {
 		t.Errorf("agent: %q; want %q", got, want)
 	}
 	if got := complete(t, "agent", "claude", ""); len(got) != 0 {

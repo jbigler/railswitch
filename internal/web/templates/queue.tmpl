@@ -9,7 +9,7 @@ has been idle a few seconds. */}}
 {{define "agentqueue"}}<form method="post" action="{{.AddURL}}" class="queue-add" data-post data-close>
 <h2>Queue for {{.Slug}}'s agent</h2>
 <p class="note">Typed into the agent, in order, each once it has been idle a few seconds; never while it works or waits on you.</p>
-<label>Prompt <textarea name="text" rows="5" maxlength="4096"></textarea></label>
+<label>Prompt <textarea name="text" rows="5" maxlength="4096" autofocus></textarea></label>
 <label>or GitHub issue # <input name="issue" inputmode="numeric" autocomplete="off" class="mono"></label>
 <div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln main">Queue</button></div>
 </form>{{end}}

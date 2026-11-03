@@ -109,6 +109,9 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/tasks", s.tasksDialog)
+	m.HandleFunc("GET /p/{prefix}/palette", s.tasksDialog) // no worktree: pages and worktrees only
+	m.HandleFunc("GET /p/{prefix}/notes", s.notesPage)
+	m.HandleFunc("POST /p/{prefix}/notes/write/{name}", s.cyberNoteWrite)
 	m.HandleFunc("GET /p/{prefix}/{slug}/pr", s.prPage)
 	m.HandleFunc("POST /p/{prefix}/{slug}/pr/{action}", s.prAction)
 	m.HandleFunc("GET /p/{prefix}/{slug}/agent-default", s.agentDefaultDialog)
@@ -410,17 +413,37 @@ func (s *Server) removeDialog(w http.ResponseWriter, r *http.Request) {
 	s.html(w, http.StatusOK, "remove", removeView{Slug: wt.Slug, Dir: rows[i].Dir, Dirty: rows[i].Dirty, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/remove"})
 }
 
+// tasksDialog is the : palette: worktree {slug}'s tasks and the actions
+// its detail shows, then the project's worktrees and pages.
 func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 	p, wt, ok := s.lookup(w, r)
 	if !ok {
 		return
 	}
-	tasks, err := readTasks(r.Context(), s.c.CLI, p.Workspace, wt.Slug)
+	base := "/p/" + p.Prefix
+	v := tasksView{Slug: wt.Slug, Pages: []actionView{
+		{"worktrees", base}, {"images", imagesURL(p.Prefix)}, {"library", base + "/library"},
+		{"settings", settingsURL(p.Prefix)}, {"notes", base + "/notes"}, {"office", base + "/virtual-office"},
+		{"machine settings", "/machine"},
+	}}
+	if wt.Slug != "" {
+		tasks, err := readTasks(r.Context(), s.c.CLI, p.Workspace, wt.Slug)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		v.URL, v.Tasks = base+"/"+wt.Slug+"/task", tasks
+		v.Actions = newDetail(p.Prefix, row{WT: wt}, "").Actions
+	}
+	ov, err := s.overviewOf(r.Context(), p.Prefix, p.Workspace)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.html(w, http.StatusOK, "tasks", tasksView{Slug: wt.Slug, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/task", Tasks: tasks})
+	for _, x := range ov.Worktrees {
+		v.Worktrees = append(v.Worktrees, actionView{Label: x.Slug, URL: base + "/" + x.Slug})
+	}
+	s.html(w, http.StatusOK, "tasks", v)
 }
 
 func (s *Server) agentDefaultDialog(w http.ResponseWriter, r *http.Request) {

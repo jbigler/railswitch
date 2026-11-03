@@ -1,0 +1,38 @@
+{{/* The agents' shared notes (D154). Save posts the text to SaveURL
+with the hash it was opened at; the CLI refuses it when the note changed
+since. */}}
+{{define "notes"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="notes">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Notes</h1>
+<p class="note">What the agents (and you) keep in the workspace's <code>notes/</code>, shared by every worktree.</p>
+<ul class="lib-list">
+{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="mono">{{.Name}}</span> <span class="muted">{{.Size}} B · {{.Modified}}</span></a></li>
+{{else}}<li class="muted">No notes.</li>
+{{end}}</ul>
+<form method="get" action="{{.URL}}" class="add-row">
+<input name="new" placeholder="name.md" class="mono" autocomplete="off" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,99}\.md" aria-label="New note's name">
+<button class="ln">New note</button>
+</form>
+</section>
+<section class="pane">
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{with .Open}}<form method="post" action="{{$.SaveURL}}" id="note" class="editor" autocomplete="off" data-hash="{{.Hash}}" data-back="{{$.URL}}">
+<h2 class="mono ed-file">{{.Name}}{{if $.New}} <span class="chip">new note</span>{{end}}</h2>
+<textarea name="text" class="mono" spellcheck="false" rows="28" aria-label="{{.Name}}">
+{{.Text}}</textarea>
+<div id="note-err" class="red" hidden></div>
+<div class="btns"><a class="ln dim" href="{{$.URL}}">Close</a>{{if not $.New}}<button type="button" class="ln danger" data-note-rm>Delete</button>{{end}}<button class="ln main">Save</button></div>
+</form>
+{{else}}{{if not .Error}}<p class="note">Open a note on the left, or start a new one.</p>
+{{end}}{{end}}</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}

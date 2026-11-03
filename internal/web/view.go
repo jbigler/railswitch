@@ -804,8 +804,9 @@ func newAgentDefault(prefix, slug string, rows []agentRow) agentDefaultView {
 }
 
 type tasksView struct {
-	Slug, URL string
-	Tasks     []task
+	Slug, URL                 string // "" without a worktree: no tasks or actions
+	Tasks                     []task
+	Actions, Worktrees, Pages []actionView
 }
 
 // colorTokens are the editable tokens, in the editor's order.

@@ -318,3 +318,4 @@ body:has(.term-panel.max) { overflow: hidden; }
 .usage-chart .bar{fill:var(--blue)}
 .usage-chart .bar.today{fill:var(--accent)}
 .usage-line{margin-top:4px}
+.set-table td.size{white-space:nowrap}

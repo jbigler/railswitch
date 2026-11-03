@@ -43,6 +43,10 @@ set -g history-limit 50000
 set -g escape-time 0
 set -g default-terminal tmux-256color
 set -as terminal-features ',xterm-256color:RGB'
+# Shift+Enter (a new line, not a submit) reaches the agent as an extended
+# key instead of a plain Enter, from a host terminal or the dashboard's.
+set -s extended-keys on
+set -as terminal-features 'xterm*:extkeys'
 # Viewers of different sizes: the window follows whoever typed last.
 set -g window-size latest
 set -g aggressive-resize on

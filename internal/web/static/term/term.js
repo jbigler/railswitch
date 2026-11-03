@@ -172,6 +172,17 @@ export function openTerminal(el, url, opts = {}) {
     }
     fit.fit();
     term.onData(send);
+    // xterm.js sends Shift+Enter as a plain Enter; in an agent's terminal
+    // send it as CSI u, which the agent's tmux (extended-keys) passes on as
+    // Shift+Enter. Not in a shell: bash would print the sequence.
+    if (new URL(url, location.href).pathname.endsWith('/agent')) {
+      term.attachCustomKeyEventHandler((e) => {
+        if (e.key !== 'Enter' || !e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return true;
+        if (e.type === 'keydown') send('\x1b[13;2u');
+        e.preventDefault();
+        return false;
+      });
+    }
     term.onBinary((d) => sendBytes(Uint8Array.from(d, (c) => c.charCodeAt(0) & 0xff))); // mouse reports: one char per byte
     observer = new ResizeObserver(resized);
     observer.observe(el);

@@ -732,6 +732,10 @@ binary), **Reconnect**: the agent and nvim pick up where they were, a shell
 starts afresh. railswitch's own refusals (another agent running, unset
 secrets) print in the panel before `[exited 1]`. In a service agent's panel `Ctrl-\` detaches,
 as in a terminal: the agent keeps running and the panel shows `[exited 0]`.
+In an agent's panel Shift+Enter is sent as an extended key (CSI u), and the
+agent's session server has tmux's `extended-keys` on, so the agent sees
+Shift+Enter (a new line) rather than Enter; a host terminal attached with
+`railswitch agent` gets the same when it supports extended keys.
 
 The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
 while a terminal is open, leaving or closing the page asks first.

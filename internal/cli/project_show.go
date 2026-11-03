@@ -20,21 +20,22 @@ import (
 // projectDoc is `project show --json`: what the settings page needs in one
 // read (docs/json.md).
 type projectDoc struct {
-	Prefix     string      `json:"prefix"`
-	Name       string      `json:"name"`
-	Repo       string      `json:"repo"`
-	BaseBranch string      `json:"base_branch"`
-	Hash       string      `json:"hash"`
-	File       string      `json:"file"` // the raw editor's text
-	Pack       packRow     `json:"pack"`
-	Firewall   firewallRow `json:"firewall"`
-	Hooks      hooksRow    `json:"hooks"`
-	Agents     []agentRow  `json:"agents"` // by name, never null
-	Options    []optionRow `json:"options"`
-	AddChoices []string    `json:"add_choices"` // the options a new extra key (D81) can take
-	Used       []string    `json:"used"`        // the stack's pack, option and agent refs
-	Env        []envPair   `json:"env"`
-	Links      []linkRow   `json:"links"`
+	Prefix     string        `json:"prefix"`
+	Name       string        `json:"name"`
+	Repo       string        `json:"repo"`
+	BaseBranch string        `json:"base_branch"`
+	Hash       string        `json:"hash"`
+	File       string        `json:"file"` // the raw editor's text
+	Pack       packRow       `json:"pack"`
+	Firewall   firewallRow   `json:"firewall"`
+	Hooks      hooksRow      `json:"hooks"`
+	Agents     []agentRow    `json:"agents"` // by name, never null
+	Options    []optionRow   `json:"options"`
+	AddChoices []string      `json:"add_choices"` // the options a new extra key (D81) can take
+	Used       []string      `json:"used"`        // the stack's pack, option and agent refs
+	Env        []envPair     `json:"env"`
+	Links      []linkRow     `json:"links"`
+	Tasks      []render.Task `json:"tasks"` // render.MergeTasks, hidden pack tasks too (D156)
 }
 
 // firewallRow is [firewall] (D119): the mode set ("" for the default),
@@ -220,6 +221,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	for _, prof := range config.FirewallProfiles {
 		d.Firewall.Allow[prof] = append([]string{}, p.Firewall.Allow[prof]...)
 	}
+	d.Tasks = render.MergeTasks(st.Pack.Tasks, p.Tasks)
 	d.Hooks = hooksRow{Deps: append([]string{}, p.Hooks.Deps...), Start: append([]string{}, p.Hooks.Start...), Create: append([]string{}, p.Hooks.Create...)}
 	d.Agents = []agentRow{}
 	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {

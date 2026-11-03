@@ -410,6 +410,16 @@ function filterPalette() {
   const items = paletteItems();
   $$("#palette .pal-list li").forEach((li) => li.classList.remove("on"));
   if (items.length) items[0].classList.add("on");
+  // No task matches: offer a new one by that name on the Settings page.
+  const nw = $("#palette .pal-new"); // only with a worktree, whose tasks it adds to
+  if (!nw) return;
+  const name = $("#palette .pal-filter").value.trim();
+  nw.hidden = !name || items.length > 0;
+  nw.classList.toggle("on", !nw.hidden);
+  $("b", nw).textContent = name;
+  $("a", nw).href = $("a", nw).dataset.base + "?task=" + encodeURIComponent(name) + "#tasks";
+  const none = $("#palette .pal-none");
+  if (none) none.hidden = !nw.hidden;
 }
 
 function paletteKey(e) {
@@ -424,7 +434,11 @@ function paletteKey(e) {
     items[i].scrollIntoView({ block: "nearest" });
   } else if (e.key === "Enter" && e.target.closest("input")) {
     e.preventDefault();
-    if (i < 0) return;
+    if (i < 0) {
+      const nw = $("#palette .pal-new:not([hidden]) a");
+      if (nw) location.href = nw.href;
+      return;
+    }
     const f = $("#palette form");
     const it = $(".pal-task", items[i]);
     if (it.tagName === "A") return void (location.href = it.href);
@@ -552,6 +566,7 @@ function target(e) {
   if (e.op === "firewall.allow.add" || e.op === "firewall.allow.remove") return "fw " + e.key + " " + e.value;
   if (e.op === "option") return "option " + e.key;
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
+  if (e.op === "task.set" || e.op === "task.unset") return "task " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
   if (e.op === "agent.setup") return "agent-setup " + e.key;
@@ -640,6 +655,17 @@ function syncLeft() {
     const none = $("tr.env-none", envBody);
     if (none) none.hidden = !!$("tr.env-new", envBody);
   }
+  // A task row shows its staged command; struck through when it goes
+  // (removed, or hidden: set to ""), highlighted when it changes or comes back.
+  $$("tr.task").forEach((row) => {
+    const e = stagedFor("task " + row.dataset.name);
+    const input = $(".task-cmd", row);
+    const gone = !!e && ((e.op === "task.set" && e.value === "") || (e.op === "task.unset" && row.dataset.source !== "hidden"));
+    if (input && document.activeElement !== input) input.value = e && e.op === "task.set" && e.value !== "" ? e.value : row.dataset.command;
+    if (input) input.disabled = gone;
+    row.classList.toggle("staged", !!e && !gone);
+    row.classList.toggle("removed", gone);
+  });
   $$("label.hook").forEach((box) => {
     const e = stagedFor("hooks " + box.dataset.list);
     const area = $(".hook-cmds", box);
@@ -811,6 +837,10 @@ if (view.startsWith("settings")) {
     }
     const fwAllow = t.closest("[data-fw-allow]");
     if (fwAllow) return stage({ op: "firewall.allow.add", key: fwAllow.dataset.prof, value: fwAllow.dataset.host }, false);
+    const taskHide = t.closest("[data-task-hide]");
+    if (taskHide) return stage({ op: "task.set", name: taskHide.closest("tr").dataset.name, value: "" }, false);
+    const taskRm = t.closest("[data-task-remove], [data-task-restore]");
+    if (taskRm) return stage({ op: "task.unset", name: taskRm.closest("tr").dataset.name }, false);
     const linkRm = t.closest("[data-link-remove]");
     if (linkRm) stage({ op: "link.remove", label: linkRm.closest("tr").dataset.label }, false);
   });
@@ -824,6 +854,11 @@ if (view.startsWith("settings")) {
     if (t.classList.contains("env-value")) {
       const row = t.closest("tr");
       return stage({ op: "env.set", name: row.dataset.name, value: t.value }, t.value === row.dataset.value);
+    }
+    if (t.classList.contains("task-cmd")) {
+      const row = t.closest("tr");
+      // An emptied box is no edit: Hide or Remove says that.
+      return stage({ op: "task.set", name: row.dataset.name, value: t.value.trim() }, t.value.trim() === row.dataset.command || !t.value.trim());
     }
     if (t.classList.contains("agent-setup-cmds")) {
       const box = t.closest("label.agent-setup");
@@ -858,6 +893,7 @@ if (view.startsWith("settings")) {
       const v = (n) => f.elements[n].value.trim();
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
       else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
+      else if (f.dataset.stage === "task") stage({ op: "task.set", name: v("name"), value: v("value") }, false);
       else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);
       f.reset();

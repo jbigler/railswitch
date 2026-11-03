@@ -1064,13 +1064,15 @@ extension (`gh extension list` has no `gh stack`) no worktree is asked.
 
 The worktree's (`-w`) tasks, by name: the pack's `[tasks]` with
 `project.toml`'s `[tasks]` over them (a project task replaces a pack task
-of the same name; `""` removes one). `railswitch task <name> [args…]`
-runs one. The text form is a table `NAME SOURCE COMMAND`.
+of the same name; `""` hides one). `railswitch task <name> [args…]`
+runs one. The text form is a table `NAME SOURCE COMMAND`. Hidden pack
+tasks are not listed: `project show` has them.
 
 ```json
 [
-  {"name": "console", "command": "bin/rails console", "source": "pack"},
-  {"name": "lint", "command": "bin/rubocop", "source": "project"}
+  {"name": "console", "command": "bin/rails console", "source": "pack", "pack": "bin/rails console"},
+  {"name": "lint", "command": "bin/rubocop", "source": "project"},
+  {"name": "test", "command": "bin/rspec", "source": "project", "pack": "bin/rails test"}
 ]
 ```
 
@@ -1079,6 +1081,7 @@ runs one. The text form is a table `NAME SOURCE COMMAND`.
 | `name` | string | The task's name. |
 | `command` | string | Its shell command, run as `sh -c '<command> "$@"' <name> <args…>`. |
 | `source` | string | `pack` or `project`. |
+| `pack` | string | The pack's command for this name; absent when the pack has no such task. A `project` task with one overrides it, and `task rm` brings it back (D156). |
 
 ## `settings preview`
 
@@ -1088,6 +1091,9 @@ or absent for the default), `firewall.allow.add` and
 `firewall.allow.remove` (`key`: `app`, `deps` or `agent`; `value`: a
 host) (D119), `option`, `env.set`,
 `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`,
+`task.set` (`name`; `value`: the command, absent or `""` to hide the
+pack's task of that name) and `task.unset` (`name`: takes the project's
+`[tasks]` entry out; D156),
 `hooks.set` (`key`: `deps`, `start` or `create`; `values`: the list's
 commands in order, absent or `[]` to remove it; D126), `agent.setup`
 (`key`: an agent's name; `values`: its setup commands in order, absent or
@@ -1156,6 +1162,10 @@ What the settings page reads: the project's choices, env and links.
     {"label": "Admin", "url": "{worktree.host}/admin", "from": "project", "hidden": false},
     {"label": "Mailer previews", "url": "{worktree.host}/rails/mailers", "from": "pack rails@1", "hidden": false},
     {"label": "Storage console", "url": "s3-ui.{worktree.host}", "from": "option rustfs@1", "hidden": false}
+  ],
+  "tasks": [
+    {"name": "console", "command": "", "source": "hidden", "pack": "bin/rails console"},
+    {"name": "lint", "command": "bin/rubocop", "source": "project"}
   ]
 }
 ```
@@ -1177,6 +1187,7 @@ What the settings page reads: the project's choices, env and links.
 | `env[]` | array | The `[env]` table by name. |
 | `links[]` | array | The project's `[[links]]` (`from: "project"`), then the stack's: pack, options in key order, tools (`pack <ref>`, `option <ref>`, `tool <name>`). URLs keep their `{placeholders}`. |
 | `links[].hidden` | bool | The label is in `hide_links`. |
+| `tasks[]` | array | As `task ls`, by name, with the pack tasks the project hides too: `source: "hidden"`, `command: ""`, `pack` their command (D156). `[]` for none. |
 
 `project write --if-hash <h>` reads the whole `project.toml` on stdin,
 refuses on a hash mismatch, parse, validation or resolve error (exit 1,

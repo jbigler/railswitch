@@ -31,9 +31,9 @@ func TestTaskLsJSON(t *testing.T) {
 		t.Fatalf("%v: %s", err, out)
 	}
 	want := []map[string]string{
-		{"name": "console", "command": "bin/rails console", "source": "pack"},
+		{"name": "console", "command": "bin/rails console", "source": "pack", "pack": "bin/rails console"},
 		{"name": "lint", "command": "bin/rubocop", "source": "project"},
-		{"name": "test", "command": "bin/rails test", "source": "pack"},
+		{"name": "test", "command": "bin/rails test", "source": "pack", "pack": "bin/rails test"},
 	}
 	if len(rows) != len(want) {
 		t.Fatalf("rows %v; want %v", rows, want)
@@ -56,6 +56,53 @@ func TestTaskLsJSON(t *testing.T) {
 	}
 	if code, _, _ := runIn(t, "-C", ws, "-w", "feat", "task", "ls", "x"); code != 2 {
 		t.Errorf("task ls x: exit %d; want 2", code)
+	}
+}
+
+// task set, rm and restore edit project.toml's [tasks] in place: its
+// comments and other lines stay, and each step is what task ls then lists.
+func TestTaskSetRmRestore(t *testing.T) {
+	ws, _ := lockedWS(t)
+	path := filepath.Join(ws, "project.toml")
+	base := readFile(t, path) + "\n# my tasks\n[tasks]   # keep\nlint = \"bin/rubocop\"   # trailing\n"
+	if err := os.WriteFile(path, []byte(base), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	step := func(want string, args ...string) {
+		t.Helper()
+		code, _, errs := runWith(t, fakeHost(), append([]string{"-C", ws, "task"}, args...)...)
+		if code != 0 {
+			t.Fatalf("task %v: exit %d: %s", args, code, errs)
+		}
+		if got := readFile(t, path); got != base+want {
+			t.Fatalf("task %v: project.toml ends\n%s\nwant\n%s", args, got[len(base)-20:], want)
+		}
+	}
+	step(`test = "bin/rspec"`+"\n", "set", "test", "bin/rspec")
+	step(`test = "bin/rspec"`+"\n"+`"test:system" = ""`+"\n", "rm", "test:system")
+	step(`"test:system" = ""`+"\n", "rm", "test") // the override goes; the pack's test is back
+	if code, _, errs := runWith(t, fakeHost(), "-C", ws, "task", "rm", "test:system"); code != 1 || !strings.Contains(errs, "task restore test:system") {
+		t.Errorf("rm of a hidden task: exit %d: %s", code, errs)
+	}
+	step("", "restore", "test:system")
+	step(`"db:seed" = "bin/rails db:seed"`+"\n", "set", "db:seed", "bin/rails db:seed")
+
+	for _, bad := range [][]string{
+		{"set", "ls", "x"},     // reserved
+		{"set", "lint", ""},    // empty: rm hides
+		{"set", "lint"},        // no command
+		{"rm", "nope"},         // no such task
+		{"restore", "console"}, // not hidden
+		{"set", "a\nb", "x"},   // a newline in the name
+		{"set", "x", "a\nb"},   // one line only
+		{"--new-term", "rm", "x"},
+	} {
+		if code, _, _ := runWith(t, fakeHost(), append([]string{"-C", ws, "task"}, bad...)...); code == 0 {
+			t.Errorf("task %q: exit 0", bad)
+		}
+	}
+	if got := readFile(t, path); got != base+`"db:seed" = "bin/rails db:seed"`+"\n" {
+		t.Errorf("a refused edit touched project.toml:\n%s", got)
 	}
 }
 
@@ -127,7 +174,7 @@ func TestTaskNewTerm(t *testing.T) {
 func TestCompleteTask(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
-	if got, want := complete(t, "task", ""), []string{"console", "ls", "test", "test:system"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "task", ""), []string{"console", "ls", "restore", "rm", "set", "test", "test:system"}; !slices.Equal(got, want) {
 		t.Errorf("task: %q; want %q", got, want)
 	}
 	if got := complete(t, "task", "test", ""); len(got) != 0 {

@@ -55,7 +55,7 @@ var completionSubs = map[string][]string{
 	"secret":           {"add", "ls", "rm", "set"},
 	"signer":           {"add", "ls", "revoke", "rm"},
 	"stack":            {"ls", "switch"},
-	"task":             {"ls"},
+	"task":             {"ls", "restore", "rm", "set"},
 	"template":         {"check", "export", "import", "ls", "show"},
 	"wt":               {"add", "ls", "rm"},
 }
@@ -151,6 +151,8 @@ var completionArgs = map[string]completer{
 	"notes write":         noteCandidates,
 	"notes rm":            noteCandidates,
 	"task":                taskCandidates,
+	"task rm":             taskCandidates,
+	"task set":            taskCandidates,
 }
 
 // railswitch completion bash|zsh|fish: print the shell's completion script.

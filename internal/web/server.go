@@ -443,6 +443,7 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 	for _, x := range ov.Worktrees {
 		v.Worktrees = append(v.Worktrees, actionView{Label: x.Slug, URL: base + "/" + x.Slug})
 	}
+	v.SettingsURL = settingsURL(p.Prefix)
 	s.html(w, http.StatusOK, "tasks", v)
 }
 

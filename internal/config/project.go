@@ -22,7 +22,7 @@ var Slots = []string{"database", "cache", "storage", "jobs", "mail", "browser"}
 
 // ReservedTasks are the words `railswitch task` takes as its own
 // subcommands: a [tasks] entry by that name could never run.
-var ReservedTasks = []string{"ls"}
+var ReservedTasks = []string{"ls", "set", "rm", "restore"}
 
 // Project is project.toml: the choices and overrides only (HANDOFF §3.2).
 type Project struct {

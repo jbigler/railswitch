@@ -196,7 +196,7 @@ func TestPages(t *testing.T) {
 		{"/p/nope/b", 404, nil},
 		{"/p/ftest/b/remove", 200, []string{"Discard changes", `name="confirm"`, "/ws/ftest/b"}},
 		{"/p/ftest/main/remove", 422, nil},
-		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`, `<button formaction="/p/ftest/b/act/restart" class="pal-task" data-action>`, `<a href="/p/ftest/main" class="pal-task"><span class="pal-kind">worktree</span>`, `<a href="/p/ftest/notes" class="pal-task"><span class="pal-kind">page</span> <b>notes</b>`, `href="/machine"`}},
+		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`, `<button formaction="/p/ftest/b/act/restart" class="pal-task" data-action>`, `<a href="/p/ftest/main" class="pal-task"><span class="pal-kind">worktree</span>`, `<a href="/p/ftest/notes" class="pal-task"><span class="pal-kind">page</span> <b>notes</b>`, `href="/machine"`, `<li class="pal-new" hidden><a class="pal-task" href="/p/ftest/settings#tasks" data-base="/p/ftest/settings">`}},
 		{"/p/ftest/palette", 200, []string{`href="/p/ftest/b"`, `href="/p/ftest/virtual-office"`}},
 		{"/p/ftest/b/agent-default", 200, []string{"<h3>claude</h3>", "from <b>main</b>", `action="/p/ftest/b/agent-default/promote"`, `name="name" value="claude"`, "Apply the default to every worktree", "Pending: b's claude takes the default at its next start (it runs now: stop it, then start it again)."}},
 		{"/colors", 200, []string{`value="#BC5215"`, "paper", "solar", "contrast"}},

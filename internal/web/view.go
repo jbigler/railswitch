@@ -634,7 +634,7 @@ type linkView struct{ Label, URL, Class string }
 
 // serviceView is a service row: LogsURL (Dozzle, by container name) while
 // its container runs, RestartURL while a restartable one runs.
-type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, RestartURL string }
+type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, RestartURL, Confirm string }
 
 type agentView struct{ Name, Glyph, Label, Class, Message string }
 
@@ -684,6 +684,9 @@ func newDetail(prefix string, r row, repo string) detailView {
 			sv.LogsURL = logsURL + "show?name=" + url.QueryEscape(s.Container)
 			if s.Restartable {
 				sv.RestartURL = path + "/restart/" + s.Service
+				if s.Role == "agent" { // its session goes with it
+					sv.Confirm = "Restart " + s.Service + "? Its session ends: what the agent is doing stops, and it starts fresh."
+				}
 			}
 		}
 		v.Services = append(v.Services, sv)

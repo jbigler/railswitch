@@ -160,7 +160,7 @@ export function play(canvas, hud) {
   };
   const frame = (t) => {
     raf = requestAnimationFrame(frame);
-    acc += t - (last ?? t);
+    acc += Math.min(t - (last ?? t), 100); // a hidden tab pauses frames; back, don't fall the whole gap at once
     last = t;
     if (over || paused) acc = 0;
     while (acc >= stepMs(levelOf(lines))) {

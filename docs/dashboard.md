@@ -159,7 +159,11 @@ is no longer accepted. What the page shows meanwhile may be stale.
   agent needs permission, asks a question or waits for a reply: the
   column that never scrolls out of a narrow pane), branch (cut short
   past 16rem, the full name as its tooltip), PR (number, checks, state,
-  review), stack state, agent state. A worktree whose running
+  review), stack state, agent state, tests (the last run of the `test`
+  task, D158: `✓ passed 5m ago`, `✗ failed 2h ago`, `— never`, with
+  `stale` when HEAD has moved since that run; its exit code, time and
+  commit are the tooltip; `—` alone when the project has no `test`
+  task). A worktree whose running
   containers were created from older units than the rendered ones
   (`overview`'s `stale`, after a settings change, say) shows "restart to
   apply" next to its stack state, in the row and in the detail; `restart`
@@ -204,7 +208,7 @@ is no longer accepted. What the page shows meanwhile may be stale.
   always; while the service runs, `logs`
   opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
   and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message, and the **default config…** link beside its label), Terminal (below) and Jobs; the terminal panels dock under the jobs.
+  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message, and the **default config…** link beside its label), Tests (as the list says, with the exit code, time and commit, and **run tests**: `railswitch task test` as a job; only with a `test` task), Terminal (below) and Jobs; the terminal panels dock under the jobs.
 
 ## Settings
 

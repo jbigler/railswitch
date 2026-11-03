@@ -826,7 +826,7 @@ with its stack state, services, agent and links. The dashboard polls it
 every 2 s, so it is cheap: one `systemctl --user show` for every unit of
 the project, exactly one `podman ps -a --format json` (running
 on-demand services and agents, and each running container's unit-hash
-label), no health check and no git call. The text form is a table `WORKTREE BRANCH STACK AGENT` (the base
+label), no health check and no git call (each worktree's HEAD commit, for `tests.stale`, is read from its git files). The text form is a table `WORKTREE BRANCH STACK AGENT TESTS` (the base
 worktree marked `(base)`) with each worktree's links indented under its
 row.
 
@@ -840,6 +840,7 @@ row.
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
       "stack": "up", "stale": false,
+      "tests": {"state": "failed", "stale": false, "last": {"exit_code": 1, "started_at": "2026-11-04T10:02:11Z", "ended_at": "2026-11-04T10:05:40Z", "commit": "9f2c…"}},
       "services": [{"service": "rails", "role": "app", "state": "active/running"}],
       "agent": {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
       "links": [
@@ -870,6 +871,10 @@ row.
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
 | `worktrees[].services[].container` | string | The service's container name (`<prefix>-<slug>-<service>`), as podman and Dozzle show it. |
 | `worktrees[].services[].restartable` | boolean | A long-lived unit, a service agent included (not an on-demand service or agent, or a oneshot like deps), that `railswitch restart <service>` restarts alone. |
+| `worktrees[].tests` | object or null | The last run of the worktree's `test` task (D158); `null` when the project has no task named `test`. Only `railswitch task test` without arguments (the whole suite) is recorded, run in a terminal, as a dashboard job or with `--new-term`, and only when the command ended on its own: a cancelled run, or podman failing to start it, records nothing. railswitch writes the record itself from its own child's exit code, in `<workspace>/.railswitch/tests/<slug>/last.json` (0600, a 0700 dir no container mounts; `wt rm` removes it). |
+| `worktrees[].tests.state` | string | `never` (no run recorded), `passed` (exit 0) or `failed`. |
+| `worktrees[].tests.stale` | boolean | The worktree's HEAD is now another commit than the one the run started on. `false` when either commit can't be read (a reftable repo, an unborn branch). The commits come from the worktree's git files, which a container can write: stale is a hint, not proof. |
+| `worktrees[].tests.last` | object or null | `null` for `never`; else `exit_code` (number, the task's own, `0` for passed), `started_at` and `ended_at` (RFC 3339 UTC), `commit` (the full HEAD commit at the start; `""` when unreadable). |
 | `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
 | `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
 
@@ -1065,8 +1070,10 @@ extension (`gh extension list` has no `gh stack`) no worktree is asked.
 The worktree's (`-w`) tasks, by name: the pack's `[tasks]` with
 `project.toml`'s `[tasks]` over them (a project task replaces a pack task
 of the same name; `""` hides one). `railswitch task <name> [args…]`
-runs one. The text form is a table `NAME SOURCE COMMAND`. Hidden pack
-tasks are not listed: `project show` has them.
+runs one; a run of the `test` task without arguments is recorded as the
+worktree's test status ([`overview`](#overview) `tests`, D158). The text
+form is a table `NAME SOURCE COMMAND`. Hidden pack tasks are not listed:
+`project show` has them.
 
 ```json
 [

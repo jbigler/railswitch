@@ -9,8 +9,10 @@ import (
 	"io/fs"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/render"
@@ -44,6 +46,7 @@ type OverviewWorktree struct {
 	Agent    *AgentRow         `json:"agent"` // the running agent, else the first not off; nil: none
 	Links    []render.Link     `json:"links"`
 	Stale    bool              `json:"stale"` // a running container was created from an older unit (D85)
+	Tests    *TestStatus       `json:"tests"` // its test task's last run (D158); nil: the project has no test task
 }
 
 // Overview is one project's every worktree, as the dashboard polls it
@@ -153,6 +156,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
 		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()
 	}
+	hasTests := slices.ContainsFunc(m.Tasks(), func(t render.Task) bool { return t.Name == TestTask })
 	for _, w := range wts {
 		in, err := m.Instance(w)
 		if err != nil {
@@ -163,6 +167,9 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 			return Overview{}, err
 		}
 		ow := OverviewWorktree{Slug: w.Slug, ID: w.ID, Branch: w.Branch, Base: w.Slug == base, Services: []OverviewService{}, Links: links}
+		if hasTests {
+			ow.Tests = testStatus(l.WS.Root, w.Slug, w.Dir)
+		}
 		for _, s := range m.Services {
 			st := unitState(props[unitOf(m, w.Slug, s.ID)])
 			ctr := containerOf(m, w.Slug, s.ID)
@@ -214,7 +221,7 @@ func chooseAgent(rows []AgentRow) *AgentRow {
 }
 
 // PrintOverview prints Overview: with asJSON one JSON document, else a
-// table WORKTREE BRANCH STACK AGENT with each worktree's links indented
+// table WORKTREE BRANCH STACK AGENT TESTS with each worktree's links indented
 // under its row.
 func (l *L) PrintOverview(ctx context.Context, asJSON bool) error {
 	ov, err := l.Overview(ctx)
@@ -231,7 +238,8 @@ func (l *L) WriteOverview(ov Overview, asJSON bool) error {
 	}
 	var table bytes.Buffer
 	tw := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "WORKTREE\tBRANCH\tSTACK\tAGENT")
+	fmt.Fprintln(tw, "WORKTREE\tBRANCH\tSTACK\tAGENT\tTESTS")
+	now := time.Now()
 	for _, w := range ov.Worktrees {
 		slug, branch := w.Slug, safefile.Printable(w.Branch) // a container can write the branch
 		if w.Base {
@@ -240,7 +248,7 @@ func (l *L) WriteOverview(ov Overview, asJSON bool) error {
 		if branch == "" {
 			branch = "-"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", slug, branch, w.Stack, agentCell(w.Agent))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", slug, branch, w.Stack, agentCell(w.Agent), testsCell(w.Tests, now))
 	}
 	if err := tw.Flush(); err != nil {
 		return err
@@ -267,6 +275,41 @@ func (l *L) WriteOverview(ov Overview, asJSON bool) error {
 		}
 	}
 	return nil
+}
+
+// testsCell is a worktree's TESTS column: "passed 5m ago", "failed (exit
+// 1) 2h ago", "(stale)" after either when HEAD moved since; "never", or
+// "-" without a test task.
+func testsCell(t *TestStatus, now time.Time) string {
+	switch {
+	case t == nil:
+		return "-"
+	case t.Last == nil:
+		return t.State
+	}
+	s := t.State
+	if t.Last.ExitCode != 0 {
+		s += " (exit " + strconv.Itoa(t.Last.ExitCode) + ")"
+	}
+	s += " " + ago(now.Sub(t.Last.EndedAt))
+	if t.Stale {
+		s += " (stale)"
+	}
+	return s
+}
+
+// ago is d in its largest whole unit: "just now", "5m ago", "3h ago",
+// "2d ago".
+func ago(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return strconv.Itoa(int(d/time.Minute)) + "m ago"
+	case d < 48*time.Hour:
+		return strconv.Itoa(int(d/time.Hour)) + "h ago"
+	}
+	return strconv.Itoa(int(d/(24*time.Hour))) + "d ago"
 }
 
 // agentCell is an agent's AGENT column: "<name>: <state>", marked

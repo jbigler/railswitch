@@ -45,8 +45,9 @@ Decisions taken with the user:
   `templates/cyberpunk.tmpl` → `office.tmpl`. D150 already serves the
   page at `/p/{prefix}/virtual-office/<set>` (the bare path redirects to
   `cyberpunk`, its API under `/p/{prefix}/virtual-office/`); `<set>` now
-  names any set, built in or installed, and the bare path redirects to
-  the active one. SSE `view=cyberpunk` → `view=office`, page title
+  names any set, built in or installed, at `/virtual-office/<set>/` (a
+  trailing slash: a bare `<set>` clashes with `/p/{prefix}/{slug}/<word>`
+  in Go's router), and the bare path redirects to the active one. SSE `view=cyberpunk` → `view=office`, page title
   "Virtual Office" (the header button already says so).
 - New: `internal/office` (Go): the piece list, glTF bounds, set checks,
   the install store. `internal/cli/office.go`: the commands.

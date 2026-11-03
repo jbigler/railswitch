@@ -34,7 +34,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - Remove objects by exact name. Never use `--filter` or a regex, and never run `git worktree prune`.
 - Every container has `NoNewPrivileges=true`, `Memory=`, and `PidsLimit=` (D34). App, deps, worker, tool, and agent containers also have `DropCapability=all`. The browser keeps `AddCapability=NET_ADMIN` and `NET_RAW`, with no `DropCapability`.
 - `hook.sh` and `firewall.sh` run with `umask 077` (D117). The hook keeps `state/` at 0700 and its files and `hook.log` at 0600.
-- Every dashboard request needs the token cookie, and every POST also needs `Origin`. Pages have no inline script or style. The dashboard reads only through `railswitch --json`, never a package's files.
+- Every dashboard request needs the token cookie, and every POST also needs `Origin`. Pages have no inline script or style. The dashboard reads only through `railswitch --json`, never a package's files. One exception (D153): it serves an installed office set's files, those its `index.json` lists, from `<data>/office/`, which only `office set add` writes after its checks.
 
 ## Code conventions
 - Build every worktree path with `naming.WorktreeDir(ws, slug)`, never `filepath.Join(ws, slug)` (D143).
@@ -70,6 +70,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - `internal/settings`: `settings preview`. It judges each edit by rendering before and after in memory.
 - `internal/web`: the dashboard. `internal/jobs` runs its actions, and `internal/dashconf` holds its colours.
 - `internal/web/static/office/`: the Virtual Office view (`docs/dashboard.md`); `kit/` its loader, `sets/cyberpunk/` the built-in set's models, built by the Blender scripts in `tools/office-kit/` (`docs/office-kit.md`). Regenerate the models; never edit them.
+- `internal/office`: the Virtual Office's sets (D153): the piece list, glTF bounds, set checks and the store of installed sets.
 - `internal/prs`: `pr ls` and `stack ls`, through `gh`.
 - `internal/safefile`: hostile-file reads and `Printable`.
 - `internal/naming`: sanitized names, object and unit names, and worktree paths.

@@ -440,7 +440,8 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		v.URL, v.Tasks = base+"/"+wt.Slug+"/task", tasks
-		v.Actions = newDetail(p.Prefix, row{WT: wt}, "").Actions
+		d := newDetail(p.Prefix, row{WT: wt}, "")
+		v.Actions = append(d.Actions, actionView{Label: "terminal window", URL: d.TermWindowURL}) // the detail shows it in its Terminal row
 	}
 	ov, err := s.overviewOf(r.Context(), p.Prefix, p.Workspace)
 	if err != nil {

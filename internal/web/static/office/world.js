@@ -147,7 +147,8 @@ export function screen(width, height, opts = {}) {
   return mesh;
 }
 
-// label is a sprite with text that always faces the camera.
+// label is a sprite with text that always faces the camera; walls and
+// boards hide it like anything else.
 export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,.75)' } = {}) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
@@ -165,7 +166,7 @@ export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,
   g.fillText(text, 18, 34);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, toneMapped: false }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, toneMapped: false }));
   s.scale.set(size * c.width / c.height, size, 1);
   s.renderOrder = 10;
   return s;
@@ -202,6 +203,7 @@ export class World {
     // walk is first person: where you stand and look, the walkable areas,
     // the pads that act when stepped on, the keys held, a click's goal.
     this.mode = 'orbit';
+    this.ySign = 1; // -1 inverts the mouse's up and down (office.js sets it)
     this.walk = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, areas: [], pads: [], onPad: null, keys: new Set(), boxes: null, goal: null };
     this.ray = new THREE.Raycaster();
     this.hover = null;
@@ -320,7 +322,7 @@ export class World {
         // pointer whose relative motion jumps: a jump is not a turn
         if (Math.abs(e.movementX) > 120 || Math.abs(e.movementY) > 120) return;
         this.walk.yaw += e.movementX * 0.004;
-        this.walk.pitch = Math.min(1.2, Math.max(-1.2, this.walk.pitch + e.movementY * 0.004));
+        this.walk.pitch = Math.min(1.2, Math.max(-1.2, this.walk.pitch + this.ySign * e.movementY * 0.004));
         return;
       }
       if (drag) {
@@ -342,10 +344,10 @@ export class World {
         }
         if (this.mode === 'walk') {
           this.walk.yaw = drag.yaw + dx * 0.004;
-          this.walk.pitch = Math.min(1.2, Math.max(-1.2, drag.pitch + dy * 0.004));
+          this.walk.pitch = Math.min(1.2, Math.max(-1.2, drag.pitch + this.ySign * dy * 0.004));
         } else {
           this.orbit.yaw = drag.yaw - dx * 0.006;
-          this.orbit.pitch = Math.min(1.4, Math.max(0.15, drag.pitch + dy * 0.004));
+          this.orbit.pitch = Math.min(1.4, Math.max(0.15, drag.pitch + this.ySign * dy * 0.004));
         }
       }
       this.pointer = { x: e.clientX, y: e.clientY };

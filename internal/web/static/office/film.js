@@ -165,6 +165,7 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
       air.add(o);
     }
   }
+  air.traverse((o) => { o.raycast = () => {}; }); // light and blinds: a click goes through them to what's behind
   const n = 700;
   const dust = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) dust.set([-11.8 + r() * 23.6, 0.2 + r() * 3.6, -7.8 + r() * 15.6], i * 3);

@@ -64,7 +64,7 @@ async function go(to) {
   closePanel();
   $('where').textContent = 'Elevator…';
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
-    prPage: showPRPage, service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer() };
+    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;
@@ -179,6 +179,19 @@ function toggleView() {
   document.body.classList.toggle('walking', m === 'walk');
 }
 $('view').addEventListener('click', toggleView);
+// invert Y is this browser's own choice: storage can be missing (private window)
+const INVERT = 'railswitch.office.invertY';
+function setInvert(on) {
+  world.ySign = on ? -1 : 1;
+  $('invert').setAttribute('aria-pressed', String(on));
+  $('invert').classList.toggle('on', on);
+}
+try { setInvert(localStorage.getItem(INVERT) === '1'); } catch { setInvert(false); }
+$('invert').addEventListener('click', () => {
+  const on = world.ySign === 1;
+  setInvert(on);
+  try { localStorage.setItem(INVERT, on ? '1' : '0'); } catch { /* this visit only */ }
+});
 addEventListener('keydown', (e) => {
   if (e.target.closest?.('input, textarea, select, .term-host') || document.querySelector('.board-modal')) return; // a focused terminal, or the open whiteboard, gets every key, Escape included
   if (e.key === 'Escape') closePanel();
@@ -264,13 +277,6 @@ function showDesk(slug) {
       body.append(el('a', { class: 'hud-btn', href: `${base}/${encodeURIComponent(slug)}/pr` }, 'PR page: checks, reviews, merge'));
     }
     return () => t?.close();
-  });
-}
-
-function showAgentDesk(slug) {
-  openPanel(`Agent console · ${slug}`, (body) => {
-    body.append(el('p', {}, 'Opens the agent in a terminal window (`railswitch agent --new-term`). A service agent keeps running when you close it.'));
-    body.append(btn('▣ Open agent console', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body)));
   });
 }
 

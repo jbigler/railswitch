@@ -959,8 +959,8 @@ any open page.
     worktree's links; **Shell** and **Neovim** open a live terminal in the
     panel (D149, as on the worktree page), **Terminal window** (`term`) and
     **Neovim window** (`nvim --new-term`) a window on this machine. **The
-    agent's desk** opens the agent console in a terminal (`agent
-    --new-term`); the agent's android stands at it, its eyes and ring in
+    agent's desk** and its wall screen open the agent panel, as the
+    android does; the agent's android stands at it, its eyes and ring in
     the agent's state (pulsing while it waits on you), its hands typing
     while it works; it opens the agent's state and message and the agent
     itself in a live terminal (D149): a running service agent's session at
@@ -997,7 +997,8 @@ any open page.
   pointer, so turning doesn't stop at the window's edge; the lock ends when
   the button comes up. Where the browser refuses it (some remote and
   virtual-machine sessions), the drag follows the pointer's position as
-  before.
+  before. **invert Y** flips the mouse's up and down in both views; the
+  browser remembers it.
 - **Outside** the windows is a city at night, seen from high up: tower
   bands fading into smog, a red horizon, tall flickering ad signs, spinners
   between the towers (first person only).

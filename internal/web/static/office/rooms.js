@@ -731,7 +731,7 @@ function support(k, scene, deco) {
 }
 
 // lab builds a worktree's floor. ui: {transport, service(slug, svc),
-// desk(slug), agentDesk(slug), agent(slug), prs(), say(text, obj), viewer()}.
+// desk(slug), agent(slug), prs(), say(text, obj), viewer()}.
 export async function lab(slug, n, ui) {
   const k = await kit(KIT_NAMES);
   const deco = decor(slug);
@@ -770,8 +770,8 @@ export async function lab(slug, n, ui) {
   put(k, scene, 'Tech_MonitorStack', -10.75, deskTop, 6.6, PI / 2);
   put(k, scene, 'Deco_DeskLamp', -11.05, deskTop, 5.6, 2.6 + PI / 2);
   put(k, scene, 'Deco_Mug', -10.7, deskTop, 7.4);
-  pickable(agentDesk, 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
-  const theirs = pickable(wallScreen(scene, -11.92, 2.7, 6.6, PI / 2, 1.6, 0.9), 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
+  pickable(agentDesk, 'Agent console: open it here or in a terminal window', () => ui.agent(slug));
+  const theirs = pickable(wallScreen(scene, -11.92, 2.7, 6.6, PI / 2, 1.6, 0.9), 'Agent console: open it here or in a terminal window', () => ui.agent(slug));
   const partner = agentAndroid(k);
   partner.position.set(-9.95, 0, 6.6);
   partner.rotation.y = -PI / 2; // faces its monitors

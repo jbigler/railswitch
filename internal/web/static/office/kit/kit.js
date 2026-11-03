@@ -1,10 +1,13 @@
-// The virtual office's asset kit: loads the glTF files in ./models/ (built by
-// tools/office-kit/, see docs/office-kit.md), recolors the highlight, and drives
-// the named moving parts. No import of its own: the dashboard's CSP allows no
-// import map, so the caller passes a GLTFLoader from whatever three.js it bundles.
+// The Virtual Office's asset kit: loads a set's glTF files (the built-in set is
+// built by tools/office-kit/, see docs/office-kit.md), draws a box for each
+// piece the set lacks (D153), recolors the highlight, and drives the named
+// moving parts. No import of its own: the dashboard's CSP allows no import
+// map, so the caller passes three.js and a GLTFLoader from it.
 //
-//   const kit = await loadOfficeKit('/static/office/sets/cyberpunk/', names, new GLTFLoader());
+//   // set: /office/set.json ({name, base, have}); pieces: kit/pieces.json
+//   const kit = await loadOfficeKit(set, pieces, names, new GLTFLoader(), THREE);
 //   const tank = kit.spawn('Pet_Aquarium'); scene.add(tank);
+//   kit.point('Furn_Desk', 'top');          // [x, y, z] in the piece's frame
 //   kit.setAccent('#ff2b6d');               // neon, accent LEDs, every screen
 //   kit.setSecondary('#ffaa00');            // violet trim, jellyfish tentacles
 //   kit.colliders(scene);                   // hidden box meshes (*_COL, *_COL1, ...) for your physics
@@ -21,28 +24,70 @@ const isAccent = (n) => n === 'RS_Neon_Accent' || n === 'RS_LED_Accent' || (n.st
 const isSecondary = (n) => n === 'RS_Neon_Secondary';
 const IS_COL = /_COL\d*$/; // one box per node: <piece>_COL, <piece>_COL1, ...
 
-export async function loadOfficeKit(baseUrl, names, loader) {
+export async function loadOfficeKit(set, pieces, names, loader, THREE) {
   const templates = new Map();
+  const missing = new Set(); // names drawn as boxes
   const accentMats = new Set();
   const secondaryMats = new Set();
+  const have = new Set(set.have);
+  const grey = new THREE.MeshStandardMaterial({ name: 'RS_Placeholder', color: 0x9aa0a8, roughness: 0.8 });
+  const red = new THREE.MeshStandardMaterial({ name: 'RS_Placeholder_Unknown', color: 0xd03030, roughness: 0.8 });
+  const edge = new THREE.LineBasicMaterial({ color: 0x5a6068 });
+  // box is a stand-in from the piece's min to its max, with one collider box
+  // when the built-in piece has colliders; a name the list lacks is red.
+  const box = (name) => {
+    const p = pieces.pieces[name];
+    if (!p) console.error(`office: ${name} is not in the piece list`);
+    const lo = p?.min ?? [-0.25, 0, -0.25], hi = p?.max ?? [0.25, 0.5, 0.25];
+    const size = [0, 1, 2].map((k) => Math.max(hi[k] - lo[k], 0.01));
+    const geo = new THREE.BoxGeometry(...size);
+    geo.translate(...[0, 1, 2].map((k) => (lo[k] + hi[k]) / 2));
+    const g = new THREE.Group();
+    g.name = name;
+    g.add(new THREE.Mesh(geo, p ? grey : red), new THREE.LineSegments(new THREE.EdgesGeometry(geo), edge));
+    if (p?.extras?.includes('collider')) {
+      const col = new THREE.Mesh(geo, grey);
+      col.name = `${name}_COL`;
+      g.add(col);
+    }
+    missing.add(name);
+    return g;
+  };
   await Promise.all(names.map(async (name) => {
-    const gltf = await loader.loadAsync(`${baseUrl}${name}.gltf`);
-    gltf.scene.traverse((o) => {
+    let root;
+    if (have.has(name) && pieces.pieces[name]) {
+      try {
+        root = (await loader.loadAsync(`${set.base}${name}.gltf`)).scene;
+      } catch (e) {
+        console.error(`office: ${set.name}'s ${name} did not load`, e);
+      }
+    }
+    root ??= box(name);
+    root.traverse((o) => {
       if (IS_COL.test(o.name)) o.visible = false;
       for (const m of [o.material].flat().filter(Boolean)) {
         if (isAccent(m.name)) accentMats.add(m);
         if (isSecondary(m.name)) secondaryMats.add(m);
       }
     });
-    templates.set(name, gltf.scene);
+    templates.set(name, root);
   }));
 
   return {
     names: [...templates.keys()],
+    missing,
     spawn(name) {
       const t = templates.get(name);
       if (!t) throw new Error(`office asset not loaded: ${name}`);
-      return t.clone(); // shares materials, so setAccent reaches every copy
+      const o = t.clone(); // shares materials, so setAccent reaches every copy
+      // a missing piece says so on hover; not the building's own pieces, whose clicks walk (functions don't survive clone())
+      if (missing.has(name) && !name.startsWith('Arch_')) o.userData.pick = { tip: `${name} · missing in ${set.name}`, act: () => {} };
+      return o;
+    },
+    point(piece, name) {
+      const v = pieces.pieces[piece]?.points?.[name];
+      if (!v) throw new Error(`office: no point ${name} on ${piece}`);
+      return v;
     },
     setAccent(color) { for (const m of accentMats) m.emissive.set(color); },
     setSecondary(color) { for (const m of secondaryMats) m.emissive.set(color); },

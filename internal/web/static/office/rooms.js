@@ -319,7 +319,8 @@ function residents(k, scene, deco, ui, androids) {
       break;
     case 'parrot': {
       // a clear line between the perches: down the corridor
-      const perches = [{ x: -3.2, y: 1.284, z: -3.6, ry: PI / 2 }, { x: 10.6, y: 1.284, z: 0.4, ry: -PI / 2 }];
+      const bar = k.point('Furn_ParrotPerch', 'bar')[1];
+      const perches = [{ x: -3.2, y: bar, z: -3.6, ry: PI / 2 }, { x: 10.6, y: bar, z: 0.4, ry: -PI / 2 }];
       for (const p of perches) put(k, scene, 'Furn_ParrotPerch', p.x, 0, p.z, p.ry);
       const bird = mine(k.spawn('Pet_Parrot_Fly'));
       scene.add(bird);
@@ -329,7 +330,7 @@ function residents(k, scene, deco, ui, androids) {
     }
     case 'sleeper':
       put(k, scene, 'Deco_Crate', -3.3, 0, -3.6, PI / 2);
-      mine(put(k, scene, 'Pet_Cat_Curled', -3.3, 0.46, -3.6, 0.4));
+      mine(put(k, scene, 'Pet_Cat_Curled', -3.3, k.point('Deco_Crate', 'top')[1], -3.6, 0.4));
       break;
     case 'aquarium':
       mine(put(k, scene, 'Pet_Aquarium', -3.3, 0, -4.4, PI / 2));
@@ -338,7 +339,7 @@ function residents(k, scene, deco, ui, androids) {
       mine(put(k, scene, 'Pet_JellyfishTank', -3.3, 0, -4.0));
       break;
     default: // the gecko's terrarium stands on the café counter
-      mine(put(k, scene, 'Pet_Gecko_Terrarium', 1.15, 0.94, -7.6));
+      mine(put(k, scene, 'Pet_Gecko_Terrarium', 1.15, k.point('Furn_CoffeeCounter', 'top')[1], -7.6));
   }
   // the androids: each a roamer that walks wherever the floor is free
   const models = ['Char_Android_A', 'Char_Android_B', 'Char_Android_C'];
@@ -380,9 +381,10 @@ function cafe(k, scene, deco, gecko) {
   scene.add(kanji);
   put(k, scene, 'Furn_CoffeeCounter', 2.0, 0, -7.65);
   put(k, scene, 'Deco_MiniFridge', 3.55, 0, -7.55);
-  put(k, scene, 'Deco_Mug', 2.9, 0.94, -7.5);
-  put(k, scene, 'Deco_Mug', 3.0, 0.94, -7.72);
-  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 1.2, 0.94, -7.6, 0.2);
+  const counter = k.point('Furn_CoffeeCounter', 'top')[1];
+  put(k, scene, 'Deco_Mug', 2.9, counter, -7.5);
+  put(k, scene, 'Deco_Mug', 3.0, counter, -7.72);
+  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 1.2, counter, -7.6, 0.2);
   put(k, scene, 'Furn_Stool', 1.4, 0, -6.8);
   put(k, scene, 'Furn_Stool', 2.6, 0, -6.8);
   put(k, scene, 'Furn_SideTable', 0.4, 0, -4.4);
@@ -542,7 +544,7 @@ function lounge(k, scene, deco, ui, accent) {
   put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
   put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI);
   put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);
-  put(k, scene, 'Deco_BookStack', 8.0, 0.42, -4.7);
+  put(k, scene, 'Deco_BookStack', 8.0, k.point('Furn_CoffeeTable', 'top')[1], -4.7);
   put(k, scene, 'Furn_Armchair', 5.3, 0, -5.0, PI / 2);
   put(k, scene, 'Furn_SideTable', 5.2, 0, -3.0);
   put(k, scene, 'Deco_FloorLamp', 11.4, 0, -2.6, PI);
@@ -713,12 +715,12 @@ function gameRoom(k, scene, deco) {
   const ticks = [];
   [3.8, 5.2].forEach((z, n) => {
     put(k, scene, 'Furn_Arcade_Stand', 11.3, 0, z, -PI / 2);
-    ticks.push(arcadeScreen(put(k, scene, 'Tech_Arcade_Bartop', 11.3, 0.78, z, -PI / 2), n));
+    ticks.push(arcadeScreen(put(k, scene, 'Tech_Arcade_Bartop', 11.3, k.point('Furn_Arcade_Stand', 'top')[1], z, -PI / 2), n));
   });
   put(k, scene, 'Furn_Sofa', 8.0, 0, 4.5, PI / 2);
   put(k, scene, 'Furn_CoffeeTable', 9.4, 0, 4.5, PI / 2);
   put(k, scene, 'Deco_Plant_Floor', 11.4, 0, 7.4, deco.r() * 6);
-  put(k, scene, 'Deco_PizzaBoxes', 9.4, 0.42, 4.4, 0.4);
+  put(k, scene, 'Deco_PizzaBoxes', 9.4, k.point('Furn_CoffeeTable', 'top')[1], 4.4, 0.4);
   return ticks;
 }
 
@@ -764,9 +766,10 @@ export async function lab(slug, n, ui) {
   pickable(desk, 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
   const mine = pickable(wallScreen(scene, -11.92, 2.65, 3.9, PI / 2, 2.2, 1.2), 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
   const agentDesk = put(k, scene, 'Furn_Desk', -10.95, 0, 6.6, PI / 2);
-  put(k, scene, 'Tech_MonitorStack', -10.75, 0.75, 6.6, PI / 2);
-  put(k, scene, 'Deco_DeskLamp', -11.05, 0.75, 5.6, 2.6 + PI / 2);
-  put(k, scene, 'Deco_Mug', -10.7, 0.75, 7.4);
+  const deskTop = k.point('Furn_Desk', 'top')[1]; // the agent's desk
+  put(k, scene, 'Tech_MonitorStack', -10.75, deskTop, 6.6, PI / 2);
+  put(k, scene, 'Deco_DeskLamp', -11.05, deskTop, 5.6, 2.6 + PI / 2);
+  put(k, scene, 'Deco_Mug', -10.7, deskTop, 7.4);
   pickable(agentDesk, 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
   const theirs = pickable(wallScreen(scene, -11.92, 2.7, 6.6, PI / 2, 1.6, 0.9), 'Agent console: open it in a terminal', () => ui.agentDesk(slug));
   const partner = agentAndroid(k);
@@ -779,7 +782,7 @@ export async function lab(slug, n, ui) {
   const setBoard = boardFace(board);
   put(k, scene, 'Deco_CoatRack', -4.6, 0, 7.5);
   put(k, scene, 'Deco_Backpack', -9.4, 0, 5.0, 0.7);
-  put(k, scene, 'Deco_BookStack', -11.0, 0.75, 2.95, 0.3);
+  put(k, scene, 'Deco_BookStack', -11.0, k.point(desk.userData.kit, 'top')[1], 2.95, 0.3); // on your workstation
   put(k, scene, 'Deco_CorkBoard', -11.98, 1.7, 5.25, PI / 2);
   put(k, scene, 'Deco_Plant_Monstera', -4.6, 0, 2.6, deco.r() * 6);
   put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', -10.0, 4, 3.0, deco.r() * 6);
@@ -1040,7 +1043,7 @@ export async function lobby(prefix, ui) {
   name.position.set(2.0, 3.45, -7.6);
   scene.add(name);
   put(k, scene, 'Furn_Desk', -7.0, 0, 4.0);
-  put(k, scene, 'Tech_Laptop', -7.0, 0.75, 4.0, PI);
+  put(k, scene, 'Tech_Laptop', -7.0, k.point('Furn_Desk', 'top')[1], 4.0, PI);
   const concierge = wanderer(k, 'Char_Android_B', rng(deco.seed + 7), ui.say);
   concierge.position.set(-7.0, 0, 4.8);
   concierge.rotation.y = PI; // behind the desk, facing the door

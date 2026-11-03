@@ -3,7 +3,7 @@
 // between them. State comes from /events?view=office; actions are the
 // dashboard's POSTs. Everything from the CLI is text: shown with
 // textContent only.
-import { World } from './world.js';
+import { World, useSet } from './world.js';
 import { lobby, lab, svcState, tokens } from './rooms.js';
 import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
 import { openTerminal } from '../term/term.js';
@@ -504,11 +504,26 @@ function apply(next) {
   }
   redraw?.();
   const banner = $('banner');
-  const lines = [state.error, ...state.banner].filter(Boolean);
+  const lines = [state.error, setNote, ...state.banner].filter(Boolean);
   banner.hidden = !lines.length;
   banner.textContent = lines.join(' · ');
   const jobs = $('jobs');
   jobs.replaceChildren(...state.jobs.slice(0, 4).map((j) => el('li', { class: j.state }, `${j.slug || prefix}: ${j.label} · ${j.state}`)));
+}
+
+// The set this page draws and the piece list (D153), before the first room.
+// A set that can't be used comes back as the built-in one with why.
+let setNote = '';
+{
+  const pieces = await getJSON('/static/office/kit/pieces.json');
+  let set;
+  try {
+    set = await getJSON(`/office/set.json?name=${encodeURIComponent(document.body.dataset.set || '')}`);
+  } catch (e) {
+    set = { name: 'cyberpunk', base: '/static/office/sets/cyberpunk/', have: Object.keys(pieces.pieces), look: {}, fallback: e.message };
+  }
+  if (set.fallback) setNote = `Office set: ${set.fallback}; showing ${set.name}.`;
+  useSet(set, pieces);
 }
 
 const es = new EventSource(`/events?p=${encodeURIComponent(prefix)}&view=office`);

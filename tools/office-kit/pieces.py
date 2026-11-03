@@ -19,6 +19,8 @@ OUT = os.path.normpath(os.path.join(WEB, 'kit', 'pieces.json'))
 # Where the layout (rooms.js) puts things on a piece, in its own frame.
 POINTS = {
     'Furn_Desk': {'top': [0, 0.75, 0]},
+    'Furn_Workstation_Lived': {'top': [0, 0.75, 0]},
+    'Furn_Workstation_Lived_B': {'top': [0, 0.75, 0]},
     'Furn_CoffeeCounter': {'top': [0, 0.94, 0]},
     'Furn_CoffeeTable': {'top': [0, 0.42, 0]},
     'Furn_Arcade_Stand': {'top': [0, 0.78, 0]},

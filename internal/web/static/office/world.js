@@ -33,8 +33,19 @@ export function hash(s) {
 // copy of a piece shares: leaving a room frees everything else it made.
 let kitP = null;
 const shared = new Set();
+// office is the set the page draws (/office/set.json) and the piece list;
+// useSet sets it before the first room (D153).
+export const office = { set: null, pieces: null };
+export function useSet(set, pieces) {
+  office.set = set;
+  office.pieces = pieces;
+}
+// look is the set's value for key (set.toml [look]), else the built-in one.
+export function look(key, fallback) {
+  return office.set?.look?.[key] ?? fallback;
+}
 export function kit(names) {
-  kitP ??= loadOfficeKit('/static/office/sets/cyberpunk/', names, new THREE.GLTFLoader()).then((k) => {
+  kitP ??= loadOfficeKit(office.set, office.pieces, names, new THREE.GLTFLoader(), THREE).then((k) => {
     for (const n of names) {
       k.spawn(n).traverse((o) => {
         if (o.geometry) shared.add(o.geometry);
@@ -93,9 +104,9 @@ export function textCanvas(lines, { w = 512, h = 256, bg = '#03060c', fg = '#9ff
     g.fillText(String(l.text ?? l).slice(0, 64), 14, y);
     y += size * 1.05;
   }
-  // the CRT: scanlines, darker edges, a thin frame with corner ticks
+  // the CRT: scanlines (the set's choice), darker edges, a thin frame with corner ticks
   g.fillStyle = 'rgba(0,0,0,.28)';
-  for (let s = 0; s < h; s += 3) g.fillRect(0, s, w, 1);
+  if (look('scanlines', true)) for (let s = 0; s < h; s += 3) g.fillRect(0, s, w, 1);
   const v = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
   v.addColorStop(0, 'rgba(0,0,0,0)');
   v.addColorStop(1, 'rgba(0,0,0,.55)');
@@ -495,6 +506,8 @@ export class World {
       }
     }
     animate(this.scene, t);
+    this.bloom.strength = look('bloom', 0.28);
+    this.bloom.enabled = this.bloom.strength > 0;
     // hover: a raycast over the whole room, so only when the pointer moved,
     // or every 150 ms while the camera moves under it
     const due = this.pointer && (this.pointer !== this.pickedAt || t - this.pickTime > 0.15);

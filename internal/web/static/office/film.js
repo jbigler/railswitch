@@ -4,7 +4,7 @@
 // cool (screens, the city), haze, light shafts through half-drawn blinds,
 // dust in the air, cables underfoot, a tube that flickers, neon kept for
 // signs. Shafts, dust, haze and sign rods show in first person only.
-import { THREE, rng } from './world.js';
+import { THREE, rng, look } from './world.js';
 
 const PI = Math.PI;
 
@@ -117,14 +117,16 @@ function droop(parent, a, b, sag, mat) {
 // its ceiling light panels, the server room's first.
 export function film(scene, { walls, panels, ceiling, accent, seed }) {
   const r = rng(seed ^ 0x5eed);
-  const fog = new THREE.FogExp2(0x0b0f1c, 0.04);
+  // the set's look (D153); the defaults are cyberpunk's set.toml
+  const fog = new THREE.FogExp2(look('fog', '#0b0f1c'), 0.04);
   scene.fog = fog;
-  scene.background = new THREE.Color(0x05060c);
-  const hemi = new THREE.HemisphereLight(0x4a5c88, 0x2a1c12, 0.5);
+  scene.background = new THREE.Color(look('background', '#05060c'));
+  const hemi = new THREE.HemisphereLight(look('ambient', '#4a5c88'), 0x2a1c12, 0.5);
   scene.add(hemi);
   scene.userData.hemi = hemi;
-  scene.userData.levels = { walk: { hemi: 2.4, fog: 0.035 }, orbit: { hemi: 9, fog: 0 } };
-  const city = new THREE.DirectionalLight(0x6fa0ff, 1.1); // the city, through the windows
+  const amb = look('ambient_intensity', 1);
+  scene.userData.levels = { walk: { hemi: 2.4 * amb, fog: look('fog_density', 0.035) }, orbit: { hemi: 9 * amb, fog: 0 } };
+  const city = new THREE.DirectionalLight(look('key', '#6fa0ff'), look('key_intensity', 1.1)); // the city, through the windows
   city.position.set(14, 6, 10);
   scene.add(city);
   const lamps = LAMPS.map(([x, y, z, c, i, d]) => {

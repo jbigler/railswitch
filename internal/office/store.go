@@ -211,7 +211,10 @@ func (s *Store) builtin(name string) Entry {
 func (s *Store) installed(name string) Entry {
 	e := Entry{Name: name, Source: "installed", Status: "ok", Have: []string{}}
 	dir := filepath.Join(s.Base(), name)
-	broken := func(why string) Entry { e.Status, e.Reason = "broken", why; return e }
+	broken := func(why string) Entry {
+		e.Status, e.Reason, e.Missing = "broken", why, len(s.List.Pieces)
+		return e
+	}
 	raw, err := safefile.Read(filepath.Join(dir, "index.json"), 1<<20)
 	if err != nil {
 		return broken("index.json: " + err.Error())

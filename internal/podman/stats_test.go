@@ -63,3 +63,28 @@ func TestStatsArgv(t *testing.T) {
 		t.Errorf("timeout %v: the default 30 s", f.Cmds[0].Timeout)
 	}
 }
+
+// TestParseStatsReal is podman 6.1.4's output, verbatim, for a container
+// run with --memory 64m.
+func TestParseStatsReal(t *testing.T) {
+	got, err := parseStats([]byte(`[
+ {
+  "id": "0eb27f71deb8",
+  "name": "rs-review-statsprobe",
+  "cpu_time": "30.683ms",
+  "cpu_percent": "1.48%",
+  "avg_cpu": "1.48%",
+  "mem_usage": "4.989MB / 67.11MB",
+  "mem_percent": "7.43%",
+  "net_io": "198B / 472B",
+  "block_io": "0B / 0B",
+  "pids": "1"
+ }
+]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := got["rs-review-statsprobe"]; s != (Stat{CPUPercent: 1.48, MemUsed: 4_989_000, MemLimit: 67_110_000, MemPercent: 7.43, PIDs: 1}) {
+		t.Errorf("%+v", s)
+	}
+}

@@ -946,7 +946,17 @@ any open page.
     its desk screen, the agent panel and the floor's big screen show its
     session's tokens, and the lobby's big screen their sum. The **PR
     station** by the windows shows the floor's pull request: title, checks,
-    review, review app. A glass board 2.4 m wide stands by the wall. The
+    review, review app. **The whiteboard** (a glass board 2.4 m wide by the
+    wall, D151) opens Excalidraw over the whole page: draw, write, paste a
+    picture. **Save and close** keeps the drawing with the worktree
+    (`railswitch whiteboard`), and the board then shows it, in Excalidraw's
+    dark mode, until you change it or `wt rm` removes the worktree; an empty
+    board clears it. **Discard changes** closes without saving. A save is
+    refused when someone saved the board since you opened it: open it again.
+    While the editor is open the office ignores its own keys (`T`, `V`,
+    walking). Left out of the vendored editor: Mermaid import, the CJK
+    hand-drawn font (such text uses a system font), and its WebAssembly
+    font subsetting (an SVG export embeds whole fonts). The
     **meeting** room (glass) holds the **holo-table**: over a chunky
     console a wireframe terrain rises in the floor's main colour (its trim in
     the second neon), with a

@@ -52,7 +52,9 @@ func TestGenericity(t *testing.T) {
 			agentSession := rel == "internal/render/agentsession.go" || rel == "internal/pack/builtin/agentbase/Containerfile.agent-base"
 			// The dashboard's browser terminal (D149) is the xterm.js library, not a host terminal.
 			browserTerm := strings.HasPrefix(rel, "internal/web/static/term/")
-			if m := termRe.Find(b); m != nil && !strings.HasPrefix(rel, "internal/term/") && !agentSession && !browserTerm {
+			// The whiteboard (D151) is the vendored Excalidraw bundle: its words ("foot") are no terminal.
+			vendored := strings.HasPrefix(rel, "internal/web/static/whiteboard/")
+			if m := termRe.Find(b); m != nil && !strings.HasPrefix(rel, "internal/term/") && !agentSession && !browserTerm && !vendored {
 				t.Errorf("%s: names terminal %q outside internal/term/", rel, m)
 			}
 			// Stage 5: Phoenix runs from a user-written pack; core knows

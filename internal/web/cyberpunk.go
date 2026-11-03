@@ -118,6 +118,7 @@ func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown project", http.StatusNotFound)
 		return
 	}
+	w.Header().Set("Content-Security-Policy", officeCSP)
 	s.html(w, http.StatusOK, "cyberpunk", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix})
 }
 
@@ -242,4 +243,35 @@ func (s *Server) cyberNoteWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.cyberJSON(w, r, text, "-C", p.Workspace, "notes", "write", n, "--if-hash", hash)
+}
+
+// boardMaxBytes is the largest whiteboard save the page sends: the CLI's
+// scene limit and its picture's, base64 (D151).
+const boardMaxBytes = 12<<20 + 6<<20
+
+// cyberBoard is worktree {slug}'s whiteboard (whiteboard show --json).
+func (s *Server) cyberBoard(w http.ResponseWriter, r *http.Request) {
+	if p, wt, ok := s.lookup(w, r); ok {
+		s.cyberJSON(w, r, nil, "-C", p.Workspace, "-w", wt.Slug, "whiteboard", "show")
+	}
+}
+
+// cyberBoardWrite saves (POST …/whiteboard/{slug}?if-hash=, the body
+// {"scene","png"}) or clears (…?rm=1) worktree {slug}'s whiteboard.
+func (s *Server) cyberBoardWrite(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	hash := r.URL.Query().Get("if-hash")
+	if r.URL.Query().Get("rm") == "1" {
+		s.cyberJSON(w, r, nil, "-C", p.Workspace, "-w", wt.Slug, "whiteboard", "rm", "--if-hash", hash)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, boardMaxBytes+1))
+	if err != nil || len(body) > boardMaxBytes {
+		http.Error(w, "a whiteboard is at most 18 MiB", http.StatusRequestEntityTooLarge)
+		return
+	}
+	s.cyberJSON(w, r, body, "-C", p.Workspace, "-w", wt.Slug, "whiteboard", "write", "--if-hash", hash)
 }

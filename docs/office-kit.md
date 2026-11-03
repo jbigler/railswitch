@@ -44,7 +44,7 @@ it changes everywhere at once:
 | `RS_Neon_Secondary` | violet trim, the sign, jellyfish tentacles | `setSecondary` |
 | `RS_FloorDisplay` | the elevator's floor number: blank, for a canvas texture | – |
 | `RS_RackDisplay`, `RS_VendScreen`, `RS_ArcadeScreen` | a rack's status display, a vending machine's menu, an arcade's screen: blank, the page draws on them | – |
-| `RS_Whiteboard` | the glass board's surface: one quad mapped to the full image, for a drawing later | – |
+| `RS_Whiteboard` | the glass board's surface: one quad mapped to the full image; the page swaps in the worktree's drawing (D151) | – |
 | `RS_HoloBed` | the holo-table's dark bed: the page draws the hologram above it | – |
 | `RS_Body`, `RS_BodyDark`, `RS_PaintViolet` | worn paint (`draw_paint`): panel seams, screws, scratches and chips to bare metal, grime; 1 m per repeat, projected per face like the walls | – |
 | `RS_ScreenOff`, `RS_Glow_Warm`, `RS_LED_Green`, `RS_LED_Amber`, … | fixed colors | – |

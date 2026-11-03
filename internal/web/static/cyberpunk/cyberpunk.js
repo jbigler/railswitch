@@ -7,6 +7,7 @@ import { World } from './world.js';
 import { lobby, lab, svcState, tokens } from './rooms.js';
 import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
 import { openTerminal } from '../term/term.js';
+import { editBoard, picture } from './whiteboard.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -63,7 +64,7 @@ async function go(to) {
   closePanel();
   $('where').textContent = 'Elevator…';
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
-    service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, viewer: () => world.viewer() };
+    service: showService, desk: showDesk, agentDesk: showAgentDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer() };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;
@@ -82,7 +83,38 @@ async function go(to) {
   world.setTicks(r.ticks); // with the racks the update added
   $('where').textContent = r.name;
   history.replaceState(null, '', to.kind === 'floor' ? `#floor/${encodeURIComponent(to.slug)}` : '#lobby');
+  if (to.kind === 'floor') loadBoard(r, to.slug);
 }
+
+// The floor's whiteboard (D151): its drawing on the board, and the editor.
+const boardURL = (slug) => `${base}/virtual-office/whiteboard/${encodeURIComponent(slug)}`;
+async function loadBoard(r, slug) {
+  try {
+    const doc = await getJSON(boardURL(slug));
+    if (room === r) r.setBoard?.(await picture(doc.png));
+  } catch { /* the board keeps its diagrams */ }
+}
+async function showBoard(slug) {
+  closePanel();
+  let doc;
+  try {
+    doc = await getJSON(boardURL(slug));
+  } catch (e) {
+    return openPanel('Whiteboard', (body) => body.append(el('p', { class: 'muted' }, `The board did not open: ${e.message}`)));
+  }
+  const r = room;
+  await editBoard(`Whiteboard · ${slug}`, doc, async (body) => {
+    const q = `?if-hash=${encodeURIComponent(doc.hash)}`;
+    if (body === null) {
+      if (!doc.hash) return '';
+      return JSON.parse(await post(boardURL(slug) + q + '&rm=1', '')).hash;
+    }
+    return JSON.parse(await post(boardURL(slug) + q, body, 'application/json')).hash;
+  }, async (png) => {
+    if (room === r) r.setBoard?.(await picture(png));
+  });
+}
+
 
 function fromHash() {
   const m = location.hash.match(/^#floor\/(.+)$/);
@@ -148,7 +180,7 @@ function toggleView() {
 }
 $('view').addEventListener('click', toggleView);
 addEventListener('keydown', (e) => {
-  if (e.target.closest?.('input, textarea, select, .term-host')) return; // a focused terminal gets every key, Escape included
+  if (e.target.closest?.('input, textarea, select, .term-host') || document.querySelector('.board-modal')) return; // a focused terminal, or the open whiteboard, gets every key, Escape included
   if (e.key === 'Escape') closePanel();
   if (e.key === 't' || e.key === 'T') transport();
   if (e.key === 'v' || e.key === 'V') toggleView();

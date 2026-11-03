@@ -17,6 +17,14 @@ func TestCyberpunkPage(t *testing.T) {
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `src="/static/cyberpunk/cyberpunk.js"`) || !strings.Contains(w.Body.String(), `data-prefix="ftest"`) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
+	// D151: data: images (the whiteboard's icons, pasted pictures) on this
+	// page only; scripts and styles stay 'self'.
+	if got := w.Header().Get("Content-Security-Policy"); got != wantCSP+"; img-src 'self' data:" {
+		t.Errorf("CSP %q", got)
+	}
+	if got := f.do(req("GET", "/p/ftest", nil)).Header().Get("Content-Security-Policy"); got != wantCSP {
+		t.Errorf("dashboard CSP %q", got)
+	}
 	if w := f.do(req("GET", "/p/nope/virtual-office/cyberpunk", nil)); w.Code != 404 {
 		t.Errorf("unknown project: %d", w.Code)
 	}
@@ -55,6 +63,11 @@ func TestCyberpunkReads(t *testing.T) {
 		{"note create", "POST", "/p/ftest/virtual-office/notes/a.md?if-hash=", "hi", 200, "--json -C /ws/ftest notes write a.md --if-hash "},
 		{"note rm", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1&if-hash=abc", "", 200, "-C /ws/ftest notes rm a.md --if-hash abc"},
 		{"note rm no hash", "POST", "/p/ftest/virtual-office/notes/a.md?rm=1", "", 400, ""},
+		{"board", "GET", "/p/ftest/virtual-office/whiteboard/b", "", 200, "--json -C /ws/ftest -w b whiteboard show"},
+		{"board unknown worktree", "GET", "/p/ftest/virtual-office/whiteboard/nope", "", 404, ""},
+		{"board write", "POST", "/p/ftest/virtual-office/whiteboard/b?if-hash=abc", `{"scene":{}}`, 200, "--json -C /ws/ftest -w b whiteboard write --if-hash abc"},
+		{"board rm", "POST", "/p/ftest/virtual-office/whiteboard/b?rm=1&if-hash=abc", "", 200, "--json -C /ws/ftest -w b whiteboard rm --if-hash abc"},
+		{"board unknown worktree write", "POST", "/p/ftest/virtual-office/whiteboard/nope?if-hash=", "{}", 404, ""},
 	} {
 		f := newFixture(t)
 		if c.key != "" {

@@ -356,7 +356,7 @@ export class World {
     });
     const moveKeys = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift']);
     addEventListener('keydown', (e) => {
-      if (this.mode !== 'walk' || e.target.closest?.('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (this.mode !== 'walk' || e.target.closest?.('input, textarea, select') || document.querySelector('.board-modal') || e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (moveKeys.has(k)) {
         this.walk.keys.add(k);

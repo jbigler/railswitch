@@ -200,3 +200,18 @@ func TestRecordFile(t *testing.T) {
 		t.Errorf("missing file: %+v %v", rep, err)
 	}
 }
+
+// An idle agent's status file reads the same for months: its counter is
+// not forgotten and counted again once Keep days pass.
+func TestApplyKeepsIdleAgent(t *testing.T) {
+	f := file{Last: map[string]last{}}
+	old := at("2026-07-01", 10)
+	s := sample("idle", "x", 5, 0, old)
+	f.apply([]Sample{s}, old)
+	now := at("2026-11-04", 10)
+	f.apply([]Sample{s}, now)
+	f.apply([]Sample{s}, now.Add(time.Minute))
+	if got := rowsOf(&f); len(got) != 0 {
+		t.Errorf("counted again: %v", got)
+	}
+}

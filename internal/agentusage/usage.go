@@ -210,7 +210,9 @@ func (f *file) apply(samples []Sample, now time.Time) bool {
 		changed = changed || len(f.Days) != n
 	}
 	for k, l := range f.Last {
-		if l.Seen < now.AddDate(0, 0, -Keep).Unix() {
+		// A key still sampled is kept however old: an idle agent's status
+		// file reads the same, and forgetting it would count it all again.
+		if l.Seen < now.AddDate(0, 0, -Keep).Unix() && !slices.ContainsFunc(samples, func(s Sample) bool { return s.Worktree+"/"+s.Agent == k }) {
 			delete(f.Last, k)
 			changed = true
 		}

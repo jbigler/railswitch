@@ -195,8 +195,8 @@ is no longer accepted. What the page shows meanwhile may be stale.
   `unknown`, in the glyph's colour;
   the systemd state is the row's tooltip; while the service runs, `logs`
   opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
-  and, for a service with a unit of its own (not an agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone), Agent (state and message), Actions and Jobs.
+  and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
+  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message), Actions and Jobs.
 
 ## Settings
 

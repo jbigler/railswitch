@@ -28,8 +28,8 @@ type OverviewService struct {
 	Role      string `json:"role"`
 	State     string `json:"state"`     // as StatusRow.State
 	Container string `json:"container"` // its container's name, as podman and Dozzle show it
-	// Restartable: a long-lived unit (not an agent, an on-demand service or
-	// a oneshot) that `restart <service>` restarts alone.
+	// Restartable: a long-lived unit (a service agent too, not an on-demand
+	// service or agent or a oneshot) that `restart <service>` restarts alone.
 	Restartable bool `json:"restartable"`
 }
 
@@ -181,7 +181,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 				}
 			}
 			ow.Services = append(ow.Services, OverviewService{Service: s.ID, Role: s.Role, State: st, Container: ctr,
-				Restartable: s.Role != render.RoleAgent && !s.OnDemand && !s.Oneshot})
+				Restartable: !s.OnDemand && !s.Oneshot})
 		}
 		ow.Stack = StackState(ow.Services)
 		names, err := m.NamesFor(w.Slug)

@@ -236,6 +236,7 @@ document.addEventListener("submit", (e) => {
   }
   if (!f.matches("form[data-post]")) return;
   e.preventDefault();
+  if (f.dataset.confirm && !confirm(f.dataset.confirm)) return;
   const remove = f.classList.contains("remove");
   if (remove && f.elements.confirm && f.elements.confirm.value !== f.dataset.slug) {
     return toast("Type " + f.dataset.slug + " to confirm.", true);

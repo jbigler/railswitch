@@ -36,9 +36,10 @@ func (l *L) Restart(ctx context.Context, slug string) error {
 
 // RestartService restarts service svc of worktree slug alone (`systemctl
 // --user restart` of its unit): its container is replaced, the rest of
-// the stack keeps running. Only a running long-lived service: an agent,
-// an on-demand service or a oneshot (deps) is refused, and so is a unit
-// that isn't active (up starts it).
+// the stack keeps running. Only a running long-lived service, a service
+// agent included (D148: it has a unit; its session restarts with it): an
+// on-demand service or agent or a oneshot (deps) is refused, and so is a
+// unit that isn't active (up starts it).
 func (l *L) RestartService(ctx context.Context, slug, svc string) error {
 	m, _, err := l.load(ctx, slug)
 	if err != nil {
@@ -51,8 +52,8 @@ func (l *L) RestartService(ctx context.Context, slug, svc string) error {
 	if err != nil {
 		return &UsageError{Msg: err.Error()}
 	}
-	if s.Role == render.RoleAgent || s.OnDemand || s.Oneshot {
-		return &UsageError{Msg: fmt.Sprintf("restart: %s has no unit to restart (an agent, on-demand or one-shot service)", svc)}
+	if s.OnDemand || s.Oneshot {
+		return &UsageError{Msg: fmt.Sprintf("restart: %s has no unit to restart (an on-demand or one-shot service)", svc)}
 	}
 	unit := unitOf(m, slug, svc)
 	st, err := l.systemd().UnitState(ctx, unit)

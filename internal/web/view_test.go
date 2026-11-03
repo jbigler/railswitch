@@ -344,9 +344,10 @@ func TestDetailActions(t *testing.T) {
 		{Service: "web", Role: "app", State: "active/running", Container: "ftest-feat-login-web", Restartable: true},
 		{Service: "db", Role: "data", State: "inactive/dead", Container: "ftest-feat-login-db", Restartable: true},
 		{Service: "agent-bot", Role: "agent", State: "active/running", Container: "ftest-feat-login-agent-bot"},
+		{Service: "agent-svc", Role: "agent", State: "active/running", Container: "ftest-feat-login-agent-svc", Restartable: true},
 	}
 	d := newDetail("ftest", r, "")
-	web, db, bot := d.Services[0], d.Services[1], d.Services[2]
+	web, db, bot, svc := d.Services[0], d.Services[1], d.Services[2], d.Services[3]
 	if web.LogsURL != "http://logs.localhost/show?name=ftest-feat-login-web" || web.RestartURL != "/p/ftest/feat-login/restart/web" {
 		t.Errorf("web: %+v", web)
 	}
@@ -354,13 +355,17 @@ func TestDetailActions(t *testing.T) {
 		t.Errorf("stopped db: %+v", db)
 	}
 	if bot.LogsURL == "" || bot.RestartURL != "" {
-		t.Errorf("agent: %+v", bot)
+		t.Errorf("on-demand agent: %+v", bot)
+	}
+	// a service agent restarts (D148), after a confirm: its session ends
+	if svc.RestartURL != "/p/ftest/feat-login/restart/agent-svc" || !strings.Contains(svc.Confirm, "Its session ends") || web.Confirm != "" {
+		t.Errorf("service agent: %+v", svc)
 	}
 	html, err := render("detail", d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`} {
+	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`, `action="/p/ftest/feat-login/restart/agent-svc" data-post data-confirm="Restart agent-svc? Its session ends`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %q", want)
 		}

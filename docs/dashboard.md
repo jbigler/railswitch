@@ -999,7 +999,14 @@ any open page.
     the second neon), with a
     pin per service (in the lobby, per floor) coloured by its state, which
     opens it, and a halo above with the floor's summary. The **game room**
-    (glass): two bartop arcades on their stands, a sofa facing them.
+    (glass): two bartop arcades on their stands, a sofa facing them. A click
+    on a cabinet plays it over the office (D154): the first is
+    **Minesweeper** (click opens, right-click flags, the first click is
+    always safe; **Size** cycles 9×9, 16×16 and 30×16), the second
+    **Stackfall**, falling blocks (`←` `→` move, `↑` or `X` turns, `Z`
+    turns back, `↓` drops a row, `Space` drops it all the way, `P` pauses;
+    its best score stays in this browser). `R` starts over; `Esc` or
+    **Close** ends the game, and the office's own keys wait until then.
 - **The elevator** (in the left wall of every floor, or `T`) lists the
   lobby and every floor; its doors open as you walk up, and stepping in
   front of them opens the list. `Esc` closes a panel.

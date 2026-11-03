@@ -75,6 +75,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - `internal/safefile`: hostile-file reads and `Printable`.
 - `internal/naming`: sanitized names, object and unit names, and worktree paths.
 - `internal/agentstatus`: the agents' status files (D58), read as hostile.
+- `internal/agentqueue`: a worktree's agent work queue (D159), host-side; `lifecycle.QueueNext` delivers it.
 - `internal/gitguard`: git-guard (D60), which checks hooks and git config that containers can write.
 - `internal/gitshadow`: a host-private stand-in for a repository's common git dir.
 - `internal/detect`: `project detect`.

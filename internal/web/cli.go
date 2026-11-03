@@ -50,15 +50,22 @@ type signerWarning struct {
 }
 
 type worktree struct {
-	Slug     string    `json:"slug"`
-	ID       int       `json:"id"`
-	Branch   string    `json:"branch"`
-	Base     bool      `json:"base"`
-	Stack    string    `json:"stack"`
-	Stale    bool      `json:"stale"`
-	Services []service `json:"services"`
-	Agent    *agent    `json:"agent"`
-	Links    []link    `json:"links"`
+	Slug     string      `json:"slug"`
+	ID       int         `json:"id"`
+	Branch   string      `json:"branch"`
+	Base     bool        `json:"base"`
+	Stack    string      `json:"stack"`
+	Stale    bool        `json:"stale"`
+	Services []service   `json:"services"`
+	Agent    *agent      `json:"agent"`
+	Links    []link      `json:"links"`
+	Queue    []queueItem `json:"queue"` // the agent work queue (D159)
+}
+
+// queueItem is a queued prompt (agentqueue.Item).
+type queueItem struct {
+	ID   int    `json:"id"`
+	Text string `json:"text"`
 }
 
 type service struct {
@@ -76,6 +83,7 @@ type agent struct {
 	Reply   bool   `json:"reply"`
 	Running bool   `json:"running"`
 	Usage   *usage `json:"usage"`
+	TS      int64  `json:"ts"`
 }
 
 // usage is an agent's session tokens (agentstatus.Usage).

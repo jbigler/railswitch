@@ -290,3 +290,10 @@ body:has(.term-panel.max) { overflow: hidden; }
 .pr-reply textarea{flex:1;font:inherit}
 .pr-review{flex-wrap:wrap}
 .pr-review .btns{display:flex;gap:.4rem}
+/* agent work queue (D159) */
+.queue{margin-top:4px}
+.queue form{display:inline}
+.queue .quiet-link{margin-left:6px;color:var(--muted);text-decoration:none;background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.queue .quiet-link:hover{color:var(--blue);text-decoration:underline}
+.queue-items{margin:2px 0 0;padding-left:1.2em}
+.queue-add textarea{display:block;width:100%;font:inherit}

@@ -32,7 +32,8 @@ var completionFiles = map[string]string{
 // ("dashboard colors") nests. A command with completionArgs too (agent)
 // offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":            {"add", "default", "ls", "screen", "send", "stop", "update"},
+	"agent":            {"add", "default", "ls", "queue", "screen", "send", "stop", "update"},
+	"agent queue":      {"add", "clear", "ls", "next", "rm"},
 	"agent default":    {"apply", "promote"},
 	"containerfile":    {"eject", "list", "new", "show", "write"},
 	"dashboard":        {"colors", "serve"},
@@ -68,6 +69,7 @@ var completionFlags = map[string][]string{
 	"":                       {"-C=", "-w=", "--json"},
 	"agent":                  {"--new-term", "--no-token", "--watch"},
 	"agent add":              {"--run=", "--use="},
+	"agent queue add":        {"--issue="},
 	"agent default apply":    {"--all"},
 	"agent default promote":  {"--all"},
 	"build":                  {"--force", "--pull"},
@@ -110,7 +112,7 @@ var completionFlags = map[string][]string{
 	"pr ls":                  {"--all"},
 	"pr merge":               {"--auto", "--method="},
 	"pr review":              {"--approve", "--comment", "--request-changes"},
-	"pr agent":               {"--thread="},
+	"pr agent":               {"--queue", "--thread="},
 	"settings apply":         {"--accept-install=", "--if-hash=", "--restart"},
 	"task":                   {"--new-term"},
 	"template check":         {"--accept="},

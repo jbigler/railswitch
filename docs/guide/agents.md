@@ -91,6 +91,16 @@ uses them). `send` takes its text on stdin, at most 4 KiB, with no
 control characters but line breaks and tabs; a multi-line text is pasted
 as one input. It types only into a running session and never starts one.
 
+To line up work for later, queue it: the dashboard types each item into
+the worktree's agent once it has been idle a few seconds, one at a time,
+never while it works or waits on you (D159).
+
+```bash
+railswitch agent queue add "then update the changelog"
+railswitch agent queue add --issue 42     # as wt add --issue --agent words it
+railswitch agent queue ls                 # rm <id> and clear edit it
+```
+
 - **Several terminals at once.** Run `railswitch agent` in as many
   terminals as you like: each shows the same agent, live, and each can
   type into it. The window follows whoever typed last.

@@ -16,7 +16,7 @@
 {{with .Agent}}<div><span class="{{.Class}}">{{.Glyph}} {{.Label}}</span> <span class="muted">{{.Name}}</span></div>
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
-{{end}}<div class="lbl">Terminal</div>
+{{end}}{{template "queue-detail" .Queue}}<div class="lbl">Terminal</div>
 <div class="actions">{{range .Terms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Label}}">{{.Label}} ▣</button>{{end}}</div>
 <div class="lbl">Actions</div>
 <div class="actions">{{range .Actions}}<form method="post" action="{{.URL}}" data-post><button class="ln">{{.Label}}</button></form>{{end}}{{if .RemoveURL}}<span class="gap"></span><a class="ln danger" href="{{.RemoveURL}}" data-dialog="remove"{{if .Merged}} title="Its PR is merged"{{end}}>{{if .Merged}}PR merged: remove…{{else}}remove…{{end}}</a>{{end}}</div>

@@ -10,8 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 	"unicode/utf8"
 
+	"github.com/jbigler/railswitch/internal/agentqueue"
 	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/render"
@@ -20,7 +22,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const prUsage = "usage: railswitch [--json] pr ls [--all] | [--json] pr show [<number>] | pr merge [<number>] [--method merge|squash|rebase] [--auto] | pr ready|rerun [<number>] | pr comment [<number>] | pr review [<number>] --approve|--request-changes|--comment | pr reply <thread> | pr resolve|unresolve <thread> | pr agent [<number>] [--thread <thread>]...  (comment, review and reply read the text on stdin)"
+const prUsage = "usage: railswitch [--json] pr ls [--all] | [--json] pr show [<number>] | pr merge [<number>] [--method merge|squash|rebase] [--auto] | pr ready|rerun [<number>] | pr comment [<number>] | pr review [<number>] --approve|--request-changes|--comment | pr reply <thread> | pr resolve|unresolve <thread> | pr agent [<number>] [--thread <thread>]... [--queue]  (comment, review and reply read the text on stdin)"
 
 // prRow is one worktree's row of pr ls.
 type prRow struct {
@@ -186,7 +188,7 @@ func logins(s []string) string {
 func prAct(ctx context.Context, e *env, args []string) int {
 	var fs *flag.FlagSet
 	var method *string
-	var auto, approve, changes, comment *bool
+	var auto, approve, changes, comment, queue *bool
 	var threads stringList
 	switch args[0] {
 	case "show":
@@ -209,6 +211,7 @@ func prAct(ctx context.Context, e *env, args []string) int {
 	case "agent":
 		fs = e.flags("pr agent")
 		fs.Var(&threads, "thread", "a review `thread` to send (repeatable; default: every unresolved one)")
+		queue = fs.Bool("queue", false, "add the text to the worktree's agent queue (D159) instead of typing it now")
 	}
 	pos, code, ok := parseMixed(fs, args[1:])
 	if !ok {
@@ -310,7 +313,7 @@ func prAct(ctx context.Context, e *env, args []string) int {
 		}
 		fmt.Fprintf(e.stdout, "reviewed #%d: %s\n", n, verdict)
 	case "agent":
-		return e.prAgent(ctx, v, threads)
+		return e.prAgent(ctx, v, threads, *queue)
 	case "rerun":
 		runs, err := prs.Rerun(ctx, e.run, repo, v)
 		if err != nil {
@@ -439,7 +442,8 @@ func prThread(ctx context.Context, e *env, args []string) int {
 // prAgent types PR v's review threads (the named ones, else every
 // unresolved one) into the worktree's default agent: its session is
 // started when it has none (agent prompt), then typed into once it settles.
-func (e *env) prAgent(ctx context.Context, v *prs.View, threads []string) int {
+// With queue the text joins the worktree's agent queue instead (D159).
+func (e *env) prAgent(ctx context.Context, v *prs.View, threads []string, queue bool) int {
 	text, n, err := prs.AgentText(v, threads, lifecycle.MaxSend)
 	if err != nil {
 		return e.fail(err)
@@ -447,6 +451,14 @@ func (e *env) prAgent(ctx context.Context, v *prs.View, threads []string) int {
 	l, slug, code := e.lifecycle(ctx, "pr agent")
 	if code != 0 {
 		return code
+	}
+	if queue {
+		it, err := agentqueue.Add(l.WS.Root, slug, text, time.Now())
+		if err != nil {
+			return e.fail(err)
+		}
+		fmt.Fprintf(e.stdout, "queued %d review thread(s) of #%d as #%d for the agent in %s\n", n, v.Number, it.ID, slug)
+		return 0
 	}
 	if err := l.AgentPrompt(ctx, slug, "", text); err != nil {
 		return e.fail(err)

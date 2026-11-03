@@ -37,6 +37,9 @@ type projectState struct {
 	stacks map[string]*ghStackRow
 	kinds  map[string]string // agentKind per slug at the last overview
 	known  bool              // kinds holds a first overview (the baseline)
+	// queueTried is the agent status ts (by slug) a queue delivery last
+	// started at: one try per status (D159).
+	queueTried map[string]int64
 }
 
 // event is one Server-Sent Event, as JSON.
@@ -293,16 +296,63 @@ func (s *Server) loadProjects(ctx context.Context) error {
 // started waiting, and updates the pages. The poll time was set when the
 // read was scheduled, so a job ending during the read keeps it due.
 func (s *Server) applyOverview(prefix string, ov overview, err error) {
+	for _, spec := range s.storeOverview(prefix, ov, err) {
+		if _, err := s.c.Jobs.Start(context.Background(), spec); err != nil {
+			s.mu.Lock()
+			if p := s.state[prefix]; p != nil {
+				delete(p.queueTried, spec.Slug) // busy: try again at the next overview
+			}
+			s.mu.Unlock()
+		}
+	}
+}
+
+// queueSettle is lifecycle.QueueSettle: how long an agent stays idle
+// before the dashboard asks for its queue's next item (D159).
+const queueSettle = 5 * time.Second
+
+// queueLabel is the label of a job delivering a queued prompt.
+const queueLabel = "agent queue next"
+
+// queueDue is the worktrees of ov whose agent may take its queue's next
+// item: running, idle or its turn over (not asking anything), QueueSettle
+// so, with a status not tried since. It marks them tried. s.mu is held.
+func (s *Server) queueDue(p *projectState, ov overview) []jobs.Spec {
+	var out []jobs.Spec
+	for _, wt := range ov.Worktrees {
+		a := wt.Agent
+		if len(wt.Queue) == 0 || a == nil || !a.Running {
+			continue
+		}
+		if k := agentKind(a); k != "idle" && k != "turn" {
+			continue
+		}
+		if s.c.Now().Sub(time.Unix(a.TS, 0)) < queueSettle || p.queueTried[wt.Slug] == a.TS {
+			continue
+		}
+		if p.queueTried == nil {
+			p.queueTried = map[string]int64{}
+		}
+		p.queueTried[wt.Slug] = a.TS
+		out = append(out, jobs.Spec{Project: p.row.Prefix, Slug: wt.Slug, Label: queueLabel, Dir: p.row.Workspace,
+			Argv: []string{s.c.Exe, "-C", p.row.Workspace, "-w", wt.Slug, "agent", "queue", "next"}})
+	}
+	return out
+}
+
+// storeOverview is applyOverview under s.mu; it returns the queue
+// deliveries to start.
+func (s *Server) storeOverview(prefix string, ov overview, err error) []jobs.Spec {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p := s.state[prefix]
 	if p == nil {
-		return
+		return nil
 	}
 	if err != nil {
 		p.ovErr = err.Error()
 		s.publish()
-		return
+		return nil
 	}
 	p.ovErr = ""
 	kinds := map[string]string{}
@@ -327,6 +377,7 @@ func (s *Server) applyOverview(prefix string, ov overview, err error) {
 		}
 	}
 	s.publish()
+	return s.queueDue(p, ov)
 }
 
 // cutRunes is s cut to n characters.

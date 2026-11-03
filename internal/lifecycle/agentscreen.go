@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/jbigler/railswitch/internal/agentstatus"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -136,8 +138,9 @@ var settle = struct {
 
 // AgentPrompt starts service agent name's session in worktree slug in the
 // background (AgentDetached) and types text into it (AgentSend) once its
-// screen settles, so any agent's first input is the text, whatever its
-// command line takes. A session already running is typed into as it is.
+// screen settles, or at once while it works, so any agent's first input is
+// the text, whatever its command line takes. A session already running is
+// typed into as it is; one waiting on a permission or a question is refused.
 func (l *L) AgentPrompt(ctx context.Context, slug, name, text string) error {
 	if err := CheckSendText(text); err != nil {
 		return err
@@ -149,6 +152,11 @@ func (l *L) AgentPrompt(ctx context.Context, slug, name, text string) error {
 	if err := l.AgentDetached(ctx, slug, name, nil); err != nil {
 		return err
 	}
+	_, in, err := l.load(ctx, slug)
+	if err != nil {
+		return err
+	}
+	status := filepath.Join(in.Values["status.dir"], name+".json")
 	deadline := time.Now().Add(settle.Max)
 	var last string
 	still := 0
@@ -166,9 +174,16 @@ func (l *L) AgentPrompt(ctx context.Context, slug, name, text string) error {
 			return err
 		}
 		now := strings.Join(sc.Lines, "\n")
+		// Read after the screen, so the last look before typing is the state:
+		// typed text and Enter would answer a pending prompt.
+		state := agentstatus.Read(status).State
 		switch {
 		case !sc.Session:
 			return fmt.Errorf("agent %s in %s: its session ended before it took the text", name, slug)
+		case state == "permission" || state == "question":
+			return fmt.Errorf("agent %s in %s is waiting on you (%s): answer it, then send again", name, slug, state)
+		case state == "working" && now != "":
+			return l.AgentSend(ctx, slug, name, text) // a busy agent queues it; its screen never settles
 		case now == "" || now != last:
 			still = 0
 		default:

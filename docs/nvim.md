@@ -163,6 +163,18 @@ one (to switch colour schemes along with `'background'`), else sets
 
 ```sh
 #!/bin/sh
+# vim-kitty-navigator runs `kitten @` inside the server, which never sees this
+# window's environment: hand it the kitty socket (as mounted in the container,
+# see Machine-local mounts), this window's id (its `ls --match id:` needs one)
+# and the key that password requests are encrypted with.
+case "${KITTY_LISTEN_ON:-}" in unix:/*)
+	sock="/kitty-sock/$(basename "${KITTY_LISTEN_ON#unix:}")"
+	nvim --server "$RAILSWITCH_NVIM_SERVER" --remote-expr \
+		"[setenv('KITTY_LISTEN_ON', 'unix:$sock'), setenv('KITTY_WINDOW_ID', '${KITTY_WINDOW_ID:-}'), setenv('KITTY_PUBLIC_KEY', '${KITTY_PUBLIC_KEY:-}')]" \
+		>/dev/null 2>&1 || true
+	;;
+esac
+
 # Tell kitty this window runs vim, so it passes the navigation keys through.
 [ -n "${KITTY_WINDOW_ID:-}" ] && kitten @ set-user-vars IS_VIM=true
 
@@ -231,6 +243,64 @@ relabel = false   # root-owned: rootless podman cannot relabel it on an SELinux 
 `relabel = false` drops `z` (options `ro`, or none when `ro = false`). Use it
 for a source you do not own (it cannot be relabelled, so the start fails on an
 SELinux-enforcing host) or whose host label must stay as it is.
+
+#### kitty: limit what the container may do
+
+**The kitty socket controls your host.** Anything in the nvim container
+that can reach it, a plugin or a language server working on a cloned
+repository, can send kitty any command, `kitten @ launch` among them, which
+runs a program on the host outside the container. Don't mount the socket
+with `allow_remote_control yes`. Give the container a password that allows
+only what vim-kitty-navigator uses instead: `focus-window`, `ls` and
+`set-user-vars`.
+
+In `kitty.conf` (kitty must listen on a socket *file* in the mounted
+directory; an abstract `unix:@name` socket can't be mounted):
+
+```conf
+allow_remote_control password
+listen_on unix:${HOME}/.local/state/kitty/kitty
+include rc-passwords.conf
+```
+
+`~/.config/kitty/rc-passwords.conf` (mode 0600; keep it out of a dotfiles
+repository):
+
+```conf
+# The host: no action list, so every action.
+remote_control_password "<host password>"
+# The nvim container: navigation only.
+remote_control_password "<nvim password>" focus-window ls set-user-vars
+```
+
+`kitten @` reads its password from `rc-pass` in kitty's config directory
+when none is given, so each side gets its own file, and the password is
+never on a command line:
+
+```sh
+umask 077
+printf '%s\n' '<host password>' > ~/.config/kitty/rc-pass        # host kitten @, railswitch --new-term
+printf '%s\n' '<nvim password>' > ~/.config/kitty/rc-pass-nvim   # the container's
+```
+
+and a third `[[mount]]` beside the two above puts the container's file
+where its `kitten` looks:
+
+```toml
+[[mount]]
+service = "nvim"
+source = "~/.config/kitty/rc-pass-nvim"
+target = "/home/appuser/.config/kitty/rc-pass"
+optional = true
+```
+
+A password request is encrypted with kitty's public key, which the
+`nvim-attach` hook above passes to the server (`KITTY_PUBLIC_KEY`). With
+`allow_remote_control password`, a request without a password is not
+accepted unasked, so every program on the host that drives kitty needs the
+host password: `kitten @` finds it in `rc-pass`. `ls` still shows the
+container every kitty window's title, command line and environment, so
+keep secrets out of the environment of shells in kitty.
 
 ## Firewall (D119)
 

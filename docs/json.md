@@ -746,11 +746,11 @@ A Virtual Office set's folder checked against the piece list (D153,
 |---|---|---|
 | `name`, `version`, `pieces`, `look` | | From `set.toml` (empty when it is missing or refused): the set's name, its own version, the piece list version it was built for, its look (each key only when set). |
 | `results[]` | array | One per piece of the list, plus one per `.gltf` the list doesn't have, by name. `status` is `ok`, `missing` (drawn as a box) or `refused` with a `reason`; `min` and `max` are the model's box (colliders left out) when it was read. |
-| `errors[]` | array of strings | Problems with the folder or `set.toml`: a symlink, a special file, more than 1,000 files, a file over 16 MiB or 256 MiB in all, a stray file, a glTF URI with a scheme (`data:` included), absolute or leaving the folder, a `pieces` other than the list's version. |
+| `errors[]` | array of strings | Problems with the folder or `set.toml`: a symlink, a special file, more than 1,000 files, a file over 16 MiB or 256 MiB in all, a stray file, a glTF URI with a scheme (`data:` included), absolute or leaving the folder, a `pieces` other than the list's version. A piece is also refused when its glTF requires Draco, Meshopt or KTX2 (`extensionsRequired`): the page sets no decoder for them. |
 
 `office set add <dir>` checks the folder, then copies the files the check
 accepted to `<data>/office/<name>/` (0700/0600) with an `index.json`
-(`{"files": {<path>: <sha256>}, "pieces": [...], "added": <time>}`) and
+(`{"files": {<path>: {"sha256", "size", "mtime"}}, "pieces": [...], "added": <time>}`) and
 checks the copy again; a refusal, or a built-in name, adds nothing.
 Re-adding a name replaces that set. `office set use <name>` writes
 `dashboard.toml` `[office] set` (refused for an unknown, stale or broken
@@ -773,7 +773,7 @@ The built-in sets, then the installed ones, by name.
 | `source` | string | `builtin` (in the dashboard's static files) or `installed` (`<data>/office/<name>/`). |
 | `version`, `pieces`, `description`, `look` | | From `set.toml`. |
 | `present`, `missing` | integer | Pieces of the list the set has, and doesn't. |
-| `status`, `reason` | string | `ok`; `stale`: built for another piece list version; `broken`: an installed set whose `index.json`, a file it lists (by sha256) or `set.toml` doesn't verify. |
+| `status`, `reason` | string | `ok`; `stale`: built for another piece list version; `broken`: an installed set whose `index.json` or `set.toml` doesn't verify, or a file it lists is missing, not a regular file, or has another size or modification time than when it was added (a stat per file: the dashboard runs `ls` for every office page, so it hashes only `set.toml`). |
 | `have` | array of strings | The pieces of the list the set has, which the page loads (the rest are boxes). |
 
 ## `notes ls`

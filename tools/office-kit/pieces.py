@@ -147,6 +147,15 @@ def main(models=MODELS):
     with open(OUT, 'w') as fh:
         json.dump({'version': version, 'pieces': pieces}, fh, indent=1, sort_keys=True)
         fh.write('\n')
+    # the built-in set is built for this list: keep its set.toml in step
+    toml = os.path.join(MODELS, 'set.toml')
+    with open(toml) as fh:
+        text = fh.read()
+    new = re.sub(r'(?m)^pieces = \d+', f'pieces = {version}', text, count=1)
+    if new != text:
+        with open(toml, 'w') as fh:
+            fh.write(new)
+        print('pieces.py: set.toml now says pieces =', version)
     print('pieces.py:', len(pieces), 'pieces, version', version, '->', OUT)
 
 

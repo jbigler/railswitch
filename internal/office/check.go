@@ -178,6 +178,11 @@ func Check(dir string, list *Pieces) (*Report, error) {
 			}
 		}
 		if res.Status == "ok" {
+			if x := slices.IndexFunc(g.ExtensionsRequired, func(e string) bool { return slices.Contains(undecoded, e) }); x >= 0 {
+				res.Status, res.Reason = "refused", fmt.Sprintf("%s: compressed (%s), which the office can't decode: export without compression", name, g.ExtensionsRequired[x])
+			}
+		}
+		if res.Status == "ok" {
 			lo, hi, err := g.bounds()
 			if err != nil {
 				res.Status, res.Reason = "refused", name+": "+err.Error()
@@ -223,6 +228,10 @@ func (g *gltfDoc) uris() []string {
 	}
 	return out
 }
+
+// undecoded are the glTF extensions the page's three.js loader has no
+// decoder for: the page sets no Draco, Meshopt or KTX2 decoder.
+var undecoded = []string{"KHR_draco_mesh_compression", "EXT_meshopt_compression", "KHR_texture_basisu"}
 
 // refPath is a glTF URI's file in the folder, or why it is refused: a
 // scheme (data: included: the page's CSP blocks three.js fetching one),

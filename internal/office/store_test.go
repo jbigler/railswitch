@@ -126,3 +126,24 @@ func TestRemove(t *testing.T) {
 		t.Error("removed it twice")
 	}
 }
+
+// A re-add whose last step fails puts the old set back rather than leave none.
+func TestAddRestoresOnFailure(t *testing.T) {
+	s := testStore(t)
+	if _, err := s.Add(writeSet(t, goodSet())); err != nil {
+		t.Fatal(err)
+	}
+	rename = func(string, string) error { return os.ErrPermission }
+	t.Cleanup(func() { rename = os.Rename })
+	v2 := goodSet()
+	v2["set.toml"] = strings.Replace(goodToml, "version = 3", "version = 4", 1)
+	if _, err := s.Add(writeSet(t, v2)); err == nil {
+		t.Fatal("no error")
+	}
+	if e, ok := s.Get("cabin"); !ok || e.Version != 3 || e.Status != "ok" {
+		t.Errorf("after a failed re-add: %+v %v", e, ok)
+	}
+	if entries, _ := os.ReadDir(s.Base()); len(entries) != 1 {
+		t.Errorf("left behind: %v", entries)
+	}
+}

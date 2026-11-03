@@ -122,6 +122,12 @@ func TestCheck(t *testing.T) {
 			f["Furn_Desk.gltf"] = gltfBox(deskMin, deskMax, "data:application/octet-stream;base64,AAAA")
 		}, "has a scheme"},
 		{"http URI", func(f map[string]string) { f["Furn_Desk.gltf"] = gltfBox(deskMin, deskMax, "http://x/y.bin") }, "has a scheme"},
+		{"draco", func(f map[string]string) {
+			f["Furn_Desk.gltf"] = strings.Replace(gltfBox(deskMin, deskMax, "Furn_Desk.bin"), `{"asset"`, `{"extensionsRequired":["KHR_draco_mesh_compression"],"asset"`, 1)
+		}, "Furn_Desk: compressed (KHR_draco_mesh_compression)"},
+		{"meshopt", func(f map[string]string) {
+			f["Furn_Desk.gltf"] = strings.Replace(gltfBox(deskMin, deskMax, "Furn_Desk.bin"), `{"asset"`, `{"extensionsRequired":["KHR_materials_emissive_strength","EXT_meshopt_compression"],"asset"`, 1)
+		}, "compressed (EXT_meshopt_compression)"},
 		{"missing file", func(f map[string]string) { f["Furn_Desk.gltf"] = gltfBox(deskMin, deskMax, "gone.bin") }, "no such file"},
 		{"stray file", func(f map[string]string) { f["notes.txt"] = "hi" }, "notes.txt: neither set.toml"},
 		{"no set.toml", func(f map[string]string) { delete(f, "set.toml") }, "set.toml: missing"},

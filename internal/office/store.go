@@ -22,12 +22,20 @@ const DefaultSet = "cyberpunk"
 // setsDir is where built-in sets live in the dashboard's static files.
 const setsDir = "office/sets"
 
-// Index is an installed set's index.json: every file it holds with its
-// sha256, the pieces it has, and when it was added.
+// Index is an installed set's index.json: every file it holds, the
+// pieces it has, and when it was added.
 type Index struct {
-	Files  map[string]string `json:"files"`
-	Pieces []string          `json:"pieces"`
-	Added  time.Time         `json:"added"`
+	Files  map[string]IndexFile `json:"files"`
+	Pieces []string             `json:"pieces"`
+	Added  time.Time            `json:"added"`
+}
+
+// IndexFile is one file of a set as added: its sha256, and the size and
+// modification time ls compares (a stat per file, not a hash of the set).
+type IndexFile struct {
+	SHA256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+	MTime  int64  `json:"mtime"` // Unix nanoseconds
 }
 
 // Entry is one set as office set ls lists it.
@@ -82,7 +90,7 @@ func (s *Store) Add(dir string) (*Report, error) {
 	}
 	defer os.RemoveAll(tmp) // gone once renamed; a failed add leaves nothing
 	src, _ := filepath.Abs(dir)
-	idx := Index{Files: map[string]string{}, Pieces: r.Have(), Added: time.Now().UTC().Truncate(time.Second)}
+	idx := Index{Files: map[string]IndexFile{}, Pieces: r.Have(), Added: time.Now().UTC().Truncate(time.Second)}
 	for _, rel := range r.Files {
 		data, err := safefile.Read(filepath.Join(src, filepath.FromSlash(rel)), MaxFileSize)
 		if err != nil {
@@ -95,8 +103,12 @@ func (s *Store) Add(dir string) (*Report, error) {
 		if err := os.WriteFile(dst, data, 0o600); err != nil {
 			return r, err
 		}
+		fi, err := os.Lstat(dst)
+		if err != nil {
+			return r, err
+		}
 		sum := sha256.Sum256(data)
-		idx.Files[rel] = hex.EncodeToString(sum[:])
+		idx.Files[rel] = IndexFile{SHA256: hex.EncodeToString(sum[:]), Size: fi.Size(), MTime: fi.ModTime().UnixNano()}
 	}
 	// The copy is what gets installed: check it again, as the folder may
 	// have changed since the first check.
@@ -115,18 +127,31 @@ func (s *Store) Add(dir string) (*Report, error) {
 		return r, err
 	}
 	dst := filepath.Join(s.Base(), r.Name)
-	if _, err := os.Lstat(dst); err == nil {
-		old, err := os.MkdirTemp(s.Base(), ".old-*")
-		if err != nil {
-			return r, err
-		}
-		defer os.RemoveAll(old)
-		if err := os.Rename(dst, filepath.Join(old, r.Name)); err != nil {
-			return r, err
-		}
+	if _, err := os.Lstat(dst); err != nil {
+		return r, rename(tmp, dst)
 	}
-	return r, os.Rename(tmp, dst)
+	old, err := os.MkdirTemp(s.Base(), ".old-*")
+	if err != nil {
+		return r, err
+	}
+	moved := filepath.Join(old, r.Name)
+	if err := os.Rename(dst, moved); err != nil {
+		os.Remove(old)
+		return r, err
+	}
+	if err := rename(tmp, dst); err != nil {
+		// put the old set back rather than leave none
+		if back := os.Rename(moved, dst); back != nil {
+			return r, fmt.Errorf("%w; the old set is kept in %s (%v)", err, moved, back)
+		}
+		os.Remove(old)
+		return r, err
+	}
+	return r, os.RemoveAll(old)
 }
+
+// rename is os.Rename; a test makes the install's last step fail.
+var rename = os.Rename
 
 // Remove removes the installed set name: <Base>/<name>, by exact path.
 func (s *Store) Remove(name string) error {
@@ -223,15 +248,27 @@ func (s *Store) installed(name string) Entry {
 	if err := json.Unmarshal(raw, &idx); err != nil {
 		return broken("index.json: " + err.Error())
 	}
-	for rel, sum := range idx.Files {
-		data, err := safefile.Read(filepath.Join(dir, filepath.FromSlash(rel)), MaxFileSize)
-		if err != nil {
+	// A stat per file, not a hash of the whole set: the dashboard asks for
+	// this on every office page it opens. set.toml alone is read.
+	for rel, f := range idx.Files {
+		path := filepath.Join(dir, filepath.FromSlash(rel))
+		fi, err := os.Lstat(path)
+		switch {
+		case err != nil:
 			return broken(rel + ": " + err.Error())
-		}
-		if got := sha256.Sum256(data); hex.EncodeToString(got[:]) != sum {
+		case !fi.Mode().IsRegular():
+			return broken(rel + ": not a regular file")
+		case fi.Size() != f.Size || fi.ModTime().UnixNano() != f.MTime:
 			return broken(rel + ": changed since it was added")
 		}
 		if rel == "set.toml" {
+			data, err := safefile.Read(path, MaxFileSize)
+			if err != nil {
+				return broken("set.toml: " + err.Error())
+			}
+			if got := sha256.Sum256(data); hex.EncodeToString(got[:]) != f.SHA256 {
+				return broken("set.toml: changed since it was added")
+			}
 			if err := e.fill(data); err != nil {
 				return broken("set.toml: " + err.Error())
 			}
@@ -241,7 +278,7 @@ func (s *Store) installed(name string) Entry {
 		return broken("index.json lists no set.toml")
 	}
 	for _, p := range idx.Pieces {
-		if _, ok := s.List.Pieces[p]; ok && idx.Files[p+".gltf"] != "" {
+		if _, ok := s.List.Pieces[p]; ok && idx.Files[p+".gltf"].SHA256 != "" {
 			e.Have = append(e.Have, p)
 		}
 	}

@@ -45,10 +45,10 @@
 **Interfaces:**
 - Produces: the layout every later task uses. Go handler names keep their `cyber*` identifiers only where renaming would churn; the template is `office`.
 
-- [ ] **Step 1:** `git mv` the files above; fix every reference found by `grep -rn "static/cyberpunk\|office/models\|office/kit.js\|cyberpunk.tmpl\|view=cyberpunk\|\"cyberpunk\"" internal tools docs AGENTS.md` (the set name `cyberpunk` in the route `/virtual-office/cyberpunk` stays).
-- [ ] **Step 2:** `make check` → passes (existing `TestCyber*`/office page tests and `noCSPViolation` cover the page).
-- [ ] **Step 3:** Manual: open `/p/<prefix>/virtual-office/cyberpunk` on the manual server; the lobby and a floor load with no console errors and look as before.
-- [ ] **Step 4: Commit** `Virtual Office: files under static/office/, the models as the cyberpunk set (D153)`
+- [x] **Step 1:** `git mv` the files above; fix every reference found by `grep -rn "static/cyberpunk\|office/models\|office/kit.js\|cyberpunk.tmpl\|view=cyberpunk\|\"cyberpunk\"" internal tools docs AGENTS.md` (the set name `cyberpunk` in the route `/virtual-office/cyberpunk` stays).
+- [x] **Step 2:** `make check` → passes (existing `TestCyber*`/office page tests and `noCSPViolation` cover the page).
+- [x] **Step 3:** Manual: open `/p/<prefix>/virtual-office/cyberpunk` on the manual server; the lobby and a floor load with no console errors and look as before.
+- [x] **Step 4: Commit** `Virtual Office: files under static/office/, the models as the cyberpunk set (D153)`
 
 ### Task 2: `pieces.json`, points and `set.toml` (done: Blender-free generator)
 
@@ -74,16 +74,16 @@
 - `func Check(dir string, list *Pieces) (*Report, error)` reads the folder from disk as hostile (`os.Lstat` each entry; no `safefile.TreeCopy` needed). Error only for an unreadable dir; every problem is in the report.
 - `var ReservedNames = []string{"issues", "prs", "notes", "whiteboard"}`; `func ValidName(s string) error`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
   - `TestBoundsTransforms`: hand-written glTF JSON with a root node `rotation` (−90° about X), `scale` 2, a nested child `translation`, two meshes; expect exact min/max.
   - `TestCheck` table: ok piece; 3 cm too wide → `refused` with reason `Furn_Desk: x -1.03..1.00, y 0.00..0.75, z -0.40..0.40 m; the list says x -1.00..1.00, y 0.00..0.75, z -0.40..0.40 (±0.02)`; the origin moved 10 cm (same size) → refused; unknown `.gltf` name → refused; piece not present → `missing`; folder refusals each give an error and `!OK()`: symlinked file, the folder itself a symlink, `../x.bin` URI, `/abs.bin`, `data:` URI, `http://` URI, a 17 MiB file, a stray `notes.txt`, 1,001 files (sparse/empty files are fine).
   - `TestParseSet`: unknown key refused; `#abc` refused; `bloom = 4` refused; `schema = 2` refused as newer; name `notes` refused; valid file parses.
   - `TestCheckDirForms`: same report for `dir`, `dir/`, and a relative path.
   - `TestCyberpunkMatchesPieces` (`pieces_test.go`): `Check` on the real folder `../web/static/office/sets/cyberpunk` (tests run in the package dir) → every piece `ok`, no `missing`, every glTF has a list entry. Built-ins at runtime are copied nowhere: `Store` checks them from `web.StaticFS()` by writing nothing and reading through `fs.FS` only for `Ls`'s counts, never `Check`.
-- [ ] **Step 2:** `go test ./internal/office/` → FAIL (undefined).
-- [ ] **Step 3:** Implement. Reason numbers: `%.2f`. A glTF that doesn't parse, has no mesh, or an accessor without `min`/`max` → refused with that reason. Referenced files = `buffers[].uri` and `images[].uri`, URL-unescaped, `path.Clean`, must not start with `..` or `/`.
-- [ ] **Step 4:** `go test ./internal/office/` → PASS; `make check` → passes.
-- [ ] **Step 5: Commit** `office: the piece list, glTF bounds and set checks (D153)`
+- [x] **Step 2:** `go test ./internal/office/` → FAIL (undefined).
+- [x] **Step 3:** Implement. Reason numbers: `%.2f`. A glTF that doesn't parse, has no mesh, or an accessor without `min`/`max` → refused with that reason. Referenced files = `buffers[].uri` and `images[].uri`, URL-unescaped, `path.Clean`, must not start with `..` or `/`.
+- [x] **Step 4:** `go test ./internal/office/` → PASS; `make check` → passes.
+- [x] **Step 5: Commit** `office: the piece list, glTF bounds and set checks (D153)`
 
 ### Task 4: The store and `railswitch office set check|add|ls|use|rm`
 
@@ -97,16 +97,16 @@
 - `func (s *Store) Add(dir string) (*Report, error)`; `func (s *Store) Ls(active string) ([]Entry, error)`; `func (s *Store) Remove(name string) error`; `func (s *Store) Get(name string) (*Entry, error)`.
 - CLI JSON: `office set check` → `Report`; `office set ls` → `{active, sets[]}`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
   - `TestAddReplaceAtomic`: add set `cabin` v1, then v2; after the second add only v2's files exist, no temp dirs remain under `<data>/office/`, `index.json` lists every file with its sha256.
   - `TestAddRefuses`: a refused check adds nothing; name `cyberpunk` refused.
   - `TestLsStatus`: built-in `cyberpunk` `ok`; installed set with `pieces = 0` → `stale`; after editing one installed file → `broken`; after `rm -r` by hand → not listed.
   - `TestDashconfOfficeRoundTrip`: `Set("light", …)` then `Save`, set `Office.Set = "cabin"`, `Save`, `Load` → both kept; a file without `[office]` loads with `Set == ""`.
   - CLI `TestOfficeSet`: `check` exit 0/1 and JSON fields; `use unknown` exit 1; `use` a stale set exit 1; `rm cyberpunk` exit 1; `rm` the active set clears `[office] set`; `ls --json` `active` defaults to `cyberpunk`.
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Implement. `Add`: `Check`; copy files into `os.MkdirTemp(<data>/office, ".add-*")`, write `index.json`, `os.Rename` the old dir to `.old-*`, rename temp to `<name>`, remove `.old-*` by exact path. Dirs 0700, files 0600. `Ls` verifies hashes of installed sets.
-- [ ] **Step 4:** Run → PASS; `make check`.
-- [ ] **Step 5:** Docs: `docs/json.md` (`office set check`, `office set ls`), `docs/completion.md`. Commit `office set check|add|ls|use|rm (D153)`.
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Implement. `Add`: `Check`; copy files into `os.MkdirTemp(<data>/office, ".add-*")`, write `index.json`, `os.Rename` the old dir to `.old-*`, rename temp to `<name>`, remove `.old-*` by exact path. Dirs 0700, files 0600. `Ls` verifies hashes of installed sets.
+- [x] **Step 4:** Run → PASS; `make check`.
+- [x] **Step 5:** Docs: `docs/json.md` (`office set check`, `office set ls`), `docs/completion.md`. Commit `office set check|add|ls|use|rm (D153)`.
 
 ### Task 5: The dashboard: set.json, installed files, routes, the Machine picker
 
@@ -119,14 +119,14 @@
 - `GET /p/{prefix}/virtual-office/{set}`: the page when `{set}` is built in or installed (else 404); the bare path redirects to the active set. Keep the fixed API routes.
 - `POST /machine/office/use` (form `name`, `ValidName`) → job `office set use <name>`, back to `/machine`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
   - `TestOfficeSetJSON`: active `cabin` installed → base `/office/sets/cabin/`; active set missing from `ls` → `cyberpunk` with `fallback`.
   - `TestOfficeSetFiles`: indexed file 200 with its bytes; unindexed 404; `..` 404; a symlink in place of an indexed file 404.
   - `TestOfficeRoutes`: `/virtual-office/cyberpunk` 200, `/virtual-office/cabin` 200 when installed, `/virtual-office/nope` 404, `/virtual-office` → 302 to the active set; `/virtual-office/notes` still the notes API.
   - `TestReservedSetNamesMatchRoutes`: the fixed paths registered under `/p/{prefix}/virtual-office/` (walk `server.go`'s route list, or a shared slice used to register them) equal `office.ReservedNames`.
   - `TestMachineOfficePicker`: machine page lists the sets and posts to `/machine/office/use`; a bad name is 400.
-- [ ] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS; `make check`.
-- [ ] **Step 5:** `docs/dashboard.md`: the Virtual Office section, the set picker, the routes. Commit `Dashboard: the active office set, installed sets' files, the Machine picker (D153)`.
+- [x] **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run → PASS; `make check`.
+- [x] **Step 5:** `docs/dashboard.md`: the Virtual Office section, the set picker, the routes. Commit `Dashboard: the active office set, installed sets' files, the Machine picker (D153)`.
 
 ### Task 6: The page reads the set
 
@@ -140,14 +140,14 @@
 - A model that fails to load → its box + `console.error`.
 - `set.look` drives `film.js` (background, fog colour/density, hemi colour, hemi levels × `ambient_intensity`, city light colour/intensity) and `world.js` (bloom strength; CRT effect on/off).
 
-- [ ] **Step 1:** `office.js` fetches `/office/set.json` and `/static/office/kit/pieces.json` before the first room; shows `fallback` as `.hud-banner`.
-- [ ] **Step 2:** Replace every point literal from Task 2 in `rooms.js` with `k.point(...)`; tooltips of missing pieces say `missing in <set>`.
-- [ ] **Step 3:** `make check` (CSP test, no inline style). Manual: cyberpunk looks as before (screenshots before/after, lobby and a floor); install a test set with three pieces copied from cyberpunk and another `[look]` → the rest are boxes, colours change; delete one of its glTFs by hand → `broken`, banner shown.
-- [ ] **Step 4: Commit** `Virtual Office: the page draws the active set, boxes for missing pieces (D153)`
+- [x] **Step 1:** `office.js` fetches `/office/set.json` and `/static/office/kit/pieces.json` before the first room; shows `fallback` as `.hud-banner`.
+- [x] **Step 2:** Replace every point literal from Task 2 in `rooms.js` with `k.point(...)`; tooltips of missing pieces say `missing in <set>`.
+- [x] **Step 3:** `make check` (CSP test, no inline style). Manual: cyberpunk looks as before (screenshots before/after, lobby and a floor); install a test set with three pieces copied from cyberpunk and another `[look]` → the rest are boxes, colours change; delete one of its glTFs by hand → `broken`, banner shown.
+- [x] **Step 4: Commit** `Virtual Office: the page draws the active set, boxes for missing pieces (D153)`
 
 ### Task 7: Docs and the roadmap row
 
 **Files:** `docs/office-kit.md` (sets, `pieces.json`, `set.toml`, building a set with `stub_set.py` and `office set check`), `docs/guide/` if it mentions the office, `AGENTS.md` (package map: `internal/office`, the `static/office/` layout; the Security rule's exception for installed sets' files), roadmap `| D153 |` row.
 
-- [ ] **Step 1:** Write them; the D153 row gives the reason for each decision in the spec, including the exception to "reads only through `railswitch --json`".
-- [ ] **Step 2:** `make check`; commit `docs: Virtual Office sets (D153)`; push and open the PR.
+- [x] **Step 1:** Write them; the D153 row gives the reason for each decision in the spec, including the exception to "reads only through `railswitch --json`".
+- [x] **Step 2:** `make check`; commit `docs: Virtual Office sets (D153)`; push and open the PR.

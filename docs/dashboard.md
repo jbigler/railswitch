@@ -1050,8 +1050,9 @@ page picks the active one (an `office set use` job; `dashboard.toml`
   place the dashboard reads files itself rather than through
   `railswitch --json`: `<data>/office/` is written only by
   `office set add` after its checks, no container mounts it, and a CLI
-  run per file would be hundreds per page. Hashes are checked by
-  `office set ls`, not per request.
+  run per file would be hundreds per page. Files are checked by
+  `office set ls` (size and modification time against `index.json`),
+  not per request.
 - A piece the set lacks is a light grey box of the piece's size where the
   piece would stand; its tooltip says "missing in <set>".
 

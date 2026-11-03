@@ -110,7 +110,7 @@ func (s *Server) officeSetFile(w http.ResponseWriter, r *http.Request) {
 	dir := filepath.Join(s.c.Data, "office", name)
 	raw, err := safefile.Read(filepath.Join(dir, "index.json"), 1<<20)
 	var idx office.Index
-	if err != nil || json.Unmarshal(raw, &idx) != nil || idx.Files[rel] == "" || rel == "index.json" || path.Clean(rel) != rel || strings.HasPrefix(rel, "../") {
+	if err != nil || json.Unmarshal(raw, &idx) != nil || idx.Files[rel].SHA256 == "" || rel == "index.json" || path.Clean(rel) != rel || strings.HasPrefix(rel, "../") {
 		http.NotFound(w, r)
 		return
 	}

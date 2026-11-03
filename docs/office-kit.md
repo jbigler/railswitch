@@ -271,7 +271,8 @@ else one box of the piece's size where the built-in piece has some.
 `max`) and an empty per point; model inside the boxes, keep each origin
 where the box puts it, and export each piece as **glTF Separate**
 (`.gltf` + `.bin` + textures; embedded `data:` URIs are refused: the
-page's CSP blocks fetching them). Then `railswitch office set check
+page's CSP blocks fetching them), without compression (Draco, Meshopt
+and KTX2 are refused: the page has no decoder for them). Then `railswitch office set check
 cabin/` reports each piece: `ok`, `missing` (it will be a grey box) or
 `refused` with its box against the list's (±2 cm on every face). It also
 refuses symlinks, special files, more than 1,000 files, a file over

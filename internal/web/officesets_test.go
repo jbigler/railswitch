@@ -57,7 +57,7 @@ func TestOfficeSetFiles(t *testing.T) {
 	dir := filepath.Join(f.s.c.Data, "office", "cabin")
 	os.MkdirAll(dir, 0o700)
 	for name, c := range map[string]string{"Furn_Desk.gltf": `{"x":1}`, "Furn_Desk.bin": "bin", "extra.bin": "not indexed",
-		"index.json": `{"files": {"Furn_Desk.gltf": "aa", "Furn_Desk.bin": "bb", "Deco_Mug.bin": "cc"}, "pieces": ["Furn_Desk"]}`} {
+		"index.json": `{"files": {"Furn_Desk.gltf": {"sha256": "aa"}, "Furn_Desk.bin": {"sha256": "bb"}, "Deco_Mug.bin": {"sha256": "cc"}}, "pieces": ["Furn_Desk"]}`} {
 		os.WriteFile(filepath.Join(dir, name), []byte(c), 0o600)
 	}
 	os.Symlink("/etc/hostname", filepath.Join(dir, "Deco_Mug.bin"))

@@ -12,8 +12,9 @@ import (
 var isCol = regexp.MustCompile(`_COL\d*$`)
 
 type gltfDoc struct {
-	Scene  *int `json:"scene"`
-	Scenes []struct {
+	ExtensionsRequired []string `json:"extensionsRequired"`
+	Scene              *int     `json:"scene"`
+	Scenes             []struct {
 		Nodes []int `json:"nodes"`
 	} `json:"scenes"`
 	Nodes []struct {

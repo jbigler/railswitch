@@ -34,8 +34,9 @@ Decisions taken with the user:
 
 - `internal/web/static/office/`: the Virtual Office view (today's
   `static/cyberpunk/`: `office.js` (was `cyberpunk.js`), `world.js`,
-  `rooms.js`, `film.js`, `actors.js`, `work.js`, `office.css`, `three.js`
-  and its licence and `vendor.sh`).
+  `rooms.js`, `film.js`, `city.js`, `actors.js`, `work.js`,
+  `whiteboard.js`, `office.css`, `three.js` and its licence and
+  `vendor.sh`).
 - `internal/web/static/office/kit/`: `kit.js` (was `static/office/kit.js`)
   and `pieces.json`.
 - `internal/web/static/office/sets/cyberpunk/`: `set.toml` and every model
@@ -46,7 +47,7 @@ Decisions taken with the user:
   `cyberpunk`, its API under `/p/{prefix}/virtual-office/`); `<set>` now
   names any set, built in or installed, and the bare path redirects to
   the active one. SSE `view=cyberpunk` → `view=office`, page title
-  "Virtual Office", header button "Virtual Office".
+  "Virtual Office" (the header button already says so).
 - New: `internal/office` (Go): the piece list, glTF bounds, set checks,
   the install store. `internal/cli/office.go`: the commands.
 - "cyberpunk" remains only as the built-in set's name and description.
@@ -86,6 +87,9 @@ Decisions taken with the user:
 
 `version` changes only when the list changes in a way that breaks sets
 (a piece's size, anchor or points); adding a piece doesn't change it.
+`build_all.py` bumps it itself: it compares the list it builds with the
+checked-in `pieces.json` and adds one when any piece's size, anchor or
+points differ, so remodelling a cyberpunk piece marks older sets stale.
 
 A set's piece must match `size` within ±0.02 m per axis and have its
 origin at `anchor` (the box's extent from the origin within ±0.02 m of the
@@ -104,14 +108,12 @@ A folder:
 
 ```toml
 schema = 1
-name = "cabin"          # [a-z][a-z0-9-]{0,30}
+name = "cabin"          # [a-z][a-z0-9-]{0,30}, not a reserved word
 version = 3             # the set's own version
 pieces = 1              # the pieces.json version it was built for
 description = "Pine, wool and lamplight"
 
 [look]                  # each key optional: the cyberpunk value otherwise
-accent = "#e8a04a"
-secondary = "#7aa36b"
 background = "#1b1612"
 fog = "#1b1612"
 fog_density = 0.02      # 0: no fog
@@ -125,11 +127,18 @@ scanlines = false
 
 `set.toml` is strict (unknown keys refused), colours `#rrggbb`, numbers in
 documented ranges (intensities 0..10, fog_density 0..1, bloom 0..3).
-`cyberpunk`'s `set.toml` holds today's values exactly.
+`cyberpunk`'s `set.toml` holds today's values exactly. The neon colours
+are not part of the look: each floor keeps its own, from the worktree's
+name (`decor(slug)` in `rooms.js`), and a set takes them by naming its
+materials `RS_Neon_Accent` and `RS_Neon_Secondary` (see The page).
 
-Built-in sets: each folder under `static/office/sets/`; their names are
-reserved. Installed sets: `<data>/office/<name>/` (the data dir is
-`~/.local/share/railswitch/`), written only by `office set add`.
+Set names share `/p/{prefix}/virtual-office/<set>` with the office's
+API, whose fixed paths win over `<set>`: `issues`, `prs`, `notes` and
+`whiteboard` are refused as set names (one list beside the routes, which
+a test keeps equal to them). Built-in sets: each folder under
+`static/office/sets/`; their names are reserved too. Installed sets:
+`<data>/office/<name>/` (the data dir is `~/.local/share/railswitch/`),
+written only by `office set add`.
 
 ## Commands
 
@@ -138,8 +147,9 @@ reserved. Installed sets: `<data>/office/<name>/` (the data dir is
   symlinks (the folder included), non-regular files, more than 1,000
   files, a file over 16 MiB, more than 256 MiB in all, a file that is
   neither `set.toml` nor a `.gltf` named after a piece nor referenced by
-  one of those glTFs, a glTF URI that is absolute, has a scheme other than
-  `data:`, or leaves the folder. Per piece: `ok`, `missing`, or `refused`
+  one of those glTFs, a glTF URI that is absolute, has a scheme (`data:`
+  included: three.js fetches those, and the page's CSP allows `fetch`
+  only from `'self'`; export as "glTF Separate"), or leaves the folder. Per piece: `ok`, `missing`, or `refused`
   with a reason naming the numbers (`Furn_Desk: 1.62 × 0.76 × 0.80 m, the
   list says 1.60 × 0.75 × 0.80 (±0.02)`); a `.gltf` whose name isn't in
   the list is refused; a glTF that doesn't parse, has no mesh, or an
@@ -176,9 +186,18 @@ synopsis.
   to `cyberpunk` with `fallback: "<reason>"`, which the page shows as a
   banner.
 - `GET /office/sets/{name}/{path...}`: an installed set's file, only when
-  `{path}` is in its `index.json`, and only when the file's sha256 still
-  matches (else 404). Read with `safefile`-like rules: regular file,
-  no symlink, under the set's directory. Cookie and Host as every request.
+  `{path}` is in its `index.json` (else 404), read with `safefile`-like
+  rules: regular file, no symlink, under the set's directory. Cookie and
+  Host as every request. No hash per request: a set is up to 256 MiB, and
+  only the host user, who can edit `index.json` too, writes the folder;
+  `office set ls` checks the hashes and reports `broken`.
+- This is an exception to "the dashboard reads only through `railswitch
+  --json`, never a package's files" (AGENTS.md), and AGENTS.md and the
+  D153 row say so: `<data>/office/` is host-only (no container mounts
+  it), only `office set add` writes it after its checks, and the
+  dashboard serves only the files its `index.json` lists, as bytes,
+  without parsing them. The alternative, a `railswitch` call per file,
+  is hundreds of processes per page load.
 - Machine page: an "Office set" row: the sets from `office set ls`, a
   select, applied by a `office set use` job.
 - The worktree page header and the project page link "Virtual Office"
@@ -233,12 +252,13 @@ With `cyberpunk` the office must look as it does today.
 Unit (no podman, network or browser):
 
 - `internal/office`: glTF bounds on hand-written glTFs (node rotation,
-  scale, nested nodes, several meshes, an offset origin, a `data:` buffer
-  URI); folder refusals (symlink, `..` URI, absolute URI, oversize file,
+  scale, nested nodes, several meshes, an offset origin); folder refusals (symlink, `..` URI, absolute URI, `data:` URI, oversize file,
   stray file, too many files); per-piece results (ok, off by 3 cm, wrong
   anchor, unknown name, missing); `set.toml` strictness and ranges.
 - `pieces.json` against the `cyberpunk` set: every piece's bounds and
   anchor match, every model has an entry (the generator can't drift).
+- The reserved set names equal the fixed paths under
+  `/p/{prefix}/virtual-office/`.
 - CLI: `check` exit codes and JSON; `add` (new, replace, built-in name
   refused); `ls` (built-in, installed, stale, broken after a file edit);
   `use` (unknown, stale refused); `rm` (built-in refused, active cleared).
@@ -261,7 +281,7 @@ look; the Machine page picker.
 - `docs/json.md`: `office set check`, `office set ls`.
 - `docs/completion.md` if completions list commands.
 - `AGENTS.md`: the package map (`internal/office`, `static/office/`
-  layout).
+  layout) and the Security rule's exception for installed sets' files.
 
 ## Out of scope
 

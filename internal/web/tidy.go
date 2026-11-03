@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,7 @@ type tidyView struct {
 type tidyRow struct {
 	tidyItem
 	Why, Size, Idle string
+	Ticked          bool // ticked for you: clean, and its PR is done or it's an unused image (idle alone is a guess)
 }
 
 // tidyIDRe is an id tidy prints: wt:<prefix>/<slug> or image:<a name
@@ -96,6 +98,7 @@ func (s *Server) tidyPage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		row := tidyRow{tidyItem: it, Why: strings.Join(why, " · "), Size: humanSize(it.Bytes)}
+		row.Ticked = !it.Dirty && slices.ContainsFunc(it.Reasons, func(r string) bool { return r != "stopped" })
 		if it.Partial {
 			row.Size = "≥ " + row.Size
 		}

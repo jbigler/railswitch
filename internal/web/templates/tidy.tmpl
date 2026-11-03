@@ -7,7 +7,7 @@
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Tidy</h1>
-<p class="note">What could go: worktrees whose PR is merged or closed, or whose stack has been stopped over {{.Days}} days, and images no stack uses. Each is checked again when it is removed. A dirty worktree (uncommitted changes) is never ticked for you.</p>
+<p class="note">What could go: worktrees whose PR is merged or closed, or whose stack has been stopped over {{.Days}} days, and images no stack uses. Each is checked again when it is removed. Only a clean worktree whose PR is done, and an unused image, start ticked; one that is only idle, or dirty (uncommitted changes), you tick yourself.</p>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{if .Warnings}}<div class="warnings">{{range .Warnings}}<p class="yellow">{{.}}</p>
 {{end}}</div>
@@ -17,7 +17,7 @@
 <table class="set-table">
 <thead><tr><th></th><th>Item</th><th>Why</th><th>Size</th><th></th></tr></thead>
 <tbody>
-{{range .Items}}<tr><td><input type="checkbox" name="{{if .Dirty}}dirty{{else}}id{{end}}" value="{{.ID}}"{{if not .Dirty}} checked{{end}} aria-label="Remove {{.Name}}"></td><td class="mono">{{if eq .Kind "worktree"}}{{.Name}}{{if .Branch}} <span class="muted">{{.Branch}}</span>{{end}}{{else}}{{.Name}}{{end}}</td><td>{{.Why}}{{if .Idle}} <span class="muted">{{.Idle}}</span>{{end}}</td><td class="mono">{{.Size}}</td><td>{{if .Dirty}}<span class="chip yellow" title="Uncommitted changes or untracked files">dirty</span>{{end}}</td></tr>
+{{range .Items}}<tr><td><input type="checkbox" name="{{if .Dirty}}dirty{{else}}id{{end}}" value="{{.ID}}"{{if .Ticked}} checked{{end}} aria-label="Remove {{.Name}}"></td><td class="mono">{{if eq .Kind "worktree"}}{{.Name}}{{if .Branch}} <span class="muted">{{.Branch}}</span>{{end}}{{else}}{{.Name}}{{end}}</td><td>{{.Why}}{{if .Idle}} <span class="muted">{{.Idle}}</span>{{end}}</td><td class="mono">{{.Size}}</td><td>{{if .Dirty}}<span class="chip yellow" title="Uncommitted changes or untracked files">dirty</span>{{end}}</td></tr>
 {{else}}<tr><td colspan="5" class="muted">Nothing to tidy.</td></tr>
 {{end}}</tbody>
 </table>

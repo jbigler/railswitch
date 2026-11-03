@@ -384,8 +384,10 @@ total. A worktree's size is its checkout's (a walk that stops after
 200,000 entries shows "≥"); an image's is podman's, shared layers
 included.
 
-- Every clean item is ticked; a **dirty** worktree (uncommitted changes
-  or untracked files) never is.
+- A clean worktree whose PR is merged or closed, and an unused image,
+  start ticked; a worktree that is only idle (the idle time can come from
+  its last commit, a guess) and a **dirty** worktree (uncommitted changes
+  or untracked files) you tick yourself.
 - **Remove selected** runs one project-level job, `railswitch tidy --rm
   <id>...`, which reads the list again and removes only what is still on
   it: a worktree by `wt rm`'s path, an image by `podman rmi <name>`.

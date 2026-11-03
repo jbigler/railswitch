@@ -177,16 +177,24 @@ or `project.toml`:
 [agents.claude]
 use = "claude@1"
 setup = [
-  "gh extension install github/gh-stack",
-  "gh skill install github/gh-stack --scope user",
+  "gh extension install github/gh-stack --force",
+  "gh skill install github/gh-stack --all --scope user --agent claude-code --force",
 ]
 ```
 
-The commands run in the agent's container, one per line in its own shell
-(no input: one that would prompt fails), before it first starts in a
-worktree, and again whenever you change the list. A failing one stops the
-rest and is reported, the agent starts anyway, and the next start tries
-them again. An agent package needs an entrypoint for this. Agents are
+The commands run in the agent's container, one per line in its own shell,
+before it first starts in a worktree, and again whenever you change one.
+Each runs once: a command that succeeded doesn't run again at the next
+start, and the first one to fail stops the rest and is reported in the
+agent's session with its exit status; the agent starts anyway, and the
+next start goes on from the command that failed. A changed command runs
+again, so make commands safe to run twice where you can (`--force` above).
+
+They run with no terminal, so nothing can prompt; pass the flags that
+answer instead. For `gh skill install` that means a skill name or
+`--all` (without either it only lists the repository's skills) and
+`--agent claude-code` (without a terminal it installs for GitHub
+Copilot). An agent package needs an entrypoint for this. Agents are
 yours: templates leave them out.
 
 ## Claude's instructions

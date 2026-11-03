@@ -66,9 +66,9 @@
 {{end}}</section>
 {{with .AgentSetups}}<section class="card" id="agent-setup">
 <h2>Agent setup</h2>
-<p class="note">Commands run in an agent's own container and home, one per line, before it first starts in a worktree, and again when you change them: tools its home keeps, like gh extensions and agent skills. A failing command is reported and the agent starts anyway; the next start tries again. Agents are yours: templates leave them out.</p>
+<p class="note">Commands run in an agent's own container and home, one per line, before it first starts in a worktree, and again when you change them: tools its home keeps, like gh extensions and agent skills. A failing command is reported and the agent starts anyway; the next start goes on from it (the ones before don't run again). Commands run without a terminal: pass the flags that answer their questions (gh skill install: a skill or --all, and --agent). Agents are yours: templates leave them out.</p>
 {{range .}}<label class="field agent-setup" data-agent="{{.Name}}" data-orig="{{.Text}}"><span class="mono">{{.Name}}</span>
-<textarea class="mono agent-setup-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="gh extension install github/gh-stack&#10;gh skill install github/gh-stack --scope user">{{.Text}}</textarea></label>
+<textarea class="mono agent-setup-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="gh extension install github/gh-stack --force&#10;gh skill install github/gh-stack --all --scope user --agent &lt;your agent&gt; --force">{{.Text}}</textarea></label>
 {{end}}</section>
 {{end}}
 <section class="card">

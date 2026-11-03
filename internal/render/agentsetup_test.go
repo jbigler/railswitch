@@ -12,7 +12,8 @@ import (
 )
 
 // TestAgentSetup (D133): an agent's setup puts a script in front of its
-// entrypoint that runs the commands once per home (a marker per list),
+// entrypoint that runs the commands once per home (a marker per command
+// and per list),
 // then execs the package's entrypoint with whatever arguments it got.
 func TestAgentSetup(t *testing.T) {
 	cmds := []string{"gh extension install github/gh-stack", "gh skill install github/gh-stack --scope user"}
@@ -34,10 +35,10 @@ func TestAgentSetup(t *testing.T) {
 	}
 	for _, want := range []string{
 		`marker='/home/appuser'/.railswitch-setup-`,
-		"(cd '/app' && exec sh -ec 'gh extension install github/gh-stack')",
+		`done='/home/appuser'/.railswitch-setup.d`,
+		"if (cd '/app' && exec sh -ec 'gh extension install github/gh-stack') </dev/null; then",
 		"exec '/usr/local/bin/entrypoint-claude.sh' \"$@\"",
-		"failed; it runs again at the next start",
-		"</dev/null || return 1",
+		"failed; it runs again at the next start, from the command that failed",
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("script lacks %q:\n%s", want, script)
@@ -146,8 +147,23 @@ func TestAgentSetupScriptRuns(t *testing.T) {
 	if _, err := os.Stat(after); err == nil {
 		t.Error("a command after a failing one ran")
 	}
-	if markers() != 0 || !strings.Contains(errs, "failed; it runs again") || !strings.Contains(out, "entry a1 a 2") {
+	if markers() != 0 || !strings.Contains(errs, "setup probe: exit 1: false") || !strings.Contains(errs, "failed; it runs again") || !strings.Contains(out, "entry a1 a 2") {
 		t.Errorf("failure: markers %d\nout %q\nerr %q", markers(), out, errs)
+	}
+	// A run that failed goes on from the failing command: the ones before
+	// it, which may not run twice (gh extension install), don't run again.
+	once, flag := filepath.Join(dir, "once"), filepath.Join(dir, "flag")
+	resume := []string{"test ! -e " + once + " && touch " + once, "test -e " + flag}
+	if _, errs := run(resume); !strings.Contains(errs, "exit 1: test -e") {
+		t.Fatalf("first run: %q", errs)
+	}
+	writeExec(flag, "")
+	if out, errs := run(resume); strings.Contains(errs, "failed") || strings.Contains(out, "touch") || markers() != 1 {
+		t.Errorf("resume: markers %d\nout %q\nerr %q", markers(), out, errs)
+	}
+	os.RemoveAll(filepath.Join(home, ".railswitch-setup.d"))
+	for _, m := range must(filepath.Glob(filepath.Join(home, ".railswitch-setup-*"))) {
+		os.Remove(m)
 	}
 	count := filepath.Join(dir, "count")
 	ok := []string{"echo x >> " + count, "true"}
@@ -172,4 +188,11 @@ func TestAgentSetupNeedsEntrypoint(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "[agents.probe] setup: the agent's package has no entrypoint") {
 		t.Errorf("err = %v", err)
 	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }

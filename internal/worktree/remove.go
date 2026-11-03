@@ -15,7 +15,7 @@ import (
 // Remove tears down the worktree target names (see resolve) and removes
 // it: its tailnet share is turned off (Unshare), its units are stopped, its
 // containers, per-worktree volumes and dev network removed by exact name,
-// its env and agent status dirs, registry entry and checkout deleted, and the project
+// its env and agent status dirs, database snapshots (D157), registry entry and checkout deleted, and the project
 // re-rendered (D28). The base worktree is refused, and so is a dirty one
 // unless force. force also deletes the worktree's home dirs (homeDirs:
 // nvim's and its agents'), which are kept otherwise: they hold logins.
@@ -63,7 +63,7 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 	} else {
 		fmt.Fprintf(m.Out, "worktree %s is not registered: no containers to remove\n", w.Slug)
 	}
-	for _, d := range []string{"env", "status", "restore-pending", "create-pending", "whiteboard"} { // whiteboard: D151
+	for _, d := range []string{"env", "status", "restore-pending", "create-pending", "whiteboard", "snapshots"} { // whiteboard: D151, snapshots: D157
 		if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, w.Slug)); err != nil {
 			return err
 		}

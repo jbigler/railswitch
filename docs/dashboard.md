@@ -789,6 +789,14 @@ Every action is a job (below).
   while this worktree's home waits for it (`agent ls`'s
   `default_pending`) the dialog says "Pending: … takes the default at its
   next start", adding "stop it, then start it again" while it runs.
+- **snapshots…** (the detail's Database area, shown when the worktree has
+  a data service; D157) opens a dialog that reads `railswitch --json db
+  snapshot ls`: each snapshot with when it was taken and its size,
+  **restore** (asks first: what the databases and storage hold now is
+  lost; `db snapshot restore --yes <name>`) and **delete** (asks first;
+  `db snapshot rm <name>`), and **Take a snapshot** with an optional name
+  (`db snapshot [<name>]`, a timestamp by default). The dashboard restores
+  or deletes only a name the list it read holds.
 - **open window ↗** (at the end of the Terminal row) runs `railswitch
   term`: a new terminal tab or window on the host with your shell in the
   worktree's folder.
@@ -1177,6 +1185,9 @@ docs/json.md.
   known terminal installed.
 - `railswitch wt add [--name <n>] [--up] <branch>`: `--up` runs `up` in the
   new worktree.
+- `railswitch [--json] db snapshot ls` (worktree), `db snapshot
+  [<name>]`, `db snapshot restore --yes <name>` and `db snapshot rm
+  <name>`: the snapshots dialog (D157).
 - `railswitch [--json] pack ls`: the built-in packs, options (with slot
   and `works_with`) and agent packages, for the new page.
 - `railswitch [--json] -w <slug> containerfile list`, `--json containerfile

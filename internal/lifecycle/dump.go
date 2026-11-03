@@ -31,6 +31,13 @@ const dumpTimeout = 30 * time.Minute
 // old one, so a failure leaves the old file as it was. It prints and
 // returns the written paths.
 func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
+	return l.dumpTo(ctx, slug, "", "")
+}
+
+// dumpTo is DBDump into dir ("": <workspace>/db-dumps/), each file printed
+// as in shown: a snapshot (D157) dumps into a temp dir it renames to shown,
+// its files 0600 in the 0700 dir its caller made.
+func (l *L) dumpTo(ctx context.Context, slug, dir, shown string) ([]string, error) {
 	m, in, err := l.load(ctx, slug)
 	if err != nil {
 		return nil, err
@@ -52,25 +59,28 @@ func (l *L) DBDump(ctx context.Context, slug string) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("%s is not running: railswitch up", ctr)
 	}
-	dir := in.Values["dumps"]
-	// 0755 dir and 0644 files: the database container restores the dumps
-	// at initdb as the image's own non-root user (no keep-id), to which the
-	// user's files appear as another owner's. Dumps hold dev data and the
-	// workspace dir is the user's own.
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(dir, 0o755); err != nil {
-		return nil, err
+	mode := os.FileMode(0o600)
+	if dir == "" {
+		dir, shown, mode = in.Values["dumps"], in.Values["dumps"], 0o644
+		// 0755 dir and 0644 files: the database container restores the dumps
+		// at initdb as the image's own non-root user (no keep-id), to which the
+		// user's files appear as another owner's. Dumps hold dev data and the
+		// workspace dir is the user's own.
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		if err := os.Chmod(dir, 0o755); err != nil {
+			return nil, err
+		}
 	}
 	var paths []string
 	write := func(name string, gz bool, c sys.Cmd) error {
 		path := filepath.Join(dir, name)
-		n, err := writeStream(ctx, l.R, path, gz, c)
+		n, err := writeStream(ctx, l.R, path, gz, mode, c)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(l.Out, "wrote %s (%d bytes)\n", path, n)
+		fmt.Fprintf(l.Out, "wrote %s (%d bytes)\n", filepath.Join(shown, name), n)
 		paths = append(paths, path)
 		return nil
 	}
@@ -192,10 +202,10 @@ func dumpCommand(o *pack.Option, sc pack.Scope) ([]string, string, error) {
 	return argv, file, nil
 }
 
-// writeStream runs c with its stdout (gzipped when gz) going to a 0644 temp
-// file next to path, which it renames over path once c succeeded; on any
+// writeStream runs c with its stdout (gzipped when gz) going to a temp
+// file next to path, given mode once written,, which it renames over path once c succeeded; on any
 // failure the temp file is removed. It returns path's size.
-func writeStream(ctx context.Context, r sys.Runner, path string, gz bool, c sys.Cmd) (int64, error) {
+func writeStream(ctx context.Context, r sys.Runner, path string, gz bool, mode os.FileMode, c sys.Cmd) (int64, error) {
 	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return 0, err
@@ -220,7 +230,7 @@ func writeStream(ctx context.Context, r sys.Runner, path string, gz bool, c sys.
 		return f.Sync()
 	}()
 	if err == nil {
-		err = f.Chmod(0o644)
+		err = f.Chmod(mode)
 	}
 	err = errors.Join(err, f.Close())
 	if err == nil {

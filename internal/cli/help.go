@@ -46,6 +46,7 @@ var synopses = map[string]string{
 	"dashboard colors set":   "dashboard colors set [--dark] [--base <preset>] [<token>=#rrggbb...]",
 	"dashboard serve":        "dashboard serve",
 	"db restore":             "db restore [--from <dir>] [--yes] [<database>|<service>...]",
+	"db snapshot restore":    "db snapshot restore [--yes] <name>  (reset the worktree's data to it)",
 	"deps":                   "deps -- <command> [<args>...]",
 	"doctor":                 "doctor",
 	"down":                   "down [--yes]",

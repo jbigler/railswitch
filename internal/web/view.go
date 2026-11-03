@@ -626,6 +626,7 @@ type detailView struct {
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	PRPageURL                         string       // the worktree's PR page (D152)
 	AgentDefaultURL                   string       // the agent default config dialog (D135)
+	SnapshotsURL                      string       // the database snapshots dialog (D157); "" without a data service
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
 	Merged, Stale                     bool
@@ -721,6 +722,9 @@ func newDetail(prefix string, r row, repo string) detailView {
 	v.Terms = append(v.Terms, actionView{Label: "shell", URL: tty + "shell"})
 	if v.Stacked != nil && v.Stacked.Error == "" {
 		v.SwitchURL = path + "/stack/switch"
+	}
+	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Role == "data" }) {
+		v.SnapshotsURL = path + "/snapshots"
 	}
 	if !wt.Base {
 		v.RemoveURL = path + "/remove"

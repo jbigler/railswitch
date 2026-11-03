@@ -19,7 +19,7 @@
 {{else}}<div class="muted">none</div>
 {{end}}<div class="lbl">Terminal</div>
 <div class="actions">{{range .Terms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Label}}" title="A live terminal in this page">{{.Label}} ▣</button>{{end}}<span class="gap"></span><form method="post" action="{{.TermWindowURL}}" data-post><button class="ln quiet" title="Open a terminal window on this machine's desktop">open window ↗</button></form></div>
-{{end}}</section>{{end}}
+{{template "detail-database" .}}{{end}}</section>{{end}}
 
 {{/* The project's unset secrets: up refuses them. Each value goes only to
 a secret set job's stdin; Start waits for the last one. */}}

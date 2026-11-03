@@ -1083,6 +1083,26 @@ tasks are not listed: `project show` has them.
 | `source` | string | `pack` or `project`. |
 | `pack` | string | The pack's command for this name; absent when the pack has no such task. A `project` task with one overrides it, and `task rm` brings it back (D156). |
 
+## `db snapshot ls`
+
+The worktree's (`-w`) database snapshots (D157), newest first; none is
+`[]`. Each is a `db dump` kept by name in
+`<workspace>/.railswitch/snapshots/<worktree>/<name>/` (dir 0700, files
+0600). The text form is a table `NAME CREATED SIZE`.
+
+```json
+[
+  {"name": "before-migrate", "created": "2026-11-04T10:00:00+01:00", "bytes": 2500000, "files": ["app_dev.dump", "rustfs_data.tar.gz"]}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The snapshot's name: `db snapshot restore <name>`, `db snapshot rm <name>`. |
+| `created` | string | When it was taken (RFC 3339; its dir's modification time). |
+| `bytes` | number | The size of its files together. |
+| `files` | array | Its dumps and volume seeds, as `db dump` names them. |
+
 ## `settings preview`
 
 Reads an edit list on stdin (a JSON array; ops `pack` (`ref`: sets

@@ -90,6 +90,17 @@ storage service and everything that needs it (the app) for the time it
 takes; what was running is started again. Name the service to restore it
 alone (`db restore storage`), or databases to leave storage as it is.
 
+Snapshots are named dumps kept per worktree, for a branch with
+destructive migrations or an agent that experiments: `railswitch db
+snapshot [<name>]` dumps the databases and storage as `db dump` does, into
+`<workspace>/.railswitch/snapshots/<worktree>/<name>/` (only you can read
+it; no container mounts it), and `db snapshot restore <name>` resets the
+worktree to it as `db restore --from` that dir would. A database created
+since the snapshot is left as it is. `db snapshot ls` lists them with
+their sizes, `db snapshot rm <name>` deletes one, and `wt rm` deletes the
+worktree's; `down` keeps them. The new worktree's database still starts
+from `db-dumps/`, never from a snapshot.
+
 ## What stays on your machine
 
 The passwords and keys railswitch generates for a project's services (the

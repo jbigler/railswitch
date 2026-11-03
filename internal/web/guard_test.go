@@ -239,16 +239,17 @@ type fixture struct {
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	cli := &fakeCLI{out: map[string]string{
-		"--json project ls":                   projectLS,
-		"--json -C /ws/ftest overview":        ftestOverview("jb/b", "up", agentJSON("idle", "", false)),
-		"--json -C /ws/hello overview":        helloOverview("null"),
-		"--json -C /ws/ftest pr ls":           ftestPRs,
-		"--json -C /ws/hello pr ls":           `[{"slug":"master","branch":"master","pr":null}]`,
-		"--json -C /ws/ftest -w b task ls":    ftestTasks,
-		"--json -C /ws/ftest -w b agent ls":   ftestAgents,
-		"--json -C /ws/ftest -w main task ls": ftestTasks,
-		"--json -C /ws/ftest wt ls":           wtLS,
-		"--json dashboard colors":             colorsJSON,
+		"--json project ls":                       projectLS,
+		"--json -C /ws/ftest overview":            ftestOverview("jb/b", "up", agentJSON("idle", "", false)),
+		"--json -C /ws/hello overview":            helloOverview("null"),
+		"--json -C /ws/ftest pr ls":               ftestPRs,
+		"--json -C /ws/hello pr ls":               `[{"slug":"master","branch":"master","pr":null}]`,
+		"--json -C /ws/ftest -w b task ls":        ftestTasks,
+		"--json -C /ws/ftest -w b agent ls":       ftestAgents,
+		"--json -C /ws/ftest -w b db snapshot ls": `[{"name":"before-migrate","created":"2026-11-04T10:00:00Z","bytes":2500000,"files":["app_dev.dump"]}]`,
+		"--json -C /ws/ftest -w main task ls":     ftestTasks,
+		"--json -C /ws/ftest wt ls":               wtLS,
+		"--json dashboard colors":                 colorsJSON,
 	}, errs: map[string]error{}}
 	run := &recRunner{}
 	logs := t.TempDir()

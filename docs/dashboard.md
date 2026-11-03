@@ -899,12 +899,13 @@ pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
 working blue, your turn yellow, idle and off muted.
 
-## Cyberpunk office
+## Virtual Office
 
 **Virtual Office** in the header opens `/p/<prefix>/virtual-office`, which
-shows its set, `/p/<prefix>/virtual-office/cyberpunk` (D150; the set is the
-path's last part): the project as a cyberpunk office tower in 3D (three.js), an optional view beside the 2D
-pages (D146). It is the starship's logic (D144) on the office kit
+redirects to the active set's page, `/p/<prefix>/virtual-office/<set>/`
+(D150, D153; D150's `/virtual-office/cyberpunk` redirects the same way):
+the project as an office tower in 3D (three.js), an optional view beside
+the 2D pages (D146). It is the starship's logic (D144) on the office kit
 (docs/office-kit.md, D145), and costs nothing until you open it: the page
 is static files in the binary, and the server only polls the project as for
 any open page.
@@ -1027,6 +1028,32 @@ the content policy (`default-src 'self'`) refuses the `blob:` URLs three.js
 makes for textures embedded in a GLB. three.js is MIT
 (`static/office/three.LICENSE.txt`), vendored with its GLTF loader and
 bloom passes as one module by `internal/web/static/office/vendor.sh`.
+
+### Sets
+
+The office's art is a **set** (D153): one look's models plus its colours,
+fog, lights and bloom. `cyberpunk` is built in; others are installed on
+the machine with `railswitch office set add <folder>` (built and checked
+as in `docs/office-kit.md`), and the **Office set** card on the Machine
+page picks the active one (an `office set use` job; `dashboard.toml`
+`[office] set`). Any listed set has its page at
+`/p/<prefix>/virtual-office/<set>/`, whatever is active.
+
+- `GET /office/set.json[?name=<set>]` is the set a page draws, from
+  `office set ls`: `{name, base, version, look, have}`, `base` being
+  `/static/office/sets/<name>/` (built in) or `/office/sets/<name>/`
+  (installed). A set that is gone, stale or broken gives `cyberpunk` with
+  `fallback` (why), which the page shows as a banner.
+- `GET /office/sets/{name}/{path...}` is an installed set's file, only one
+  its `index.json` lists, read as bytes (a regular file, no symlink, at
+  most 16 MiB) and never parsed; anything else is 404. This is the one
+  place the dashboard reads files itself rather than through
+  `railswitch --json`: `<data>/office/` is written only by
+  `office set add` after its checks, no container mounts it, and a CLI
+  run per file would be hundreds per page. Hashes are checked by
+  `office set ls`, not per request.
+- A piece the set lacks is a light grey box of the piece's size where the
+  piece would stand; its tooltip says "missing in <set>".
 
 ## Commands
 

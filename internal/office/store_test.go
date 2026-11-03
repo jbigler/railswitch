@@ -72,7 +72,7 @@ func TestLsStatus(t *testing.T) {
 	}
 	status := func() map[string]Entry {
 		t.Helper()
-		ls, err := s.Ls("cabin")
+		ls, err := s.Ls()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,7 +83,7 @@ func TestLsStatus(t *testing.T) {
 		return m
 	}
 	m := status()
-	if m["cyberpunk"].Status != "ok" || m["cyberpunk"].Source != "builtin" || m["cyberpunk"].Have != nil || m["cabin"].Status != "ok" || len(m["cabin"].Have) != 1 {
+	if m["cyberpunk"].Status != "ok" || m["cyberpunk"].Source != "builtin" || len(m["cyberpunk"].Have) != 1 || m["cabin"].Status != "ok" || len(m["cabin"].Have) != 1 {
 		t.Fatalf("ls: %+v", m)
 	}
 	s.List.Version = 2 // a newer piece list

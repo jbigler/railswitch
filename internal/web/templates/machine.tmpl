@@ -47,6 +47,15 @@
 </form>
 <p class="note">A folder from <code>template export --to</code>. You see every file, flagged lines included, before anything is saved.</p>
 </section>
+<section class="card" id="office">
+<h2>Office set</h2>
+<p class="note">The Virtual Office's look. Add one with <code>railswitch office set add &lt;folder&gt;</code>; a piece a set lacks is drawn as a box.</p>
+{{if .OfficeError}}<p class="red set-error">{{.OfficeError}}</p>
+{{else}}<form method="post" action="/machine/office/use" class="new-form" data-job="office-use">
+<label class="field">Set <select name="name">{{range .OfficeSets}}<option value="{{.Name}}"{{if eq .Name $.OfficeActive}} selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+<div class="btns"><button class="ln main">Use this set</button></div>
+</form>
+{{end}}</section>
 </section>
 <section class="pane">
 {{template "jobs" .Jobs}}

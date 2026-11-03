@@ -46,6 +46,7 @@ type Config struct {
 	Jobs    *jobs.Hub
 	Exe     string // for job argv[0]
 	Home    string // the user's home: a new project's default folder, its create job's dir
+	Data    string // the machine data dir: installed office sets' files (D153)
 	Version string
 	Now     func() time.Time
 	// Run and Env start terminals (D149): the runner, and the environment
@@ -92,7 +93,10 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}", s.page)
 	m.HandleFunc("GET /p/{prefix}/{slug}", s.page)
 	m.HandleFunc("GET /p/{prefix}/virtual-office", s.officeDefault)
-	m.HandleFunc("GET /p/{prefix}/virtual-office/cyberpunk", s.cyberPage)
+	m.HandleFunc("GET /p/{prefix}/virtual-office/cyberpunk", s.officeDefault) // D150's link
+	m.HandleFunc("GET /p/{prefix}/virtual-office/{set}/{$}", s.cyberPage)
+	m.HandleFunc("GET /office/set.json", s.officeSetJSON)
+	m.HandleFunc("GET /office/sets/{name}/{path...}", s.officeSetFile)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/issues", s.cyberIssues)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/prs", s.cyberPRs)
 	m.HandleFunc("POST /p/{prefix}/virtual-office/issues/{n}/start", s.cyberIssueStart)
@@ -151,6 +155,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /machine", s.machinePage)
 	m.HandleFunc("GET /machine/templates/import", s.templateImportPage)
 	m.HandleFunc("POST /machine/templates/import", s.templateImport)
+	m.HandleFunc("POST /machine/office/use", s.officeUse)
 	m.HandleFunc("POST /machine/signers/add", s.signerAdd)
 	m.HandleFunc("POST /machine/signers/rm", s.signerRm)
 	m.HandleFunc("POST /machine/signers/revoke", s.signerRevoke)

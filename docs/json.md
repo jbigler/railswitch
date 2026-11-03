@@ -764,7 +764,7 @@ The built-in sets, then the installed ones, by name.
 ```json
 {"active": "cyberpunk", "sets": [
  {"name": "cyberpunk", "source": "builtin", "version": 1, "pieces": 1, "present": 109, "missing": 0, "status": "ok", "description": "Neon, worn metal and a city in the smog", "look": {…}, "have": ["Arch_CeilingDuct_4m", …]},
- {"name": "cabin", "source": "installed", "version": 3, "pieces": 1, "present": 12, "missing": 97, "status": "broken", "reason": "Furn_Desk.bin: changed since it was added", "description": "Pine, wool and lamplight", "look": {…}}]}
+ {"name": "cabin", "source": "installed", "version": 3, "pieces": 1, "present": 12, "missing": 97, "status": "broken", "reason": "Furn_Desk.bin: changed since it was added", "description": "Pine, wool and lamplight", "look": {…}, "have": ["Furn_Desk", …]}]}
 ```
 
 | Field | Type | Meaning |
@@ -774,7 +774,7 @@ The built-in sets, then the installed ones, by name.
 | `version`, `pieces`, `description`, `look` | | From `set.toml`. |
 | `present`, `missing` | integer | Pieces of the list the set has, and doesn't. |
 | `status`, `reason` | string | `ok`; `stale`: built for another piece list version; `broken`: an installed set whose `index.json`, a file it lists (by sha256) or `set.toml` doesn't verify. |
-| `have` | array of strings | The active set only: the pieces it has, which the page loads (the rest are boxes). |
+| `have` | array of strings | The pieces of the list the set has, which the page loads (the rest are boxes). |
 
 ## `notes ls`
 

@@ -94,7 +94,7 @@ func cmdOffice(_ context.Context, e *env, args []string) int {
 			return e.fail(err)
 		}
 		active := activeSet(f)
-		sets, err := st.Ls(active)
+		sets, err := st.Ls()
 		if err != nil {
 			return e.fail(err)
 		}

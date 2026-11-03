@@ -42,7 +42,7 @@ type Entry struct {
 	Reason      string   `json:"reason,omitempty"`
 	Description string   `json:"description"`
 	Look        Look     `json:"look"`
-	Have        []string `json:"have,omitempty"` // the active set's pieces
+	Have        []string `json:"have"` // the pieces of the list it has
 }
 
 // Store is the built-in sets (in static, the dashboard's static files) and
@@ -150,12 +150,8 @@ func (s *Store) Remove(name string) error {
 	return os.RemoveAll(dst)
 }
 
-// Ls lists the built-in sets, then the installed ones, each by name; the
-// active one (DefaultSet for "") carries the pieces it has.
-func (s *Store) Ls(active string) ([]Entry, error) {
-	if active == "" {
-		active = DefaultSet
-	}
+// Ls lists the built-in sets, then the installed ones, each by name.
+func (s *Store) Ls() ([]Entry, error) {
 	var out []Entry
 	builtins, err := fs.ReadDir(s.Static, setsDir)
 	if err != nil {
@@ -173,11 +169,6 @@ func (s *Store) Ls(active string) ([]Entry, error) {
 	for _, d := range installed {
 		if d.IsDir() && ValidName(d.Name()) == nil && !s.Builtin(d.Name()) {
 			out = append(out, s.installed(d.Name()))
-		}
-	}
-	for i := range out {
-		if out[i].Name != active {
-			out[i].Have = nil
 		}
 	}
 	return out, nil
@@ -199,7 +190,7 @@ func (s *Store) Get(name string) (Entry, bool) {
 }
 
 func (s *Store) builtin(name string) Entry {
-	e := Entry{Name: name, Source: "builtin", Status: "ok"}
+	e := Entry{Name: name, Source: "builtin", Status: "ok", Have: []string{}}
 	data, err := fs.ReadFile(s.Static, path.Join(setsDir, name, "set.toml"))
 	if err == nil {
 		err = e.fill(data)
@@ -218,7 +209,7 @@ func (s *Store) builtin(name string) Entry {
 }
 
 func (s *Store) installed(name string) Entry {
-	e := Entry{Name: name, Source: "installed", Status: "ok"}
+	e := Entry{Name: name, Source: "installed", Status: "ok", Have: []string{}}
 	dir := filepath.Join(s.Base(), name)
 	broken := func(why string) Entry { e.Status, e.Reason = "broken", why; return e }
 	raw, err := safefile.Read(filepath.Join(dir, "index.json"), 1<<20)

@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/jbigler/railswitch/internal/office"
 	"io"
 	"log"
 	"net/http"
@@ -14,7 +15,7 @@ import (
 )
 
 // The Virtual Office (D146): an optional 3D view of a project,
-// /p/{prefix}/virtual-office/cyberpunk (the set in the path: D150), the starship's logic (D144) on the office kit
+// /p/{prefix}/virtual-office/<set>/ (the set in the path: D150, D153), the starship's logic (D144) on the office kit
 // (D145). The lobby is the project (its PRs, issues and the agents' shared
 // notes), each worktree a floor of the tower (its services in the server
 // room, the user's desk, the agent's desk, one pet); the elevator goes
@@ -96,18 +97,25 @@ func (s *Server) pushCyber(sub *subscriber) {
 }
 
 type cyberView struct {
-	Title, Prefix string
+	Title, Prefix, Set string
 }
 
-// officeDefault sends /p/{prefix}/virtual-office to the built-in set: the
-// set is the path's last part (D150), so sets can sit beside it later.
+// officeDefault sends /p/{prefix}/virtual-office (and D150's
+// .../virtual-office/cyberpunk) to the active set's page (D153; the
+// built-in one when office set ls can't say).
 func (s *Server) officeDefault(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.cyberProject(w, r); !ok {
 		return
 	}
-	http.Redirect(w, r, "/p/"+r.PathValue("prefix")+"/virtual-office/cyberpunk", http.StatusFound)
+	set := office.DefaultSet
+	if ls, err := readJSON[setLs](r.Context(), s.c.CLI, "office", "set", "ls"); err == nil && ls.find(ls.Active) != nil {
+		set = ls.Active
+	}
+	http.Redirect(w, r, "/p/"+r.PathValue("prefix")+"/virtual-office/"+set+"/", http.StatusFound)
 }
 
+// cyberPage is /p/{prefix}/virtual-office/{set}/: the office drawn with
+// set, one office set ls lists. The page asks /office/set.json for it.
 func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 	p, ok, err := s.project(r.Context(), r.PathValue("prefix"))
 	if err != nil {
@@ -118,8 +126,20 @@ func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown project", http.StatusNotFound)
 		return
 	}
+	set := r.PathValue("set")
+	if set != office.DefaultSet { // the built-in one is always there
+		ls, err := readJSON[setLs](r.Context(), s.c.CLI, "office", "set", "ls")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		if ls.find(set) == nil {
+			http.Error(w, "unknown office set", http.StatusNotFound)
+			return
+		}
+	}
 	w.Header().Set("Content-Security-Policy", officeCSP)
-	s.html(w, http.StatusOK, "office", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix})
+	s.html(w, http.StatusOK, "office", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix, Set: set})
 }
 
 // cyberJSON answers the output of a railswitch --json read as is.
@@ -178,7 +198,7 @@ func (s *Server) cyberIssueStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.start(w, r, jobs.Spec{Project: p.Prefix, Label: fmt.Sprintf("work on issue #%d", n), Dir: p.Workspace,
-		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/virtual-office/cyberpunk")
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "wt", "add", "--issue", strconv.Itoa(n), "--agent"}}, nil, "/p/"+p.Prefix+"/virtual-office")
 }
 
 // noteName is a shared note's file name (the CLI checks it again).

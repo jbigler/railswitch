@@ -93,7 +93,7 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .pal-task{display:block;width:100%;padding:4px 6px;text-align:left;background:none;border:0;border-radius:4px;cursor:pointer}
 .pal-list li.on .pal-task,.pal-task:hover{background:var(--sel)}
 a.pal-task{color:var(--text);text-decoration:none}
-.pal-kind{display:inline-block;min-width:5.5em;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.pal-kind{display:inline-block;min-width:7.5em;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .colors-mode{margin-top:8px;padding-top:8px;border-top:1px solid var(--sel)}
 .fields{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
 .dlg label.field{display:flex;align-items:center;gap:6px;margin:4px 0}
@@ -320,3 +320,4 @@ body:has(.term-panel.max) { overflow: hidden; }
 .usage-chart .bar.today{fill:var(--accent)}
 .usage-line{margin-top:4px}
 .set-table td.size{white-space:nowrap}
+#note textarea{display:block;width:100%;box-sizing:border-box}

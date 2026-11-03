@@ -29,6 +29,16 @@ import (
 //go:embed static
 var staticFiles embed.FS
 
+// StaticFS is the dashboard's static files (/static/...): the CLI reads the
+// office's piece list and built-in sets from it (D153).
+func StaticFS() fs.FS {
+	s, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 // Config is what the dashboard runs with.
 type Config struct {
 	Token   string
@@ -75,10 +85,7 @@ func New(c Config) *Server {
 		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1),
 		state: map[string]*projectState{}, subs: map[*subscriber]struct{}{},
 	}
-	static, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		panic(err)
-	}
+	static := StaticFS()
 	m := http.NewServeMux()
 	m.HandleFunc("GET /healthz", s.healthz)
 	m.HandleFunc("GET /{$}", s.root)

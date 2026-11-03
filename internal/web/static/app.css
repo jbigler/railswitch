@@ -98,6 +98,7 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .colors-reset{display:flex;justify-content:flex-end}
 
 .stale{color:var(--yellow);font-weight:700}
+.actions>.stale{margin-left:6px} /* the row is flex: the space before it collapses */
 
 /* Settings */
 .settings h1{font-size:20px;margin:0 0 4px}

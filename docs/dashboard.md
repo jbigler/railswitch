@@ -134,7 +134,7 @@ browser's back button works too). Clicking a worktree opens its detail;
 ↑↓ moves the selection without leaving the list. The list hides its
 `stack` and `tests` columns, shown in the detail, and below 520 px its
 `branch` column. The other pages stack their two panes; a settings table
-still wider than the window scrolls by itself.
+still wider than the window scrolls its pane.
 
 - **Header:** "RailSwitch", then two labelled groups. **project**: the
   project button (the prefix, or "choose"; opens the switcher) and, with

@@ -155,7 +155,8 @@ function select(slug, push) {
   body.dataset.sel = slug;
   // A click opens the detail (a narrow window shows one pane); ↑↓ doesn't.
   if (push) body.dataset.pane = "detail";
-  history[push ? "pushState" : "replaceState"](null, "", pageURL(slug));
+  // ↑↓ on the list keeps its URL, so Back returns to the list, not a detail.
+  if (push || body.dataset.pane !== "list") history[push ? "pushState" : "replaceState"](null, "", pageURL(slug));
   connect();
 }
 

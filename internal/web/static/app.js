@@ -123,7 +123,8 @@ function afterSwap(id) {
     const slug = $("#detail").dataset.slug || "";
     body.dataset.sel = slug;
     // The worktree shown may not be the URL's (it was removed): follow it.
-    if (slug && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
+    // A URL without one stays: a narrow window shows the list for it.
+    if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
   }
 }
 
@@ -152,7 +153,10 @@ function pageURL(slug) {
 function select(slug, push) {
   $$("#list tbody tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.slug === slug));
   body.dataset.sel = slug;
-  history[push ? "pushState" : "replaceState"](null, "", pageURL(slug));
+  // A click opens the detail (a narrow window shows one pane); ↑↓ doesn't.
+  if (push) body.dataset.pane = "detail";
+  // ↑↓ on the list keeps its URL, so Back returns to the list, not a detail.
+  if (push || body.dataset.pane !== "list") history[push ? "pushState" : "replaceState"](null, "", pageURL(slug));
   connect();
 }
 

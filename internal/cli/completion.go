@@ -32,12 +32,14 @@ var completionFiles = map[string]string{
 // ("dashboard colors") nests. A command with completionArgs too (agent)
 // offers both for its first word.
 var completionSubs = map[string][]string{
-	"agent":            {"add", "default", "ls", "screen", "send", "stop", "update"},
+	"agent":            {"add", "default", "ls", "queue", "screen", "send", "stop", "update", "usage"},
+	"agent queue":      {"add", "clear", "ls", "next", "rm"},
 	"agent default":    {"apply", "promote"},
 	"containerfile":    {"eject", "list", "new", "show", "write"},
 	"dashboard":        {"colors", "serve"},
 	"dashboard colors": {"reset", "set"},
-	"db":               {"dump", "restore"},
+	"db":               {"dump", "restore", "snapshot"},
+	"db snapshot":      {"ls", "restore", "rm"},
 	"fw":               {"allow", "show"},
 	"hooks":            {"backup", "check", "restore"},
 	"issue":            {"ls"},
@@ -55,7 +57,7 @@ var completionSubs = map[string][]string{
 	"secret":           {"add", "ls", "rm", "set"},
 	"signer":           {"add", "ls", "revoke", "rm"},
 	"stack":            {"ls", "switch"},
-	"task":             {"ls"},
+	"task":             {"ls", "restore", "rm", "set"},
 	"template":         {"check", "export", "import", "ls", "show"},
 	"wt":               {"add", "ls", "rm"},
 }
@@ -68,8 +70,10 @@ var completionFlags = map[string][]string{
 	"":                       {"-C=", "-w=", "--json"},
 	"agent":                  {"--new-term", "--no-token", "--watch"},
 	"agent add":              {"--run=", "--use="},
+	"agent queue add":        {"--issue="},
 	"agent default apply":    {"--all"},
 	"agent default promote":  {"--all"},
+	"agent usage":            {"--all", "--days="},
 	"build":                  {"--force", "--pull"},
 	"containerfile eject":    {"--force"},
 	"containerfile show":     {"--default"},
@@ -79,6 +83,7 @@ var completionFlags = map[string][]string{
 	"down":                   {"--yes"},
 	"exec":                   {"--fresh"},
 	"db restore":             {"--from=", "--yes"},
+	"db snapshot restore":    {"--yes"},
 	"gc":                     {"--dry-run", "--volumes", "--yes"},
 	"hooks restore":          {"--force"},
 	"lock":                   {"--accept=", "--restart", "--review"},
@@ -108,11 +113,13 @@ var completionFlags = map[string][]string{
 	"secret add":             {"--env=", "--git-signing", "--machine", "--service="},
 	"secret set":             {"--restart"},
 	"pr ls":                  {"--all"},
+	"stats":                  {"--all"},
 	"pr merge":               {"--auto", "--method="},
 	"pr review":              {"--approve", "--comment", "--request-changes"},
-	"pr agent":               {"--thread="},
+	"pr agent":               {"--queue", "--thread="},
 	"settings apply":         {"--accept-install=", "--if-hash=", "--restart"},
 	"task":                   {"--new-term"},
+	"tidy":                   {"--all", "--days=", "--force", "--rm"},
 	"template check":         {"--accept="},
 	"template import":        {"--accept="},
 	"template export":        {"--description=", "--name=", "--to=", "--version="},
@@ -151,6 +158,8 @@ var completionArgs = map[string]completer{
 	"notes write":         noteCandidates,
 	"notes rm":            noteCandidates,
 	"task":                taskCandidates,
+	"task rm":             taskCandidates,
+	"task set":            taskCandidates,
 }
 
 // railswitch completion bash|zsh|fish: print the shell's completion script.

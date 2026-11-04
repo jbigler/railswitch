@@ -84,3 +84,12 @@ body.walking #scene::after { opacity: 1; }
 .board-status { flex: 1; color: var(--cp-dim, #9aa); font-weight: 400; }
 .board-host { flex: 1; position: relative; min-height: 0; }
 .hud-btn.primary { border-color: var(--cp-accent); }
+
+/* The game room's arcades (D154): a cabinet's game over the office, a
+   .board-modal so the office's keys stand down. */
+.board-modal.arcade { background: radial-gradient(ellipse at center, #120a2a 0%, var(--cp-bg) 75%); }
+.arcade-screen { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.arcade-screen canvas { max-width: 100%; max-height: calc(100% - 3em); border: 2px solid var(--cp-accent); border-radius: 6px;
+  box-shadow: 0 0 18px rgba(34, 230, 255, .35), 0 0 48px rgba(255, 43, 214, .18); user-select: none; touch-action: none; }
+.arcade-help { margin: 0; color: var(--cp-dim); font: 12px ui-monospace, monospace; text-align: center; }
+.board-modal.arcade .board-status { font-family: ui-monospace, monospace; color: var(--cp-accent); text-shadow: 0 0 6px var(--cp-accent); }

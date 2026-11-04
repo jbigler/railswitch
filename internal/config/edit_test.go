@@ -338,6 +338,41 @@ func TestSetOptionNoOptionsTable(t *testing.T) {
 	}
 }
 
+func TestTaskSetUnset(t *testing.T) {
+	data := commented + "\n[tasks]   # mine\nlint = \"bin/rubocop\"   # keep\n\"db:seed\" = \"bin/rails db:seed\"\n"
+	got, err := SetTask(data, "lint", "bin/rubocop -a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, data, `"bin/rubocop"`, `"bin/rubocop -a"`); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = SetTask(data, "test:system", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := data + "\"test:system\" = \"\"\n"; got != want {
+		t.Errorf("got\n%s", got)
+	}
+	got, err = UnsetTask(data, "db:seed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := replaceOnce(t, data, "\"db:seed\" = \"bin/rails db:seed\"\n", ""); got != want {
+		t.Errorf("got\n%s", got)
+	}
+	if _, err := UnsetTask(data, "nope"); err == nil {
+		t.Error("unset of an absent task is not an error")
+	}
+	got, err = SetTask(commented, "lint", "bin/rubocop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := commented + "\n[tasks]\nlint = \"bin/rubocop\"\n"; got != want {
+		t.Errorf("got\n%s", got)
+	}
+}
+
 func TestEnvSetUnset(t *testing.T) {
 	got, err := SetEnv(edited, "A", "9")
 	if err != nil {

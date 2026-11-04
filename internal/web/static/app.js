@@ -5,7 +5,7 @@
 
 const body = document.body;
 const prefix = body.dataset.prefix;
-const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine or new
+const view = body.dataset.view || ""; // "", settings, settingsfile, images, library, editor, review, import, machine, notes or new
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
@@ -186,7 +186,6 @@ document.addEventListener("click", (e) => {
   if (termBtn) return openTermPanel(termBtn);
   const opener = t.closest("[data-open]");
   if (opener) return openDialog(opener.dataset.open);
-  if (t.closest("[data-palette]")) return openPalette();
   if (t.closest("[data-colors]")) return openColors();
   if (t.closest("[data-notify]")) {
     Notification.requestPermission().then(() => afterSwap("header"));
@@ -241,11 +240,12 @@ document.addEventListener("submit", (e) => {
   if (remove && f.elements.confirm && f.elements.confirm.value !== f.dataset.slug) {
     return toast("Type " + f.dataset.slug + " to confirm.", true);
   }
-  post(f, new URLSearchParams(new FormData(f, e.submitter)));
+  const by = e.submitter;
+  post(f, new URLSearchParams(new FormData(f, by)), by && by.hasAttribute("formaction") ? by.formAction : f.action);
 });
 
-async function post(f, data) {
-  const r = await fetch(f.action, {
+async function post(f, data, url = f.action) {
+  const r = await fetch(url, {
     method: "POST", body: data, credentials: "same-origin", headers: { Accept: "application/json" },
   });
   if (r.ok) {
@@ -282,8 +282,8 @@ function hideToast() {
 
 // Keys.
 
-// Terminal panels (D149): docked in #terms, outside the detail that SSE
-// replaces; each closes its WebSocket when removed.
+// Terminal panels (D149): docked in #terms, under the jobs and outside the
+// detail that SSE replaces; each closes its WebSocket when removed.
 async function openTermPanel(btn) {
   const dock = $("#terms");
   if (!dock) return;
@@ -308,6 +308,7 @@ async function openTermPanel(btn) {
   head.append(title, full, x);
   panel.append(head, host);
   dock.prepend(panel);
+  panel.scrollIntoView({ block: "nearest" }); // the dock sits below the jobs
   let t = null;
   try {
     const { openTerminal } = await import("/static/term/term.js");
@@ -375,18 +376,21 @@ function filterSwitcher() {
   });
 }
 
-// Task palette: Enter runs the highlighted task in a new terminal or as a
-// job, as "in a new terminal" says (ticked unless this browser last
-// unticked it); Shift+Enter the other way.
+// Command palette: the selected worktree's tasks and actions, the
+// project's worktrees and pages. Enter runs the highlighted task in a new
+// terminal or as a job, as "in a new terminal" says (ticked unless this
+// browser last unticked it), Shift+Enter the other way; it posts an
+// action and follows a link.
 
 const termKey = "railswitch.palette.term";
 
 async function openPalette() {
-  const url = $("#detail") && $("#detail").dataset.tasks;
-  if (!url || !body.dataset.sel) return toast("No worktree selected.", true);
+  if (!prefix) return toast("No project.", true);
+  const url = ($("#detail") && body.dataset.sel && $("#detail").dataset.tasks) || "/p/" + encodeURIComponent(prefix) + "/palette";
   const d = await loadDialog("palette", url);
   if (!d) return;
-  if (recall(termKey) === "0") $(".pal-term", d).checked = false;
+  const term = $(".pal-term", d);
+  if (term && recall(termKey) === "0") term.checked = false;
   $(".pal-filter", d).focus();
   filterPalette();
 }
@@ -397,15 +401,50 @@ document.addEventListener("change", (e) => {
 });
 
 function paletteItems() {
-  return $$("#palette .pal-list li[data-filter]").filter((li) => !li.hidden);
+  return $$("#palette .pal-list li[data-filter], #palette .pal-list li.pal-new").filter((li) => !li.hidden);
+}
+
+// fuzzy scores query q against s (both lower case): q's letters in order,
+// spaces ignored ("pgset" finds "page settings"); more for a letter that
+// starts a word or follows the last one, less for a gap; -1 for no match.
+function fuzzy(q, s) {
+  let score = 0;
+  let from = 0;
+  let last = -2;
+  for (const c of q.replace(/\s+/g, "")) {
+    const k = s.indexOf(c, from);
+    if (k < 0) return -1;
+    score += (k === last + 1 ? 2 : 0) + (k === 0 || /[\s_./:-]/.test(s[k - 1]) ? 3 : 0) - Math.min(k - from, 10) * 0.1;
+    last = k;
+    from = k + 1;
+  }
+  return score;
 }
 
 function filterPalette() {
   const q = $("#palette .pal-filter").value.trim().toLowerCase();
-  $$("#palette .pal-list li[data-filter]").forEach((li) => (li.hidden = !li.dataset.filter.toLowerCase().includes(q)));
+  const list = $("#palette .pal-list");
+  const lis = $$("li[data-filter]", list);
+  lis.forEach((li, i) => {
+    li.dataset.at ??= i; // the template's order, for ties and an empty filter
+    li.score = fuzzy(q, li.dataset.filter.toLowerCase());
+    li.hidden = li.score < 0;
+  });
+  lis.sort((a, b) => b.score - a.score || a.dataset.at - b.dataset.at);
+  list.prepend(...lis); // best first; the lines without data-filter stay last
+  // A name no task has: offer a new task by it on the Settings page, last
+  // in the list (other lines may match it too); only with a worktree.
+  const nw = $("#palette .pal-new");
+  const name = $("#palette .pal-filter").value.trim();
+  if (nw) nw.hidden = !name || $$("#palette button[name=task]").some((b) => b.value === name);
   const items = paletteItems();
   $$("#palette .pal-list li").forEach((li) => li.classList.remove("on"));
   if (items.length) items[0].classList.add("on");
+  if (!nw) return;
+  $("b", nw).textContent = name;
+  $("a", nw).href = $("a", nw).dataset.base + "?task=" + encodeURIComponent(name) + "#tasks";
+  const none = $("#palette .pal-none");
+  if (none) none.hidden = !nw.hidden;
 }
 
 function paletteKey(e) {
@@ -422,8 +461,11 @@ function paletteKey(e) {
     e.preventDefault();
     if (i < 0) return;
     const f = $("#palette form");
+    const it = $(".pal-task", items[i]);
+    if (it.tagName === "A") return void (location.href = it.href);
+    if (it.hasAttribute("data-action")) return post(f, new URLSearchParams(), it.formAction);
     const data = new URLSearchParams(new FormData(f));
-    data.set("task", $("button", items[i]).value);
+    data.set("task", it.value);
     if ($(".pal-term", f).checked !== e.shiftKey) data.set("term", "1");
     else data.delete("term");
     post(f, data);
@@ -545,6 +587,7 @@ function target(e) {
   if (e.op === "firewall.allow.add" || e.op === "firewall.allow.remove") return "fw " + e.key + " " + e.value;
   if (e.op === "option") return "option " + e.key;
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
+  if (e.op === "task.set" || e.op === "task.unset") return "task " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
   if (e.op === "agent.setup") return "agent-setup " + e.key;
@@ -633,6 +676,17 @@ function syncLeft() {
     const none = $("tr.env-none", envBody);
     if (none) none.hidden = !!$("tr.env-new", envBody);
   }
+  // A task row shows its staged command; struck through when it goes
+  // (removed, or hidden: set to ""), highlighted when it changes or comes back.
+  $$("tr.task").forEach((row) => {
+    const e = stagedFor("task " + row.dataset.name);
+    const input = $(".task-cmd", row);
+    const gone = !!e && ((e.op === "task.set" && e.value === "") || (e.op === "task.unset" && row.dataset.source !== "hidden"));
+    if (input && document.activeElement !== input) input.value = e && e.op === "task.set" && e.value !== "" ? e.value : row.dataset.command;
+    if (input) input.disabled = gone;
+    row.classList.toggle("staged", !!e && !gone);
+    row.classList.toggle("removed", gone);
+  });
   $$("label.hook").forEach((box) => {
     const e = stagedFor("hooks " + box.dataset.list);
     const area = $(".hook-cmds", box);
@@ -804,6 +858,10 @@ if (view.startsWith("settings")) {
     }
     const fwAllow = t.closest("[data-fw-allow]");
     if (fwAllow) return stage({ op: "firewall.allow.add", key: fwAllow.dataset.prof, value: fwAllow.dataset.host }, false);
+    const taskHide = t.closest("[data-task-hide]");
+    if (taskHide) return stage({ op: "task.set", name: taskHide.closest("tr").dataset.name, value: "" }, false);
+    const taskRm = t.closest("[data-task-remove], [data-task-restore]");
+    if (taskRm) return stage({ op: "task.unset", name: taskRm.closest("tr").dataset.name }, false);
     const linkRm = t.closest("[data-link-remove]");
     if (linkRm) stage({ op: "link.remove", label: linkRm.closest("tr").dataset.label }, false);
   });
@@ -817,6 +875,11 @@ if (view.startsWith("settings")) {
     if (t.classList.contains("env-value")) {
       const row = t.closest("tr");
       return stage({ op: "env.set", name: row.dataset.name, value: t.value }, t.value === row.dataset.value);
+    }
+    if (t.classList.contains("task-cmd")) {
+      const row = t.closest("tr");
+      // An emptied box is no edit: Hide or Remove says that.
+      return stage({ op: "task.set", name: row.dataset.name, value: t.value.trim() }, t.value.trim() === row.dataset.command || !t.value.trim());
     }
     if (t.classList.contains("agent-setup-cmds")) {
       const box = t.closest("label.agent-setup");
@@ -851,6 +914,7 @@ if (view.startsWith("settings")) {
       const v = (n) => f.elements[n].value.trim();
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
       else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
+      else if (f.dataset.stage === "task") stage({ op: "task.set", name: v("name"), value: v("value") }, false);
       else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);
       f.reset();
@@ -992,7 +1056,7 @@ function jobNext(f) {
   return "";
 }
 
-if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr") {
+if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr" || view === "tidy") {
   document.addEventListener("submit", (e) => {
     const f = e.target;
     if (f.matches("form[data-add-file]")) {
@@ -1300,6 +1364,35 @@ function startNew() {
   ready();
 }
 
+// Notes (D155): Save posts the text with the hash it was opened at, and
+// the CLI refuses it when the note changed since; the refusal stays shown
+// and the text stays in the box.
+
+function startNotes() {
+  const f = $("#note");
+  if (!f) return;
+  const err = $("#note-err");
+  const name = decodeURIComponent(f.action.split("/").pop());
+  async function write(q, text) {
+    const r = await fetch(f.action + "?" + new URLSearchParams(q), {
+      method: "POST", body: text, credentials: "same-origin", headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+    if (r.ok) return true;
+    err.textContent = (await r.text()).trim();
+    err.hidden = false;
+    toast(err.textContent, true);
+    return false;
+  }
+  f.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (await write({ "if-hash": f.dataset.hash }, f.elements.text.value)) location.href = f.dataset.back + "?n=" + encodeURIComponent(name);
+  });
+  $("[data-note-rm]", f)?.addEventListener("click", async () => {
+    if (!confirm("Delete " + name + "?")) return;
+    if (await write({ rm: "1", "if-hash": f.dataset.hash }, "")) location.href = f.dataset.back;
+  });
+}
+
 // Start: the remembered project and sort, then the stream.
 
 (function start() {
@@ -1322,6 +1415,7 @@ function startNew() {
     afterSwap("header");
     if (view === "settings") startSettings();
     if (view === "editor") startEditor();
+    if (view === "notes") startNotes();
     connect();
     return;
   }

@@ -91,6 +91,16 @@ uses them). `send` takes its text on stdin, at most 4 KiB, with no
 control characters but line breaks and tabs; a multi-line text is pasted
 as one input. It types only into a running session and never starts one.
 
+To line up work for later, queue it: the dashboard types each item into
+the worktree's agent once it has been idle a few seconds, one at a time,
+never while it works or waits on you (D159).
+
+```bash
+railswitch agent queue add "then update the changelog"
+railswitch agent queue add --issue 42     # as wt add --issue --agent words it
+railswitch agent queue ls                 # rm <id> and clear edit it
+```
+
 - **Several terminals at once.** Run `railswitch agent` in as many
   terminals as you like: each shows the same agent, live, and each can
   type into it. The window follows whoever typed last.
@@ -140,6 +150,22 @@ the agent in a live terminal in the page (D149), the same session
 `railswitch agent` joins, so slash suggestions, `/plugin` and other menus
 work as in your terminal. Closing the panel leaves a service agent
 running.
+
+### Its token usage over time
+
+When the agent's package counts its session's tokens (claude@1 does),
+railswitch keeps a 90-day history per day, worktree and agent:
+
+```bash
+railswitch agent usage               # this worktree, the last 14 days
+railswitch agent usage --all --days 30   # every worktree of the project
+```
+
+The dashboard draws it as a bar chart under the worktree list, shows each
+worktree's total in its Agent area, and warns in the banner when a
+worktree's agents use far more today than on a usual day. The history is
+recorded while the dashboard runs (or whenever you run `overview` or
+`agent usage`). Cost shows only when the package reports one.
 
 ## Its sandbox
 

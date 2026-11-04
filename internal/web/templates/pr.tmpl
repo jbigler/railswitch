@@ -34,13 +34,13 @@ escaped here; data-md bodies get their Markdown as text nodes (app.js). */}}
 {{else}}<p class="muted">No checks.</p>{{end}}
 
 <h2>Review threads <span class="muted">{{$.Unresolved}} unresolved of {{len $.Threads}}</span></h2>
-{{if $.Unresolved}}<form method="post" action="{{$.ActURL}}/agent" data-job="pr" data-confirm="Type the {{$.Unresolved}} unresolved review thread(s) into {{$.Slug}}'s agent? It starts the agent's session if it has none."><input type="hidden" name="number" value="{{.Number}}"><button class="ln main">Send all unresolved to the agent</button></form>{{end}}
+{{if $.Unresolved}}<form method="post" action="{{$.ActURL}}/agent" data-job="pr" data-confirm="Type the {{$.Unresolved}} unresolved review thread(s) into {{$.Slug}}'s agent? It starts the agent's session if it has none."><input type="hidden" name="number" value="{{.Number}}"><button class="ln main">Send all unresolved to the agent</button></form><form method="post" action="{{$.ActURL}}/agent" data-job="pr"><input type="hidden" name="number" value="{{.Number}}"><input type="hidden" name="queue" value="1"><button class="ln" title="Add them to {{$.Slug}}'s agent queue: typed in once it is idle">Queue for agent</button></form>{{end}}
 {{range $.Threads}}<article class="pr-thread{{if .Resolved}} resolved{{end}}">
 <header><code>{{.Path}}{{if .Line}}:{{.Line}}{{end}}</code>{{if .Outdated}} <span class="muted">outdated</span>{{end}}{{if .Resolved}} <span class="green">resolved</span>{{end}}</header>
 {{if .Tail}}<pre class="pr-hunk">{{.Tail}}</pre>{{end}}
 {{range .Comments}}<div class="pr-tc"><b>{{.Author}}</b> <span class="muted">{{.Created}}</span>{{if .URL}} <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">↗</a>{{end}}<div class="md" data-md>{{.Body}}</div></div>{{end}}
 <div class="pr-tactions">
-<form method="post" action="{{$.ActURL}}/agent" data-job="pr"><input type="hidden" name="number" value="{{$.PR.Number}}"><input type="hidden" name="thread" value="{{.ID}}"><button class="ln" title="Type this thread into {{$.Slug}}'s agent">Send to agent</button></form>
+<form method="post" action="{{$.ActURL}}/agent" data-job="pr"><input type="hidden" name="number" value="{{$.PR.Number}}"><input type="hidden" name="thread" value="{{.ID}}"><button class="ln" title="Type this thread into {{$.Slug}}'s agent">Send to agent</button><button class="ln" name="queue" value="1" title="Add it to {{$.Slug}}'s agent queue: typed in once it is idle">Queue for agent</button></form>
 <form method="post" action="{{$.ActURL}}/{{if .Resolved}}unresolve{{else}}resolve{{end}}" data-job="pr"><input type="hidden" name="thread" value="{{.ID}}"><button class="ln">{{if .Resolved}}Unresolve{{else}}Resolve{{end}}</button></form>
 </div>
 <form method="post" action="{{$.ActURL}}/reply" data-job="pr" class="pr-reply"><input type="hidden" name="thread" value="{{.ID}}"><textarea name="body" rows="2" placeholder="Reply…" required></textarea><button class="ln">Reply</button></form>

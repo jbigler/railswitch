@@ -236,6 +236,23 @@ func TestPreviewLinkNone(t *testing.T) {
 	}
 }
 
+// Task edits (D156) change no unit: none, and nothing restarts even with
+// the app running. A reserved name is blocked by validation.
+func TestPreviewTasks(t *testing.T) {
+	e := filialEnv(t, nil)
+	e.Running = func(string) bool { return true }
+	p := preview(t, e, Edit{Op: "task.set", Name: "db:seed", Value: "bin/rails db:seed"}, Edit{Op: "task.set", Name: "console"},
+		Edit{Op: "task.unset", Name: "console"}, Edit{Op: "task.set", Name: "ls", Value: "x"})
+	for i, want := range []Impact{ImpactNone, ImpactNone, ImpactNone, ImpactBlocked} {
+		if p.Edits[i].Impact != want {
+			t.Errorf("edit %d: %+v; want %s", i, p.Edits[i], want)
+		}
+	}
+	if len(p.Restart) != 0 {
+		t.Errorf("Restart = %v", p.Restart)
+	}
+}
+
 func TestPreviewEnvCheckAndRestart(t *testing.T) {
 	e := filialEnv(t, nil)
 	e.Running = func(unit string) bool { return unit == "filial-master-rails.service" }

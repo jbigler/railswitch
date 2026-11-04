@@ -129,8 +129,9 @@ is no longer accepted. What the page shows meanwhile may be stale.
 
 - **Header:** "RailSwitch", then two labelled groups. **project**: the
   project button (the prefix, or "choose"; opens the switcher) and, with
-  a project, `worktrees` (its page), `tasks :`, `images`, `library` and
-  `settings` (the project's pages, below). Then `◆ N need input`. On the
+  a project, after a thin divider, `worktrees` (its page), `images`,
+  `tidy`, `library`, `settings`, `notes` and `office` (the Virtual Office; the
+  project's pages, below). Then `◆ N need input`. On the
   right, **machine**: `settings` (the Machine page), `logs` (Dozzle at
   `http://logs.localhost/`), a `notifications` button until the browser
   permission is decided, and `⚙` (dashboard colours). The link of the
@@ -149,7 +150,9 @@ is no longer accepted. What the page shows meanwhile may be stale.
   `overview`'s `template_update` is true: "The template <ref> changed
   since this project was made from it. See it in Settings" (the
   Settings page's Template changed notice, below; `<ref>` is
-  `overview`'s `template.ref`).
+  `overview`'s `template.ref`). One line per worktree `agent usage`
+  flags `runaway` (D162): "Agent usage of <worktree> is high today: <n>
+  tokens, over 3 times its usual day (<median>)."
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
@@ -158,11 +161,23 @@ is no longer accepted. What the page shows meanwhile may be stale.
   agent needs permission, asks a question or waits for a reply: the
   column that never scrolls out of a narrow pane), branch (cut short
   past 16rem, the full name as its tooltip), PR (number, checks, state,
-  review), stack state, agent state. A worktree whose running
+  review), stack state, agent state, tests (the last run of the `test`
+  task, D158: `✓ passed 5m ago`, `✗ failed 2h ago`, `— never`, with
+  `stale` when HEAD has moved since that run; its exit code, time and
+  commit are the tooltip; `—` alone when the project has no `test`
+  task). A worktree whose running
   containers were created from older units than the rendered ones
   (`overview`'s `stale`, after a settings change, say) shows "restart to
   apply" next to its stack state, in the row and in the detail; `restart`
   clears it.
+- **Agent usage** (under the list, D162): the project's agents' tokens
+  per day for the last 14 days, one bar per day (today's in the accent
+  colour; a bar's tooltip is its day, its tokens and the cost when the
+  agent's package reports one), headed by the sum. It is `agent usage
+  --all --days 14 --json`, read with the PRs (every 60 s with a page
+  open, and on Refresh PRs); absent while those days have no usage. The
+  chart is SVG drawn by the page's template with attributes and classes
+  only (the CSP allows no inline style).
 - **Secrets to set** (above the detail, only while a secret `up` needs
   is unset: `secret ls`'s `up`, read once per page load with 5 s to
   answer; none when it can't be read): "Set these secrets to start
@@ -177,9 +192,13 @@ is no longer accepted. What the page shows meanwhile may be stale.
   turns on. Start selects the base worktree, runs `up` there and
   says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with such secrets opens with this card.
-- **Detail** (the selected worktree): name, `⎇ branch`, the PR line
+- **Detail** (the selected worktree): name, then one line: `⎇ branch`
+  (left out when the branch is the worktree's name), the stack state
+  (and "restart to apply"), the PR line
   (`PR #2141 ready · checks ✓ · approved`, a link to the PR; Links gains
-  **Review app** when `pr ls` finds one, the PR's GitHub deployment), then, when its branch is in a
+  **Review app** when `pr ls` finds one, the PR's GitHub deployment).
+  Right under it the actions (start, restart, stop, `remove…`; see
+  Actions). Then, when its branch is in a
   gh stack (`stack ls`, read with the PRs), Stack, in gh stack view's
   words: `◆ Stack #10350` (linked to the stack on GitHub) · `Base:
   master` · `22 branches (8 merged)`, and `⚠ restack needed` when a
@@ -193,10 +212,13 @@ is no longer accepted. What the page shows meanwhile may be stale.
   glyph, the name and a plain state word, `running`, `starting`,
   `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
   `unknown`, in the glyph's colour;
-  the systemd state is the row's tooltip; while the service runs, `logs`
+  the systemd state is the row's tooltip; a running service's `logs` and
+  `restart` show while the pointer is on its row or the keyboard is in it
+  (always on a touch screen), a service in any other state shows them
+  always; while the service runs, `logs`
   opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
   and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it), Agent (state and message), Actions and Jobs.
+  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it; while it runs, a small bar of its memory against its limit, amber from 80 %, red from 95 %, with memory, CPU and PIDs in its tooltip, D161), Agent (state and message, then the worktree's usage from `agent usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when reported, in yellow with `⚠` while it is `runaway`; the **default config…** link beside its label), Tests (as the list says, with the exit code, time and commit, and **run tests**: `railswitch task test` as a job; only with a `test` task), Terminal (below) and Jobs; the terminal panels dock under the jobs.
 
 ## Settings
 
@@ -256,6 +278,16 @@ shows what each one does before anything is written.
   project's own `[[links]]` only. The add form needs both a label and an
   address. Use `{worktree.host}`, `{worktree.slug}` or `{branch}`; they
   are filled in per worktree.
+- **Tasks** (`#tasks`, D156): `project show`'s `tasks`, each with its
+  command and where it comes from: `pack`, `project`, `project, over the
+  pack's`, or `pack, hidden`. Editing a command stages `task.set` when you
+  leave the field (a pack task you change becomes the project's; an
+  emptied box stages nothing). A pack task has Hide (`task.set` with an
+  empty value: `name = ""`); a project task has Remove, or "Back to the
+  pack's" when it overrides one (`task.unset`); a hidden pack task has
+  Restore (`task.unset`). The add form (name, command) stages `task.set`;
+  the staged card names it. `?task=<name>` fills the add form's name and
+  focuses its command: the palette's "new task" opens it.
 - **Secrets:** one row per declared secret: services, delivery (`file` or
   `env <VAR>`), set (with its date) or not set; never the value. "Set
   value" runs `railswitch secret set <name>` as a job; "Add a secret"
@@ -270,7 +302,7 @@ shows what each one does before anything is written.
   already saved. The server refuses (400, no job) another name or
   version.
 - **Edit project.toml** opens the raw editor (below), for everything
-  else: services, routes, tasks, firewall, agents, image, tools, versions.
+  else: services, routes, firewall, agents, image, tools, versions.
 
 **Staged changes**
 
@@ -373,6 +405,28 @@ a local file into it, in the browser only (1 MiB at most).
   failed" above the job's output. If the file changed
   on disk since the page read it, nothing is written and the page offers
   Reload; your text stays until you reload.
+
+## Tidy
+
+`/p/<prefix>/tidy` (`tidy` in the header, D160) lists what could go, from
+`railswitch --json tidy`: each worktree whose PR is merged or closed or
+whose stack has been stopped over 14 days, and each image of the project
+no stack uses (what `gc` would remove), with why and its size, and the
+total. A worktree's size is its checkout's (a walk that stops after
+200,000 entries shows "≥"); an image's is podman's, shared layers
+included.
+
+- A clean worktree whose PR is merged or closed, and an unused image,
+  start ticked; a worktree that is only idle (the idle time can come from
+  its last commit, a guess) and a **dirty** worktree (uncommitted changes
+  or untracked files) you tick yourself.
+- **Remove selected** runs one project-level job, `railswitch tidy --rm
+  <id>...`, which reads the list again and removes only what is still on
+  it: a worktree by `wt rm`'s path, an image by `podman rmi <name>`.
+  Ticking a dirty worktree needs "Discard their changes" too (the server
+  refuses it otherwise, 400), which adds `--force`: that worktree goes as
+  `wt rm --force` takes it, with its nvim and agent homes. The server
+  refuses an id that isn't one of this project's.
 
 ## Library
 
@@ -706,15 +760,17 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 | ↑ / ↓ | move the selection; the URL follows |
 | `P` | the project switcher: projects with worktree, running and ◆ counts; typing filters projects and every project's worktrees |
 | `1`–`9` | in the switcher (filter empty): jump to that project |
-| `:` | the task palette for the selected worktree |
+| `:` | the command palette (any project page; the worktree list's hint says so) |
 | Esc | close a dialog or a message |
-| Enter | in the palette: run the highlighted task as a job |
+| Enter | in the palette: run the highlighted line (a task as "in a new terminal" says) |
 | Shift+Enter | in the palette: run the task the other way from "in a new terminal" |
 
 ## Terminals
 
 The worktree's **Terminal** row opens a live terminal in the page (D149),
-docked under the worktree's details; several can be open at once.
+docked under the worktree's jobs; several can be open at once. The row
+ends with **open window ↗**, the `terminal` action below: a window on the
+desktop, not in the page.
 
 | Button | Runs | When the panel closes |
 |--------|------|-----------------------|
@@ -734,6 +790,10 @@ binary), **Reconnect**: the agent and nvim pick up where they were, a shell
 starts afresh. railswitch's own refusals (another agent running, unset
 secrets) print in the panel before `[exited 1]`. In a service agent's panel `Ctrl-\` detaches,
 as in a terminal: the agent keeps running and the panel shows `[exited 0]`.
+In an agent's panel Shift+Enter is sent as an extended key (CSI u), and the
+agent's session server has tmux's `extended-keys` on, so the agent sees
+Shift+Enter (a new line) rather than Enter; a host terminal attached with
+`railswitch agent` gets the same when it supports extended keys.
 
 The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
 while a terminal is open, leaving or closing the page asks first.
@@ -767,8 +827,31 @@ Every action is a job (below).
   while this worktree's home waits for it (`agent ls`'s
   `default_pending`) the dialog says "Pending: … takes the default at its
   next start", adding "stop it, then start it again" while it runs.
-- **terminal** runs `railswitch term`: a new terminal tab or window on
-  the host with your shell in the worktree's folder.
+- **snapshots…** (the detail's Database area, shown when the worktree has
+  a data service; D157) opens a dialog that reads `railswitch --json db
+  snapshot ls`: each snapshot with when it was taken and its size,
+  **restore** (asks first: what the databases and storage hold now is
+  lost; `db snapshot restore --yes <name>`) and **delete** (asks first;
+  `db snapshot rm <name>`), and **Take a snapshot** with an optional name
+  (`db snapshot [<name>]`, a timestamp by default). The dashboard restores
+  or deletes only a name the list it read holds.
+- **Queue** (under the detail's Agent, D159): the worktree's agent work
+  queue from `overview`'s `queue`, each item's first line (the whole text
+  as its tooltip) with **remove** (`agent queue rm <id>`), **clear**
+  (`agent queue clear`, asked first) and **add to queue…**, a dialog with
+  a prompt box and an issue number field (`agent queue add`, the text on
+  stdin, or `agent queue add --issue <n>`). The dashboard delivers the
+  queue: when an overview shows a worktree with a queue whose agent runs
+  and is `idle`, or its turn is over without a question to you, with a
+  status at least 5 s old, it runs `agent queue next` as a job (label
+  `agent queue next`), once per status `ts` (a job of that worktree
+  already running: at the next overview). `next` checks the same again
+  and types the first item through `agent prompt`, removing it only once
+  typed; an agent working, or waiting on a permission or a question, is
+  never typed into. Each delivery shows in Jobs.
+- **open window ↗** (at the end of the Terminal row) runs `railswitch
+  term`: a new terminal tab or window on the host with your shell in the
+  worktree's folder.
 - **nvim** and **agent** (the cyberpunk office's desks) run `railswitch nvim
   --new-term` and `railswitch agent --new-term`.
 - **Stack branch** (with a gh stack): a click on another open branch of
@@ -808,17 +891,33 @@ Every action is a job (below).
   settles, or at once while it works; an agent waiting on a permission
   or a question is refused, since the text's Enter would answer it). **Send all unresolved to the agent** does it for every open
   thread, as much as fits in one input (4096 bytes; the rest are counted
-  and pointed to on GitHub). The page also adds a **Comment** to the
+  and pointed to on GitHub). **Queue for agent**, by each, adds the same
+  text to the worktree's agent queue instead (`pr agent --queue`, D159),
+  typed in once the agent is idle. The page also adds a **Comment** to the
   conversation and submits a **Review** (comment only, request changes,
   approve). Typed text goes to `gh` on stdin, never in its arguments.
-- **Task palette** (`:`): `railswitch --json task ls` for the selected worktree,
-  filtered as you type, with an "args" field split like a shell (quotes and
-  backslash, no expansion), and "in a new terminal", ticked unless this
-  browser last unticked it (kept in its local storage). Enter or a click
-  runs the task as the box says: ticked, `railswitch task --new-term
-  <name> <args…>`, a terminal window (interactive tasks such as
-  `console` need one); unticked, `railswitch task <name> <args…>` as a
-  job with its output under Jobs. Shift+Enter runs it the other way.
+- **Command palette** (`:`, D155; `/p/<prefix>/<slug>/tasks`, or
+  `/p/<prefix>/palette` on a page with no worktree selected): one list,
+  filtered as you type, each line with its kind: the selected worktree's
+  **tasks** (`railswitch --json task ls`), its **actions** (the Actions
+  buttons of its detail, posting to the same URLs), the project's
+  **worktrees** and its **pages** (worktrees, images, tidy, library, settings,
+  notes, office, machine settings). The filter is fuzzy: its letters in
+  order, spaces ignored, so `pgset` finds "page settings"; the best match
+  is first (letters that start words or run together), ties in the list's
+  order. A typed kind word (`task`, `action`, `worktree`, `page`) filters
+  to that kind. Tasks keep the
+  "args" field, split like a shell (quotes and backslash, no expansion),
+  and "in a new terminal", ticked unless this browser last unticked it
+  (kept in its local storage). Enter or a click runs the task as the box
+  says: ticked, `railswitch task --new-term <name> <args…>`, a terminal
+  window (interactive tasks such as `console` need one); unticked,
+  `railswitch task <name> <args…>` as a job with its output under Jobs.
+  Shift+Enter runs it the other way. Enter on an action starts its job;
+  on a worktree or page it opens it. With a worktree selected, when no task
+  is named exactly what the filter says, the list ends with "new task
+  <filter>…" (Enter on it, the first line when nothing else matches, or a
+  click): the Settings page's Tasks card with that name filled in.
 - **Cancel** on a running job stops it.
 
 ## Jobs
@@ -865,7 +964,10 @@ above an open dialog too.
   are no desktop notifications without one.
 - Polling: `railswitch --json overview` every 2 s for a project with a page open,
   every 10 s for the others (so their waiting agents reach the strip);
-  `railswitch --json pr ls` every 60 s for a project with a page open.
+  `railswitch --json pr ls` every 60 s for a project with a page open;
+  `railswitch --json stats` of the selected worktree every 10 s, by the
+  page itself (`GET /p/<prefix>/<slug>/stats`) and only while its tab is
+  visible: one `podman stats` per looking tab, not per worktree.
   A request for a prefix the project list lacks reads `project ls` again
   only when the list is 5 s old or older; until then it is a 404.
 
@@ -901,9 +1003,23 @@ pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
 working blue, your turn yellow, idle and off muted.
 
+## Notes
+
+`/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
+notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
+first, and opens one in an editor (`?n=<name>`, `notes show`). **Save**
+posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
+handler the office's Notes kiosk uses, which runs `notes write <name>
+--if-hash <hash>` with the text on stdin: a note changed since you opened
+it is refused, the CLI's message stays under the box, and your text stays
+in it. **Delete** asks first, then runs `notes rm <name> --if-hash
+<hash>`. **New note** takes a name (`[A-Za-z0-9][A-Za-z0-9._-]{0,99}.md`)
+and opens an empty editor (`?new=<name>`) whose Save creates it
+(`--if-hash ""`, refused when the name exists).
+
 ## Virtual Office
 
-**Virtual Office** in the header opens `/p/<prefix>/virtual-office`, which
+`office` in the header opens `/p/<prefix>/virtual-office`, which
 redirects to the active set's page, `/p/<prefix>/virtual-office/<set>/`
 (D150, D153; D150's `/virtual-office/cyberpunk` redirects the same way):
 the project as an office tower in 3D (three.js), an optional view beside
@@ -987,7 +1103,14 @@ any open page.
     the second neon), with a
     pin per service (in the lobby, per floor) coloured by its state, which
     opens it, and a halo above with the floor's summary. The **game room**
-    (glass): two bartop arcades on their stands, a sofa facing them.
+    (glass): two bartop arcades on their stands, a sofa facing them. A click
+    on a cabinet plays it over the office (D154): the first is
+    **Minesweeper** (click opens, right-click flags, the first click is
+    always safe; **Size** cycles 9×9, 16×16 and 30×16), the second
+    **Stackfall**, falling blocks (`←` `→` move, `↑` or `X` turns, `Z`
+    turns back, `↓` drops a row, `Space` drops it all the way, `P` pauses;
+    its best score stays in this browser). `R` starts over; `Esc` or
+    **Close** ends the game, and the office's own keys wait until then.
 - **The elevator** (in the left wall of every floor, or `T`) lists the
   lobby and every floor; its doors open as you walk up, and stepping in
   front of them opens the list. `Esc` closes a panel.
@@ -1079,6 +1202,10 @@ docs/json.md.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
+- `railswitch --json agent usage --all --days 14` (project, with the PRs):
+  the agents' usage history (D162). The dashboard's `overview` poll is
+  what records it: every `overview` adds each agent's session counter's
+  growth to the history.
 - `railswitch [--json] pr ls` (project): each worktree's pull request via
   the host's `gh` (`gh pr list --head=<branch>` per worktree branch on the
   repo from `project.toml`, never a worktree's git config, run in `/`, away from any workspace's config files): number, title, url, state (`draft`, `open`,
@@ -1095,8 +1222,9 @@ docs/json.md.
   extension, and a failed read keeps the last stacks.
 - `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged
   with the project's `[tasks]` in `project.toml`; a project task replaces a
-  pack task of the same name and `""` removes one; no task may be named
-  `ls`:
+  pack task of the same name and `""` hides one; no task may be named
+  `ls`, `set`, `rm` or `restore`. Each row's `pack` is the pack's command
+  for the name, when there is one:
 
   ```toml
   [tasks]
@@ -1104,6 +1232,15 @@ docs/json.md.
   lint = ""
   ```
 
+- `railswitch task set <name> <command>`, `task rm <name>`, `task restore
+  <name>` (project, D156): edit `project.toml`'s `[tasks]` with the line
+  editor (its comments and other lines stay), then lock and render, as a
+  settings apply does. `set` writes `name = "<command>"` (one argument:
+  quote it). `rm` takes out the project's task, which brings back the
+  pack's of that name if any, and for a pack task the project doesn't set
+  writes `name = ""` to hide it. `restore` takes out that `""`. A name
+  that isn't a task, a hidden one for `rm`, or one not hidden for
+  `restore` is an error.
 - `railswitch task [--new-term] <name> [args…]` (worktree): runs the task
   in the app image as `exec` does, as `sh -c '<command> "$@"' <name>
   <args…>`; stdin and the terminal pass through; the exit code is the
@@ -1113,6 +1250,14 @@ docs/json.md.
   known terminal installed.
 - `railswitch wt add [--name <n>] [--up] <branch>`: `--up` runs `up` in the
   new worktree.
+- `railswitch [--json] db snapshot ls` (worktree), `db snapshot
+  [<name>]`, `db snapshot restore --yes <name>` and `db snapshot rm
+  <name>`: the snapshots dialog (D157).
+- `railswitch agent queue add [--issue <n>]` (text on stdin), `agent
+  queue rm <id>`, `agent queue clear` and `agent queue next` (worktree):
+  the agent work queue (D159), above; `overview`'s `queue` shows it.
+- `railswitch --json tidy` (project) and `tidy --rm [--force] <id>...`:
+  the Tidy page.
 - `railswitch [--json] pack ls`: the built-in packs, options (with slot
   and `works_with`) and agent packages, for the new page.
 - `railswitch [--json] -w <slug> containerfile list`, `--json containerfile

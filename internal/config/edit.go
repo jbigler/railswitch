@@ -608,6 +608,33 @@ func UnsetEnv(data, name string) (string, error) {
 	return d.removeStmt(s), nil
 }
 
+// SetTask sets the project [tasks] name to cmd; "" hides the pack's task
+// of that name (D156).
+func SetTask(data, name, cmd string) (string, error) {
+	d, err := parseEdit(data, "tasks", false, false)
+	if err != nil {
+		return "", err
+	}
+	table := []string{"tasks"}
+	if s := d.find(table, name); s != nil {
+		return d.setValue(s, QuoteString(cmd)), nil
+	}
+	return d.insertKey(table, keyTOML(name), QuoteString(cmd)), nil
+}
+
+// UnsetTask removes the project [tasks] name; an absent name is an error.
+func UnsetTask(data, name string) (string, error) {
+	d, err := parseEdit(data, "tasks", false, false)
+	if err != nil {
+		return "", err
+	}
+	s := d.find([]string{"tasks"}, name)
+	if s == nil {
+		return "", fmt.Errorf("project.toml: [tasks] has no %s", keyTOML(name))
+	}
+	return d.removeStmt(s), nil
+}
+
 // AddLink appends a [[links]] table. A label already used by a project link
 // is an error.
 func AddLink(data, label, url string) (string, error) {

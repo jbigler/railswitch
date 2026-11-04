@@ -1,7 +1,7 @@
 {{define "list"}}<div id="list" class="list">
 <div class="tb">Sort <span class="seg">{{range .Sorts}}<a{{if .On}} class="on"{{end}} href="{{.URL}}" data-sort>{{.Label}}{{if .On}}{{if .Rev}} ↑{{else}} ↓{{end}}{{end}}</a>{{end}}</span><span class="sp"></span><form method="post" action="{{.RefreshURL}}" data-post><button class="ln dim">Refresh PRs</button></form><button type="button" class="ln dim" data-open="newwt">+ New worktree</button></div>
 <table>
-<thead><tr><th>worktree</th><th>branch</th><th>PR</th><th>stack</th><th>agent</th></tr></thead>
+<thead><tr><th>worktree</th><th>branch</th><th>PR</th><th>stack</th><th>agent</th><th>tests</th></tr></thead>
 <tbody>
 {{range .Rows}}{{template "row" .}}
 {{end}}</tbody>
@@ -15,4 +15,10 @@
 <td{{with .PR}} title="{{.Title}}"{{end}}>{{with .PR}}<a class="pr" href="{{.URL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{if .Glyph}} <span class="{{.ChecksClass}}">{{.Glyph}}</span>{{end}} <span class="{{.StateClass}}">{{.State}}</span>{{if .Review}} · <span class="{{.ReviewClass}}">{{.Review}}</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
 <td class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}{{if .Stale}} <span class="stale">restart to apply</span>{{end}}</td>
 <td class="{{.AgentClass}}"{{if .AgentTitle}} title="{{.AgentTitle}}"{{end}}>{{.AgentGlyph}} {{.AgentText}}</td>
+<td class="tests">{{with .Tests}}<span class="{{.Class}}" title="{{.Title}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
 </tr>{{end}}
+
+{{/* The project's agent usage per day (D162): SVG attributes only, the
+CSP allows no inline style. */}}
+{{define "usage"}}<div id="usage" class="usage">{{with .}}<div class="lbl">Agent usage <span class="usage-sum">{{.Summary}}</span></div>
+<svg class="usage-chart" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="Agent usage, {{.Summary}}">{{range .Bars}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"><title>{{.Title}}</title></rect>{{end}}</svg>{{end}}</div>{{end}}

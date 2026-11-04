@@ -7,6 +7,7 @@ Strip, Banner and Projects. */}}
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/theme.css" id="theme">
 <script src="/static/app.js" defer></script>
+<script src="/static/stats.js" defer></script>
 </head>{{end}}
 
 {{define "top"}}{{template "header" .Header}}
@@ -32,19 +33,22 @@ Strip, Banner and Projects. */}}
 <main class="grid">
 <section class="left">
 {{template "list" .List}}
-<div class="note">↑↓ moves through worktrees · P switches project · : runs a task</div>
+{{template "usage" .Usage}}
+<div class="note">↑↓ moves through worktrees · P switches project · : command palette</div>
 </section>
 <section class="pane">
 {{with .Secrets}}{{template "secrets-needed" .}}{{end}}
 {{template "detail" .Detail}}
-<div id="terms" class="terms"></div>
 {{template "jobs" .Jobs}}
+<div id="terms" class="terms"></div>
 </section>
 </main>
 {{template "common-dialogs" .}}
 {{template "newwt" .List}}
 <dialog id="remove" class="dlg"></dialog>
 <dialog id="agentdefault" class="dlg"></dialog>
+<dialog id="snapshots" class="dlg"></dialog>
+<dialog id="agentqueue" class="dlg"></dialog>
 </body>
 </html>
 {{end}}

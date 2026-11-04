@@ -734,12 +734,19 @@ func TestWtRmRemovesStatusDir(t *testing.T) {
 	e.add(t, "other", "")
 	for _, slug := range []string{"feat", "other"} {
 		writeFile(t, filepath.Join(e.ws, ".railswitch", "status", slug, "claude.json"), `{"v":1,"state":"idle","message":"","ts":1}`)
+		writeFile(t, filepath.Join(e.ws, ".railswitch", "snapshots", slug, "s1", "app_dev.dump"), "PGDMP")
 	}
 	if err := e.m.Remove(context.Background(), "feat", false); err != nil {
 		t.Fatal(err)
 	}
 	if exists(filepath.Join(e.ws, ".railswitch", "status", "feat")) {
 		t.Error("status/feat remains after wt rm")
+	}
+	if exists(filepath.Join(e.ws, ".railswitch", "snapshots", "feat")) {
+		t.Error("snapshots/feat remains after wt rm")
+	}
+	if !exists(filepath.Join(e.ws, ".railswitch", "snapshots", "other", "s1", "app_dev.dump")) {
+		t.Error("wt rm feat removed snapshots/other")
 	}
 	if exists(filepath.Join(e.ws, ".railswitch", "create-pending", "feat")) {
 		t.Error("create-pending/feat remains after wt rm")

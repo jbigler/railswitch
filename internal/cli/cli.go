@@ -60,6 +60,7 @@ var commands = map[string]command{
 	"down":          cmdDown,
 	"restart":       cmdRestart,
 	"status":        cmdStatus,
+	"stats":         cmdStats,
 	"overview":      cmdOverview,
 	"share":         cmdShare,
 	"unshare":       cmdUnshare,
@@ -81,6 +82,7 @@ var commands = map[string]command{
 	"signer":        cmdSigner,
 	"library":       cmdLibrary,
 	"template":      cmdTemplate,
+	"tidy":          cmdTidy,
 }
 
 // Main runs railswitch with args (without the program name) and returns the exit code.

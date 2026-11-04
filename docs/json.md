@@ -541,6 +541,46 @@ Exit 0; a failed removal is a warning.
 | `bytes` | number | The removed images' size, layers they share with kept images included. |
 | `warnings` | array | A project that doesn't load (nothing of its prefix is removed), a removal that failed. |
 
+## `tidy`
+
+What `railswitch tidy [--all] [--days <n>]` suggests removing (D160):
+the project's (`--all`: every registered project's) worktrees and images.
+It removes nothing; `tidy --rm [--force] <id>...` does (text output only).
+
+```json
+{"days": 14, "bytes": 1390004096,
+ "items": [
+  {"id": "wt:shop/feature-x", "kind": "worktree", "project": "shop", "name": "feature-x", "branch": "feature/x",
+   "reasons": ["pr-merged", "stopped"], "pr": 42, "stack": "stopped",
+   "idle_since": "2026-10-01T09:00:00Z", "idle_from": "systemd", "dirty": false, "bytes": 4096, "partial": false},
+  {"id": "image:localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "kind": "image", "project": "shop",
+   "name": "localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "branch": "", "reasons": ["unused"], "pr": 0,
+   "stack": "", "idle_since": "", "idle_from": "", "dirty": false, "bytes": 1390000000, "partial": false}],
+ "warnings": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `days` | number | `--days`: a stopped stack idle longer is a candidate (default 14). |
+| `items[].id` | string | What `tidy --rm` takes: `wt:<prefix>/<slug>` or `image:<name>`. |
+| `items[].kind` | string | `worktree` or `image`. |
+| `items[].reasons` | array | A worktree: `pr-merged`, `pr-closed` (its branch's PR as `pr ls` picks it), `stopped` (the stack is stopped and idle over `days`). An image: `unused` (no worktree's current render builds it and no container uses it: `gc`'s judgement). The base worktree is never listed. |
+| `items[].pr` | number | The merged or closed PR's number; `0` for none. |
+| `items[].stack` | string | The worktree's stack state, as `overview` has it; `""` for an image. |
+| `items[].idle_since` | string | For a stopped stack, RFC 3339 UTC: the latest time one of its units stopped, as systemd remembers it (`idle_from` `systemd`; forgotten at reboot), else HEAD's commit time (`commit`); `""` when neither is known (never `stopped` then). |
+| `items[].dirty` | boolean | Uncommitted changes or untracked files: `tidy --rm` keeps it unless `--force`. |
+| `items[].bytes` | number | A worktree: its checkout's regular files (apparent size, symlinks not followed). An image: podman's size, shared layers included. |
+| `items[].partial` | boolean | The checkout walk stopped after 200,000 entries: `bytes` is a lower bound. |
+| `bytes` | number | The items' bytes summed. |
+| `warnings` | array | No PR states (gh missing or failing, a repo not on GitHub: no `pr-*` reasons), a project that doesn't load (`--all`), `gc`'s warnings. |
+
+`tidy --rm <id>...` lists again first and removes only the ids still
+listed: worktrees first, by `wt rm`'s path (its checks, exact names), then
+images by `podman rmi <name>`. An id no longer listed, or a dirty worktree
+without `--force`, is refused and kept; the others still go; exit 1 when
+any was refused or failed. `--force` applies only to the dirty worktrees
+named: they go as `wt rm --force` takes them.
+
 ## `fw show [service]`
 
 The firewall of the worktree's containers (the workspace root: every
@@ -624,6 +664,37 @@ tools, agents). It is an array with one object per service.
 | `state` | string | The unit's systemd state, `<ActiveState>/<SubState>`, e.g. `active/running`, `inactive/dead`, `failed/failed`. An on-demand agent has no unit: `running` while its container runs (`railswitch agent`), else `on-demand`. |
 | `health` | string | podman's health status of the container (`starting`, `healthy`, `unhealthy`) for a service with a health check (the app included, D34); `""` for a service without one, or when its container does not exist. |
 
+## `stats [--all]`
+
+Each service's resource use against its limits (D161): the current
+worktree's (`-w <slug>`, or the worktree the working directory is in), or
+with `--all` every worktree's, in registry then model order. One `podman
+stats --no-stream` samples the running containers; a service whose
+container isn't running has `running` false and zero figures.
+
+```json
+[
+  {"worktree": "feat", "service": "rails", "role": "app", "container": "demo-feat-rails", "running": true,
+   "cpu_percent": 3.5, "mem_used": 3221000000, "mem_limit": 4295000000, "mem_percent": 75.0, "pids": 12, "pids_limit": 4096},
+  {"worktree": "feat", "service": "deps", "role": "deps", "container": "demo-feat-deps", "running": false,
+   "cpu_percent": 0, "mem_used": 0, "mem_limit": 0, "mem_percent": 0, "pids": 0, "pids_limit": 4096}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `worktree` | string | The worktree's slug. |
+| `service` | string | Service id, e.g. `rails`, `db`. |
+| `role` | string | As in `status`. |
+| `container` | string | Its container's exact name. |
+| `running` | boolean | podman sampled it: its container runs. |
+| `cpu_percent` | number | podman's CPU percentage for the sample (100 is one core); 0 when podman printed none. |
+| `mem_used` | number | Memory in use, in bytes, as podman prints it (4 significant figures). |
+| `mem_limit` | number | The container's memory limit in bytes, as podman reports it: the unit's `Memory=` (D34). |
+| `mem_percent` | number | `mem_used` of `mem_limit`, in percent, podman's figure (else computed). |
+| `pids` | number | Processes and threads in the container; 0 when podman printed none. |
+| `pids_limit` | number | The unit's `PidsLimit=` (D34), from the model; known while it is stopped too. |
+
 ## `agent ls`
 
 The project's agents (`project.toml [agents]`), sorted by name, with each
@@ -653,7 +724,59 @@ hook writes.
 | `config` | boolean | Its package has `[config] paths`, so it can have a project default (`agent default`, D135). |
 | `default` | object or null | Where the project's default for it came from: `from` (the worktree promoted) and `promoted` (RFC 3339); `null` without one. |
 | `default_pending` | boolean | Its home in this worktree holds the request to take the default (a new home, or `agent default apply`): its entrypoint applies it at the agent's next start. |
-| `usage` | object or null | The status file's `usage`: the tokens of the agent's current (or last) session, as its package's hook counts them: `input`, `output`, `cache_read`, `cache_write` (integers). `null` when the file has none, or one with a count below 0 or above 10^13. claude@1 counts them from the session's transcript when a turn ends or a session starts. |
+| `usage` | object or null | The status file's `usage`: the tokens of the agent's current (or last) session, as its package's hook counts them: `input`, `output`, `cache_read`, `cache_write` (integers), and `cost` (a number, US dollars) only when the package reports one (D162). `null` when the file has none, or one with a count below 0 or above 10^13, or a cost below 0 or above 10^6. claude@1 counts them from the session's transcript when a turn ends or a session starts; it reports no cost. |
+
+## `agent usage [--days N] [--all]`
+
+The agents' token history (D162): per local day, worktree and agent, the
+growth of each agent's session counter (`agent ls`'s `usage`). Without
+`--all` the current worktree's (`-w <slug>`), with `--all` every
+worktree's of the project. `--days` (1 to 90, default 14) is the window,
+today included.
+
+The history is recorded on the host by the commands that read the status
+files: every `overview` (the dashboard polls it every 2 to 10 s for every
+project) and every `agent usage`, which records before it reports. Each
+reading adds the growth since the last one to the local day of the status
+file's `ts` (today's when `ts` is 0, in the future or past the 90 days
+kept). A count that drops (or a cost that drops) is a new session: all of
+its counter is new, nothing is subtracted. A session that ends between
+two readings loses its growth since the last one, and a new session that
+already passed the last one's counts when first read is taken as growth.
+Each sum is capped at 10^15.
+
+The file is `~/.local/share/railswitch/usage/<prefix>.json` (0600, its
+directory 0700, written atomically under `<prefix>.json.lock`): one JSON
+object, `{"schema": 1, "last": {"<worktree>/<agent>": {...}}, "days":
+[<row>...]}`, `last` each counter as last read. Days older than 90 are
+dropped. A file with a `schema` above 1 is refused as written by a newer
+railswitch (D39); `overview` then records nothing but still answers.
+
+```json
+{"today": "2026-11-04", "days": 2,
+ "daily": [{"day": "2026-11-03", "total": 2100000, "input": 100000, "output": 0, "cache_read": 2000000, "cache_write": 0, "cost": null},
+           {"day": "2026-11-04", "total": 9300000, "input": 300000, "output": 40000, "cache_read": 8900000, "cache_write": 60000, "cost": null}],
+ "rows": [{"day": "2026-11-03", "worktree": "feat", "agent": "claude", "input": 100000, "output": 0, "cache_read": 2000000, "cache_write": 0, "cost": null},
+          {"day": "2026-11-04", "worktree": "feat", "agent": "claude", "input": 300000, "output": 40000, "cache_read": 8900000, "cache_write": 60000, "cost": null}],
+ "worktrees": [{"worktree": "feat", "total": 11400000, "input": 400000, "output": 40000, "cache_read": 10900000, "cache_write": 60000, "cost": null, "today": 9300000, "median": 2100000, "runaway": true}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `today` | string | Today, `YYYY-MM-DD` in local time. |
+| `days` | number | The window, `--days`. |
+| `daily` | array | Every day of the window, oldest first, summed over the worktrees (and agents) reported; days without usage are zeros. Never null. |
+| `rows` | array | The window's days with usage, per worktree and agent: oldest first, then by worktree, then agent. Never null. |
+| `worktrees` | array | Per worktree with usage in the window, by name: its sums over the window. Never null. |
+| `input`, `output`, `cache_read`, `cache_write` | number | Tokens. |
+| `total` | number | The four summed (on `daily` and `worktrees`; `rows` have the four only). |
+| `cost` | number or null | US dollars, summed over the readings whose package reported a cost; `null` when none did. railswitch never prices tokens. |
+| `today` (worktree) | number | Its total today. |
+| `median` | number | The median total of its days with usage among the 14 before today (whatever `--days`). |
+| `runaway` | boolean | Today is far above its usual day: at least 3 days with usage among those 14, today at least 1,000,000 tokens and over 3 times `median`. The text form prints `runaway: <worktree> ...` under the table. |
+
+The text form is a table `DAY WORKTREE AGENT TOTAL INPUT OUTPUT CACHE
+READ CACHE WRITE COST` of `rows` (`-` for no cost).
 
 ## `agent screen [<name>]`
 
@@ -674,6 +797,37 @@ An on-demand agent is refused (exit 1). The text form prints the lines.
 | `running` | boolean | Its container runs in this worktree. `false`: `session` is `false` and `lines` empty, exit 0. |
 | `session` | boolean | Its session server holds the agent's session. `false` (the container runs, no agent in it): `lines` empty, exit 0. |
 | `lines` | array of strings | The screen, top to bottom; never null. |
+
+## `agent queue ls`
+
+The current worktree's agent work queue (D159), in order: the prompts
+`agent queue add` queued (or `pr agent --queue`), which `agent queue next`
+types into the worktree's default agent one at a time, as it goes idle.
+Kept host-side in `<workspace>/.railswitch/queue/<slug>/queue.json`
+(0600, no container mounts it; `wt rm` removes it); at most 20 items of at
+most 4096 bytes each, checked as `agent send` checks its text. The text
+form is a table `ID TEXT` with each item's first line (control characters
+as spaces).
+
+```json
+{"slug": "feat-login", "delivered": 1793115142, "items": [{"id": 3, "text": "Fix the failing spec\nthen run the linter", "added": 1793115100}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `slug` | string | The worktree. |
+| `delivered` | number | When the last delivery started (Unix seconds), `0` for none. `next` waits for an agent status from a later second, so one status never takes two items. |
+| `items` | array | Oldest first; never null. |
+| `items[].id` | number | The item's id in this queue, never reused; `agent queue rm <id>` removes it. |
+| `items[].text` | string | What is typed, as given (UTF-8, line breaks and tabs only). |
+| `items[].added` | number | When it was queued (Unix seconds). |
+
+`agent queue next` types the first item when the default agent runs, its
+status is `idle` or `done` without a question to the user (`reply`), at
+least 5 s old and not older than `delivered`; it prints `held: <why>` and
+exits 0 otherwise, and when another delivery of the worktree runs.
+Typing goes through `agent prompt` (D152), whose refusals apply; the item
+is removed only once typed, so a failed delivery keeps it (exit 1).
 
 ## `issue ls`
 
@@ -826,7 +980,7 @@ with its stack state, services, agent and links. The dashboard polls it
 every 2 s, so it is cheap: one `systemctl --user show` for every unit of
 the project, exactly one `podman ps -a --format json` (running
 on-demand services and agents, and each running container's unit-hash
-label), no health check and no git call. The text form is a table `WORKTREE BRANCH STACK AGENT` (the base
+label), no health check and no git call (each worktree's HEAD commit, for `tests.stale`, is read from its git files). The text form is a table `WORKTREE BRANCH STACK AGENT TESTS` (the base
 worktree marked `(base)`) with each worktree's links indented under its
 row.
 
@@ -839,7 +993,8 @@ row.
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
-      "stack": "up", "stale": false,
+      "stack": "up", "stale": false, "queue": [],
+      "tests": {"state": "failed", "stale": false, "last": {"exit_code": 1, "started_at": "2026-11-04T10:02:11Z", "ended_at": "2026-11-04T10:05:40Z", "commit": "9f2c…"}},
       "services": [{"service": "rails", "role": "app", "state": "active/running"}],
       "agent": {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
       "links": [
@@ -870,7 +1025,12 @@ row.
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
 | `worktrees[].services[].container` | string | The service's container name (`<prefix>-<slug>-<service>`), as podman and Dozzle show it. |
 | `worktrees[].services[].restartable` | boolean | A long-lived unit, a service agent included (not an on-demand service or agent, or a oneshot like deps), that `railswitch restart <service>` restarts alone. |
+| `worktrees[].tests` | object or null | The last run of the worktree's `test` task (D158); `null` when the project has no task named `test`. Only `railswitch task test` without arguments (the whole suite) is recorded, run in a terminal, as a dashboard job or with `--new-term`, and only when the command ended on its own: a cancelled run, or podman failing to start it, records nothing. railswitch writes the record itself from its own child's exit code, in `<workspace>/.railswitch/tests/<slug>/last.json` (0600, a 0700 dir no container mounts; `wt rm` removes it). |
+| `worktrees[].tests.state` | string | `never` (no run recorded), `passed` (exit 0) or `failed`. |
+| `worktrees[].tests.stale` | boolean | The worktree's HEAD is now another commit than the one the run started on. `false` when either commit can't be read (a reftable repo, an unborn branch). The commits come from the worktree's git files, which a container can write: stale is a hint, not proof. |
+| `worktrees[].tests.last` | object or null | `null` for `never`; else `exit_code` (number, the task's own, `0` for passed), `started_at` and `ended_at` (RFC 3339 UTC), `commit` (the full HEAD commit at the start; `""` when unreadable). |
 | `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
+| `worktrees[].queue` | array | Its agent work queue's items (D159), as [`agent queue ls`](#agent-queue-ls)'s `items`; `[]` for none, or when the queue file can't be read (`agent queue ls` says why). |
 | `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
 
 ## `lock --review`
@@ -1064,13 +1224,17 @@ extension (`gh extension list` has no `gh stack`) no worktree is asked.
 
 The worktree's (`-w`) tasks, by name: the pack's `[tasks]` with
 `project.toml`'s `[tasks]` over them (a project task replaces a pack task
-of the same name; `""` removes one). `railswitch task <name> [args…]`
-runs one. The text form is a table `NAME SOURCE COMMAND`.
+of the same name; `""` hides one). `railswitch task <name> [args…]`
+runs one; a run of the `test` task without arguments is recorded as the
+worktree's test status ([`overview`](#overview) `tests`, D158). The text
+form is a table `NAME SOURCE COMMAND`. Hidden pack tasks are not listed:
+`project show` has them.
 
 ```json
 [
-  {"name": "console", "command": "bin/rails console", "source": "pack"},
-  {"name": "lint", "command": "bin/rubocop", "source": "project"}
+  {"name": "console", "command": "bin/rails console", "source": "pack", "pack": "bin/rails console"},
+  {"name": "lint", "command": "bin/rubocop", "source": "project"},
+  {"name": "test", "command": "bin/rspec", "source": "project", "pack": "bin/rails test"}
 ]
 ```
 
@@ -1079,6 +1243,27 @@ runs one. The text form is a table `NAME SOURCE COMMAND`.
 | `name` | string | The task's name. |
 | `command` | string | Its shell command, run as `sh -c '<command> "$@"' <name> <args…>`. |
 | `source` | string | `pack` or `project`. |
+| `pack` | string | The pack's command for this name; absent when the pack has no such task. A `project` task with one overrides it, and `task rm` brings it back (D156). |
+
+## `db snapshot ls`
+
+The worktree's (`-w`) database snapshots (D157), newest first; none is
+`[]`. Each is a `db dump` kept by name in
+`<workspace>/.railswitch/snapshots/<worktree>/<name>/` (dir 0700, files
+0600). The text form is a table `NAME CREATED SIZE`.
+
+```json
+[
+  {"name": "before-migrate", "created": "2026-11-04T10:00:00+01:00", "bytes": 2500000, "files": ["app_dev.dump", "rustfs_data.tar.gz"]}
+]
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `name` | string | The snapshot's name: `db snapshot restore <name>`, `db snapshot rm <name>`. |
+| `created` | string | When it was taken (RFC 3339; its dir's modification time). |
+| `bytes` | number | The size of its files together. |
+| `files` | array | Its dumps and volume seeds, as `db dump` names them. |
 
 ## `settings preview`
 
@@ -1088,6 +1273,9 @@ or absent for the default), `firewall.allow.add` and
 `firewall.allow.remove` (`key`: `app`, `deps` or `agent`; `value`: a
 host) (D119), `option`, `env.set`,
 `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`,
+`task.set` (`name`; `value`: the command, absent or `""` to hide the
+pack's task of that name) and `task.unset` (`name`: takes the project's
+`[tasks]` entry out; D156),
 `hooks.set` (`key`: `deps`, `start` or `create`; `values`: the list's
 commands in order, absent or `[]` to remove it; D126), `agent.setup`
 (`key`: an agent's name; `values`: its setup commands in order, absent or
@@ -1156,6 +1344,10 @@ What the settings page reads: the project's choices, env and links.
     {"label": "Admin", "url": "{worktree.host}/admin", "from": "project", "hidden": false},
     {"label": "Mailer previews", "url": "{worktree.host}/rails/mailers", "from": "pack rails@1", "hidden": false},
     {"label": "Storage console", "url": "s3-ui.{worktree.host}", "from": "option rustfs@1", "hidden": false}
+  ],
+  "tasks": [
+    {"name": "console", "command": "", "source": "hidden", "pack": "bin/rails console"},
+    {"name": "lint", "command": "bin/rubocop", "source": "project"}
   ]
 }
 ```
@@ -1177,6 +1369,7 @@ What the settings page reads: the project's choices, env and links.
 | `env[]` | array | The `[env]` table by name. |
 | `links[]` | array | The project's `[[links]]` (`from: "project"`), then the stack's: pack, options in key order, tools (`pack <ref>`, `option <ref>`, `tool <name>`). URLs keep their `{placeholders}`. |
 | `links[].hidden` | bool | The label is in `hide_links`. |
+| `tasks[]` | array | As `task ls`, by name, with the pack tasks the project hides too: `source: "hidden"`, `command: ""`, `pack` their command (D156). `[]` for none. |
 
 `project write --if-hash <h>` reads the whole `project.toml` on stdin,
 refuses on a hash mismatch, parse, validation or resolve error (exit 1,

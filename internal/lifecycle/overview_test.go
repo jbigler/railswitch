@@ -177,7 +177,7 @@ func TestOverview(t *testing.T) {
 		t.Fatalf("%v: %s", err, e.out)
 	}
 	wt := doc["worktrees"].([]any)[1].(map[string]any)
-	for _, k := range []string{"slug", "id", "branch", "base", "stack", "services", "agent", "links", "stale"} {
+	for _, k := range []string{"slug", "id", "branch", "base", "stack", "services", "agent", "links", "stale", "tests"} {
 		if _, ok := wt[k]; !ok {
 			t.Errorf("worktree JSON lacks %q: %v", k, wt)
 		}
@@ -193,7 +193,7 @@ func TestOverview(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := e.out.String()
-	for _, w := range []string{"WORKTREE", "BRANCH", "STACK", "AGENT", "master (base)", "jb/feat", "failed", "probe: permission", "\n  App ", "http://feat."} {
+	for _, w := range []string{"WORKTREE", "BRANCH", "STACK", "AGENT", "TESTS", "never", "master (base)", "jb/feat", "failed", "probe: permission", "\n  App ", "http://feat."} {
 		if !strings.Contains(text, w) {
 			t.Errorf("text lacks %q:\n%s", w, text)
 		}

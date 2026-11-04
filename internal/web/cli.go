@@ -50,15 +50,38 @@ type signerWarning struct {
 }
 
 type worktree struct {
-	Slug     string    `json:"slug"`
-	ID       int       `json:"id"`
-	Branch   string    `json:"branch"`
-	Base     bool      `json:"base"`
-	Stack    string    `json:"stack"`
-	Stale    bool      `json:"stale"`
-	Services []service `json:"services"`
-	Agent    *agent    `json:"agent"`
-	Links    []link    `json:"links"`
+	Slug     string      `json:"slug"`
+	ID       int         `json:"id"`
+	Branch   string      `json:"branch"`
+	Base     bool        `json:"base"`
+	Stack    string      `json:"stack"`
+	Stale    bool        `json:"stale"`
+	Services []service   `json:"services"`
+	Agent    *agent      `json:"agent"`
+	Links    []link      `json:"links"`
+	Tests    *tests      `json:"tests"` // nil: the project has no test task
+	Queue    []queueItem `json:"queue"` // the agent work queue (D159)
+}
+
+// tests is a worktree's test task's last run (D158): State never, passed
+// or failed; Stale when HEAD moved since.
+type tests struct {
+	State string   `json:"state"`
+	Stale bool     `json:"stale"`
+	Last  *testRun `json:"last"` // nil: never run
+}
+
+type testRun struct {
+	ExitCode  int       `json:"exit_code"`
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at"`
+	Commit    string    `json:"commit"` // HEAD at the start, read from git files a container can write
+}
+
+// queueItem is a queued prompt (agentqueue.Item).
+type queueItem struct {
+	ID   int    `json:"id"`
+	Text string `json:"text"`
 }
 
 type service struct {
@@ -76,6 +99,7 @@ type agent struct {
 	Reply   bool   `json:"reply"`
 	Running bool   `json:"running"`
 	Usage   *usage `json:"usage"`
+	TS      int64  `json:"ts"`
 }
 
 // usage is an agent's session tokens (agentstatus.Usage).
@@ -148,7 +172,8 @@ type ghStackPR struct {
 type task struct {
 	Name    string `json:"name"`
 	Command string `json:"command"`
-	Source  string `json:"source"`
+	Source  string `json:"source"` // pack, project, or (project show only) hidden
+	Pack    string `json:"pack"`   // the pack's command for the name, if any
 }
 
 type wtRow struct {
@@ -187,6 +212,7 @@ type projectShow struct {
 	Options    []optionRow   `json:"options"`
 	Env        []envRow      `json:"env"`
 	Links      []projectLink `json:"links"`
+	Tasks      []task        `json:"tasks"`
 	AddChoices []string      `json:"add_choices"`
 	Used       []string      `json:"used"` // the stack's pack, option and agent refs
 	File       string        `json:"file"`

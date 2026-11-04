@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/jbigler/railswitch/internal/agentstatus"
+	"github.com/jbigler/railswitch/internal/agentusage"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 // AgentRow is one agent of `railswitch agent ls` (and one element of its
@@ -524,4 +526,41 @@ func (l *L) agentName(m *render.Model, name string) (string, error) {
 		return "", fmt.Errorf("project %s has several agents: name one of %s (or set default = true on one in project.toml)", m.Prefix, strings.Join(names, ", "))
 	}
 	return "", fmt.Errorf("project %s has no agent %s (agents: %s)", m.Prefix, name, strings.Join(names, ", "))
+}
+
+// usageSamples are the session counters of rows, worktree slug's agents,
+// for the usage history (D162).
+func usageSamples(samples []agentusage.Sample, slug string, rows []AgentRow) []agentusage.Sample {
+	for _, r := range rows {
+		if r.Usage != nil {
+			samples = append(samples, agentusage.Sample{Worktree: slug, Agent: r.Name, Usage: *r.Usage, TS: r.TS})
+		}
+	}
+	return samples
+}
+
+// usagePath is project prefix's usage history.
+func (l *L) usagePath(prefix string) string { return agentusage.Path(l.WS.Dirs.Data, prefix) }
+
+// AgentUsage records every worktree's agents' counters now, then reports
+// the usage history of the last days days of worktree slug ("": every
+// worktree), D162.
+func (l *L) AgentUsage(ctx context.Context, slug string, days int) (agentusage.Report, error) {
+	m, err := l.modelFor(workspace.LocalHost())
+	if err != nil {
+		return agentusage.Report{}, err
+	}
+	var samples []agentusage.Sample
+	for _, w := range m.Inputs.Worktrees {
+		in, err := m.Instance(w)
+		if err != nil {
+			return agentusage.Report{}, err
+		}
+		samples = usageSamples(samples, w.Slug, agentRows(m, in, nil))
+	}
+	now := time.Now()
+	if err := agentusage.Record(l.usagePath(m.Prefix), samples, now); err != nil {
+		return agentusage.Report{}, err
+	}
+	return agentusage.Read(l.usagePath(m.Prefix), days, slug, now)
 }

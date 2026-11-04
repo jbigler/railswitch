@@ -761,28 +761,81 @@ func ReadHost(ctx context.Context, r sys.Runner) (render.Host, error) {
 // files (a worktree's files are hostile: safefile only); "" when detached or
 // unreadable.
 func branchOf(dir string) string {
-	gitPath := filepath.Join(dir, ".git")
-	head := filepath.Join(gitPath, "HEAD")
-	if data, err := safefile.Read(gitPath, safefile.Limit); err == nil {
-		// A linked worktree: .git is a file "gitdir: <path>".
-		gd, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "gitdir: ")
-		if !ok {
-			return ""
-		}
-		if !filepath.IsAbs(gd) {
-			gd = filepath.Join(dir, gd)
-		}
-		head = filepath.Join(gd, "HEAD")
-	}
-	data, err := safefile.Read(head, safefile.Limit)
-	if err != nil {
-		return ""
-	}
-	branch, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "ref: refs/heads/")
+	head, _ := readHead(dir)
+	branch, ok := strings.CutPrefix(head, "ref: refs/heads/")
 	if !ok || strings.ContainsAny(branch, "\r\n\x00") {
 		return ""
 	}
 	return branch
+}
+
+// readHead is worktree dir's HEAD, trimmed, and its git dir: .git, or where
+// a linked worktree's .git file points; "" when unreadable.
+func readHead(dir string) (head, gitDir string) {
+	gitDir = filepath.Join(dir, ".git")
+	if data, err := safefile.Read(gitDir, safefile.Limit); err == nil {
+		// A linked worktree: .git is a file "gitdir: <path>".
+		gd, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "gitdir: ")
+		if !ok {
+			return "", ""
+		}
+		if !filepath.IsAbs(gd) {
+			gd = filepath.Join(dir, gd)
+		}
+		gitDir = gd
+	}
+	data, err := safefile.Read(filepath.Join(gitDir, "HEAD"), safefile.Limit)
+	if err != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(string(data)), gitDir
+}
+
+// HeadCommit is the commit checked out in worktree dir, read from its git
+// files as branchOf reads the branch, running no git: a detached HEAD, else
+// its branch's loose ref, else its line in packed-refs, both in the common
+// dir. "" when unreadable (a reftable repo too). A container can write
+// these files: the commit says what was checked out, it proves nothing.
+func HeadCommit(dir string) string {
+	head, gd := readHead(dir)
+	if isCommit(head) {
+		return head
+	}
+	ref, ok := strings.CutPrefix(head, "ref: ")
+	if !ok || !strings.HasPrefix(ref, "refs/heads/") || strings.Contains(ref, "..") || strings.ContainsAny(ref, "\r\n\x00") {
+		return ""
+	}
+	common := gd
+	if data, err := safefile.Read(filepath.Join(gd, "commondir"), safefile.Limit); err == nil {
+		common = strings.TrimSpace(string(data))
+		if !filepath.IsAbs(common) {
+			common = filepath.Join(gd, common)
+		}
+	}
+	if data, err := safefile.Read(filepath.Join(common, filepath.FromSlash(ref)), safefile.Limit); err == nil {
+		if c := strings.TrimSpace(string(data)); isCommit(c) {
+			return c
+		}
+		return ""
+	}
+	data, err := safefile.Read(filepath.Join(common, "packed-refs"), packedRefsMax)
+	if err != nil {
+		return ""
+	}
+	for line := range strings.Lines(string(data)) {
+		if c, r, ok := strings.Cut(strings.TrimSpace(line), " "); ok && r == ref && isCommit(c) {
+			return c
+		}
+	}
+	return ""
+}
+
+// packedRefsMax caps the packed-refs HeadCommit reads.
+const packedRefsMax = 64 << 20
+
+// isCommit: s is a full SHA-1 or SHA-256 object name.
+func isCommit(s string) bool {
+	return (len(s) == 40 || len(s) == 64) && strings.Trim(s, "0123456789abcdef") == ""
 }
 
 func sortedKeys[V any](m map[string]V) []string {

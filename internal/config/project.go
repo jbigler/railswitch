@@ -22,7 +22,7 @@ var Slots = []string{"database", "cache", "storage", "jobs", "mail", "browser"}
 
 // ReservedTasks are the words `railswitch task` takes as its own
 // subcommands: a [tasks] entry by that name could never run.
-var ReservedTasks = []string{"ls"}
+var ReservedTasks = []string{"ls", "set", "rm", "restore"}
 
 // Project is project.toml: the choices and overrides only (HANDOFF §3.2).
 type Project struct {
@@ -239,7 +239,7 @@ func LibraryRef(s string) (alias, rest string, ok bool) {
 
 // reservedAgents are names an agent cannot take: they are subcommands or
 // image names of `railswitch agent`.
-var reservedAgents = []string{"ls", "stop", "add", "base", "default", "update", "screen", "send"}
+var reservedAgents = []string{"ls", "stop", "add", "base", "default", "update", "screen", "send", "queue", "usage"}
 
 // Load decodes path strictly: a key project.toml does not define is an error
 // naming its dotted path. The schema is read first, on its own, so a file from

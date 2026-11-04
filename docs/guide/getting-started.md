@@ -124,16 +124,20 @@ cd worktrees/feature-x
 railswitch up | stop | restart
 railswitch logs -f rails
 railswitch exec bin/rails console
-railswitch task test                  # the pack's and project's tasks
+railswitch task test                  # the pack's and project's tasks; `test` alone records pass/fail (overview, dashboard)
+railswitch task set lint "bin/rubocop" # add or change a project task; task rm / task restore hide and bring back a pack's
 railswitch db dump                    # the databases (not Rails' test ones) and storage, into <workspace>/db-dumps/
 railswitch db restore                 # put them back into this worktree (asks first; `db restore storage`: storage only)
+railswitch db snapshot before-migrate # a named dump of this worktree, kept for it (no name: a timestamp)
+railswitch db snapshot ls             # its snapshots, newest first, with their sizes
+railswitch db snapshot restore before-migrate  # reset its data to one (asks first); db snapshot rm <name> deletes one
 railswitch down                       # stops it AND deletes its volumes (asks first)
 railswitch wt rm feature-x            # --force: even with uncommitted changes (lost)
 ```
 
 A worktree is named after its branch (`feature/x` becomes `feature-x`).
 The dashboard's own page words (`virtual-office`, `settings`, `images`,
-`library`, `review`, `tty`) are no worktree's name: a branch called one of
+`library`, `review`, `tty`, `notes`, `palette`, `tidy`) are no worktree's name: a branch called one of
 them gets a short hash added, and `--name` refuses them.
 
 `stop` keeps a worktree's data; `down` deletes its volumes, the database

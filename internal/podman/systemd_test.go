@@ -81,3 +81,15 @@ func TestActiveSince(t *testing.T) {
 		wantCalls(t, f, []string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "ActiveEnterTimestamp", "x.service"})
 	}
 }
+
+// TestInactiveSince: the latest InactiveEnterTimestamp of the units, from
+// one call; a unit never inactive is skipped.
+func TestInactiveSince(t *testing.T) {
+	f := &systest.Fake{}
+	f.On([]string{"systemctl"}, sys.Result{Stdout: []byte("Id=a.service\nInactiveEnterTimestamp=Tue 2026-10-27 09:00:00.000000 UTC\n\nId=b.service\nInactiveEnterTimestamp=Wed 2026-10-28 09:00:00.000000 UTC\n\nId=c.service\nInactiveEnterTimestamp=\n")}, nil)
+	got, err := Systemd{R: f}.InactiveSince(ctx, []string{"a.service", "b.service", "c.service"})
+	if err != nil || !got.Equal(time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("InactiveSince = %v, %v", got, err)
+	}
+	wantCalls(t, f, []string{"systemctl", "--user", "show", "--timestamp=us+utc", "-p", "Id,InactiveEnterTimestamp", "a.service", "b.service", "c.service"})
+}

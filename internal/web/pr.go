@@ -149,6 +149,10 @@ func (s *Server) prAction(w http.ResponseWriter, r *http.Request) {
 			argv = append(argv, "--thread", id)
 			label = "send a review thread to the agent"
 		}
+		if r.FormValue("queue") != "" { // D159
+			argv = append(argv, "--queue")
+			label = strings.Replace(label, "send", "queue", 1)
+		}
 	case "merge":
 		m := r.FormValue("method")
 		if m != "merge" && m != "squash" && m != "rebase" {

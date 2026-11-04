@@ -1,0 +1,25 @@
+{{/* The detail's Database area (D157): opens the snapshots dialog. */}}
+{{define "detail-database"}}{{if .SnapshotsURL}}<div class="lbl">Database</div>
+<div class="actions"><a class="ln" href="{{.SnapshotsURL}}" data-dialog="snapshots">snapshots…</a></div>
+{{end}}{{end}}
+
+{{/* A worktree's database snapshots (D157): take one, restore or delete
+each; every button is a job, restore and delete ask first. */}}
+{{define "snapshots"}}<div class="snapshots">
+<h2>Database snapshots of {{.Slug}}</h2>
+<form method="post" action="{{.TakeURL}}" data-post data-close>
+<label>Name <input name="name" placeholder="a timestamp" autocomplete="off" class="mono"></label>
+<div class="btns"><button class="ln main">Take a snapshot</button></div>
+</form>
+{{if .Snapshots}}<table class="set-table">
+<thead><tr><th>Name</th><th>Taken</th><th>Size</th><th></th></tr></thead>
+<tbody>
+{{range .Snapshots}}<tr><td class="mono">{{.Name}}</td><td class="mono">{{.Created}}</td><td class="mono">{{.Size}}</td>
+<td><form method="post" action="{{$.RestoreURL}}" data-post data-close data-confirm="Restore {{.Name}} into {{$.Slug}}? What its databases and storage hold now is lost."><input type="hidden" name="name" value="{{.Name}}"><button class="ln">restore</button></form>
+<form method="post" action="{{$.RmURL}}" data-post data-close data-confirm="Delete snapshot {{.Name}}?"><input type="hidden" name="name" value="{{.Name}}"><button class="ln danger">delete</button></form></td></tr>
+{{end}}</tbody>
+</table>
+{{else}}<p class="muted">No snapshots yet.</p>
+{{end}}<p class="note">A snapshot is a <code>db dump</code> kept by name for this worktree. Restore resets its databases and storage to it; the database must be running.</p>
+<div class="btns"><button type="button" class="ln" data-cancel>Close</button></div>
+</div>{{end}}

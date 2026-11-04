@@ -17,6 +17,7 @@ import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
 import { city } from './city.js';
 import { issuesFor, prsFor, whoLabel } from './work.js';
+import { arcadeTitle } from './arcade/arcade.js';
 
 const PI = Math.PI;
 
@@ -708,14 +709,16 @@ function holoTable(scene, x, z, color) {
 
 // gameRoom (front-right, behind glass, by the windows): two bartop arcades
 // on their stands along the windows, a sofa facing them, a coffee table.
-// Returns its ticks.
-function gameRoom(k, scene, deco) {
+// A cabinet's click opens its game (ui.arcade). Returns its ticks.
+function gameRoom(k, scene, deco, ui) {
   zoneSign(scene, 'Game room', 5, 1.3);
   rug(scene, 5.5, 11.5, 3.0, 7.6, deco.accent);
   const ticks = [];
   [3.8, 5.2].forEach((z, n) => {
-    put(k, scene, 'Furn_Arcade_Stand', 11.3, 0, z, -PI / 2);
-    ticks.push(arcadeScreen(put(k, scene, 'Tech_Arcade_Bartop', 11.3, k.point('Furn_Arcade_Stand', 'top')[1], z, -PI / 2), n));
+    const tip = `Arcade: play ${arcadeTitle(n)}`;
+    pickable(put(k, scene, 'Furn_Arcade_Stand', 11.3, 0, z, -PI / 2), tip, () => ui.arcade(n));
+    const cab = pickable(put(k, scene, 'Tech_Arcade_Bartop', 11.3, k.point('Furn_Arcade_Stand', 'top')[1], z, -PI / 2), tip, () => ui.arcade(n));
+    ticks.push(arcadeScreen(cab, n));
   });
   put(k, scene, 'Furn_Sofa', 8.0, 0, 4.5, PI / 2);
   put(k, scene, 'Furn_CoffeeTable', 9.4, 0, 4.5, PI / 2);
@@ -731,7 +734,7 @@ function support(k, scene, deco) {
 }
 
 // lab builds a worktree's floor. ui: {transport, service(slug, svc),
-// desk(slug), agent(slug), prs(), say(text, obj), viewer()}.
+// desk(slug), agent(slug), prs(), say(text, obj), viewer(), arcade(n)}.
 export async function lab(slug, n, ui) {
   const k = await kit(KIT_NAMES);
   const deco = decor(slug);
@@ -792,7 +795,7 @@ export async function lab(slug, n, ui) {
   const cafeTicks = cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
   const holo = meeting(k, scene, deco);
-  const gameTicks = gameRoom(k, scene, deco);
+  const gameTicks = gameRoom(k, scene, deco, ui);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 1 + (deco.seed % 2));
   res.start();
@@ -1077,7 +1080,7 @@ export async function lobby(prefix, ui) {
   const cafeTicks = cafe(k, scene, deco, which === 'gecko');
   const big = lounge(k, scene, deco, ui, deco.accent);
   const holo = meeting(k, scene, deco);
-  const gameTicks = gameRoom(k, scene, deco);
+  const gameTicks = gameRoom(k, scene, deco, ui);
   support(k, scene, deco);
   const res = residents(k, scene, deco, ui, 2);
   res.start();

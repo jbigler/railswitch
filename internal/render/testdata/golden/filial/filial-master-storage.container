@@ -7,7 +7,7 @@ Wants=railswitch-traefik.service
 After=railswitch-traefik.service
 
 [Container]
-Label=filial.unit-hash=342de8ddc329
+Label=filial.unit-hash=e678b94c66ee
 Image=docker.io/rustfs/rustfs:1.0.0-alpha.83
 ContainerName=filial-master-storage
 Network=filial-master-dev.network:alias=storage
@@ -18,7 +18,7 @@ AddHost=s3.master.filial.localhost:10.214.3.2
 AddHost=s3-ui.master.filial.localhost:10.214.3.2
 AddHost=vnc.master.filial.localhost:10.214.3.2
 PublishPort=127.0.0.1:19001:9000
-Volume=filial-master-rustfs-data:/data
+Volume=filial-master-rustfs-data:/data:U
 NoNewPrivileges=true
 Memory=2g
 PidsLimit=1024

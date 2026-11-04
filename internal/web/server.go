@@ -96,6 +96,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/virtual-office/cyberpunk", s.officeDefault) // D150's link
 	m.HandleFunc("GET /p/{prefix}/virtual-office/{set}/{$}", s.cyberPage)
 	m.HandleFunc("GET /office/set.json", s.officeSetJSON)
+	m.HandleFunc("GET /office/tv.json", s.officeTVJSON)
 	m.HandleFunc("GET /office/sets/{name}/{path...}", s.officeSetFile)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/issues", s.cyberIssues)
 	m.HandleFunc("GET /p/{prefix}/virtual-office/prs", s.cyberPRs)

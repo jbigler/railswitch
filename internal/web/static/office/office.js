@@ -9,6 +9,7 @@ import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
 import { openTerminal } from '../term/term.js';
 import { editBoard, picture } from './whiteboard.js';
 import { openArcade } from './arcade/arcade.js';
+import { tvPlay, tvStop, tvPlaying } from './tv.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -65,7 +66,7 @@ async function go(to) {
   closePanel();
   $('where').textContent = 'Elevator…';
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
-    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer(), arcade: (n) => { closePanel(); openArcade(n); } };
+    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, tv: showTV, viewer: () => world.viewer(), arcade: (n) => { closePanel(); openArcade(n); } };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;
@@ -76,6 +77,7 @@ async function go(to) {
     return;
   }
   if (build !== building) return;
+  tvStop(); // the screen it plays on goes with the room
   room?.leave?.();
   world.set(r.scene, r.view, r.walk);
   room = r;
@@ -415,6 +417,31 @@ function showIssues() {
       body.append(list);
     };
     getJSON(`${base}/virtual-office/issues`).then((d) => { doc = d; draw(); }).catch((e) => { body.replaceChildren(); errorTo(body, e); });
+  });
+}
+
+// showTV lists the sources the lounge's big screen offers (D168), from
+// dashboard.toml [office.tv]; obj is where a failure is said.
+function showTV(mesh, obj) {
+  openPanel('The big screen', (body) => {
+    (async () => {
+      let doc;
+      try {
+        doc = await getJSON('/office/tv.json');
+      } catch (e) {
+        errorTo(body, e);
+        return;
+      }
+      const ul = el('ul', { class: 'items' });
+      const j = doc.jellyfin;
+      if (j) {
+        ul.append(el('li', {}, el('button', { type: 'button', class: 'link', on: { click: () => { closePanel(); tvPlay(mesh, j, (t) => say(t, obj)); } } }, `▶ Jellyfin: ${j.playlist}`),
+          ' ', el('span', { class: 'muted' }, new URL(j.url).host)));
+      }
+      if (!ul.children.length) ul.append(el('li', { class: 'muted' }, 'No sources. On the host: railswitch office tv jellyfin set --url <server> --playlist <name>, then railswitch office tv jellyfin key.'));
+      body.append(ul);
+      if (tvPlaying(mesh)) body.append(btn('■ Stop', () => { tvStop(); closePanel(); }));
+    })();
   });
 }
 

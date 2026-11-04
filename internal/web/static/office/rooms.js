@@ -541,7 +541,7 @@ function arcadeScreen(cab, seed) {
 function lounge(k, scene, deco, ui, accent) {
   zoneSign(scene, 'Lounge', 5, -1.3);
   const big = bigScreen(scene, 8, 2.2, -7.88, 0, 4.2, 2.3, accent);
-  pickable(big.screen, 'The big screen', () => ui.say('This screen is yours: what goes up here comes later.', big));
+  pickable(big.screen, 'The big screen: pick something to watch', () => ui.tv(big.screen, big));
   put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
   put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI);
   put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);

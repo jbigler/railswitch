@@ -138,7 +138,11 @@ func (s *Server) cyberPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	w.Header().Set("Content-Security-Policy", officeCSP)
+	pol := officeCSP
+	if o := strings.Join(s.tvOrigins(r.Context()), " "); o != "" {
+		pol += "; media-src " + o + "; connect-src 'self' " + o // the lounge's TV (D168)
+	}
+	w.Header().Set("Content-Security-Policy", pol)
 	s.html(w, http.StatusOK, "office", cyberView{Title: p.Prefix + " · Virtual Office · RailSwitch", Prefix: p.Prefix, Set: set})
 }
 

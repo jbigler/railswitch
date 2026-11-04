@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"io/fs"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/tomlfile"
@@ -44,6 +47,46 @@ type File struct {
 	// OfficeSet is [office] set: the Virtual Office's set (D153); "" is
 	// the built-in default.
 	OfficeSet string
+	// Jellyfin is [office.tv.jellyfin]: a source the lounge's big screen
+	// offers (D168); a zero Jellyfin is no such source. Later sources sit
+	// beside it under [office.tv].
+	Jellyfin Jellyfin
+}
+
+// Jellyfin is [office.tv.jellyfin]: the server at URL (http or https,
+// maybe with a base path), the playlist by name, and the Jellyfin user
+// whose playlist it is ("" asks without one). Its API key is in
+// JellyfinKeyPath.
+type Jellyfin struct {
+	URL      string `toml:"url" json:"url"`
+	Playlist string `toml:"playlist" json:"playlist"`
+	User     string `toml:"user" json:"user"`
+}
+
+// JellyfinKeyPath is <d.Data>/dashboard/jellyfin-key: the Jellyfin API
+// key, 0600 in the dashboard's 0700 directory, next to its token.
+func JellyfinKeyPath(d machine.Dirs) string {
+	return filepath.Join(d.Data, "dashboard", "jellyfin-key")
+}
+
+var (
+	tvOrigin = regexp.MustCompile(`^https?://([A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(:[0-9]{1,5})?$`)
+	tvPath   = regexp.MustCompile(`^(/[A-Za-z0-9._~-]+)*$`)
+)
+
+// TVOrigin checks a TV source's url and answers its origin, which goes into
+// the office page's Content-Security-Policy: only plain host and path
+// characters, so no URL can add to the policy.
+func TVOrigin(u string) (string, error) {
+	p, err := url.Parse(u)
+	if err != nil || p.User != nil || p.RawQuery != "" || p.ForceQuery || p.Fragment != "" || p.Opaque != "" {
+		return "", fmt.Errorf("office.tv: url %q: want http(s)://host[:port][/path]", u)
+	}
+	origin := p.Scheme + "://" + p.Host
+	if !tvOrigin.MatchString(origin) || !tvPath.MatchString(strings.TrimSuffix(p.Path, "/")) {
+		return "", fmt.Errorf("office.tv: url %q: want http(s)://host[:port][/path]", u)
+	}
+	return origin, nil
 }
 
 // Path is <d.Config>/dashboard.toml.
@@ -70,6 +113,9 @@ func Load(d machine.Dirs) (*File, error) {
 		} `toml:"colors"`
 		Office struct {
 			Set string `toml:"set"`
+			TV  struct {
+				Jellyfin Jellyfin `toml:"jellyfin"`
+			} `toml:"tv"`
 		} `toml:"office"`
 	}
 	if err := tomlfile.Decode(data, SchemaVersion, &raw); err != nil {
@@ -97,7 +143,32 @@ func Load(d machine.Dirs) (*File, error) {
 		}
 	}
 	f.OfficeSet = raw.Office.Set
+	if err := raw.Office.TV.Jellyfin.Check(); err != nil {
+		return nil, fmt.Errorf("%s: %w", Path(d), err)
+	}
+	f.Jellyfin = raw.Office.TV.Jellyfin
 	return f, nil
+}
+
+// Check refuses a Jellyfin with a bad url, or a url without a playlist; the
+// playlist and user names only need no control characters (Save's
+// strconv.Quote would write one as \x.., which TOML refuses).
+func (t Jellyfin) Check() error {
+	if t == (Jellyfin{}) {
+		return nil
+	}
+	if t.URL == "" || t.Playlist == "" {
+		return fmt.Errorf("office.tv.jellyfin: set both url and playlist")
+	}
+	if _, err := TVOrigin(t.URL); err != nil {
+		return err
+	}
+	for _, v := range []string{t.Playlist, t.User} {
+		if strings.ContainsFunc(v, unicode.IsControl) || len(v) > 200 {
+			return fmt.Errorf("office.tv: a name is at most 200 bytes, with no control characters")
+		}
+	}
+	return nil
 }
 
 // Save writes dashboard.toml atomically with only the changed tokens.
@@ -121,6 +192,12 @@ func (f *File) Save(d machine.Dirs) error {
 	}
 	if f.OfficeSet != "" {
 		fmt.Fprintf(&b, "\n[office]\nset = %s\n", strconv.Quote(f.OfficeSet))
+	}
+	if j := f.Jellyfin; j != (Jellyfin{}) {
+		fmt.Fprintf(&b, "\n[office.tv.jellyfin]\nurl = %s\nplaylist = %s\n", strconv.Quote(j.URL), strconv.Quote(j.Playlist))
+		if j.User != "" {
+			fmt.Fprintf(&b, "user = %s\n", strconv.Quote(j.User))
+		}
 	}
 	if err := os.MkdirAll(d.Config, 0o755); err != nil {
 		return err

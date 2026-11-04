@@ -1233,6 +1233,11 @@ is and transcodes the rest); a seek starts the stream again at that point
 (`StartTimeTicks`), since a transcoded stream can't seek by range. Each
 start carries a new `PlaySessionId`: Jellyfin names its transcode without
 the start time and would serve an earlier one from the beginning.
+The transcode a start replaces is stopped at once
+(`DELETE /Videos/ActiveEncodings`, by the page's `DeviceId` and that
+session), and so is the last one on ■ Stop or when the page closes;
+Jellyfin would let it run on for 10 s or more. A seek waits for the bar to
+rest half a second, so a few quick clicks start one transcode, not several.
 
 The TV belongs to the page, not a floor: take the elevator and the same
 video goes on, on that floor's lounge screen. Its sound falls off with

@@ -7,7 +7,7 @@ generated = ["S3_SECRET_KEY"]   # D17
 
 [pin]
 name = "rustfs"
-default = "1.0.0-alpha.83"
+default = "1.0.4"
 
 [image]
 pull = "docker.io/rustfs/rustfs:{rustfs}"
@@ -28,7 +28,8 @@ S3_SECRET_KEY = "{generated.S3_SECRET_KEY}"
 gives = { S3_ENDPOINT = "{share.url.s3}" }
 
 [env]
-RUSTFS_VOLUMES = "/data/rustfs{0..3}"
+# One drive (D165): four in one volume gave erasure coding nothing to survive.
+RUSTFS_VOLUMES = "/data"
 RUSTFS_ACCESS_KEY = "rustfsadmin"
 RUSTFS_SECRET_KEY = "{generated.S3_SECRET_KEY}"
 RUSTFS_CONSOLE_ENABLE = "true"

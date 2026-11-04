@@ -59,7 +59,7 @@ export function tvState() {
 export function tvPlay(src, pl, i, say) {
   report();
   const keep = on;
-  on = { src, pl, i, say, fails: 0, pos: keep?.pos ?? {}, done: keep?.done ?? new Set() };
+  on = { src, pl, i, say, fails: 0, pos: keep?.pos ?? {}, done: keep?.done ?? new Set(), was: keep && { src: keep.src, session: keep.session } };
   if (!keep) video.muted = false;
   cover(true);
   start(resumeAt(pl.items[i]));
@@ -100,10 +100,12 @@ export function tvStop() {
   if (!on) return;
   report();
   cover(false);
+  const was = on;
   on = null;
   video.pause();
   video.removeAttribute('src');
   video.load();
+  kill(was.src, was.session);
 }
 
 function resumeAt(it) {
@@ -113,15 +115,30 @@ function resumeAt(it) {
   return u && !u.Played ? (u.PlaybackPositionTicks || 0) / 1e7 : 0;
 }
 
+const unique = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+// The video codecs this browser plays in MP4: one of them is copied, not
+// transcoded, which a small Jellyfin server can't do much of.
+const CODECS = ['h264', ...Object.entries({ hevc: 'hvc1.2.4.L120.90', av1: 'av01.0.08M.10', vp9: 'vp09.02.40.10' })
+  .filter(([, c]) => video.canPlayType(`video/mp4; codecs="${c}"`)).map(([k]) => k)].join(',');
+const DEVICE = `railswitch-${unique()}`; // this page, to Jellyfin
+
 function start(at) {
+  const was = on.was ?? { src: on.src, session: on.session };
+  on.was = null;
   on.offset = at;
   on.abs = null;
   // A fresh PlaySessionId each start: Jellyfin names the transcode's file
   // without StartTimeTicks, and serves an existing one from its beginning.
-  const session = Date.now().toString(36) + Math.random().toString(36).slice(2);
-  const p = { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', maxWidth: '1920', PlaySessionId: session };
+  on.session = unique();
+  // A bitrate, or Jellyfin scales a transcode down to 416 px wide; stereo
+  // audio is cheaper to make than 5.1.
+  const p = {
+    container: 'mp4', videoCodec: CODECS, audioCodec: 'aac', maxWidth: '1920', VideoBitrate: '20000000',
+    AudioBitrate: '192000', MaxAudioChannels: '2', DeviceId: DEVICE, PlaySessionId: on.session,
+  };
   if (at > 0) p.StartTimeTicks = String(Math.round(at * 1e7));
   video.src = jellyfinURL(on.src, `/Videos/${encodeURIComponent(on.pl.items[on.i].Id)}/stream.mp4`, p);
+  kill(was.src, was.session); // after the new src, or the cut stream would end and skip
   video.play().catch((e) => {
     // the click's user activation ran out during the lookups: play muted
     // rather than not at all; the mute button brings the sound
@@ -179,7 +196,17 @@ video.addEventListener('error', () => {
 setInterval(() => {
   if (on && !video.paused) report();
 }, 15000);
-addEventListener('pagehide', () => report());
+addEventListener('pagehide', () => {
+  report();
+  if (on) kill(on.src, on.session);
+});
+
+// kill stops a session's transcode now: Jellyfin would let it run on for
+// 10 s or more after its stream is dropped, at full speed.
+function kill(src, session) {
+  if (!session) return;
+  fetch(jellyfinURL(src, '/Videos/ActiveEncodings', { deviceId: DEVICE, playSessionId: session }), { method: 'DELETE', keepalive: true }).catch(() => {});
+}
 
 // The sound falls off past the sofa, (REF/d)^2 beyond REF, and the room's
 // walls (the screen group's userData.room: {minX, maxX, minZ, maxZ}) take

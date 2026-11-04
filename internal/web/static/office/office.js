@@ -436,9 +436,14 @@ function showTV(g) {
     const seek = el('input', { type: 'range', min: 0, step: 1, 'aria-label': 'Position' });
     const time = el('span', { class: 'muted' });
     const bar = el('div', { class: 'tv-seek' }, seek, time);
+    // a seek waits for the bar to rest: each one is a new transcode
     let dragging = false;
-    seek.addEventListener('input', () => { dragging = true; });
-    seek.addEventListener('change', () => { dragging = false; tvSeek(Number(seek.value)); });
+    let settle = 0;
+    seek.addEventListener('input', () => { dragging = true; clearTimeout(settle); });
+    seek.addEventListener('change', () => {
+      clearTimeout(settle);
+      settle = setTimeout(() => { dragging = false; tvSeek(Number(seek.value)); }, 500);
+    });
     let list = null; // the playlist's items, drawn
     let shown = '';
     const draw = () => {

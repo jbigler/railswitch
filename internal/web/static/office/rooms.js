@@ -541,12 +541,12 @@ const SOFA = { x: 8, z: -3.15, yaw: 0, eye: 1.15 };
 
 // lounge (back-right, behind glass): the sofa facing the big screen on the
 // back wall, on a rug, an armchair and a side table, an arc lamp. The
-// screen is sized for the sofa (D168): 16:9, 40° wide from the seated eye
-// 4.7 m away (THX's figure: 2 × 4.73 × tan 20° = 3.44 m), its middle a
-// little above that eye.
+// screen is sized for the sofa (D168): 16:9, 50° wide from the seated eye
+// 4.7 m away (the immersive end of THX's range: 2 × 4.73 × tan 25° =
+// 4.41 m), its middle a little above that eye, its top under the ceiling.
 function lounge(k, scene, deco, ui, accent) {
   zoneSign(scene, 'Lounge', 5, -1.3);
-  const big = bigScreen(scene, 8, 1.6, -7.88, 0, 3.44, 1.935, accent);
+  const big = bigScreen(scene, 8, 1.75, -7.88, 0, 4.41, 2.48, accent);
   big.userData.room = { minX: 4, maxX: 12, minZ: -8, maxZ: -2 }; // the lounge's walls, for the TV's sound
   pickable(big.screen, 'The big screen: pick something to watch', () => ui.tv(big));
   put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);

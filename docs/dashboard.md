@@ -1090,8 +1090,9 @@ any open page.
     browser's time, and the pet's corner. The **lounge** (glass): the
     sofa facing the **big screen** on the back wall from 4.7 m (click the
     sofa to sit on it: seated eye height, facing the screen; any step
-    stands up). The screen is sized for that seat: 16:9, 3.44 m wide, 40°
-    of the view (THX's figure), its middle a little above the seated eye.
+    stands up). The screen is sized for that seat: 16:9, 4.41 m wide, 50°
+    of the view (the immersive end of THX's range), its middle a little
+    above the seated eye.
     It shows the floor's summary until you click it and pick something to
     watch (see [The lounge's TV](#the-lounges-tv)).
   - Front side, by the windows: **work** (glass): **your desk**'s wall
@@ -1228,11 +1229,19 @@ later need it for a playlist that isn't public.
 
 The playlist is looked up by its exact name each time the panel opens, so
 a playlist edited in Jellyfin shows as edited. Its videos play in turn and
-round again, asked as H.264 and AAC in MP4 (Jellyfin copies what already
-is and transcodes the rest); a seek starts the stream again at that point
+round again, in MP4 with stereo AAC. The page offers every video codec the
+browser plays in MP4 (H.264, and HEVC, AV1 or VP9 where it can), so
+Jellyfin copies the video when it can and transcodes only the rest, at up
+to 1920 wide and 20 Mb/s. Jellyfin's per-user "video transcoding" switch
+doesn't stop this: it only steers clients that ask how to play; a seek starts the stream again at that point
 (`StartTimeTicks`), since a transcoded stream can't seek by range. Each
 start carries a new `PlaySessionId`: Jellyfin names its transcode without
 the start time and would serve an earlier one from the beginning.
+The transcode a start replaces is stopped at once
+(`DELETE /Videos/ActiveEncodings`, by the page's `DeviceId` and that
+session), and so is the last one on ■ Stop or when the page closes;
+Jellyfin would let it run on for 10 s or more. A seek waits for the bar to
+rest half a second, so a few quick clicks start one transcode, not several.
 
 The TV belongs to the page, not a floor: take the elevator and the same
 video goes on, on that floor's lounge screen. Its sound falls off with

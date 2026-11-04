@@ -253,6 +253,26 @@ func TestTTYEnv(t *testing.T) {
 	}
 }
 
+// TestTTYBackground: an nvim terminal gets the panel's bg as
+// NVIM_BACKGROUND; another value, or another kind, gets none.
+func TestTTYBackground(t *testing.T) {
+	_, srv := ttyFixture(t, `echo "bg:${NVIM_BACKGROUND-unset}:"`)
+	for path, want := range map[string]string{
+		"/p/ftest/tty/b/nvim?cols=80&rows=24&bg=light":  "bg:light:",
+		"/p/ftest/tty/b/nvim?cols=80&rows=24&bg=dark":   "bg:dark:",
+		"/p/ftest/tty/b/nvim?cols=80&rows=24&bg=;x":     "bg:unset:",
+		"/p/ftest/tty/b/shell?cols=80&rows=24&bg=light": "bg:unset:",
+	} {
+		c, _, err := dialTTY(t, srv, path, "", true)
+		if err != nil {
+			t.Fatal(path, err)
+		}
+		if out, _, _ := readAll(t, c, ""); !strings.Contains(out, want) {
+			t.Errorf("%s: out %q, want %q", path, out, want)
+		}
+	}
+}
+
 // waitGone waits until pid (read from file) no longer exists.
 func waitGone(t *testing.T, file string) {
 	t.Helper()

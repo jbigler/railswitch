@@ -57,6 +57,15 @@ function cssTheme(el) {
   };
 }
 
+// shade is 'light' or 'dark' for a #rrggbb background, by the luminance
+// weights Neovim (and docs/nvim.md's hook) use; undefined otherwise.
+function shade(hex) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+  if (!m) return undefined;
+  const [r, g, b] = m.slice(1).map((h) => parseInt(h, 16) / 255);
+  return 0.299 * r + 0.587 * g + 0.114 * b < 0.5 ? 'dark' : 'light';
+}
+
 function tag(name, cls, text) {
   const e = document.createElement(name);
   if (cls) e.className = cls;
@@ -100,6 +109,8 @@ export function openTerminal(el, url, opts = {}) {
     q.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     q.searchParams.set('cols', cols);
     q.searchParams.set('rows', rows);
+    const bg = shade(term.options.theme.background);
+    if (bg) q.searchParams.set('bg', bg); // the panel's light or dark, for nvim's hook
     const ws = new WebSocket(q);
     ws.binaryType = 'arraybuffer';
     sock = ws;

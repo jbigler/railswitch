@@ -724,7 +724,9 @@ docked under the worktree's details; several can be open at once.
 
 Each panel is a terminal like any other: keys arrive as you type (slash
 suggestions, menus, arrows, Esc), the program follows the panel's size,
-and the dashboard's colours apply. The font is the first installed of Maple
+and the dashboard's colours apply. An nvim panel runs `railswitch nvim` with
+`NVIM_BACKGROUND` set to `light` or `dark` by its background, for the
+`nvim-attach` hook ([nvim.md](nvim.md#hooks)). The font is the first installed of Maple
 Mono (its Nerd Font builds first, so icons and prompt glyphs draw) and
 JetBrains Mono, else the system's monospace. When the program exits the panel shows
 `[exited N]` and **Reopen**; if the dashboard restarts (a new railswitch

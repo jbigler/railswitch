@@ -403,9 +403,34 @@ function paletteItems() {
   return $$("#palette .pal-list li[data-filter]").filter((li) => !li.hidden);
 }
 
+// fuzzy scores query q against s (both lower case): q's letters in order,
+// spaces ignored ("pgset" finds "page settings"); more for a letter that
+// starts a word or follows the last one, less for a gap; -1 for no match.
+function fuzzy(q, s) {
+  let score = 0;
+  let from = 0;
+  let last = -2;
+  for (const c of q.replace(/\s+/g, "")) {
+    const k = s.indexOf(c, from);
+    if (k < 0) return -1;
+    score += (k === last + 1 ? 2 : 0) + (k === 0 || /[\s_./:-]/.test(s[k - 1]) ? 3 : 0) - Math.min(k - from, 10) * 0.1;
+    last = k;
+    from = k + 1;
+  }
+  return score;
+}
+
 function filterPalette() {
   const q = $("#palette .pal-filter").value.trim().toLowerCase();
-  $$("#palette .pal-list li[data-filter]").forEach((li) => (li.hidden = !li.dataset.filter.toLowerCase().includes(q)));
+  const list = $("#palette .pal-list");
+  const lis = $$("li[data-filter]", list);
+  lis.forEach((li, i) => {
+    li.dataset.at ??= i; // the template's order, for ties and an empty filter
+    li.score = fuzzy(q, li.dataset.filter.toLowerCase());
+    li.hidden = li.score < 0;
+  });
+  lis.sort((a, b) => b.score - a.score || a.dataset.at - b.dataset.at);
+  list.prepend(...lis); // best first; the lines without data-filter stay last
   const items = paletteItems();
   $$("#palette .pal-list li").forEach((li) => li.classList.remove("on"));
   if (items.length) items[0].classList.add("on");

@@ -378,6 +378,7 @@ func (b *builder) services() error {
 		}
 		if s.Worktree {
 			s.Workdir = "/app"
+			s.Mounts = append(s.Mounts, Mount{Source: literal(b.ws(GitDir)), Target: GitConfigMount, Options: "ro,z"})
 		}
 		s.Mounts = append(s.Mounts, b.machineMounts(s.ID)...)
 	}

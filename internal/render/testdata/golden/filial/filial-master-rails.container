@@ -8,7 +8,7 @@ Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefi
 After=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=filial.unit-hash=4b75d5b4f927
+Label=filial.unit-hash=87fa26d965bb
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-master-rails
 Network=filial-master-dev.network:alias=rails
@@ -27,6 +27,7 @@ Volume=/WORKSPACES/filial/worktrees/master/.git:/WORKSPACES/filial/worktrees/mas
 Volume=/WORKSPACES/filial/worktrees/master/.git:/app/.git:ro,z
 Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-app.sh:/usr/local/bin/entrypoint-app.sh:ro,z
+Volume=/WORKSPACES/filial/git:/etc/railswitch-git:ro,z
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
 Volume=filial_corepack:/home/appuser/.corepack:U

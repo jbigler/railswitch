@@ -57,6 +57,16 @@ else
 fi
 `
 
+// The project's git config (D164): <workspace>/git/config, which the user
+// writes, read-only in every container that has the worktree, as git's
+// system config, so a container's own ~/.gitconfig and the repository's
+// config still override it. The folder is mounted, not the file, so an
+// edit (an editor's rename) shows at once.
+const (
+	GitDir         = "git"
+	GitConfigMount = "/etc/railswitch-git"
+)
+
 // notesAgent mounts the shared notes and railswitch-notes into agent s.
 func (b *builder) notesAgent(s *Service) {
 	if !b.assets[notesScriptRel] {

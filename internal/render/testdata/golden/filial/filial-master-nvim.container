@@ -5,7 +5,7 @@
 Description=filial nvim of worktree master
 
 [Container]
-Label=filial.unit-hash=a6aed10bc1da
+Label=filial.unit-hash=32d9ee31c78a
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-c220c5d3
 ContainerName=filial-master-nvim
 Network=filial-master-dev.network:alias=nvim
@@ -26,6 +26,7 @@ Volume=/WORKSPACES/filial/worktrees/master/.git:/app/.git:z
 Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/app/.git/hooks:ro,z
 Volume=/WORKSPACES/filial/.railswitch/home/master:/home/appuser:z
 Volume=/WORKSPACES/filial/.railswitch/assets/nvim/entrypoints/entrypoint-nvim.sh:/usr/local/bin/entrypoint-nvim.sh:ro,z
+Volume=/WORKSPACES/filial/git:/etc/railswitch-git:ro,z
 Volume=filial-master-node-modules:/app/node_modules:U
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U

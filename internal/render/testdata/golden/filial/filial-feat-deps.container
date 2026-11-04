@@ -5,7 +5,7 @@
 Description=filial deps of worktree feat
 
 [Container]
-Label=filial.unit-hash=8067b6f9687f
+Label=filial.unit-hash=570ef9ca58cf
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-feat-deps
 Network=filial-feat-dev.network:alias=deps
@@ -14,6 +14,7 @@ User=1000:1000
 EnvironmentFile=/WORKSPACES/filial/.railswitch/env/feat/deps.env
 Volume=/WORKSPACES/filial/worktrees/feat:/app:z
 Volume=/WORKSPACES/filial/.railswitch/assets/rails/entrypoints/entrypoint-deps.sh:/usr/local/bin/entrypoint-deps.sh:ro,z
+Volume=/WORKSPACES/filial/git:/etc/railswitch-git:ro,z
 Volume=filial_gems_ruby3.3.6:/usr/local/bundle
 Volume=filial_npm_cache:/home/appuser/.npm:U
 Volume=filial_corepack:/home/appuser/.corepack:U

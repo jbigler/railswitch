@@ -246,7 +246,7 @@ func TestApplyCreatesHomeSubdirs(t *testing.T) {
 
 func TestPlanStatusDirs(t *testing.T) {
 	p, ws, qdir := filialPlan(t)
-	want := []string{".railswitch/status/master", ".railswitch/status/feat", "notes", ".railswitch/agent-default/claude", ".railswitch/agent-memory/probe"}
+	want := []string{".railswitch/status/master", ".railswitch/status/feat", "notes", "git", ".railswitch/agent-default/claude", ".railswitch/agent-memory/probe"}
 	if !slices.Equal(p.StatusDirs, want) {
 		t.Errorf("StatusDirs = %v; want %v", p.StatusDirs, want)
 	}
@@ -265,7 +265,7 @@ func TestPlanStatusDirs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.StatusDirs) != 0 {
+	if !slices.Equal(p.StatusDirs, []string{"git"}) { // D164: the project's git config, for every stack
 		t.Errorf("StatusDirs without agents = %v", p.StatusDirs)
 	}
 }

@@ -328,6 +328,10 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	pv := s.pageData(p.Prefix, wt.Slug, k)
 	s.mu.Unlock()
+	pv.Pane, pv.ListURL = "list", "/p/"+p.Prefix+k.query()
+	if r.PathValue("slug") != "" {
+		pv.Pane = "detail"
+	}
 	// Read once per page, briefly: secrets that can't be read in time
 	// show no card.
 	ctx, cancel := context.WithTimeout(r.Context(), secretsWait)

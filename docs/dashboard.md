@@ -127,6 +127,15 @@ When the live stream drops, a red line under the header says so:
 "Logged out — run `railswitch dashboard` for a new link" when the cookie
 is no longer accepted. What the page shows meanwhile may be stale.
 
+**Narrow windows** (800 px or less) show one column (D166). The project
+page shows one pane: `/p/<prefix>` the worktree list, `/p/<prefix>/<slug>`
+that worktree's detail, with `← worktrees` above it back to the list (the
+browser's back button works too). Clicking a worktree opens its detail;
+↑↓ moves the selection without leaving the list. The list hides its
+`stack` and `tests` columns, shown in the detail, and below 520 px its
+`branch` column. The other pages stack their two panes; a settings table
+still wider than the window scrolls its pane.
+
 - **Header:** "RailSwitch", then two labelled groups. **project**: the
   project button (the prefix, or "choose"; opens the switcher) and, with
   a project, after a thin divider, `worktrees` (its page), `images`,

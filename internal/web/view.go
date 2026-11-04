@@ -391,15 +391,19 @@ func prLabel(p *pr) string {
 
 type pageView struct {
 	Title, Prefix, Sel, Sort string
-	Header                   headerView
-	Projects                 projectsView
-	Strip                    stripView
-	Banner                   bannerView
-	List                     listView
-	Detail                   detailView
-	Usage                    *usageView // nil: no agent usage in the chart's days
-	Jobs                     jobsView
-	Secrets                  *secretsCard // nil: every secret is set
+	// Pane is the one a narrow window shows: list, or detail when the URL
+	// names a worktree (docs/dashboard.md Narrow windows). ListURL is the
+	// detail's way back.
+	Pane, ListURL string
+	Header        headerView
+	Projects      projectsView
+	Strip         stripView
+	Banner        bannerView
+	List          listView
+	Detail        detailView
+	Usage         *usageView // nil: no agent usage in the chart's days
+	Jobs          jobsView
+	Secrets       *secretsCard // nil: every secret is set
 }
 
 // secretsCard asks for the project's unset secrets while up refuses one

@@ -28,7 +28,7 @@ Strip, Banner and Projects. */}}
 {{define "page"}}<!doctype html>
 <html lang="en">
 {{template "head" .}}
-<body data-prefix="{{.Prefix}}" data-sel="{{.Sel}}" data-sort="{{.Sort}}">
+<body data-prefix="{{.Prefix}}" data-sel="{{.Sel}}" data-sort="{{.Sort}}" data-pane="{{.Pane}}">
 {{template "top" .}}
 <main class="grid">
 <section class="left">
@@ -37,6 +37,7 @@ Strip, Banner and Projects. */}}
 <div class="note">↑↓ moves through worktrees · P switches project · : command palette</div>
 </section>
 <section class="pane">
+<a class="back" href="{{.ListURL}}">← worktrees</a>
 {{with .Secrets}}{{template "secrets-needed" .}}{{end}}
 {{template "detail" .Detail}}
 {{template "jobs" .Jobs}}

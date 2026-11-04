@@ -930,6 +930,21 @@ The built-in sets, then the installed ones, by name.
 | `status`, `reason` | string | `ok`; `stale`: built for another piece list version; `broken`: an installed set whose `index.json` or `set.toml` doesn't verify, or a file it lists is missing, not a regular file, or has another size or modification time than when it was added (a stat per file: the dashboard runs `ls` for every office page, so it hashes only `set.toml`). |
 | `have` | array of strings | The pieces of the list the set has, which the page loads (the rest are boxes). |
 
+## `office tv`
+
+The sources the lounge's big screen offers (D168), each `null` when not
+set up. The API key itself is never printed.
+
+```json
+{"jellyfin": {"url": "https://jellyfin.example.lan", "playlist": "Lounge", "user": "sam", "key_set": true}}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `jellyfin.url` | string | `dashboard.toml` `[office.tv.jellyfin] url`: `http(s)://host[:port][/path]`. |
+| `jellyfin.playlist`, `jellyfin.user` | string | The playlist's exact name, and its owner (`""`: none). |
+| `jellyfin.key_set` | boolean | Whether `office tv jellyfin key` has stored a key. |
+
 ## `notes ls`
 
 The workspace's shared notes (D141, D144): each regular file in

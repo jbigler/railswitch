@@ -9,6 +9,7 @@ import { work, setWho, follow, unfollow, issuesFor, prsFor } from './work.js';
 import { openTerminal } from '../term/term.js';
 import { editBoard, picture } from './whiteboard.js';
 import { openArcade } from './arcade/arcade.js';
+import { tvEar, tvAttach, tvPlaylist, tvPlay, tvPause, tvSkip, tvMute, tvSeek, tvStop, tvState } from './tv.js';
 
 const prefix = document.body.dataset.prefix;
 const base = `/p/${encodeURIComponent(prefix)}`;
@@ -33,6 +34,7 @@ let room = null;
 let here = null; // {kind: 'lobby'} | {kind: 'floor', slug}
 let building = 0;
 const world = new World($('scene'));
+tvEar(world.camera);
 
 world.onTip = (t) => {
   const tip = $('tip');
@@ -65,7 +67,7 @@ async function go(to) {
   closePanel();
   $('where').textContent = 'Elevator…';
   const ui = { transport, say, toFloor: (slug) => go({ kind: 'floor', slug }), prs: showPRs, issues: showIssues, issueList: () => getJSON(`${base}/virtual-office/issues`), prList: () => getJSON(`${base}/virtual-office/prs`), notes: showNotes, config: showConfig,
-    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, viewer: () => world.viewer(), arcade: (n) => { closePanel(); openArcade(n); } };
+    prPage: showPRPage, service: showService, desk: showDesk, agent: showAgent, whiteboard: showBoard, tv: showTV, sit: (seat) => { world.sit(seat); syncView(); }, viewer: () => world.viewer(), arcade: (n) => { closePanel(); openArcade(n); } };
   const n = state.worktrees.findIndex((w) => w.slug === to.slug) + 1;
   if (to.kind === 'floor' && !n) to = { kind: 'lobby' }; // a removed worktree's old link
   let r;
@@ -76,6 +78,7 @@ async function go(to) {
     return;
   }
   if (build !== building) return;
+  tvAttach(r.tv); // the TV goes along, before the old room is freed
   room?.leave?.();
   world.set(r.scene, r.view, r.walk);
   room = r;
@@ -174,7 +177,11 @@ const ttyURL = (slug, kind) => `${base}/tty/${encodeURIComponent(slug)}/${kind}`
 $('panel-close').addEventListener('click', closePanel);
 $('transport').addEventListener('click', transport);
 function toggleView() {
-  const m = world.setMode(world.mode === 'walk' ? 'orbit' : 'walk');
+  world.setMode(world.mode === 'walk' ? 'orbit' : 'walk');
+  syncView();
+}
+function syncView() {
+  const m = world.mode;
   $('view').textContent = m === 'walk' ? 'overview' : 'walk';
   $('help').hidden = m !== 'walk';
   document.body.classList.toggle('walking', m === 'walk');
@@ -415,6 +422,81 @@ function showIssues() {
       body.append(list);
     };
     getJSON(`${base}/virtual-office/issues`).then((d) => { doc = d; draw(); }).catch((e) => { body.replaceChildren(); errorTo(body, e); });
+  });
+}
+
+// showTV is the big screen's panel (D168): each source from dashboard.toml
+// [office.tv] with its playlist, freshly looked up; a click plays a video,
+// and while one plays, its controls. g is the screen, where failures are
+// said.
+const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function showTV(g) {
+  openPanel('The big screen', (body) => {
+    const ctl = el('div', { class: 'tv-ctl' });
+    const seek = el('input', { type: 'range', min: 0, step: 1, 'aria-label': 'Position' });
+    const time = el('span', { class: 'muted' });
+    const bar = el('div', { class: 'tv-seek' }, seek, time);
+    let dragging = false;
+    seek.addEventListener('input', () => { dragging = true; });
+    seek.addEventListener('change', () => { dragging = false; tvSeek(Number(seek.value)); });
+    let list = null; // the playlist's items, drawn
+    let shown = '';
+    const draw = () => {
+      const st = tvState();
+      const key = st ? `${st.items[st.i].Id} ${st.paused} ${st.muted}` : '';
+      if (st && !dragging) {
+        seek.max = Math.max(1, Math.floor(st.dur));
+        seek.value = Math.floor(st.pos);
+        time.textContent = `${clock(st.pos)} / ${clock(st.dur)}`;
+      }
+      if (key === shown) return;
+      shown = key;
+      bar.hidden = !st;
+      ctl.replaceChildren(...(st ? [
+        btn('⏮', () => { tvSkip(-1); draw(); }, { 'aria-label': 'Previous' }),
+        btn(st.paused ? '▶' : '⏸', () => { tvPause(); setTimeout(draw, 50); }, { 'aria-label': st.paused ? 'Play' : 'Pause' }),
+        btn('⏭', () => { tvSkip(1); draw(); }, { 'aria-label': 'Next' }),
+        btn(st.muted ? '🔇' : '🔊', () => { tvMute(); draw(); }, { 'aria-label': st.muted ? 'Unmute' : 'Mute' }),
+        btn('■ Stop', () => { tvStop(); draw(); }),
+      ] : []));
+      for (const li of list?.children ?? []) li.classList.toggle('on', !!st && li.dataset.id === st.items[st.i].Id);
+    };
+    const timer = setInterval(draw, 500);
+    (async () => {
+      let doc;
+      try {
+        doc = await getJSON('/office/tv.json');
+      } catch (e) {
+        errorTo(body, e);
+        return;
+      }
+      const j = doc.jellyfin;
+      if (!j) {
+        body.append(el('p', { class: 'muted' }, 'No sources. On the host: railswitch office tv jellyfin set --url <server> --playlist <name>, then railswitch office tv jellyfin key.'));
+        return;
+      }
+      body.append(el('h3', {}, `Jellyfin · ${j.playlist}`), ctl, bar);
+      draw();
+      let pl;
+      try {
+        pl = await tvPlaylist(j);
+      } catch (e) {
+        errorTo(body, e);
+        return;
+      }
+      list = el('ul', { class: 'items tv-list' });
+      pl.items.forEach((it, i) => {
+        const u = it.UserData ?? {};
+        const note = u.Played ? '✓ watched' : u.PlaybackPositionTicks ? `stopped at ${clock(u.PlaybackPositionTicks / 1e7)}` : '';
+        list.append(el('li', { 'data-id': it.Id },
+          el('button', { type: 'button', class: 'link', on: { click: () => { tvPlay(j, pl, i, (t) => say(t, g)); draw(); } } }, it.Name),
+          ' ', el('span', { class: 'muted' }, [it.RunTimeTicks ? clock(it.RunTimeTicks / 1e7) : '', note].filter(Boolean).join(' · '))));
+      });
+      body.append(list);
+      shown = null;
+      draw();
+    })();
+    return () => clearInterval(timer);
   });
 }
 

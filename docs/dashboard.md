@@ -1088,9 +1088,12 @@ any open page.
     and a drinks vending machine under neon headers, their menus drawn
     live, the coffee counter, a bistro table, a clock that keeps your
     browser's time, and the pet's corner. The **lounge** (glass): the
-    sofa facing the **big screen** on the back wall from 4.5 m; the screen
-    shows the floor's summary for now, what it shows is yours to choose
-    later.
+    sofa facing the **big screen** on the back wall from 4.7 m (click the
+    sofa to sit on it: seated eye height, facing the screen; any step
+    stands up). The screen is sized for that seat: 16:9, 3.44 m wide, 40°
+    of the view (THX's figure), its middle a little above the seated eye.
+    It shows the floor's summary until you click it and pick something to
+    watch (see [The lounge's TV](#the-lounges-tv)).
   - Front side, by the windows: **work** (glass): **your desk**'s wall
     screen shows the branch, stack, PR and links; the desk shows the
     worktree's links; **Shell** and **Neovim** open a live terminal in the
@@ -1200,6 +1203,59 @@ page picks the active one (an `office set use` job; `dashboard.toml`
   not per request.
 - A piece the set lacks is a light grey box of the piece's size where the
   piece would stand; its tooltip says "missing in <set>".
+
+### The lounge's TV
+
+Clicking the lounge's big screen (D168) opens its panel: each source with
+its playlist, looked up fresh, where a click plays a video; while one
+plays, ⏮ ⏸/▶ ⏭, mute, ■ Stop and a seek bar. The only source so far is a
+Jellyfin playlist, set up on the host:
+
+```sh
+railswitch office tv jellyfin set --url https://jellyfin.example.lan --playlist Lounge [--user sam]
+railswitch office tv jellyfin key        # the API key (Jellyfin: Dashboard → API Keys), on stdin
+railswitch office tv                     # what is set up
+railswitch office tv jellyfin rm         # remove it and its key
+```
+
+`set` writes `dashboard.toml` `[office.tv.jellyfin]` (`url`, `playlist`,
+`user`; a flag left out keeps its value), so it can be edited there too.
+`url` is `http(s)://host[:port][/base path]`, nothing more: its origin
+goes into the office page's Content-Security-Policy as `media-src` and
+`connect-src`, the only origin the page may reach besides the dashboard.
+`--user` names the Jellyfin user whose playlist it is; Jellyfin 10.9 and
+later need it for a playlist that isn't public.
+
+The playlist is looked up by its exact name each time the panel opens, so
+a playlist edited in Jellyfin shows as edited. Its videos play in turn and
+round again, asked as H.264 and AAC in MP4 (Jellyfin copies what already
+is and transcodes the rest); a seek starts the stream again at that point
+(`StartTimeTicks`), since a transcoded stream can't seek by range.
+
+The TV belongs to the page, not a floor: take the elevator and the same
+video goes on, on that floor's lounge screen. Its sound falls off with
+your distance from the screen, full out to 5 m (the sofa), then
+(5 / distance)², and with the lounge's walls: it drops to a fifth over
+the first 1.5 m outside them (about −20 dB in the corridor, −40 dB by
+the elevator). So there is no volume control, only mute.
+
+With `--user`, a video resumes where it stopped: the page tells Jellyfin
+that user's position every 15 s, on pause, skip, stop and leaving the
+page, and marks a video played when it ends
+(`POST /UserItems/{id}/UserData`, Jellyfin 10.9 and later; older ones
+ignore it), and the panel shows each video's state. Without a user it
+remembers only for as long as the page is open. Jellyfin must send
+`Access-Control-Allow-Origin` (it sends `*` by default; a reverse proxy
+in front of it must not add a second one), or WebGL can't draw the frames.
+
+The key is the one secret the office page holds: `office tv jellyfin key`
+reads it from stdin (a no-echo prompt on a terminal) into
+`<data>/dashboard/jellyfin-key` (0600, next to the dashboard's token),
+`office tv --json` says only whether it is set, and `GET /office/tv.json`
+(`{jellyfin: {url, playlist, user, key} | null}`) reads it from that file
+for the page, which puts it in Jellyfin's URLs (`ApiKey` and `api_key`: a
+`<video>` can't send a header). Give it a key you would let your browser
+hold.
 
 ## Commands
 

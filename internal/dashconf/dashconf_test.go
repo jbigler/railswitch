@@ -217,3 +217,40 @@ func TestOfficeSetRoundTrip(t *testing.T) {
 		t.Errorf("after a colours save: %+v", h)
 	}
 }
+
+// D168: [office.tv.jellyfin] round-trips, and a url that could add to the
+// office page's CSP, or carry a key or query, is refused.
+func TestJellyfin(t *testing.T) {
+	d := dirs(t)
+	f, _ := Load(d)
+	f.OfficeSet = "cabin"
+	f.Jellyfin = Jellyfin{URL: "https://media.example.lan/jf", Playlist: `Lounge "late"`, User: "sam"}
+	if err := f.Save(d); err != nil {
+		t.Fatal(err)
+	}
+	if g, err := Load(d); err != nil || g.Jellyfin != f.Jellyfin || g.OfficeSet != "cabin" {
+		t.Fatalf("reload: %v %+v", err, g)
+	}
+	for u, want := range map[string]string{
+		"https://media.example.lan":     "https://media.example.lan",
+		"http://127.0.0.1:8096/jf/":     "http://127.0.0.1:8096",
+		"http://[::1]:8096":             "http://[::1]:8096",
+		"ftp://media.example.lan":       "",
+		"https://u:p@media.example.lan": "",
+		"https://media.example.lan/?a":  "",
+		"https://media.example.lan;x":   "",
+		"https://a.lan/x;script-src *":  "",
+		"https://a.lan%20b":             "",
+		"media.example.lan":             "",
+	} {
+		got, err := TVOrigin(u)
+		if got != want || (err == nil) != (want != "") {
+			t.Errorf("TVOrigin(%q) = %q, %v; want %q", u, got, err, want)
+		}
+	}
+	for _, j := range []Jellyfin{{URL: "https://a.lan"}, {Playlist: "x"}, {URL: "https://a.lan", Playlist: "x\ny"}} {
+		if j.Check() == nil {
+			t.Errorf("%+v passed", j)
+		}
+	}
+}

@@ -535,15 +535,22 @@ function arcadeScreen(cab, seed) {
   };
 }
 
+// SOFA is the lounge sofa's middle seat: x, z, facing the screen (yaw 0
+// looks to -z), a seated eye height.
+const SOFA = { x: 8, z: -3.15, yaw: 0, eye: 1.15 };
+
 // lounge (back-right, behind glass): the sofa facing the big screen on the
-// back wall from a comfortable 4.5 m, on a rug, an armchair and a side table,
-// an arc lamp.
+// back wall, on a rug, an armchair and a side table, an arc lamp. The
+// screen is sized for the sofa (D168): 16:9, 40° wide from the seated eye
+// 4.7 m away (THX's figure: 2 × 4.73 × tan 20° = 3.44 m), its middle a
+// little above that eye.
 function lounge(k, scene, deco, ui, accent) {
   zoneSign(scene, 'Lounge', 5, -1.3);
-  const big = bigScreen(scene, 8, 2.2, -7.88, 0, 4.2, 2.3, accent);
-  pickable(big.screen, 'The big screen', () => ui.say('This screen is yours: what goes up here comes later.', big));
+  const big = bigScreen(scene, 8, 1.6, -7.88, 0, 3.44, 1.935, accent);
+  big.userData.room = { minX: 4, maxX: 12, minZ: -8, maxZ: -2 }; // the lounge's walls, for the TV's sound
+  pickable(big.screen, 'The big screen: pick something to watch', () => ui.tv(big));
   put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
-  put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI);
+  pickable(put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI), 'The sofa: sit and watch', () => ui.sit(SOFA));
   put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);
   put(k, scene, 'Deco_BookStack', 8.0, k.point('Furn_CoffeeTable', 'top')[1], -4.7);
   put(k, scene, 'Furn_Armchair', 5.3, 0, -5.0, PI / 2);
@@ -861,7 +868,7 @@ export async function lab(slug, n, ui) {
     theirs.update(a ? [{ text: a.state, color: '#ffe08a' }, ...(a.usage ? [{ text: `${tokens(a.usage)} tokens · ${tokens({ ...a.usage, input: 0, cache_read: 0, cache_write: 0 })} out`, color: '#9fc3ff' }] : []), ...(a.message ? wrap(a.message, 30, a.usage ? 3 : 4) : [])] : ['no agent running'], a ? a.name : 'agent');
   };
   const walk = { areas: AREAS, start: { x: LIFT.x + 1.7, z: LIFT.z, yaw: PI / 2 }, pads: [sh.pad] };
-  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 24, max: 40 }, walk, update, ticks, name: `Floor ${n} · ${slug}`, setBoard };
+  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.2, pitch: 0.85, dist: 24, max: 40 }, walk, update, ticks, name: `Floor ${n} · ${slug}`, setBoard, tv: big };
 }
 
 // rack is a server rack for one service: its LEDs and accent bar show the
@@ -1130,5 +1137,5 @@ export async function lobby(prefix, ui) {
   };
   const walk = { areas: AREAS, start: { x: LIFT.x + 1.7, z: LIFT.z, yaw: PI / 2 }, pads: [sh.pad] };
   const leave = () => { live = false; };
-  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.15, pitch: 0.8, dist: 25, max: 40 }, walk, update, ticks, name: `Lobby · ${prefix}`, redrawWork: drawWork, leave };
+  return { scene, view: { target: new THREE.Vector3(0, 0.5, 0), yaw: 0.15, pitch: 0.8, dist: 25, max: 40 }, walk, update, ticks, name: `Lobby · ${prefix}`, redrawWork: drawWork, leave, tv: big };
 }

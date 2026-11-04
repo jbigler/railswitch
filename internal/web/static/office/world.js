@@ -456,6 +456,7 @@ export class World {
     const fwd = (k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 1 : 0);
     const side = (k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0);
     w.yaw += ((k.has('arrowright') ? 1 : 0) - (k.has('arrowleft') ? 1 : 0)) * dt * 1.8;
+    if (fwd || side || w.goal) w.seat = null; // any step stands up
     if (fwd || side) {
       const speed = (k.has('shift') ? 5 : 2.8) * dt / Math.hypot(fwd, side);
       const sin = Math.sin(w.yaw);
@@ -478,8 +479,20 @@ export class World {
     w.last = { x: w.pos.x, z: w.pos.z };
     w.bob = (w.bob ?? 0) + moved * 5.5;
     w.sway = Math.max(0, Math.min(1, (w.sway ?? 0) + (moved > 1e-4 ? dt * 4 : -dt * 3)));
-    this.camera.position.set(w.pos.x, 1.7 + Math.sin(w.bob) * 0.018 * w.sway, w.pos.z);
+    this.camera.position.set(w.pos.x, (w.seat?.eye ?? 1.7) + Math.sin(w.bob) * 0.018 * w.sway, w.pos.z);
     this.camera.rotation.set(-w.pitch, -w.yaw, 0, 'YXZ');
+  }
+
+  // sit puts the walker on a seat {x, z, yaw, eye}: there, looking yaw
+  // with the eye at eye m, until the next step.
+  sit(seat) {
+    this.setMode('walk');
+    const w = this.walk;
+    w.goal = null;
+    w.pos.set(seat.x, 0, seat.z);
+    w.yaw = seat.yaw;
+    w.pitch = 0;
+    w.seat = seat;
   }
 
   // where the viewer stands, for the pets to keep their distance

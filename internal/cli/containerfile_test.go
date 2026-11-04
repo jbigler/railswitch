@@ -464,7 +464,8 @@ func TestBuiltinContainerfilesSelfContained(t *testing.T) {
 			if len(fields) == 0 {
 				continue
 			}
-			if op := strings.ToUpper(fields[0]); op != "COPY" && op != "ADD" {
+			op := strings.ToUpper(fields[0])
+			if op != "COPY" && op != "ADD" {
 				continue
 			}
 			remote := func(f string) bool { return strings.HasPrefix(f, "https://") } // ADD of a URL (D163) reads no context

@@ -326,6 +326,43 @@ container with railswitch's options (keep-id, no capabilities,
 `no-new-privileges`) and these mounts, `ls`, `set-user-vars` and
 `focus-window` work; `get-colors` and `launch` are refused.
 
+#### One Copilot sign-in for every worktree
+
+Each worktree's nvim has its own home, so a plugin that keeps its sign-in
+there (copilot.lua, through astrocommunity's `copilot-lua-cmp` too, keeps
+it in `~/.config/github-copilot/`) asks once per worktree. A writable
+mount of one host folder shares it:
+
+```sh
+mkdir -p ~/.local/share/railswitch/copilot && chmod 700 ~/.local/share/railswitch/copilot
+```
+
+```toml
+[[mount]]
+service  = "nvim"
+source   = "~/.local/share/railswitch/copilot"
+target   = "/home/appuser/.config/github-copilot"
+ro       = false                 # the plugin writes its sign-in here
+projects = ["shop"]              # optional: only these prefixes
+```
+
+Create the folder first: podman doesn't create a missing source, and
+nvim's container then fails to start. A folder of its own, not the host's
+`~/.config/github-copilot`, keeps the container's sign-in apart, so it can
+be revoked on GitHub by itself. Only nvim's containers get it, not agents
+or the app. keep-id makes the container's user you, so the folder needs no
+`chown`.
+
+A mount reaches nvim when its unit is written again and nvim restarts.
+The units of every worktree of the project are written by `up`, `restart`
+(or the dashboard's restart), an agent's start or a settings change in
+any one worktree; `railswitch restart nvim` alone restarts the unit as it
+was last written. So: `railswitch restart` in one worktree, or any of the
+others and then `restart nvim` in each. Then `:Copilot auth` in one
+worktree signs in every worktree's nvim at its next start. The same pattern serves any tool that keeps a sign-in
+under `~/.config` or `~/.local/state`; `~/.local/share/nvim` is already
+shared by every worktree (the `nvim_share` volume).
+
 ## Firewall (D119)
 
 nvim follows the project's firewall mode (`enforce` when the project has

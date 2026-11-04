@@ -912,8 +912,9 @@ Every action is a job (below).
   window (interactive tasks such as `console` need one); unticked,
   `railswitch task <name> <args…>` as a job with its output under Jobs.
   Shift+Enter runs it the other way. Enter on an action starts its job;
-  on a worktree or page it opens it. With a worktree selected, when the
-  filter matches nothing, the list offers "new task <filter>…" (Enter or a
+  on a worktree or page it opens it. With a worktree selected, when no task
+  is named exactly what the filter says, the list ends with "new task
+  <filter>…" (Enter on it, the first line when nothing else matches, or a
   click): the Settings page's Tasks card with that name filled in.
 - **Cancel** on a running job stops it.
 

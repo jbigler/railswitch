@@ -93,3 +93,10 @@ body.walking #scene::after { opacity: 1; }
   box-shadow: 0 0 18px rgba(34, 230, 255, .35), 0 0 48px rgba(255, 43, 214, .18); user-select: none; touch-action: none; }
 .arcade-help { margin: 0; color: var(--cp-dim); font: 12px ui-monospace, monospace; text-align: center; }
 .board-modal.arcade .board-status { font-family: ui-monospace, monospace; color: var(--cp-accent); text-shadow: 0 0 6px var(--cp-accent); }
+
+/* the lounge's TV (D168) */
+.tv-ctl { display: flex; gap: 6px; flex-wrap: wrap; }
+.tv-seek { display: flex; gap: 8px; align-items: center; }
+.tv-seek[hidden] { display: none; }
+.tv-seek input { flex: 1; accent-color: var(--cp-accent); }
+.panel ul.tv-list li.on { border-color: var(--cp-accent); }

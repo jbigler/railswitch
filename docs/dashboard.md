@@ -941,7 +941,10 @@ Every action is a job (below).
 - A job is a child `railswitch -C <workspace> [-w <slug>] <args>` in a
   `systemd-run --user --scope`, so restarting the dashboard doesn't kill a
   running `up`. It gets the session's display, SSH agent and terminal
-  variables from `systemctl --user show-environment`, plus `NO_COLOR=1`.
+  variables from `systemctl --user show-environment`, plus `NO_COLOR=1`,
+  which keeps its log plain. A job that opens a terminal window (terminal,
+  nvim, agent, a task in a window) gets no `NO_COLOR`: the window's
+  programs inherit it, and lazygit there drew no colour.
   Its stdin is `/dev/null`, except for the settings jobs: their edit
   list, secret value or project.toml text is written to the child's stdin
   and kept nowhere else (not the job's label, log, page or events).

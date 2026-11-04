@@ -53,6 +53,9 @@ type Spec struct {
 	Label   string   // shown in the page, e.g. "up", "task test"
 	Argv    []string // full argv; argv[0] is the program
 	Dir     string
+	// Window: the job opens a terminal window, whose programs inherit its
+	// environment, so it gets no NO_COLOR (a lazygit there drew no colour).
+	Window bool
 }
 
 // State is a job's state.
@@ -104,7 +107,7 @@ type Hub struct {
 
 // New returns a hub writing job logs to logDir, which it creates 0700 and
 // clears of logs from a previous run. env gives the child's full
-// environment at each start; NO_COLOR=1 is added.
+// environment at each start; NO_COLOR=1 is added, except for a Window job.
 func New(r sys.Runner, logDir string, env func(context.Context) []string) (*Hub, error) {
 	if err := os.MkdirAll(logDir, 0o700); err != nil {
 		return nil, fmt.Errorf("jobs: %w", err)
@@ -139,7 +142,10 @@ func (h *Hub) StartInput(ctx context.Context, s Spec, stdin []byte) (Snapshot, e
 		return Snapshot{}, errors.New("jobs: empty argv")
 	}
 	s.Argv = slices.Clone(s.Argv)
-	env := append(slices.Clone(h.env(ctx)), "NO_COLOR=1")
+	env := slices.Clone(h.env(ctx))
+	if !s.Window {
+		env = append(env, "NO_COLOR=1")
+	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()

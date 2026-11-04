@@ -900,8 +900,11 @@ Every action is a job (below).
   **tasks** (`railswitch --json task ls`), its **actions** (the Actions
   buttons of its detail, posting to the same URLs), the project's
   **worktrees** and its **pages** (worktrees, images, tidy, library, settings,
-  notes, office, machine settings). A typed kind word (`task`, `action`,
-  `worktree`, `page`) filters to that kind. Tasks keep the
+  notes, office, machine settings). The filter is fuzzy: its letters in
+  order, spaces ignored, so `pgset` finds "page settings"; the best match
+  is first (letters that start words or run together), ties in the list's
+  order. A typed kind word (`task`, `action`, `worktree`, `page`) filters
+  to that kind. Tasks keep the
   "args" field, split like a shell (quotes and backslash, no expansion),
   and "in a new terminal", ticked unless this browser last unticked it
   (kept in its local storage). Enter or a click runs the task as the box

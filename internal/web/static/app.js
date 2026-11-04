@@ -397,20 +397,20 @@ document.addEventListener("change", (e) => {
 });
 
 function paletteItems() {
-  return $$("#palette .pal-list li[data-filter]").filter((li) => !li.hidden);
+  return $$("#palette .pal-list li[data-filter], #palette .pal-list li.pal-new").filter((li) => !li.hidden);
 }
 
 function filterPalette() {
   const q = $("#palette .pal-filter").value.trim().toLowerCase();
   $$("#palette .pal-list li[data-filter]").forEach((li) => (li.hidden = !li.dataset.filter.toLowerCase().includes(q)));
+  // A name no task has: offer a new task by it on the Settings page, last
+  // in the list (other lines may match it too).
+  const nw = $("#palette .pal-new");
+  const name = $("#palette .pal-filter").value.trim();
+  nw.hidden = !name || $$("#palette button[name=task]").some((b) => b.value === name);
   const items = paletteItems();
   $$("#palette .pal-list li").forEach((li) => li.classList.remove("on"));
   if (items.length) items[0].classList.add("on");
-  // No task matches: offer a new one by that name on the Settings page.
-  const nw = $("#palette .pal-new");
-  const name = $("#palette .pal-filter").value.trim();
-  nw.hidden = !name || items.length > 0;
-  nw.classList.toggle("on", !nw.hidden);
   $("b", nw).textContent = name;
   $("a", nw).href = $("a", nw).dataset.base + "?task=" + encodeURIComponent(name) + "#tasks";
   const none = $("#palette .pal-none");
@@ -429,11 +429,9 @@ function paletteKey(e) {
     items[i].scrollIntoView({ block: "nearest" });
   } else if (e.key === "Enter" && e.target.closest("input")) {
     e.preventDefault();
-    if (i < 0) {
-      const nw = $("#palette .pal-new:not([hidden]) a");
-      if (nw) location.href = nw.href;
-      return;
-    }
+    if (i < 0) return;
+    const a = $("a", items[i]); // new task…
+    if (a) return void (location.href = a.href);
     const f = $("#palette form");
     const data = new URLSearchParams(new FormData(f));
     data.set("task", $("button", items[i]).value);

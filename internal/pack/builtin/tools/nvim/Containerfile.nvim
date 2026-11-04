@@ -47,8 +47,8 @@ RUN make CMAKE_BUILD_TYPE=RelWithDebInfo CMAKE_INSTALL_PREFIX=/usr/local/ && \
   strip /usr/local/bin/nvim
 
 # Release binaries for amd64 or arm64, each checked before install:
-# lazygit (most configs bind it to <leader>gg) against its release's
-# checksums.txt; the tree-sitter CLI (nvim-treesitter builds parsers with
+# lazygit (most configs bind it to <leader>gg), the latest release when the
+# image is built (D163), against its release's checksums.txt; the tree-sitter CLI (nvim-treesitter builds parsers with
 # it) against the SHA-256s below, as GitHub lists them for the release's
 # assets (it publishes no checksums file). Debian's tree-sitter-cli is older
 # than nvim-treesitter needs, and bookworm has none. On a bookworm base
@@ -57,14 +57,21 @@ RUN make CMAKE_BUILD_TYPE=RelWithDebInfo CMAKE_INSTALL_PREFIX=/usr/local/ && \
 # falls back without them, so it works.
 FROM docker.io/library/debian:trixie-slim AS downloads
 ARG DEBIAN_FRONTEND=noninteractive
-ARG LAZYGIT_VERSION=0.66.2
+# latest: the latest release. Set a version (0.66.2) to pin it.
+ARG LAZYGIT_VERSION=latest
 ARG TREE_SITTER_VERSION=0.27.1
 ARG TREE_SITTER_SHA256_X64=d01042f94ba3d6827ddc9788e235f75d8366431be42bdf90ade534d960c98b7d
 ARG TREE_SITTER_SHA256_ARM64=404be5d54a4955571c4067c21d4699660eab3a534cefb0659341b207f7139ec5
 RUN apt-get update -qq && \
   apt-get install -y --no-install-recommends ca-certificates curl && \
   rm -rf /var/lib/apt/lists/*
-RUN case "$(dpkg --print-architecture)" in \
+# The latest release's record: ADD fetches it on every build, and its
+# download counts change, so the step below runs again even with the build
+# cache (D163). api.github.com allows 60 unauthenticated requests an hour.
+ADD https://api.github.com/repos/jesseduffield/lazygit/releases/latest /tmp/lazygit-latest.json
+RUN if [ "${LAZYGIT_VERSION}" = latest ]; then LAZYGIT_VERSION=$(sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' /tmp/lazygit-latest.json); fi && \
+  case "${LAZYGIT_VERSION}" in [0-9]*) ;; *) echo "no lazygit version in its latest release" >&2; exit 1 ;; esac && \
+  case "$(dpkg --print-architecture)" in \
     amd64) LG=x86_64; TS=x64; TS_SHA="${TREE_SITTER_SHA256_X64}" ;; \
     arm64) LG=arm64; TS=arm64; TS_SHA="${TREE_SITTER_SHA256_ARM64}" ;; \
     *) echo "unsupported architecture: $(dpkg --print-architecture)" >&2; exit 1 ;; \

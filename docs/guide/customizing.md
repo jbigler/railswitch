@@ -78,6 +78,31 @@ To copy files git doesn't track (`.env.development.local`, a `tags` file)
 into each new worktree, list them in `[project] seed_files`: `wt add`
 copies each from the base worktree when the new one doesn't have it.
 
+## Git config
+
+`<workspace>/git/config` is the project's git config, in git's own format:
+aliases, `pull.rebase`, `rerere.enabled`, a diff tool. Every worktree uses
+it, in every container that has the worktree (the app, deps, workers, the
+editor and the agents), and an edit shows at once, with no restart.
+railswitch creates the empty `git/` folder; you write `config`:
+
+```ini
+[alias]
+	co = checkout
+	lg = log --oneline --graph
+[pull]
+	rebase = true
+```
+
+Containers read it as git's system config (`GIT_CONFIG_SYSTEM`), read-only,
+so a container's own `~/.gitconfig` and the repository's `.git/config`
+still win over it, and a container can't change it. It is never your host's
+`~/.gitconfig`, and your host's git doesn't read it. Agents can read it, so
+keep tokens and credential helpers out of it: a secret with `git_host = "github.com"`
+in `project.toml` ([agents](agents.md)) is the way to give a container git access. Commit
+identity still comes from your host's `user.name` and `user.email` where a
+service gets one.
+
 ## Images
 
 The **Images** page lists the Containerfiles the project builds: the base

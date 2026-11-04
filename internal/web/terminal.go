@@ -191,6 +191,10 @@ func (s *Server) tty(w http.ResponseWriter, r *http.Request) {
 		env = s.c.Env(ctx)
 	}
 	env = append(slices.Clip(env), term.BrowserEnv...)
+	// The panel's own light or dark, for the nvim-attach hook (docs/nvim.md).
+	if bg := r.URL.Query().Get("bg"); r.PathValue("kind") == "nvim" && (bg == "light" || bg == "dark") {
+		env = append(env, "NVIM_BACKGROUND="+bg)
+	}
 
 	// The program: its context ends with the connection (SIGTERM to its
 	// session, SIGKILL after ttyGrace).

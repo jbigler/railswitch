@@ -158,6 +158,9 @@ func (m *Model) Plan() (*Plan, error) {
 	if hasAgents {
 		status = append(status, NotesDir) // D141: the shared notes
 	}
+	if slices.ContainsFunc(m.Services, func(s Service) bool { return s.Worktree }) {
+		status = append(status, GitDir) // D164: the project's git config, mounted, so it must exist
+	}
 	for _, a := range m.Inputs.Stack.Agents {
 		if len(a.Agent.Config.Paths) > 0 {
 			status = append(status, path.Join(AgentDefaultDir, a.Name))

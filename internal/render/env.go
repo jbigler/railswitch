@@ -178,6 +178,9 @@ func (b *builder) envSpecs() {
 			}
 		}
 		b.gitWiring(s)
+		if s.Worktree {
+			s.EnvSpec = append(s.EnvSpec, EnvVar{Name: "GIT_CONFIG_SYSTEM", Value: literal(GitConfigMount + "/config"), Layer: LayerWorktree, Source: "the project's git config (D164)", svc: s.ID, scheme: s.scheme})
+		}
 
 		if consumer {
 			share(packSrc+" [share] env", s.ID, s.scheme, pk.Share.Env)

@@ -320,7 +320,7 @@ func TestDepsGetsNoSecrets(t *testing.T) {
 		}
 	}
 	// D11, D44: the pack layer, options' [deps_env] and [services.deps.env] only.
-	want := []string{"BINDING", "BUNDLE_FROZEN", "COREPACK_HOME", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
+	want := []string{"BINDING", "BUNDLE_FROZEN", "COREPACK_HOME", "GIT_CONFIG_SYSTEM", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", "RAILS_DEVELOPMENT_HOSTS", "RAILS_ENV", "RUBY_DEBUG_HOST"}
 	if !slices.Equal(names, want) {
 		t.Errorf("deps env = %v; want %v", names, want)
 	}
@@ -507,7 +507,7 @@ func TestSecretGitWiring(t *testing.T) {
 	}
 	for _, svc := range []string{"rails", "deps", "db"} {
 		for _, e := range in.Env[svc] {
-			if strings.HasPrefix(e.Name, "GIT_") {
+			if strings.HasPrefix(e.Name, "GIT_") && e.Name != "GIT_CONFIG_SYSTEM" { // D164: every worktree service
 				t.Errorf("%s has %s", svc, e.Name)
 			}
 		}
@@ -1086,7 +1086,7 @@ func TestGitSigningEnv(t *testing.T) {
 		t.Errorf("agent-claude GIT_AUTHOR_NAME = %q", e.Value)
 	}
 	for _, e := range in.Env["rails"] {
-		if strings.HasPrefix(e.Name, "GIT_") {
+		if strings.HasPrefix(e.Name, "GIT_") && e.Name != "GIT_CONFIG_SYSTEM" { // D164: every worktree service
 			t.Errorf("rails has %s", e.Name)
 		}
 	}
@@ -1303,5 +1303,27 @@ func TestDBTestName(t *testing.T) {
 		if got := in.Values["db_test"]; got != "shop_specs" {
 			t.Errorf("db_test from database.yml = %q; want shop_specs", got)
 		}
+	}
+}
+
+// D164: every service with the worktree mounts <workspace>/git read-only
+// and reads its config as git's system config; the others neither.
+func TestProjectGitConfig(t *testing.T) {
+	m, in := filial(t, nil)
+	n := 0
+	for _, s := range m.Services {
+		has := slices.ContainsFunc(s.Mounts, func(mt Mount) bool {
+			return mt.Target == GitConfigMount && mt.Options == "ro,z" && strings.HasSuffix(mt.Source, "/"+GitDir)
+		})
+		e, env := envVar(in, s.ID, "GIT_CONFIG_SYSTEM")
+		if has != s.Worktree || env != s.Worktree || env && e.Value != GitConfigMount+"/config" {
+			t.Errorf("%s (worktree %v): mount %v, GIT_CONFIG_SYSTEM %v %q", s.ID, s.Worktree, has, env, e.Value)
+		}
+		if s.Worktree {
+			n++
+		}
+	}
+	if n < 3 {
+		t.Fatalf("only %d worktree services", n)
 	}
 }

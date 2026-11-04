@@ -18,11 +18,18 @@ Besides Neovim (built from source on the project's base image, so it
 links against the base's own C library: one built on a newer Debian than
 the base's doesn't start) the image has `ripgrep`, `fd`, `fzf`,
 `universal-ctags`, `lua5.4`, `luarocks`, `xclip` and `unzip` from the
-base's packages, and two pinned downloads, each changed by its `ARG` in
+base's packages, and two downloads, each set by its `ARG` in
 `Containerfile.nvim`:
 
-- `lazygit` (`LAZYGIT_VERSION`): the release binary for amd64 or arm64,
-  checked against the release's `checksums.txt`.
+- `lazygit` (`LAZYGIT_VERSION`, `latest` by default; a version pins it):
+  the release binary for amd64 or arm64, checked against the release's
+  `checksums.txt`. `latest` is the newest release when the image is built
+  (`railswitch build --force` builds it again): the build reads it from
+  GitHub's API, which allows 60 unauthenticated requests an hour. The
+  entrypoint gives each worktree's home an empty
+  `~/.config/lazygit/config.yml` when it has none: lazygit creates it only
+  when `LG_CONFIG_FILE` is unset, and a plugin that sets it (to theme
+  lazygit) makes a missing one an error.
 - the tree-sitter CLI (`TREE_SITTER_VERSION`), which nvim-treesitter
   builds parsers with: the release binary, checked against the SHA-256s
   pinned next to the version (the release publishes no checksums file;
@@ -151,7 +158,8 @@ The mode needs pushing because the server starts as `nvim --headless
 terminal colour query, run only when a UI is attached at startup) never
 runs and `'background'` stays `dark`. The hook works it out on the host on
 every attach, so a theme flip since the server started is picked up too:
-`NVIM_BACKGROUND` (`dark` or `light`) when set; else kitty's live
+`NVIM_BACKGROUND` (`dark` or `light`) when set (the dashboard's browser
+terminal sets it to its own background's, by the same luminance); else, in a kitty window, kitty's live
 background colour (`kitten @ get-colors`, which needs `allow_remote_control
 yes` in `kitty.conf`), classified by luminance with the weights Neovim
 uses; else `dark`. It calls `BackgroundSet(mode)` if your config defines
@@ -183,7 +191,9 @@ esac
 # overrides; else kitty's live background colour by luminance; else dark.
 mode=${NVIM_BACKGROUND:-}
 case "$mode" in dark | light) ;; *)
-	bg=$(kitten @ get-colors 2>/dev/null | awk '$1 == "background" { print $2; exit }')
+	# Outside kitty (the dashboard's browser terminal) kitten @ asks the terminal
+	# itself and waits for an answer that never comes: query kitty only.
+	bg=; [ -n "${KITTY_WINDOW_ID:-}" ] && bg=$(kitten @ get-colors 2>/dev/null | awk '$1 == "background" { print $2; exit }')
 	# hx() instead of strtonum(): POSIX awk (mawk, busybox) has no strtonum.
 	mode=$(awk -v hex="$bg" '
 		function hx(s,  d) { d = "0123456789abcdef"; s = tolower(s)

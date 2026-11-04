@@ -206,7 +206,7 @@ still wider than the window scrolls its pane.
   (and "restart to apply"), the PR line
   (`PR #2141 ready · checks ✓ · approved`, a link to the PR; Links gains
   **Review app** when `pr ls` finds one, the PR's GitHub deployment).
-  Right under it the actions (start, restart, stop, `remove…`; see
+  Right under it the actions (start, restart, stop, `down…`, `remove…`; see
   Actions). Then, when its branch is in a
   gh stack (`stack ls`, read with the PRs), Stack, in gh stack view's
   words: `◆ Stack #10350` (linked to the stack on GitHub) · `Base:
@@ -874,6 +874,13 @@ Every action is a job (below).
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
   <branch>`.
+- **down…** (every worktree, the base too): the dialog says what goes,
+  its containers and its volumes (database, cache, storage), and what
+  stays: the checkout, its branch and the project's shared volumes. With
+  a data service it links `snapshots…` to keep the database first.
+  Confirming → `railswitch -w <slug> down --yes` (the dialog is the
+  confirmation). The next start begins with empty data, seeded from
+  `db-dumps/`, and runs `[hooks] create` again.
 - **remove…** (not offered for the base worktree; it reads "PR merged:
   remove…" once the worktree's PR is merged): the dialog reads `railswitch --json wt ls` for the dirty flag
   and lists what goes: the checkout, its containers and volumes, its nvim

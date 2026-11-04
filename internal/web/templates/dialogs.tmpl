@@ -22,6 +22,18 @@
 {{end}}<div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln danger">Remove</button></div>
 </form>{{end}}
 
+{{define "down"}}<form method="post" action="{{.URL}}" class="remove" data-post data-close>
+<h2>Take {{.Slug}} down?</h2>
+<p>This stops it and deletes:</p>
+<ul>
+<li>its containers</li>
+<li>its volumes: its database, cache and storage data</li>
+</ul>
+<p>The checkout, its branch and the project's shared volumes stay. The next start begins with empty data, seeded from <code>db-dumps/</code> when there is a dump, and runs the create hooks again.</p>
+{{with .SnapshotsURL}}<p>To keep the database, take a <a href="{{.}}" data-dialog="snapshots">snapshot</a> first.</p>
+{{end}}<div class="btns"><button type="button" class="ln" data-cancel>Cancel</button><button class="ln danger">Delete volumes</button></div>
+</form>{{end}}
+
 {{/* An agent's project default config (D135): promote this worktree's,
 or have homes take the default at their agent's next start. */}}
 {{define "agentdefault"}}<div class="agentdefault">

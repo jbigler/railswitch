@@ -108,6 +108,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
+	m.HandleFunc("GET /p/{prefix}/{slug}/down", s.downDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/tasks", s.tasksDialog)
 	m.HandleFunc("GET /p/{prefix}/palette", s.tasksDialog) // no worktree: pages and worktrees only
 	m.HandleFunc("GET /p/{prefix}/notes", s.notesPage)
@@ -123,6 +124,7 @@ func New(c Config) *Server {
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
+	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
 	m.HandleFunc("POST /p/{prefix}/{slug}/restart/{service}", s.restartService)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-default/{verb}", s.agentDefault)
@@ -424,6 +426,20 @@ func (s *Server) removeDialog(w http.ResponseWriter, r *http.Request) {
 	s.html(w, http.StatusOK, "remove", removeView{Slug: wt.Slug, Dir: rows[i].Dir, Dirty: rows[i].Dirty, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/remove"})
 }
 
+// downDialog confirms down: what it deletes, and a snapshot first when the
+// worktree has a database.
+func (s *Server) downDialog(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	v := downView{Slug: wt.Slug, URL: worktreePath(p, wt.Slug) + "/down"}
+	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Role == "data" }) {
+		v.SnapshotsURL = worktreePath(p, wt.Slug) + "/snapshots"
+	}
+	s.html(w, http.StatusOK, "down", v)
+}
+
 // tasksDialog is the : palette: worktree {slug}'s tasks and the actions
 // its detail shows, then the project's worktrees and pages.
 func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
@@ -651,6 +667,18 @@ func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
 		argv = append(argv, "--force")
 	}
 	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "remove", Dir: p.Workspace, Argv: append(argv, wt.Slug)}, nil, "/p/"+p.Prefix)
+}
+
+// down runs down --yes: the dialog was the confirmation.
+func (s *Server) down(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	s.start(w, r, jobs.Spec{
+		Project: p.Prefix, Slug: wt.Slug, Label: "down", Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "down", "--yes"},
+	}, nil, worktreePath(p, wt.Slug))
 }
 
 // badName: empty, a flag, or holding a blank or control character.

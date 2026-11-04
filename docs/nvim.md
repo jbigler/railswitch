@@ -18,11 +18,18 @@ Besides Neovim (built from source on the project's base image, so it
 links against the base's own C library: one built on a newer Debian than
 the base's doesn't start) the image has `ripgrep`, `fd`, `fzf`,
 `universal-ctags`, `lua5.4`, `luarocks`, `xclip` and `unzip` from the
-base's packages, and two pinned downloads, each changed by its `ARG` in
+base's packages, and two downloads, each set by its `ARG` in
 `Containerfile.nvim`:
 
-- `lazygit` (`LAZYGIT_VERSION`): the release binary for amd64 or arm64,
-  checked against the release's `checksums.txt`.
+- `lazygit` (`LAZYGIT_VERSION`, `latest` by default; a version pins it):
+  the release binary for amd64 or arm64, checked against the release's
+  `checksums.txt`. `latest` is the newest release when the image is built
+  (`railswitch build --force` builds it again): the build reads it from
+  GitHub's API, which allows 60 unauthenticated requests an hour. The
+  entrypoint gives each worktree's home an empty
+  `~/.config/lazygit/config.yml` when it has none: lazygit creates it only
+  when `LG_CONFIG_FILE` is unset, and a plugin that sets it (to theme
+  lazygit) makes a missing one an error.
 - the tree-sitter CLI (`TREE_SITTER_VERSION`), which nvim-treesitter
   builds parsers with: the release binary, checked against the SHA-256s
   pinned next to the version (the release publishes no checksums file;

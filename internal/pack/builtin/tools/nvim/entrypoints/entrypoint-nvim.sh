@@ -10,6 +10,11 @@ set -eu
 
 mkdir -p ~/.config ~/.local
 
+# lazygit makes its config.yml only when LG_CONFIG_FILE is unset; a plugin
+# that sets it (to theme lazygit) makes a missing one an error. The home is
+# per worktree and starts without one.
+[ -e ~/.config/lazygit/config.yml ] || { mkdir -p ~/.config/lazygit && : >~/.config/lazygit/config.yml; }
+
 # ~/.config/nvim is the <prefix>_nvim_config volume, shared by every
 # worktree's nvim: whatever you configure persists. With [tools.nvim]
 # config_repo (NVIM_CONFIG_REPO; NVIM_CONFIG_REF a branch or tag, D54), the

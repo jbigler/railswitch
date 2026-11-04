@@ -84,7 +84,8 @@ replaced, the others are left as they are (it asks first, naming each
 one; `--from <dir>` for dumps from elsewhere, `--yes` without asking).
 A dump runs with the database's full rights, so restore only dumps you
 made or trust, and never point `--from` into a worktree an agent can
-write to. Storage (RustFS's objects, `rustfs_data.tar.gz`) is restored
+write to. Storage (RustFS's objects, one drive at `/data` in its volume,
+`rustfs_data.tar.gz`) is restored
 too: its volume is emptied and filled from the dump, which stops the
 storage service and everything that needs it (the app) for the time it
 takes; what was running is started again. Name the service to restore it

@@ -116,6 +116,10 @@ function resumeAt(it) {
 }
 
 const unique = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+// The video codecs this browser plays in MP4: one of them is copied, not
+// transcoded, which a small Jellyfin server can't do much of.
+const CODECS = ['h264', ...Object.entries({ hevc: 'hvc1.2.4.L120.90', av1: 'av01.0.08M.10', vp9: 'vp09.02.40.10' })
+  .filter(([, c]) => video.canPlayType(`video/mp4; codecs="${c}"`)).map(([k]) => k)].join(',');
 const DEVICE = `railswitch-${unique()}`; // this page, to Jellyfin
 
 function start(at) {
@@ -126,7 +130,12 @@ function start(at) {
   // A fresh PlaySessionId each start: Jellyfin names the transcode's file
   // without StartTimeTicks, and serves an existing one from its beginning.
   on.session = unique();
-  const p = { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', maxWidth: '1920', DeviceId: DEVICE, PlaySessionId: on.session };
+  // A bitrate, or Jellyfin scales a transcode down to 416 px wide; stereo
+  // audio is cheaper to make than 5.1.
+  const p = {
+    container: 'mp4', videoCodec: CODECS, audioCodec: 'aac', maxWidth: '1920', VideoBitrate: '20000000',
+    AudioBitrate: '192000', MaxAudioChannels: '2', DeviceId: DEVICE, PlaySessionId: on.session,
+  };
   if (at > 0) p.StartTimeTicks = String(Math.round(at * 1e7));
   video.src = jellyfinURL(on.src, `/Videos/${encodeURIComponent(on.pl.items[on.i].Id)}/stream.mp4`, p);
   kill(was.src, was.session); // after the new src, or the cut stream would end and skip

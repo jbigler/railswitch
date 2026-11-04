@@ -1228,8 +1228,11 @@ later need it for a playlist that isn't public.
 
 The playlist is looked up by its exact name each time the panel opens, so
 a playlist edited in Jellyfin shows as edited. Its videos play in turn and
-round again, asked as H.264 and AAC in MP4 (Jellyfin copies what already
-is and transcodes the rest); a seek starts the stream again at that point
+round again, in MP4 with stereo AAC. The page offers every video codec the
+browser plays in MP4 (H.264, and HEVC, AV1 or VP9 where it can), so
+Jellyfin copies the video when it can and transcodes only the rest, at up
+to 1920 wide and 20 Mb/s. Jellyfin's per-user "video transcoding" switch
+doesn't stop this: it only steers clients that ask how to play; a seek starts the stream again at that point
 (`StartTimeTicks`), since a transcoded stream can't seek by range. Each
 start carries a new `PlaySessionId`: Jellyfin names its transcode without
 the start time and would serve an earlier one from the beginning.

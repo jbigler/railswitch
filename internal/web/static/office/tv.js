@@ -116,7 +116,10 @@ function resumeAt(it) {
 function start(at) {
   on.offset = at;
   on.abs = null;
-  const p = { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', maxWidth: '1920' };
+  // A fresh PlaySessionId each start: Jellyfin names the transcode's file
+  // without StartTimeTicks, and serves an existing one from its beginning.
+  const session = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const p = { container: 'mp4', videoCodec: 'h264', audioCodec: 'aac', maxWidth: '1920', PlaySessionId: session };
   if (at > 0) p.StartTimeTicks = String(Math.round(at * 1e7));
   video.src = jellyfinURL(on.src, `/Videos/${encodeURIComponent(on.pl.items[on.i].Id)}/stream.mp4`, p);
   video.play().catch((e) => {

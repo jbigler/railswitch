@@ -41,6 +41,9 @@ RUSTFS_TELEMETRY = "off"
 [[volumes]]
 name = "rustfs-data"
 mount = "/data"
+# :U, the volume to RustFS's user (10001): one drive writes /data itself,
+# whose owner a seeded or older volume left as root (D165).
+chown = true
 seed = "rustfs_data.tar.gz"   # D18: imported from <workspace>/db-dumps/ when the volume is created
 
 [[ports]]                     # for tailnet share (D46)

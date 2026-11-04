@@ -547,6 +547,7 @@ const SOFA = { x: 8, z: -3.15, yaw: 0, eye: 1.15 };
 function lounge(k, scene, deco, ui, accent) {
   zoneSign(scene, 'Lounge', 5, -1.3);
   const big = bigScreen(scene, 8, 1.6, -7.88, 0, 3.44, 1.935, accent);
+  big.userData.room = { minX: 4, maxX: 12, minZ: -8, maxZ: -2 }; // the lounge's walls, for the TV's sound
   pickable(big.screen, 'The big screen: pick something to watch', () => ui.tv(big));
   put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
   pickable(put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI), 'The sofa: sit and watch', () => ui.sit(SOFA));

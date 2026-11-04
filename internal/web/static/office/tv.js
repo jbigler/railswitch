@@ -178,13 +178,23 @@ setInterval(() => {
 }, 15000);
 addEventListener('pagehide', () => report());
 
-// The sound falls off past the sofa: full at REF, (REF/d)^1.5 beyond.
+// The sound falls off past the sofa, (REF/d)^2 beyond REF, and the room's
+// walls (the screen group's userData.room: {minX, maxX, minZ, maxZ}) take
+// it down to WALLS over the first FADE m outside them: a step out of the
+// lounge must be heard, and distance alone is only a few dB.
+const WALLS = 0.2;
+const FADE = 1.5;
+function loudness(d, outside) {
+  return Math.min(1, (REF / Math.max(d, REF)) ** 2) * (WALLS + (1 - WALLS) * Math.max(0, 1 - outside / FADE));
+}
 const at = new THREE.Vector3();
 const me = new THREE.Vector3();
 setInterval(() => {
   if (!on || !ear || !screen) return;
-  const d = screen.getWorldPosition(at).distanceTo(ear.getWorldPosition(me));
-  video.volume = Math.min(1, (REF / Math.max(d, REF)) ** 1.5);
+  ear.getWorldPosition(me);
+  const r = screen.userData.room;
+  const outside = r ? Math.hypot(Math.max(r.minX - me.x, 0, me.x - r.maxX), Math.max(r.minZ - me.z, 0, me.z - r.maxZ)) : 0;
+  video.volume = loudness(screen.getWorldPosition(at).distanceTo(me), outside);
 }, 100);
 
 // jellyfinURL is a Jellyfin URL with the key in its query: a <video> can't

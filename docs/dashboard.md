@@ -1234,8 +1234,10 @@ is and transcodes the rest); a seek starts the stream again at that point
 
 The TV belongs to the page, not a floor: take the elevator and the same
 video goes on, on that floor's lounge screen. Its sound falls off with
-your distance from the screen: full out to 5 m (the sofa), then
-(5 / distance)^1.5, so there is no volume control, only mute.
+your distance from the screen, full out to 5 m (the sofa), then
+(5 / distance)², and with the lounge's walls: it drops to a fifth over
+the first 1.5 m outside them (about −20 dB in the corridor, −40 dB by
+the elevator). So there is no volume control, only mute.
 
 With `--user`, a video resumes where it stopped: the page tells Jellyfin
 that user's position every 15 s, on pause, skip, stop and leaving the

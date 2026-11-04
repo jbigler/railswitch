@@ -421,7 +421,8 @@ func TestShowDefault(t *testing.T) {
 
 // TestBuiltinContainerfilesSelfContained: an ejected default builds
 // unchanged with containerfiles/ as its context, so no built-in reads the
-// build context (only COPY --from= of another stage or image).
+// build context (only COPY --from= of another stage or image, or ADD of an
+// https URL).
 func TestBuiltinContainerfilesSelfContained(t *testing.T) {
 	cat, err := pack.LoadBuiltins()
 	if err != nil {
@@ -466,7 +467,8 @@ func TestBuiltinContainerfilesSelfContained(t *testing.T) {
 			if op := strings.ToUpper(fields[0]); op != "COPY" && op != "ADD" {
 				continue
 			}
-			if !slices.ContainsFunc(fields[1:], func(f string) bool { return strings.HasPrefix(f, "--from=") }) {
+			remote := func(f string) bool { return strings.HasPrefix(f, "https://") } // ADD of a URL (D163) reads no context
+			if !slices.ContainsFunc(fields[1:], func(f string) bool { return strings.HasPrefix(f, "--from=") }) && !(op == "ADD" && slices.ContainsFunc(fields[1:], remote)) {
 				t.Errorf("%s:%d reads the build context: %s", f.name, i+1, line)
 			}
 		}

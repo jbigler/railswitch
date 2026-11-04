@@ -7,7 +7,7 @@ generated = ["S3_SECRET_KEY"]   # D17
 
 [pin]
 name = "rustfs"
-default = "1.0.0-alpha.83"
+default = "1.0.4"
 
 [image]
 pull = "docker.io/rustfs/rustfs:{rustfs}"

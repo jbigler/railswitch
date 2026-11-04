@@ -1090,8 +1090,9 @@ any open page.
     browser's time, and the pet's corner. The **lounge** (glass): the
     sofa facing the **big screen** on the back wall from 4.7 m (click the
     sofa to sit on it: seated eye height, facing the screen; any step
-    stands up). The screen is sized for that seat: 16:9, 3.44 m wide, 40°
-    of the view (THX's figure), its middle a little above the seated eye.
+    stands up). The screen is sized for that seat: 16:9, 4.41 m wide, 50°
+    of the view (the immersive end of THX's range), its middle a little
+    above the seated eye.
     It shows the floor's summary until you click it and pick something to
     watch (see [The lounge's TV](#the-lounges-tv)).
   - Front side, by the windows: **work** (glass): **your desk**'s wall

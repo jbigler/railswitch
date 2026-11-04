@@ -382,6 +382,11 @@ func TestEnv(t *testing.T) {
 	if !slices.Equal(j.Lines, []string{"1 injected"}) {
 		t.Errorf("lines = %q, want [1 injected]", j.Lines)
 	}
+	win := sh("p", "a", `echo "${NO_COLOR-unset}"`)
+	win.Window = true
+	if j := run(t, h, win); !slices.Equal(j.Lines, []string{"unset"}) {
+		t.Errorf("window job lines = %q, want [unset]", j.Lines)
+	}
 }
 
 func TestSubscribe(t *testing.T) {

@@ -581,15 +581,16 @@ func worktreePath(p projectRow, slug string) string { return "/p/" + p.Prefix + 
 // worktreeActions are a worktree's buttons: the action in the URL, the
 // railswitch arguments it runs.
 var worktreeActions = map[string]struct {
-	label string
-	args  []string
+	label  string
+	args   []string
+	window bool // opens a terminal window (jobs.Spec.Window)
 }{
-	"up":      {"start", []string{"up"}},
-	"stop":    {"stop", []string{"stop"}},
-	"restart": {"restart", []string{"restart"}},
-	"term":    {"terminal", []string{"term"}},
-	"nvim":    {"nvim", []string{"nvim", "--new-term"}},
-	"agent":   {"agent", []string{"agent", "--new-term"}},
+	"up":      {"start", []string{"up"}, false},
+	"stop":    {"stop", []string{"stop"}, false},
+	"restart": {"restart", []string{"restart"}, false},
+	"term":    {"terminal", []string{"term"}, true},
+	"nvim":    {"nvim", []string{"nvim", "--new-term"}, true},
+	"agent":   {"agent", []string{"agent", "--new-term"}, true},
 }
 
 func (s *Server) act(w http.ResponseWriter, r *http.Request) {
@@ -604,7 +605,7 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 	}
 	s.start(w, r, jobs.Spec{
 		Project: p.Prefix, Slug: wt.Slug, Label: a.label, Dir: p.Workspace,
-		Argv: append([]string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug}, a.args...),
+		Argv: append([]string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug}, a.args...), Window: a.window,
 	}, nil, worktreePath(p, wt.Slug))
 }
 
@@ -742,7 +743,7 @@ func (s *Server) runTask(w http.ResponseWriter, r *http.Request) {
 		argv = append(argv, "--new-term")
 	}
 	argv = append(append(argv, name), args...)
-	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "task " + name, Dir: p.Workspace, Argv: argv}, nil, worktreePath(p, wt.Slug))
+	s.start(w, r, jobs.Spec{Project: p.Prefix, Slug: wt.Slug, Label: "task " + name, Dir: p.Workspace, Argv: argv, Window: r.PostFormValue("term") != ""}, nil, worktreePath(p, wt.Slug))
 }
 
 func (s *Server) refreshPRs(w http.ResponseWriter, r *http.Request) {

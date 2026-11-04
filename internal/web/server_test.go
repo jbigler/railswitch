@@ -196,9 +196,9 @@ func TestPages(t *testing.T) {
 		code int
 		want []string
 	}{
-		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`, `<div id="conn" class="banner conn" hidden></div>`}},
+		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `data-pane="list"`, `<a class="back" href="/p/ftest">`, `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim">Refresh PRs</button></form>`, `<div id="conn" class="banner conn" hidden></div>`}},
 		{"/p/ftest/images", 200, []string{`<nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>`, `<a class="hb" href="/p/ftest">worktrees</a>`, `<span class="hd-div" aria-hidden="true"></span>`, `href="/p/ftest/notes"`, `>office</a>`, `<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>`}},
-		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `href="/p/ftest/b/snapshots" data-dialog="snapshots"`, `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
+		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `data-pane="detail"`, `<a class="back" href="/p/ftest?sort=-name">`, `href="/p/ftest/b/snapshots" data-dialog="snapshots"`, `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
 		{"/p/nope", 404, nil},
 		{"/p/nope/b", 404, nil},
 		{"/p/ftest/b/remove", 200, []string{"Discard changes", `name="confirm"`, "/ws/ftest/b"}},

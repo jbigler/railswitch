@@ -321,3 +321,23 @@ body:has(.term-panel.max) { overflow: hidden; }
 .usage-line{margin-top:4px}
 .set-table td.size{white-space:nowrap}
 #note textarea{display:block;width:100%;box-sizing:border-box}
+
+/* Narrow windows (docs/dashboard.md): one column; the project page shows
+   the list or a worktree's detail, as data-pane says. */
+.back{display:none}
+@media (max-width:800px){
+.grid{grid-template-columns:minmax(0,1fr);align-content:start}
+.left{border-right:0}
+body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none}
+.back{display:inline-block;margin-bottom:8px}
+/* stack and tests are in the detail; branch too, below 520px */
+#list th:nth-child(4),#list td:nth-child(4),#list th:nth-child(6),#list td:nth-child(6){display:none}
+.tb{flex-wrap:wrap}
+/* a settings table wider than the window scrolls by itself */
+.set-table{display:block;overflow-x:auto}
+.set-table th,.set-table td{padding-left:5px;padding-right:5px}
+.set-table .chip,.secret-form{white-space:normal;flex-wrap:wrap}
+.secret-form input:not([type=checkbox]){width:7em}
+.tb a,.tb button{white-space:nowrap}
+}
+@media (max-width:520px){#list th:nth-child(2),#list td:nth-child(2){display:none}}

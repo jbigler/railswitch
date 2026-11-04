@@ -353,11 +353,13 @@ be revoked on GitHub by itself. Only nvim's containers get it, not agents
 or the app. keep-id makes the container's user you, so the folder needs no
 `chown`.
 
-A mount reaches a worktree when its units are written again: `railswitch
-up`, `railswitch restart` or the dashboard's restart, each worktree once.
-`railswitch restart nvim` restarts the unit as it was, without the mount.
-Then `:Copilot auth` in one worktree signs in every worktree's nvim at
-its next start. The same pattern serves any tool that keeps a sign-in
+A mount reaches nvim when its unit is written again and nvim restarts.
+The units of every worktree of the project are written by `up`, `restart`
+(or the dashboard's restart), an agent's start or a settings change in
+any one worktree; `railswitch restart nvim` alone restarts the unit as it
+was last written. So: `railswitch restart` in one worktree, or any of the
+others and then `restart nvim` in each. Then `:Copilot auth` in one
+worktree signs in every worktree's nvim at its next start. The same pattern serves any tool that keeps a sign-in
 under `~/.config` or `~/.local/state`; `~/.local/share/nvim` is already
 shared by every worktree (the `nvim_share` volume).
 

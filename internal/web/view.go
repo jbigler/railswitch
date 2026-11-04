@@ -674,9 +674,10 @@ type detailView struct {
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
 	TermWindowURL                     string       // the term action: a window on the desktop
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
-	PRPageURL                         string       // the worktree's PR page (D152)
-	AgentDefaultURL                   string       // the agent default config dialog (D135)
-	SnapshotsURL                      string       // the database snapshots dialog (D157); "" without a data service
+	DownURL                           string
+	PRPageURL                         string // the worktree's PR page (D152)
+	AgentDefaultURL                   string // the agent default config dialog (D135)
+	SnapshotsURL                      string // the database snapshots dialog (D157); "" without a data service
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
 	Merged, Stale                     bool
@@ -782,6 +783,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Role == "data" }) {
 		v.SnapshotsURL = path + "/snapshots"
 	}
+	v.DownURL = path + "/down"
 	if !wt.Base {
 		v.RemoveURL = path + "/remove"
 		v.Merged = r.PR != nil && r.PR.State == "merged"
@@ -833,6 +835,8 @@ func newJobs(snaps []jobs.Snapshot, rows []row, slug string) jobsView {
 }
 
 // Dialog fragments.
+
+type downView struct{ Slug, URL, SnapshotsURL string }
 
 type removeView struct {
 	Slug, Dir, URL string

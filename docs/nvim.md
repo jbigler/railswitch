@@ -151,7 +151,7 @@ The mode needs pushing because the server starts as `nvim --headless
 terminal colour query, run only when a UI is attached at startup) never
 runs and `'background'` stays `dark`. The hook works it out on the host on
 every attach, so a theme flip since the server started is picked up too:
-`NVIM_BACKGROUND` (`dark` or `light`) when set; else kitty's live
+`NVIM_BACKGROUND` (`dark` or `light`) when set; else, in a kitty window, kitty's live
 background colour (`kitten @ get-colors`, which needs `allow_remote_control
 yes` in `kitty.conf`), classified by luminance with the weights Neovim
 uses; else `dark`. It calls `BackgroundSet(mode)` if your config defines
@@ -183,7 +183,9 @@ esac
 # overrides; else kitty's live background colour by luminance; else dark.
 mode=${NVIM_BACKGROUND:-}
 case "$mode" in dark | light) ;; *)
-	bg=$(kitten @ get-colors 2>/dev/null | awk '$1 == "background" { print $2; exit }')
+	# Outside kitty (the dashboard's browser terminal) kitten @ asks the terminal
+	# itself and waits for an answer that never comes: query kitty only.
+	bg=; [ -n "${KITTY_WINDOW_ID:-}" ] && bg=$(kitten @ get-colors 2>/dev/null | awk '$1 == "background" { print $2; exit }')
 	# hx() instead of strtonum(): POSIX awk (mawk, busybox) has no strtonum.
 	mode=$(awk -v hex="$bg" '
 		function hx(s,  d) { d = "0123456789abcdef"; s = tolower(s)

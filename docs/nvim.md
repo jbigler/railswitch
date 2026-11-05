@@ -18,7 +18,10 @@ Besides Neovim (built from source on the project's base image, so it
 links against the base's own C library: one built on a newer Debian than
 the base's doesn't start) the image has `ripgrep`, `fd`, `fzf`,
 `universal-ctags`, `lua5.4`, `luarocks`, `xclip` and `unzip` from the
-base's packages, and two downloads, each set by its `ARG` in
+base's packages, the GitHub CLI `gh` from GitHub's package repository, its current release
+whenever the image is built, as for lazygit below (a
+`github.com` token secret nvim receives reaches it as `GH_TOKEN`, D169),
+and two downloads, each set by its `ARG` in
 `Containerfile.nvim`:
 
 - `lazygit` (`LAZYGIT_VERSION`, `latest` by default; a version pins it):

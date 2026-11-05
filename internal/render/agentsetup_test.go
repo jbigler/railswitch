@@ -60,7 +60,7 @@ func TestAgentSetup(t *testing.T) {
 }
 
 // TestGHToken (D133): a github.com secret an agent receives as a file
-// also reaches it as GH_TOKEN, once; nvim (no gh) doesn't get it; a
+// also reaches it as GH_TOKEN, once, as it does nvim (D169); a
 // secret already delivered as GH_TOKEN, or the agent's own env GH_TOKEN,
 // wins.
 func TestGHToken(t *testing.T) {
@@ -89,8 +89,8 @@ func TestGHToken(t *testing.T) {
 	if n := count(in.SecretSpecs("agent-claude")); n != 1 {
 		t.Errorf("agent GH_TOKEN %d times; want 1: %q", n, in.SecretSpecs("agent-claude"))
 	}
-	if n := count(in.SecretSpecs("nvim")); n != 0 {
-		t.Errorf("nvim got GH_TOKEN: %q", in.SecretSpecs("nvim"))
+	if n := count(in.SecretSpecs("nvim")); n != 1 {
+		t.Errorf("nvim GH_TOKEN %d times; want 1: %q", n, in.SecretSpecs("nvim"))
 	}
 	in = gh(func(p *config.Project) {
 		p.Secrets["mine"] = config.Secret{Services: []string{"agent-claude"}, Env: "GH_TOKEN"}

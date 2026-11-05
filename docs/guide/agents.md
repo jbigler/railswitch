@@ -182,7 +182,7 @@ recorded while the dashboard runs (or whenever you run `overview` or
   agents and nvim: `railswitch secret set github_token` gives them git
   over HTTPS. To sign commits, add a signing-only key with `secret add
   --git-signing`.
-- **GitHub CLI.** Agents have `gh`. A `github_token` (a secret with
+- **GitHub CLI.** Agents have `gh`, its current release whenever the image is built. A `github_token` (a secret with
   `git_host = "github.com"`) an agent receives reaches it as `GH_TOKEN`
   too, so `gh pr`, `gh stack` and the like work with the token you set
   (not when the agent already gets a `GH_TOKEN` of its own). A project

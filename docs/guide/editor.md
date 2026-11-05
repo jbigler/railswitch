@@ -40,6 +40,10 @@ the `agent` list in Settings. For a private config repository on GitHub,
 set the `github_token` secret `project new` declared; elsewhere, add a
 token secret with `git_host` and `services = ["nvim"]`.
 
+nvim has the GitHub CLI, `gh`, as agents do. A `github.com` token secret
+nvim receives (`github_token`) reaches it as `GH_TOKEN` too, so `gh` and
+plugins built on it work with the token you set.
+
 Reference: [docs/nvim.md](../nvim.md).
 
 Next: [The firewall](firewall.md).

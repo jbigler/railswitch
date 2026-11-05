@@ -337,7 +337,8 @@ func TestTagsIncludeFromDigests(t *testing.T) {
 	}
 	deb := tags(map[string]string{ruby: "sha256:" + strings.Repeat("a", 64), debian: "sha256:" + strings.Repeat("c", 64)})
 	for name := range aa {
-		if changes := name == "nvim" || name == "agent claude"; (aa[name] != deb[name]) != changes { // both FROM debian
+		// FROM debian: nvim and the agent base (their gh stage, D169), and the agents built on it
+		if changes := name == "nvim" || name == "agent-base" || strings.HasPrefix(name, "agent "); (aa[name] != deb[name]) != changes {
 			t.Errorf("debian digest: %s tag changed = %v; want %v", name, aa[name] != deb[name], changes)
 		}
 	}

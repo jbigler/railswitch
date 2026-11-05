@@ -13,16 +13,7 @@
 <section class="dcard wide" data-panel="services"><h2 class="lbl">Services</h2>
 <div class="services">{{range .Services}}<div class="svc{{if ne .Word "running"}} attn{{end}}" data-svc="{{.Name}}" title="{{.Name}}: {{.State}}"><span class="g {{.Class}}" aria-hidden="true">{{.Glyph}}</span><span class="mono name">{{.Name}}</span><span class="st {{.Class}}">{{.Word}}</span><span class="svc-acts">{{if .LogsURL}}<a href="{{.LogsURL}}" target="_blank" rel="noopener" title="{{.Name}}'s logs in Dozzle">logs</a>{{end}}{{if .RestartURL}}<form method="post" action="{{.RestartURL}}" data-post{{with .Confirm}} data-confirm="{{.}}"{{end}}><button title="Restart {{.Name}} alone">restart</button></form>{{end}}</span></div>{{else}}<span class="muted">none</span>{{end}}</div>
 </section>
-{{if or .PR .Stacked}}<section class="dcard" data-panel="overview"><h2 class="lbl">Pull request{{if .PR}} <a class="quiet-link" href="{{.PRPageURL}}" title="Checks, reviews, comments, merge">PR page</a>{{end}}</h2>
-{{with .PR}}<div>{{if .URL}}<a class="pr-line {{.StateClass}}" href="{{.URL}}" target="_blank" rel="noopener" title="{{.Title}}">{{.Line}}</a>{{else}}<span class="{{.StateClass}}">{{.Line}}</span>{{end}}</div>
-{{end}}{{with .Stacked}}<h3 class="lbl">Stack</h3>
-{{if .Error}}<div class="muted">stack ? {{.Error}}</div>
-{{else}}<div class="stack-head muted">{{if .Number}}◆ {{if .NumberURL}}<a href="{{.NumberURL}}" target="_blank" rel="noopener">Stack #{{.Number}}</a>{{else}}Stack #{{.Number}}{{end}} · {{end}}Base: <span class="mono">{{.Trunk}}</span> · {{.Count}}{{if .Restack}} · <span class="yellow">⚠ restack needed</span>{{end}}</div>
-<ol class="gh-stack">{{range $b := .Open}}<li class="stack-branch{{if .Current}} head{{end}}"><span class="muted">├</span> {{with .PR}}{{if $b.PRURL}}<a class="pr {{.StateClass}}" href="{{$b.PRURL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{else}}<span class="{{.StateClass}}">#{{.Number}}</span>{{end}}{{if .Glyph}} <span class="{{.ChecksClass}}">{{.Glyph}}</span>{{end}} <span class="{{.StateClass}}">{{.State}}</span>{{if .Review}} · <span class="{{.ReviewClass}}">{{.Review}}</span>{{end}}{{else}}<span class="muted">no PR</span>{{end}} {{if .Current}}<strong class="mono">{{.Name}}</strong> <strong class="accent">◀ HEAD</strong>{{else if $.SwitchURL}}<form method="post" action="{{$.SwitchURL}}" class="stack-switch" data-post><input type="hidden" name="branch" value="{{.Name}}"><button class="mono" title="Check out {{.Name}} here">{{.Name}}</button></form>{{else}}<span class="mono">{{.Name}}</span>{{end}}{{if .Queued}} <span class="blue">queued</span>{{end}}{{if .NeedsRebase}} <span class="yellow" title="needs restack">⚠</span>{{end}}</li>
-{{end}}{{with .Merged}}<li class="stack-merged"><details><summary><span class="muted">├</span> <span class="green">✓ {{len .}} merged</span></summary><ol>{{range $m := .}}<li class="muted">{{with .PR}}{{if $m.PRURL}}<a class="pr" href="{{$m.PRURL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{else}}#{{.Number}}{{end}}{{end}} <span class="mono">{{.Name}}</span></li>{{end}}</ol></details></li>
-{{end}}<li class="stack-trunk muted">└ <span class="mono">{{.Trunk}}</span></li></ol>
-{{end}}{{end}}</section>
-{{end}}<section class="dcard" data-panel="agent"><h2 class="lbl">Agent <a class="quiet-link" href="{{.AgentDefaultURL}}" data-dialog="agentdefault">default config…</a></h2>
+<section class="dcard" data-panel="agent"><h2 class="lbl">Agent <a class="quiet-link" href="{{.AgentDefaultURL}}" data-dialog="agentdefault">default config…</a></h2>
 {{with .Agent}}<div><span class="{{.Class}}">{{.Glyph}} {{.Label}}</span> <span class="muted">{{.Name}}</span></div>
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
@@ -35,7 +26,17 @@
 {{end}}<section class="dcard" data-panel="overview"><h2 class="lbl">Open</h2>
 <div class="links">{{range .Links}}<a class="{{.Class}}" href="{{.URL}}" target="_blank" rel="noopener">{{.Label}}</a>{{end}}</div>
 </section>
-{{template "detail-database" .}}</div>
+{{template "detail-database" .}}{{if or .PR .Stacked}}<section class="dcard wide" data-panel="overview"><h2 class="lbl">Pull request{{if .PR}} <a class="quiet-link" href="{{.PRPageURL}}" title="Checks, reviews, comments, merge">PR page</a>{{end}}</h2>
+{{with .PR}}<div>{{if .URL}}<a class="pr-line {{.StateClass}}" href="{{.URL}}" target="_blank" rel="noopener" title="{{.Title}}">{{.Line}}</a>{{else}}<span class="{{.StateClass}}">{{.Line}}</span>{{end}}</div>
+{{end}}{{with .Stacked}}<h3 class="lbl">Stack</h3>
+{{if .Error}}<div class="muted">stack ? {{.Error}}</div>
+{{else}}<div class="stack-head muted">{{if .Number}}◆ {{if .NumberURL}}<a href="{{.NumberURL}}" target="_blank" rel="noopener">Stack #{{.Number}}</a>{{else}}Stack #{{.Number}}{{end}} · {{end}}Base: <span class="mono">{{.Trunk}}</span> · {{.Count}}{{if .Restack}} · <span class="yellow">⚠ restack needed</span>{{end}}</div>
+<ol class="gh-stack">{{range $b := .Open}}<li class="stack-branch{{if .Current}} head{{end}}"><span class="muted">├</span> {{with .PR}}{{if $b.PRURL}}<a class="pr {{.StateClass}}" href="{{$b.PRURL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{else}}<span class="{{.StateClass}}">#{{.Number}}</span>{{end}}{{if .Glyph}} <span class="{{.ChecksClass}}">{{.Glyph}}</span>{{end}} <span class="{{.StateClass}}">{{.State}}</span>{{if .Review}} · <span class="{{.ReviewClass}}">{{.Review}}</span>{{end}}{{else}}<span class="muted">no PR</span>{{end}} {{if .Current}}<strong class="mono">{{.Name}}</strong> <strong class="accent">◀ HEAD</strong>{{else if $.SwitchURL}}<form method="post" action="{{$.SwitchURL}}" class="stack-switch" data-post><input type="hidden" name="branch" value="{{.Name}}"><button class="mono" title="Check out {{.Name}} here">{{.Name}}</button></form>{{else}}<span class="mono">{{.Name}}</span>{{end}}{{if .Queued}} <span class="blue">queued</span>{{end}}{{if .NeedsRebase}} <span class="yellow" title="needs restack">⚠</span>{{end}}</li>
+{{end}}{{with .Merged}}<li class="stack-merged"><details><summary><span class="muted">├</span> <span class="green">✓ {{len .}} merged</span></summary><ol>{{range $m := .}}<li class="muted">{{with .PR}}{{if $m.PRURL}}<a class="pr" href="{{$m.PRURL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{else}}#{{.Number}}{{end}}{{end}} <span class="mono">{{.Name}}</span></li>{{end}}</ol></details></li>
+{{end}}<li class="stack-trunk muted">└ <span class="mono">{{.Trunk}}</span></li></ol>
+{{end}}{{end}}</section>
+{{end}}
+</div>
 {{end}}</section>{{end}}
 
 {{/* The project's unset secrets: up refuses them. Each value goes only to

@@ -217,7 +217,8 @@ still wider than the window scrolls its pane.
     PR page, `down…` and `remove…` (see Actions).
   - **Tabs:** Overview, Services (`2/9`: running of all), Agent, Tests
     (with a `test` task), Database (with a data service) and Jobs.
-    Overview shows every card; another tab only its own, full width.
+    Overview shows every card, each its own height; another tab only its
+    own, full width.
     The tab is remembered in the browser's `localStorage` for every
     worktree and project; one a worktree lacks shows Overview. A live
     update keeps it.
@@ -236,8 +237,9 @@ still wider than the window scrolls its pane.
     with it; while it runs, a small bar of its memory against its limit,
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
     tooltip, D161.
-  - **Pull request** (Overview only; with a PR or a gh stack): the PR
-    line and **PR page**. Then, when its branch is in a gh stack (`stack
+  - **Pull request** (Overview only; with a PR or a gh stack; full
+    width, after the other cards, as a stack runs long): the PR line and
+    **PR page**. Then, when its branch is in a gh stack (`stack
     ls`, read with the PRs), Stack, in gh stack view's words: `◆ Stack
     #10350` (linked to the stack on GitHub) · `Base: master` · `22
     branches (8 merged)`, and `⚠ restack needed` when a branch needs a

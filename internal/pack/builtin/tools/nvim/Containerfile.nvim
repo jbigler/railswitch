@@ -89,6 +89,25 @@ RUN if [ "${LAZYGIT_VERSION}" = latest ]; then LAZYGIT_VERSION=$(sed -n 's/.*"ta
   gunzip "${TS_FILE}" && \
   install -m 755 "tree-sitter-linux-${TS}" /usr/local/bin/tree-sitter
 
+# The GitHub CLI from GitHub's own package repository (Debian's is too old
+# for gh skill), its current release on every build: the ADD of its latest
+# release's record, fetched on every build (its download counts change),
+# runs the install again despite the layer cache, as lazygit's does (D163,
+# D169). gh is one static binary; the final stage copies it in as its last
+# step, so a build reruns only that step, and only when gh changed.
+FROM docker.io/library/debian:trixie-slim AS gh
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && \
+  apt-get install -y --no-install-recommends ca-certificates curl && \
+  install -d -m 0755 /etc/apt/keyrings && \
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+  chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && \
+  rm -rf /var/lib/apt/lists/*
+ADD https://api.github.com/repos/cli/cli/releases/latest /tmp/gh-latest.json
+RUN apt-get update -qq && apt-get install -y --no-install-recommends gh && \
+  rm -rf /var/lib/apt/lists/*
+
 FROM ${BASE_IMAGE}
 USER root
 
@@ -122,22 +141,6 @@ RUN apt-get update -qq && \
   xclip && \
   rm -rf /var/lib/apt/lists/*
 
-# The GitHub CLI from GitHub's own package repository, as the agent base
-# has it: a github.com secret nvim receives reaches it as GH_TOKEN (D169).
-# Its latest release's record, fetched on every build (its download counts
-# change), runs the step again even with the build cache, so each build
-# installs the current gh, as lazygit's does (D163).
-ADD https://api.github.com/repos/cli/cli/releases/latest /tmp/gh-latest.json
-RUN rm -f /tmp/gh-latest.json && \
-  apt-get update -qq && \
-  apt-get install --no-install-recommends -y ca-certificates curl && \
-  install -d -m 0755 /etc/apt/keyrings && \
-  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-  chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && \
-  apt-get update -qq && apt-get install --no-install-recommends -y gh && \
-  rm -rf /var/lib/apt/lists/*
-
 # The volumes mounted under ~ need their parents to belong to appuser.
 RUN mkdir -p /home/appuser/.config /home/appuser/.local/share /home/appuser/.npm-global && \
   chown -R 1000:1000 /home/appuser/.config /home/appuser/.local /home/appuser/.npm-global
@@ -145,6 +148,9 @@ RUN mkdir -p /home/appuser/.config /home/appuser/.local/share /home/appuser/.npm
 # `npm install -g` goes to the shared npm volume, whatever the base sets.
 ENV NPM_CONFIG_PREFIX=/home/appuser/.npm-global
 ENV PATH=/home/appuser/.npm-global/bin:${PATH}
+
+# gh (the gh stage): a github.com secret nvim receives reaches it as GH_TOKEN.
+COPY --from=gh /usr/bin/gh /usr/local/bin/gh
 
 USER appuser
 

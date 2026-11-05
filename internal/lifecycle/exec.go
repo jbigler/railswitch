@@ -42,7 +42,10 @@ func (l *L) Exec(ctx context.Context, slug string, fresh bool, argv []string) er
 		}
 	}
 	envFile := filepath.Join(m.Inputs.Workspace, ".railswitch", "env", slug, app.ID+".env")
-	args, err := l.transient(m, in, app, envFile, runOpts{}, argv)
+	// Full: the app's routed hosts (S3_ENDPOINT and the like) resolve only
+	// through Traefik; without them an initializer that calls one retries
+	// on every boot (D172).
+	args, err := l.transient(m, in, app, envFile, runOpts{Full: true}, argv)
 	if err != nil {
 		return err
 	}
@@ -92,7 +95,7 @@ func (l *L) interactive(ctx context.Context, timeout time.Duration, name string,
 }
 
 // runOpts are what a transient run adds to the service's shared settings.
-// The zero value (exec, deps) joins the dev network only and sets no name
+// The zero value (deps) joins the dev network only and sets no name
 // (a running container of the service already holds it) and no entrypoint.
 type runOpts struct {
 	// Full: every network of the service, with the same --add-host entries

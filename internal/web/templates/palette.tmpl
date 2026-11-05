@@ -9,7 +9,7 @@
 {{end}}{{end}}{{range .Actions}}<li data-filter="action {{.Label}}"><button formaction="{{.URL}}" class="pal-task" data-action><span class="pal-kind">action</span> <b>{{.Label}}</b> <span class="muted">{{$.Slug}}</span></button></li>
 {{end}}{{range .Worktrees}}<li data-filter="worktree {{.Label}}"><a href="{{.URL}}" class="pal-task"><span class="pal-kind">worktree</span> <b>{{.Label}}</b></a></li>
 {{end}}{{range .Pages}}<li data-filter="page {{.Label}}"><a href="{{.URL}}" class="pal-task"><span class="pal-kind">page</span> <b>{{.Label}}</b></a></li>
-{{end}}{{if .Slug}}<li class="pal-new" hidden><a class="pal-task" href="{{.SettingsURL}}#tasks" data-base="{{.SettingsURL}}">new task <b class="mono"></b>…</a></li>
+{{end}}{{if .Slug}}<li class="pal-new" hidden><a class="pal-task" href="{{.SettingsURL}}#tasks" data-base="{{.SettingsURL}}">New task <b class="mono"></b>…</a></li>
 {{end}}</ul>
 <p class="note">Enter runs the highlighted line{{if .Slug}}: a task as the box says, Shift+Enter the other way{{end}} · Esc closes</p>
 </form>{{end}}

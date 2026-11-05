@@ -182,7 +182,7 @@ function toggleView() {
 }
 function syncView() {
   const m = world.mode;
-  $('view').textContent = m === 'walk' ? 'overview' : 'walk';
+  $('view').textContent = m === 'walk' ? 'Overview' : 'Walk';
   $('help').hidden = m !== 'walk';
   document.body.classList.toggle('walking', m === 'walk');
 }

@@ -1,24 +1,26 @@
 {{define "header"}}<header id="header" class="hd" data-need="{{.Need}}">
 <b class="logo">RailSwitch</b>
 <nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>
-<button type="button" class="hb proj" data-open="switcher" title="Switch project (P)">{{if .Prefix}}<span class="mono">{{.Prefix}}</span>{{else}}choose{{end}} ▾ <kbd>P</kbd></button>
+<button type="button" class="hb proj" data-open="switcher" title="Switch project (P)">{{if .Prefix}}<span class="mono">{{.Prefix}}</span>{{else}}Choose{{end}} ▾ <kbd>P</kbd></button>
 {{if .Prefix}}<span class="hd-div" aria-hidden="true"></span>
-<a class="hb" href="/p/{{.Prefix}}">worktrees</a>
-<a class="hb" href="/p/{{.Prefix}}/images">images</a>
-<a class="hb" href="/p/{{.Prefix}}/tidy" title="What could go: merged or idle worktrees, unused images">tidy</a>
-<a class="hb" href="/p/{{.Prefix}}/library">library</a>
-<a class="hb" href="/p/{{.Prefix}}/settings">settings</a>
-<a class="hb" href="/p/{{.Prefix}}/notes" title="The agents' shared notes">notes</a>
-<a class="hb" href="/p/{{.Prefix}}/virtual-office" title="The Virtual Office: the project as an office tower in 3D">office</a>
+<a class="hb" href="/p/{{.Prefix}}">Worktrees</a>
+<a class="hb" href="/p/{{.Prefix}}/images">Images</a>
+<a class="hb" href="/p/{{.Prefix}}/tidy" title="What could go: merged or idle worktrees, unused images">Tidy</a>
+<a class="hb" href="/p/{{.Prefix}}/library">Library</a>
+<a class="hb" href="/p/{{.Prefix}}/settings">Settings</a>
+<a class="hb" href="/p/{{.Prefix}}/notes" title="The agents' shared notes">Notes</a>
+<a class="hb" href="/p/{{.Prefix}}/virtual-office" title="The Virtual Office: the project as an office tower in 3D">Office</a>
 {{end}}</nav>
-{{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}
+{{if .Need}}<span class="need need-chip">◆ {{.Need}} need input</span>{{end}}
 <span class="sp"></span>
-<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>
-<a class="hb" href="/machine" title="Templates, libraries and signers on this machine">settings</a>
-<a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">logs</a>
-<button type="button" class="hb" data-notify hidden>notifications</button>
-<button type="button" class="hb" data-colors title="Dashboard colours">⚙</button>
-</nav>
+<details class="menu" data-keep="machine" aria-label="This machine"><summary class="hb">Machine ▾</summary>
+<div class="menu-pop">
+<a class="hb" href="/machine" title="Templates, libraries and signers on this machine">Settings</a>
+<a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">Logs ↗</a>
+<button type="button" class="hb" data-notify hidden>Notifications</button>
+<button type="button" class="hb" data-colors title="Dashboard colours">Colours</button>
+</div>
+</details>
 </header>{{end}}
 
 {{define "projects"}}<ul id="projects" class="projects">

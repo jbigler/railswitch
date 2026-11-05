@@ -10,6 +10,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
 const projectStore = "railswitch.project";
+const tabStore = "railswitch.tab";
 
 // recall and remember read and write this browser's local storage, which a
 // private window or blocked site data makes throw: the page works without.
@@ -83,11 +84,17 @@ function swap(id, html) {
   // Each job's output stays where the reader left it; one at its end
   // (or new) follows the new lines.
   const scroll = {};
+  // Folds and menus the reader opened or closed stay so.
+  const kept = {};
+  $$("details[data-keep]", el).forEach((d) => (kept[d.dataset.keep] = d.open));
   $$(".out", el).forEach((o) => {
     const job = o.closest(".job");
     if (job) scroll[job.id] = o.scrollTop + o.clientHeight >= o.scrollHeight - 4 ? null : o.scrollTop;
   });
   el.replaceWith(next);
+  $$("details[data-keep]", next).forEach((d) => {
+    if (d.dataset.keep in kept) d.open = kept[d.dataset.keep];
+  });
   $$(".out", next).forEach((o) => {
     const job = o.closest(".job");
     const top = job ? scroll[job.id] : null;
@@ -117,6 +124,8 @@ function afterSwap(id) {
     if (btn) btn.hidden = !("Notification" in window) || Notification.permission !== "default";
   } else if (id === "projects") {
     filterSwitcher();
+  } else if (id === "list") {
+    filterList();
   } else if (id === "jobs") {
     [...watched.keys()].forEach(jobEnded);
   } else if (id === "detail") {
@@ -125,7 +134,33 @@ function afterSwap(id) {
     // The worktree shown may not be the URL's (it was removed): follow it.
     // A URL without one stays: a narrow window shows the list for it.
     if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
+    showTab();
+    agentTermShown();
   }
+}
+
+// The detail's tabs: Overview shows every card, another tab only its own
+// (CSS, from body[data-tab]); the choice is kept for the next page.
+
+function showTab(tab) {
+  const tabs = $$("#detail [data-tab]");
+  if (!tabs.length) return;
+  if (tab) remember(tabStore, tab);
+  tab = tab || recall(tabStore) || "overview";
+  if (!tabs.some((b) => b.dataset.tab === tab)) tab = "overview";
+  body.dataset.tab = tab;
+  tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+}
+
+// The list's filter: a worktree shows while its name or branch holds the
+// text; a group with none showing hides.
+
+function filterList() {
+  const f = $("#wt-filter");
+  if (!f) return;
+  const q = f.value.trim().toLowerCase();
+  $$("#list tr[data-slug]").forEach((tr) => (tr.hidden = q !== "" && !tr.dataset.filter.toLowerCase().includes(q)));
+  $$("#list tbody.grp").forEach((g) => (g.hidden = !$$("tr[data-slug]", g).some((tr) => !tr.hidden)));
 }
 
 // Notifications.
@@ -151,7 +186,7 @@ function pageURL(slug) {
 }
 
 function select(slug, push) {
-  $$("#list tbody tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.slug === slug));
+  $$("#list tr[data-slug]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.slug === slug));
   body.dataset.sel = slug;
   // A click opens the detail (a narrow window shows one pane); ↑↓ doesn't.
   if (push) body.dataset.pane = "detail";
@@ -161,7 +196,7 @@ function select(slug, push) {
 }
 
 function move(delta) {
-  const rows = $$("#list tbody tr");
+  const rows = $$("#list tr[data-slug]:not([hidden])");
   if (!rows.length) return;
   let i = rows.findIndex((tr) => tr.classList.contains("sel"));
   i = Math.min(rows.length - 1, Math.max(0, i + delta));
@@ -180,7 +215,13 @@ document.addEventListener("click", (e) => {
     remember(sortStore, new URL(sortLink.href).searchParams.get("sort") || "name");
     return;
   }
-  const row = t.closest("#list tbody tr");
+  // An open menu closes on a click outside it, or on one of its items.
+  $$("details.menu[open]").forEach((d) => {
+    if (!d.contains(t) || t.closest(".menu-pop a, .menu-pop button")) d.open = false;
+  });
+  const tabBtn = t.closest("#detail [data-tab]");
+  if (tabBtn) return showTab(tabBtn.dataset.tab);
+  const row = t.closest("#list tr[data-slug]");
   if (row && !t.closest("a.pr") && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     e.preventDefault();
     select(row.dataset.slug, true);
@@ -205,6 +246,20 @@ document.addEventListener("click", (e) => {
   if (!t.closest("#toast")) return;
   hideToast();
 });
+
+// A menu opens to the left of its button, or to the right when the left
+// has no room (a button near the window's left edge).
+document.addEventListener(
+  "toggle",
+  (e) => {
+    const d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.classList.contains("menu") || !d.open) return;
+    const pop = $(".menu-pop", d);
+    pop.classList.remove("rightward");
+    if (pop.getBoundingClientRect().left < 8) pop.classList.add("rightward");
+  },
+  true,
+);
 
 function openDialog(id) {
   const d = document.getElementById(id);
@@ -287,13 +342,26 @@ function hideToast() {
 // Keys.
 
 // Terminal panels (D149): docked in #terms, under the jobs and outside the
-// detail that SSE replaces; each closes its WebSocket when removed.
+// detail that SSE replaces, so switching tabs or worktrees keeps them;
+// each closes its WebSocket when removed. A button with data-term-tab
+// shows that tab first; a terminal already open is shown again, not
+// opened twice.
 async function openTermPanel(btn) {
   const dock = $("#terms");
   if (!dock) return;
+  if (btn.dataset.termTab) showTab(btn.dataset.termTab);
+  const open = $$(".term-panel", dock).find((p) => p.dataset.termUrl === btn.dataset.term);
+  if (open) {
+    open.scrollIntoView({ block: "nearest" });
+    open.focusTerm?.();
+    return;
+  }
   const slug = $("#detail")?.dataset.slug || "";
   const panel = document.createElement("section");
   panel.className = "term-panel";
+  // Not data-term: a click in the panel would then open it again.
+  panel.dataset.termUrl = btn.dataset.term;
+  if ("termAgent" in btn.dataset) panel.dataset.agentOf = slug;
   const head = document.createElement("header");
   const title = document.createElement("span");
   title.className = "mono";
@@ -301,7 +369,7 @@ async function openTermPanel(btn) {
   const full = document.createElement("button");
   full.type = "button";
   full.className = "ln";
-  full.textContent = "maximize";
+  full.textContent = "Maximize";
   full.title = "Fill the window; Esc stays in the terminal (F11 then fills the screen)";
   const x = document.createElement("button");
   x.type = "button";
@@ -317,6 +385,7 @@ async function openTermPanel(btn) {
   try {
     const { openTerminal } = await import("/static/term/term.js");
     t = openTerminal(host, btn.dataset.term);
+    panel.focusTerm = () => t.focus();
   } catch (err) {
     host.textContent = String(err.message || err);
   }
@@ -324,13 +393,24 @@ async function openTermPanel(btn) {
   // which vim needs. F11 (the browser's own) fills the screen and keeps Esc.
   full.addEventListener("click", () => {
     const on = panel.classList.toggle("max");
-    full.textContent = on ? "restore" : "maximize";
+    full.textContent = on ? "Restore" : "Maximize";
     t?.focus();
   });
   x.addEventListener("click", () => {
     t?.close();
     panel.remove();
+    agentTermShown();
   });
+  agentTermShown();
+}
+
+// agentTermShown marks the body while the shown worktree's agent terminal
+// is open: on the Agent tab it takes the Agent card's place (CSS).
+function agentTermShown() {
+  const slug = $("#detail")?.dataset.slug || "";
+  const on = slug !== "" && $$("#terms .term-panel").some((p) => p.dataset.agentOf === slug);
+  if (on) body.dataset.agentTerm = "";
+  else delete body.dataset.agentTerm;
 }
 
 document.addEventListener("keydown", (e) => {
@@ -1432,12 +1512,16 @@ function startNotes() {
   remember(projectStore, prefix);
   const params = new URLSearchParams(location.search);
   const saved = recall(sortStore);
-  if (!params.has("sort") && saved && saved !== "name") {
+  // Only a key the sort bar still offers (an old "running" is gone, D170).
+  const offered = (k) => $$("#list a[data-sort]").some((a) => (new URL(a.href).searchParams.get("sort") || "").replace(/^-/, "") === k.replace(/^-/, ""));
+  if (!params.has("sort") && saved && saved !== "name" && offered(saved)) {
     params.set("sort", saved);
     location.replace(location.pathname + "?" + params);
     return;
   }
   afterSwap("header");
+  showTab();
+  $("#wt-filter")?.addEventListener("input", filterList);
   connect();
 })();
 

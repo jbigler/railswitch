@@ -142,7 +142,7 @@ func TestSettingsPageRenders(t *testing.T) {
 	noCSPViolation(t, "settings", body)
 
 	main := f.do(req("GET", "/p/ftest", nil)).Body.String()
-	if !strings.Contains(main, `<a class="hb" href="/p/ftest/settings">settings</a>`) {
+	if !strings.Contains(main, `<a class="hb" href="/p/ftest/settings">Settings</a>`) {
 		t.Error("the header has no Settings link")
 	}
 

@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jbigler/railswitch/internal/jobs"
 )
@@ -18,7 +20,14 @@ import (
 //go:embed templates/*.tmpl
 var templateFiles embed.FS
 
-var tmpl = template.Must(template.New("").ParseFS(templateFiles, "templates/*.tmpl"))
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"cap": capFirst}).ParseFS(templateFiles, "templates/*.tmpl"))
+
+// capFirst is s with its first letter upper case: a button's label from a
+// word that is also a command or job label ("start", "shell").
+func capFirst(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[n:]
+}
 
 // render executes the named template (a page or a fragment).
 func render(name string, data any) (string, error) {
@@ -52,7 +61,11 @@ type sortKey struct {
 	Rev bool
 }
 
-var sortBys = []string{"name", "running", "pr", "agent"}
+// Not "running": the list groups worktrees by state (listGroups), so each
+// group is sorted by one of these.
+var sortBys = []string{"name", "pr", "agent"}
+
+var sortLabels = map[string]string{"name": "Name", "pr": "PR", "agent": "Agent"}
 
 func parseSort(s string) sortKey {
 	k := sortKey{}
@@ -140,10 +153,11 @@ func sortRows(rows []row, k sortKey) {
 // Agents.
 
 // agentKind is what the page shows of an agent: its state, with done
-// split into reply (waiting for a reply) and turn (your turn); no agent
-// is off.
+// split into reply (waiting for a reply) and turn (your turn); no agent,
+// or one whose container doesn't run (its status file outlives it), is
+// off.
 func agentKind(a *agent) string {
-	if a == nil {
+	if a == nil || !a.Running {
 		return "off"
 	}
 	switch a.State {
@@ -497,8 +511,40 @@ func signerWarningText(sw signerWarning) string {
 type listView struct {
 	Sorts      []sortLink
 	Rows       []rowView
+	Groups     []listGroup // Rows by state, each in Rows' order; no empty group
 	AddURL     string
 	RefreshURL string
+}
+
+// listGroup is one heading of the list: the worktrees that need you (an
+// agent waits on you, or the stack failed), the running ones, the rest.
+type listGroup struct {
+	Name string
+	Rows []rowView
+}
+
+var groupNames = []string{"Needs you", "Running", "Stopped"}
+
+// listGroups puts rows under groupNames, keeping their order.
+func listGroups(rows []rowView) []listGroup {
+	by := make([][]rowView, len(groupNames))
+	for _, r := range rows {
+		i := 2
+		switch {
+		case r.Need != "" || r.stack == "failed":
+			i = 0
+		case r.stack == "up" || r.stack == "partial":
+			i = 1
+		}
+		by[i] = append(by[i], r)
+	}
+	var out []listGroup
+	for i, rs := range by {
+		if len(rs) > 0 {
+			out = append(out, listGroup{Name: groupNames[i], Rows: rs})
+		}
+	}
+	return out
 }
 
 type sortLink struct {
@@ -519,11 +565,12 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 		if on {
 			next.Rev = !k.Rev
 		}
-		v.Sorts = append(v.Sorts, sortLink{Label: by, URL: base + "?sort=" + next.String(), On: on, Rev: on && k.Rev})
+		v.Sorts = append(v.Sorts, sortLink{Label: sortLabels[by], URL: base + "?sort=" + next.String(), On: on, Rev: on && k.Rev})
 	}
 	for _, r := range rows {
 		v.Rows = append(v.Rows, newRow(prefix, r, sel, k))
 	}
+	v.Groups = listGroups(v.Rows)
 	return v
 }
 
@@ -646,6 +693,7 @@ type rowView struct {
 	Need                              string     // the agent waits on you: its label ("permission"), shown by the name
 	Stale                             bool       // runs an older unit: "restart to apply"
 	Tests                             *testsView // nil: no test task
+	stack                             string     // the stack's state, for listGroups
 }
 
 func newRow(prefix string, r row, sel string, k sortKey) rowView {
@@ -656,8 +704,9 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 		StackGlyph: stackGlyph(r.WT.Stack), StackText: stackText(r.WT), StackClass: stackClass(r.WT.Stack),
 		AgentGlyph: agentGlyph(kind), AgentText: agentLabel(kind), AgentClass: agentClass(kind),
 		Stale: r.WT.Stale, Stacked: stackedRow(r), Tests: newTests(r.WT.Tests, r.Now),
+		stack: r.WT.Stack,
 	}
-	if r.WT.Agent != nil {
+	if kind != "off" { // an agent that isn't running says nothing
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
 	}
 	if needsInput(kind) {
@@ -672,10 +721,13 @@ type detailView struct {
 	PR                                *prView
 	StackGlyph, StackText, StackClass string
 	Links                             []linkView
+	AppURL                            string // the first app link: the header's Open app; "" for none
 	Services                          []serviceView
+	ServicesUp                        string // "2/9": services running of all, for the Services tab
 	Agent                             *agentView
 	Actions                           []actionView
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
+	AgentTerms                        []agentTerm  // an agent terminal per configured agent
 	TermWindowURL                     string       // the term action: a window on the desktop
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	DownURL                           string
@@ -684,6 +736,7 @@ type detailView struct {
 	SnapshotsURL                      string // the database snapshots dialog (D157); "" without a data service
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
+	Switching                         string // the branch a running stack switch checks out; "" for none
 	Merged, Stale                     bool
 	Tests                             *testsView // nil: no test task
 	TaskURL                           string     // posts a task to run as a job
@@ -701,6 +754,13 @@ type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, RestartURL, C
 type agentView struct{ Name, Glyph, Label, Class, Message string }
 
 type actionView struct{ Label, URL string }
+
+// agentTerm opens one agent's terminal panel; Running while its container
+// runs.
+type agentTerm struct {
+	Name, URL string
+	Running   bool
+}
 
 // newDetail is row r's detail; repo is the project's PR URL prefix
 // (projectPRRepo), which the stack's PR numbers link through. Links: App
@@ -727,6 +787,9 @@ func newDetail(prefix string, r row, repo string) detailView {
 			class := "ln"
 			if group == "app" {
 				class += " main"
+				if v.AppURL == "" {
+					v.AppURL = l.URL
+				}
 			}
 			v.Links = append(v.Links, linkView{Label: l.Label, URL: l.URL, Class: class + dim})
 		}
@@ -739,6 +802,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		v.Links = append(v.Links, linkView{Label: "Review app", URL: r.PR.ReviewApp, Class: "ln quiet"})
 	}
 	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln quiet"})
+	up := 0
 	for _, s := range wt.Services {
 		g, c, word := serviceLook(s.State)
 		sv := serviceView{Name: s.Service, State: s.State, Word: word, Glyph: g, Class: c}
@@ -752,10 +816,17 @@ func newDetail(prefix string, r row, repo string) detailView {
 			}
 		}
 		v.Services = append(v.Services, sv)
+		if word == "running" {
+			up++
+		}
 	}
+	v.ServicesUp = fmt.Sprintf("%d/%d", up, len(v.Services))
 	if a := wt.Agent; a != nil {
 		kind := agentKind(a)
-		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind), Message: a.Message}
+		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind)}
+		if kind != "off" { // a stopped agent's message is its status file's last
+			v.Agent.Message = a.Message
+		}
 	}
 	v.Queue = newQueue(prefix, wt)
 	// What the stack's state allows: a stopped one starts, a running one
@@ -772,11 +843,21 @@ func newDetail(prefix string, r row, repo string) detailView {
 	}
 	v.TermWindowURL = path + "/act/term"
 	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
-	agentURL := tty + "agent" // the default agent, or the one the overview names
-	if wt.Agent != nil {
-		agentURL += "?agent=" + url.QueryEscape(wt.Agent.Name)
+	// One per configured agent: each is a service agent-<name> (on demand
+	// or not), so the page can open any of them.
+	for _, s := range wt.Services {
+		if name, ok := strings.CutPrefix(s.Service, "agent-"); ok && s.Role == "agent" {
+			_, _, word := serviceLook(s.State)
+			v.AgentTerms = append(v.AgentTerms, agentTerm{Name: name, URL: tty + "agent?agent=" + url.QueryEscape(name), Running: word == "running"})
+		}
 	}
-	v.Terms = append(v.Terms, actionView{Label: "agent", URL: agentURL})
+	if len(v.AgentTerms) == 0 { // none listed: the default agent, or the one the overview names
+		a := agentTerm{Name: "agent", URL: tty + "agent"}
+		if wt.Agent != nil {
+			a.Name, a.URL = wt.Agent.Name, a.URL+"?agent="+url.QueryEscape(wt.Agent.Name)
+		}
+		v.AgentTerms = []agentTerm{a}
+	}
 	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Service == "nvim" }) {
 		v.Terms = append(v.Terms, actionView{Label: "nvim", URL: tty + "nvim"})
 	}
@@ -795,7 +876,12 @@ func newDetail(prefix string, r row, repo string) detailView {
 	return v
 }
 
-type jobsView struct{ Jobs []jobView }
+// jobsView is the jobs section; Fold (the worktree page) folds away the
+// output of a job that ended well, which other pages show as their result.
+type jobsView struct {
+	Jobs []jobView
+	Fold bool
+}
 
 type jobView struct {
 	ID, Label, State, Class, Started, CancelURL string

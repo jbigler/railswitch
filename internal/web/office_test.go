@@ -142,6 +142,22 @@ func TestCyberpunkState(t *testing.T) {
 	}
 }
 
+// TestCyberpunkStoppedAgent: an agent whose container doesn't run isn't
+// at its desk, whatever its status file last said.
+func TestCyberpunkStoppedAgent(t *testing.T) {
+	f := newFixture(t)
+	f.cli.set("--json -C /ws/ftest overview", ftestOverview("jb/b", "stopped", `{"name":"bot","state":"done","message":"Ship it?","ts":1,"reply":true,"running":false}`))
+	f.s.pollOnce(context.Background())
+	f.s.mu.Lock()
+	st := f.s.cyberData("ftest")
+	f.s.mu.Unlock()
+	for _, fl := range st.Worktrees {
+		if fl.Slug == "b" && fl.Agent != nil {
+			t.Errorf("stopped agent at b's desk: %+v", fl.Agent)
+		}
+	}
+}
+
 // TestCyberpunkIssueStart: work on an issue is one project job: the
 // worktree on the issue's branch, up, the agent on it.
 func TestCyberpunkIssueStart(t *testing.T) {

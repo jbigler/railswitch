@@ -13,7 +13,7 @@ escaped here; data-md bodies get their Markdown as text nodes (app.js). */}}
 <p class="red set-error">{{.Error}}</p>
 {{else}}{{with .PR}}
 <h1>{{.Title}} <span class="muted">#{{.Number}}</span></h1>
-<p class="pr-meta"><span class="chip pr-{{.State}}">{{.State}}</span> <b>{{.Author}}</b> wants to merge <code>{{.Head}}</code> into <code>{{.Base}}</code> · <span class="green">+{{.Additions}}</span> <span class="red">−{{.Deletions}}</span>{{range .Labels}} <span class="chip">{{.}}</span>{{end}}{{if .URL}} · <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">open on GitHub ↗</a>{{end}}</p>
+<p class="pr-meta"><span class="chip pr-{{.State}}">{{.State}}</span> <b>{{.Author}}</b> wants to merge <code>{{.Head}}</code> into <code>{{.Base}}</code> · <span class="green">+{{.Additions}}</span> <span class="red">−{{.Deletions}}</span>{{range .Labels}} <span class="chip">{{.}}</span>{{end}}{{if .URL}} · <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">Open on GitHub ↗</a>{{end}}</p>
 <p class="pr-status">checks <b class="pr-{{.Checks}}">{{.Checks}}</b> · review <b class="pr-{{.Review}}">{{.Review}}</b> · merge <b class="pr-{{.MergeState}}">{{.MergeState}}</b>{{if eq .Mergeable "conflicting"}} <span class="red">(conflicts)</span>{{end}}{{if .AutoMerge}} · <span class="blue">{{if .Queue}}in the merge queue{{else}}auto-merge ({{.AutoMerge}}){{end}}</span>{{end}}</p>
 
 {{if eq .State "open" "draft"}}<div class="actions pr-actions">

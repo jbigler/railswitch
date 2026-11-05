@@ -44,7 +44,7 @@ func TestTestsColumn(t *testing.T) {
 				t.Errorf("%s: row has %q:\n%s", c.name, w, rowHTML)
 			}
 		}
-		if !strings.Contains(detail, `>Tests<`) || !strings.Contains(detail, `<form method="post" action="/p/ftest/feat-login/task" data-post><input type="hidden" name="task" value="test"><button class="ln">run tests</button></form>`) {
+		if !strings.Contains(detail, `>Tests<`) || !strings.Contains(detail, `<form method="post" action="/p/ftest/feat-login/task" data-post><input type="hidden" name="task" value="test"><button class="ln">Run tests</button></form>`) {
 			t.Errorf("%s: detail lacks the Tests line and its button:\n%s", c.name, detail)
 		}
 	}
@@ -52,7 +52,7 @@ func TestTestsColumn(t *testing.T) {
 	if html, _ := render("detail", newDetail("ftest", r, "")); strings.Contains(html, ">Tests<") {
 		t.Errorf("no test task, yet a Tests line:\n%s", html)
 	}
-	if html, _ := render("row", newRow("ftest", r, "", parseSort("name"))); !strings.Contains(html, `<td class="tests"><span class="muted">—</span></td>`) {
+	if html, _ := render("row", newRow("ftest", r, "", parseSort("name"))); !strings.Contains(html, `<div class="tests"><span class="muted">—</span></div>`) {
 		t.Errorf("no test task: tests cell not —:\n%s", html)
 	}
 }

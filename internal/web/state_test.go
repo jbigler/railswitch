@@ -95,11 +95,12 @@ func TestRowChangeEvents(t *testing.T) {
 	}
 }
 
-// TestOrderChangeSendsList: a change that moves a row resends the list.
+// TestOrderChangeSendsList: a change that moves a row, here to another
+// group (b's stack fails: Needs you), resends the list.
 func TestOrderChangeSendsList(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "b", parseSort("running"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	drain(sub)
@@ -399,5 +400,31 @@ func TestGhStack(t *testing.T) {
 	ev, ok = byID(drain(sub), "detail")
 	if !ok || !strings.Contains(ev.HTML, "jb/c</strong> <strong class=\"accent\">◀ HEAD") {
 		t.Errorf("detail after the switch: %v\n%s", ok, ev.HTML)
+	}
+}
+
+// TestSwitchingFromJobs: the detail's Switching is the branch of the
+// worktree's running stack switch job, and clears when it ends.
+func TestSwitchingFromJobs(t *testing.T) {
+	f := newFixture(t)
+	f.s.pollOnce(context.Background())
+	f.run.block = make(chan struct{})
+	if _, err := f.s.c.Jobs.Start(context.Background(), jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/q", Argv: []string{"railswitch"}}); err != nil {
+		t.Fatal(err)
+	}
+	f.run.wait(t, 1)
+	detail := func() string {
+		f.s.mu.Lock()
+		defer f.s.mu.Unlock()
+		return f.s.pageData("ftest", "b", sortKey{By: "name"}).Detail.Switching
+	}
+	if got := detail(); got != "jb/q" {
+		t.Errorf("Switching while running = %q, want jb/q", got)
+	}
+	close(f.run.block)
+	f.run.block = nil
+	f.ended(t)
+	if got := detail(); got != "" {
+		t.Errorf("Switching after the job = %q, want none", got)
 	}
 }

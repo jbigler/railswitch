@@ -1,8 +1,8 @@
 /* RailSwitch dashboard: layout A. The colours are CSS variables that
    /theme.css sets from `railswitch dashboard colors`; the Flexoki values
    below only stand in when that fails. */
-:root{--bg:#FFFCF0;--bg2:#F2F0E5;--sel:#E6E4D9;--border:#CECDC3;--text:#100F0F;--muted:#6F6E69;--accent:#BC5215;--blue:#205EA6;--green:#536907;--yellow:#8E6B01;--purple:#5E409D;--red:#AF3029}
-@media (prefers-color-scheme: dark){:root{--bg:#100F0F;--bg2:#1C1B1A;--sel:#282726;--border:#403E3C;--text:#CECDC3;--muted:#878580;--accent:#DA702C;--blue:#4385BE;--green:#879A39;--yellow:#D0A215;--purple:#8B7EC8;--red:#D14D41}}
+:root{--card:color-mix(in srgb,var(--bg) 25%,#fff);--bg:#FFFCF0;--bg2:#F2F0E5;--sel:#E6E4D9;--border:#CECDC3;--text:#100F0F;--muted:#6F6E69;--accent:#BC5215;--blue:#205EA6;--green:#536907;--yellow:#8E6B01;--purple:#5E409D;--red:#AF3029}
+@media (prefers-color-scheme: dark){:root{--card:var(--bg2);--bg:#100F0F;--bg2:#1C1B1A;--sel:#282726;--border:#403E3C;--text:#CECDC3;--muted:#878580;--accent:#DA702C;--blue:#4385BE;--green:#879A39;--yellow:#D0A215;--purple:#8B7EC8;--red:#D14D41}}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -276,6 +276,11 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .term-panel > div { flex: 1; }
 .term-panel.max { position: fixed; inset: 0; z-index: 50; height: auto; resize: none; }
 body:has(.term-panel.max) { overflow: hidden; }
+/* On the Agent tab the worktree's agent terminal takes the Agent card's
+   place, and the room below the tabs. */
+body[data-tab=agent][data-agent-term] .wt [data-panel=agent] { display: none; }
+body[data-tab=agent] .wt .term-panel:not(.max) { height: max(24rem, calc(100vh - 12rem)); }
+body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
 /* The PR page (D152). */
 .prpage h2{margin-top:1.4rem}
 .pr-meta,.pr-status{margin:.3rem 0}
@@ -330,8 +335,6 @@ body:has(.term-panel.max) { overflow: hidden; }
 .left{border-right:0}
 body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none}
 .back{display:inline-block;margin-bottom:8px}
-/* stack and tests are in the detail; branch too, below 520px */
-#list th:nth-child(4),#list td:nth-child(4),#list th:nth-child(6),#list td:nth-child(6){display:none}
 .tb{flex-wrap:wrap}
 /* a table wider than the window scrolls its pane, not the page */
 .grid>.pane{overflow-x:auto}
@@ -340,4 +343,62 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .secret-form input:not([type=checkbox]){width:7em}
 .tb a,.tb button{white-space:nowrap}
 }
-@media (max-width:520px){#list th:nth-child(2),#list td:nth-child(2){display:none}}
+@media (max-width:800px){.grid.wt{grid-template-columns:minmax(0,1fr)}}
+
+/* The worktree page (D170): menus, a grouped list, the detail's head,
+   tabs and cards. Scoped to .wt: other pages share the jobs section. */
+.need-chip{padding:2px 10px;border-radius:999px;background:color-mix(in srgb,var(--accent) 14%,var(--bg));border:1px solid color-mix(in srgb,var(--accent) 40%,var(--bg))}
+.menu{position:relative;display:inline-block}
+.menu>summary{list-style:none;cursor:pointer}
+.menu>summary::-webkit-details-marker{display:none}
+.menu-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:20;min-width:180px;display:flex;flex-direction:column;gap:2px;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;box-shadow:0 6px 18px rgb(0 0 0/.15)}
+.menu-pop .hb,.menu-pop form button{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:4px;background:none;border:0;cursor:pointer;color:var(--text);text-decoration:none;font:inherit;white-space:nowrap}
+.menu-pop .hb:hover,.menu-pop form button:hover{background:var(--sel)}
+.menu-pop form{display:block;margin:0}
+.menu-pop .danger{color:var(--red)}
+.menu-pop.rightward{left:0;right:auto}
+.grid.wt{grid-template-columns:minmax(340px,460px) minmax(0,1fr)}
+.wt .filter{display:flex;gap:6px;align-items:center;padding:12px 12px 2px}
+.wt .filter input{flex:1;min-width:0;padding:6px 10px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px}
+.wt .filter form{display:inline}
+.wt .filter .ln{margin:0}
+.wt #list table{table-layout:fixed}
+.wt #list td{white-space:normal;vertical-align:top;padding:8px 10px}
+.wt #list col.c-dot{width:2.2em}
+.wt #list col.c-side{width:12.5em}
+.wt #list td.dot{padding-right:0;text-align:center;font-size:1.1em;line-height:1.25}
+.wt #list td.side{text-align:right;font-size:12px}
+.wt #list .wt-cell a{font-weight:700}
+.wt #list .wt-cell>div{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wt #list .trunc{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+.wt #list .grp-hd,.wt #list .grp-hd th{cursor:default}
+.wt #list .grp-hd th{padding:14px 10px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.grp-n{margin-left:4px;font-weight:600}
+.wt .pane{padding:0}
+.wt .pane>.back,.wt .pane>.card{margin:12px 20px}
+.wt .terms{margin:0 20px 16px}
+.d-head{display:flex;flex-wrap:wrap;gap:12px 20px;justify-content:space-between;align-items:flex-start;padding:16px 20px 10px}
+.d-title{min-width:0;display:flex;flex-direction:column;gap:6px}
+.d-title h1{overflow-wrap:anywhere}
+.d-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pill{font-size:12px;font-weight:700;padding:1px 9px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);text-decoration:none;white-space:nowrap}
+.d-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
+.d-acts form{display:inline}
+.d-acts .ln{margin:0}
+.tabs{display:flex;flex-wrap:wrap;gap:4px 18px;padding:0 20px;border-bottom:1px solid var(--border)}
+.tabs button{font:inherit;font-weight:700;background:none;border:0;border-bottom:2px solid transparent;padding:8px 2px;color:var(--muted);cursor:pointer}
+.tabs button[aria-pressed=true]{color:var(--text);border-bottom-color:var(--accent)}
+.dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:14px;padding:16px 20px 0;align-items:start}
+.wt .dcard .services{grid-template-columns:repeat(auto-fill,minmax(min(19rem,100%),1fr))}
+.wt .dcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card);min-width:0} /* --card: white-ish on light, a step up on dark */
+.wt .dcard.wide{grid-column:1/-1}
+.wt .dcard>.lbl{margin:0 0 8px}
+.wt .dcard h3.lbl{margin:10px 0 4px}
+.wt #jobs{margin:14px 20px 16px}
+.wt .jobs .none{display:none}
+.wt .jobs:not(:has(.job)){display:none}
+.job-out summary{cursor:pointer;font-size:12px;padding:2px 0}
+/* Overview shows every card; another tab only its own. */
+body:where([data-tab]:not([data-tab=overview])) .wt [data-panel]{display:none} /* :where keeps it below the rules that show a tab's card */
+body[data-tab=services] .wt [data-panel=services],body[data-tab=agent] .wt [data-panel=agent],body[data-tab=tests] .wt [data-panel=tests],body[data-tab=database] .wt [data-panel=database],body[data-tab=jobs] .wt [data-panel=jobs]{display:block;grid-column:1/-1}
+body[data-tab=jobs] .wt .jobs .none{display:block}

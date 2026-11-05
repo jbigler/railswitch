@@ -479,8 +479,8 @@ func (s *Server) publish() {
 }
 
 // push sends sub the fragments that changed since it last got them: a
-// row on its own while the list's order and selection stay, else the
-// whole list. s.mu is held.
+// row on its own while the list's order, groups and selection stay, else
+// the whole list. s.mu is held.
 func (s *Server) push(sub *subscriber) {
 	if sub.view == "office" {
 		s.pushCyber(sub)
@@ -520,7 +520,13 @@ func (s *Server) push(sub *subscriber) {
 			return
 		}
 		rows[i] = html
-		keys = append(keys, r.Slug)
+	}
+	// A row that moves to another group (its state changed) moves too.
+	for _, g := range pv.List.Groups {
+		keys = append(keys, g.Name)
+		for _, r := range g.Rows {
+			keys = append(keys, r.Slug)
+		}
 	}
 	if key := strings.Join(keys, "\x00"); key != sub.listKey {
 		html, err := render("list", pv.List)
@@ -559,7 +565,9 @@ func (s *Server) subJobs(sub *subscriber, snaps []jobs.Snapshot) jobsView {
 	if sub.view != "" {
 		sel = ""
 	}
-	return newJobs(snaps, rows, sel)
+	v := newJobs(snaps, rows, sel)
+	v.Fold = sub.view == ""
+	return v
 }
 
 // rows is prefix's worktrees with their PRs sorted by k, and the slug
@@ -656,6 +664,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		Detail: detailView{Empty: true},
 		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),
 	}
+	pv.Jobs.Fold = true
 	var usage *usageDoc
 	if p := s.state[prefix]; p != nil {
 		usage = p.usage

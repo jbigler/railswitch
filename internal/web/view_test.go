@@ -41,7 +41,6 @@ func TestSort(t *testing.T) {
 		{"name", []string{"main", "alpha", "beta", "delta", "eps", "gamma", "zeta"}},
 		{"", []string{"main", "alpha", "beta", "delta", "eps", "gamma", "zeta"}},
 		{"bogus", []string{"main", "alpha", "beta", "delta", "eps", "gamma", "zeta"}},
-		{"running", []string{"alpha", "main", "eps", "gamma", "beta", "delta", "zeta"}},
 		{"pr", []string{"eps", "beta", "alpha", "zeta", "main", "delta", "gamma"}},
 		{"agent", []string{"alpha", "eps", "gamma", "beta", "main", "zeta", "delta"}},
 	} {
@@ -148,7 +147,7 @@ func fixtureRow(stack string, base bool, p *pr) row {
 
 var anchorRe = regexp.MustCompile(`<a [^>]*class="([^"]*)"[^>]*>([^<]*)</a>`)
 
-// TestDetailFragment: Links come before Services, App first and main; a
+// TestDetailFragment: the Open card lists the links, App first and main; a
 // stopped stack greys its links; remove only for non-base worktrees; a
 // merged PR says so on its one remove button; hostile text is escaped.
 func TestDetailFragment(t *testing.T) {
@@ -160,10 +159,12 @@ func TestDetailFragment(t *testing.T) {
 	if !strings.Contains(html, `<a class="pr-line green" href="https://github.com/o/r/pull/2141"`) {
 		t.Errorf("the header's PR line is no link:\n%s", html)
 	}
-	li, si := strings.Index(html, ">Links<"), strings.Index(html, ">Services<")
-	if li < 0 || si < 0 || li > si {
-		t.Errorf("Links at %d, Services at %d:\n%s", li, si, html)
+	// The links are the Open card's.
+	li := strings.Index(html, ">Open<")
+	if li < 0 {
+		t.Fatalf("no Open card:\n%s", html)
 	}
+	si := li + strings.Index(html[li:], "</section>")
 	links := anchorRe.FindAllStringSubmatch(html[li:si], -1)
 	if len(links) == 0 || links[0][2] != "App" || !strings.Contains(" "+links[0][1]+" ", " main ") {
 		t.Errorf("first link %q, want App with class main:\n%s", links, html)
@@ -190,7 +191,8 @@ func TestDetailFragment(t *testing.T) {
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("stopped", false, nil), ""))
-	li, si = strings.Index(html, ">Links<"), strings.Index(html, ">Services<")
+	li = strings.Index(html, ">Open<")
+	si = li + strings.Index(html[li:], "</section>")
 	for _, l := range anchorRe.FindAllStringSubmatch(html[li:si], -1) {
 		if l[2] == "Logs" {
 			continue
@@ -216,12 +218,12 @@ func TestDetailFragment(t *testing.T) {
 // state classes.
 func TestRowFragment(t *testing.T) {
 	open := &pr{Number: 2141, Title: "Login <b>", URL: "https://github.com/o/r/pull/2141", State: "open", Checks: "pass", Review: "approved"}
-	rv := newRow("ftest", fixtureRow("up", false, open), "feat-login", parseSort("running"))
+	rv := newRow("ftest", fixtureRow("up", false, open), "feat-login", parseSort("pr"))
 	html, err := render("row", rv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`id="row-feat-login"`, `class="sel"`, "#2141", "✓", "ready", "approved", `class="green"`, `class="need"`, "permission", `href="/p/ftest/feat-login?sort=running"`, "Login &lt;b&gt;"} {
+	for _, want := range []string{`id="row-feat-login"`, `class="sel"`, "#2141", "✓", "ready", "approved", `class="green"`, `class="need"`, "permission", `href="/p/ftest/feat-login?sort=pr"`, "Login &lt;b&gt;"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("row lacks %q:\n%s", want, html)
 		}
@@ -386,7 +388,7 @@ func TestReviewAppLink(t *testing.T) {
 	}
 }
 
-// TestRowNeedMarker: a worktree whose agent waits on you is marked by its
+// TestRowNeedMarker: a worktree whose agent waits on you says so under its
 // name, where the row never scrolls out of view; the branch is cut short
 // with its full name as the tooltip.
 func TestRowNeedMarker(t *testing.T) {
@@ -395,18 +397,18 @@ func TestRowNeedMarker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`<td><span class="need" title="bot: Bash: &lt;script&gt;rm&lt;/script&gt;" aria-label="permission">◆</span> <a href=`, `<span class="trunc" title="jb/feat-login">jb/feat-login</span>`} {
+	for _, want := range []string{`<div class="need" title="bot: Bash: &lt;script&gt;rm&lt;/script&gt;">◆ permission</div>`, `<span class="trunc" title="jb/feat-login">jb/feat-login</span>`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("row lacks %q:\n%s", want, html)
 		}
 	}
 	r.WT.Agent.State = "working"
-	if html, _ := render("row", newRow("ftest", r, "", sortKey{By: "name"})); strings.Contains(html, `<span class="need"`) {
+	if html, _ := render("row", newRow("ftest", r, "", sortKey{By: "name"})); strings.Contains(html, `class="need"`) {
 		t.Errorf("a working agent marked as needing input:\n%s", html)
 	}
 }
 
-// TestDetailTerminals: the Terminal row opens the agent (named when the
+// TestDetailTerminals: the Terminal menu opens the agent (named when the
 // overview names one), nvim when the worktree runs it, and a shell; the
 // dock for the panels sits outside the detail, which SSE replaces.
 func TestDetailTerminals(t *testing.T) {
@@ -416,9 +418,9 @@ func TestDetailTerminals(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`data-term="/p/ftest/tty/feat-login/agent?agent=bot"`, `data-term="/p/ftest/tty/feat-login/shell"`,
-		// the desktop window sits in the Terminal row, after the panels
-		`shell ▣</button><span class="gap"></span><form method="post" action="/p/ftest/feat-login/act/term"`,
-		"⎇ jb/feat-login · "} {
+		// the desktop window sits in the Terminal menu, after the panels
+		`shell ▣</button><form method="post" action="/p/ftest/feat-login/act/term"`,
+		`<span class="mono br" title="branch">⎇ jb/feat-login</span>`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %s", want)
 		}

@@ -52,7 +52,7 @@ func TestTestsColumn(t *testing.T) {
 	if html, _ := render("detail", newDetail("ftest", r, "")); strings.Contains(html, ">Tests<") {
 		t.Errorf("no test task, yet a Tests line:\n%s", html)
 	}
-	if html, _ := render("row", newRow("ftest", r, "", parseSort("name"))); !strings.Contains(html, `<td class="tests"><span class="muted">—</span></td>`) {
+	if html, _ := render("row", newRow("ftest", r, "", parseSort("name"))); !strings.Contains(html, `<div class="tests"><span class="muted">—</span></div>`) {
 		t.Errorf("no test task: tests cell not —:\n%s", html)
 	}
 }

@@ -11,14 +11,16 @@
 <a class="hb" href="/p/{{.Prefix}}/notes" title="The agents' shared notes">notes</a>
 <a class="hb" href="/p/{{.Prefix}}/virtual-office" title="The Virtual Office: the project as an office tower in 3D">office</a>
 {{end}}</nav>
-{{if .Need}}<span class="need">◆ {{.Need}} need input</span>{{end}}
+{{if .Need}}<span class="need need-chip">◆ {{.Need}} need input</span>{{end}}
 <span class="sp"></span>
-<nav class="hd-group" aria-label="This machine"><span class="hd-cap">machine</span>
+<details class="menu" data-keep="machine" aria-label="This machine"><summary class="hb">machine ▾</summary>
+<div class="menu-pop">
 <a class="hb" href="/machine" title="Templates, libraries and signers on this machine">settings</a>
-<a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">logs</a>
+<a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">logs ↗</a>
 <button type="button" class="hb" data-notify hidden>notifications</button>
-<button type="button" class="hb" data-colors title="Dashboard colours">⚙</button>
-</nav>
+<button type="button" class="hb" data-colors title="Dashboard colours">colours</button>
+</div>
+</details>
 </header>{{end}}
 
 {{define "projects"}}<ul id="projects" class="projects">

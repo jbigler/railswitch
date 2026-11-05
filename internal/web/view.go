@@ -52,7 +52,9 @@ type sortKey struct {
 	Rev bool
 }
 
-var sortBys = []string{"name", "running", "pr", "agent"}
+// Not "running": the list groups worktrees by state (listGroups), so each
+// group is sorted by one of these.
+var sortBys = []string{"name", "pr", "agent"}
 
 func parseSort(s string) sortKey {
 	k := sortKey{}
@@ -497,8 +499,40 @@ func signerWarningText(sw signerWarning) string {
 type listView struct {
 	Sorts      []sortLink
 	Rows       []rowView
+	Groups     []listGroup // Rows by state, each in Rows' order; no empty group
 	AddURL     string
 	RefreshURL string
+}
+
+// listGroup is one heading of the list: the worktrees that need you (an
+// agent waits on you, or the stack failed), the running ones, the rest.
+type listGroup struct {
+	Name string
+	Rows []rowView
+}
+
+var groupNames = []string{"Needs you", "Running", "Stopped"}
+
+// listGroups puts rows under groupNames, keeping their order.
+func listGroups(rows []rowView, stacks map[string]string) []listGroup {
+	by := make([][]rowView, len(groupNames))
+	for _, r := range rows {
+		i := 2
+		switch {
+		case r.Need != "" || stacks[r.Slug] == "failed":
+			i = 0
+		case stacks[r.Slug] == "up" || stacks[r.Slug] == "partial":
+			i = 1
+		}
+		by[i] = append(by[i], r)
+	}
+	var out []listGroup
+	for i, rs := range by {
+		if len(rs) > 0 {
+			out = append(out, listGroup{Name: groupNames[i], Rows: rs})
+		}
+	}
+	return out
 }
 
 type sortLink struct {
@@ -521,9 +555,12 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 		}
 		v.Sorts = append(v.Sorts, sortLink{Label: by, URL: base + "?sort=" + next.String(), On: on, Rev: on && k.Rev})
 	}
+	stacks := map[string]string{}
 	for _, r := range rows {
 		v.Rows = append(v.Rows, newRow(prefix, r, sel, k))
+		stacks[r.WT.Slug] = r.WT.Stack
 	}
+	v.Groups = listGroups(v.Rows, stacks)
 	return v
 }
 
@@ -672,7 +709,9 @@ type detailView struct {
 	PR                                *prView
 	StackGlyph, StackText, StackClass string
 	Links                             []linkView
+	AppURL                            string // the first app link: the header's Open app; "" for none
 	Services                          []serviceView
+	ServicesUp                        string // "2/9": services running of all, for the Services tab
 	Agent                             *agentView
 	Actions                           []actionView
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
@@ -727,6 +766,9 @@ func newDetail(prefix string, r row, repo string) detailView {
 			class := "ln"
 			if group == "app" {
 				class += " main"
+				if v.AppURL == "" {
+					v.AppURL = l.URL
+				}
 			}
 			v.Links = append(v.Links, linkView{Label: l.Label, URL: l.URL, Class: class + dim})
 		}
@@ -739,6 +781,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		v.Links = append(v.Links, linkView{Label: "Review app", URL: r.PR.ReviewApp, Class: "ln quiet"})
 	}
 	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln quiet"})
+	up := 0
 	for _, s := range wt.Services {
 		g, c, word := serviceLook(s.State)
 		sv := serviceView{Name: s.Service, State: s.State, Word: word, Glyph: g, Class: c}
@@ -752,7 +795,11 @@ func newDetail(prefix string, r row, repo string) detailView {
 			}
 		}
 		v.Services = append(v.Services, sv)
+		if word == "running" {
+			up++
+		}
 	}
+	v.ServicesUp = fmt.Sprintf("%d/%d", up, len(v.Services))
 	if a := wt.Agent; a != nil {
 		kind := agentKind(a)
 		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind), Message: a.Message}
@@ -795,7 +842,12 @@ func newDetail(prefix string, r row, repo string) detailView {
 	return v
 }
 
-type jobsView struct{ Jobs []jobView }
+// jobsView is the jobs section; Fold (the worktree page) folds away the
+// output of a job that ended well, which other pages show as their result.
+type jobsView struct {
+	Jobs []jobView
+	Fold bool
+}
 
 type jobView struct {
 	ID, Label, State, Class, Started, CancelURL string

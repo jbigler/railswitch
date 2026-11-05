@@ -95,11 +95,12 @@ func TestRowChangeEvents(t *testing.T) {
 	}
 }
 
-// TestOrderChangeSendsList: a change that moves a row resends the list.
+// TestOrderChangeSendsList: a change that moves a row, here to another
+// group (b's stack fails: Needs you), resends the list.
 func TestOrderChangeSendsList(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "b", parseSort("running"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	drain(sub)

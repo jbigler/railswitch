@@ -1,21 +1,24 @@
 {{define "list"}}<div id="list" class="list">
-<div class="tb">Sort <span class="seg">{{range .Sorts}}<a{{if .On}} class="on"{{end}} href="{{.URL}}" data-sort>{{.Label}}{{if .On}}{{if .Rev}} ↑{{else}} ↓{{end}}{{end}}</a>{{end}}</span><span class="sp"></span><form method="post" action="{{.RefreshURL}}" data-post><button class="ln dim">Refresh PRs</button></form><button type="button" class="ln dim" data-open="newwt">+ New worktree</button></div>
+<div class="tb">Sort <span class="seg">{{range .Sorts}}<a{{if .On}} class="on"{{end}} href="{{.URL}}" data-sort>{{.Label}}{{if .On}}{{if .Rev}} ↑{{else}} ↓{{end}}{{end}}</a>{{end}}</span></div>
 <table>
-<thead><tr><th>worktree</th><th>branch</th><th>PR</th><th>stack</th><th>agent</th><th>tests</th></tr></thead>
-<tbody>
+<colgroup><col class="c-dot"><col><col class="c-side"></colgroup>
+{{range .Groups}}<tbody class="grp">
+<tr class="grp-hd"><th colspan="3">{{.Name}} <span class="grp-n">{{len .Rows}}</span></th></tr>
 {{range .Rows}}{{template "row" .}}
 {{end}}</tbody>
-</table>
+{{end}}</table>
 {{if not .Rows}}<p class="note">No worktrees.</p>{{end}}
 </div>{{end}}
 
-{{define "row"}}<tr id="{{.ID}}"{{if .Sel}} class="sel"{{end}} data-slug="{{.Slug}}">
-<td>{{if .Need}}<span class="need" title="{{.AgentTitle}}" aria-label="{{.Need}}">◆</span> {{end}}<a href="{{.URL}}" data-row>{{.Slug}}</a>{{if .Base}} <span class="muted">(base)</span>{{end}}</td>
-<td class="br mono"><span class="trunc" title="{{.Branch}}">{{.Branch}}</span>{{with .Stacked}} <span class="stacked" title="position in its gh stack">≡ {{.}}</span>{{end}}</td>
-<td{{with .PR}} title="{{.Title}}"{{end}}>{{with .PR}}<a class="pr" href="{{.URL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{if .Glyph}} <span class="{{.ChecksClass}}">{{.Glyph}}</span>{{end}} <span class="{{.StateClass}}">{{.State}}</span>{{if .Review}} · <span class="{{.ReviewClass}}">{{.Review}}</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
-<td class="{{.StackClass}}">{{.StackGlyph}} {{.StackText}}{{if .Stale}} <span class="stale">restart to apply</span>{{end}}</td>
-<td class="{{.AgentClass}}"{{if .AgentTitle}} title="{{.AgentTitle}}"{{end}}>{{.AgentGlyph}} {{.AgentText}}</td>
-<td class="tests">{{with .Tests}}<span class="{{.Class}}" title="{{.Title}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
+{{/* A worktree: the stack's state as a dot, the name over its branch (and
+what its agent waits on), the PR over the tests on the right. */}}
+{{define "row"}}<tr id="{{.ID}}"{{if .Sel}} class="sel"{{end}} data-slug="{{.Slug}}" data-filter="{{.Slug}} {{.Branch}}">
+<td class="dot {{.StackClass}}" title="stack {{.StackText}}"><span aria-label="stack {{.StackText}}">{{.StackGlyph}}</span></td>
+<td class="wt-cell"><a href="{{.URL}}" data-row>{{.Slug}}</a>{{if .Base}} <span class="muted">(base)</span>{{end}}{{if .Stale}} <span class="stale">restart to apply</span>{{end}}
+<div class="br mono"><span class="trunc" title="{{.Branch}}">{{.Branch}}</span>{{with .Stacked}} <span class="stacked" title="position in its gh stack">≡ {{.}}</span>{{end}}</div>
+{{if .Need}}<div class="need" title="{{.AgentTitle}}">◆ {{.AgentText}}</div>{{else if .AgentTitle}}<div class="{{.AgentClass}} sub" title="{{.AgentTitle}}">{{.AgentGlyph}} agent {{.AgentText}}</div>{{end}}</td>
+<td class="side"><div{{with .PR}} title="{{.Title}}"{{end}}>{{with .PR}}<a class="pr" href="{{.URL}}" target="_blank" rel="noopener">#{{.Number}}</a>{{if .Glyph}} <span class="{{.ChecksClass}}">{{.Glyph}}</span>{{end}} <span class="{{.StateClass}}">{{.State}}</span>{{if .Review}} · <span class="{{.ReviewClass}}">{{.Review}}</span>{{end}}{{else}}<span class="muted">no PR</span>{{end}}</div>
+<div class="tests">{{with .Tests}}<span class="{{.Class}}" title="{{.Title}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</div></td>
 </tr>{{end}}
 
 {{/* The project's agent usage per day (D162): SVG attributes only, the

@@ -30,8 +30,9 @@ Strip, Banner and Projects. */}}
 {{template "head" .}}
 <body data-prefix="{{.Prefix}}" data-sel="{{.Sel}}" data-sort="{{.Sort}}" data-pane="{{.Pane}}">
 {{template "top" .}}
-<main class="grid">
+<main class="grid wt">
 <section class="left">
+<div class="filter"><input id="wt-filter" type="search" placeholder="Filter worktrees" aria-label="Filter worktrees" autocomplete="off"><form method="post" action="{{.List.RefreshURL}}" data-post><button class="ln dim" title="Refresh PRs" aria-label="Refresh PRs">↻</button></form><button type="button" class="ln main" data-open="newwt">+ New</button></div>
 {{template "list" .List}}
 {{template "usage" .Usage}}
 <div class="note">↑↓ moves through worktrees · P switches project · : command palette</div>

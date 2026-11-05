@@ -1,6 +1,7 @@
 {{/* The detail's Database area (D157): opens the snapshots dialog. */}}
-{{define "detail-database"}}{{if .SnapshotsURL}}<div class="lbl">Database</div>
+{{define "detail-database"}}{{if .SnapshotsURL}}<section class="dcard" data-panel="database"><h2 class="lbl">Database</h2>
 <div class="actions"><a class="ln" href="{{.SnapshotsURL}}" data-dialog="snapshots">snapshots…</a></div>
+</section>
 {{end}}{{end}}
 
 {{/* A worktree's database snapshots (D157): take one, restore or delete

@@ -131,19 +131,19 @@ is no longer accepted. What the page shows meanwhile may be stale.
 page shows one pane: `/p/<prefix>` the worktree list, `/p/<prefix>/<slug>`
 that worktree's detail, with `← worktrees` above it back to the list (the
 browser's back button works too). Clicking a worktree opens its detail;
-↑↓ moves the selection without leaving the list. The list hides its
-`stack` and `tests` columns, shown in the detail, and below 520 px its
-`branch` column. The other pages stack their two panes; a settings table
+↑↓ moves the selection without leaving the list. The other pages stack
+their two panes; a settings table
 still wider than the window scrolls its pane.
 
-- **Header:** "RailSwitch", then two labelled groups. **project**: the
-  project button (the prefix, or "choose"; opens the switcher) and, with
-  a project, after a thin divider, `worktrees` (its page), `images`,
+- **Header** (D170): "RailSwitch", then the labelled **project** group:
+  the project button (the prefix, or "choose"; opens the switcher) and,
+  with a project, after a thin divider, `worktrees` (its page), `images`,
   `tidy`, `library`, `settings`, `notes` and `office` (the Virtual Office; the
   project's pages, below). Then `◆ N need input`. On the
-  right, **machine**: `settings` (the Machine page), `logs` (Dozzle at
-  `http://logs.localhost/`), a `notifications` button until the browser
-  permission is decided, and `⚙` (dashboard colours). The link of the
+  right, the **machine ▾** menu: `settings` (the Machine page), `logs ↗`
+  (Dozzle at `http://logs.localhost/`), `notifications` until the browser
+  permission is decided, and `colours` (dashboard colours). A menu closes
+  on a click outside it or on one of its items. The link of the
   page shown is marked. The tab title is `(N) RailSwitch`, N counting
   agents in permission, question or waiting-for-reply across all
   projects.
@@ -165,20 +165,25 @@ still wider than the window scrolls its pane.
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
-- **List:** a toolbar with the sort bar, `+ New worktree` and `Refresh
-  PRs`, then one row per worktree: name (with `◆` in front while its
-  agent needs permission, asks a question or waits for a reply: the
-  column that never scrolls out of a narrow pane), branch (cut short
-  past 16rem, the full name as its tooltip), PR (number, checks, state,
-  review), stack state, agent state, tests (the last run of the `test`
-  task, D158: `✓ passed 5m ago`, `✗ failed 2h ago`, `— never`, with
-  `stale` when HEAD has moved since that run; its exit code, time and
-  commit are the tooltip; `—` alone when the project has no `test`
-  task). A worktree whose running
-  containers were created from older units than the rendered ones
-  (`overview`'s `stale`, after a settings change, say) shows "restart to
-  apply" next to its stack state, in the row and in the detail; `restart`
-  clears it.
+- **List** (D170): a filter field (a worktree shows while its name or
+  branch holds the text; a group with none showing hides; it is the
+  page's, so a live update keeps it), `↻` (Refresh PRs) and `+ New`;
+  the sort bar; then the worktrees in three groups, each headed with
+  its count and left out when empty: **Needs you** (its agent needs
+  permission, asks a question or waits for a reply, or its stack
+  failed), **Running** (stack up or partial) and **Stopped** (the rest),
+  each sorted by the sort bar. A row is the stack's state as a dot (its
+  word the tooltip); the name over the branch (cut short, the full name
+  as its tooltip; `≡ 15/22` in a gh stack) and, under them, `◆ <what the
+  agent waits on>` or the agent's state; on the right the PR (number,
+  checks, state, review; `no PR`) over the tests (the last run of the
+  `test` task, D158: `✓ passed 5m ago`, `✗ failed 2h ago`, `— never`,
+  with `stale` when HEAD has moved since that run; its exit code, time
+  and commit are the tooltip; `—` alone when the project has no `test`
+  task). A worktree whose running containers were created from older
+  units than the rendered ones (`overview`'s `stale`, after a settings
+  change, say) shows "restart to apply" by its name and in the detail;
+  `restart` clears it. A row that changes group resends the list.
 - **Agent usage** (under the list, D162): the project's agents' tokens
   per day for the last 14 days, one bar per day (today's in the accent
   colour; a bar's tooltip is its day, its tokens and the cost when the
@@ -201,33 +206,59 @@ still wider than the window scrolls its pane.
   turns on. Start selects the base worktree, runs `up` there and
   says where its output is; the card goes when it ends ok. `up` refuses an unset
   secret, so a new project with such secrets opens with this card.
-- **Detail** (the selected worktree): name, then one line: `⎇ branch`
-  (left out when the branch is the worktree's name), the stack state
-  (and "restart to apply"), the PR line
-  (`PR #2141 ready · checks ✓ · approved`, a link to the PR; Links gains
-  **Review app** when `pr ls` finds one, the PR's GitHub deployment).
-  Right under it the actions (start, restart, stop, `down…`, `remove…`; see
-  Actions). Then, when its branch is in a
-  gh stack (`stack ls`, read with the PRs), Stack, in gh stack view's
-  words: `◆ Stack #10350` (linked to the stack on GitHub) · `Base:
-  master` · `22 branches (8 merged)`, and `⚠ restack needed` when a
-  branch needs a rebase; the open branches top first, each with its PR
-  (number linked, checks glyph, `draft`/`ready`, review such as
-  `approved`), the branch, `◀ HEAD` on the current one, `queued`, `⚠`;
-  the merged ones folded, the trunk last. Every other open branch's name
-  checks it out here (see Actions). The list shows `≡ 15/22` next to the
-  branch: the current branch's place among all of the stack's,
-  bottom first. Then Links, Services (one aligned row per service: a
-  glyph, the name and a plain state word, `running`, `starting`,
-  `stopping`, `reloading`, `busy`, `failed`, `stopped`, `on demand` or
-  `unknown`, in the glyph's colour;
-  the systemd state is the row's tooltip; a running service's `logs` and
-  `restart` show while the pointer is on its row or the keyboard is in it
-  (always on a touch screen), a service in any other state shows them
-  always; while the service runs, `logs`
-  opens its container in Dozzle (`http://logs.localhost/show?name=<container>`)
-  and, for a service with a unit of its own (a service agent too; not an on-demand agent or deps),
-  `restart` runs `railswitch restart <service>`, which restarts it alone; a service agent's asks first, as its session ends with it; while it runs, a small bar of its memory against its limit, amber from 80 %, red from 95 %, with memory, CPU and PIDs in its tooltip, D161), Agent (state and message, then the worktree's usage from `agent usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when reported, in yellow with `⚠` while it is `runaway`; the **default config…** link beside its label), Tests (as the list says, with the exit code, time and commit, and **run tests**: `railswitch task test` as a job; only with a `test` task), Terminal (below) and Jobs; the terminal panels dock under the jobs.
+- **Detail** (the selected worktree, D170): a head, tabs and cards.
+  - **Head:** the name, then pills: `⎇ branch` (left out when the branch
+    is the worktree's name), the stack state, "restart to apply", the PR
+    line (`PR #2141 ready · checks ✓ · approved`, a link to the PR) and
+    the tests (`✓ tests passed 1h ago`). On the right the actions: the
+    stack's (start, or restart and stop; the first one filled), **Open
+    app ↗** (the first app link), **Run tests** (`railswitch task test`
+    as a job; only with a `test` task), **Terminal ▾** (below) and **⋯**:
+    PR page, `down…` and `remove…` (see Actions).
+  - **Tabs:** Overview, Services (`2/9`: running of all), Agent, Tests
+    (with a `test` task), Database (with a data service) and Jobs.
+    Overview shows every card; another tab only its own, full width.
+    The tab is remembered in the browser's `localStorage` for every
+    worktree and project; one a worktree lacks shows Overview. A live
+    update keeps it.
+  - **Services** (full width): one aligned row per service: a glyph, the
+    name and a plain state word, `running`, `starting`, `stopping`,
+    `reloading`, `busy`, `failed`, `stopped`, `on demand` or `unknown`,
+    in the glyph's colour; the systemd state is the row's tooltip; a
+    running service's `logs` and `restart` show while the pointer is on
+    its row or the keyboard is in it (always on a touch screen), a
+    service in any other state shows them always; while the service
+    runs, `logs` opens its container in Dozzle
+    (`http://logs.localhost/show?name=<container>`) and, for a service
+    with a unit of its own (a service agent too; not an on-demand agent
+    or deps), `restart` runs `railswitch restart <service>`, which
+    restarts it alone; a service agent's asks first, as its session ends
+    with it; while it runs, a small bar of its memory against its limit,
+    amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
+    tooltip, D161.
+  - **Pull request** (Overview only; with a PR or a gh stack): the PR
+    line and **PR page**. Then, when its branch is in a gh stack (`stack
+    ls`, read with the PRs), Stack, in gh stack view's words: `◆ Stack
+    #10350` (linked to the stack on GitHub) · `Base: master` · `22
+    branches (8 merged)`, and `⚠ restack needed` when a branch needs a
+    rebase; the open branches top first, each with its PR (number
+    linked, checks glyph, `draft`/`ready`, review such as `approved`),
+    the branch, `◀ HEAD` on the current one, `queued`, `⚠`; the merged
+    ones folded, the trunk last. Every other open branch's name checks
+    it out here (see Actions).
+  - **Agent:** state and message, then the worktree's usage from `agent
+    usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when
+    reported, in yellow with `⚠` while it is `runaway`; the queue; the
+    **default config…** link beside its label.
+  - **Tests:** as the list says, with the exit code, time and commit,
+    and **run tests**.
+  - **Open** (Overview only): the links, App first and filled, then the
+    project's and the stack's, all greyed while the stack is stopped;
+    then PR, **Review app** when `pr ls` finds one (the PR's GitHub
+    deployment) and Logs, quieter.
+  - **Database:** **snapshots…** (D157).
+  - **Jobs** (full width, below the cards; left out of Overview while
+    there are none): see Jobs. The terminal panels dock under it.
 
 ## Settings
 
@@ -577,7 +608,7 @@ accepted until the update is accepted.
 
 ## Machine
 
-`/machine` (the header's "machine" link; no project needed) has a
+`/machine` (`settings` in the header's machine menu; no project needed) has a
 **Templates** section (D113): the templates from `railswitch --json
 template ls`, and **Import from a folder**, a path field that opens
 `/machine/templates/import?dir=<path>`. That page reads `railswitch
@@ -754,13 +785,13 @@ Click a key in the sort bar; clicking the active one reverses it.
 | Key | Order (ties by name) |
 |---|---|
 | name | the base worktree first, then by slug |
-| running | failed, up, partial, stopped |
 | pr | PR number, highest first; worktrees without a PR last |
 | agent | permission, question, reply, your turn, working, idle, off |
 
 The choice is remembered per project in the browser's `localStorage` and
-sent as `?sort=`: `name`, `running`, `pr` or `agent`, with a leading `-`
-when reversed (`?sort=-pr`). An unknown value is `name`.
+sent as `?sort=`: `name`, `pr` or `agent`, with a leading `-` when
+reversed (`?sort=-pr`). An unknown value is `name` (`running` among them:
+the list's groups order by state, D170). The sort orders each group.
 
 ## Keys
 
@@ -776,8 +807,8 @@ when reversed (`?sort=-pr`). An unknown value is `name`.
 
 ## Terminals
 
-The worktree's **Terminal** row opens a live terminal in the page (D149),
-docked under the worktree's jobs; several can be open at once. The row
+The worktree's **Terminal ▾** menu opens a live terminal in the page (D149),
+docked under the worktree's jobs; several can be open at once. The menu
 ends with **open window ↗**, the `terminal` action below: a window on the
 desktop, not in the page.
 
@@ -862,7 +893,7 @@ Every action is a job (below).
   and types the first item through `agent prompt`, removing it only once
   typed; an agent working, or waiting on a permission or a question, is
   never typed into. Each delivery shows in Jobs.
-- **open window ↗** (at the end of the Terminal row) runs `railswitch
+- **open window ↗** (at the end of the Terminal menu) runs `railswitch
   term`: a new terminal tab or window on the host with your shell in the
   worktree's folder.
 - **nvim** and **agent** (the cyberpunk office's desks) run `railswitch nvim
@@ -957,6 +988,10 @@ Every action is a job (below).
 - A worktree's Jobs list shows its own jobs, the project-level ones and
   those of removed worktrees (so a `wt rm`'s output stays visible).
 - Cancel sends SIGTERM to the job's process group, SIGKILL 3 s later.
+- On the worktree page a job's output is a fold, open while it runs and
+  after it fails or is cancelled, closed after it ends ok (D170); one
+  you open or close stays so through live updates. Other pages show
+  every job's output open: there it is the result.
 - States: running, ok, failed (with the exit code), cancelled.
 - The hub keeps the last 5000 lines and 4 MiB per job (lines cut at 64 KiB,
   ANSI escapes stripped); the page shows the last 500 with "… N earlier
@@ -1003,7 +1038,7 @@ preset and up to eight changed colours.
 - Editable tokens: `bg`, `bg2`, `text`, `muted`, `accent`, `blue`,
   `green`, `yellow`. `sel`, `border`, `purple` and `red` are fixed by the
   preset.
-- `⚙` opens the editor for the current mode: preset, eight colour fields,
+- `colours` (the header's machine menu) opens the editor for the current mode: preset, eight colour fields,
   a live preview, and a warning for any text colour below 4.5:1 against
   the background (saving is still allowed). "Reset to preset" drops the
   mode's changed colours and keeps its preset.

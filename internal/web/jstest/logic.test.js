@@ -1,5 +1,5 @@
 // Tests of the dashboard's page-free logic (static/logic.js), run by
-// `node --test internal/web/jstest/` in make check: no packages, no browser.
+// `node --test internal/web/jstest/*.test.js` in make check: no packages, no browser.
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";

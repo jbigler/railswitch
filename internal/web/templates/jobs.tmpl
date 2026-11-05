@@ -2,7 +2,7 @@
 {{if .Jobs}}<h2 class="lbl">Jobs</h2>
 {{end}}{{range .Jobs}}<div class="job" id="{{.ID}}" data-state="{{.State}}"{{if .Conflict}} data-conflict{{end}} data-exit="{{.Exit}}">
 <div class="job-hd"><b>{{.Label}}</b> <span class="{{.Class}}">{{.State}}{{if eq .State "failed"}} (exit {{.Exit}}){{end}}</span> <span class="muted">{{.Started}}</span>{{if .Running}}<form method="post" action="{{.CancelURL}}" data-post><button class="ln danger">Cancel</button></form>{{end}}</div>
-{{if or .Lines .Earlier}}<details class="job-out" data-keep="{{.ID}}"{{if or (not $.Fold) .Running (ne .State "ok")}} open{{end}}><summary class="muted">output</summary>
+{{if or .Lines .Earlier}}<details class="job-out" data-keep="{{.ID}}"{{if or (not $.Fold) .Running (ne .State "ok")}} open{{end}}><summary class="muted">Output</summary>
 <pre class="out mono">{{if .Earlier}}… {{.Earlier}} earlier lines
 {{end}}{{range .Lines}}{{.}}
 {{end}}</pre></details>

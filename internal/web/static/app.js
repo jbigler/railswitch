@@ -369,7 +369,7 @@ async function openTermPanel(btn) {
   const full = document.createElement("button");
   full.type = "button";
   full.className = "ln";
-  full.textContent = "maximize";
+  full.textContent = "Maximize";
   full.title = "Fill the window; Esc stays in the terminal (F11 then fills the screen)";
   const x = document.createElement("button");
   x.type = "button";
@@ -393,7 +393,7 @@ async function openTermPanel(btn) {
   // which vim needs. F11 (the browser's own) fills the screen and keeps Esc.
   full.addEventListener("click", () => {
     const on = panel.classList.toggle("max");
-    full.textContent = on ? "restore" : "maximize";
+    full.textContent = on ? "Restore" : "Maximize";
     t?.focus();
   });
   x.addEventListener("click", () => {

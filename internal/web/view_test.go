@@ -179,7 +179,7 @@ func TestDetailFragment(t *testing.T) {
 	if want := []string{"App", "Flipper", "Evil", "Browser (VNC)", "PR", "Logs"}; !slices.Equal(labels, want) {
 		t.Errorf("links %q, want %q", labels, want)
 	}
-	for _, want := range []string{"PR #2141 ready · checks ✓ · approved", `target="_blank"`, `rel="noopener"`, "remove…", "&lt;script&gt;"} {
+	for _, want := range []string{"PR #2141 ready · checks ✓ · approved", `target="_blank"`, `rel="noopener"`, "Remove…", "&lt;script&gt;"} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %q:\n%s", want, html)
 		}
@@ -361,7 +361,7 @@ func TestDetailAgentTerms(t *testing.T) {
 			t.Errorf("%s: %d buttons, want 2 (Terminal menu, Agent card)", url, n)
 		}
 	}
-	if !strings.Contains(html, "agent: claude ● ▣") || !strings.Contains(html, "agent: omp ▣") {
+	if !strings.Contains(html, "Agent: claude ● ▣") || !strings.Contains(html, "Agent: omp ▣") {
 		t.Errorf("menu entries don't name the agents or mark the running one:\n%s", html)
 	}
 }

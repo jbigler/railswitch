@@ -76,7 +76,7 @@ func TestImagesPage(t *testing.T) {
 	}
 
 	main := f.do(req("GET", "/p/ftest", nil)).Body.String()
-	contains(t, "header", main, `<a class="hb" href="/p/ftest/images">images</a>`, `<a class="hb" href="/p/ftest/library">library</a>`)
+	contains(t, "header", main, `<a class="hb" href="/p/ftest/images">Images</a>`, `<a class="hb" href="/p/ftest/library">Library</a>`)
 }
 
 func TestImagesEditor(t *testing.T) {
@@ -358,7 +358,7 @@ func TestDefaultChanged(t *testing.T) {
 	contains(t, "project", body, `<div class="cf-banner">The default of your own <a class="mono" href="/p/ftest/images/edit/pg-client">Containerfile.pg-client</a> changed since you ejected it.`)
 	contains(t, "review", f.do(req("GET", "/p/ftest/review", nil)).Body.String(),
 		`This project has its own copy of <a class="mono" href="/p/ftest/images/edit/pg-client">Containerfile.pg-client</a>. Accepting updates the default, not your copy`)
-	if c := strings.Count(f.do(req("GET", "/p/ftest/images", nil)).Body.String(), "default changed</a>"); c != 1 {
+	if c := strings.Count(f.do(req("GET", "/p/ftest/images", nil)).Body.String(), "Default changed</a>"); c != 1 {
 		t.Errorf("%d badges; want 1", c)
 	}
 }

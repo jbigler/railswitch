@@ -1,6 +1,6 @@
 {{/* The detail's Database area (D157): opens the snapshots dialog. */}}
 {{define "detail-database"}}{{if .SnapshotsURL}}<section class="dcard" data-panel="database"><h2 class="lbl">Database</h2>
-<div class="actions"><a class="ln" href="{{.SnapshotsURL}}" data-dialog="snapshots">snapshots…</a></div>
+<div class="actions"><a class="ln" href="{{.SnapshotsURL}}" data-dialog="snapshots">Snapshots…</a></div>
 </section>
 {{end}}{{end}}
 
@@ -16,8 +16,8 @@ each; every button is a job, restore and delete ask first. */}}
 <thead><tr><th>Name</th><th>Taken</th><th>Size</th><th></th></tr></thead>
 <tbody>
 {{range .Snapshots}}<tr><td class="mono">{{.Name}}</td><td class="mono">{{.Created}}</td><td class="mono">{{.Size}}</td>
-<td><form method="post" action="{{$.RestoreURL}}" data-post data-close data-confirm="Restore {{.Name}} into {{$.Slug}}? What its databases and storage hold now is lost."><input type="hidden" name="name" value="{{.Name}}"><button class="ln">restore</button></form>
-<form method="post" action="{{$.RmURL}}" data-post data-close data-confirm="Delete snapshot {{.Name}}?"><input type="hidden" name="name" value="{{.Name}}"><button class="ln danger">delete</button></form></td></tr>
+<td><form method="post" action="{{$.RestoreURL}}" data-post data-close data-confirm="Restore {{.Name}} into {{$.Slug}}? What its databases and storage hold now is lost."><input type="hidden" name="name" value="{{.Name}}"><button class="ln">Restore</button></form>
+<form method="post" action="{{$.RmURL}}" data-post data-close data-confirm="Delete snapshot {{.Name}}?"><input type="hidden" name="name" value="{{.Name}}"><button class="ln danger">Delete</button></form></td></tr>
 {{end}}</tbody>
 </table>
 {{else}}<p class="muted">No snapshots yet.</p>

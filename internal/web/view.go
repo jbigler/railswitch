@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jbigler/railswitch/internal/jobs"
 )
@@ -18,7 +20,14 @@ import (
 //go:embed templates/*.tmpl
 var templateFiles embed.FS
 
-var tmpl = template.Must(template.New("").ParseFS(templateFiles, "templates/*.tmpl"))
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"cap": capFirst}).ParseFS(templateFiles, "templates/*.tmpl"))
+
+// capFirst is s with its first letter upper case: a button's label from a
+// word that is also a command or job label ("start", "shell").
+func capFirst(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[n:]
+}
 
 // render executes the named template (a page or a fragment).
 func render(name string, data any) (string, error) {
@@ -55,6 +64,8 @@ type sortKey struct {
 // Not "running": the list groups worktrees by state (listGroups), so each
 // group is sorted by one of these.
 var sortBys = []string{"name", "pr", "agent"}
+
+var sortLabels = map[string]string{"name": "Name", "pr": "PR", "agent": "Agent"}
 
 func parseSort(s string) sortKey {
 	k := sortKey{}
@@ -554,7 +565,7 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 		if on {
 			next.Rev = !k.Rev
 		}
-		v.Sorts = append(v.Sorts, sortLink{Label: by, URL: base + "?sort=" + next.String(), On: on, Rev: on && k.Rev})
+		v.Sorts = append(v.Sorts, sortLink{Label: sortLabels[by], URL: base + "?sort=" + next.String(), On: on, Rev: on && k.Rev})
 	}
 	for _, r := range rows {
 		v.Rows = append(v.Rows, newRow(prefix, r, sel, k))

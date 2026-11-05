@@ -137,12 +137,12 @@ still wider than the window scrolls its pane.
 
 - **Header** (D170): "RailSwitch", then the labelled **project** group:
   the project button (the prefix, or "choose"; opens the switcher) and,
-  with a project, after a thin divider, `worktrees` (its page), `images`,
-  `tidy`, `library`, `settings`, `notes` and `office` (the Virtual Office; the
+  with a project, after a thin divider, `Worktrees` (its page), `Images`,
+  `Tidy`, `Library`, `Settings`, `Notes` and `Office` (the Virtual Office; the
   project's pages, below). Then `◆ N need input`. On the
-  right, the **machine ▾** menu: `settings` (the Machine page), `logs ↗`
-  (Dozzle at `http://logs.localhost/`), `notifications` until the browser
-  permission is decided, and `colours` (dashboard colours). A menu closes
+  right, the **Machine ▾** menu: `Settings` (the Machine page), `Logs ↗`
+  (Dozzle at `http://logs.localhost/`), `Notifications` until the browser
+  permission is decided, and `Colours` (dashboard colours). A menu closes
   on a click outside it or on one of its items. The link of the
   page shown is marked. The tab title is `(N) RailSwitch`, N counting
   agents in permission, question or waiting-for-reply across all
@@ -183,7 +183,7 @@ still wider than the window scrolls its pane.
   task). A worktree whose running containers were created from older
   units than the rendered ones (`overview`'s `stale`, after a settings
   change, say) shows "restart to apply" by its name and in the detail;
-  `restart` clears it. A row that changes group resends the list.
+  **Restart** clears it. A row that changes group resends the list.
 - **Agent usage** (under the list, D162): the project's agents' tokens
   per day for the last 14 days, one bar per day (today's in the accent
   colour; a bar's tooltip is its day, its tokens and the cost when the
@@ -214,7 +214,7 @@ still wider than the window scrolls its pane.
     stack's (start, or restart and stop; the first one filled), **Open
     app ↗** (the first app link), **Run tests** (`railswitch task test`
     as a job; only with a `test` task), **Terminal ▾** (below) and **⋯**:
-    PR page, `down…` and `remove…` (see Actions).
+    PR page, `Down…` and `Remove…` (see Actions).
   - **Tabs:** Overview, Services (`2/9`: running of all), Agent, Tests
     (with a `test` task), Database (with a data service) and Jobs.
     Overview shows every card, each its own height; another tab only its
@@ -226,13 +226,13 @@ still wider than the window scrolls its pane.
     name and a plain state word, `running`, `starting`, `stopping`,
     `reloading`, `busy`, `failed`, `stopped`, `on demand` or `unknown`,
     in the glyph's colour; the systemd state is the row's tooltip; a
-    running service's `logs` and `restart` show while the pointer is on
+    running service's `Logs` and `Restart` show while the pointer is on
     its row or the keyboard is in it (always on a touch screen), a
     service in any other state shows them always; while the service
-    runs, `logs` opens its container in Dozzle
+    runs, `Logs` opens its container in Dozzle
     (`http://logs.localhost/show?name=<container>`) and, for a service
     with a unit of its own (a service agent too; not an on-demand agent
-    or deps), `restart` runs `railswitch restart <service>`, which
+    or deps), `Restart` runs `railswitch restart <service>`, which
     restarts it alone; a service agent's asks first, as its session ends
     with it; while it runs, a small bar of its memory against its limit,
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
@@ -259,11 +259,11 @@ still wider than the window scrolls its pane.
     runs: each a service `agent-<name>`, on demand or not; with none
     listed, one for the agent the overview names, else the default) that
     opens its terminal panel on the Agent tab (below), as the Terminal
-    menu's `agent: <name> ▣` does; the **default config…** link beside its
+    menu's `Agent: <name> ▣` does; the **Default config…** link beside its
     label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
-  - **Database:** **snapshots…** (D157).
+  - **Database:** **Snapshots…** (D157).
   - Agent, Tests and Database come last, side by side: each has its own
     tab too.
   - **Jobs** (full width, below the cards; left out of Overview while
@@ -271,7 +271,7 @@ still wider than the window scrolls its pane.
 
 ## Settings
 
-`/p/<prefix>/settings` (`settings` in the header) edits the project's
+`/p/<prefix>/settings` (`Settings` in the header) edits the project's
 `project.toml`. Changes are staged, not applied: the right-hand panel
 shows what each one does before anything is written.
 
@@ -410,7 +410,7 @@ blocks) the project's other jobs. Its output shows under the panel.
 
 ## Images
 
-`/p/<prefix>/images` (`images` in the header) shows what a worktree
+`/p/<prefix>/images` (`Images` in the header) shows what a worktree
 builds. Every `RUN` line in these Containerfiles runs on this machine
 during the build, outside the firewall.
 
@@ -457,7 +457,7 @@ a local file into it, in the browser only (1 MiB at most).
 
 ## Tidy
 
-`/p/<prefix>/tidy` (`tidy` in the header, D160) lists what could go, from
+`/p/<prefix>/tidy` (`Tidy` in the header, D160) lists what could go, from
 `railswitch --json tidy`: each worktree whose PR is merged or closed or
 whose stack has been stopped over 14 days, and each image of the project
 no stack uses (what `gc` would remove), with why and its size, and the
@@ -479,7 +479,7 @@ included.
 
 ## Library
 
-`/p/<prefix>/library` (`library` in the header) lists the packages from
+`/p/<prefix>/library` (`Library` in the header) lists the packages from
 `railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
 each `built in`, `local` (the workspace's `packs/<name>/` and
 `options/<name>/`) or `library <alias>` (a library package,
@@ -617,7 +617,7 @@ accepted until the update is accepted.
 
 ## Machine
 
-`/machine` (`settings` in the header's machine menu; no project needed) has a
+`/machine` (`Settings` in the header's Machine menu; no project needed) has a
 **Templates** section (D113): the templates from `railswitch --json
 template ls`, and **Import from a folder**, a path field that opens
 `/machine/templates/import?dir=<path>`. That page reads `railswitch
@@ -824,12 +824,12 @@ An agent's terminal (from the Agent card or the menu) shows the Agent
 tab first. There the worktree's agent terminal takes the Agent
 card's place and the window's height below the tabs, until it is closed;
 the card comes back then. The menu
-ends with **open window ↗**, the `terminal` action below: a window on the
+ends with **Open window ↗**, the `terminal` action below: a window on the
 desktop, not in the page.
 
 | Button | Runs | When the panel closes |
 |--------|------|-----------------------|
-| **agent: <name> ▣**, one per configured agent | `railswitch agent <name>`; with no agent service listed, one entry for the agent the overview shows, else the default. One agent runs per worktree (D62): with another one running, the panel shows its refusal | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
+| **Agent: <name> ▣**, one per configured agent | `railswitch agent <name>`; with no agent service listed, one entry for the agent the overview shows, else the default. One agent runs per worktree (D62): with another one running, the panel shows its refusal | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
 | **nvim ▣** (when the worktree runs nvim) | `railswitch nvim` | nvim keeps running; only this UI goes |
 | **shell ▣** | a login shell in the app container (`railswitch exec`, bash when the image has it, else `sh`) | the shell ends |
 
@@ -876,7 +876,7 @@ Every action is a job (below).
 - **start, restart, stop** run `railswitch up|restart|stop` in the
   worktree, as the stack's state allows: a stopped stack offers start; a
   running one restart and stop; a partial or failed one all three.
-- **default config…** (next to the detail's Agent label) opens a dialog
+- **Default config…** (next to the detail's Agent label) opens a dialog
   that reads `agent ls` for the worktree: per agent with `[config]
   paths`, where its default came from, **Make <worktree>'s <agent> config
   the default** (`agent default promote <agent> [--all]`, the box "and
@@ -886,7 +886,7 @@ Every action is a job (below).
   while this worktree's home waits for it (`agent ls`'s
   `default_pending`) the dialog says "Pending: … takes the default at its
   next start", adding "stop it, then start it again" while it runs.
-- **snapshots…** (the detail's Database area, shown when the worktree has
+- **Snapshots…** (the detail's Database area, shown when the worktree has
   a data service; D157) opens a dialog that reads `railswitch --json db
   snapshot ls`: each snapshot with when it was taken and its size,
   **restore** (asks first: what the databases and storage hold now is
@@ -897,7 +897,7 @@ Every action is a job (below).
 - **Queue** (under the detail's Agent, D159): the worktree's agent work
   queue from `overview`'s `queue`, each item's first line (the whole text
   as its tooltip) with **remove** (`agent queue rm <id>`), **clear**
-  (`agent queue clear`, asked first) and **add to queue…**, a dialog with
+  (`agent queue clear`, asked first) and **Add to queue…**, a dialog with
   a prompt box and an issue number field (`agent queue add`, the text on
   stdin, or `agent queue add --issue <n>`). The dashboard delivers the
   queue: when an overview shows a worktree with a queue whose agent runs
@@ -908,7 +908,7 @@ Every action is a job (below).
   and types the first item through `agent prompt`, removing it only once
   typed; an agent working, or waiting on a permission or a question, is
   never typed into. Each delivery shows in Jobs.
-- **open window ↗** (at the end of the Terminal menu) runs `railswitch
+- **Open window ↗** (at the end of the Terminal menu) runs `railswitch
   term`: a new terminal tab or window on the host with your shell in the
   worktree's folder.
 - **nvim** and **agent** (the cyberpunk office's desks) run `railswitch nvim
@@ -1026,7 +1026,7 @@ above an open dialog too.
 
 ## Notifications
 
-- Click `notifications` in the header once to let the browser decide; the
+- Click `Notifications` in the header's Machine menu once to let the browser decide; the
   button disappears after that.
 - A notification fires when a worktree's agent moves into needs
   permission, has a question, is waiting for your reply, or your turn, from
@@ -1058,7 +1058,7 @@ preset and up to eight changed colours.
 - Editable tokens: `bg`, `bg2`, `text`, `muted`, `accent`, `blue`,
   `green`, `yellow`. `sel`, `border`, `purple` and `red` are fixed by the
   preset.
-- `colours` (the header's machine menu) opens the editor for the current mode: preset, eight colour fields,
+- `Colours` (the header's Machine menu) opens the editor for the current mode: preset, eight colour fields,
   a live preview, and a warning for any text colour below 4.5:1 against
   the background (saving is still allowed). "Reset to preset" drops the
   mode's changed colours and keeps its preset.
@@ -1097,7 +1097,7 @@ and opens an empty editor (`?new=<name>`) whose Save creates it
 
 ## Virtual Office
 
-`office` in the header opens `/p/<prefix>/virtual-office`, which
+`Office` in the header opens `/p/<prefix>/virtual-office`, which
 redirects to the active set's page, `/p/<prefix>/virtual-office/<set>/`
 (D150, D153; D150's `/virtual-office/cyberpunk` redirects the same way):
 the project as an office tower in 3D (three.js), an optional view beside

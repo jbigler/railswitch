@@ -428,6 +428,10 @@ func TestDetailTerminals(t *testing.T) {
 	if strings.Contains(html, "/tty/feat-login/nvim") {
 		t.Error("an nvim button without an nvim service")
 	}
+	// The Agent card opens the same terminal as the menu's agent item.
+	if n := strings.Count(html, `data-term="/p/ftest/tty/feat-login/agent?agent=bot"`); n != 2 {
+		t.Errorf("agent terminal buttons: %d, want 2 (Terminal menu, Agent card)", n)
+	}
 	r.WT.Services = append(r.WT.Services, service{Service: "nvim", Role: "tool", State: "active/running"})
 	r.WT.Agent = nil
 	html, _ = render("detail", newDetail("ftest", r, ""))

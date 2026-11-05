@@ -254,8 +254,10 @@ still wider than the window scrolls its pane.
     it out here (see Actions).
   - **Agent:** state and message, then the worktree's usage from `agent
     usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when
-    reported, in yellow with `⚠` while it is `runaway`; the queue; the
-    **default config…** link beside its label.
+    reported, in yellow with `⚠` while it is `runaway`; the queue;
+    **open terminal ▣**, the agent's terminal panel as the Terminal
+    menu's **agent ▣** opens it; the **default config…** link beside its
+    label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
   - **Database:** **snapshots…** (D157).

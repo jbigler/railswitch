@@ -1023,8 +1023,10 @@ if (view.startsWith("settings")) {
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
       else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
       else if (f.dataset.stage === "task") {
-        if (f.elements.fresh.checked) stage({ op: "task.fresh.add", name: v("name") }, false);
+        // The task first: preview judges edits in order, and fresh_tasks
+        // naming a task that doesn't exist yet is a render error.
         stage({ op: "task.set", name: v("name"), value: v("value") }, false);
+        if (f.elements.fresh.checked) stage({ op: "task.fresh.add", name: v("name") }, false);
       }
       else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);

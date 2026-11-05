@@ -351,3 +351,23 @@ func TestPreviewHooks(t *testing.T) {
 		t.Errorf("bad command: %+v", r)
 	}
 }
+
+// The Tasks card's add form with New container (D171): the task, then
+// fresh_tasks, both apply; the other order blocks the fresh_tasks edit,
+// which names a task that doesn't exist yet.
+func TestPreviewFreshTaskOrder(t *testing.T) {
+	e := filialEnv(t, nil)
+	set, fresh := Edit{Op: "task.set", Name: "retest", Value: "retest --rails"}, Edit{Op: "task.fresh.add", Name: "retest"}
+	p := preview(t, e, set, fresh)
+	for i, r := range p.Edits {
+		if r.Impact == ImpactBlocked {
+			t.Errorf("edit %d blocked: %+v", i, r)
+		}
+	}
+	if !strings.Contains(p.NewText, `fresh_tasks = ["retest"]`) {
+		t.Errorf("project.toml lacks fresh_tasks:\n%s", p.NewText)
+	}
+	if p := preview(t, e, fresh, set); p.Edits[0].Impact != ImpactBlocked {
+		t.Errorf("fresh_tasks before its task: %+v; want blocked", p.Edits[0])
+	}
+}

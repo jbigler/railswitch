@@ -675,44 +675,68 @@ func RemoveLink(data, label string) (string, error) {
 // HideLink appends label to the top-level hide_links; a hidden label is an
 // error.
 func HideLink(data, label string) (string, error) {
-	d, s, err := parseHideLinks(data)
+	return addTopElem(data, "hide_links", label, "link %q is already hidden")
+}
+
+// ShowLink removes label from hide_links; a label not hidden is an error.
+func ShowLink(data, label string) (string, error) {
+	return removeTopElem(data, "hide_links", label, "link %q is not hidden")
+}
+
+// AddFreshTask appends name to the top-level fresh_tasks (D171); a name
+// already there is an error.
+func AddFreshTask(data, name string) (string, error) {
+	return addTopElem(data, "fresh_tasks", name, "task %q already runs in a new container")
+}
+
+// RemoveFreshTask removes name from fresh_tasks; a name not there is an
+// error.
+func RemoveFreshTask(data, name string) (string, error) {
+	return removeTopElem(data, "fresh_tasks", name, "task %q does not run in a new container")
+}
+
+// addTopElem appends value to the top-level string array key, creating it;
+// a value already there is the error dup.
+func addTopElem(data, key, value, dup string) (string, error) {
+	d, s, err := parseTopArray(data, key)
 	if err != nil {
 		return "", err
 	}
-	elem := QuoteString(label)
+	elem := QuoteString(value)
 	if s == nil {
-		return d.insertTop("hide_links = [" + elem + "]\n"), nil
+		return d.insertTop(key + " = [" + elem + "]\n"), nil
 	}
 	elems, err := d.arrayElems(s)
 	if err != nil {
 		return "", err
 	}
-	if slices.ContainsFunc(elems, func(e arrayElem) bool { return e.value == label }) {
-		return "", fmt.Errorf("project.toml: link %q is already hidden", label)
+	if slices.ContainsFunc(elems, func(e arrayElem) bool { return e.value == value }) {
+		return "", fmt.Errorf("project.toml: "+dup, value)
 	}
 	return d.appendToArray(s, elem)
 }
 
-// ShowLink removes label from hide_links; a label not hidden is an error.
-func ShowLink(data, label string) (string, error) {
-	d, s, err := parseHideLinks(data)
+// removeTopElem removes value from the top-level array key; an absent key
+// is the error missing.
+func removeTopElem(data, key, value, missing string) (string, error) {
+	d, s, err := parseTopArray(data, key)
 	if err != nil {
 		return "", err
 	}
 	if s == nil {
-		return "", fmt.Errorf("project.toml: link %q is not hidden", label)
+		return "", fmt.Errorf("project.toml: "+missing, value)
 	}
-	return d.removeArrayElem(s, label)
+	return d.removeArrayElem(s, value)
 }
 
-func parseHideLinks(data string) (*doc, *stmt, error) {
-	d, err := parseEdit(data, "hide_links", false, true)
+func parseTopArray(data, key string) (*doc, *stmt, error) {
+	d, err := parseEdit(data, key, false, true)
 	if err != nil {
 		return nil, nil, err
 	}
-	s := d.find(nil, "hide_links")
+	s := d.find(nil, key)
 	if s != nil && d.data[s.value[0]] != '[' {
-		return nil, nil, &BlockedError{d.line(s.start), "hide_links is not an array"}
+		return nil, nil, &BlockedError{d.line(s.start), key + " is not an array"}
 	}
 	return d, s, nil
 }

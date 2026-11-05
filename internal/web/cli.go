@@ -174,6 +174,7 @@ type task struct {
 	Command string `json:"command"`
 	Source  string `json:"source"` // pack, project, or (project show only) hidden
 	Pack    string `json:"pack"`   // the pack's command for the name, if any
+	Fresh   bool   `json:"fresh"`  // fresh_tasks names it (D171)
 }
 
 type wtRow struct {

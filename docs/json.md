@@ -1291,7 +1291,8 @@ host) (D119), `option`, `env.set`,
 `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`,
 `task.set` (`name`; `value`: the command, absent or `""` to hide the
 pack's task of that name) and `task.unset` (`name`: takes the project's
-`[tasks]` entry out; D156),
+`[tasks]` entry out; D156), `task.fresh.add` and `task.fresh.remove`
+(`name`: adds it to or takes it from `fresh_tasks`; D171),
 `hooks.set` (`key`: `deps`, `start` or `create`; `values`: the list's
 commands in order, absent or `[]` to remove it; D126), `agent.setup`
 (`key`: an agent's name; `values`: its setup commands in order, absent or

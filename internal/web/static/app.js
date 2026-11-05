@@ -341,13 +341,24 @@ function hideToast() {
 // Keys.
 
 // Terminal panels (D149): docked in #terms, under the jobs and outside the
-// detail that SSE replaces; each closes its WebSocket when removed.
+// detail that SSE replaces, so switching tabs or worktrees keeps them;
+// each closes its WebSocket when removed. A button with data-term-tab
+// shows that tab first; a terminal already open is shown again, not
+// opened twice.
 async function openTermPanel(btn) {
   const dock = $("#terms");
   if (!dock) return;
+  if (btn.dataset.termTab) showTab(btn.dataset.termTab);
+  const open = $$(".term-panel", dock).find((p) => p.dataset.term === btn.dataset.term);
+  if (open) {
+    open.scrollIntoView({ block: "nearest" });
+    open.focusTerm?.();
+    return;
+  }
   const slug = $("#detail")?.dataset.slug || "";
   const panel = document.createElement("section");
   panel.className = "term-panel";
+  panel.dataset.term = btn.dataset.term;
   const head = document.createElement("header");
   const title = document.createElement("span");
   title.className = "mono";
@@ -371,6 +382,7 @@ async function openTermPanel(btn) {
   try {
     const { openTerminal } = await import("/static/term/term.js");
     t = openTerminal(host, btn.dataset.term);
+    panel.focusTerm = () => t.focus();
   } catch (err) {
     host.textContent = String(err.message || err);
   }

@@ -31,7 +31,7 @@
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
 {{end}}{{with .Usage}}<div class="usage-line{{if $.Runaway}} yellow{{else}} muted{{end}}">{{if $.Runaway}}⚠ {{end}}{{.}}</div>
-{{end}}{{template "queue-detail" .Queue}}<div class="actions">{{range .Terms}}{{if eq .Label "agent"}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Label}}" title="The agent's terminal in this page">open terminal ▣</button>{{end}}{{end}}</div>
+{{end}}{{template "queue-detail" .Queue}}<div class="actions">{{range .Terms}}{{if eq .Label "agent"}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Label}}" data-term-tab="agent" title="The agent's terminal, on the Agent tab">open terminal ▣</button>{{end}}{{end}}</div>
 </section>
 {{with .Tests}}<section class="dcard" data-panel="tests"><h2 class="lbl">Tests</h2>
 <div><span class="{{.Class}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}} <span class="muted">{{.Title}}</span></div>

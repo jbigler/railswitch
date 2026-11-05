@@ -256,7 +256,7 @@ still wider than the window scrolls its pane.
     usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when
     reported, in yellow with `⚠` while it is `runaway`; the queue;
     **open terminal ▣**, the agent's terminal panel as the Terminal
-    menu's **agent ▣** opens it; the **default config…** link beside its
+    menu's **agent ▣** opens it, on the Agent tab (below); the **default config…** link beside its
     label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
@@ -814,7 +814,12 @@ the list's groups order by state, D170). The sort orders each group.
 ## Terminals
 
 The worktree's **Terminal ▾** menu opens a live terminal in the page (D149),
-docked under the worktree's jobs; several can be open at once. The menu
+docked under the worktree's jobs; several can be open at once, and one
+already open is shown again rather than opened twice. The panels stay
+through a switch of tab or worktree (each is titled with its worktree).
+The Agent card's **open terminal ▣** shows the Agent tab first, where the
+dock sits right under the card and a panel takes 70 % of the window's
+height. The menu
 ends with **open window ↗**, the `terminal` action below: a window on the
 desktop, not in the page.
 

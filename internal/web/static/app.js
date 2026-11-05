@@ -246,6 +246,20 @@ document.addEventListener("click", (e) => {
   hideToast();
 });
 
+// A menu opens to the left of its button, or to the right when the left
+// has no room (a button near the window's left edge).
+document.addEventListener(
+  "toggle",
+  (e) => {
+    const d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.classList.contains("menu") || !d.open) return;
+    const pop = $(".menu-pop", d);
+    pop.classList.remove("rightward");
+    if (pop.getBoundingClientRect().left < 8) pop.classList.add("rightward");
+  },
+  true,
+);
+
 function openDialog(id) {
   const d = document.getElementById(id);
   if (!d || d.open) return;

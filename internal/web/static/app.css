@@ -351,6 +351,7 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .menu-pop .hb:hover,.menu-pop form button:hover{background:var(--sel)}
 .menu-pop form{display:block;margin:0}
 .menu-pop .danger{color:var(--red)}
+.menu-pop.rightward{left:0;right:auto}
 .grid.wt{grid-template-columns:minmax(340px,460px) minmax(0,1fr)}
 .wt .filter{display:flex;gap:6px;align-items:center;padding:12px 12px 2px}
 .wt .filter input{flex:1;min-width:0;padding:6px 10px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px}

@@ -276,8 +276,11 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 .term-panel > div { flex: 1; }
 .term-panel.max { position: fixed; inset: 0; z-index: 50; height: auto; resize: none; }
 body:has(.term-panel.max) { overflow: hidden; }
-/* On the Agent tab the dock sits right under the Agent card: room to work. */
-body[data-tab=agent] .wt .term-panel:not(.max) { height: max(24rem, 70vh); }
+/* On the Agent tab the worktree's agent terminal takes the Agent card's
+   place, and the room below the tabs. */
+body[data-tab=agent][data-agent-term] .wt [data-panel=agent] { display: none; }
+body[data-tab=agent] .wt .term-panel:not(.max) { height: max(24rem, calc(100vh - 12rem)); }
+body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
 /* The PR page (D152). */
 .prpage h2{margin-top:1.4rem}
 .pr-meta,.pr-status{margin:.3rem 0}

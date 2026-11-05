@@ -135,6 +135,7 @@ function afterSwap(id) {
     // A URL without one stays: a narrow window shows the list for it.
     if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
     showTab();
+    agentTermShown();
   }
 }
 
@@ -349,7 +350,7 @@ async function openTermPanel(btn) {
   const dock = $("#terms");
   if (!dock) return;
   if (btn.dataset.termTab) showTab(btn.dataset.termTab);
-  const open = $$(".term-panel", dock).find((p) => p.dataset.term === btn.dataset.term);
+  const open = $$(".term-panel", dock).find((p) => p.dataset.termUrl === btn.dataset.term);
   if (open) {
     open.scrollIntoView({ block: "nearest" });
     open.focusTerm?.();
@@ -358,7 +359,9 @@ async function openTermPanel(btn) {
   const slug = $("#detail")?.dataset.slug || "";
   const panel = document.createElement("section");
   panel.className = "term-panel";
-  panel.dataset.term = btn.dataset.term;
+  // Not data-term: a click in the panel would then open it again.
+  panel.dataset.termUrl = btn.dataset.term;
+  if (btn.dataset.termLabel === "agent") panel.dataset.agentOf = slug;
   const head = document.createElement("header");
   const title = document.createElement("span");
   title.className = "mono";
@@ -396,7 +399,18 @@ async function openTermPanel(btn) {
   x.addEventListener("click", () => {
     t?.close();
     panel.remove();
+    agentTermShown();
   });
+  agentTermShown();
+}
+
+// agentTermShown marks the body while the shown worktree's agent terminal
+// is open: on the Agent tab it takes the Agent card's place (CSS).
+function agentTermShown() {
+  const slug = $("#detail")?.dataset.slug || "";
+  const on = slug !== "" && $$("#terms .term-panel").some((p) => p.dataset.agentOf === slug);
+  if (on) body.dataset.agentTerm = "";
+  else delete body.dataset.agentTerm;
 }
 
 document.addEventListener("keydown", (e) => {

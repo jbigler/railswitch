@@ -817,9 +817,10 @@ The worktree's **Terminal ▾** menu opens a live terminal in the page (D149),
 docked under the worktree's jobs; several can be open at once, and one
 already open is shown again rather than opened twice. The panels stay
 through a switch of tab or worktree (each is titled with its worktree).
-The Agent card's **open terminal ▣** shows the Agent tab first, where the
-dock sits right under the card and a panel takes 70 % of the window's
-height. The menu
+The Agent card's **open terminal ▣** shows the Agent tab first. There
+the worktree's agent terminal (from either button) takes the Agent
+card's place and the window's height below the tabs, until it is closed;
+the card comes back then. The menu
 ends with **open window ↗**, the `terminal` action below: a window on the
 desktop, not in the page.
 

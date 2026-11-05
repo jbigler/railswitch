@@ -5,8 +5,8 @@
 Description=phx nvim of worktree master
 
 [Container]
-Label=phx.unit-hash=17f865d2fab5
-Image=localhost/phx/nvim:elixir1.18.4-otp27-d15cf13d
+Label=phx.unit-hash=d88686c37541
+Image=localhost/phx/nvim:elixir1.18.4-otp27-1d4403d0
 ContainerName=phx-master-nvim
 Network=phx-master-dev.network:alias=nvim
 Network=phx-proxy.network

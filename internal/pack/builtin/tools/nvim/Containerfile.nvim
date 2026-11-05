@@ -122,6 +122,17 @@ RUN apt-get update -qq && \
   xclip && \
   rm -rf /var/lib/apt/lists/*
 
+# The GitHub CLI from GitHub's own package repository, as the agent base
+# has it: a github.com secret nvim receives reaches it as GH_TOKEN (D169).
+RUN apt-get update -qq && \
+  apt-get install --no-install-recommends -y ca-certificates curl && \
+  install -d -m 0755 /etc/apt/keyrings && \
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+  chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list && \
+  apt-get update -qq && apt-get install --no-install-recommends -y gh && \
+  rm -rf /var/lib/apt/lists/*
+
 # The volumes mounted under ~ need their parents to belong to appuser.
 RUN mkdir -p /home/appuser/.config /home/appuser/.local/share /home/appuser/.npm-global && \
   chown -R 1000:1000 /home/appuser/.config /home/appuser/.local /home/appuser/.npm-global

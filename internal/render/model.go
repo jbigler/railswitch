@@ -1013,10 +1013,12 @@ func SecretName(prefix, name string, s config.Secret) string {
 func (in *Instance) SecretSpecs(svc string) []string {
 	p := in.m.Inputs.Project
 	var specs []string
-	// GH_TOKEN for gh, which only the agent image has: not when the agent
-	// gets one already, from a secret or its env (which of an env file and
-	// an env secret wins is not something to rely on).
-	agent := slices.ContainsFunc(in.m.Services, func(s Service) bool { return s.ID == svc && s.Role == RoleAgent })
+	// GH_TOKEN for gh, which the agent and nvim images have (D169): not
+	// when the service gets one already, from a secret or its env (which of
+	// an env file and an env secret wins is not something to rely on).
+	agent := slices.ContainsFunc(in.m.Services, func(s Service) bool {
+		return s.ID == svc && (s.Role == RoleAgent || s.Role == RoleTool)
+	})
 	ghToken := !agent || slices.ContainsFunc(in.Env[svc], func(e EnvVar) bool { return e.Name == "GH_TOKEN" })
 	for _, name := range sortedKeys(p.Secrets) {
 		if p.Secrets[name].Env == "GH_TOKEN" && slices.Contains(p.Secrets[name].Services, svc) {
@@ -1035,7 +1037,7 @@ func (in *Instance) SecretSpecs(svc string) []string {
 		}
 		specs = append(specs, spec+",type=mount,target=/run/secrets/"+name+",uid=1000,gid=1000,mode=0400")
 		// gh reads its token from GH_TOKEN, not git's credential helper: a
-		// github.com secret an agent receives also reaches it there, as
+		// github.com secret an agent or tool receives also reaches it there, as
 		// podman's env secret (never an env file, D33). The first one wins
 		// (D133).
 		if sec.GitHost == "github.com" && !ghToken {

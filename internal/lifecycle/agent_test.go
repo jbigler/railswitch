@@ -132,8 +132,16 @@ func TestExecNoName(t *testing.T) {
 	if slices.Contains(c, "--name") || slices.Contains(c, "--entrypoint") {
 		t.Errorf("exec --fresh argv has --name or --entrypoint: %q", c)
 	}
-	if nets := flagValues(c, "--network"); !slices.Equal(nets, []string{"filial-feat-dev"}) {
+	// The app's networks and host entries, as its unit has (D172): its
+	// routed hosts resolve only through Traefik.
+	if nets := flagValues(c, "--network"); !slices.Equal(nets, []string{"filial-feat-dev", "filial_proxy"}) {
 		t.Errorf("exec --fresh networks %q", nets)
+	}
+	if hosts := flagValues(c, "--add-host"); len(hosts) == 0 {
+		t.Errorf("exec --fresh has no --add-host: %q", c)
+	}
+	if !slices.Contains(c, "traefik.enable=false") {
+		t.Errorf("exec --fresh is routed: %q", c)
 	}
 }
 

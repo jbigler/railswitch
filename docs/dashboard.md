@@ -803,6 +803,10 @@ In an agent's panel Shift+Enter is sent as an extended key (CSI u), and the
 agent's session server has tmux's `extended-keys` on, so the agent sees
 Shift+Enter (a new line) rather than Enter; a host terminal attached with
 `railswitch agent` gets the same when it supports extended keys.
+kitty is not one: tmux asks the terminal for xterm's modifyOtherKeys, which
+kitty ignores, so through the session kitty sends Shift+Enter as a plain
+Enter. Map it in `kitty.conf` (`map shift+enter send_text all \x1b\r`);
+the agent takes the ESC Enter as a new line.
 
 The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
 while a terminal is open, leaving or closing the page asks first.

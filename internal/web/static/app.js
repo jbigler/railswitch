@@ -11,6 +11,7 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
 const projectStore = "railswitch.project";
 const tabStore = "railswitch.tab";
+const wtStore = "railswitch.wt." + prefix;
 
 // recall and remember read and write this browser's local storage, which a
 // private window or blocked site data makes throw: the page works without.
@@ -118,6 +119,10 @@ function markCurrent() {
 function afterSwap(id) {
   if (id === "header") {
     markCurrent();
+    // Worktrees returns to the worktree last shown (after markCurrent,
+    // which matches the plain link).
+    const last = prefix && recall(wtStore);
+    for (const a of $$("#header a.hb")) if (last && a.getAttribute("href") === "/p/" + prefix) a.href = pageURL(last);
     const n = Number($("#header").dataset.need || 0);
     document.title = n ? `(${n}) RailSwitch` : "RailSwitch";
     const btn = $("[data-notify]");
@@ -131,6 +136,7 @@ function afterSwap(id) {
   } else if (id === "detail") {
     const slug = $("#detail").dataset.slug || "";
     body.dataset.sel = slug;
+    if (slug) remember(wtStore, slug);
     // The worktree shown may not be the URL's (it was removed): follow it.
     // A URL without one stays: a narrow window shows the list for it.
     if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));

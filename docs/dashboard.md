@@ -137,7 +137,8 @@ still wider than the window scrolls its pane.
 
 - **Header** (D170): "RailSwitch", then the labelled **project** group:
   the project button (the prefix, or "choose"; opens the switcher) and,
-  with a project, after a thin divider, `Worktrees` (its page), `Images`,
+  with a project, after a thin divider, `Worktrees` (its page, at the
+  worktree last shown: kept per project in the browser's `localStorage`), `Images`,
   `Tidy`, `Library`, `Settings`, `Notes` and `Office` (the Virtual Office; the
   project's pages, below). Then `◆ N need input`. On the
   right, the **Machine ▾** menu: `Settings` (the Machine page), `Logs ↗`

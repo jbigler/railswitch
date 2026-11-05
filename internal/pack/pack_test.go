@@ -333,7 +333,7 @@ func TestPlaywrightOptionEnv(t *testing.T) {
 		}
 	}
 	skip := map[string]string{"PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"} // D44: the browser has Chrome
-	if !maps.Equal(o.Gives, map[string]string{"PLAYWRIGHT_HOST": "ws://{service}:8888/connect", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"}) {
+	if !maps.Equal(o.Gives, map[string]string{"PLAYWRIGHT_HOST": "ws://{service}:8888/connect", "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1", "BROWSER_CPUS": "{cpus.tool}"}) {
 		t.Errorf("playwright gives = %v", o.Gives)
 	}
 	if !maps.Equal(o.DepsEnv, skip) {

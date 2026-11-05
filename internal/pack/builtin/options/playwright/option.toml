@@ -17,6 +17,7 @@ args = { PLAYWRIGHT_VERSION = "{playwright}" }
 
 [gives]
 PLAYWRIGHT_HOST = "ws://{service}:8888/connect"
+BROWSER_CPUS = "{cpus.tool}"             # the browser's --cpus cap: the rails pack's test:system runs that many workers (D174)
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"   # npm installs via `railswitch exec`: the browser has Chrome
 
 [deps_env]                    # D44: npm installs in deps skip the browser download too

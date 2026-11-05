@@ -67,7 +67,7 @@ type Manager struct {
 
 // Add checks out target in a new worktree <WS>/worktrees/<slug>, registers it,
 // seeds it and renders. target is a branch, a PR number (its head branch,
-// via gh) or a new branch, created from the base worktree's HEAD. name is
+// via gh) or a new branch, created from origin/<base branch> (D173). name is
 // the worktree name (--name); when empty, Add prompts for it on a terminal
 // and otherwise uses the sanitized branch, suffixed with 4 hex digits of
 // its sha256 when that slug is taken. Nothing is registered unless
@@ -376,9 +376,26 @@ func (m *Manager) slugFor(branch, name string) (string, error) {
 	return slug, nil
 }
 
+// startPoint is where a new branch starts: origin/<base branch>, else the
+// local base branch, else HEAD.
+func (m *Manager) startPoint(ctx context.Context, base string) (string, error) {
+	for _, ref := range []string{"refs/remotes/origin/" + m.Base, "refs/heads/" + m.Base} {
+		ok, err := m.hasRef(ctx, base, ref)
+		if err != nil {
+			return "", err
+		}
+		if ok {
+			return ref, nil
+		}
+	}
+	return "HEAD", nil
+}
+
 // gitWorktreeAdd checks branch out at dir: an existing local branch, a
-// new tracking branch for origin/<branch>, else a new branch at the base
-// worktree's HEAD. created: it created the local branch.
+// new tracking branch for origin/<branch> (fetched first: one pushed since
+// the last fetch is still found), else a new branch from the project's
+// base branch, never what the base worktree has checked out (D173).
+// created: it created the local branch.
 func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) (created bool, err error) {
 	args := []string{"worktree", "add", dir, branch}
 	local, err := m.hasRef(ctx, base, "refs/heads/"+branch)
@@ -390,10 +407,24 @@ func (m *Manager) gitWorktreeAdd(ctx context.Context, base, dir, branch string) 
 		if err != nil {
 			return false, err
 		}
+		if !remote {
+			// Best effort: a branch origin lacks, or no network, is a new branch.
+			if m.fetch(ctx, base, "refs/heads/"+branch+":refs/remotes/origin/"+branch) == nil {
+				if remote, err = m.hasRef(ctx, base, "refs/remotes/origin/"+branch); err != nil {
+					return false, err
+				}
+			}
+		}
 		if remote {
 			args = []string{"worktree", "add", "--track", "-b", branch, dir, "origin/" + branch}
 		} else {
-			args = []string{"worktree", "add", "-b", branch, dir, "HEAD"}
+			start, err := m.startPoint(ctx, base)
+			if err != nil {
+				return false, err
+			}
+			// --no-track: a branch made from origin/<base> must not
+			// take it as its upstream.
+			args = []string{"worktree", "add", "--no-track", "-b", branch, dir, start}
 		}
 	}
 	if _, err := m.gitT(ctx, gitLong, base, args...); err != nil {

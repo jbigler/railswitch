@@ -61,10 +61,11 @@ func TestTasksMerge(t *testing.T) {
 		p.Tasks = map[string]string{"test": "bin/rspec", "console": "", "lint": "bin/rubocop"}
 		p.FreshTasks = []string{"lint"}
 	})
+	const systemTask = "env ${BROWSER_CPUS:+PARALLEL_WORKERS=${PARALLEL_WORKERS:-$BROWSER_CPUS}} bin/rails test:system"
 	want := []Task{
 		{"lint", "bin/rubocop", "project", "", true},
 		{"test", "bin/rspec", "project", "bin/rails test", false},
-		{"test:system", "bin/rails test:system", "pack", "bin/rails test:system", false},
+		{"test:system", systemTask, "pack", systemTask, false},
 	}
 	if got := m.Tasks(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Tasks = %+v; want %+v", got, want)

@@ -236,6 +236,10 @@ func TestEnvScope(t *testing.T) {
 			t.Errorf("%s PLAYWRIGHT_HOST = %q", svc, e.Value)
 		}
 	}
+	// D174: the browser's --cpus cap, a quarter of the host's 8.
+	if e, _ := envVar(in, "rails", "BROWSER_CPUS"); e.Value != "2" {
+		t.Errorf("rails BROWSER_CPUS = %q; want 2", e.Value)
+	}
 	if _, ok := envVar(in, "browser", "PLAYWRIGHT_HOST"); ok {
 		t.Errorf("browser got its own [gives]")
 	}

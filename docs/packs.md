@@ -271,6 +271,14 @@ its `Containerfile.base` installs bun only when `BUN_VERSION` is set.
 `npm_global_node{node?}`, so it works with a pack that has no `node` runtime.
 `{env.X?}` still needs `X` set.
 
+### CPU shares
+
+`{cpus.tool}` is a tool container's `--cpus` cap: a quarter of the host's
+CPUs, at least 1. The playwright option gives the app it as
+`BROWSER_CPUS`, and the rails pack's `test:system` task runs that many
+workers (`PARALLEL_WORKERS`, unless the project sets one): Rails' default
+is one per host core, and they all share the one browser (D174).
+
 ### Env references
 
 An env value may use `{env.X}`: X's value from the pack's `[env]`, an

@@ -731,7 +731,6 @@ type detailView struct {
 	TermWindowURL                     string       // the term action: a window on the desktop
 	AgentStopURL                      string       // POST agent=<name>: railswitch agent stop <name> (D176)
 	RunningAgent                      *agentTerm   // the agent running in this worktree (one at most, D62); nil: none
-	OtherAgents                       []agentTerm  // with one running: the others, which Switch to starts after stopping it
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	DownURL                           string
 	PRPageURL                         string // the worktree's PR page (D152)
@@ -865,13 +864,6 @@ func newDetail(prefix string, r row, repo string) detailView {
 	for i := range v.AgentTerms {
 		if v.AgentTerms[i].Running && v.RunningAgent == nil {
 			v.RunningAgent = &v.AgentTerms[i]
-		}
-	}
-	if v.RunningAgent != nil {
-		for _, a := range v.AgentTerms {
-			if a.Name != v.RunningAgent.Name {
-				v.OtherAgents = append(v.OtherAgents, a)
-			}
 		}
 	}
 	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Service == "nvim" }) {

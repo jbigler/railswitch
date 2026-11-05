@@ -423,8 +423,11 @@ async function openTermPanel(btn) {
 function switchAgent(btn) {
   const { switchUrl, switchFrom, switchTerm, switchTo } = btn.dataset;
   if (!confirm("Stop " + switchFrom + " and start " + switchTo + "? " + switchFrom + "'s session ends; what it changed in the worktree stays.")) return;
+  const slug = $("#detail")?.dataset.slug;
   startJob(switchUrl, new URLSearchParams({ agent: switchFrom }), (state) => {
     if (state !== "ok") return toast(switchFrom + " did not stop; " + switchTo + " was not started. Its output is under Jobs.", true);
+    // Left for another worktree meanwhile: never start an agent unasked.
+    if ($("#detail")?.dataset.slug !== slug) return toast(switchFrom + " stopped; start " + switchTo + " from its Agent card.", false);
     openTermPanel({ dataset: { term: switchTerm, termLabel: switchTo, termAgent: "", termTab: "agent" } });
   });
 }

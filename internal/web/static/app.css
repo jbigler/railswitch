@@ -1,8 +1,8 @@
 /* RailSwitch dashboard: layout A. The colours are CSS variables that
    /theme.css sets from `railswitch dashboard colors`; the Flexoki values
    below only stand in when that fails. */
-:root{--bg:#FFFCF0;--bg2:#F2F0E5;--sel:#E6E4D9;--border:#CECDC3;--text:#100F0F;--muted:#6F6E69;--accent:#BC5215;--blue:#205EA6;--green:#536907;--yellow:#8E6B01;--purple:#5E409D;--red:#AF3029}
-@media (prefers-color-scheme: dark){:root{--bg:#100F0F;--bg2:#1C1B1A;--sel:#282726;--border:#403E3C;--text:#CECDC3;--muted:#878580;--accent:#DA702C;--blue:#4385BE;--green:#879A39;--yellow:#D0A215;--purple:#8B7EC8;--red:#D14D41}}
+:root{--card:color-mix(in srgb,var(--bg) 25%,#fff);--bg:#FFFCF0;--bg2:#F2F0E5;--sel:#E6E4D9;--border:#CECDC3;--text:#100F0F;--muted:#6F6E69;--accent:#BC5215;--blue:#205EA6;--green:#536907;--yellow:#8E6B01;--purple:#5E409D;--red:#AF3029}
+@media (prefers-color-scheme: dark){:root{--card:var(--bg2);--bg:#100F0F;--bg2:#1C1B1A;--sel:#282726;--border:#403E3C;--text:#CECDC3;--muted:#878580;--accent:#DA702C;--blue:#4385BE;--green:#879A39;--yellow:#D0A215;--purple:#8B7EC8;--red:#D14D41}}
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -385,7 +385,7 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .tabs button[aria-pressed=true]{color:var(--text);border-bottom-color:var(--accent)}
 .dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:14px;padding:16px 20px 0;align-items:start}
 .wt .dcard .services{grid-template-columns:repeat(auto-fill,minmax(min(19rem,100%),1fr))}
-.wt .dcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--bg);min-width:0}
+.wt .dcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card);min-width:0} /* --card: white-ish on light, a step up on dark */
 .wt .dcard.wide{grid-column:1/-1}
 .wt .dcard>.lbl{margin:0 0 8px}
 .wt .dcard h3.lbl{margin:10px 0 4px}

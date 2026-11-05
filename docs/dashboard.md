@@ -254,7 +254,7 @@ still wider than the window scrolls its pane.
     **default config…** link beside its label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
-  - **Open** (Overview only): the links, App first and filled, then the
+  - **Open** (Overview only; first, full width): the links, App first and filled, then the
     project's and the stack's, all greyed while the stack is stopped;
     then PR, **Review app** when `pr ls` finds one (the PR's GitHub
     deployment) and Logs, quieter.

@@ -989,8 +989,10 @@ Every action is a job (below).
   those of removed worktrees (so a `wt rm`'s output stays visible).
 - Cancel sends SIGTERM to the job's process group, SIGKILL 3 s later.
 - On the worktree page a job's output is a fold, open while it runs and
-  after it fails or is cancelled, closed after it ends ok (D170); one
-  you open or close stays so through live updates. Other pages show
+  after it fails or is cancelled; a job that ended ok shows it closed
+  when the page loads (D170). Live updates keep each fold as it is, so a
+  job you watched run keeps its output open after it ends, and one you
+  open or close stays so. Other pages show
   every job's output open: there it is the result.
 - States: running, ok, failed (with the exit code), cancelled.
 - The hub keeps the last 5000 lines and 4 MiB per job (lines cut at 64 KiB,

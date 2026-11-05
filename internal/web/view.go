@@ -142,10 +142,11 @@ func sortRows(rows []row, k sortKey) {
 // Agents.
 
 // agentKind is what the page shows of an agent: its state, with done
-// split into reply (waiting for a reply) and turn (your turn); no agent
-// is off.
+// split into reply (waiting for a reply) and turn (your turn); no agent,
+// or one whose container doesn't run (its status file outlives it), is
+// off.
 func agentKind(a *agent) string {
-	if a == nil {
+	if a == nil || !a.Running {
 		return "off"
 	}
 	switch a.State {
@@ -514,14 +515,14 @@ type listGroup struct {
 var groupNames = []string{"Needs you", "Running", "Stopped"}
 
 // listGroups puts rows under groupNames, keeping their order.
-func listGroups(rows []rowView, stacks map[string]string) []listGroup {
+func listGroups(rows []rowView) []listGroup {
 	by := make([][]rowView, len(groupNames))
 	for _, r := range rows {
 		i := 2
 		switch {
-		case r.Need != "" || stacks[r.Slug] == "failed":
+		case r.Need != "" || r.stack == "failed":
 			i = 0
-		case stacks[r.Slug] == "up" || stacks[r.Slug] == "partial":
+		case r.stack == "up" || r.stack == "partial":
 			i = 1
 		}
 		by[i] = append(by[i], r)
@@ -555,12 +556,10 @@ func newList(prefix string, rows []row, sel string, k sortKey) listView {
 		}
 		v.Sorts = append(v.Sorts, sortLink{Label: by, URL: base + "?sort=" + next.String(), On: on, Rev: on && k.Rev})
 	}
-	stacks := map[string]string{}
 	for _, r := range rows {
 		v.Rows = append(v.Rows, newRow(prefix, r, sel, k))
-		stacks[r.WT.Slug] = r.WT.Stack
 	}
-	v.Groups = listGroups(v.Rows, stacks)
+	v.Groups = listGroups(v.Rows)
 	return v
 }
 
@@ -683,6 +682,7 @@ type rowView struct {
 	Need                              string     // the agent waits on you: its label ("permission"), shown by the name
 	Stale                             bool       // runs an older unit: "restart to apply"
 	Tests                             *testsView // nil: no test task
+	stack                             string     // the stack's state, for listGroups
 }
 
 func newRow(prefix string, r row, sel string, k sortKey) rowView {
@@ -693,8 +693,9 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 		StackGlyph: stackGlyph(r.WT.Stack), StackText: stackText(r.WT), StackClass: stackClass(r.WT.Stack),
 		AgentGlyph: agentGlyph(kind), AgentText: agentLabel(kind), AgentClass: agentClass(kind),
 		Stale: r.WT.Stale, Stacked: stackedRow(r), Tests: newTests(r.WT.Tests, r.Now),
+		stack: r.WT.Stack,
 	}
-	if r.WT.Agent != nil {
+	if kind != "off" { // an agent that isn't running says nothing
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
 	}
 	if needsInput(kind) {
@@ -802,7 +803,10 @@ func newDetail(prefix string, r row, repo string) detailView {
 	v.ServicesUp = fmt.Sprintf("%d/%d", up, len(v.Services))
 	if a := wt.Agent; a != nil {
 		kind := agentKind(a)
-		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind), Message: a.Message}
+		v.Agent = &agentView{Name: a.Name, Glyph: agentGlyph(kind), Label: agentLabel(kind), Class: agentClass(kind)}
+		if kind != "off" { // a stopped agent's message is its status file's last
+			v.Agent.Message = a.Message
+		}
 	}
 	v.Queue = newQueue(prefix, wt)
 	// What the stack's state allows: a stopped one starts, a running one

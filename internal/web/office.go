@@ -65,6 +65,9 @@ func (s *Server) cyberData(prefix string) cyberState {
 		for _, wt := range p.ov.Worktrees {
 			fl := cyberFloor{Slug: wt.Slug, Branch: wt.Branch, Base: wt.Base, Stack: wt.Stack,
 				Services: wt.Services, Agent: wt.Agent, Links: wt.Links, PR: p.prs[wt.Slug]}
+			if fl.Agent != nil && !fl.Agent.Running {
+				fl.Agent = nil // its status file outlives it: no agent at the desk
+			}
 			if fl.Services == nil {
 				fl.Services = []service{}
 			}

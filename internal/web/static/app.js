@@ -1486,7 +1486,9 @@ function startNotes() {
   remember(projectStore, prefix);
   const params = new URLSearchParams(location.search);
   const saved = recall(sortStore);
-  if (!params.has("sort") && saved && saved !== "name") {
+  // Only a key the sort bar still offers (an old "running" is gone, D170).
+  const offered = (k) => $$("#list a[data-sort]").some((a) => (new URL(a.href).searchParams.get("sort") || "").replace(/^-/, "") === k.replace(/^-/, ""));
+  if (!params.has("sort") && saved && saved !== "name" && offered(saved)) {
     params.set("sort", saved);
     location.replace(location.pathname + "?" + params);
     return;

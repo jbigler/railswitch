@@ -18,7 +18,7 @@ func slugs(rows []row) []string {
 }
 
 func wtAgent(state string, reply bool) *agent {
-	return &agent{Name: "bot", State: state, Reply: reply}
+	return &agent{Name: "bot", State: state, Reply: reply, Running: true}
 }
 
 // TestSort: each key, its ties by name, and reverse.
@@ -133,7 +133,7 @@ func fixtureRow(stack string, base bool, p *pr) row {
 		WT: worktree{
 			Slug: "feat-login", Branch: "jb/feat-login", Base: base, Stack: stack,
 			Services: []service{{Service: "web", Role: "app", State: "active/running"}},
-			Agent:    &agent{Name: "bot", State: "permission", Message: "Bash: <script>rm</script>"},
+			Agent:    &agent{Name: "bot", State: "permission", Message: "Bash: <script>rm</script>", Running: true},
 			Links: []link{
 				{Label: "App", URL: "http://feat-login.ftest.localhost/", Group: "app"},
 				{Label: "Flipper", URL: "http://feat-login.ftest.localhost/flipper", Group: "project"},
@@ -449,5 +449,54 @@ func TestDetailTerminals(t *testing.T) {
 	page := f.do(req("GET", "/p/ftest/b", nil)).Body.String()
 	if !strings.Contains(page, `<div id="terms" class="terms"></div>`) || strings.Index(page, `id="jobs"`) > strings.Index(page, `id="terms"`) {
 		t.Error("the page has no terminal dock under the jobs")
+	}
+}
+
+// TestListGroups (D170): Needs you holds an agent waiting on you (even in
+// a stopped stack) and a failed stack, Running an up or partial one,
+// Stopped the rest; each group keeps the rows' order, an empty one goes.
+func TestListGroups(t *testing.T) {
+	rows := []row{
+		{WT: worktree{Slug: "a-up", Stack: "up"}},
+		{WT: worktree{Slug: "b-stopped", Stack: "stopped"}},
+		{WT: worktree{Slug: "c-partial", Stack: "partial"}},
+		{WT: worktree{Slug: "d-failed", Stack: "failed"}},
+		{WT: worktree{Slug: "e-waits", Stack: "stopped", Agent: wtAgent("done", true)}},
+		{WT: worktree{Slug: "f-up-asks", Stack: "up", Agent: wtAgent("question", false)}},
+	}
+	var got []string
+	for _, g := range newList("ftest", rows, "", sortKey{By: "name"}).Groups {
+		got = append(got, g.Name+":")
+		for _, r := range g.Rows {
+			got = append(got, r.Slug)
+		}
+	}
+	want := []string{"Needs you:", "d-failed", "e-waits", "f-up-asks", "Running:", "a-up", "c-partial", "Stopped:", "b-stopped"}
+	if !slices.Equal(got, want) {
+		t.Errorf("groups %q, want %q", got, want)
+	}
+	if g := newList("ftest", rows[:1], "", sortKey{By: "name"}).Groups; len(g) != 1 || g[0].Name != "Running" {
+		t.Errorf("one up worktree: groups %+v, want Running alone", g)
+	}
+}
+
+// TestStoppedAgentSaysNothing: an agent whose container doesn't run is
+// off, whatever its status file last said: no "waiting for reply" in the
+// row, the detail or the Needs you group.
+func TestStoppedAgentSaysNothing(t *testing.T) {
+	r := row{WT: worktree{Slug: "w", Stack: "stopped", Agent: &agent{Name: "bot", State: "done", Reply: true, Message: "Ship it?"}}}
+	if k := agentKind(r.WT.Agent); k != "off" {
+		t.Errorf("stopped agent's kind %q, want off", k)
+	}
+	html, _ := render("row", newRow("ftest", r, "", sortKey{By: "name"}))
+	if strings.Contains(html, "waiting for reply") || strings.Contains(html, "Ship it?") {
+		t.Errorf("row of a stopped agent:\n%s", html)
+	}
+	d := newDetail("ftest", r, "")
+	if d.Agent == nil || d.Agent.Label != "off" || d.Agent.Message != "" {
+		t.Errorf("detail agent %+v, want off without its message", d.Agent)
+	}
+	if g := newList("ftest", []row{r}, "", sortKey{By: "name"}).Groups; len(g) != 1 || g[0].Name != "Stopped" {
+		t.Errorf("groups %+v, want Stopped", g)
 	}
 }

@@ -5,8 +5,8 @@
 Description=filial nvim of worktree feat
 
 [Container]
-Label=filial.unit-hash=ef441cbabde0
-Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-1f842a1e
+Label=filial.unit-hash=580c76e7c8e6
+Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-51b49dfb
 ContainerName=filial-feat-nvim
 Network=filial-feat-dev.network:alias=nvim
 Network=filial-proxy.network

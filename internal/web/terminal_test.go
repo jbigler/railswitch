@@ -23,17 +23,19 @@ func TestTTYArgv(t *testing.T) {
 	wsb := []string{testExe, "-C", "/ws/ftest", "-w", "b"}
 	for _, c := range []struct {
 		kind, agent string
+		args        []string
 		want        []string
 	}{
-		{"agent", "", append(slices.Clone(wsb), "agent")},
-		{"agent", "probe", append(slices.Clone(wsb), "agent", "probe")},
-		{"nvim", "", append(slices.Clone(wsb), "nvim")},
-		{"shell", "", append(slices.Clone(wsb), "exec", "--", "sh", "-c", "command -v bash >/dev/null && exec bash -l; exec sh -l")},
-		{"task", "rails:test:watcher", append(slices.Clone(wsb), "task", "rails:test:watcher")},
-		{"task", "", nil},
-		{"bash", "", nil},
+		{"agent", "", nil, append(slices.Clone(wsb), "agent")},
+		{"agent", "probe", nil, append(slices.Clone(wsb), "agent", "probe")},
+		{"nvim", "", nil, append(slices.Clone(wsb), "nvim")},
+		{"shell", "", nil, append(slices.Clone(wsb), "exec", "--", "sh", "-c", "command -v bash >/dev/null && exec bash -l; exec sh -l")},
+		{"task", "rails:test:watcher", nil, append(slices.Clone(wsb), "task", "rails:test:watcher")},
+		{"task", "test", []string{"a", "b c"}, append(slices.Clone(wsb), "task", "test", "a", "b c")},
+		{"task", "", nil, nil},
+		{"bash", "", nil, nil},
 	} {
-		got, ok := ttyArgv(testExe, "/ws/ftest", "b", c.kind, c.agent)
+		got, ok := ttyArgv(testExe, "/ws/ftest", "b", c.kind, c.agent, c.args)
 		if ok != (c.want != nil) || !slices.Equal(got, c.want) {
 			t.Errorf("%s %q: %q, %v; want %q", c.kind, c.agent, got, ok, c.want)
 		}
@@ -140,6 +142,7 @@ func TestTTYRefusals(t *testing.T) {
 		{"/p/ftest/tty/b/agent?agent=-x&cols=80&rows=24", "", 4000, "unknown agent -x"},
 		{"/p/ftest/tty/b/task?task=nope&cols=80&rows=24", "", 4000, "unknown task nope"},
 		{"/p/ftest/tty/b/task?cols=80&rows=24", "", 4000, "unknown task "},
+		{"/p/ftest/tty/b/task?task=test&args=%22x&cols=80&rows=24", "", 4000, `args: unterminated " quote`},
 		{"/p/ftest/tty/b/shell?cols=0&rows=24", "", 4000, "bad size"},
 		{"/p/ftest/tty/b/shell?cols=80&rows=1001", "", 4000, "bad size"},
 		{"/p/ftest/tty/b/shell?cols=80&rows=24", "hello", 4000, "bad message"},
@@ -261,11 +264,11 @@ func TestTTYEnv(t *testing.T) {
 // worktree's tasks (D175).
 func TestTTYTask(t *testing.T) {
 	_, srv := ttyFixture(t, `echo "argv:$*"`)
-	c, _, err := dialTTY(t, srv, "/p/ftest/tty/b/task?task=test&cols=80&rows=24", "", true)
+	c, _, err := dialTTY(t, srv, "/p/ftest/tty/b/task?task=test&args=a+%22b+c%22&cols=80&rows=24", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out, _, _ := readAll(t, c, ""); !strings.Contains(out, "argv:-C /ws/ftest -w b task test") {
+	if out, _, _ := readAll(t, c, ""); !strings.Contains(out, "argv:-C /ws/ftest -w b task test a b c") {
 		t.Errorf("out %q", out)
 	}
 }

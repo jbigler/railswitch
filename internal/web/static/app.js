@@ -233,11 +233,13 @@ document.addEventListener("click", (e) => {
     select(row.dataset.slug, true);
     return;
   }
-  const termBtn = t.closest("[data-term]");
-  if (termBtn) {
-    termBtn.closest("dialog")?.close(); // the palette's terminal task
-    return openTermPanel(termBtn);
+  const palTask = t.closest("#palette button[name=task]");
+  if (palTask) {
+    e.preventDefault(); // not the form's submit: runPaletteTask picks the way
+    return runPaletteTask(palTask, e.shiftKey);
   }
+  const termBtn = t.closest("[data-term]");
+  if (termBtn) return openTermPanel(termBtn);
   const opener = t.closest("[data-open]");
   if (opener) return openDialog(opener.dataset.open);
   if (t.closest("[data-colors]")) return openColors();
@@ -470,28 +472,59 @@ function filterSwitcher() {
 }
 
 // Command palette: the selected worktree's tasks and actions, the
-// project's worktrees and pages. Enter runs the highlighted task in a new
-// terminal or as a job, as "in a new terminal" says (ticked unless this
-// browser last unticked it), Shift+Enter the other way; it posts an
-// action and follows a link.
+// project's worktrees and pages. Enter runs the highlighted task in a
+// terminal panel or as a job, as "in a terminal panel" says (ticked unless
+// this browser last unticked it; a terminal_tasks task always in a
+// terminal, D175), Shift+Enter in a desktop window; it posts an action
+// and follows a link.
 
-const termKey = "railswitch.palette.term";
+const termKey = "railswitch.palette.panel";
 
 async function openPalette() {
   if (!prefix) return toast("No project.", true);
   const url = ($("#detail") && body.dataset.sel && $("#detail").dataset.tasks) || "/p/" + encodeURIComponent(prefix) + "/palette";
   const d = await loadDialog("palette", url);
   if (!d) return;
-  const term = $(".pal-term", d);
-  if (term && recall(termKey) === "0") term.checked = false;
   $(".pal-filter", d).focus();
   filterPalette();
 }
 
 document.addEventListener("change", (e) => {
-  if (!e.target.matches("#palette .pal-term")) return;
+  if (!e.target.matches("#palette .pal-term") || e.target.disabled) return;
   remember(termKey, e.target.checked ? "1" : "0");
 });
+
+// palTermSync shows the box for the highlighted line: ticked and fixed for
+// a terminal_tasks task, else this browser's choice.
+function palTermSync() {
+  const box = $("#palette .pal-term");
+  if (!box) return;
+  const it = $("#palette li.on button[name=task]");
+  const fixed = !!it && it.hasAttribute("data-terminal");
+  box.disabled = fixed;
+  box.checked = fixed || recall(termKey) !== "0";
+  $("#palette .pal-term-why").textContent = fixed
+    ? "(always for this task: Settings → Tasks · Shift+Enter: a desktop window)"
+    : "(off: a job, its output under Jobs · Shift+Enter: a desktop window)";
+}
+
+// runPaletteTask runs task button it: shift, a desktop window (task
+// --new-term); a terminal_tasks task or a ticked box, a terminal panel in
+// the page; else a job.
+function runPaletteTask(it, shift) {
+  const f = it.form;
+  const name = it.value;
+  const args = f.elements.args ? f.elements.args.value.trim() : "";
+  if (!shift && (it.hasAttribute("data-terminal") || $(".pal-term", f).checked)) {
+    it.closest("dialog").close();
+    const url = f.dataset.tty + "task?task=" + encodeURIComponent(name) + (args ? "&args=" + encodeURIComponent(args) : "");
+    return openTermPanel({ dataset: { term: url, termLabel: args ? name + " " + args : name } });
+  }
+  const data = new URLSearchParams(new FormData(f));
+  data.set("task", name);
+  if (shift) data.set("term", "1");
+  post(f, data);
+}
 
 function paletteItems() {
   return $$("#palette .pal-list li[data-filter], #palette .pal-list li.pal-new").filter((li) => !li.hidden);
@@ -533,6 +566,7 @@ function filterPalette() {
   const items = paletteItems();
   $$("#palette .pal-list li").forEach((li) => li.classList.remove("on"));
   if (items.length) items[0].classList.add("on");
+  palTermSync();
   if (!nw) return;
   $("b", nw).textContent = name;
   $("a", nw).href = $("a", nw).dataset.base + "?task=" + encodeURIComponent(name) + "#tasks";
@@ -550,6 +584,7 @@ function paletteKey(e) {
     i = Math.min(items.length - 1, Math.max(0, i + (e.key === "ArrowDown" ? 1 : -1)));
     items[i].classList.add("on");
     items[i].scrollIntoView({ block: "nearest" });
+    palTermSync();
   } else if (e.key === "Enter" && e.target.closest("input")) {
     e.preventDefault();
     if (i < 0) return;
@@ -557,15 +592,7 @@ function paletteKey(e) {
     const it = $(".pal-task", items[i]);
     if (it.tagName === "A") return void (location.href = it.href);
     if (it.hasAttribute("data-action")) return post(f, new URLSearchParams(), it.formAction);
-    if (it.dataset.term) {
-      it.closest("dialog").close();
-      return openTermPanel(it);
-    }
-    const data = new URLSearchParams(new FormData(f));
-    data.set("task", it.value);
-    if ($(".pal-term", f).checked !== e.shiftKey) data.set("term", "1");
-    else data.delete("term");
-    post(f, data);
+    runPaletteTask(it, e.shiftKey);
   }
 }
 

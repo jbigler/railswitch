@@ -822,8 +822,8 @@ the list's groups order by state, D170). The sort orders each group.
 | `1`–`9` | in the switcher (filter empty): jump to that project |
 | `:` | the command palette (any project page; the worktree list's hint says so) |
 | Esc | close a dialog or a message |
-| Enter | in the palette: run the highlighted line (a task as "in a new terminal" says) |
-| Shift+Enter | in the palette: run the task the other way from "in a new terminal" |
+| Enter | in the palette: run the highlighted line (a task in a terminal panel or as a job, as "in a terminal panel" says) |
+| Shift+Enter | in the palette: run the task in a desktop window (`task --new-term`) |
 
 ## Terminals
 
@@ -843,7 +843,7 @@ desktop, not in the page.
 | **Agent: <name> ▣**, one per configured agent | `railswitch agent <name>`; with no agent service listed, one entry for the agent the overview shows, else the default. One agent runs per worktree (D62): with another one running, the panel shows its refusal | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
 | **nvim ▣** (when the worktree runs nvim) | `railswitch nvim` | nvim keeps running; only this UI goes |
 | **shell ▣** | a login shell in the app container (`railswitch exec`, bash when the image has it, else `sh`) | the shell ends |
-| a task marked **▣** in the `:` palette (`terminal_tasks`, D175) | `railswitch task <name>`, the name checked against the worktree's tasks (`tty/{slug}/task?task=<name>`); no args | the task is hung up, its container with it |
+| a task from the `:` palette ("in a terminal panel", or marked ▣: `terminal_tasks`, D175) | `railswitch task <name> <args…>`, the name checked against the worktree's tasks and the args split like the job's (`tty/{slug}/task?task=<name>&args=<args>`) | the task is hung up, its container with it |
 
 Each panel is a terminal like any other: keys arrive as you type (slash
 suggestions, menus, arrows, Esc), the program follows the panel's size,
@@ -989,13 +989,15 @@ Every action is a job (below).
   order. A typed kind word (`task`, `action`, `worktree`, `page`) filters
   to that kind. Tasks keep the
   "args" field, split like a shell (quotes and backslash, no expansion),
-  and "in a new terminal", ticked unless this browser last unticked it
+  and "in a terminal panel", ticked unless this browser last unticked it
   (kept in its local storage). Enter or a click runs the task as the box
-  says: ticked, `railswitch task --new-term <name> <args…>`, a terminal
-  window (interactive tasks such as `console` need one); unticked,
-  `railswitch task <name> <args…>` as a job with its output under Jobs.
-  Shift+Enter runs it the other way. A task marked ▣ (`terminal_tasks`)
-  opens in a terminal panel in the page instead, without args, either way.
+  says: ticked, `railswitch task <name> <args…>` in a terminal panel in
+  the page (Terminals, below; interactive tasks such as `console` need a
+  terminal); unticked, the same as a job with its output under Jobs.
+  Shift+Enter or Shift+click opens it in a desktop window instead
+  (`railswitch task --new-term`). A task marked ▣ (`terminal_tasks`, D175)
+  always gets a terminal: while it is highlighted the box shows ticked and
+  can't be changed, and says why.
   Enter on an action starts its job;
   on a worktree or page it opens it. With a worktree selected, when no task
   is named exactly what the filter says, the list ends with "new task

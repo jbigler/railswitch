@@ -41,8 +41,8 @@ var agentName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,30}$`)
 
 // ttyArgv is the command a terminal of kind runs; false for an unknown
 // kind. name is, for agent, an agent and, for task, a task (D175), each
-// already checked against the worktree's.
-func ttyArgv(exe, ws, slug, kind, name string) ([]string, bool) {
+// already checked against the worktree's; args are a task's arguments.
+func ttyArgv(exe, ws, slug, kind, name string, args []string) ([]string, bool) {
 	argv := []string{exe, "-C", ws, "-w", slug}
 	switch kind {
 	case "agent":
@@ -54,7 +54,7 @@ func ttyArgv(exe, ws, slug, kind, name string) ([]string, bool) {
 		if name == "" {
 			return nil, false
 		}
-		argv = append(argv, "task", name)
+		argv = append(append(argv, "task", name), args...)
 	case "nvim":
 		argv = append(argv, "nvim")
 	case "shell":
@@ -121,8 +121,12 @@ func (s *Server) ttyCommand(ctx context.Context, r *http.Request) (argv []string
 		}
 	}
 	name := agent
+	var args []string
 	if kind == "task" {
 		name = q.Get("task")
+		if args, err = SplitArgs(q.Get("args")); err != nil {
+			return nil, 0, 0, &ttyRefusal{4000, "args: " + err.Error()}
+		}
 		tasks, err := readTasks(ctx, s.c.CLI, p.Workspace, slug)
 		if err != nil {
 			return nil, 0, 0, &ttyRefusal{websocket.StatusInternalError, err.Error()}
@@ -131,7 +135,7 @@ func (s *Server) ttyCommand(ctx context.Context, r *http.Request) (argv []string
 			return nil, 0, 0, &ttyRefusal{4000, "unknown task " + name}
 		}
 	}
-	argv, ok = ttyArgv(s.c.Exe, p.Workspace, slug, kind, name)
+	argv, ok = ttyArgv(s.c.Exe, p.Workspace, slug, kind, name, args)
 	if !ok {
 		return nil, 0, 0, &ttyRefusal{4000, "unknown terminal " + kind}
 	}

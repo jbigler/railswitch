@@ -4,8 +4,8 @@
 Description=railswitch Dozzle
 
 [Container]
-Label=railswitch.unit-hash=02e0f91880da
-Image=docker.io/amir20/dozzle:v11.3.5
+Label=railswitch.unit-hash=301c1c63e9ab
+Image=docker.io/amir20/dozzle:v11.4.1
 ContainerName=railswitch-dozzle
 Network=railswitch-machine.network:ip=10.214.255.3
 Volume=%t/podman/podman.sock:/var/run/docker.sock:ro

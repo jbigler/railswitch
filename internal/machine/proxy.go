@@ -131,7 +131,7 @@ func ProxyUnits(r *Registry) map[string][]byte {
 		"Description=railswitch Dozzle",
 		"",
 		"[Container]",
-		"Image=docker.io/amir20/dozzle:v11.3.5",
+		"Image=docker.io/amir20/dozzle:v11.4.1",
 		"ContainerName="+DozzleContainer,
 		"Network="+MachineNetworkUnitName+":ip="+addr(MachineSubnet, ".3"),
 		"Volume=%t/podman/podman.sock:/var/run/docker.sock:ro",

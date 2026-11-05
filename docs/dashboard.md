@@ -253,18 +253,23 @@ still wider than the window scrolls its pane.
     the branch, `◀ HEAD` on the current one, `queued`, `⚠`; the merged
     ones folded, the trunk last. Every other open branch's name checks
     it out here (see Actions).
-  - **Agent:** state and message, then the worktree's usage from `agent
-    usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when
-    reported, in yellow with `⚠` while it is `runaway`; the queue;
-    a button per configured agent (`claude ▣`, `● claude ▣` while it
-    runs: each a service `agent-<name>`, on demand or not; with none
-    listed, one for the agent the overview names, else the default) that
-    opens its terminal panel on the Agent tab (below), as the Terminal
-    menu's `Agent: <name> ▣` does; **Stop <name>** for each running agent
-    (D176), after a confirm: `railswitch agent stop <name>` as a job, the
-    name checked against the worktree's `agent ls` (one agent runs per
-    worktree, so this is how you switch to another); the **Default
-    config…** link beside its label.
+  - **Agent** (D176), the running agent first: one agent runs per
+    worktree (D62). With one running, a green box says "`<name>` is
+    running" with its state (Idle, Working, Waiting for reply…),
+    **Open terminal** (its terminal panel on the Agent tab, below, as the
+    Terminal menu's `Agent: <name>` does) and **Stop <name>** (after a
+    confirm, `railswitch agent stop <name>` as a job, the name checked
+    against the worktree's `agent ls`); its message under it; then
+    "Other agents:" each stopped one with **Switch to <name>**, which
+    after a confirm stops the running agent and, when that job ends
+    well, opens the other's terminal, which starts it. With none running,
+    "No agent running" and a **Start <name>** per configured agent (the
+    first one filled), each opening its terminal. Agents are the
+    services `agent-<name>`, on demand or not; with none listed, the
+    agent the overview names, else the default. Then the worktree's
+    usage from `agent usage` (`<n> tokens today · <m> in 14 days`,
+    ` · $<cost>` when reported, yellow with `⚠` while `runaway`), the
+    queue, and the **Default config…** link beside the card's label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
   - **Database:** **Snapshots…** (D157).

@@ -49,6 +49,10 @@ var ops = map[string]opSpec{
 	// unset takes the project's entry out (D156).
 	"task.set":   {required: []string{"name"}, optional: []string{"value"}},
 	"task.unset": {required: []string{"name"}},
+	// name is a task that runs in a new container, never the running app
+	// (fresh_tasks, D171).
+	"task.fresh.add":    {required: []string{"name"}},
+	"task.fresh.remove": {required: []string{"name"}},
 	// key is a list of config.HookLists; values its commands in order, none
 	// removes it.
 	"hooks.set": {required: []string{"key"}},
@@ -118,6 +122,10 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.SetTask(data, e.Name, e.Value)
 	case "task.unset":
 		return config.UnsetTask(data, e.Name)
+	case "task.fresh.add":
+		return config.AddFreshTask(data, e.Name)
+	case "task.fresh.remove":
+		return config.RemoveFreshTask(data, e.Name)
 	case "link.add":
 		return config.AddLink(data, e.Label, e.URL)
 	case "link.remove":

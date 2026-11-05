@@ -752,3 +752,25 @@ func TestSetAgentSetup(t *testing.T) {
 		}
 	}
 }
+
+// TestFreshTask: fresh_tasks is created at the top, added to, and taken
+// from; a name twice or a name not there is an error (D171).
+func TestFreshTask(t *testing.T) {
+	in := "schema = 1\n\n[tasks]\nretest = \"retest --rails\"\n"
+	got, err := AddFreshTask(in, "retest")
+	if err != nil || got != "schema = 1\nfresh_tasks = [\"retest\"]\n\n[tasks]\nretest = \"retest --rails\"\n" {
+		t.Fatalf("add: %q, %v", got, err)
+	}
+	if _, err := AddFreshTask(got, "retest"); err == nil {
+		t.Error("added twice")
+	}
+	if got, err = AddFreshTask(got, "lint"); err != nil || !strings.Contains(got, `fresh_tasks = ["retest", "lint"]`) {
+		t.Fatalf("second add: %q, %v", got, err)
+	}
+	if got, err = RemoveFreshTask(got, "retest"); err != nil || !strings.Contains(got, `fresh_tasks = ["lint"]`) {
+		t.Fatalf("remove: %q, %v", got, err)
+	}
+	if _, err := RemoveFreshTask(in, "retest"); err == nil {
+		t.Error("removed from no fresh_tasks")
+	}
+}

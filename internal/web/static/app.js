@@ -672,6 +672,7 @@ function target(e) {
   if (e.op === "option") return "option " + e.key;
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
   if (e.op === "task.set" || e.op === "task.unset") return "task " + e.name;
+  if (e.op === "task.fresh.add" || e.op === "task.fresh.remove") return "fresh " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
   if (e.op === "agent.setup") return "agent-setup " + e.key;
@@ -768,7 +769,10 @@ function syncLeft() {
     const gone = !!e && ((e.op === "task.set" && e.value === "") || (e.op === "task.unset" && row.dataset.source !== "hidden"));
     if (input && document.activeElement !== input) input.value = e && e.op === "task.set" && e.value !== "" ? e.value : row.dataset.command;
     if (input) input.disabled = gone;
-    row.classList.toggle("staged", !!e && !gone);
+    const fe = stagedFor("fresh " + row.dataset.name);
+    const box = $(".task-fresh", row);
+    if (box) box.checked = fe ? fe.op === "task.fresh.add" : row.dataset.fresh === "true";
+    row.classList.toggle("staged", (!!e || !!fe) && !gone);
     row.classList.toggle("removed", gone);
   });
   $$("label.hook").forEach((box) => {
@@ -942,10 +946,20 @@ if (view.startsWith("settings")) {
     }
     const fwAllow = t.closest("[data-fw-allow]");
     if (fwAllow) return stage({ op: "firewall.allow.add", key: fwAllow.dataset.prof, value: fwAllow.dataset.host }, false);
+    // Hiding or removing a task takes it out of fresh_tasks too: a name
+    // there with no task is a render error.
+    const unfresh = (row) => row.dataset.fresh === "true" && stage({ op: "task.fresh.remove", name: row.dataset.name }, false);
     const taskHide = t.closest("[data-task-hide]");
-    if (taskHide) return stage({ op: "task.set", name: taskHide.closest("tr").dataset.name, value: "" }, false);
+    if (taskHide) {
+      unfresh(taskHide.closest("tr"));
+      return stage({ op: "task.set", name: taskHide.closest("tr").dataset.name, value: "" }, false);
+    }
     const taskRm = t.closest("[data-task-remove], [data-task-restore]");
-    if (taskRm) return stage({ op: "task.unset", name: taskRm.closest("tr").dataset.name }, false);
+    if (taskRm) {
+      const row = taskRm.closest("tr");
+      if (t.closest("[data-task-remove]") && !row.dataset.stock) unfresh(row); // back to the pack's keeps the task
+      return stage({ op: "task.unset", name: row.dataset.name }, false);
+    }
     const linkRm = t.closest("[data-link-remove]");
     if (linkRm) stage({ op: "link.remove", label: linkRm.closest("tr").dataset.label }, false);
   });
@@ -964,6 +978,10 @@ if (view.startsWith("settings")) {
       const row = t.closest("tr");
       // An emptied box is no edit: Hide or Remove says that.
       return stage({ op: "task.set", name: row.dataset.name, value: t.value.trim() }, t.value.trim() === row.dataset.command || !t.value.trim());
+    }
+    if (t.classList.contains("task-fresh")) {
+      const row = t.closest("tr");
+      return stage({ op: t.checked ? "task.fresh.add" : "task.fresh.remove", name: row.dataset.name }, t.checked === (row.dataset.fresh === "true"));
     }
     if (t.classList.contains("agent-setup-cmds")) {
       const box = t.closest("label.agent-setup");
@@ -998,7 +1016,10 @@ if (view.startsWith("settings")) {
       const v = (n) => f.elements[n].value.trim();
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
       else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
-      else if (f.dataset.stage === "task") stage({ op: "task.set", name: v("name"), value: v("value") }, false);
+      else if (f.dataset.stage === "task") {
+        if (f.elements.fresh.checked) stage({ op: "task.fresh.add", name: v("name") }, false);
+        stage({ op: "task.set", name: v("name"), value: v("value") }, false);
+      }
       else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);
       f.reset();

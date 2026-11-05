@@ -59,17 +59,18 @@ func TestHideLinks(t *testing.T) {
 func TestTasksMerge(t *testing.T) {
 	m, _ := filial(t, func(p *config.Project) {
 		p.Tasks = map[string]string{"test": "bin/rspec", "console": "", "lint": "bin/rubocop"}
+		p.FreshTasks = []string{"lint"}
 	})
 	want := []Task{
-		{"lint", "bin/rubocop", "project", ""},
-		{"test", "bin/rspec", "project", "bin/rails test"},
-		{"test:system", "bin/rails test:system", "pack", "bin/rails test:system"},
+		{"lint", "bin/rubocop", "project", "", true},
+		{"test", "bin/rspec", "project", "bin/rails test", false},
+		{"test:system", "bin/rails test:system", "pack", "bin/rails test:system", false},
 	}
 	if got := m.Tasks(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Tasks = %+v; want %+v", got, want)
 	}
 	// A hidden pack task is listed as hidden; a "" with no pack task is not.
-	all := MergeTasks(m.Inputs.Stack.Pack.Tasks, map[string]string{"console": "", "gone": ""})
+	all := MergeTasks(m.Inputs.Stack.Pack.Tasks, map[string]string{"console": "", "gone": ""}, nil)
 	if len(all) != 3 || all[0] != (Task{Name: "console", Source: "hidden", Pack: "bin/rails console"}) {
 		t.Errorf("MergeTasks = %+v", all)
 	}

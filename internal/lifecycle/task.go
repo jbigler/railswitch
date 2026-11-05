@@ -21,38 +21,39 @@ func (l *L) Tasks(ctx context.Context) ([]render.Task, error) {
 	return m.Tasks(), nil
 }
 
-// TaskCommand is task name's command; an unknown name is a *UsageError.
-func (l *L) TaskCommand(ctx context.Context, name string) (string, error) {
+// TaskNamed is task name; an unknown name is a *UsageError.
+func (l *L) TaskNamed(ctx context.Context, name string) (render.Task, error) {
 	tasks, err := l.Tasks(ctx)
 	if err != nil {
-		return "", err
+		return render.Task{}, err
 	}
 	for _, t := range tasks {
 		if t.Name == name {
-			return t.Command, nil
+			return t, nil
 		}
 	}
-	return "", &UsageError{Msg: "unknown task " + name + "; railswitch task ls"}
+	return render.Task{}, &UsageError{Msg: "unknown task " + name + "; railswitch task ls"}
 }
 
 // Task runs task name of worktree slug's app as exec does (its running
-// container, else a transient one), as `sh -c '<command> "$@"' <name>
+// container, else a transient one; always a transient one for a Fresh
+// task, D171), as `sh -c '<command> "$@"' <name>
 // <args…>`: the arguments reach the command as its own, unexpanded. A
 // non-zero exit is an *ExitError with the task's code. A run of TestTask
 // without arguments, the whole suite, is recorded with its exit code
 // (D158); a run that didn't end on its own (podman failed, it was
 // cancelled) is not.
 func (l *L) Task(ctx context.Context, slug, name string, args []string) error {
-	cmd, err := l.TaskCommand(ctx, name)
+	t, err := l.TaskNamed(ctx, name)
 	if err != nil {
 		return err
 	}
-	argv := append([]string{"sh", "-c", cmd + ` "$@"`, name}, args...)
+	argv := append([]string{"sh", "-c", t.Command + ` "$@"`, name}, args...)
 	if name != TestTask || len(args) > 0 {
-		return l.Exec(ctx, slug, false, argv)
+		return l.Exec(ctx, slug, t.Fresh, argv)
 	}
 	run := TestRun{StartedAt: time.Now().UTC(), Commit: workspace.HeadCommit(naming.WorktreeDir(l.WS.Root, slug))}
-	err = l.Exec(ctx, slug, false, argv)
+	err = l.Exec(ctx, slug, t.Fresh, argv)
 	var x *ExitError
 	switch {
 	case ctx.Err() != nil:

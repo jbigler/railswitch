@@ -132,6 +132,7 @@ a.pal-task{color:var(--text);text-decoration:none}
 .set-table tr.removed td{text-decoration:line-through;color:var(--muted)}
 .add-row{display:flex;gap:6px;margin-top:8px}
 .add-row input{flex:1;min-width:0}
+.add-row label.fresh{display:flex;gap:4px;align-items:center;white-space:nowrap}.add-row label.fresh input{flex:none}
 .secret-form{display:flex;gap:6px;align-items:center}
 .secrets-needed form[data-start-base]{margin-top:8px}
 .secret-form input:not([type=checkbox]){min-width:0;width:10em}

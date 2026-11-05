@@ -796,14 +796,14 @@ func newProject(cat *pack.Catalog, packRef, name, prefix, repo string, opts []st
 	return p, st, nil
 }
 
-// projectTOML renders p's schema, hide_links, [project], its lines
+// projectTOML renders p's schema, hide_links, fresh_tasks, [project], its lines
 // (config.LinesTOML) and [template]: not [image] and [secrets], which
 // writeProject adds.
 func projectTOML(p *config.Project) []byte {
 	var b strings.Builder
 	kv := func(k, v string) { fmt.Fprintf(&b, "%s = %s\n", k, config.QuoteString(v)) }
 	fmt.Fprintf(&b, "schema = %d\n", p.Schema)
-	b.WriteString(config.HideLinksTOML(p))
+	b.WriteString(config.TopTOML(p))
 	b.WriteString("\n[project]\n")
 	kv("name", p.Project.Name)
 	kv("prefix", p.Project.Prefix)

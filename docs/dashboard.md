@@ -334,8 +334,12 @@ shows what each one does before anything is written.
   emptied box stages nothing). A pack task has Hide (`task.set` with an
   empty value: `name = ""`); a project task has Remove, or "Back to the
   pack's" when it overrides one (`task.unset`); a hidden pack task has
-  Restore (`task.unset`). The add form (name, command) stages `task.set`;
-  the staged card names it. `?task=<name>` fills the add form's name and
+  Restore (`task.unset`). New container (`fresh_tasks`, D171) runs the
+  task in a throwaway container of the app image, never the running app:
+  ticking it stages `task.fresh.add`, clearing it `task.fresh.remove`;
+  Hide and Remove clear it too, since a `fresh_tasks` name with no task is
+  a render error. The add form (name, command, New container) stages
+  `task.set`, and `task.fresh.add` when ticked; the staged card names it. `?task=<name>` fills the add form's name and
   focuses its command: the palette's "new task" opens it.
 - **Secrets:** one row per declared secret: services, delivery (`file` or
   `env <VAR>`), set (with its date) or not set; never the value. "Set

@@ -106,6 +106,7 @@ type stackFile struct {
 	Version     int                               `toml:"version"`
 	Description string                            `toml:"description"`
 	HideLinks   []string                          `toml:"hide_links"`
+	FreshTasks  []string                          `toml:"fresh_tasks"`
 	Stack       config.StackRef                   `toml:"stack"`
 	Options     map[string]string                 `toml:"options"`
 	Versions    map[string]string                 `toml:"versions"`
@@ -229,7 +230,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 		Ask: f.Ask, Secrets: []string{}, Containerfiles: map[string][]byte{}, Bundled: map[pack.Ref]Bundle{}, Files: mem,
 		Lines: &config.Project{
 			Schema: config.SchemaVersion, Stack: f.Stack, Options: f.Options, Versions: f.Versions, Env: f.Env,
-			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, Routes: f.Routes,
+			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, FreshTasks: f.FreshTasks, Routes: f.Routes,
 			Firewall: f.Firewall, Hooks: f.Hooks, Image: config.ImageConfig{Addons: f.Image.Addons},
 		},
 	}
@@ -394,7 +395,7 @@ func (t *Template) Encode() []byte {
 	if t.Description != "" {
 		fmt.Fprintf(&b, "description = %s\n", config.QuoteString(t.Description))
 	}
-	b.WriteString(config.HideLinksTOML(t.Lines))
+	b.WriteString(config.TopTOML(t.Lines))
 	b.WriteString(config.LinesTOML(t.Lines))
 	if a := t.Lines.Image.Addons; len(a) > 0 {
 		q := make([]string, len(a))

@@ -1259,6 +1259,7 @@ form is a table `NAME SOURCE COMMAND`. Hidden pack tasks are not listed:
 | `command` | string | Its shell command, run as `sh -c '<command> "$@"' <name> <args…>`. |
 | `source` | string | `pack` or `project`. |
 | `pack` | string | The pack's command for this name; absent when the pack has no such task. A `project` task with one overrides it, and `task rm` brings it back (D156). |
+| `fresh` | bool | `true` when `fresh_tasks` names it: it runs in a new container, never the running app (D171). Absent otherwise. |
 
 ## `db snapshot ls`
 
@@ -1290,7 +1291,8 @@ host) (D119), `option`, `env.set`,
 `env.unset`, `link.add`, `link.remove`, `link.hide`, `link.show`,
 `task.set` (`name`; `value`: the command, absent or `""` to hide the
 pack's task of that name) and `task.unset` (`name`: takes the project's
-`[tasks]` entry out; D156),
+`[tasks]` entry out; D156), `task.fresh.add` and `task.fresh.remove`
+(`name`: adds it to or takes it from `fresh_tasks`; D171),
 `hooks.set` (`key`: `deps`, `start` or `create`; `values`: the list's
 commands in order, absent or `[]` to remove it; D126), `agent.setup`
 (`key`: an agent's name; `values`: its setup commands in order, absent or

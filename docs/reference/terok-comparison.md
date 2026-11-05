@@ -1,7 +1,35 @@
 # terok comparison: handover
 
-Status on 2026-11-05: research done, nothing implemented. The next step is to
-choose which items to build. Items 1, 3 and 4 need no design spec.
+Status on 2026-11-06: every item is built or set aside, each with its PR
+and decision row:
+
+| # | Item | Outcome |
+|---|---|---|
+| 1 | Address floor | Built: #140, D179 |
+| 2 | Allow sets filled by DNS | Built: #144 (stacked on #140), D182 |
+| 3 | Temporary allows | Built: #140, D179 (`fw allow --for`) |
+| 4 | Check the live ruleset | Built: #140, D179 |
+| 5 | Stand-in tokens | Set aside (below) |
+| 6 | Git gate | Set aside (below) |
+| 7 | `railswitch panic` | Built: #143, D181 |
+| 8 | Empty `/etc/hosts` | Built: #143, D181 (`--hosts-file=none`, not `--no-hosts`) |
+
+Also from this work: `meta:google` (#142, D180), Google's service ranges
+without Google Cloud's.
+
+**Why 5 is set aside.** The firewall already keeps an agent from sending
+the token anywhere but GitHub and its own API. A broker would stop it
+copying the token out for use after the session, but while the agent
+runs it can still do whatever the token allows, through the broker,
+unless the broker checks every request against a policy, which is a large
+project. A fine-grained GitHub token scoped to the one repository, with
+only the permissions the agent needs and a short expiry, gives most of
+the benefit for no code. Revisit if agents need tokens with wider reach.
+
+**Why 6 is set aside.** railswitch worktrees share the host repository,
+and you already review and push from the host; the note's own overlap
+question stands. With 5 set aside, a gate's main benefit (scoped pushes)
+isn't there either.
 
 ## What was compared
 

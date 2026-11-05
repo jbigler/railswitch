@@ -729,6 +729,7 @@ type detailView struct {
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
 	AgentTerms                        []agentTerm  // an agent terminal per configured agent
 	TermWindowURL                     string       // the term action: a window on the desktop
+	AgentStopURL                      string       // POST agent=<name>: railswitch agent stop <name> (D176)
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	DownURL                           string
 	PRPageURL                         string // the worktree's PR page (D152)
@@ -842,6 +843,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		v.Actions = append(v.Actions, actionView{Label: worktreeActions[act].label, URL: path + "/act/" + act})
 	}
 	v.TermWindowURL = path + "/act/term"
+	v.AgentStopURL = path + "/agent-stop"
 	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
 	// One per configured agent: each is a service agent-<name> (on demand
 	// or not), so the page can open any of them.

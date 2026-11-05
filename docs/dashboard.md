@@ -260,8 +260,11 @@ still wider than the window scrolls its pane.
     runs: each a service `agent-<name>`, on demand or not; with none
     listed, one for the agent the overview names, else the default) that
     opens its terminal panel on the Agent tab (below), as the Terminal
-    menu's `Agent: <name> ▣` does; the **Default config…** link beside its
-    label.
+    menu's `Agent: <name> ▣` does; **Stop <name>** for each running agent
+    (D176), after a confirm: `railswitch agent stop <name>` as a job, the
+    name checked against the worktree's `agent ls` (one agent runs per
+    worktree, so this is how you switch to another); the **Default
+    config…** link beside its label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
   - **Database:** **Snapshots…** (D157).

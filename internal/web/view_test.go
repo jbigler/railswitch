@@ -364,6 +364,11 @@ func TestDetailAgentTerms(t *testing.T) {
 	if !strings.Contains(html, "Agent: claude ● ▣") || !strings.Contains(html, "Agent: omp ▣") {
 		t.Errorf("menu entries don't name the agents or mark the running one:\n%s", html)
 	}
+	// D176: the running agent has a Stop; the stopped one doesn't.
+	if !strings.Contains(html, `<form method="post" action="/p/ftest/feat-login/agent-stop" data-post data-confirm="Stop claude?`) ||
+		!strings.Contains(html, `<input type="hidden" name="agent" value="claude"><button class="ln danger">Stop claude</button>`) || strings.Contains(html, "Stop omp") {
+		t.Errorf("Stop buttons wrong:\n%s", html)
+	}
 }
 
 // TestDetailActions: the actions follow the stack's state; a running

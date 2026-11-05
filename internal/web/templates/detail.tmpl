@@ -31,7 +31,7 @@
 {{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
 {{else}}<div class="muted">none</div>
 {{end}}{{with .Usage}}<div class="usage-line{{if $.Runaway}} yellow{{else}} muted{{end}}">{{if $.Runaway}}⚠ {{end}}{{.}}</div>
-{{end}}{{template "queue-detail" .Queue}}<div class="actions">{{range .AgentTerms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent" title="{{.Name}}'s terminal, on the Agent tab">{{if .Running}}● {{end}}{{.Name}} ▣</button>{{end}}</div>
+{{end}}{{template "queue-detail" .Queue}}<div class="actions">{{range .AgentTerms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent" title="{{.Name}}'s terminal, on the Agent tab">{{if .Running}}● {{end}}{{.Name}} ▣</button>{{end}}{{range .AgentTerms}}{{if .Running}}<form method="post" action="{{$.AgentStopURL}}" data-post data-confirm="Stop {{.Name}}? Its session ends; what it changed in the worktree stays."><input type="hidden" name="agent" value="{{.Name}}"><button class="ln danger">Stop {{.Name}}</button></form>{{end}}{{end}}</div>
 </section>
 {{with .Tests}}<section class="dcard" data-panel="tests"><h2 class="lbl">Tests</h2>
 <div><span class="{{.Class}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}} <span class="muted">{{.Title}}</span></div>

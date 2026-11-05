@@ -27,11 +27,12 @@
 {{end}}{{end}}</section>
 {{end}}
 <section class="dcard" data-panel="agent"><h2 class="lbl">Agent <a class="quiet-link" href="{{.AgentDefaultURL}}" data-dialog="agentdefault">Default config…</a></h2>
-{{with .Agent}}<div><span class="{{.Class}}">{{.Glyph}} {{.Label}}</span> <span class="muted">{{.Name}}</span></div>
-{{if .Message}}<div class="msg">{{.Message}}</div>{{end}}
-{{else}}<div class="muted">none</div>
+{{with .RunningAgent}}<div class="agent-now on"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b><span class="mono">{{.Name}}</span> is running</b>{{with $.Agent}}<span class="{{.Class}}">{{cap .Label}}</span>{{end}}</div><div class="agent-acts"><button type="button" class="ln main" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent">Open terminal</button><form method="post" action="{{$.AgentStopURL}}" data-post data-confirm="Stop {{.Name}}? Its session ends; what it changed in the worktree stays."><input type="hidden" name="agent" value="{{.Name}}"><button class="ln danger">Stop {{.Name}}</button></form></div></div>
+{{with $.Agent}}{{if .Message}}<div class="msg">{{.Message}}</div>{{end}}{{end}}
+{{if gt (len $.AgentTerms) 1}}<div class="agent-others"><span class="muted">Other agents:</span>{{range $.AgentTerms}}{{if not .Running}} <span><b class="mono">{{.Name}}</b> <span class="muted">stopped</span></span> <button type="button" class="ln" data-switch-url="{{$.AgentStopURL}}" data-switch-from="{{$.RunningAgent.Name}}" data-switch-term="{{.URL}}" data-switch-to="{{.Name}}">Switch to {{.Name}}</button>{{end}}{{end}}</div>
+{{end}}{{else}}<div class="agent-now"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b>No agent running</b><span class="muted">An agent starts in this worktree's container when its terminal opens.</span></div><div class="agent-acts">{{range $i, $a := .AgentTerms}}<button type="button" class="ln{{if eq $i 0}} main{{end}}" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent">Start {{.Name}}</button>{{end}}</div></div>
 {{end}}{{with .Usage}}<div class="usage-line{{if $.Runaway}} yellow{{else}} muted{{end}}">{{if $.Runaway}}⚠ {{end}}{{.}}</div>
-{{end}}{{template "queue-detail" .Queue}}<div class="actions">{{range .AgentTerms}}<button type="button" class="ln" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent" title="{{.Name}}'s terminal, on the Agent tab">{{if .Running}}● {{end}}{{.Name}} ▣</button>{{end}}</div>
+{{end}}{{template "queue-detail" .Queue}}
 </section>
 {{with .Tests}}<section class="dcard" data-panel="tests"><h2 class="lbl">Tests</h2>
 <div><span class="{{.Class}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}} <span class="muted">{{.Title}}</span></div>

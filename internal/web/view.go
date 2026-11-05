@@ -729,6 +729,8 @@ type detailView struct {
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
 	AgentTerms                        []agentTerm  // an agent terminal per configured agent
 	TermWindowURL                     string       // the term action: a window on the desktop
+	AgentStopURL                      string       // POST agent=<name>: railswitch agent stop <name> (D176)
+	RunningAgent                      *agentTerm   // the agent running in this worktree (one at most, D62); nil: none
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	DownURL                           string
 	PRPageURL                         string // the worktree's PR page (D152)
@@ -842,6 +844,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		v.Actions = append(v.Actions, actionView{Label: worktreeActions[act].label, URL: path + "/act/" + act})
 	}
 	v.TermWindowURL = path + "/act/term"
+	v.AgentStopURL = path + "/agent-stop"
 	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
 	// One per configured agent: each is a service agent-<name> (on demand
 	// or not), so the page can open any of them.
@@ -854,9 +857,14 @@ func newDetail(prefix string, r row, repo string) detailView {
 	if len(v.AgentTerms) == 0 { // none listed: the default agent, or the one the overview names
 		a := agentTerm{Name: "agent", URL: tty + "agent"}
 		if wt.Agent != nil {
-			a.Name, a.URL = wt.Agent.Name, a.URL+"?agent="+url.QueryEscape(wt.Agent.Name)
+			a.Name, a.URL, a.Running = wt.Agent.Name, a.URL+"?agent="+url.QueryEscape(wt.Agent.Name), wt.Agent.Running
 		}
 		v.AgentTerms = []agentTerm{a}
+	}
+	for i := range v.AgentTerms {
+		if v.AgentTerms[i].Running && v.RunningAgent == nil {
+			v.RunningAgent = &v.AgentTerms[i]
+		}
 	}
 	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Service == "nvim" }) {
 		v.Terms = append(v.Terms, actionView{Label: "nvim", URL: tty + "nvim"})

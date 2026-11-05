@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// TopTOML is p's top-level hide_links and fresh_tasks lines, each only
+// TopTOML is p's top-level hide_links, fresh_tasks and terminal_tasks lines, each only
 // when set: top-level keys, written before the first table.
 func TopTOML(p *Project) string {
 	var s string
@@ -16,6 +16,9 @@ func TopTOML(p *Project) string {
 	}
 	if len(p.FreshTasks) > 0 {
 		s += "fresh_tasks = " + stringArray(p.FreshTasks) + "\n"
+	}
+	if len(p.TerminalTasks) > 0 {
+		s += "terminal_tasks = " + stringArray(p.TerminalTasks) + "\n"
 	}
 	return s
 }

@@ -351,3 +351,19 @@ func TestSecretsCard(t *testing.T) {
 		t.Error("a card although every secret is set")
 	}
 }
+
+// TestPaletteTerminalTask: a terminal_tasks task is a terminal panel button,
+// not a job's submit button (D175); its name is escaped into the URL.
+func TestPaletteTerminalTask(t *testing.T) {
+	f := newFixture(t)
+	f.cli.set("--json -C /ws/ftest -w b task ls", `[{"name":"rails:test watcher","command":"retest --rails","source":"project","terminal":true},{"name":"test","command":"bin/rails test","source":"pack"}]`)
+	body := f.do(req("GET", "/p/ftest/b/tasks", nil)).Body.String()
+	for _, want := range []string{
+		`<button type="button" class="pal-task" data-term="/p/ftest/tty/b/task?task=rails%3Atest&#43;watcher" data-term-label="rails:test watcher"`,
+		`<button name="task" value="test" class="pal-task">`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("palette lacks %q:\n%s", want, body)
+		}
+	}
+}

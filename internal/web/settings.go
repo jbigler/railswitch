@@ -34,7 +34,7 @@ type edit struct {
 	Values []string `json:"values,omitempty"`
 }
 
-var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "task.set", "task.unset", "task.fresh.add", "task.fresh.remove", "hooks.set", "agent.setup"}
+var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "task.set", "task.unset", "task.fresh.add", "task.fresh.remove", "task.terminal.add", "task.terminal.remove", "hooks.set", "agent.setup"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -304,6 +304,10 @@ func editTitle(show projectShow, e edit) string {
 		return "Task " + e.Name + ": runs in a new container"
 	case "task.fresh.remove":
 		return "Task " + e.Name + ": runs in the running app"
+	case "task.terminal.add":
+		return "Task " + e.Name + ": opens in a terminal"
+	case "task.terminal.remove":
+		return "Task " + e.Name + ": runs as a job"
 	case "task.unset":
 		if i := slices.IndexFunc(show.Tasks, func(t task) bool { return t.Name == e.Name }); i >= 0 && show.Tasks[i].Pack != "" {
 			return fmt.Sprintf("Task %s: back to the pack's %q", e.Name, show.Tasks[i].Pack)

@@ -101,23 +101,24 @@ func (t *Template) Packages() []string {
 // stackFile is stack.toml as decoded: only these keys, so a [project],
 // [worktrees], [share] or [secrets] line is an unknown key, refused.
 type stackFile struct {
-	Schema      int                               `toml:"schema"`
-	Name        string                            `toml:"name"`
-	Version     int                               `toml:"version"`
-	Description string                            `toml:"description"`
-	HideLinks   []string                          `toml:"hide_links"`
-	FreshTasks  []string                          `toml:"fresh_tasks"`
-	Stack       config.StackRef                   `toml:"stack"`
-	Options     map[string]string                 `toml:"options"`
-	Versions    map[string]string                 `toml:"versions"`
-	Env         map[string]string                 `toml:"env"`
-	Services    map[string]config.ServiceOverride `toml:"services"`
-	Tasks       map[string]string                 `toml:"tasks"`
-	Links       []config.Link                     `toml:"links"`
-	Routes      []config.Route                    `toml:"routes"`
-	Firewall    config.Firewall                   `toml:"firewall"`
-	Hooks       config.Hooks                      `toml:"hooks"`
-	Image       struct {
+	Schema        int                               `toml:"schema"`
+	Name          string                            `toml:"name"`
+	Version       int                               `toml:"version"`
+	Description   string                            `toml:"description"`
+	HideLinks     []string                          `toml:"hide_links"`
+	FreshTasks    []string                          `toml:"fresh_tasks"`
+	TerminalTasks []string                          `toml:"terminal_tasks"`
+	Stack         config.StackRef                   `toml:"stack"`
+	Options       map[string]string                 `toml:"options"`
+	Versions      map[string]string                 `toml:"versions"`
+	Env           map[string]string                 `toml:"env"`
+	Services      map[string]config.ServiceOverride `toml:"services"`
+	Tasks         map[string]string                 `toml:"tasks"`
+	Links         []config.Link                     `toml:"links"`
+	Routes        []config.Route                    `toml:"routes"`
+	Firewall      config.Firewall                   `toml:"firewall"`
+	Hooks         config.Hooks                      `toml:"hooks"`
+	Image         struct {
 		Addons []string `toml:"addons"`
 	} `toml:"image"`
 	Ask    []Ask        `toml:"ask"`
@@ -230,7 +231,7 @@ func Decode(fsys fs.FS) (*Template, error) {
 		Ask: f.Ask, Secrets: []string{}, Containerfiles: map[string][]byte{}, Bundled: map[pack.Ref]Bundle{}, Files: mem,
 		Lines: &config.Project{
 			Schema: config.SchemaVersion, Stack: f.Stack, Options: f.Options, Versions: f.Versions, Env: f.Env,
-			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, FreshTasks: f.FreshTasks, Routes: f.Routes,
+			Services: f.Services, Tasks: f.Tasks, Links: f.Links, HideLinks: f.HideLinks, FreshTasks: f.FreshTasks, TerminalTasks: f.TerminalTasks, Routes: f.Routes,
 			Firewall: f.Firewall, Hooks: f.Hooks, Image: config.ImageConfig{Addons: f.Image.Addons},
 		},
 	}

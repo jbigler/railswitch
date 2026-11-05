@@ -26,28 +26,29 @@ var ReservedTasks = []string{"ls", "set", "rm", "restore"}
 
 // Project is project.toml: the choices and overrides only (HANDOFF §3.2).
 type Project struct {
-	Schema     int                         `toml:"schema"` // must be 1 (D39)
-	From       string                      `toml:"from"`
-	Project    Meta                        `toml:"project"`
-	Stack      StackRef                    `toml:"stack"`
-	Options    map[string]string           `toml:"options"` // slot → ref, or "none"
-	Versions   map[string]string           `toml:"versions"`
-	Env        map[string]string           `toml:"env"`
-	Share      Share                       `toml:"share"` // layer 7 (D46), while a worktree is shared on the tailnet
-	Services   map[string]ServiceOverride  `toml:"services"`
-	Worktrees  map[string]WorktreeOverride `toml:"worktrees"`
-	Secrets    map[string]Secret           `toml:"secrets"` // key = secret name; values live in podman secrets (D33)
-	Links      []Link                      `toml:"links"`
-	HideLinks  []string                    `toml:"hide_links"`  // labels of stack links not shown
-	Tasks      map[string]string           `toml:"tasks"`       // project tasks; "" removes a pack task
-	FreshTasks []string                    `toml:"fresh_tasks"` // tasks run in a new container, never the running app (D171)
-	Routes     []Route                     `toml:"routes"`      // extra Traefik routes to a service's port (D67)
-	Tools      Tools                       `toml:"tools"`
-	Firewall   Firewall                    `toml:"firewall"`
-	Image      ImageConfig                 `toml:"image"`
-	Agents     map[string]Agent            `toml:"agents"` // agent name → its package and settings
-	Hooks      Hooks                       `toml:"hooks"`
-	Template   *TemplateRef                `toml:"template"`
+	Schema        int                         `toml:"schema"` // must be 1 (D39)
+	From          string                      `toml:"from"`
+	Project       Meta                        `toml:"project"`
+	Stack         StackRef                    `toml:"stack"`
+	Options       map[string]string           `toml:"options"` // slot → ref, or "none"
+	Versions      map[string]string           `toml:"versions"`
+	Env           map[string]string           `toml:"env"`
+	Share         Share                       `toml:"share"` // layer 7 (D46), while a worktree is shared on the tailnet
+	Services      map[string]ServiceOverride  `toml:"services"`
+	Worktrees     map[string]WorktreeOverride `toml:"worktrees"`
+	Secrets       map[string]Secret           `toml:"secrets"` // key = secret name; values live in podman secrets (D33)
+	Links         []Link                      `toml:"links"`
+	HideLinks     []string                    `toml:"hide_links"`     // labels of stack links not shown
+	Tasks         map[string]string           `toml:"tasks"`          // project tasks; "" removes a pack task
+	TerminalTasks []string                    `toml:"terminal_tasks"` // tasks the dashboard runs in a terminal panel, not as a job (D175)
+	FreshTasks    []string                    `toml:"fresh_tasks"`    // tasks run in a new container, never the running app (D171)
+	Routes        []Route                     `toml:"routes"`         // extra Traefik routes to a service's port (D67)
+	Tools         Tools                       `toml:"tools"`
+	Firewall      Firewall                    `toml:"firewall"`
+	Image         ImageConfig                 `toml:"image"`
+	Agents        map[string]Agent            `toml:"agents"` // agent name → its package and settings
+	Hooks         Hooks                       `toml:"hooks"`
+	Template      *TemplateRef                `toml:"template"`
 }
 
 // Hooks is the [hooks] table (D126): shell commands railswitch runs at
@@ -404,12 +405,18 @@ func (p *Project) Validate() error {
 		v.oneLine(path, l)
 	}
 
-	for i, name := range p.FreshTasks {
-		path := fmt.Sprintf("fresh_tasks[%d]", i)
-		if name == "" {
-			v.add(path, "is empty")
+	for _, l := range []struct {
+		key   string
+		names []string
+	}{{"fresh_tasks", p.FreshTasks}, {"terminal_tasks", p.TerminalTasks}} {
+		key, names := l.key, l.names
+		for i, name := range names {
+			path := fmt.Sprintf("%s[%d]", key, i)
+			if name == "" {
+				v.add(path, "is empty")
+			}
+			v.oneLine(path, name)
 		}
-		v.oneLine(path, name)
 	}
 
 	for _, name := range sortedKeys(p.Tasks) {

@@ -29,6 +29,8 @@ func TestTTYArgv(t *testing.T) {
 		{"agent", "probe", append(slices.Clone(wsb), "agent", "probe")},
 		{"nvim", "", append(slices.Clone(wsb), "nvim")},
 		{"shell", "", append(slices.Clone(wsb), "exec", "--", "sh", "-c", "command -v bash >/dev/null && exec bash -l; exec sh -l")},
+		{"task", "rails:test:watcher", append(slices.Clone(wsb), "task", "rails:test:watcher")},
+		{"task", "", nil},
 		{"bash", "", nil},
 	} {
 		got, ok := ttyArgv(testExe, "/ws/ftest", "b", c.kind, c.agent)
@@ -136,6 +138,8 @@ func TestTTYRefusals(t *testing.T) {
 		{"/p/ftest/tty/b/bash?cols=80&rows=24", "", 4000, "unknown terminal bash"},
 		{"/p/ftest/tty/b/agent?agent=nope&cols=80&rows=24", "", 4000, "unknown agent nope"},
 		{"/p/ftest/tty/b/agent?agent=-x&cols=80&rows=24", "", 4000, "unknown agent -x"},
+		{"/p/ftest/tty/b/task?task=nope&cols=80&rows=24", "", 4000, "unknown task nope"},
+		{"/p/ftest/tty/b/task?cols=80&rows=24", "", 4000, "unknown task "},
 		{"/p/ftest/tty/b/shell?cols=0&rows=24", "", 4000, "bad size"},
 		{"/p/ftest/tty/b/shell?cols=80&rows=1001", "", 4000, "bad size"},
 		{"/p/ftest/tty/b/shell?cols=80&rows=24", "hello", 4000, "bad message"},
@@ -249,6 +253,19 @@ func TestTTYEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	if out, _, _ := readAll(t, c, ""); !strings.Contains(out, "env:xterm-256color:truecolor") {
+		t.Errorf("out %q", out)
+	}
+}
+
+// TestTTYTask: a task terminal runs `railswitch task <name>` for one of the
+// worktree's tasks (D175).
+func TestTTYTask(t *testing.T) {
+	_, srv := ttyFixture(t, `echo "argv:$*"`)
+	c, _, err := dialTTY(t, srv, "/p/ftest/tty/b/task?task=test&cols=80&rows=24", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, _, _ := readAll(t, c, ""); !strings.Contains(out, "argv:-C /ws/ftest -w b task test") {
 		t.Errorf("out %q", out)
 	}
 }

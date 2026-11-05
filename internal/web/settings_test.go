@@ -32,7 +32,7 @@ var projectShowJSON = `{"prefix":"ftest","name":"Ftest App","repo":"git@github.c
   {"label":"Mailer previews","url":"{worktree.host}/rails/mailers","from":"pack web@1","hidden":true}],
  "tasks":[
   {"name":"console","command":"","source":"hidden","pack":"bin/rails console"},
-  {"name":"lint","command":"bin/rubocop","source":"project","fresh":true},
+  {"name":"lint","command":"bin/rubocop","source":"project","fresh":true,"terminal":true},
   {"name":"test","command":"bin/rspec","source":"project","pack":"bin/rails test"},
   {"name":"test:system","command":"bin/rails test:system","source":"pack","pack":"bin/rails test:system"}],
  "file":"\n# first line blank\nschema = 1\n"}`
@@ -168,6 +168,7 @@ func TestSettingsTasks(t *testing.T) {
 		`data-name="test" data-source="project"`, "project, over the pack's", `data-task-remove title="bin/rails test">Back to the pack's</button>`,
 		`data-name="test:system" data-source="pack"`, "data-task-hide",
 		`<input type="checkbox" class="task-fresh" checked aria-label="Run lint in a new container">`, `<input type="checkbox" class="task-fresh" aria-label="Run test in a new container">`,
+		`<input type="checkbox" class="task-terminal" checked aria-label="Open lint in a terminal">`, `<input type="checkbox" class="task-terminal" aria-label="Open test in a terminal">`,
 		`<form class="add-row" data-stage="task">`, `aria-label="Task name" value="db:seed"`, `aria-label="Task command" autofocus`,
 	} {
 		if !strings.Contains(body, want) {
@@ -179,8 +180,8 @@ func TestSettingsTasks(t *testing.T) {
 		t.Error("no ?task=, yet the command box takes the focus")
 	}
 
-	f.cli.set(previewKey, `{"hash":"`+testHash+`","diff":"","edits":[`+strings.Repeat(`{"index":0,"impact":"none","reasons":[],"error":""},`, 6)+`{"index":6,"impact":"none","reasons":[],"error":""}],"restart":[]}`)
-	list := `[{"op":"task.set","name":"lint","value":"bin/rubocop -a"},{"op":"task.set","name":"db:seed","value":"bin/rails db:seed"},{"op":"task.set","name":"test:system"},{"op":"task.unset","name":"test"},{"op":"task.unset","name":"console"},{"op":"task.fresh.add","name":"db:seed"},{"op":"task.fresh.remove","name":"lint"}]`
+	f.cli.set(previewKey, `{"hash":"`+testHash+`","diff":"","edits":[`+strings.Repeat(`{"index":0,"impact":"none","reasons":[],"error":""},`, 8)+`{"index":8,"impact":"none","reasons":[],"error":""}],"restart":[]}`)
+	list := `[{"op":"task.set","name":"lint","value":"bin/rubocop -a"},{"op":"task.set","name":"db:seed","value":"bin/rails db:seed"},{"op":"task.set","name":"test:system"},{"op":"task.unset","name":"test"},{"op":"task.unset","name":"console"},{"op":"task.fresh.add","name":"db:seed"},{"op":"task.fresh.remove","name":"lint"},{"op":"task.terminal.add","name":"db:seed"},{"op":"task.terminal.remove","name":"lint"}]`
 	w := f.do(jsonPost("/p/ftest/settings/preview", list))
 	if in, _ := f.cli.stdinOf(previewKey); w.Code != 200 || string(in) != list {
 		t.Fatalf("%d %s; stdin %s", w.Code, w.Body, in)
@@ -189,6 +190,7 @@ func TestSettingsTasks(t *testing.T) {
 		"Task lint: &#34;bin/rubocop&#34; → &#34;bin/rubocop -a&#34;", "Task db:seed: added, &#34;bin/rails db:seed&#34;",
 		"Task test:system: hidden", "Task test: back to the pack&#39;s &#34;bin/rails test&#34;", "Task console: back to the pack&#39;s &#34;bin/rails console&#34;",
 		"Task db:seed: runs in a new container", "Task lint: runs in the running app",
+		"Task db:seed: opens in a terminal", "Task lint: runs as a job",
 	} {
 		if !strings.Contains(w.Body.String(), want) {
 			t.Errorf("panel lacks %q", want)

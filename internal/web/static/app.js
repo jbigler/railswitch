@@ -234,7 +234,10 @@ document.addEventListener("click", (e) => {
     return;
   }
   const termBtn = t.closest("[data-term]");
-  if (termBtn) return openTermPanel(termBtn);
+  if (termBtn) {
+    termBtn.closest("dialog")?.close(); // the palette's terminal task
+    return openTermPanel(termBtn);
+  }
   const opener = t.closest("[data-open]");
   if (opener) return openDialog(opener.dataset.open);
   if (t.closest("[data-colors]")) return openColors();
@@ -554,6 +557,10 @@ function paletteKey(e) {
     const it = $(".pal-task", items[i]);
     if (it.tagName === "A") return void (location.href = it.href);
     if (it.hasAttribute("data-action")) return post(f, new URLSearchParams(), it.formAction);
+    if (it.dataset.term) {
+      it.closest("dialog").close();
+      return openTermPanel(it);
+    }
     const data = new URLSearchParams(new FormData(f));
     data.set("task", it.value);
     if ($(".pal-term", f).checked !== e.shiftKey) data.set("term", "1");
@@ -679,6 +686,7 @@ function target(e) {
   if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
   if (e.op === "task.set" || e.op === "task.unset") return "task " + e.name;
   if (e.op === "task.fresh.add" || e.op === "task.fresh.remove") return "fresh " + e.name;
+  if (e.op === "task.terminal.add" || e.op === "task.terminal.remove") return "terminal " + e.name;
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
   if (e.op === "agent.setup") return "agent-setup " + e.key;
@@ -778,7 +786,10 @@ function syncLeft() {
     const fe = stagedFor("fresh " + row.dataset.name);
     const box = $(".task-fresh", row);
     if (box) box.checked = fe ? fe.op === "task.fresh.add" : row.dataset.fresh === "true";
-    row.classList.toggle("staged", (!!e || !!fe) && !gone);
+    const te = stagedFor("terminal " + row.dataset.name);
+    const tbox = $(".task-terminal", row);
+    if (tbox) tbox.checked = te ? te.op === "task.terminal.add" : row.dataset.terminal === "true";
+    row.classList.toggle("staged", (!!e || !!fe || !!te) && !gone);
     row.classList.toggle("removed", gone);
   });
   $$("label.hook").forEach((box) => {
@@ -952,9 +963,12 @@ if (view.startsWith("settings")) {
     }
     const fwAllow = t.closest("[data-fw-allow]");
     if (fwAllow) return stage({ op: "firewall.allow.add", key: fwAllow.dataset.prof, value: fwAllow.dataset.host }, false);
-    // Hiding or removing a task takes it out of fresh_tasks too: a name
-    // there with no task is a render error.
-    const unfresh = (row) => row.dataset.fresh === "true" && stage({ op: "task.fresh.remove", name: row.dataset.name }, false);
+    // Hiding or removing a task takes it out of fresh_tasks and
+    // terminal_tasks too: a name there with no task is a render error.
+    const unfresh = (row) => {
+      if (row.dataset.fresh === "true") stage({ op: "task.fresh.remove", name: row.dataset.name }, false);
+      if (row.dataset.terminal === "true") stage({ op: "task.terminal.remove", name: row.dataset.name }, false);
+    };
     const taskHide = t.closest("[data-task-hide]");
     if (taskHide) {
       unfresh(taskHide.closest("tr"));
@@ -988,6 +1002,10 @@ if (view.startsWith("settings")) {
     if (t.classList.contains("task-fresh")) {
       const row = t.closest("tr");
       return stage({ op: t.checked ? "task.fresh.add" : "task.fresh.remove", name: row.dataset.name }, t.checked === (row.dataset.fresh === "true"));
+    }
+    if (t.classList.contains("task-terminal")) {
+      const row = t.closest("tr");
+      return stage({ op: t.checked ? "task.terminal.add" : "task.terminal.remove", name: row.dataset.name }, t.checked === (row.dataset.terminal === "true"));
     }
     if (t.classList.contains("agent-setup-cmds")) {
       const box = t.closest("label.agent-setup");
@@ -1027,6 +1045,7 @@ if (view.startsWith("settings")) {
         // naming a task that doesn't exist yet is a render error.
         stage({ op: "task.set", name: v("name"), value: v("value") }, false);
         if (f.elements.fresh.checked) stage({ op: "task.fresh.add", name: v("name") }, false);
+        if (f.elements.terminal.checked) stage({ op: "task.terminal.add", name: v("name") }, false);
       }
       else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);

@@ -221,7 +221,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	for _, prof := range config.FirewallProfiles {
 		d.Firewall.Allow[prof] = append([]string{}, p.Firewall.Allow[prof]...)
 	}
-	d.Tasks = render.MergeTasks(st.Pack.Tasks, p.Tasks, p.FreshTasks)
+	d.Tasks = render.MergeTasks(st.Pack.Tasks, p.Tasks, p.FreshTasks, p.TerminalTasks)
 	d.Hooks = hooksRow{Deps: append([]string{}, p.Hooks.Deps...), Start: append([]string{}, p.Hooks.Start...), Create: append([]string{}, p.Hooks.Create...)}
 	d.Agents = []agentRow{}
 	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {

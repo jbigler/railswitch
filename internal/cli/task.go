@@ -58,7 +58,7 @@ func cmdTask(ctx context.Context, e *env, args []string) int {
 	}
 	if *newTerm {
 		// Checked here: the new terminal may close before its error is read.
-		if _, err := l.TaskCommand(ctx, name); err != nil {
+		if _, err := l.TaskNamed(ctx, name); err != nil {
 			return e.taskErr(err)
 		}
 		return e.taskNewTerm(ctx, l.WS.Root, slug, name, rest)
@@ -85,7 +85,7 @@ func (e *env) taskEdit(ctx context.Context, verb string, args []string) int {
 		return e.fail(err)
 	}
 	var cur render.Task
-	for _, t := range render.MergeTasks(w.Stack.Pack.Tasks, w.Project.Tasks) {
+	for _, t := range render.MergeTasks(w.Stack.Pack.Tasks, w.Project.Tasks, w.Project.FreshTasks) {
 		if t.Name == name {
 			cur = t
 		}

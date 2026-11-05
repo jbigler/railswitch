@@ -7,13 +7,17 @@ import (
 	"strings"
 )
 
-// HideLinksTOML is p's top-level hide_links line, "" when it hides none: a
-// top-level key, written before the first table.
-func HideLinksTOML(p *Project) string {
-	if len(p.HideLinks) == 0 {
-		return ""
+// TopTOML is p's top-level hide_links and fresh_tasks lines, each only
+// when set: top-level keys, written before the first table.
+func TopTOML(p *Project) string {
+	var s string
+	if len(p.HideLinks) > 0 {
+		s += "hide_links = " + stringArray(p.HideLinks) + "\n"
 	}
-	return "hide_links = " + stringArray(p.HideLinks) + "\n"
+	if len(p.FreshTasks) > 0 {
+		s += "fresh_tasks = " + stringArray(p.FreshTasks) + "\n"
+	}
+	return s
 }
 
 // LinesTOML renders the tables of p that a template carries (D108) and

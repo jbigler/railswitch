@@ -362,6 +362,20 @@ console = ""              # removes the pack's console
 lint    = "bin/rubocop"   # a project task
 ```
 
+A task runs in the worktree's running app container, or a new one when
+the app is down. `project.toml`'s top-level `fresh_tasks` names tasks that
+always run in a new, throwaway container of the app image (as `railswitch
+exec --fresh`), so they never touch the running server: a watcher such as
+retest. A name with no task is an error at render
+(`fresh_tasks: no task named "nope"`).
+
+```toml
+fresh_tasks = ["retest"]   # top level, before any table
+
+[tasks]
+retest = "retest --rails"
+```
+
 ## Commands
 
 - `railswitch pack eject <ref> [--as <name>]` copies a built-in pack or

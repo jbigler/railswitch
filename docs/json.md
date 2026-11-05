@@ -1259,6 +1259,7 @@ form is a table `NAME SOURCE COMMAND`. Hidden pack tasks are not listed:
 | `command` | string | Its shell command, run as `sh -c '<command> "$@"' <name> <args…>`. |
 | `source` | string | `pack` or `project`. |
 | `pack` | string | The pack's command for this name; absent when the pack has no such task. A `project` task with one overrides it, and `task rm` brings it back (D156). |
+| `fresh` | bool | `true` when `fresh_tasks` names it: it runs in a new container, never the running app (D171). Absent otherwise. |
 
 ## `db snapshot ls`
 

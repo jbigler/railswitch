@@ -259,6 +259,9 @@ func Build(in Inputs) (*Model, error) {
 	if err := b.checkHideLinks(); err != nil {
 		return nil, err
 	}
+	if err := b.checkFreshTasks(); err != nil {
+		return nil, err
+	}
 	b.addonWarnings()
 	return b.m, nil
 }

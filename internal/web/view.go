@@ -858,7 +858,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 	if len(v.AgentTerms) == 0 { // none listed: the default agent, or the one the overview names
 		a := agentTerm{Name: "agent", URL: tty + "agent"}
 		if wt.Agent != nil {
-			a.Name, a.URL = wt.Agent.Name, a.URL+"?agent="+url.QueryEscape(wt.Agent.Name)
+			a.Name, a.URL, a.Running = wt.Agent.Name, a.URL+"?agent="+url.QueryEscape(wt.Agent.Name), wt.Agent.Running
 		}
 		v.AgentTerms = []agentTerm{a}
 	}

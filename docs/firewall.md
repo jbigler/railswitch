@@ -25,6 +25,21 @@ calls, and it is usually short.
 Hostnames are resolved by the host when a container starts, so a host
 whose addresses change (a CDN) can need a restart to follow them.
 
+An entry `meta:<name>` is a provider's published address ranges instead,
+fetched by the host when a container starts (it needs `curl` and `jq`;
+offline, it is skipped and named in `hook.log`). Use it for a provider
+that answers each lookup from a large rotating pool, where the address
+resolved at start is often not the one the app gets a moment later:
+
+| Entry | Ranges |
+|---|---|
+| `meta:github` | GitHub's web, API and git ranges (`api.github.com/meta`) |
+| `meta:google` | Google's own services: `goog.json` without every range that overlaps `cloud.json`, so not the Google Cloud addresses any rented server lives in. Without `cloud.json` nothing is added (D180) |
+| `meta:datadog-us5` | Datadog US5's API ranges |
+
+For example, an app that signs in with Google at start:
+`allow.app = ["accounts.google.com", "meta:google"]`.
+
 ## Mode
 
 | Mode | What it does |

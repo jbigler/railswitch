@@ -13,7 +13,7 @@ var FirewallProfiles = []string{"app", "deps", "agent"}
 
 // CheckAllowHost refuses h unless it is an allow list entry the firewall
 // hook takes: a host name, an IPv4 address or CIDR, or meta:<name> (a
-// published range set, meta:github).
+// published range set: meta:github, meta:google).
 func CheckAllowHost(h string) error {
 	if _, _, err := net.ParseCIDR(h); err == nil && !strings.Contains(h, ":") {
 		return nil

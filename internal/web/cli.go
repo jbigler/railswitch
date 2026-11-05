@@ -170,11 +170,12 @@ type ghStackPR struct {
 }
 
 type task struct {
-	Name    string `json:"name"`
-	Command string `json:"command"`
-	Source  string `json:"source"` // pack, project, or (project show only) hidden
-	Pack    string `json:"pack"`   // the pack's command for the name, if any
-	Fresh   bool   `json:"fresh"`  // fresh_tasks names it (D171)
+	Name     string `json:"name"`
+	Command  string `json:"command"`
+	Source   string `json:"source"`   // pack, project, or (project show only) hidden
+	Pack     string `json:"pack"`     // the pack's command for the name, if any
+	Fresh    bool   `json:"fresh"`    // fresh_tasks names it (D171)
+	Terminal bool   `json:"terminal"` // terminal_tasks names it: a terminal panel, not a job (D175)
 }
 
 type wtRow struct {

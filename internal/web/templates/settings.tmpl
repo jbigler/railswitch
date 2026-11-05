@@ -112,25 +112,27 @@
 <section class="card" id="tasks">
 <h2>Tasks</h2>
 <table class="set-table">
-<thead><tr><th>Name</th><th>Command</th><th>From</th><th title="Runs in a new container, never the running app">New container</th><th></th></tr></thead>
+<thead><tr><th>Name</th><th>Command</th><th>From</th><th title="Runs in a new container, never the running app">New container</th><th title="The dashboard opens it in a terminal panel, not as a job">Terminal</th><th></th></tr></thead>
 <tbody>
-{{range .Project.Tasks}}<tr class="task" data-name="{{.Name}}" data-source="{{.Source}}" data-command="{{.Command}}" data-fresh="{{.Fresh}}" data-stock="{{.Pack}}">
+{{range .Project.Tasks}}<tr class="task" data-name="{{.Name}}" data-source="{{.Source}}" data-command="{{.Command}}" data-fresh="{{.Fresh}}" data-terminal="{{.Terminal}}" data-stock="{{.Pack}}">
 <td class="mono">{{.Name}}</td>
 <td>{{if eq .Source "hidden"}}<span class="mono muted">{{.Pack}}</span>{{else}}<input class="mono task-cmd" value="{{.Command}}" autocomplete="off" spellcheck="false" aria-label="Command of {{.Name}}">{{end}}</td>
 <td><span class="chip">{{if eq .Source "hidden"}}pack, hidden{{else if and (eq .Source "project") .Pack}}project, over the pack's{{else}}{{.Source}}{{end}}</span></td>
 <td>{{if ne .Source "hidden"}}<input type="checkbox" class="task-fresh"{{if .Fresh}} checked{{end}} aria-label="Run {{.Name}} in a new container">{{end}}</td>
+<td>{{if ne .Source "hidden"}}<input type="checkbox" class="task-terminal"{{if .Terminal}} checked{{end}} aria-label="Open {{.Name}} in a terminal">{{end}}</td>
 <td>{{if eq .Source "hidden"}}<button type="button" class="ln" data-task-restore>Restore</button>{{else if eq .Source "pack"}}<button type="button" class="ln danger" data-task-hide>Hide</button>{{else if .Pack}}<button type="button" class="ln" data-task-remove title="{{.Pack}}">Back to the pack's</button>{{else}}<button type="button" class="ln danger" data-task-remove>Remove</button>{{end}}</td>
 </tr>
-{{else}}<tr><td colspan="5" class="muted">No tasks.</td></tr>
+{{else}}<tr><td colspan="6" class="muted">No tasks.</td></tr>
 {{end}}</tbody>
 </table>
 <form class="add-row" data-stage="task">
 <input name="name" placeholder="name" class="mono" autocomplete="off" spellcheck="false" required aria-label="Task name" value="{{.NewTask}}">
 <input name="value" placeholder="bin/rails db:seed" class="mono" autocomplete="off" spellcheck="false" required aria-label="Task command"{{if .NewTask}} autofocus{{end}}>
 <label class="fresh"><input type="checkbox" name="fresh"> New container</label>
+<label class="fresh"><input type="checkbox" name="terminal"> Terminal</label>
 <button class="ln" disabled>Add task</button>
 </form>
-<p class="note">The project's <code>[tasks]</code> over the pack's, run from the <kbd>:</kbd> palette or <code>railswitch task &lt;name&gt;</code> in the app, with <code>sh -c</code> in <code>/app</code>. A changed command is staged when you leave the field; a pack task you change becomes the project's. Hide keeps a pack task from the list (<code>name = ""</code>); Restore brings it back. A task with New container ticked (<code>fresh_tasks</code>) always runs in a throwaway container of the app image, never the running app: for a watcher such as retest.</p>
+<p class="note">The project's <code>[tasks]</code> over the pack's, run from the <kbd>:</kbd> palette or <code>railswitch task &lt;name&gt;</code> in the app, with <code>sh -c</code> in <code>/app</code>. A changed command is staged when you leave the field; a pack task you change becomes the project's. Hide keeps a pack task from the list (<code>name = ""</code>); Restore brings it back. A task with New container ticked (<code>fresh_tasks</code>) always runs in a throwaway container of the app image, never the running app: for a watcher such as retest. A task with Terminal ticked (<code>terminal_tasks</code>) opens in a terminal panel from the <kbd>:</kbd> palette, not as a job: for anything you watch or type into.</p>
 </section>
 
 <section class="card">

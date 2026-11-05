@@ -460,7 +460,7 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		v.URL, v.Tasks = base+"/"+wt.Slug+"/task", tasks
+		v.URL, v.Tasks, v.TTY = base+"/"+wt.Slug+"/task", tasks, base+"/tty/"+wt.Slug+"/"
 		d := newDetail(p.Prefix, row{WT: wt}, "")
 		v.Actions = append(d.Actions, actionView{Label: "terminal window", URL: d.TermWindowURL}) // the detail shows it in its Terminal row
 	}

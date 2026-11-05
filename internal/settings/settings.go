@@ -53,6 +53,10 @@ var ops = map[string]opSpec{
 	// (fresh_tasks, D171).
 	"task.fresh.add":    {required: []string{"name"}},
 	"task.fresh.remove": {required: []string{"name"}},
+	// name is a task the dashboard runs in a terminal panel
+	// (terminal_tasks, D175).
+	"task.terminal.add":    {required: []string{"name"}},
+	"task.terminal.remove": {required: []string{"name"}},
 	// key is a list of config.HookLists; values its commands in order, none
 	// removes it.
 	"hooks.set": {required: []string{"key"}},
@@ -126,6 +130,10 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.AddFreshTask(data, e.Name)
 	case "task.fresh.remove":
 		return config.RemoveFreshTask(data, e.Name)
+	case "task.terminal.add":
+		return config.AddTerminalTask(data, e.Name)
+	case "task.terminal.remove":
+		return config.RemoveTerminalTask(data, e.Name)
 	case "link.add":
 		return config.AddLink(data, e.Label, e.URL)
 	case "link.remove":

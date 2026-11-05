@@ -377,8 +377,13 @@ exec --fresh`), so they never touch the running server: a watcher such as
 retest. A name with no task is an error at render
 (`fresh_tasks: no task named "nope"`).
 
+`terminal_tasks` names tasks the dashboard runs in a terminal panel in
+the page, not as a job: anything you watch or type into (D175). The two
+lists are independent; a name with no task is an error the same way.
+
 ```toml
-fresh_tasks = ["retest"]   # top level, before any table
+fresh_tasks = ["retest"]      # top level, before any table
+terminal_tasks = ["retest"]
 
 [tasks]
 retest = "retest --rails"

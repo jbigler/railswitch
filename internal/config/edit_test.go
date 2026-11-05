@@ -774,3 +774,19 @@ func TestFreshTask(t *testing.T) {
 		t.Error("removed from no fresh_tasks")
 	}
 }
+
+// TestTerminalTask: terminal_tasks is added to and taken from like
+// fresh_tasks (D175).
+func TestTerminalTask(t *testing.T) {
+	in := "schema = 1\n\n[tasks]\nretest = \"retest --rails\"\n"
+	got, err := AddTerminalTask(in, "retest")
+	if err != nil || !strings.Contains(got, "terminal_tasks = [\"retest\"]\n") {
+		t.Fatalf("add: %q, %v", got, err)
+	}
+	if _, err := AddTerminalTask(got, "retest"); err == nil {
+		t.Error("added twice")
+	}
+	if got, err = RemoveTerminalTask(got, "retest"); err != nil || strings.Contains(got, `"retest"]`) {
+		t.Fatalf("remove: %q, %v", got, err)
+	}
+}

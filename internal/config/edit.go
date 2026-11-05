@@ -695,6 +695,18 @@ func RemoveFreshTask(data, name string) (string, error) {
 	return removeTopElem(data, "fresh_tasks", name, "task %q does not run in a new container")
 }
 
+// AddTerminalTask appends name to the top-level terminal_tasks (D175); a
+// name already there is an error.
+func AddTerminalTask(data, name string) (string, error) {
+	return addTopElem(data, "terminal_tasks", name, "task %q already opens in a terminal")
+}
+
+// RemoveTerminalTask removes name from terminal_tasks; a name not there is
+// an error.
+func RemoveTerminalTask(data, name string) (string, error) {
+	return removeTopElem(data, "terminal_tasks", name, "task %q does not open in a terminal")
+}
+
 // addTopElem appends value to the top-level string array key, creating it;
 // a value already there is the error dup.
 func addTopElem(data, key, value, dup string) (string, error) {

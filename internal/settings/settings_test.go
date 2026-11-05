@@ -371,3 +371,12 @@ func TestPreviewFreshTaskOrder(t *testing.T) {
 		t.Errorf("fresh_tasks before its task: %+v; want blocked", p.Edits[0])
 	}
 }
+
+// A terminal_tasks name with no task is blocked, like fresh_tasks (D175).
+func TestPreviewTerminalTask(t *testing.T) {
+	e := filialEnv(t, nil)
+	p := preview(t, e, Edit{Op: "task.set", Name: "retest", Value: "retest --rails"}, Edit{Op: "task.terminal.add", Name: "retest"}, Edit{Op: "task.terminal.add", Name: "nope"})
+	if p.Edits[1].Impact == ImpactBlocked || p.Edits[2].Impact != ImpactBlocked || !strings.Contains(p.Edits[2].Error, `terminal_tasks: no task named "nope"`) {
+		t.Errorf("edits %+v", p.Edits)
+	}
+}

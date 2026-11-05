@@ -144,8 +144,9 @@ them gets a short hash added, and `--name` refuses them.
 
 `stop` keeps a worktree's data; `down` deletes its volumes, the database
 included. The dashboard does the same from each worktree's row: up, stop,
-restart, open the app and its links, and run a task (Shift+Enter runs it
-in a new terminal).
+restart, open the app and its links, and run a task from the `:` palette:
+in a terminal panel in the page or as a job (Shift+Enter: a desktop
+window).
 
 Each worktree also publishes a few ports on 127.0.0.1 for tools on your
 machine: the database (55432 + its number), the Ruby debugger (33000 +),

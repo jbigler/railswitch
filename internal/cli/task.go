@@ -85,7 +85,7 @@ func (e *env) taskEdit(ctx context.Context, verb string, args []string) int {
 		return e.fail(err)
 	}
 	var cur render.Task
-	for _, t := range render.MergeTasks(w.Stack.Pack.Tasks, w.Project.Tasks, w.Project.FreshTasks) {
+	for _, t := range render.MergeTasks(w.Stack.Pack.Tasks, w.Project.Tasks, w.Project.FreshTasks, w.Project.TerminalTasks) {
 		if t.Name == name {
 			cur = t
 		}

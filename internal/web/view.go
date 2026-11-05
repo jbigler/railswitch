@@ -961,6 +961,7 @@ func newAgentDefault(prefix, slug string, rows []agentRow) agentDefaultView {
 
 type tasksView struct {
 	Slug, URL                 string // "" without a worktree: no tasks or actions
+	TTY                       string // the worktree's terminal path, for a terminal task (D175)
 	SettingsURL               string // the palette's "new task" goes to its Tasks card
 	Tasks                     []task
 	Actions, Worktrees, Pages []actionView

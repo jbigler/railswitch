@@ -351,3 +351,22 @@ func TestSecretsCard(t *testing.T) {
 		t.Error("a card although every secret is set")
 	}
 }
+
+// TestPaletteTerminalTask: a terminal_tasks task is marked for the script,
+// which always opens it in a terminal (D175); the form carries the
+// worktree's terminal path.
+func TestPaletteTerminalTask(t *testing.T) {
+	f := newFixture(t)
+	f.cli.set("--json -C /ws/ftest -w b task ls", `[{"name":"rails:test watcher","command":"retest --rails","source":"project","terminal":true},{"name":"test","command":"bin/rails test","source":"pack"}]`)
+	body := f.do(req("GET", "/p/ftest/b/tasks", nil)).Body.String()
+	for _, want := range []string{
+		`data-tty="/p/ftest/tty/b/"`,
+		`<button name="task" value="rails:test watcher" class="pal-task" data-terminal title="Always in a terminal (Settings → Tasks)"><span class="pal-kind">task</span> <b>rails:test watcher</b> ▣`,
+		`<button name="task" value="test" class="pal-task">`,
+		`in a terminal panel`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("palette lacks %q:\n%s", want, body)
+		}
+	}
+}

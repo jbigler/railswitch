@@ -113,7 +113,10 @@ browser = "none"           # opt-in: --option browser=playwright@1
 [tasks]
 console = "bin/rails console"
 test = "bin/rails test"
-"test:system" = "bin/rails test:system"
+# One worker per browser CPU (D174): Rails' default is one per host core,
+# and past the browser's cap pages starve into Playwright's 5 s timeouts.
+# A PARALLEL_WORKERS of the project's wins; without a browser, Rails decides.
+"test:system" = "env ${BROWSER_CPUS:+PARALLEL_WORKERS=${PARALLEL_WORKERS:-$BROWSER_CPUS}} bin/rails test:system"
 
 [[links]]
 label = "Mailer previews"

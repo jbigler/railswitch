@@ -892,6 +892,7 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 		"status.dir":     filepath.Join(m.Inputs.Workspace, filepath.FromSlash(statusDir), wt.Slug), // D58: the agents' status files
 		"agent.default":  filepath.Join(m.Inputs.Workspace, filepath.FromSlash(AgentDefaultDir)),    // <agent.default>/<agent>: its default config (D135)
 		"agent.memory":   filepath.Join(m.Inputs.Workspace, filepath.FromSlash(AgentMemoryDir)),     // <agent.memory>/<agent>: its memory, shared by every worktree (D136)
+		"cpus.tool":      in.CPUs(&Service{Role: RoleTool}),                                         // a tool's --cpus cap, the browser's (D174)
 	}
 	in.Values = v
 	override := p.Worktrees[wt.Slug].Versions

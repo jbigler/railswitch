@@ -206,6 +206,9 @@ func TestAddAllocatesAfterGit(t *testing.T) {
 		t.Error("no create-pending marker for the new worktree (D126)")
 	}
 	for _, c := range e.f.Calls {
+		if slices.Equal(c[:3], []string{"git", "-C", "/"}) {
+			continue // sys.GitNetEnv's read of the user's core.sshCommand, outside any repo
+		}
 		if c[0] == "git" && !slices.Contains(c, "core.fsmonitor=false") || c[0] == "git" && !slices.Contains(c, "core.hooksPath=/dev/null") {
 			t.Errorf("git call without the safety config: %q", c)
 		}
@@ -890,5 +893,46 @@ func TestUnregisteredGitWorktreeOnlyInWorktrees(t *testing.T) {
 	}
 	if exists(filepath.Join(e.ws, "worktrees", "stray")) || !exists(filepath.Join(e.ws, "old")) {
 		t.Error("removed the wrong git worktree")
+	}
+}
+
+// TestAddFetchesUnfetchedBranch: a branch pushed to origin since the last
+// fetch is fetched and tracked, not made anew at the base (D173).
+func TestAddFetchesUnfetchedBranch(t *testing.T) {
+	e := setup(t)
+	other := filepath.Join(t.TempDir(), "other")
+	git(t, e.ws, "clone", "-q", filepath.Join(filepath.Dir(e.ws), "remote.git"), other)
+	git(t, other, "checkout", "-q", "-b", "theirs")
+	writeFile(t, filepath.Join(other, "THEIRS"), "x\n")
+	git(t, other, "add", "THEIRS")
+	git(t, other, "commit", "-q", "-m", "theirs")
+	git(t, other, "push", "-q", "origin", "theirs")
+	want := strings.TrimSpace(git(t, other, "rev-parse", "HEAD"))
+
+	w := e.add(t, "theirs", "")
+	if got := strings.TrimSpace(git(t, w.Dir, "rev-parse", "HEAD")); got != want {
+		t.Errorf("HEAD %s; want origin's theirs %s", got, want)
+	}
+	if up := strings.TrimSpace(git(t, w.Dir, "rev-parse", "--abbrev-ref", "theirs@{upstream}")); up != "origin/theirs" {
+		t.Errorf("upstream %q; want origin/theirs", up)
+	}
+}
+
+// TestAddNewBranchFromBase: a new branch starts at origin/<base branch>,
+// not at what the base worktree has checked out, and tracks nothing (D173).
+func TestAddNewBranchFromBase(t *testing.T) {
+	e := setup(t)
+	want := strings.TrimSpace(git(t, e.base, "rev-parse", "origin/master"))
+	git(t, e.base, "checkout", "-q", "-b", "elsewhere")
+	writeFile(t, filepath.Join(e.base, "ELSEWHERE"), "x\n")
+	git(t, e.base, "add", "ELSEWHERE")
+	git(t, e.base, "commit", "-q", "-m", "elsewhere")
+
+	w := e.add(t, "brand-new", "")
+	if got := strings.TrimSpace(git(t, w.Dir, "rev-parse", "HEAD")); got != want {
+		t.Errorf("HEAD %s; want origin/master %s", got, want)
+	}
+	if out, err := exec.Command("git", "-C", w.Dir, "rev-parse", "--abbrev-ref", "brand-new@{upstream}").CombinedOutput(); err == nil {
+		t.Errorf("brand-new tracks %s; want no upstream", out)
 	}
 }

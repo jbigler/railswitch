@@ -328,6 +328,10 @@ body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
 .set-table td.size{white-space:nowrap}
 #note textarea{display:block;width:100%;box-sizing:border-box}
 
+/* Settings: Staged changes and Apply stay in view while the left column
+   scrolls (wide windows; a narrow one stacks the columns). */
+@media (min-width:801px){.grid.settings>.pane{position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}}
+
 /* Narrow windows (docs/dashboard.md): one column; the project page shows
    the list or a worktree's detail, as data-pane says. */
 .back{display:none}

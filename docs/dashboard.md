@@ -358,7 +358,8 @@ shows what each one does before anything is written.
 - **Edit project.toml** opens the raw editor (below), for everything
   else: services, routes, firewall, agents, image, tools, versions.
 
-**Staged changes**
+**Staged changes** (the right column, which stays in view while the left
+one scrolls, on a window wider than 800px)
 
 - "Staged changes · N", one card per edit: what changes (`cache: kv@1 →
   none`, `Env BIND: "0.0.0.0" → "127.0.0.1"`, `Link Admin: added`), its

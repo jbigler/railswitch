@@ -240,6 +240,8 @@ document.addEventListener("click", (e) => {
   }
   const termBtn = t.closest("[data-term]");
   if (termBtn) return openTermPanel(termBtn);
+  const sw = t.closest("[data-switch-url]");
+  if (sw) return switchAgent(sw);
   const opener = t.closest("[data-open]");
   if (opener) return openDialog(opener.dataset.open);
   if (t.closest("[data-colors]")) return openColors();
@@ -413,6 +415,21 @@ async function openTermPanel(btn) {
     agentTermShown();
   });
   agentTermShown();
+}
+
+// switchAgent stops the running agent (D176) and, once that job ends
+// well, opens the other agent's terminal, which starts it: one agent runs
+// per worktree.
+function switchAgent(btn) {
+  const { switchUrl, switchFrom, switchTerm, switchTo } = btn.dataset;
+  if (!confirm("Stop " + switchFrom + " and start " + switchTo + "? " + switchFrom + "'s session ends; what it changed in the worktree stays.")) return;
+  const slug = $("#detail")?.dataset.slug;
+  startJob(switchUrl, new URLSearchParams({ agent: switchFrom }), (state) => {
+    if (state !== "ok") return toast(switchFrom + " did not stop; " + switchTo + " was not started. Its output is under Jobs.", true);
+    // Left for another worktree meanwhile: never start an agent unasked.
+    if ($("#detail")?.dataset.slug !== slug) return toast(switchFrom + " stopped; start " + switchTo + " from its Agent card.", false);
+    openTermPanel({ dataset: { term: switchTerm, termLabel: switchTo, termAgent: "", termTab: "agent" } });
+  });
 }
 
 // agentTermShown marks the body while the shown worktree's agent terminal

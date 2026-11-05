@@ -356,13 +356,39 @@ func TestDetailAgentTerms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, url := range []string{"agent?agent=claude", "agent?agent=omp"} {
-		if n := strings.Count(html, `data-term="/p/ftest/tty/feat-login/`+url+`"`); n != 2 {
-			t.Errorf("%s: %d buttons, want 2 (Terminal menu, Agent card)", url, n)
+	// D176: claude runs, so its terminal is in the menu and the card's
+	// banner; omp's is in the menu, and the card switches to it.
+	for url, want := range map[string]int{"agent?agent=claude": 2, "agent?agent=omp": 1} {
+		if n := strings.Count(html, `data-term="/p/ftest/tty/feat-login/`+url+`"`); n != want {
+			t.Errorf("%s: %d terminal buttons, want %d", url, n, want)
+		}
+	}
+	for _, want := range []string{
+		`<div class="agent-now on"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b><span class="mono">claude</span> is running</b>`,
+		`>Open terminal</button>`,
+		`<button type="button" class="ln" data-switch-url="/p/ftest/feat-login/agent-stop" data-switch-from="claude" data-switch-term="/p/ftest/tty/feat-login/agent?agent=omp" data-switch-to="omp">Switch to omp</button>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("card lacks %q:\n%s", want, html)
 		}
 	}
 	if !strings.Contains(html, "Agent: claude ● ▣") || !strings.Contains(html, "Agent: omp ▣") {
 		t.Errorf("menu entries don't name the agents or mark the running one:\n%s", html)
+	}
+	// None running: no banner of a running one, a Start per agent, the first the main one.
+	r.WT.Services[len(r.WT.Services)-2].State = "inactive/dead"
+	idle, err := render("detail", newDetail("ftest", r, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(idle, "<b>No agent running</b>") || !strings.Contains(idle, `class="ln main" data-term="/p/ftest/tty/feat-login/agent?agent=claude"`) ||
+		!strings.Contains(idle, `>Start omp</button>`) || strings.Contains(idle, "Stop claude") || strings.Contains(idle, "Switch to") {
+		t.Errorf("idle card wrong:\n%s", idle)
+	}
+	// D176: the running agent has a Stop; the stopped one doesn't.
+	if !strings.Contains(html, `<form method="post" action="/p/ftest/feat-login/agent-stop" data-post data-confirm="Stop claude?`) ||
+		!strings.Contains(html, `<input type="hidden" name="agent" value="claude"><button class="ln danger">Stop claude</button>`) || strings.Contains(html, "Stop omp") {
+		t.Errorf("Stop buttons wrong:\n%s", html)
 	}
 }
 

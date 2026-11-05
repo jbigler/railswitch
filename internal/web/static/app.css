@@ -66,6 +66,16 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .services .svc{display:grid;grid-template-columns:1.3em minmax(0,1fr) 5rem 4.5rem;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)}
 .services .svc .g{font-size:1.6em;line-height:.8;text-align:center}
 .services .svc .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The Agent card (D176): the running agent, or that none runs, first. */
+.agent-now{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg2)}
+.agent-now.on{border-color:var(--green);background:color-mix(in srgb,var(--green) 12%,var(--card))}
+.agent-dot{flex:none;width:12px;height:12px;border-radius:50%;border:2px solid var(--muted);box-sizing:border-box}
+.agent-now.on .agent-dot{background:var(--green);border-color:var(--green)}
+.agent-what{display:flex;flex-direction:column;gap:2px;flex:1 1 14rem;min-width:0}
+.agent-what b{font-size:1.1em}
+.agent-acts{display:flex;flex-wrap:wrap;align-items:center}
+.agent-acts form{display:inline}
+.agent-others{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 8px}
 .msg{margin-top:4px;padding:6px 8px;background:var(--bg2);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere}
 .actions{display:flex;flex-wrap:wrap;align-items:center}
 .actions form,.job-hd form{display:inline;margin-left:6px}

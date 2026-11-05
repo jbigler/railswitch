@@ -328,19 +328,23 @@
    "max": [
     0.277,
     1.839,
-    0.161
+    0.16
    ],
    "min": [
     -0.278,
-    0.004,
+    0.005,
     -0.138
    ],
    "parts": [
     "AndroidA_Arm_L",
     "AndroidA_Arm_R",
+    "AndroidA_Forearm_L",
+    "AndroidA_Forearm_R",
     "AndroidA_Head",
     "AndroidA_Leg_L",
-    "AndroidA_Leg_R"
+    "AndroidA_Leg_R",
+    "AndroidA_Shin_L",
+    "AndroidA_Shin_R"
    ]
   },
   "Char_Android_Agent": {
@@ -360,9 +364,13 @@
    "parts": [
     "Agent_Arm_L",
     "Agent_Arm_R",
+    "Agent_Forearm_L",
+    "Agent_Forearm_R",
     "Agent_Head",
     "Agent_Leg_L",
-    "Agent_Leg_R"
+    "Agent_Leg_R",
+    "Agent_Shin_L",
+    "Agent_Shin_R"
    ]
   },
   "Char_Android_B": {
@@ -373,19 +381,23 @@
    "max": [
     0.277,
     1.839,
-    0.161
+    0.16
    ],
    "min": [
     -0.278,
-    0.004,
+    0.005,
     -0.138
    ],
    "parts": [
     "AndroidB_Arm_L",
     "AndroidB_Arm_R",
+    "AndroidB_Forearm_L",
+    "AndroidB_Forearm_R",
     "AndroidB_Head",
     "AndroidB_Leg_L",
-    "AndroidB_Leg_R"
+    "AndroidB_Leg_R",
+    "AndroidB_Shin_L",
+    "AndroidB_Shin_R"
    ]
   },
   "Char_Android_C": {
@@ -395,19 +407,23 @@
    "max": [
     0.277,
     1.839,
-    0.161
+    0.16
    ],
    "min": [
     -0.278,
-    0.004,
+    0.005,
     -0.138
    ],
    "parts": [
     "AndroidC_Arm_L",
     "AndroidC_Arm_R",
+    "AndroidC_Forearm_L",
+    "AndroidC_Forearm_R",
     "AndroidC_Head",
     "AndroidC_Leg_L",
-    "AndroidC_Leg_R"
+    "AndroidC_Leg_R",
+    "AndroidC_Shin_L",
+    "AndroidC_Shin_R"
    ]
   },
   "Deco_Backpack": {
@@ -1033,6 +1049,38 @@
     "top": [
      0,
      0.75,
+     0
+    ]
+   }
+  },
+  "Furn_Desk_SitStand": {
+   "extras": [
+    "collider",
+    "parts",
+    "accent"
+   ],
+   "max": [
+    0.8,
+    0.74,
+    0.375
+   ],
+   "min": [
+    -0.8,
+    0.0,
+    -0.375
+   ],
+   "parts": [
+    "Desk_SitStand_Top"
+   ],
+   "points": {
+    "stand": [
+     0,
+     1.1,
+     0
+    ],
+    "top": [
+     0,
+     0.74,
      0
     ]
    }

@@ -1184,9 +1184,11 @@ any open page.
     panel (D149, as on the worktree page), **Terminal window** (`term`) and
     **Neovim window** (`nvim --new-term`) a window on this machine. **The
     agent's desk** and its wall screen open the agent panel, as the
-    android does; the agent's android stands at it, its eyes and ring in
-    the agent's state (pulsing while it waits on you), its hands typing
-    while it works; it opens the agent's state and message and the agent
+    android does. The desk is a sit-stand one (D183): while the agent
+    works, its android stands and types, the desk raised to standing height
+    with its screens and the chair pushed back; otherwise it sits, the desk
+    down. Waiting on you, it stays as it was. Its eyes and ring show the
+    agent's state (pulsing while it waits on you); it opens the agent's state and message and the agent
     itself in a live terminal (D149): a running service agent's session at
     once, else after **Connect** (connecting runs `up`), with **Open
     console window** beside it; with a package that counts them (claude@1),

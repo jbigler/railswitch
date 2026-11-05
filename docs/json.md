@@ -1539,6 +1539,9 @@ such an entry, and reports any hook in `.git/modules/**/hooks/` and any
 symlink or file where `.git/worktrees`, `.git/modules` or a directory under
 them should be (`not-a-dir`); a finding
 is a warning (`warn` true), and `railswitch hooks check` lists them.
+`dnsmasq (DNS filter)` checks for a dnsmasq built with nftset in the
+firewall hook's PATH; without one, enforce-mode containers resolve any
+name (D182), so a failure is a warning.
 `ssh-keygen -Y` checks that `ssh-keygen` supports `-Y verify` (OpenSSH 8.2
 or newer), which `library verify` and `library sign` need; a failure is a
 warning, since nothing else needs it.
@@ -1556,9 +1559,9 @@ code, and the text output shows it as `warn`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `dnsmasq (DNS filter)`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
-| `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`): it doesn't change the exit code. `false` for a passed check. |
+| `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`, `dnsmasq (DNS filter)`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a missing `stack.lock`, `railswitch lock --review` for a stale one); `""` for a passed check. |
 

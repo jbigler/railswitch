@@ -82,6 +82,15 @@ func TestDescriptorGolden(t *testing.T) {
 	if compact.String() != brief {
 		t.Errorf("descriptor\n got %s\nwant %s", compact.String(), brief)
 	}
+	// D182: the poststop one runs hook.sh … stop, at poststop, for the same containers.
+	stop := files(t, fw)[".railswitch/firewall/hooks.d/filial-firewall-stop.json"]
+	compact.Reset()
+	if err := json.Compact(&compact, stop.Data); err != nil {
+		t.Fatal(err)
+	}
+	if want := strings.Replace(strings.Replace(brief, `"/WORKSPACES/filial/.railswitch/firewall"]`, `"/WORKSPACES/filial/.railswitch/firewall","stop"]`, 1), `["createRuntime"]`, `["poststop"]`, 1); compact.String() != want {
+		t.Errorf("stop descriptor\n got %s\nwant %s", compact.String(), want)
+	}
 }
 
 func TestScriptFiles(t *testing.T) {
@@ -113,7 +122,9 @@ func TestScriptFiles(t *testing.T) {
 		".railswitch/firewall/deps.allow",
 		".railswitch/firewall/firewall.sh",
 		".railswitch/firewall/hook.sh",
+		".railswitch/firewall/hooks.d/filial-firewall-stop.json",
 		".railswitch/firewall/hooks.d/filial-firewall.json",
+		".railswitch/firewall/resolv.conf",
 	}
 	if !slices.Equal(keys, want) {
 		t.Errorf("files %v, want %v", keys, want)
@@ -595,4 +606,133 @@ func TestFirewallAllowFor(t *testing.T) {
 			t.Errorf("%v: succeeded\n%s", args, out)
 		}
 	}
+}
+
+// TestHookDNSFilter (D182): with filial.firewall.dns=filter under enforce,
+// the hook writes the filter's config (the gateway for container names and
+// each allowed name, with its nftset) and starts dnsmasq in the
+// container's netns; without dnsmasq it fails the start; under log it
+// starts nothing; the poststop run ends it and drops its files.
+func TestHookDNSFilter(t *testing.T) {
+	ann := map[string]string{
+		"filial.firewall": "app", "filial.firewall.mode": "enforce",
+		"filial.firewall.networks": "filial-feat-dev", "filial.firewall.dns": "filter",
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "hook.sh")
+	src, _ := os.ReadFile(filepath.Join("assets", "hook.sh"))
+	if err := os.WriteFile(script, src, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "app.allow"), []byte("api.example.com\n203.0.113.0/24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withDNS := func(t *testing.T, root string, dnsmasq bool) []string {
+		env := hookEnv(t, filepath.Join(t.TempDir(), "nft.out"))
+		bin := t.TempDir()
+		shims := map[string]string{"getent": "#!/bin/bash\necho \"198.51.100.20 STREAM $2\"\n"}
+		if dnsmasq {
+			// The stand-in records its argv and, as dnsmasq does, writes its pid file.
+			shims["dnsmasq"] = "#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\nsleep 300 & echo $! >\"$pf\"\n"
+		}
+		for name, body := range shims {
+			if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i, kv := range env {
+			if strings.HasPrefix(kv, "PATH=") {
+				env[i] = "PATH=" + bin + ":" + strings.TrimPrefix(kv, "PATH=")
+			}
+		}
+		return append(env, "DNSLOG="+filepath.Join(root, "dnsmasq.argv"))
+	}
+
+	root := t.TempDir()
+	env := withDNS(t, root, true)
+	if msg, err := runHookAt(t, script, root, env, ann); err != nil {
+		t.Fatalf("hook: %v\n%s", err, msg)
+	}
+	for _, kv := range env {
+		if out, ok := strings.CutPrefix(kv, "OUT="); ok {
+			rules, _ := os.ReadFile(out)
+			r := string(rules)
+			side, local := strings.Index(r, "ip daddr 10.89.7.1 udp dport 53 udp sport != 1053 goto deny"), strings.Index(r, "@local4 accept")
+			if side < 0 || !strings.Contains(r, "ip daddr 10.89.7.1 tcp dport 53 goto deny") || side > local {
+				t.Errorf("DNS to the gateway is not kept to the filter, ahead of local4:\n%s", r)
+			}
+		}
+	}
+	conf, err := os.ReadFile(filepath.Join(root, "state", "dns", "0123456789ab.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"# gateway=10.89.7.1\n", "listen-address=127.0.0.1\n", "no-resolv\n", "cache-size=0\n",
+		"server=//10.89.7.1\n", "server=/dns.podman/10.89.7.1\n",
+		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=1053\n",
+	} {
+		if !strings.Contains(string(conf), want) {
+			t.Errorf("conf lacks %q:\n%s", want, conf)
+		}
+	}
+	if strings.Contains(string(conf), "203.0.113.0/24") {
+		t.Errorf("a CIDR is in the DNS filter:\n%s", conf)
+	}
+	argv, _ := os.ReadFile(filepath.Join(root, "dnsmasq.argv"))
+	if string(argv) != "--conf-file="+filepath.Join(root, "state", "dns", "0123456789ab.conf")+"\n" {
+		t.Errorf("dnsmasq argv %q", argv)
+	}
+	pidFile := filepath.Join(root, "state", "dns", "0123456789ab.pid")
+	pid, _ := os.ReadFile(pidFile)
+
+	// poststop: the filter ends, its files go.
+	stop := exec.Command("bash", script, "filial", root, "stop")
+	stop.Stdin = strings.NewReader(`{"id":"0123456789abcdef0123456789abcdef","status":"stopped"}`)
+	if out, err := stop.CombinedOutput(); err != nil {
+		t.Fatalf("stop: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(pidFile); err == nil {
+		t.Error("the pid file survived poststop")
+	}
+	if p := strings.TrimSpace(string(pid)); p != "" {
+		if err := exec.Command("kill", "-0", p).Run(); err == nil {
+			t.Errorf("the filter (pid %s) still runs after poststop", p)
+			_ = exec.Command("kill", p).Run()
+		}
+	}
+
+	// No dnsmasq: the start fails, naming it.
+	root = t.TempDir()
+	env = withDNS(t, root, false)
+	for i, kv := range env {
+		if strings.HasPrefix(kv, "PATH=") { // keep the shims, drop a real dnsmasq the host may have
+			env[i] = "PATH=" + strings.SplitN(strings.TrimPrefix(kv, "PATH="), ":", 2)[0] + ":" + filepath.Dir(lookTool(t, "nsenter")) + ":/usr/bin:/bin"
+		}
+	}
+	if msg, err := runHookAt(t, script, root, env, ann); err == nil || !strings.Contains(string(msg), "no dnsmasq") {
+		t.Errorf("without dnsmasq: %v\n%s", err, msg)
+	}
+
+	// log mode: no filter.
+	root = t.TempDir()
+	ann["filial.firewall.mode"] = "log"
+	if msg, err := runHookAt(t, script, root, withDNS(t, root, true), ann); err != nil {
+		t.Fatalf("log: %v\n%s", err, msg)
+	}
+	if _, err := os.Stat(filepath.Join(root, "dnsmasq.argv")); err == nil {
+		t.Error("log mode started the DNS filter")
+	}
+}
+
+// lookTool is the shim directory's tool name (hookEnv's first PATH entry).
+func lookTool(t *testing.T, name string) string {
+	t.Helper()
+	for _, kv := range hookEnv(t, filepath.Join(t.TempDir(), "x")) {
+		if p, ok := strings.CutPrefix(kv, "PATH="); ok {
+			return filepath.Join(strings.SplitN(p, ":", 2)[0], name)
+		}
+	}
+	t.Fatal("no PATH")
+	return ""
 }

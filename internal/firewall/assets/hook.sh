@@ -21,6 +21,21 @@
 #   <prefix>.firewall.networks  comma list of the podman networks the container
 #                            joins; their subnets are what "local" means
 #   <prefix>.firewall.extra  optional extra hostnames/IPs, comma or space separated
+#   <prefix>.firewall.dns    filter: run a DNS filter for the container (D182,
+#                            below); render sets it, and mounts resolv.conf,
+#                            under enforce when the host has dnsmasq with nftset
+#
+# DNS filter (D182): a dnsmasq the hook starts in the container's network
+# namespace (not its process namespace: nothing inside can see or signal
+# it), on 127.0.0.1:53, which the container's /etc/resolv.conf names (a
+# read-only mount render adds: podman's own would name the network's
+# resolver). Queries to the network's resolver are rejected unless they
+# come from the filter's own source port (QPORT), so it can't be skipped. It answers the allow lists' host names (and their
+# subdomains), the worktree's container names and *.dns.podman, each by
+# asking the network's own resolver, and puts every address it answers
+# into allowd4 as it goes, with a timeout: a host whose addresses rotate
+# keeps working. Every other name gets REFUSED, which closes DNS as a way
+# out. The poststop hook (hook.sh <prefix> <dir> stop) ends it.
 #
 # crun runs hooks inside podman's rootless user namespace, where this process
 # is uid 0 with CAP_NET_ADMIN over the container's network namespace, so plain
@@ -50,6 +65,7 @@ ROOT="${2:?usage: hook.sh <project-prefix> <firewall-dir>  (OCI state JSON on st
 STATE="$ROOT/state"
 LOG="$ROOT/hook.log"
 TABLE=wt_firewall
+QPORT=1053 # the DNS filter's source port for its own upstream queries
 FLOOR=(0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16)
 
 # Only this user reads the state and the log (another local user would
@@ -58,7 +74,7 @@ FLOOR=(0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 169.254.0.0/16 172.16.0.0/12 192.168.0
 umask 077
 mkdir -p "$STATE"
 chmod 700 "$STATE" || true
-chmod 600 "$STATE"/* "$LOG" 2>/dev/null || true
+for f in "$STATE"/* "$STATE"/dns/* "$LOG"; do [[ -f "$f" ]] && chmod 600 "$f"; done 2>/dev/null || true
 log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
 die() { log "error: ${cid:-?} $*"; printf 'firewall hook: %s\n' "$*" >&2; exit 1; }
 
@@ -72,13 +88,27 @@ field_str() {
   [[ "$oci" =~ \"$key\"[[:space:]]*:[[:space:]]*\"([^\"]*)\" ]] && printf '%s' "${BASH_REMATCH[1]}"
 }
 
-pid="$(field_num pid)" || die "no pid in the OCI state"
 cid="$(field_str id)" || die "no id in the OCI state"
 cid="${cid:0:12}"
+DNSDIR="$STATE/dns"
+
+# poststop: end the container's DNS filter, if it has one. Never fails: the
+# container is already gone.
+if [[ "${3:-}" == stop ]]; then
+  if [[ -f "$DNSDIR/$cid.pid" ]]; then
+    dpid="$(cat "$DNSDIR/$cid.pid" 2>/dev/null)"
+    [[ "$dpid" =~ ^[0-9]+$ ]] && kill "$dpid" 2>/dev/null || true
+  fi
+  rm -f "$DNSDIR/$cid.conf" "$DNSDIR/$cid.pid" "$DNSDIR/$cid.log"
+  exit 0
+fi
+
+pid="$(field_num pid)" || die "no pid in the OCI state"
 profiles="$(field_str "$P.firewall")" || die "no $P.firewall annotation"
 mode="$(field_str "$P.firewall.mode")" || true
 extra="$(field_str "$P.firewall.extra")" || true
 networks="$(field_str "$P.firewall.networks")" || true
+dns="$(field_str "$P.firewall.dns")" || true
 
 case "$mode" in
   enforce|log|off) ;;
@@ -133,9 +163,11 @@ meta_ranges() {
   done < <(jq -r "$filter" <<<"$json" 2>/dev/null)
 }
 
+names=()      # host names, for the DNS filter
 resolve() {
   local name="$1" ip found=""
   [[ "$name" =~ ^[A-Za-z0-9.-]+$ ]] || { unresolved+=("$name (not a hostname)"); return 0; }
+  names+=("$name")
   while read -r ip; do
     [[ "$ip" =~ $ipv4 ]] || continue
     add "$ip" "$name"; found=1
@@ -185,6 +217,15 @@ for n in "${netlist[@]}"; do
     [[ "$net" =~ $ipv4 ]] && local4+=("$net")
   done < <(grep -oE '"subnet"[[:space:]]*:[[:space:]]*"[^"]+"' "$NETWORK_DIR/$n.json" | grep -oE '[0-9.]+/[0-9]+')
 done
+# The first network's gateway answers its container names (aardvark-dns):
+# the DNS filter asks it.
+gateway="$(grep -oE '"gateway"[[:space:]]*:[[:space:]]*"[0-9.]+"' "$NETWORK_DIR/${netlist[0]}.json" | grep -oE '[0-9]+(\.[0-9]+){3}' | head -n 1)" || true
+filter=""
+if [[ "$dns" == filter && "$mode" == enforce ]]; then
+  DNSMASQ="$(command -v dnsmasq)" || die "$P.firewall.dns=filter, but there is no dnsmasq on this host: install it (railswitch doctor), or rerun railswitch render"
+  [[ "$gateway" =~ $ipv4 ]] || die "network ${netlist[0]} has no gateway in $NETWORK_DIR/${netlist[0]}.json: the DNS filter has nothing to ask"
+  filter=1
+fi
 
 elements() { (( $# )) || return 0; printf 'elements = { %s }' "$(IFS=,; printf '%s' "$*")"; }
 
@@ -202,6 +243,8 @@ table inet $TABLE {
   set allow4 { type ipv4_addr; flags interval; auto-merge; $(elements ${allow[@]+"${allow[@]}"}) }
   # fw allow --for: addresses the kernel drops when their timeout ends.
   set allowt4 { type ipv4_addr; flags timeout; }
+  # The DNS filter's answers (D182); each lasts an hour past its last lookup.
+  set allowd4 { type ipv4_addr; flags timeout; timeout 1h; }
   set local4 { type ipv4_addr; flags interval; auto-merge; $(elements ${local4[@]+"${local4[@]}"}) }
   set floor4 { type ipv4_addr; flags interval; elements = { $floor } }
   # Everything that met the final verdict: rejected under enforce, would have
@@ -212,10 +255,12 @@ table inet $TABLE {
     type filter hook output priority filter; policy accept;
     oif "lo" accept
     ct state established,related accept
+$([[ -n "$filter" ]] && printf '    ip daddr %s udp dport 53 udp sport != %s goto deny\n    ip daddr %s tcp dport 53 goto deny\n' "$gateway" "$QPORT" "$gateway")
     ip daddr @local4 accept
     ip daddr @floor4 goto deny
     ip daddr @allow4 accept
     ip daddr @allowt4 accept
+    ip daddr @allowd4 accept
     # Neighbour discovery and other link-local IPv6 housekeeping.
     ip6 daddr { fe80::/10, ff02::/16 } accept
     goto deny
@@ -244,16 +289,41 @@ floor_set="$(set_text floor4)"
 for f in "${FLOOR[@]}"; do
   grep -qF -- "$f" <<<"$floor_set" || die "verify: floor4 lacks $f"
 done
-fl="$(line_of '@floor4')"; al="$(line_of '@allow4')"; tl="$(line_of '@allowt4')"
-[[ -n "$fl" && -n "$al" && -n "$tl" && "$fl" -lt "$al" && "$fl" -lt "$tl" ]] || die "verify: the floor rule is not ahead of the allow rules"
+fl="$(line_of '@floor4')"; al="$(line_of '@allow4')"; tl="$(line_of '@allowt4')"; dl="$(line_of '@allowd4')"
+[[ -n "$fl" && -n "$al" && -n "$tl" && -n "$dl" && "$fl" -lt "$al" && "$fl" -lt "$tl" && "$fl" -lt "$dl" ]] || die "verify: the floor rule is not ahead of the allow rules"
 [[ "$(last_rule output)" == "goto deny" ]] || die "verify: chain output does not end in goto deny"
 [[ "$(last_rule deny)" == "${verdict%% *}"* ]] || die "verify: chain deny does not end in ${verdict%% *}"
 if (( ${#allow[@]} )); then
   grep -q 'elements' <<<"$(set_text allow4)" || die "verify: allow4 is empty, ${#allow[@]} entries were asked for"
+fi
+if [[ -n "$filter" ]]; then
+  ll="$(line_of '@local4')"; gl="$(line_of "ip daddr $gateway udp dport 53")"
+  [[ -n "$gl" && -n "$ll" && "$gl" -lt "$ll" ]] || die "verify: DNS to $gateway is not kept to the filter"
+fi
+
+# The DNS filter: its config, then dnsmasq in the container's network
+# namespace. It daemonizes; no pid file within 5 s fails the start.
+if [[ -n "$filter" ]]; then
+  mkdir -p "$DNSDIR"
+  conf="$DNSDIR/$cid.conf"
+  {
+    printf '# railswitch DNS filter for %s (D182): written by hook.sh at each start.\n' "$cid"
+    printf '# gateway=%s\n' "$gateway"
+    printf '%s\n' port=53 listen-address=127.0.0.1 bind-dynamic no-resolv no-hosts no-poll cache-size=0 \
+      user=root group=root "query-port=$QPORT" "pid-file=$DNSDIR/$cid.pid" "log-facility=$DNSDIR/$cid.log" \
+      "server=//$gateway" "server=/dns.podman/$gateway"
+    for n in ${names[@]+"${names[@]}"}; do
+      printf 'server=/%s/%s\nnftset=/%s/4#inet#%s#allowd4\n' "$n" "$gateway" "$n" "$TABLE"
+    done
+  } >"$conf"
+  rm -f "$DNSDIR/$cid.pid"
+  nsenter -t "$pid" -n "$DNSMASQ" --conf-file="$conf" </dev/null >>"$LOG" 2>&1 || die "dnsmasq did not start for pid $pid (see $LOG)"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -s "$DNSDIR/$cid.pid" ]] && break; sleep 0.5; done
+  [[ -s "$DNSDIR/$cid.pid" ]] || die "dnsmasq wrote no pid file for pid $pid (see $LOG)"
 fi
 
 {
   printf 'profiles=%s\nmode=%s\n' "$profiles" "$mode"
   printf 'label %s\n' ${labels[@]+"${labels[@]}"}
 } >"$STATE/$cid"
-log "$cid pid=$pid profiles=$profiles mode=$mode allow=${#allow[@]} local=${local4[*]:-none}${unresolved[*]:+ unresolved: ${unresolved[*]}}"
+log "$cid pid=$pid profiles=$profiles mode=$mode allow=${#allow[@]} local=${local4[*]:-none} dns=$([[ -n "$filter" ]] && echo filter || echo open)${unresolved[*]:+ unresolved: ${unresolved[*]}}"

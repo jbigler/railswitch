@@ -342,6 +342,9 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 			ann = append(ann, quoteWord(a))
 		}
 		u.add(c, "Annotation", ann...)
+		if in.DNSFilter(s) {
+			u.add(c, "Volume", ResolvConfMount(ws))
+		}
 	}
 
 	var args []string

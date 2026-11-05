@@ -328,3 +328,28 @@ func TestAgentMemoryMount(t *testing.T) {
 		}
 	}
 }
+
+// TestDNSFilterUnits (D182): on a host with dnsmasq, an enforce-mode
+// firewalled container resolves at 127.0.0.1 and asks the hook for the
+// filter; a log-mode one doesn't; without dnsmasq, none does.
+func TestDNSFilterUnits(t *testing.T) {
+	m, _ := filial(t, func(p *config.Project) { p.Firewall.Mode = "log" })
+	m.Inputs.Host.DNSFilter = true
+	units, err := Quadlet(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent := "filial-feat-agent-probe.container" // agents are always enforce
+	hasLine(t, units, agent, "Volume="+ResolvConfMount(m.Inputs.Workspace))
+	hasLine(t, units, agent, "Annotation=filial.firewall.dns=filter")
+	if rails := string(units["filial-feat-rails.container"]); strings.Contains(rails, "resolv.conf") || strings.Contains(rails, "firewall.dns") {
+		t.Errorf("a log-mode app resolves through the filter:\n%s", rails)
+	}
+	m.Inputs.Host.DNSFilter = false
+	if units, err = Quadlet(m); err != nil {
+		t.Fatal(err)
+	}
+	if a := string(units[agent]); strings.Contains(a, "resolv.conf") || strings.Contains(a, "firewall.dns") {
+		t.Errorf("no dnsmasq, yet the agent resolves through the filter:\n%s", a)
+	}
+}

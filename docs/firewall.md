@@ -42,8 +42,37 @@ registries and `github.com`, which are also places to send data to; the
 agent list holds the agent's API. The app's list is what your app itself
 calls, and it is usually short.
 
-Hostnames are resolved by the host when a container starts, so a host
-whose addresses change (a CDN) can need a restart to follow them.
+Hostnames are resolved by the host when a container starts. With the DNS
+filter (below) a container also gets each address it later looks up for an
+allowed name, so a host whose addresses change (a CDN, Google) keeps
+working; without it, it can need a restart to follow them.
+
+## DNS filter (D182)
+
+When the host has dnsmasq built with nftset (`railswitch doctor` checks:
+Arch, Fedora and Debian's are), every container firewalled under
+`enforce` (agents always are) resolves through its own filter:
+
+- The firewall hook starts a dnsmasq in the container's network
+  namespace, outside its processes, on `127.0.0.1:53`, and mounts a
+  read-only `/etc/resolv.conf` that names it.
+- It answers the host names on the container's allow lists (and their
+  subdomains), the worktree's container names (`db`, `redis`, …) and
+  `*.dns.podman`, by asking the network's own resolver. Each address it
+  answers for an allowed name is allowed for the next hour, beside the
+  addresses resolved at start.
+- Every other name gets `REFUSED`: DNS is no longer a way out, and a
+  name an app needs but the list lacks shows up as a lookup failure.
+- Asking the network's resolver directly is blocked; only the filter
+  may.
+- `fw allow <service> <host>` adds the name to that container's filter
+  too, and restarts the filter.
+- It ends with the container.
+
+A `meta:<name>` entry adds addresses, not names: list the host names the
+app uses beside it (`["accounts.google.com", "meta:google"]`). Without
+dnsmasq nothing changes: containers resolve any name, and `doctor` warns.
+Installing it takes effect at the next render and container start.
 
 ## Mode
 
@@ -114,8 +143,11 @@ agent's own firewall is only as strong as the app's.
 
 ## Known limits
 
-- DNS: the worktree's resolver forwards any name upstream, so a name
-  lookup itself is a narrow way out.
+- DNS: without dnsmasq on the host (or under `log`), the worktree's
+  resolver forwards any name upstream, so a name lookup itself is a narrow
+  way out. With it (D182), an allowed domain's subdomains resolve too, so
+  queries can still carry data to that domain's own name servers. A
+  large answer that needs DNS over TCP fails.
 - `deps` must reach package registries and GitHub, so an install script an
   agent adds can still reach them. A changed `Gemfile` or `package.json`
   shows in the git diff before you run `up` or `deps`.

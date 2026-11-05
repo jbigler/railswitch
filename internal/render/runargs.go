@@ -107,10 +107,7 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 		return nil
 	}
 	p := in.m.Prefix
-	mode := s.FirewallMode
-	if mode == "" {
-		mode = FirewallMode(in.m.Inputs.Project, in.m.Inputs.Stack)
-	}
+	mode := in.firewallMode(s)
 	ann := []string{
 		p + ".firewall=" + strings.Join(s.Firewall, ","),
 		p + ".firewall.networks=" + strings.Join(networks, ","),
@@ -122,7 +119,41 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 	if len(s.FirewallExtra) > 0 {
 		ann = append(ann, p+".firewall.extra="+strings.Join(s.FirewallExtra, ","))
 	}
+	if in.DNSFilter(s) {
+		ann = append(ann, p+".firewall.dns=filter")
+	}
 	return ann
+}
+
+// firewallMode is s's firewall mode: its own (an agent's), else the project's.
+func (in *Instance) firewallMode(s *Service) string {
+	if s.FirewallMode != "" {
+		return s.FirewallMode
+	}
+	return FirewallMode(in.m.Inputs.Project, in.m.Inputs.Stack)
+}
+
+// ResolvConf is the resolv.conf a DNS-filtered container gets (D182):
+// the filter, and podman's search domain for the worktree's containers.
+// firewall.Files writes it; ResolvConfMount mounts it read-only.
+const ResolvConf = "nameserver 127.0.0.1\nsearch dns.podman\n"
+
+// ResolvConfRel is ResolvConf's file, workspace-relative.
+const ResolvConfRel = ".railswitch/firewall/resolv.conf"
+
+// ResolvConfMount is the -v/Volume= spec that puts ResolvConf at
+// /etc/resolv.conf: podman's own names the network's resolver, which
+// passes --dns on as its upstream instead of naming it.
+func ResolvConfMount(ws string) string {
+	return filepath.Join(ws, filepath.FromSlash(ResolvConfRel)) + ":/etc/resolv.conf:ro,z"
+}
+
+// DNSFilter reports whether s's container resolves through the hook's DNS
+// filter (D182): it is firewalled by the hook, under enforce, on a host
+// with dnsmasq. Its container then gets ResolvConf, and its annotations
+// ask the hook to start the filter.
+func (in *Instance) DNSFilter(s *Service) bool {
+	return s.Firewalled() && in.m.Inputs.Host.DNSFilter && in.firewallMode(s) == "enforce"
 }
 
 // allowDigest is a digest of what s's profiles' allow lists are made of:

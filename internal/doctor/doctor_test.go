@@ -82,6 +82,15 @@ func host(t *testing.T, portStart string, present bool, found ...string) Host {
 	}
 	h.Dashboards = []string{dashboardServer(t, http.StatusOK, "ok v0.1.0\n")}
 	h.Token = dashToken
+	h.HookDirs = []string{filepath.Join(dir, "sbin")}
+	if present { // a dnsmasq to find; its --version is the fake runner's (dnsmasqNftset)
+		if err := os.MkdirAll(h.HookDirs[0], 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(h.HookDirs[0], "dnsmasq"), nil, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := os.WriteFile(h.PortStart, []byte(portStart+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +175,7 @@ func names(cs []Check) []string {
 
 var hostChecks = []string{
 	"podman >= 5.3", "quadlet generator", "podman.socket active", "unprivileged port 80",
-	"nft", "nsenter", "getent", "jq", "curl", "ssh-keygen -Y", "dashboard enabled", "dashboard answers", "user services outlive logout", "machine subnet free", "networks isolated",
+	"nft", "nsenter", "getent", "jq", "curl", "dnsmasq (DNS filter)", "ssh-keygen -Y", "dashboard enabled", "dashboard answers", "user services outlive logout", "machine subnet free", "networks isolated",
 }
 
 func TestAllOK(t *testing.T) {
@@ -177,6 +186,7 @@ func TestAllOK(t *testing.T) {
 	f.On(socketActive, sys.Result{Stdout: []byte("active\n")}, nil)
 	f.On([]string{"gpg", "--list-secret-keys", "ABCD1234"}, sys.Result{Stdout: []byte("sec rsa4096\n")}, nil)
 	h := host(t, "80", true, "nft", "nsenter", "getent", "jq", "curl", "pass", "gpg")
+	f.On([]string{filepath.Join(h.HookDirs[0], "dnsmasq"), "--version"}, sys.Result{Stdout: []byte("Dnsmasq version 2.93\nCompile time options: IPv6 GNU-getopt DBus conntrack ipset nftset auth DNSSEC\n")}, nil)
 
 	got := h.Run(context.Background(), f, ws)
 	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "proxy subnet", "git-guard", "cgroup v2", "pass", "gpg", "gpg secret key")
@@ -598,5 +608,21 @@ func TestPodmanMinor(t *testing.T) {
 		if c := (Host{}).podman(context.Background(), f); c.OK != ok {
 			t.Errorf("podman %s: ok %v; want %v (%+v)", v, c.OK, ok, c)
 		}
+	}
+}
+
+// TestDNSFilterCheck (D182): a dnsmasq without nftset, or none, is a
+// warning naming what to install.
+func TestDNSFilterCheck(t *testing.T) {
+	h := host(t, "80", true)
+	f := fakeHost()
+	f.On([]string{filepath.Join(h.HookDirs[0], "dnsmasq"), "--version"}, sys.Result{Stdout: []byte("Compile time options: IPv6 no-nftset\n")}, nil)
+	c := h.dnsFilter(context.Background(), f)
+	if c.OK || !c.Warn || !strings.Contains(c.Fix, "nftset") {
+		t.Errorf("dnsmasq without nftset: %+v", c)
+	}
+	h.HookDirs = []string{t.TempDir()}
+	if c := h.dnsFilter(context.Background(), f); c.OK || !strings.Contains(c.Detail, "no dnsmasq") {
+		t.Errorf("no dnsmasq: %+v", c)
 	}
 }

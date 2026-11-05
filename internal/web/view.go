@@ -716,6 +716,7 @@ type detailView struct {
 	Agent                             *agentView
 	Actions                           []actionView
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)
+	AgentTerms                        []agentTerm  // an agent terminal per configured agent
 	TermWindowURL                     string       // the term action: a window on the desktop
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	DownURL                           string
@@ -742,6 +743,13 @@ type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, RestartURL, C
 type agentView struct{ Name, Glyph, Label, Class, Message string }
 
 type actionView struct{ Label, URL string }
+
+// agentTerm opens one agent's terminal panel; Running while its container
+// runs.
+type agentTerm struct {
+	Name, URL string
+	Running   bool
+}
 
 // newDetail is row r's detail; repo is the project's PR URL prefix
 // (projectPRRepo), which the stack's PR numbers link through. Links: App
@@ -824,11 +832,21 @@ func newDetail(prefix string, r row, repo string) detailView {
 	}
 	v.TermWindowURL = path + "/act/term"
 	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
-	agentURL := tty + "agent" // the default agent, or the one the overview names
-	if wt.Agent != nil {
-		agentURL += "?agent=" + url.QueryEscape(wt.Agent.Name)
+	// One per configured agent: each is a service agent-<name> (on demand
+	// or not), so the page can open any of them.
+	for _, s := range wt.Services {
+		if name, ok := strings.CutPrefix(s.Service, "agent-"); ok && s.Role == "agent" {
+			_, _, word := serviceLook(s.State)
+			v.AgentTerms = append(v.AgentTerms, agentTerm{Name: name, URL: tty + "agent?agent=" + url.QueryEscape(name), Running: word == "running"})
+		}
 	}
-	v.Terms = append(v.Terms, actionView{Label: "agent", URL: agentURL})
+	if len(v.AgentTerms) == 0 { // none listed: the default agent, or the one the overview names
+		a := agentTerm{Name: "agent", URL: tty + "agent"}
+		if wt.Agent != nil {
+			a.Name, a.URL = wt.Agent.Name, a.URL+"?agent="+url.QueryEscape(wt.Agent.Name)
+		}
+		v.AgentTerms = []agentTerm{a}
+	}
 	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Service == "nvim" }) {
 		v.Terms = append(v.Terms, actionView{Label: "nvim", URL: tty + "nvim"})
 	}

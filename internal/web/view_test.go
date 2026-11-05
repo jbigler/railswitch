@@ -339,6 +339,33 @@ func TestStackSwitching(t *testing.T) {
 	}
 }
 
+// TestDetailAgentTerms: each configured agent (a service agent-<name>,
+// on demand or not) gets a terminal, marked while it runs; the Terminal
+// menu and the Agent card both offer them.
+func TestDetailAgentTerms(t *testing.T) {
+	r := fixtureRow("up", false, nil)
+	r.WT.Services = append(r.WT.Services,
+		service{Service: "agent-claude", Role: "agent", State: "active/running"},
+		service{Service: "agent-omp", Role: "agent", State: "on-demand"})
+	d := newDetail("ftest", r, "")
+	if len(d.AgentTerms) != 2 || d.AgentTerms[0] != (agentTerm{Name: "claude", URL: "/p/ftest/tty/feat-login/agent?agent=claude", Running: true}) ||
+		d.AgentTerms[1] != (agentTerm{Name: "omp", URL: "/p/ftest/tty/feat-login/agent?agent=omp"}) {
+		t.Fatalf("agent terms %+v", d.AgentTerms)
+	}
+	html, err := render("detail", d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, url := range []string{"agent?agent=claude", "agent?agent=omp"} {
+		if n := strings.Count(html, `data-term="/p/ftest/tty/feat-login/`+url+`"`); n != 2 {
+			t.Errorf("%s: %d buttons, want 2 (Terminal menu, Agent card)", url, n)
+		}
+	}
+	if !strings.Contains(html, "agent: claude ● ▣") || !strings.Contains(html, "agent: omp ▣") {
+		t.Errorf("menu entries don't name the agents or mark the running one:\n%s", html)
+	}
+}
+
 // TestDetailActions: the actions follow the stack's state; a running
 // service links its logs in Dozzle by container name and, when it has a
 // unit of its own, restarts alone.

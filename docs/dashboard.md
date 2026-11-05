@@ -255,8 +255,11 @@ still wider than the window scrolls its pane.
   - **Agent:** state and message, then the worktree's usage from `agent
     usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when
     reported, in yellow with `⚠` while it is `runaway`; the queue;
-    **open terminal ▣**, the agent's terminal panel as the Terminal
-    menu's **agent ▣** opens it, on the Agent tab (below); the **default config…** link beside its
+    a button per configured agent (`claude ▣`, `● claude ▣` while it
+    runs: each a service `agent-<name>`, on demand or not; with none
+    listed, one for the agent the overview names, else the default) that
+    opens its terminal panel on the Agent tab (below), as the Terminal
+    menu's `agent: <name> ▣` does; the **default config…** link beside its
     label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
@@ -817,8 +820,8 @@ The worktree's **Terminal ▾** menu opens a live terminal in the page (D149),
 docked under the worktree's jobs; several can be open at once, and one
 already open is shown again rather than opened twice. The panels stay
 through a switch of tab or worktree (each is titled with its worktree).
-The Agent card's **open terminal ▣** shows the Agent tab first. There
-the worktree's agent terminal (from either button) takes the Agent
+An agent's terminal (from the Agent card or the menu) shows the Agent
+tab first. There the worktree's agent terminal takes the Agent
 card's place and the window's height below the tabs, until it is closed;
 the card comes back then. The menu
 ends with **open window ↗**, the `terminal` action below: a window on the
@@ -826,7 +829,7 @@ desktop, not in the page.
 
 | Button | Runs | When the panel closes |
 |--------|------|-----------------------|
-| **agent ▣** | `railswitch agent [<name>]` (the agent the overview shows, else the default) | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
+| **agent: <name> ▣**, one per configured agent | `railswitch agent <name>`; with no agent service listed, one entry for the agent the overview shows, else the default. One agent runs per worktree (D62): with another one running, the panel shows its refusal | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
 | **nvim ▣** (when the worktree runs nvim) | `railswitch nvim` | nvim keeps running; only this UI goes |
 | **shell ▣** | a login shell in the app container (`railswitch exec`, bash when the image has it, else `sh`) | the shell ends |
 

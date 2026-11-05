@@ -361,7 +361,7 @@ async function openTermPanel(btn) {
   panel.className = "term-panel";
   // Not data-term: a click in the panel would then open it again.
   panel.dataset.termUrl = btn.dataset.term;
-  if (btn.dataset.termLabel === "agent") panel.dataset.agentOf = slug;
+  if ("termAgent" in btn.dataset) panel.dataset.agentOf = slug;
   const head = document.createElement("header");
   const title = document.createElement("span");
   title.className = "mono";

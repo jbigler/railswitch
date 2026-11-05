@@ -237,8 +237,12 @@ still wider than the window scrolls its pane.
     with it; while it runs, a small bar of its memory against its limit,
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
     tooltip, D161.
+  - **Links** (Overview only; full width, under Services): the links,
+    App first and filled, then the project's and the stack's, all greyed
+    while the stack is stopped; then PR, **Review app** when `pr ls`
+    finds one (the PR's GitHub deployment) and Logs, quieter.
   - **Pull request** (Overview only; with a PR or a gh stack; full
-    width, after the other cards, as a stack runs long): the PR line and
+    width, under Links): the PR line and
     **PR page**. Then, when its branch is in a gh stack (`stack
     ls`, read with the PRs), Stack, in gh stack view's words: `◆ Stack
     #10350` (linked to the stack on GitHub) · `Base: master` · `22
@@ -254,11 +258,9 @@ still wider than the window scrolls its pane.
     **default config…** link beside its label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
-  - **Open** (Overview only; first, full width): the links, App first and filled, then the
-    project's and the stack's, all greyed while the stack is stopped;
-    then PR, **Review app** when `pr ls` finds one (the PR's GitHub
-    deployment) and Logs, quieter.
   - **Database:** **snapshots…** (D157).
+  - Agent, Tests and Database come last, side by side: each has its own
+    tab too.
   - **Jobs** (full width, below the cards; left out of Overview while
     there are none): see Jobs. The terminal panels dock under it.
 

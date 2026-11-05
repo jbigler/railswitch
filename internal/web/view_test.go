@@ -147,7 +147,7 @@ func fixtureRow(stack string, base bool, p *pr) row {
 
 var anchorRe = regexp.MustCompile(`<a [^>]*class="([^"]*)"[^>]*>([^<]*)</a>`)
 
-// TestDetailFragment: the Open card lists the links, App first and main; a
+// TestDetailFragment: the Links card lists the links, App first and main; a
 // stopped stack greys its links; remove only for non-base worktrees; a
 // merged PR says so on its one remove button; hostile text is escaped.
 func TestDetailFragment(t *testing.T) {
@@ -159,10 +159,10 @@ func TestDetailFragment(t *testing.T) {
 	if !strings.Contains(html, `<a class="pr-line green" href="https://github.com/o/r/pull/2141"`) {
 		t.Errorf("the header's PR line is no link:\n%s", html)
 	}
-	// The links are the Open card's.
-	li := strings.Index(html, ">Open<")
+	// The links are the Links card's.
+	li := strings.Index(html, ">Links<")
 	if li < 0 {
-		t.Fatalf("no Open card:\n%s", html)
+		t.Fatalf("no Links card:\n%s", html)
 	}
 	si := li + strings.Index(html[li:], "</section>")
 	links := anchorRe.FindAllStringSubmatch(html[li:si], -1)
@@ -191,7 +191,7 @@ func TestDetailFragment(t *testing.T) {
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("stopped", false, nil), ""))
-	li = strings.Index(html, ">Open<")
+	li = strings.Index(html, ">Links<")
 	si = li + strings.Index(html[li:], "</section>")
 	for _, l := range anchorRe.FindAllStringSubmatch(html[li:si], -1) {
 		if l[2] == "Logs" {

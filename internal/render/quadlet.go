@@ -28,6 +28,12 @@ const traefikUnit = machine.ProxyService
 // dozzleUnit is the machine-wide log viewer, at logs.localhost.
 const dozzleUnit = machine.DozzleService
 
+// HostsFileArg builds a container's /etc/hosts from nothing but its own
+// entries (its name, localhost, host.containers.internal) and --add-host,
+// never the host's /etc/hosts: no host-private names reach a container
+// (D181, from the terok comparison). Every unit and transient run passes it.
+const HostsFileArg = "--hosts-file=none"
+
 // Quadlet renders the project's Quadlet files, keyed by filename: the proxy
 // network, and for every worktree its dev network and one .container per
 // service but an on-demand one. Every value railswitch did not write itself
@@ -344,7 +350,8 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 		u.add(c, "Annotation", ann...)
 	}
 
-	var args []string
+	// HostsFileArg first: no host /etc/hosts lines in the container (D181).
+	args := []string{HostsFileArg}
 	if n := in.CPUs(s); n != "" {
 		args = append(args, "--cpus="+n)
 	}
@@ -353,9 +360,7 @@ func containerUnit(in *Instance, s *Service, routes []RenderedRoute) (*unit, err
 	} else if ux.Interactive {
 		args = append(args, "--interactive")
 	}
-	if len(args) > 0 {
-		u.add(c, "PodmanArgs", strings.Join(args, " "))
-	}
+	u.add(c, "PodmanArgs", strings.Join(args, " "))
 
 	if s.Oneshot {
 		// The unit's own journal is the log: passthrough hands it stdout.

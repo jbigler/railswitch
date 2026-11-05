@@ -5,7 +5,7 @@
 Description=filial cache of worktree feat
 
 [Container]
-Label=filial.unit-hash=e6ac048ee6ad
+Label=filial.unit-hash=e479982941d8
 Image=docker.io/library/redis:8-alpine
 ContainerName=filial-feat-cache
 Network=filial-feat-dev.network:alias=cache
@@ -23,6 +23,7 @@ Annotation=filial.firewall=none
 Annotation=filial.firewall.networks=filial-feat-dev
 Annotation=filial.firewall.mode=enforce
 Annotation=filial.firewall.lists=fdbb9db68f1d
+PodmanArgs=--hosts-file=none
 LogDriver=journald
 Exec=redis-server --loglevel warning --save "" --appendonly no
 StopTimeout=60

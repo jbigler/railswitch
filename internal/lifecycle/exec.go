@@ -139,7 +139,7 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 		}
 	}
 	// --init: a command as PID 1 would ignore hangupScript's SIGHUP.
-	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i", "--init", "--preserve-fds", "1"}
+	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i", "--init", "--preserve-fds", "1", render.HostsFileArg}
 	if l.TTY {
 		args = append(args, "-t")
 	}

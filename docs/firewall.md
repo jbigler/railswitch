@@ -88,6 +88,27 @@ agent's own firewall is only as strong as the app's.
   without those hosts, so plugin and language-server downloads from
   `raw.githubusercontent.com` and PyPI are blocked under enforce.
 
+## Panic (D181)
+
+`railswitch panic` is for when something is wrong: an agent doing what it
+shouldn't. From anywhere, for every registered project, it cuts every
+running railswitch container off the network (its firewall table becomes
+drop-all but loopback, loaded from outside the container as the hook
+does), then pauses every running agent container, so its processes stop
+and it stays as it was to be looked at (`podman exec` still works on it
+once unpaused; `podman logs` now). It asks nothing first and goes on past
+a step that fails, naming it; `--json` reports what it did (docs/json.md).
+Containers without a name (`railswitch exec --fresh`) aren't reached.
+To bring a worktree back, restart it (`railswitch -w <worktree>
+restart`): new containers get the normal rules.
+
+## Host names
+
+A container's `/etc/hosts` holds its own name, `localhost` and the
+worktree's routed hosts (`--add-host`), never the host machine's
+`/etc/hosts` entries, so names private to your machine or LAN don't
+reach it (podman's `--hosts-file=none`, D181).
+
 ## Known limits
 
 - DNS: the worktree's resolver forwards any name upstream, so a name

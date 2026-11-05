@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=eefcae115285
+Label=filial.unit-hash=5b19a1ef03a6
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-ac1150a1
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
@@ -42,7 +42,7 @@ Annotation=filial.firewall=agent-probe
 Annotation=filial.firewall.networks=filial-feat-dev,filial_proxy
 Annotation=filial.firewall.mode=enforce
 Annotation=filial.firewall.lists=2367eca40f40
-PodmanArgs=--cpus=4 --tty --interactive
+PodmanArgs=--hosts-file=none --cpus=4 --tty --interactive
 LogDriver=journald
 Entrypoint=tmux
 Exec=-L agent -f /usr/local/share/railswitch/agent-tmux.conf -D

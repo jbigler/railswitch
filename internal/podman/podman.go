@@ -366,6 +366,28 @@ func (p Podman) inspectContainer(ctx context.Context, format, name string) (stri
 	return strings.TrimSpace(string(r.Stdout)), nil
 }
 
+// PID is a container's process ID and its state (running, paused, …);
+// 0 and "" for a missing container.
+func (p Podman) PID(ctx context.Context, name string) (int, string, error) {
+	s, err := p.inspectContainer(ctx, "{{.State.Pid}} {{.State.Status}}", name)
+	if err != nil || s == "" {
+		return 0, "", err
+	}
+	pid, status, _ := strings.Cut(s, " ")
+	n, err := strconv.Atoi(pid)
+	if err != nil {
+		return 0, "", fmt.Errorf("podman inspect %s: pid %q", name, pid)
+	}
+	return n, status, nil
+}
+
+// Pause freezes container name's processes (`podman pause`): they stop,
+// and the container and its state stay as they are.
+func (p Podman) Pause(ctx context.Context, name string) error {
+	_, err := p.run(ctx, 10*time.Second, "pause", name)
+	return err
+}
+
 // Running reports `{{.State.Running}}`; a missing container is not running.
 func (p Podman) Running(ctx context.Context, name string) (bool, error) {
 	s, err := p.inspectContainer(ctx, "{{.State.Running}}", name)

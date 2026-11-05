@@ -65,6 +65,7 @@ var synopses = map[string]string{
 	"fw allow":               "fw allow <service> <host|ip>...",
 	"fw show":                "fw show [<service>]",
 	"gc":                     "gc [--dry-run] [--volumes] [--yes]",
+	"panic":                  "panic",
 	"hooks backup":           "hooks backup [<hook>...]",
 	"hooks check":            "hooks check",
 	"hooks restore":          "hooks restore [--force]",

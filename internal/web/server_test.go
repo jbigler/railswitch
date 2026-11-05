@@ -226,7 +226,7 @@ func TestPages(t *testing.T) {
 			}
 		}
 		html := strings.HasPrefix(w.Header().Get("Content-Type"), "text/html")
-		if body := w.Body.String(); html && (strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") || (strings.Contains(body, "<script") && !strings.Contains(body, `<script src="/static/app.js" defer></script>`))) {
+		if body := w.Body.String(); html && (strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") || (strings.Contains(body, "<script") && !strings.Contains(body, `<script src="/static/app.js" type="module"></script>`))) {
 			t.Errorf("%s: inline style or script (CSP)", c.path)
 		}
 	}

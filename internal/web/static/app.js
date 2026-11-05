@@ -1,7 +1,8 @@
 // RailSwitch dashboard. The server renders every fragment; this script
 // only swaps them in from the event stream, and drives keys, dialogs,
-// notifications, the palette filter and the colour preview.
-"use strict";
+// notifications, the palette filter and the colour preview. A module
+// (strict); its page-free logic is logic.js, tested by `node --test`.
+import { fuzzy, target, hookLines, addTaskEdits, taskWay } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -453,7 +454,7 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("input", (e) => {
   if (e.target.id === "switcher-filter") filterSwitcher();
   else if (e.target.classList.contains("pal-filter")) filterPalette();
-  else if (e.target.matches(".colors-form input[type=color]")) preview(e.target.form);
+  else if (e.target.matches(".colors-form input[type=color]")) previewColors(e.target.form);
 });
 
 function filterSwitcher() {
@@ -515,36 +516,20 @@ function runPaletteTask(it, shift) {
   const f = it.form;
   const name = it.value;
   const args = f.elements.args ? f.elements.args.value.trim() : "";
-  if (!shift && (it.hasAttribute("data-terminal") || $(".pal-term", f).checked)) {
+  const way = taskWay({ shift, terminal: it.hasAttribute("data-terminal"), panel: $(".pal-term", f).checked });
+  if (way === "panel") {
     it.closest("dialog").close();
     const url = f.dataset.tty + "task?task=" + encodeURIComponent(name) + (args ? "&args=" + encodeURIComponent(args) : "");
     return openTermPanel({ dataset: { term: url, termLabel: args ? name + " " + args : name } });
   }
   const data = new URLSearchParams(new FormData(f));
   data.set("task", name);
-  if (shift) data.set("term", "1");
+  if (way === "window") data.set("term", "1");
   post(f, data);
 }
 
 function paletteItems() {
   return $$("#palette .pal-list li[data-filter], #palette .pal-list li.pal-new").filter((li) => !li.hidden);
-}
-
-// fuzzy scores query q against s (both lower case): q's letters in order,
-// spaces ignored ("pgset" finds "page settings"); more for a letter that
-// starts a word or follows the last one, less for a gap; -1 for no match.
-function fuzzy(q, s) {
-  let score = 0;
-  let from = 0;
-  let last = -2;
-  for (const c of q.replace(/\s+/g, "")) {
-    const k = s.indexOf(c, from);
-    if (k < 0) return -1;
-    score += (k === last + 1 ? 2 : 0) + (k === 0 || /[\s_./:-]/.test(s[k - 1]) ? 3 : 0) - Math.min(k - from, 10) * 0.1;
-    last = k;
-    from = k + 1;
-  }
-  return score;
 }
 
 function filterPalette() {
@@ -630,7 +615,10 @@ async function postColors(f, data) {
   toast("Colours saved", false);
 }
 
-function preview(f) {
+// previewColors shows form f's colours at once, with contrast warnings.
+// (It was a second preview(), which the settings one silently replaced
+// while app.js was a classic script: a module refuses the duplicate.)
+function previewColors(f) {
   const mine = f.dataset.mode === (dark.matches ? "dark" : "light");
   const vals = {};
   $$("input[type=color]", f).forEach((i) => {
@@ -701,28 +689,6 @@ async function loadBlocked() {
   } catch {
     // the dashboard went away: the placeholder stays
   }
-}
-
-// target is what an edit changes; a later edit of the same target
-// replaces the earlier one.
-function target(e) {
-  if (e.op === "pack") return "pack";
-  if (e.op === "firewall.mode") return "fwmode";
-  if (e.op === "firewall.allow.add" || e.op === "firewall.allow.remove") return "fw " + e.key + " " + e.value;
-  if (e.op === "option") return "option " + e.key;
-  if (e.op === "env.set" || e.op === "env.unset") return "env " + e.name;
-  if (e.op === "task.set" || e.op === "task.unset") return "task " + e.name;
-  if (e.op === "task.fresh.add" || e.op === "task.fresh.remove") return "fresh " + e.name;
-  if (e.op === "task.terminal.add" || e.op === "task.terminal.remove") return "terminal " + e.name;
-  if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
-  if (e.op === "hooks.set") return "hooks " + e.key;
-  if (e.op === "agent.setup") return "agent-setup " + e.key;
-  return e.op + " " + e.label;
-}
-
-// hookLines is a Hooks box's commands: one per line, blank lines left out.
-function hookLines(text) {
-  return text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
 }
 
 // stage puts e in the list; back (the control is at its current value
@@ -1068,11 +1034,7 @@ if (view.startsWith("settings")) {
       if (f.dataset.stage === "env") stage({ op: "env.set", name: v("name"), value: f.elements.value.value }, false);
       else if (f.dataset.stage === "service") stage({ op: "option", key: v("key"), ref: f.elements.ref.value }, false);
       else if (f.dataset.stage === "task") {
-        // The task first: preview judges edits in order, and fresh_tasks
-        // naming a task that doesn't exist yet is a render error.
-        stage({ op: "task.set", name: v("name"), value: v("value") }, false);
-        if (f.elements.fresh.checked) stage({ op: "task.fresh.add", name: v("name") }, false);
-        if (f.elements.terminal.checked) stage({ op: "task.terminal.add", name: v("name") }, false);
+        for (const ed of addTaskEdits(v("name"), v("value"), f.elements.fresh.checked, f.elements.terminal.checked)) stage(ed, false);
       }
       else if (f.dataset.stage === "fw") stage({ op: "firewall.allow.add", key: f.elements.key.value, value: v("value") }, false);
       else stage({ op: "link.add", label: v("label"), url: v("url") }, false);

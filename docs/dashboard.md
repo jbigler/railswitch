@@ -914,9 +914,12 @@ Every action is a job (below).
   the stack runs `railswitch stack switch <branch>` (`git switch
   --no-guess` through a private copy of the repository's git config: no
   hook, filter or fsmonitor a container wrote runs on the host); the
-  dashboard refuses a branch the stack it last read doesn't hold. When
+  dashboard refuses a branch the stack it last read doesn't hold. While
+  the job runs, the branch shows `◐ switching…` and no branch is a link,
+  so a second click can't start another switch. When
   the job ends ok the page marks the branch HEAD at once and reads the
-  stacks again behind it. Everything else (`gh stack up`, `push`,
+  stacks again behind it; when it fails, the branches are links again
+  and its output is in Jobs. Everything else (`gh stack up`, `push`,
   `rebase`) you run with gh stack in the worktree.
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]

@@ -724,6 +724,7 @@ type detailView struct {
 	SnapshotsURL                      string // the database snapshots dialog (D157); "" without a data service
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
+	Switching                         string // the branch a running stack switch checks out; "" for none
 	Merged, Stale                     bool
 	Tests                             *testsView // nil: no test task
 	TaskURL                           string     // posts a task to run as a job

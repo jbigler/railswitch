@@ -402,3 +402,29 @@ func TestGhStack(t *testing.T) {
 		t.Errorf("detail after the switch: %v\n%s", ok, ev.HTML)
 	}
 }
+
+// TestSwitchingFromJobs: the detail's Switching is the branch of the
+// worktree's running stack switch job, and clears when it ends.
+func TestSwitchingFromJobs(t *testing.T) {
+	f := newFixture(t)
+	f.s.pollOnce(context.Background())
+	f.run.block = make(chan struct{})
+	if _, err := f.s.c.Jobs.Start(context.Background(), jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/q", Argv: []string{"railswitch"}}); err != nil {
+		t.Fatal(err)
+	}
+	f.run.wait(t, 1)
+	detail := func() string {
+		f.s.mu.Lock()
+		defer f.s.mu.Unlock()
+		return f.s.pageData("ftest", "b", sortKey{By: "name"}).Detail.Switching
+	}
+	if got := detail(); got != "jb/q" {
+		t.Errorf("Switching while running = %q, want jb/q", got)
+	}
+	close(f.run.block)
+	f.run.block = nil
+	f.ended(t)
+	if got := detail(); got != "" {
+		t.Errorf("Switching after the job = %q, want none", got)
+	}
+}

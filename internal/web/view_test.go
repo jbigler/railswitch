@@ -319,6 +319,26 @@ func TestStackedView(t *testing.T) {
 	}
 }
 
+// TestStackSwitching: while a switch runs, its branch says so and no
+// branch is a switch form, so a second click can't race the first.
+func TestStackSwitching(t *testing.T) {
+	st := &ghStackRow{Slug: "c", Stack: &ghStack{Trunk: "main", Current: "jb/a", Branches: []ghStackBranch{
+		{Name: "jb/a", Current: true}, {Name: "jb/q"}, {Name: "jb/r"},
+	}}}
+	d := newDetail("ftest", row{WT: worktree{Slug: "c", Branch: "jb/a"}, Stacked: st}, "")
+	d.Switching = "jb/q"
+	html, err := render("detail", d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html, `<span class="mono">jb/q</span> <span class="blue switching">◐ switching…</span>`) {
+		t.Errorf("jb/q not marked switching:\n%s", html)
+	}
+	if strings.Contains(html, "stack-switch") {
+		t.Errorf("a switch form while switching:\n%s", html)
+	}
+}
+
 // TestDetailActions: the actions follow the stack's state; a running
 // service links its logs in Dozzle by container name and, when it has a
 // unit of its own, restarts alone.

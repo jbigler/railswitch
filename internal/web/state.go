@@ -424,6 +424,9 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		}
 		sub.diff("job", "jobs", html, info)
 	}
+	if strings.HasPrefix(j.Spec.Label, switchLabel) && j.State == jobs.StateRunning {
+		s.publish() // the stack shows the branch switching, the others not to click
+	}
 	if p := s.state[j.Spec.Project]; p != nil && j.State != jobs.StateRunning {
 		p.ovAt = time.Time{}
 		wake(s.wakeOV)
@@ -432,8 +435,8 @@ func (s *Server) jobEvent(ev jobs.Event) {
 			// (gh stack asks GitHub, which takes a while) behind it.
 			if j.State == jobs.StateOK {
 				p.switched(j.Spec.Slug, branch)
-				s.publish()
 			}
+			s.publish() // ended either way: the switching mark goes
 			p.prNow = true
 			wake(s.wakePR)
 		}
@@ -442,6 +445,17 @@ func (s *Server) jobEvent(ev jobs.Event) {
 
 // switchLabel starts the label of a job checking out a stack branch.
 const switchLabel = "stack switch "
+
+// switching is the branch a running stack switch of worktree slug checks
+// out, "" for none. s.mu is held.
+func (s *Server) switching(prefix, slug string) string {
+	for _, j := range s.c.Jobs.Jobs(prefix, slug) {
+		if b, ok := strings.CutPrefix(j.Spec.Label, switchLabel); ok && j.State == jobs.StateRunning {
+			return b
+		}
+	}
+	return ""
+}
 
 // stackBranch reports whether branch is an open branch of worktree
 // slug's stack, other than the current one, as last read. s.mu is not held.
@@ -674,6 +688,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		if r.WT.Slug == sel {
 			pv.Detail = newDetail(prefix, r, projectPRRepo(rows))
 			pv.Detail.Usage, pv.Detail.Runaway = usageLine(usage, sel)
+			pv.Detail.Switching = s.switching(prefix, sel)
 		}
 	}
 	return pv

@@ -21,7 +21,7 @@ var FirewallFloor = []string{"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "169.25
 
 // CheckAllowHost refuses h unless it is an allow list entry the firewall
 // hook takes: a host name, an IPv4 address or CIDR outside FirewallFloor,
-// or meta:<name> (a published range set: meta:github, meta:google).
+// or meta:<name> (a published range set: meta:github, meta:google, meta:anthropic).
 func CheckAllowHost(h string) error {
 	if _, _, err := net.ParseCIDR(h); err == nil && !strings.Contains(h, ":") {
 		return CheckFloor(h)

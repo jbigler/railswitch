@@ -8,6 +8,8 @@ entrypoint = "entrypoints/entrypoint-claude.sh"
 allow = [
   "claude.ai",
   "api.anthropic.com",
+  "platform.claude.com",      # sign-in (OAuth); the DNS filter answers listed names only
+  "meta:anthropic",           # Anthropic's fixed ranges: an answer that moves within them mid-session stays allowed
   "statsig.com",
   "sentry.io",
   "registry.npmjs.org",       # chrome-devtools-mcp via npx

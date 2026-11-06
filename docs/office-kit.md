@@ -40,7 +40,7 @@ it changes everywhere at once:
 |---|---|---|
 | `RS_Neon_Accent` | neon strips, outlines, fan rings | `setAccent` |
 | `RS_LED_Accent` | status LEDs, the black cat's eyes | `setAccent` |
-| `RS_Screen`, `RS_Screen_UI`, `RS_Screen_Term` | screens: a grayscale emissive texture tinted by the emissive color | `setAccent` |
+| `RS_Screen`, `RS_Screen_UI`, `RS_Screen_Term`, `RS_Screen_Chart`, `RS_Screen_Nodes`, `RS_Screen_Table` | screens: a grayscale emissive texture tinted by the emissive color; a monitor group deals the six in shuffled rounds, so neighbours differ | `setAccent` |
 | `RS_Neon_Secondary` | violet trim, the sign, jellyfish tentacles | `setSecondary` |
 | `RS_FloorDisplay` | the elevator's floor number: blank, for a canvas texture | – |
 | `RS_RackDisplay`, `RS_VendScreen`, `RS_ArcadeScreen` | a rack's status display, a vending machine's menu, an arcade's screen: blank, the page draws on them | – |

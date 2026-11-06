@@ -53,7 +53,7 @@ export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plai
   'Arch_Ceiling_Sprinkler_4m', 'Arch_Ceiling_Fan', 'Arch_Ceiling_Vent', 'Arch_WallPipes_4m',
   'Light_CeilingPanel', 'Light_PendantBox',
   'Tech_ServerRack', 'Tech_ServerRack_B', 'Tech_ToolCart', 'Tech_TerminalKiosk', 'Tech_MonitorBank',
-  'Tech_MonitorStack', 'Tech_Laptop', 'Tech_MonitorWall_A',
+  'Tech_MonitorStack', 'Tech_Laptop', 'Tech_Keyboard', 'Tech_MonitorWall_A',
   'Furn_Workstation_Lived', 'Furn_Workstation_Lived_B', 'Furn_Desk', 'Furn_Desk_SitStand', 'Furn_CoffeeTable',
   'Deco_Boxes', 'Deco_Crate', 'Deco_MiniFridge', 'Deco_CorkBoard', 'Deco_NeonSign', 'Deco_Extinguisher', 'Deco_DeskLamp', 'Deco_Mug',
   'Pet_Cat_Walk', 'Pet_Cat_Sitting', 'Pet_Dog_Walk', 'Pet_Dog_Lying', 'Furn_DogBed', 'Deco_PetBowls', 'Pet_Parrot_Fly',
@@ -783,6 +783,7 @@ export async function lab(slug, n, ui) {
     put(k, scene, 'Tech_MonitorStack', -10.95, deskTop, 6.6, PI / 2),
     put(k, scene, 'Deco_DeskLamp', -11.15, deskTop, 5.95, 2.6 + PI / 2),
     put(k, scene, 'Deco_Mug', -10.75, deskTop, 7.2),
+    put(k, scene, 'Tech_Keyboard', -10.75, deskTop, 6.6, PI / 2), // at the front edge, its keys to the agent
   ];
   agentDesk.updateMatrixWorld(true);
   const top = agentDesk.getObjectByName('Desk_SitStand_Top'); // absent in a set without the piece: then nothing rises

@@ -7,6 +7,26 @@ its own rules. It always allows loopback, replies and the subnets of the
 container's own networks (the worktree's dev network, the proxy network).
 Anything else is decided by the container's profiles and the mode.
 
+## Never allowed (D179)
+
+These IPv4 ranges are refused whatever an allow list says, right after
+the container's own networks: `0.0.0.0/8`, the private ranges
+`10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`, carrier-grade NAT
+`100.64.0.0/10` (which Tailscale uses) and link-local `169.254.0.0/16`,
+which holds the cloud metadata address `169.254.169.254`. So a container
+can't reach your LAN, your tailnet or a cloud host's credentials through
+an allow entry, or through a hostname that resolves to one of them.
+An allow entry, `[agents.<name>] allow` entry or `fw allow` argument
+that is such an address or range, or contains one (`0.0.0.0/0`), is
+refused with the reason. Under `log` they are recorded like anything
+else the mode lets through. A container still reaches the worktree's
+services and Traefik, which live on its own networks.
+
+After loading the rules the hook reads them back from the kernel and
+checks them: the never-allowed set holds every range, its rule comes
+before the allow lists, and everything else ends in the mode's verdict.
+A mismatch fails the container's start, as a failed load does.
+
 ## Profiles: one list per kind of container (D119)
 
 | Container | Profiles | Its list |
@@ -50,8 +70,12 @@ agent's own firewall is only as strong as the app's.
 - `railswitch fw show [service] [--json]`: every container's profiles and
   mode, and what was blocked (or, in log mode, would have been), with the
   host each address resolves to (docs/json.md).
-- `railswitch fw allow <service> <host>…`: allow a host in a running
-  container until it restarts.
+- `railswitch fw allow [--for <duration>] <service> <host>…`: allow a
+  host in a running container until it restarts. With `--for` (`30m`,
+  `2h`, at most `168h`) the kernel drops the allow when the time is up,
+  even if railswitch isn't running; it takes addresses and hostnames,
+  not ranges. A container started before D179 has no set for timed
+  allows: restart it first.
 - Settings, Firewall card (docs/dashboard.md): the mode, each list, and
   "Blocked, or would be under enforce" with an Allow button per resolved
   host. Edits are staged and applied like any other Settings edit

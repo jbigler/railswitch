@@ -9,11 +9,14 @@
 #                   would have been. Also names any of the worktree's
 #                   containers that run WITHOUT the firewall, which means the
 #                   hook never fired.
-#   allow SVC HOST… add hostnames/IPs to a running container's allowlist, e.g.
+#   allow [--for Ns] SVC HOST…
+#                   add hostnames/IPs to a running container's allowlist, e.g.
 #                   `railswitch fw allow nvim example.com`. Live only: gone on
 #                   the next start. To keep it, add it to the profile's
 #                   [firewall] allow.<profile> list in project.toml (an
-#                   agent-<name>'s: [agents.<name>] allow).
+#                   agent-<name>'s: [agents.<name>] allow). With --for <N>s
+#                   the kernel drops it after N seconds (the allowt4 set,
+#                   D179); railswitch checks the duration.
 #
 # Environment (set by railswitch):
 #   FIREWALL_DIR     <workspace>/.railswitch/firewall: the hook's state/ dir
@@ -140,6 +143,11 @@ cmd_show() {
 }
 
 cmd_allow() {
+  local for=""
+  if [[ "${1:-}" == --for ]]; then
+    for="${2:-}"; shift 2 || true
+    [[ "$for" =~ ^[1-9][0-9]*s$ ]] || die "--for wants <seconds>s, e.g. 1800s"
+  fi
   local svc="${1:-}"; shift || true
   [[ -n "$svc" && $# -gt 0 ]] || die "usage: railswitch fw allow <service> <host|ip>...  e.g. railswitch fw allow nvim example.com"
   [[ -n "$W" ]] || die "run from inside a worktree, or pass -w <worktree>"
@@ -156,6 +164,17 @@ cmd_allow() {
     printf '%s -> %s\n' "$h" "$(getent ahostsv4 "$h" | awk '{ print $1 }' | sort -u | paste -sd' ' -)"
   done
   (( ${#ips[@]} )) || die "nothing resolved"
+  if [[ -n "$for" ]]; then
+    local timed=() i
+    for i in "${ips[@]}"; do
+      [[ "$i" != */* ]] || die "--for takes addresses, not the range $i"
+      timed+=("$i timeout $for")
+    done
+    in_netns "$pid" nft add element inet "$TABLE" allowt4 "{ $(IFS=,; printf '%s' "${timed[*]}") }" \
+      || die "$name has no timed allow set: restart it to pick up the current firewall"
+    printf 'allowed in %s for %s (the kernel drops it then, or at its next start)\n' "$name" "$for"
+    return
+  fi
   in_netns "$pid" nft add element inet "$TABLE" allow4 "{ $(IFS=,; printf '%s' "${ips[*]}") }"
   printf 'allowed in %s until its next start\n' "$name"
 }

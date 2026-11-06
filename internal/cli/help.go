@@ -62,7 +62,7 @@ var synopses = map[string]string{
 	"down":                   "down [--yes]",
 	"env":                    "env [<service>]",
 	"exec":                   "exec [--fresh] -- <command> [<args>...]",
-	"fw allow":               "fw allow <service> <host|ip>...",
+	"fw allow":               "fw allow [--for <duration>] <service> <host|ip>...",
 	"fw show":                "fw show [<service>]",
 	"gc":                     "gc [--dry-run] [--volumes] [--yes]",
 	"hooks backup":           "hooks backup [<hook>...]",

@@ -5,13 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -23,7 +26,11 @@ import (
 // (2 s each), allow resolves each host.
 const fwTimeout = 2 * time.Minute
 
-const fwUsage = "usage: railswitch fw show [service] | railswitch fw allow <service> <host|ip>..."
+const fwUsage = "usage: railswitch fw show [service] | railswitch fw allow [--for <duration>] <service> <host|ip>..."
+
+// fwMaxFor bounds fw allow --for: a longer allow belongs in the profile's
+// allow list.
+const fwMaxFor = 7 * 24 * time.Hour
 
 // railswitch fw show [svc] | fw allow <svc> <host…>: run the rendered
 // firewall.sh, which inspects or adjusts the live firewall of this
@@ -35,7 +42,14 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 		return e.usageErr(fwUsage)
 	}
 	sub := args[0]
-	fs := e.flags("fw " + sub)
+	var fs *flag.FlagSet
+	var forDur *time.Duration
+	if sub == "allow" {
+		fs = e.flags("fw allow")
+		forDur = fs.Duration("for", 0, "the allow expires after this long (the kernel drops it), e.g. 30m; at most 168h")
+	} else {
+		fs = e.flags("fw " + sub)
+	}
 	if code, ok := parse(fs, args[1:]); !ok {
 		return code
 	}
@@ -48,6 +62,25 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 	if len(rest) > 0 {
 		if err := naming.ValidService(rest[0]); err != nil {
 			return e.usageErr("fw %s: %v", sub, err)
+		}
+	}
+	var forArgs []string
+	if sub == "allow" {
+		// The address floor (D179) is refused here, with the reason;
+		// the hook's rules would only drop it silently.
+		for _, h := range rest[1:] {
+			if err := config.CheckFloor(h); err != nil {
+				return e.usageErr("fw allow: %v", err)
+			}
+			if *forDur != 0 && strings.Contains(h, "/") {
+				return e.usageErr("fw allow --for: %s is a range; a timed allow takes addresses and hostnames", h)
+			}
+		}
+		switch d := *forDur; {
+		case d < 0, d > fwMaxFor, d != 0 && d < time.Second:
+			return e.usageErr("fw allow --for: %v is not between 1s and %v", d, fwMaxFor)
+		case d != 0:
+			forArgs = []string{"--for", strconv.Itoa(int(d.Seconds())) + "s"}
 		}
 	}
 	w, err := workspace.Load(ctx, e.dir, e.slug)
@@ -80,7 +113,7 @@ func cmdFw(ctx context.Context, e *env, args []string) int {
 	}
 	_, err = e.run.Run(ctx, sys.Cmd{
 		Name:    script,
-		Args:    append([]string{sub}, rest...),
+		Args:    append(append([]string{sub}, forArgs...), rest...),
 		Env:     env,
 		Stdout:  e.stdout,
 		Stderr:  e.stderr,

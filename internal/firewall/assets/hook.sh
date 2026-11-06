@@ -27,6 +27,13 @@
 # nsenter + nft works. Hostnames are resolved here, by the host, once per
 # start: no DNS reaches the container's allowlist from inside it.
 #
+# Never allowed, whatever an allow list says (D179): FLOOR below -- this
+# network, private ranges, carrier-grade NAT and link-local, which holds the
+# cloud metadata address. They are rejected after the container's own
+# networks, so a LAN address or 169.254.169.254 can't be opened by an allow
+# entry or a hostname that resolves to one. config.FirewallFloor is the same
+# list (a test checks).
+#
 # Always allowed: loopback, replies, and the subnets of the networks named in
 # <prefix>.firewall.networks -- the worktree's dev network (db, redis, rustfs,
 # playwright, aardvark DNS at the gateway) and the proxy network (Traefik).
@@ -43,6 +50,7 @@ ROOT="${2:?usage: hook.sh <project-prefix> <firewall-dir>  (OCI state JSON on st
 STATE="$ROOT/state"
 LOG="$ROOT/hook.log"
 TABLE=wt_firewall
+FLOOR=(0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16)
 
 # Only this user reads the state and the log (another local user would
 # learn every container's addresses and blocked hosts): new files 0600,
@@ -185,13 +193,17 @@ if [[ "$mode" == enforce ]]; then
 else
   verdict='accept'
 fi
+floor="$(IFS=,; printf '%s' "${FLOOR[*]}")"
 
 ruleset="$(cat <<EOF
 table inet $TABLE
 delete table inet $TABLE
 table inet $TABLE {
   set allow4 { type ipv4_addr; flags interval; auto-merge; $(elements ${allow[@]+"${allow[@]}"}) }
+  # fw allow --for: addresses the kernel drops when their timeout ends.
+  set allowt4 { type ipv4_addr; flags timeout; }
   set local4 { type ipv4_addr; flags interval; auto-merge; $(elements ${local4[@]+"${local4[@]}"}) }
+  set floor4 { type ipv4_addr; flags interval; elements = { $floor } }
   # Everything that met the final verdict: rejected under enforce, would have
   # been under log. Read by fw:show; entries age out after a week.
   set blocked4 { type ipv4_addr . inet_proto . inet_service; flags dynamic,timeout; timeout 7d; size 4096; }
@@ -201,9 +213,14 @@ table inet $TABLE {
     oif "lo" accept
     ct state established,related accept
     ip daddr @local4 accept
+    ip daddr @floor4 goto deny
     ip daddr @allow4 accept
+    ip daddr @allowt4 accept
     # Neighbour discovery and other link-local IPv6 housekeeping.
     ip6 daddr { fe80::/10, ff02::/16 } accept
+    goto deny
+  }
+  chain deny {
     meta l4proto { tcp, udp } meta nfproto ipv4 add @blocked4 { ip daddr . meta l4proto . th dport }
     meta l4proto { tcp, udp } meta nfproto ipv6 add @blocked6 { ip6 daddr . meta l4proto . th dport }
     $verdict
@@ -213,6 +230,27 @@ EOF
 )"
 
 nsenter -t "$pid" -n nft -f - <<<"$ruleset" 2>>"$LOG" || die "nft rejected the ruleset for pid $pid (see $LOG)"
+
+# Read the table back and check what must hold (D179): nft returning 0 is
+# not proof the kernel holds these rules. Any miss fails the start.
+live="$(nsenter -t "$pid" -n nft list table inet "$TABLE" 2>>"$LOG")" || die "cannot list table $TABLE in pid $pid (see $LOG)"
+# block NAME: the lines of "chain NAME" up to its closing brace.
+block() { awk -v h="chain $1 {" 'index($0, h) { on = 1; next } on && /^[[:space:]]*}[[:space:]]*$/ { exit } on' <<<"$live"; }
+# set_text NAME: "set NAME" to its first closing brace: its elements.
+set_text() { awk -v h="set $1 {" 'index($0, h) { on = 1 } on { print; if (index($0, "}")) exit }' <<<"$live"; }
+last_rule() { block "$1" | sed -e 's/^[[:space:]]*//' -e '/^$/d' | tail -n 1; }
+line_of() { block output | grep -nF -- "$1" | head -n 1 | cut -d: -f1; }
+floor_set="$(set_text floor4)"
+for f in "${FLOOR[@]}"; do
+  grep -qwF -- "$f" <<<"$floor_set" || die "verify: floor4 lacks $f"
+done
+fl="$(line_of '@floor4')"; al="$(line_of '@allow4')"; tl="$(line_of '@allowt4')"
+[[ -n "$fl" && -n "$al" && -n "$tl" && "$fl" -lt "$al" && "$fl" -lt "$tl" ]] || die "verify: the floor rule is not ahead of the allow rules"
+[[ "$(last_rule output)" == "goto deny" ]] || die "verify: chain output does not end in goto deny"
+[[ "$(last_rule deny)" == "${verdict%% *}"* ]] || die "verify: chain deny does not end in ${verdict%% *}"
+if (( ${#allow[@]} )); then
+  grep -q 'elements' <<<"$(set_text allow4)" || die "verify: allow4 is empty, ${#allow[@]} entries were asked for"
+fi
 
 {
   printf 'profiles=%s\nmode=%s\n' "$profiles" "$mode"

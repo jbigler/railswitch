@@ -698,6 +698,14 @@ func (l *loader) checkPack(dir string, p *Pack) bool {
 			l.add(file, "runtimes.%s: name must match %s", name, nameRe)
 		}
 		l.sources(file, "runtimes."+name, p.Runtimes[name].From)
+		if s := p.Runtimes[name].DropSuffix; s != "" {
+			if _, err := regexp.Compile("(?:" + s + ")$"); err != nil {
+				l.add(file, "runtimes.%s.drop_suffix: %v", name, err)
+			}
+		}
+	}
+	if p.DBName.DropSuffix != "" || p.DBTestName.DropSuffix != "" {
+		l.add(file, "drop_suffix: only a [runtimes.<name>] takes it")
 	}
 	l.sources(file, "db_name", p.DBName.From)
 	l.env(file, "env", p.Env)
@@ -914,7 +922,7 @@ func (l *loader) checkAgent(dir string, a *Agent) bool {
 	l.file(file, "image.file", dir, a.Image.File)
 	l.file(file, "entrypoint", dir, a.Entrypoint)
 	for i, h := range a.Allow {
-		// meta:<name> is a published range set the firewall hook fetches (meta:github).
+		// meta:<name> is a published range set the firewall hook fetches (meta:github, meta:google).
 		if !hostRe.MatchString(strings.TrimPrefix(h, "meta:")) {
 			l.add(file, "allow[%d]: %q is not a host name or meta:<name>", i, h)
 		}

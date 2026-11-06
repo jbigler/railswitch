@@ -47,8 +47,15 @@ type Worktree struct {
 type Host struct {
 	CPUs                                int
 	Home, NetworkDir, GitName, GitEmail string
-	Missing                             map[string]bool // optional machine mount sources absent at render time (D57)
+	// DNSFilter: the host has a dnsmasq with nftset in HookPathDirs, so
+	// enforce-mode containers get the hook's DNS filter (D182).
+	DNSFilter bool
+	Missing   map[string]bool // optional machine mount sources absent at render time (D57)
 }
+
+// HookPathDirs are the directories of the firewall hook's PATH, in order:
+// where it, and ReadHost for it, find nft, nsenter and dnsmasq.
+var HookPathDirs = []string{"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"}
 
 // MachineMount is a config.toml [[mount]] of this project (D57). Index is
 // its position in config.toml, for messages.
@@ -922,7 +929,7 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 				v[name], v[name+".major"] = "", ""
 				continue
 			}
-			val, src = r.Value, "runtimes."+name+" ("+r.Source+")"
+			val, src = ch.Value(r.Value), "runtimes."+name+" ("+r.Source+")"
 		}
 		if err := setVersion(name, val, src); err != nil {
 			return nil, err

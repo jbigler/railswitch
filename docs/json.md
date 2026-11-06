@@ -127,7 +127,7 @@ exists, else an option under `options/<name>/`).
 {
   "ref": "rails@1", "kind": "pack", "source": "built in", "path": "",
   "app": {"service": "rails", "server": "bin/dev", "port": 3000, "health": "curl -fsS http://localhost:3000/up"},
-  "runtimes": [{"name": "bun", "from": [".bun-version", "package.json:packageManager.bun"], "fallback": ""}],
+  "runtimes": [{"name": "bun", "from": [".bun-version", "package.json:packageManager.bun"], "fallback": "", "drop_suffix": ""}],
   "ports": [{"name": "debug", "base": 33000, "container": 0}, {"name": "app", "base": 13000, "container": 3000}],
   "pin": null, "gives": [], "readme": ""
 }
@@ -141,7 +141,7 @@ exists, else an option under `options/<name>/`).
 | `path` | string | A local package's directory; `""` for a built-in. |
 | `app` | object | A pack's app: `service`, `server`, `port`, `health`. Absent for an option. |
 | `slot`, `service` | string | An option's slot and service id. Absent for a pack. |
-| `runtimes` | array | A pack's version chains, by name: `name`, `from` (sources, in order), `fallback` (`""`: none). |
+| `runtimes` | array | A pack's version chains, by name: `name`, `from` (sources, in order), `fallback` (`""`: none), `drop_suffix` (the regexp whose match is cut off the end of a value read from a source, D178; `""`: none). |
 | `ports` | array | Published ports: `name`, `base` (the host port is `base` + worktree ID), `container` (`0` for `same_port`). |
 | `pin` | object or null | An option's version pin: `name`, `default`. |
 | `gives` | array of strings | The env names an option gives the app, sorted. |
@@ -1539,6 +1539,9 @@ such an entry, and reports any hook in `.git/modules/**/hooks/` and any
 symlink or file where `.git/worktrees`, `.git/modules` or a directory under
 them should be (`not-a-dir`); a finding
 is a warning (`warn` true), and `railswitch hooks check` lists them.
+`dnsmasq (DNS filter)` checks for a dnsmasq built with nftset in the
+firewall hook's PATH; without one, enforce-mode containers resolve any
+name (D182), so a failure is a warning.
 `ssh-keygen -Y` checks that `ssh-keygen` supports `-Y verify` (OpenSSH 8.2
 or newer), which `library verify` and `library sign` need; a failure is a
 warning, since nothing else needs it.
@@ -1556,9 +1559,9 @@ code, and the text output shows it as `warn`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `dnsmasq (DNS filter)`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
-| `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`): it doesn't change the exit code. `false` for a passed check. |
+| `warn` | boolean | A failed check is only a warning (`git-guard`, `ssh-keygen -Y`, `dnsmasq (DNS filter)`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |
 | `fix` | string | How to repair a failed check, e.g. a command to run (`railswitch allow-ports`, `railswitch render`, or `railswitch lock` for a missing `stack.lock`, `railswitch lock --review` for a stale one); `""` for a passed check. |
 

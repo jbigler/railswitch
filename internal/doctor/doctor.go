@@ -22,6 +22,7 @@ import (
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/podman"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
 )
@@ -45,6 +46,7 @@ type Host struct {
 	Quadlet    []string // podman's quadlet generator: the first that exists
 	Cgroup     string   // cgroup v2's root cgroup.controllers
 	LookPath   func(name string) (string, error)
+	HookDirs   []string // where the firewall hook looks for dnsmasq (render.HookPathDirs)
 	Dashboards []string // the dashboard's addresses, asked for /healthz (machine.ProbeDashboards)
 	// Token is this user's dashboard login token, which the dashboard
 	// proves it holds ("": none yet, nothing passes).
@@ -58,6 +60,7 @@ var DefaultHost = Host{
 	Quadlet:    podman.QuadletPaths,
 	Cgroup:     "/sys/fs/cgroup/cgroup.controllers",
 	LookPath:   exec.LookPath,
+	HookDirs:   render.HookPathDirs,
 	Dashboards: machine.DashboardAddrs,
 }
 
@@ -76,7 +79,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, sshKeygen(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
+	out = append(out, h.dnsFilter(ctx, r), sshKeygen(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
 	}
@@ -138,6 +141,20 @@ func (h Host) quadlet() Check {
 		return c
 	}
 	c.Detail = strings.Join(errs, "; ")
+	return c
+}
+
+// dnsFilter warns unless the host has a dnsmasq built with nftset: without
+// it, enforce-mode containers resolve any name through the network's
+// resolver, a narrow way out (D182).
+func (h Host) dnsFilter(ctx context.Context, r sys.Runner) Check {
+	c := Check{Name: "dnsmasq (DNS filter)", Warn: true,
+		Fix: "install dnsmasq 2.87 or newer, built with nftset (Arch, Fedora and Debian's are): enforce-mode containers then resolve only their allowed names; render, then restart them"}
+	if workspace.HasDNSFilter(ctx, r, h.HookDirs) {
+		c.OK, c.Detail = true, "dnsmasq with nftset: enforce-mode containers resolve only their allowed names"
+	} else {
+		c.Detail = "no dnsmasq with nftset in " + strings.Join(h.HookDirs, ":") + ": containers resolve any name"
+	}
 	return c
 }
 

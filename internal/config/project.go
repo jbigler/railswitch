@@ -501,6 +501,8 @@ func (p *Project) Validate() error {
 		for i, h := range a.Allow {
 			if !hostRe.MatchString(h) {
 				v.add(fmt.Sprintf("%s.allow[%d]", path, i), "%q is not a host name", h)
+			} else if err := CheckFloor(h); err != nil {
+				v.add(fmt.Sprintf("%s.allow[%d]", path, i), "%v", err)
 			}
 		}
 		for i, c := range a.Setup {

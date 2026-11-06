@@ -11,17 +11,53 @@ import (
 // app and its workers (D119), deps installs, every agent.
 var FirewallProfiles = []string{"app", "deps", "agent"}
 
+// FirewallFloor are the IPv4 ranges no allow entry opens (D179): this
+// network, private ranges, carrier-grade NAT (Tailscale) and link-local,
+// which holds the cloud metadata address 169.254.169.254. The firewall
+// hook rejects them after a container's own networks and before its allow
+// lists; internal/firewall/assets/hook.sh keeps the same list (a test
+// checks). Hostnames that resolve into them are blocked the same way.
+var FirewallFloor = []string{"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16"}
+
 // CheckAllowHost refuses h unless it is an allow list entry the firewall
-// hook takes: a host name, an IPv4 address or CIDR, or meta:<name> (a
-// published range set, meta:github).
+// hook takes: a host name, an IPv4 address or CIDR outside FirewallFloor,
+// or meta:<name> (a published range set: meta:github, meta:google).
 func CheckAllowHost(h string) error {
 	if _, _, err := net.ParseCIDR(h); err == nil && !strings.Contains(h, ":") {
-		return nil
+		return CheckFloor(h)
 	}
 	if hostRe.MatchString(strings.TrimPrefix(h, "meta:")) {
-		return nil
+		return CheckFloor(h)
 	}
 	return fmt.Errorf("%q is not a host name, IPv4 address or CIDR, or meta:<name>", h)
+}
+
+// CheckFloor refuses an IPv4 address or CIDR h that reaches into
+// FirewallFloor: the firewall would reject it whatever the allow list
+// says. Anything else (a host name) passes.
+func CheckFloor(h string) error {
+	n := ipv4Net(h)
+	if n == nil {
+		return nil
+	}
+	for _, f := range FirewallFloor {
+		_, fn, _ := net.ParseCIDR(f)
+		if fn.Contains(n.IP) || n.Contains(fn.IP) {
+			return fmt.Errorf("%q reaches into %s, which the firewall never opens (private, link-local and cloud-metadata ranges, D179)", h, f)
+		}
+	}
+	return nil
+}
+
+// ipv4Net is h as an IPv4 network (an address is a /32); nil for anything else.
+func ipv4Net(h string) *net.IPNet {
+	if _, n, err := net.ParseCIDR(h); err == nil && n.IP.To4() != nil {
+		return n
+	}
+	if ip := net.ParseIP(h).To4(); ip != nil && !strings.Contains(h, ":") {
+		return &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	}
+	return nil
 }
 
 // parseFirewall splits data and checks that [firewall] is the shape the

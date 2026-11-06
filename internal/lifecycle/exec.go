@@ -167,6 +167,9 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 	for _, h := range hosts {
 		args = append(args, "--add-host", h)
 	}
+	if in.DNSFilter(s) { // the hook starts the filter: it's annotated above (D182)
+		args = append(args, "-v", render.ResolvConfMount(m.Inputs.Workspace))
+	}
 	if s.Worktree {
 		args = append(args, "--userns", render.WorktreeUserNS, "--user", render.WorktreeUser)
 	}

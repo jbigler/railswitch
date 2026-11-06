@@ -79,6 +79,8 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .msg{margin-top:4px;padding:6px 8px;background:var(--bg2);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere}
 .actions{display:flex;flex-wrap:wrap;align-items:center}
 .actions form,.job-hd form{display:inline;margin-left:6px}
+.fw-live{display:inline-flex;align-items:center;gap:4px}
+.fw-live .ln{margin:0}
 .gap{width:14px}
 .actions.top{margin:8px 0 2px}
 
@@ -358,7 +360,6 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .secret-form input:not([type=checkbox]){width:7em}
 .tb a,.tb button{white-space:nowrap}
 }
-@media (max-width:800px){.grid.wt{grid-template-columns:minmax(0,1fr)}}
 
 /* The worktree page (D170): menus, a grouped list, the detail's head,
    tabs and cards. Scoped to .wt: other pages share the jobs section. */
@@ -373,6 +374,9 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .menu-pop .danger{color:var(--red)}
 .menu-pop.rightward{left:0;right:auto}
 .grid.wt{grid-template-columns:minmax(340px,460px) minmax(0,1fr)}
+/* After the rule above, which it overrides: one column, the list or the
+   detail as data-pane says (else the detail lands in the 460px track). */
+@media (max-width:800px){.grid.wt{grid-template-columns:minmax(0,1fr)}}
 .wt .filter{display:flex;gap:6px;align-items:center;padding:12px 12px 2px}
 .wt .filter input{flex:1;min-width:0;padding:6px 10px;font:inherit;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px}
 .wt .filter form{display:inline}

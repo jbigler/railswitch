@@ -1683,16 +1683,16 @@ base = "flexoki"
 ## `panic`
 
 What `railswitch panic` did (D181): every running container of every
-registered project, by exact name, cut off the network; then every running
-agent paused. It acts, then reports; it exits 1 when any step failed.
+registered worktree (its name starts with `<prefix>-<slug>-`) cut off the
+network, then paused. It acts, then reports; it exits 1 when any step
+failed, and 1 with no document when podman can't list containers.
 
 ```json
 {
   "containers": [
-    {"project": "shop", "worktree": "feat", "container": "shop-feat-rails", "quarantined": true, "paused": false},
+    {"project": "shop", "worktree": "feat", "container": "shop-feat-rails", "quarantined": true, "paused": true},
     {"project": "shop", "worktree": "feat", "container": "shop-feat-agent-claude", "quarantined": true, "paused": true}
-  ],
-  "projects": [{"prefix": "old", "error": "workspace missing: /home/me/old"}]
+  ]
 }
 ```
 
@@ -1700,6 +1700,5 @@ agent paused. It acts, then reports; it exits 1 when any step failed.
 |---|---|---|
 | `containers[]` | array | One per running container it reached; `[]` for none. |
 | `containers[].quarantined` | bool | Its egress firewall is now drop-all but loopback. |
-| `containers[].paused` | bool | An agent container, now paused (`podman pause`). |
+| `containers[].paused` | bool | Now paused (`podman pause`), or already was. |
 | `containers[].error` | string | What failed, absent when nothing did. |
-| `projects[]` | array | A registered project it could not reach (workspace missing or unloadable); `[]` for none. |

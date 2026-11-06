@@ -523,6 +523,9 @@ func TestDepsUnfrozen(t *testing.T) {
 	if !slices.Contains(c, "filial.firewall=deps") || argAfter(c, "--annotation") != "filial.firewall=deps" {
 		t.Errorf("argv lacks --annotation filial.firewall=deps: %q", c)
 	}
+	if !strings.HasPrefix(argAfter(c, "--name"), "filial-feat-deps-run-") { // panic reaches it (D181)
+		t.Errorf("argv lacks --name filial-feat-deps-run-<n>: %q", c)
+	}
 	if argAfter(c, "-w") != "/app" || !slices.Equal(c[len(c)-3:], []string{"bundle", "add", "x"}) {
 		t.Errorf("argv %q", c)
 	}

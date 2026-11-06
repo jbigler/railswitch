@@ -6,7 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/machine"
+	"github.com/jbigler/railswitch/internal/podman"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -37,57 +38,65 @@ table inet wt_firewall {
 // hold up the others.
 const panicStep = 10 * time.Second
 
-// Panic is `railswitch panic` for this project (D181, after terok's): every
-// running container of every registered worktree, by exact name, loses its
-// network (quarantineRules, loaded from outside it as the firewall hook
-// does), then every running agent container is paused, so its processes
-// stop and it stays as it is to be looked at. Each step is best effort:
-// one that fails is in its row and the rest go on. Containers without a
-// name (exec --fresh) are not reached. A restart of the worktree brings it
-// back: new containers, new rules.
-func (l *L) Panic(ctx context.Context) ([]PanicRow, error) {
-	m, err := l.model(ctx)
+// Panic is `railswitch panic` (D181, after terok's): every container of
+// every registered worktree loses its network (quarantineRules, loaded from
+// outside it as the firewall hook does), then every one of them is paused,
+// so its processes stop, systemd can't restart it with fresh rules, and it
+// stays as it is to be looked at. A container belongs to a worktree when
+// its name starts exactly with "<prefix>-<slug>-": the units' containers
+// and the transient ones (deps, exec --fresh, on-demand agents), which are
+// named so. It needs no workspace, so a project that doesn't load is still
+// reached. Each step is best effort: one that fails is in its row and the
+// rest go on. A restart of the worktree brings it back: new containers,
+// new rules.
+func Panic(ctx context.Context, r sys.Runner, wts []machine.WorktreeEntry) ([]PanicRow, error) {
+	p := podman.Podman{R: r}
+	res, err := r.Run(ctx, sys.Cmd{Name: "podman", Args: []string{"ps", "-a", "--format", "{{.Names}}"}, Timeout: panicStep})
 	if err != nil {
 		return nil, err
 	}
-	p := l.podman()
 	var rows []PanicRow
-	var agents []int // rows of running agents, paused after every quarantine
-	for _, wt := range m.Inputs.Worktrees {
-		for _, s := range m.Services {
-			name := containerOf(m, wt.Slug, s.ID)
-			row := PanicRow{Project: m.Prefix, Worktree: wt.Slug, Container: name}
-			pid, status, err := p.PID(ctx, name)
-			if err != nil { // podman can't say: report it, never skip it unseen
-				row.Error = "inspect: " + err.Error()
-				rows = append(rows, row)
-				continue
+	var running []int // rows of running containers, paused after every quarantine
+	for _, name := range strings.Fields(string(res.Stdout)) {
+		// The longest "<prefix>-<slug>-" wins: slug feat-x is not slug feat's.
+		var wt *machine.WorktreeEntry
+		for i, w := range wts {
+			if strings.HasPrefix(name, w.Prefix+"-"+w.Slug+"-") && (wt == nil || len(w.Prefix+w.Slug) > len(wt.Prefix+wt.Slug)) {
+				wt = &wts[i]
 			}
-			if pid == 0 || (status != "running" && status != "paused") {
-				continue // not running: nothing to stop
-			}
-			if _, err := l.R.Run(ctx, sys.Cmd{
-				Name:    "podman",
-				Args:    []string{"unshare", "nsenter", "-t", strconv.Itoa(pid), "-n", "nft", "-f", "-"},
-				Stdin:   strings.NewReader(quarantineRules),
-				Timeout: panicStep,
-			}); err != nil {
-				row.Error = "quarantine: " + err.Error()
-			} else {
-				row.Quarantined = true
-			}
-			if s.Role == render.RoleAgent {
-				if status == "paused" {
-					row.Paused = true
-				} else {
-					agents = append(agents, len(rows))
-				}
-			}
-			rows = append(rows, row)
 		}
+		if wt == nil {
+			continue
+		}
+		row := PanicRow{Project: wt.Prefix, Worktree: wt.Slug, Container: name}
+		pid, status, err := p.PID(ctx, name)
+		if err != nil { // podman can't say: report it, never skip it unseen
+			row.Error = "inspect: " + err.Error()
+			rows = append(rows, row)
+			continue
+		}
+		if pid == 0 || (status != "running" && status != "paused") {
+			continue // not running: nothing to stop
+		}
+		if _, err := r.Run(ctx, sys.Cmd{
+			Name:    "podman",
+			Args:    []string{"unshare", "nsenter", "-t", strconv.Itoa(pid), "-n", "nft", "-f", "-"},
+			Stdin:   strings.NewReader(quarantineRules),
+			Timeout: panicStep,
+		}); err != nil {
+			row.Error = "quarantine: " + err.Error()
+		} else {
+			row.Quarantined = true
+		}
+		if status == "paused" {
+			row.Paused = true
+		} else {
+			running = append(running, len(rows))
+		}
+		rows = append(rows, row)
 	}
 	// Every network is cut before the first pause: pausing is slower.
-	for _, i := range agents {
+	for _, i := range running {
 		r := &rows[i]
 		if err := p.Pause(ctx, r.Container); err != nil {
 			r.Error = strings.TrimPrefix(r.Error+"; pause: "+err.Error(), "; ")

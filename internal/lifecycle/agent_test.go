@@ -129,8 +129,9 @@ func TestExecNoName(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := find(t, e.calls(), "podman --hooks-dir")
-	if slices.Contains(c, "--name") || slices.Contains(c, "--entrypoint") {
-		t.Errorf("exec --fresh argv has --name or --entrypoint: %q", c)
+	// Named after its worktree and service, so panic reaches it (D181).
+	if n := flagValues(c, "--name"); len(n) != 1 || !strings.HasPrefix(n[0], "filial-feat-rails-run-") || slices.Contains(c, "--entrypoint") {
+		t.Errorf("exec --fresh argv: want --name filial-feat-rails-run-<n>, no --entrypoint: %q", c)
 	}
 	// The app's networks and host entries, as its unit has (D172): its
 	// routed hosts resolve only through Traefik.

@@ -235,7 +235,9 @@ still wider than the window scrolls its pane.
     with a unit of its own (a service agent too; not an on-demand agent
     or deps), `Restart` runs `railswitch restart <service>`, which
     restarts it alone; a service agent's asks first, as its session ends
-    with it; while it runs, a small bar of its memory against its limit,
+    with it; deps, a oneshot that logs to its unit's journal and so never
+    to Dozzle, has `Logs` in every state, which starts a job running
+    `railswitch logs deps` and shows the journal in Jobs (D186); while it runs, a small bar of its memory against its limit,
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
     tooltip, D161.
   - **Links** (Overview only; full width, under Services): the links,

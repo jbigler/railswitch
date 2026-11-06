@@ -16,7 +16,8 @@
 #                   [firewall] allow.<profile> list in project.toml (an
 #                   agent-<name>'s: [agents.<name>] allow). With --for <N>s
 #                   the kernel drops it after N seconds (the allowt4 set,
-#                   D179); railswitch checks the duration.
+#                   D179); railswitch checks the duration. A timed allow
+#                   adds addresses only, not names to the DNS filter (D182).
 #
 # Environment (set by railswitch):
 #   FIREWALL_DIR     <workspace>/.railswitch/firewall: the hook's state/ dir
@@ -204,9 +205,15 @@ cmd_allow() {
   done
   (( ${#ips[@]} )) || die "nothing resolved"
   # A container behind the DNS filter must also be answered for the names.
+  # Not for a timed allow: the filter has no expiry, and each lookup would
+  # re-add the addresses to allowd4, outlasting --for.
   if (( ${#names[@]} )) && [[ -f "$DNSDIR/${id:0:12}.conf" ]]; then
-    dns_add "$pid" "${id:0:12}" "${names[@]}"
-    printf 'its DNS filter now answers %s\n' "${names[*]}"
+    if [[ -n "$for" ]]; then
+      printf 'note: %s allowed by address only; its DNS filter does not answer %s, so code that looks the name up still fails (allow without --for for that)\n' "$name" "${names[*]}"
+    else
+      dns_add "$pid" "${id:0:12}" "${names[@]}"
+      printf 'its DNS filter now answers %s\n' "${names[*]}"
+    fi
   fi
   if [[ -n "$for" ]]; then
     local timed=() i

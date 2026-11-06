@@ -29,8 +29,9 @@
 # namespace (not its process namespace: nothing inside can see or signal
 # it), on 127.0.0.1:53, which the container's /etc/resolv.conf names (a
 # read-only mount render adds: podman's own would name the network's
-# resolver). Queries to the network's resolver are rejected unless they
-# come from the filter's own source port (QPORT), so it can't be skipped. It answers the allow lists' host names (and their
+# resolver). Queries to any of its networks' resolvers (each gateway) are
+# rejected unless they come from the filter's own source port (QPORT), so it
+# can't be skipped. It answers the allow lists' host names (and their
 # subdomains), the worktree's container names and *.dns.podman, each by
 # asking the network's own resolver, and puts every address it answers
 # into allowd4 as it goes, with a timeout: a host whose addresses rotate
@@ -65,7 +66,11 @@ ROOT="${2:?usage: hook.sh <project-prefix> <firewall-dir>  (OCI state JSON on st
 STATE="$ROOT/state"
 LOG="$ROOT/hook.log"
 TABLE=wt_firewall
-QPORT=1053 # the DNS filter's source port for its own upstream queries
+# The DNS filter's source port for its own upstream queries. Below 1024: the
+# netns keeps the kernel's default ip_unprivileged_port_start (1024) and the
+# container has no capabilities, so nothing inside can bind it while
+# dnsmasq doesn't (a restart, a crash); dnsmasq runs as root here and can.
+QPORT=953
 FLOOR=(0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16)
 
 # Only this user reads the state and the log (another local user would
@@ -217,9 +222,15 @@ for n in "${netlist[@]}"; do
     [[ "$net" =~ $ipv4 ]] && local4+=("$net")
   done < <(grep -oE '"subnet"[[:space:]]*:[[:space:]]*"[^"]+"' "$NETWORK_DIR/$n.json" | grep -oE '[0-9.]+/[0-9]+')
 done
-# The first network's gateway answers its container names (aardvark-dns):
-# the DNS filter asks it.
-gateway="$(grep -oE '"gateway"[[:space:]]*:[[:space:]]*"[0-9.]+"' "$NETWORK_DIR/${netlist[0]}.json" | grep -oE '[0-9]+(\.[0-9]+){3}' | head -n 1)" || true
+# Each network's gateway runs a resolver (aardvark-dns) that forwards any
+# name upstream: the DNS filter's rules block all of them. The first
+# network's answers the worktree's container names: the filter asks it.
+gw_of() { grep -oE '"gateway"[[:space:]]*:[[:space:]]*"[0-9.]+"' "$NETWORK_DIR/$1.json" | grep -oE '[0-9]+(\.[0-9]+){3}' || true; }
+gateway="$(gw_of "${netlist[0]}" | head -n 1)"
+gateways=()
+for n in "${netlist[@]}"; do
+  while read -r g; do [[ "$g" =~ $ipv4 ]] && gateways+=("$g"); done < <(gw_of "$n")
+done
 filter=""
 if [[ "$dns" == filter && "$mode" == enforce ]]; then
   DNSMASQ="$(command -v dnsmasq)" || die "$P.firewall.dns=filter, but there is no dnsmasq on this host: install it (railswitch doctor), or rerun railswitch render"
@@ -243,7 +254,8 @@ table inet $TABLE {
   set allow4 { type ipv4_addr; flags interval; auto-merge; $(elements ${allow[@]+"${allow[@]}"}) }
   # fw allow --for: addresses the kernel drops when their timeout ends.
   set allowt4 { type ipv4_addr; flags timeout; }
-  # The DNS filter's answers (D182); each lasts an hour past its last lookup.
+  # The DNS filter's answers (D182); each lasts an hour after it was first
+  # added (a later lookup doesn't extend it).
   set allowd4 { type ipv4_addr; flags timeout; timeout 1h; }
   set local4 { type ipv4_addr; flags interval; auto-merge; $(elements ${local4[@]+"${local4[@]}"}) }
   set floor4 { type ipv4_addr; flags interval; elements = { $floor } }
@@ -255,7 +267,7 @@ table inet $TABLE {
     type filter hook output priority filter; policy accept;
     oif "lo" accept
     ct state established,related accept
-$([[ -n "$filter" ]] && printf '    ip daddr %s udp dport 53 udp sport != %s goto deny\n    ip daddr %s tcp dport 53 goto deny\n' "$gateway" "$QPORT" "$gateway")
+$([[ -n "$filter" ]] && for g in "${gateways[@]}"; do printf '    ip daddr %s udp dport 53 udp sport != %s goto deny\n    ip daddr %s tcp dport 53 goto deny\n' "$g" "$QPORT" "$g"; done)
     ip daddr @local4 accept
     ip daddr @floor4 goto deny
     ip daddr @allow4 accept
@@ -297,8 +309,11 @@ if (( ${#allow[@]} )); then
   grep -q 'elements' <<<"$(set_text allow4)" || die "verify: allow4 is empty, ${#allow[@]} entries were asked for"
 fi
 if [[ -n "$filter" ]]; then
-  ll="$(line_of '@local4')"; gl="$(line_of "ip daddr $gateway udp dport 53")"
-  [[ -n "$gl" && -n "$ll" && "$gl" -lt "$ll" ]] || die "verify: DNS to $gateway is not kept to the filter"
+  ll="$(line_of '@local4')"
+  for g in "${gateways[@]}"; do
+    ul="$(line_of "ip daddr $g udp dport 53")"; cl="$(line_of "ip daddr $g tcp dport 53")"
+    [[ -n "$ul" && -n "$cl" && -n "$ll" && "$ul" -lt "$ll" && "$cl" -lt "$ll" ]] || die "verify: DNS to $g is not kept to the filter"
+  done
 fi
 
 # The DNS filter: its config, then dnsmasq in the container's network

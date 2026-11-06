@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -616,7 +618,7 @@ func TestFirewallAllowFor(t *testing.T) {
 func TestHookDNSFilter(t *testing.T) {
 	ann := map[string]string{
 		"filial.firewall": "app", "filial.firewall.mode": "enforce",
-		"filial.firewall.networks": "filial-feat-dev", "filial.firewall.dns": "filter",
+		"filial.firewall.networks": "filial-feat-dev,filial-feat-proxy", "filial.firewall.dns": "filter",
 	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "hook.sh")
@@ -657,9 +659,13 @@ func TestHookDNSFilter(t *testing.T) {
 		if out, ok := strings.CutPrefix(kv, "OUT="); ok {
 			rules, _ := os.ReadFile(out)
 			r := string(rules)
-			side, local := strings.Index(r, "ip daddr 10.89.7.1 udp dport 53 udp sport != 1053 goto deny"), strings.Index(r, "@local4 accept")
-			if side < 0 || !strings.Contains(r, "ip daddr 10.89.7.1 tcp dport 53 goto deny") || side > local {
-				t.Errorf("DNS to the gateway is not kept to the filter, ahead of local4:\n%s", r)
+			local := strings.Index(r, "@local4 accept")
+			// Every network's gateway: the proxy's resolver forwards upstream too.
+			for _, gw := range []string{"10.89.7.1", "10.89.8.1"} {
+				udp, tcp := strings.Index(r, "ip daddr "+gw+" udp dport 53 udp sport != 953 goto deny"), strings.Index(r, "ip daddr "+gw+" tcp dport 53 goto deny")
+				if udp < 0 || tcp < 0 || udp > local || tcp > local {
+					t.Errorf("DNS to %s is not kept to the filter, ahead of local4:\n%s", gw, r)
+				}
 			}
 		}
 	}
@@ -670,7 +676,7 @@ func TestHookDNSFilter(t *testing.T) {
 	for _, want := range []string{
 		"# gateway=10.89.7.1\n", "listen-address=127.0.0.1\n", "no-resolv\n", "cache-size=0\n",
 		"server=//10.89.7.1\n", "server=/dns.podman/10.89.7.1\n",
-		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=1053\n",
+		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=953\n",
 	} {
 		if !strings.Contains(string(conf), want) {
 			t.Errorf("conf lacks %q:\n%s", want, conf)
@@ -735,4 +741,115 @@ func lookTool(t *testing.T, name string) string {
 	}
 	t.Fatal("no PATH")
 	return ""
+}
+
+// TestFirewallAllowDNS (D182): fw allow adds a host name to the container's
+// DNS filter and restarts it; allow --for leaves the filter alone (its
+// lines have no expiry) and says so; fw show ends the filter of a
+// container that is gone and drops its files.
+func TestFirewallAllowDNS(t *testing.T) {
+	bin := t.TempDir()
+	dir := t.TempDir()
+	dnsDir := filepath.Join(dir, "state", "dns")
+	if err := os.MkdirAll(dnsDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	argvLog := filepath.Join(dir, "dnsmasq.argv")
+	shims := map[string]string{
+		// podman: inspect answers id and pid, unshare runs its command, ps lists nothing.
+		"podman":  "#!/bin/bash\ncase \"$1\" in\n  inspect) [[ \"$*\" == *Pid* ]] && echo 4242 || echo 0123456789abcdef ;;\n  unshare) shift; exec \"$@\" ;;\nesac\n",
+		"nsenter": "#!/bin/bash\nwhile (( $# )) && [[ $1 != -n ]]; do shift; done\nshift\nexec \"$@\"\n",
+		"nft":     "#!/bin/bash\n",
+		"getent":  "#!/bin/bash\necho \"203.0.113.9 STREAM $2\"\n",
+		// As dnsmasq does: daemonize (off the output pipe), write the pid file.
+		"dnsmasq": "#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\nsleep 300 >/dev/null 2>&1 & echo $! >\"$pf\"\n",
+	}
+	for name, body := range shims {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "state", "0123456789ab"), []byte("profiles=agent\nmode=enforce\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	conf := filepath.Join(dnsDir, "0123456789ab.conf")
+	pidFile := filepath.Join(dnsDir, "0123456789ab.pid")
+	base := "# gateway=10.89.7.1\npid-file=" + pidFile + "\nserver=/api.example.com/10.89.7.1\n"
+	if err := os.WriteFile(conf, []byte(base), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The running filter.
+	old := exec.Command("sleep", "300")
+	if err := old.Start(); err != nil {
+		t.Fatal(err)
+	}
+	oldDone := make(chan struct{})
+	go func() { _ = old.Wait(); close(oldDone) }()
+	t.Cleanup(func() { _ = old.Process.Kill() })
+	if err := os.WriteFile(pidFile, []byte(strconv.Itoa(old.Process.Pid)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(args ...string) (string, error) {
+		cmd := exec.Command("bash", append([]string{filepath.Join("assets", "firewall.sh")}, args...)...)
+		cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "DNSLOG="+argvLog,
+			"FIREWALL_DIR="+dir, "PREFIX=filial", "WORKTREE=api")
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+
+	// --for: the filter's config stays as it was, and nothing restarts.
+	out, err := run("allow", "--for", "600s", "agent", "other.example.com")
+	if err != nil {
+		t.Fatalf("allow --for: %v\n%s", err, out)
+	}
+	if got, _ := os.ReadFile(conf); string(got) != base {
+		t.Errorf("allow --for changed the filter's config:\n%s", got)
+	}
+	if _, err := os.Stat(argvLog); err == nil {
+		t.Error("allow --for restarted the filter")
+	}
+	if !strings.Contains(out, "does not answer other.example.com") {
+		t.Errorf("allow --for: no note about the filter:\n%s", out)
+	}
+
+	// Without --for: the name joins the config, the old filter ends, a new one starts.
+	if out, err := run("allow", "agent", "new.example.com"); err != nil {
+		t.Fatalf("allow: %v\n%s", err, out)
+	}
+	got, _ := os.ReadFile(conf)
+	for _, want := range []string{"server=/new.example.com/10.89.7.1\n", "nftset=/new.example.com/4#inet#wt_firewall#allowd4\n"} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("conf lacks %q:\n%s", want, got)
+		}
+	}
+	select {
+	case <-oldDone:
+	case <-time.After(5 * time.Second):
+		t.Error("the old filter still runs after allow")
+	}
+	if argv, _ := os.ReadFile(argvLog); string(argv) != "--conf-file="+conf+"\n" {
+		t.Errorf("dnsmasq argv %q", argv)
+	}
+	pid, _ := os.ReadFile(pidFile)
+	p := strings.TrimSpace(string(pid))
+	if p == "" || p == strconv.Itoa(old.Process.Pid) {
+		t.Fatalf("no new filter pid: %q", p)
+	}
+
+	// show, with the container gone: the filter ends, its files go.
+	if out, err := run("show"); err != nil {
+		t.Fatalf("show: %v\n%s", err, out)
+	}
+	for _, f := range []string{conf, pidFile} {
+		if _, err := os.Stat(f); err == nil {
+			t.Errorf("%s survived show", f)
+		}
+	}
+	for i := 0; i < 50 && exec.Command("kill", "-0", p).Run() == nil; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if exec.Command("kill", "-0", p).Run() == nil {
+		t.Errorf("the filter (pid %s) still runs after show", p)
+		_ = exec.Command("kill", p).Run()
+	}
 }

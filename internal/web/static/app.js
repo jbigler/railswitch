@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -13,6 +13,7 @@ const sortStore = "railswitch.sort." + prefix;
 const projectStore = "railswitch.project";
 const tabStore = "railswitch.tab";
 const wtStore = "railswitch.wt." + prefix;
+const daysStore = "railswitch.usagedays"; // the usage views' range (D187)
 
 // recall and remember read and write this browser's local storage, which a
 // private window or blocked site data makes throw: the page works without.
@@ -41,7 +42,7 @@ function connect() {
   if (es) es.close();
   clearTimeout(retry);
   // The new page has a prefix only once Create starts its job.
-  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", view: view === "new" || view === "machine" || view === "import" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", days: body.dataset.days || "", view: view === "new" || view === "machine" || view === "import" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -188,8 +189,7 @@ function notify(ev) {
 // and sends its detail and jobs.
 
 function pageURL(slug) {
-  const sort = body.dataset.sort;
-  return "/p/" + encodeURIComponent(prefix) + "/" + encodeURIComponent(slug) + (sort && sort !== "name" ? "?sort=" + encodeURIComponent(sort) : "");
+  return "/p/" + encodeURIComponent(prefix) + "/" + encodeURIComponent(slug) + pageQuery(body.dataset.sort, body.dataset.days);
 }
 
 function select(slug, push) {
@@ -220,6 +220,25 @@ document.addEventListener("click", (e) => {
   const sortLink = t.closest("a[data-sort]");
   if (sortLink) {
     remember(sortStore, new URL(sortLink.href).searchParams.get("sort") || "name");
+    return;
+  }
+  // The usage range (D187): kept in the URL and this browser, and the
+  // stream restarts to send the usage views for it.
+  const daysLink = t.closest("a[data-days]");
+  if (daysLink) {
+    e.preventDefault();
+    body.dataset.days = daysLink.dataset.days;
+    remember(daysStore, daysLink.dataset.days);
+    history.replaceState(null, "", location.pathname + pageQuery(body.dataset.sort, body.dataset.days));
+    connect();
+    return;
+  }
+  // A worktree's segment of the usage chart opens its Agent tab.
+  const usageWT = t.closest("#usage a[data-usage-wt]");
+  if (usageWT && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    e.preventDefault();
+    remember(tabStore, "agent");
+    select(usageWT.dataset.usageWt, true);
     return;
   }
   // An open menu closes on a click outside it, or on one of its items.
@@ -1568,8 +1587,17 @@ function startNotes() {
   const saved = recall(sortStore);
   // Only a key the sort bar still offers (an old "running" is gone, D170).
   const offered = (k) => $$("#list a[data-sort]").some((a) => (new URL(a.href).searchParams.get("sort") || "").replace(/^-/, "") === k.replace(/^-/, ""));
+  const savedDays = recall(daysStore);
+  let moved = false;
   if (!params.has("sort") && saved && saved !== "name" && offered(saved)) {
     params.set("sort", saved);
+    moved = true;
+  }
+  if (!params.has("days") && (savedDays === "7" || savedDays === "30")) {
+    params.set("days", savedDays);
+    moved = true;
+  }
+  if (moved) {
     location.replace(location.pathname + "?" + params);
     return;
   }

@@ -2,7 +2,9 @@
 # Claude Code hook: writes this agent's status (D58 v1) to
 # $RAILSWITCH_STATUS_FILE: {"v":1,"state":"…","message":"…","ts":<unix seconds>},
 # with "usage": the session's tokens, counted from its transcript when a turn
-# ends or a session starts (resumed), carried over by the other events.
+# ends or a session starts (resumed), carried over by the other events; with
+# the session's id, its context (the last request's input, cached or not)
+# and when it started (its transcript's first timestamp, else when first seen).
 # entrypoint-claude.sh registers it for several hook events; the event name
 # arrives in the JSON payload on stdin.
 set -eu
@@ -32,19 +34,33 @@ fi
 # one count per message id. A transcript that can't be read leaves no usage.
 event=$(jq -r '.hook_event_name // empty' "$in")
 transcript=$(jq -r '.transcript_path // empty' "$in")
+session=$(jq -r '.session_id // "" | strings' "$in")
 case "$event" in
 Stop | SessionStart)
+  prevusage=$usage
   usage=null
   if [ -n "$transcript" ] && [ -f "$transcript" ]; then
     # raw lines, each parsed alone: a line that isn't JSON (a half-written
     # last one) is skipped instead of losing the whole count
-    usage=$(jq -cnR '
-      reduce (inputs | fromjson? | select(.type == "assistant") | .message | select((.id | type) == "string" and (.usage | type) == "object")) as $m
-        ({}; .[$m.id] = $m.usage)
-      | [.[]] as $u
+    usage=$(jq -cnR --arg session "$session" --argjson now "$(date +%s)" --argjson prev "$prevusage" '
+      def n: numbers // 0;
+      reduce (inputs | fromjson? | objects) as $l ({by: {}, last: null, first: null};
+        .first //= ([$l.timestamp | strings | sub("\\.[0-9]+"; "") | try fromdateiso8601 catch empty][0])
+        | ($l.message // {}) as $m
+        | if $l.type == "assistant" and ($m | type) == "object" and ($m.id | type) == "string" and ($m.usage | type) == "object" then
+            .by[$m.id] = $m.usage
+            # a subagent request (a sidechain) is not the session context
+            | if $l.isSidechain == true then . else .last = $m.usage end
+          else . end)
+      | [.by[]] as $u
       | def sum($k): [$u[] | .[$k] | numbers] | add // 0;
       {input: sum("input_tokens"), output: sum("output_tokens"),
        cache_read: sum("cache_read_input_tokens"), cache_write: sum("cache_creation_input_tokens")}
+      + if $session == "" then {} else
+          {session: $session,
+           context: (.last // {} | (.input_tokens | n) + (.cache_read_input_tokens | n) + (.cache_creation_input_tokens | n)),
+           started: (.first // (if ($prev | type) == "object" and $prev.session == $session then $prev.started else null end) // $now)}
+        end
     ' "$transcript" 2>/dev/null) || usage=null
     [ -n "$usage" ] || usage=null
   fi

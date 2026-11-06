@@ -14,7 +14,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jbigler/railswitch/internal/agentstatus"
+	"github.com/jbigler/railswitch/internal/agentusage"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/pack"
@@ -934,5 +937,36 @@ func TestAddNewBranchFromBase(t *testing.T) {
 	}
 	if out, err := exec.Command("git", "-C", w.Dir, "rev-parse", "--abbrev-ref", "brand-new@{upstream}").CombinedOutput(); err == nil {
 		t.Errorf("brand-new tracks %s; want no upstream", out)
+	}
+}
+
+// D187: wt rm renames the worktree's agent usage, kept for the project's
+// totals; another worktree's stays.
+func TestRemoveRetiresUsage(t *testing.T) {
+	e := setup(t)
+	e.add(t, "api", "")
+	e.add(t, "api-v2", "")
+	path := agentusage.Path(e.m.Data, prefix)
+	now := time.Now()
+	var samples []agentusage.Sample
+	for _, slug := range []string{"api", "api-v2"} {
+		samples = append(samples, agentusage.Sample{Worktree: slug, Agent: "x", Usage: agentstatus.Usage{Input: 5}, TS: now.Unix()})
+	}
+	if err := agentusage.Record(path, samples, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.m.Remove(context.Background(), "api", false); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := agentusage.Read(path, 1, "", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, w := range rep.Worktrees {
+		got = append(got, fmt.Sprintf("%s %d %v", w.Worktree, w.Total, w.Removed))
+	}
+	if want := []string{"api (removed " + now.Format(time.DateOnly) + ") 5 true", "api-v2 5 false"}; !slices.Equal(got, want) {
+		t.Errorf("usage %q; want %q", got, want)
 	}
 }

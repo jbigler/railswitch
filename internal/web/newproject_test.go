@@ -349,7 +349,7 @@ func TestNewStreamFollowsCreate(t *testing.T) {
 	f.run.out = "cloned\n"
 	f.do(req("POST", "/new/create", stepOne()))
 	f.endedIn(t, "masto")
-	sub := f.s.subscribe("masto", "", parseSort("name"), "new")
+	sub := f.s.subscribe("masto", "", parseSort("name"), usageDefault, "new")
 	defer f.s.unsubscribe(sub)
 	var ids []string
 	for drained := false; !drained; {
@@ -390,7 +390,7 @@ func TestNewCreateUpFailed(t *testing.T) {
 	v.Set("up", "1")
 	f.do(req("POST", "/new/create", v))
 	f.endedIn(t, "masto")
-	sub := f.s.subscribe("masto", "", parseSort("name"), "new")
+	sub := f.s.subscribe("masto", "", parseSort("name"), usageDefault, "new")
 	defer f.s.unsubscribe(sub)
 	sawExit := false
 	for drained := false; !drained; {

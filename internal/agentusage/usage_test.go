@@ -157,6 +157,20 @@ func TestReportRunaway(t *testing.T) {
 	if rep.Worktrees[0].Worktree != "busy" || rep.Worktrees[0].Total != 3*2_000_000+7_000_000 || rep.Worktrees[0].Median != 2_000_000 {
 		t.Errorf("busy %+v", rep.Worktrees[0])
 	}
+	f.add(Row{Day: now.AddDate(0, 0, -3).Format(time.DateOnly), Worktree: "reads", Agent: "x", Tokens: Tokens{Input: 10, CacheRead: 1000}})
+	f.add(Row{Day: now.AddDate(0, 0, -2).Format(time.DateOnly), Worktree: "reads", Agent: "x", Tokens: Tokens{Output: 30, CacheWrite: 20, CacheRead: 1000}})
+	for _, w := range f.report(7, "", now).Worktrees {
+		switch w.Worktree {
+		case "busy":
+			if w.PriorDays != 4 || w.MedianNewOutput != 2_000_000 {
+				t.Errorf("busy usual day %+v", w)
+			}
+		case "reads": // cache reads count for the total, not the new tokens and output
+			if w.PriorDays != 2 || w.Median != 1030 || w.MedianNewOutput != 30 {
+				t.Errorf("reads usual day %+v", w)
+			}
+		}
+	}
 	if one := f.report(7, "calm", now); len(one.Worktrees) != 1 || one.Worktrees[0].Worktree != "calm" {
 		t.Errorf("one worktree %+v", one.Worktrees)
 	}
@@ -213,5 +227,69 @@ func TestApplyKeepsIdleAgent(t *testing.T) {
 	f.apply([]Sample{s}, now.Add(time.Minute))
 	if got := rowsOf(&f); len(got) != 0 {
 		t.Errorf("counted again: %v", got)
+	}
+}
+
+// D187: two sessions writing one status file in turn (two terminals on one
+// worktree's agent) each count once: a session's counter is compared with
+// its own last value, not the other session's.
+func TestApplySessionsAlternate(t *testing.T) {
+	f := file{Last: map[string]last{}}
+	now := at("2026-11-04", 10)
+	s := func(id string, in int64, min int) Sample {
+		ts := now.Add(time.Duration(min) * time.Minute)
+		return Sample{Worktree: "a", Agent: "x", Usage: agentstatus.Usage{Input: in, Session: id}, TS: ts.Unix()}
+	}
+	for i, smp := range []Sample{s("A", 100, 0), s("B", 50, 1), s("A", 120, 2), s("B", 60, 3), s("A", 130, 4)} {
+		f.apply([]Sample{smp}, now.Add(time.Duration(i)*time.Minute))
+	}
+	if got, want := rowsOf(&f), map[string]int64{"2026-11-04 a x": 130 + 60}; !equal(got, want) {
+		t.Errorf("rows %v; want %v", got, want)
+	}
+}
+
+// D187: a removed worktree's rows keep their usage under a new name; a
+// new worktree of the old name starts at zero, its counter new.
+func TestRetire(t *testing.T) {
+	path := Path(t.TempDir(), "proj")
+	if err := Retire(path, "a", at("2026-11-04", 9)); err != nil {
+		t.Fatalf("no file yet: %v", err)
+	}
+	day1, now := at("2026-11-03", 10), at("2026-11-04", 10)
+	s := func(in int64, ts time.Time) Sample {
+		return Sample{Worktree: "a", Agent: "x", Usage: agentstatus.Usage{Input: in, Session: "S"}, TS: ts.Unix()}
+	}
+	for _, r := range []struct {
+		smp Sample
+		at  time.Time
+	}{{s(100, day1), day1}, {s(150, now), now}, {sample("b", "x", 7, 0, now), now}} {
+		if err := Record(path, []Sample{r.smp}, r.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Retire(path, "a", now); err != nil {
+		t.Fatal(err)
+	}
+	// The same session's status again (a new worktree named a reusing the
+	// status file's last value) counts as new, under a.
+	if err := Record(path, []Sample{s(150, now)}, now); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := Read(path, 2, "", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]WorktreeTotal{}
+	for _, w := range rep.Worktrees {
+		got[w.Worktree] = w
+	}
+	old := got["a (removed 2026-11-04)"]
+	if !old.Removed || old.Total != 150 || old.Today != 50 || got["a"].Removed || got["a"].Total != 150 || got["b"].Total != 7 || len(got) != 3 {
+		t.Errorf("worktrees %+v", rep.Worktrees)
+	}
+	for _, r := range rep.Rows {
+		if r.Removed != strings.Contains(r.Worktree, "removed") {
+			t.Errorf("row %+v", r)
+		}
 	}
 }

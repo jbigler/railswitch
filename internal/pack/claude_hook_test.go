@@ -199,6 +199,65 @@ func TestHookUsage(t *testing.T) {
 	}
 }
 
+// D187: with the payload's session_id, the usage carries the session, its
+// context (the last main-chain request's input, cached or not; a
+// subagent's sidechain request is not it) and its start (the transcript's
+// first timestamp; without one, the start the status file had for that
+// session).
+func TestHookSession(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq not on PATH")
+	}
+	file := filepath.Join(t.TempDir(), "claude.json")
+	run := func(payload string) map[string]any {
+		t.Helper()
+		cmd := exec.Command("bash", claudeHook)
+		cmd.Stdin = strings.NewReader(payload)
+		cmd.Env = append(withoutStatus(os.Environ()), "RAILSWITCH_STATUS_FILE="+file)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+		var s map[string]any
+		data, _ := os.ReadFile(file)
+		if err := json.Unmarshal(data, &s); err != nil {
+			t.Fatalf("%v: %s", err, data)
+		}
+		u, _ := s["usage"].(map[string]any)
+		return u
+	}
+	write := func(lines ...string) string {
+		p := filepath.Join(t.TempDir(), "s.jsonl")
+		if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		b, _ := json.Marshal(p)
+		return string(b)
+	}
+	tp := write(
+		`{"type":"user","timestamp":"2026-11-04T10:00:00.123Z","message":{"role":"user","content":"hi"}}`,
+		`{"type":"assistant","timestamp":"2026-11-04T10:00:05Z","message":{"id":"m1","usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":100,"cache_creation_input_tokens":20}}}`,
+		`{"type":"assistant","timestamp":"2026-11-04T10:01:00Z","message":{"id":"m2","usage":{"input_tokens":3,"output_tokens":7,"cache_read_input_tokens":130,"cache_creation_input_tokens":4}}}`,
+		`{"type":"assistant","isSidechain":true,"message":{"id":"m3","usage":{"input_tokens":900,"output_tokens":1}}}`,
+	)
+	u := run(`{"hook_event_name":"Stop","session_id":"abc-1","transcript_path":` + tp + `,"last_assistant_message":"done"}`)
+	if u["session"] != "abc-1" || u["context"] != float64(3+130+4) || u["started"] != float64(1793786400) || u["input"] != float64(913) {
+		t.Errorf("usage %v", u)
+	}
+	// No timestamps: the start the file had for the same session stays.
+	untimed := write(`{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":1,"output_tokens":1}}}`)
+	if u := run(`{"hook_event_name":"Stop","session_id":"abc-1","transcript_path":` + untimed + `}`); u["started"] != float64(1793786400) || u["context"] != float64(1) {
+		t.Errorf("same session, no timestamp: %v", u)
+	}
+	// Another session without timestamps starts now.
+	if u := run(`{"hook_event_name":"Stop","session_id":"def-2","transcript_path":` + untimed + `}`); u["session"] != "def-2" || u["started"].(float64) < 1793786400+86400 {
+		t.Errorf("new session: %v", u)
+	}
+	// No session_id (an older Claude): the counts alone.
+	if u := run(`{"hook_event_name":"Stop","transcript_path":` + tp + `}`); len(u) != 4 {
+		t.Errorf("no session: %v", u)
+	}
+}
+
 func mapsEqual(a, b map[string]any) bool {
 	if len(a) != len(b) {
 		return false

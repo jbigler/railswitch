@@ -1,7 +1,8 @@
 // Package agentusage keeps the agents' token (and cost) history (D162):
 // per project one JSON file, <data>/usage/<prefix>.json, that sums the
-// growth of each agent's session counter (agentstatus.Usage) per local day,
-// worktree and agent. The counters come from status files a container
+// growth of each agent session's counter (agentstatus.Usage) per local day,
+// worktree and agent (D187: per session, so two sessions sharing one
+// status file don't count each other's totals again). The counters come from status files a container
 // writes, so they are hostile: agentstatus bounds each one, and every sum
 // here saturates.
 package agentusage
@@ -15,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -77,11 +79,13 @@ func fromStatus(u agentstatus.Usage) Tokens {
 	return Tokens{Input: u.Input, Output: u.Output, CacheRead: u.CacheRead, CacheWrite: u.CacheWrite, Cost: u.Cost}
 }
 
-// Row is one day's usage of one agent in one worktree.
+// Row is one day's usage of one agent in one worktree. Removed marks a
+// removed worktree's row, renamed "<name> (removed <day>)" (D187).
 type Row struct {
 	Day      string `json:"day"` // YYYY-MM-DD, local time
 	Worktree string `json:"worktree"`
 	Agent    string `json:"agent"`
+	Removed  bool   `json:"removed,omitempty"`
 	Tokens
 }
 
@@ -96,7 +100,7 @@ type last struct {
 // file is the JSON document on disk.
 type file struct {
 	Schema int             `json:"schema"`
-	Last   map[string]last `json:"last"` // by "<worktree>/<agent>"
+	Last   map[string]last `json:"last"` // by "<worktree>/<agent>/<session>", or "<worktree>/<agent>" without a session id
 	Days   []Row           `json:"days"`
 }
 
@@ -106,6 +110,15 @@ type Sample struct {
 	Worktree, Agent string
 	Usage           agentstatus.Usage
 	TS              int64
+}
+
+// key is s's entry in file.Last.
+func (s Sample) key() string {
+	k := s.Worktree + "/" + s.Agent
+	if s.Usage.Session != "" {
+		k += "/" + s.Usage.Session
+	}
+	return k
 }
 
 // Path is the usage file of project prefix under the data dir.
@@ -140,6 +153,23 @@ func Record(path string, samples []Sample, now time.Time) error {
 	if len(samples) == 0 {
 		return nil
 	}
+	return update(path, func(f *file) bool { return f.apply(samples, now) })
+}
+
+// Retire renames worktree's rows in the file at path to "<worktree>
+// (removed <today>)", marked removed, and forgets its counters, under the
+// file's lock (D187): the project's totals keep its usage, and a new
+// worktree of the same name starts at zero.
+func Retire(path, worktree string, now time.Time) error {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return update(path, func(f *file) bool { return f.retire(worktree, now) })
+}
+
+// update changes the file at path with change, under its lock; change
+// reports whether it changed anything to write.
+func update(path string, change func(*file) bool) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -160,7 +190,7 @@ func Record(path string, samples []Sample, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	if !f.apply(samples, now) {
+	if !change(&f) {
 		return nil
 	}
 	data, err := json.Marshal(f)
@@ -175,7 +205,7 @@ func Record(path string, samples []Sample, now time.Time) error {
 func (f *file) apply(samples []Sample, now time.Time) bool {
 	changed := false
 	for _, s := range samples {
-		key := s.Worktree + "/" + s.Agent
+		key := s.key()
 		prev, seen := f.Last[key]
 		cur := fromStatus(s.Usage)
 		delta := cur
@@ -191,9 +221,9 @@ func (f *file) apply(samples []Sample, now time.Time) bool {
 			}
 		}
 		// else: first seen, or a count dropped: a new session, all of it new.
-		// shortcut: a new session that already passed the old one's counts
-		// reads as growth and loses the old one's unseen tail; a session id
-		// in the status file would fix it.
+		// shortcut: without a session id (an older package's status file),
+		// a new session that already passed the old one's counts reads as
+		// growth and loses the old one's unseen tail.
 		if !seen || !same(prev.Usage, s.Usage) || prev.TS != s.TS {
 			f.Last[key] = last{Usage: s.Usage, TS: s.TS, Seen: now.Unix()}
 			changed = true
@@ -212,10 +242,31 @@ func (f *file) apply(samples []Sample, now time.Time) bool {
 	for k, l := range f.Last {
 		// A key still sampled is kept however old: an idle agent's status
 		// file reads the same, and forgetting it would count it all again.
-		if l.Seen < now.AddDate(0, 0, -Keep).Unix() && !slices.ContainsFunc(samples, func(s Sample) bool { return s.Worktree+"/"+s.Agent == k }) {
+		if l.Seen < now.AddDate(0, 0, -Keep).Unix() && !slices.ContainsFunc(samples, func(s Sample) bool { return s.key() == k }) {
 			delete(f.Last, k)
 			changed = true
 		}
+	}
+	return changed
+}
+
+func (f *file) retire(worktree string, now time.Time) bool {
+	changed := false
+	for k := range f.Last {
+		if strings.HasPrefix(k, worktree+"/") {
+			delete(f.Last, k)
+			changed = true
+		}
+	}
+	name := worktree + " (removed " + now.Format(time.DateOnly) + ")"
+	days := f.Days
+	f.Days = nil
+	for _, r := range days {
+		if r.Worktree == worktree && !r.Removed {
+			r.Worktree, r.Removed = name, true
+			changed = true
+		}
+		f.add(r) // merges a row of a worktree of that name removed earlier today
 	}
 	return changed
 }
@@ -245,7 +296,7 @@ func day(ts int64, now time.Time) string {
 
 func (f *file) add(r Row) {
 	for i := range f.Days {
-		if d := &f.Days[i]; d.Day == r.Day && d.Worktree == r.Worktree && d.Agent == r.Agent {
+		if d := &f.Days[i]; d.Day == r.Day && d.Worktree == r.Worktree && d.Agent == r.Agent && d.Removed == r.Removed {
 			d.add(r.Tokens)
 			return
 		}
@@ -280,7 +331,10 @@ type DayTotal struct {
 
 // WorktreeTotal is one worktree's usage in the window. Today is its total
 // today, Median the median total of its days with usage among the 14
-// before; Runaway flags today far above it.
+// before; Runaway flags today far above it. PriorDays is how many such
+// days there are, MedianNewOutput the median of their new tokens and
+// output (input, cache writes and output: the dashboard's usual day,
+// D187). Removed marks a removed worktree's usage (Retire).
 type WorktreeTotal struct {
 	Worktree string `json:"worktree"`
 	Total    int64  `json:"total"`
@@ -288,6 +342,10 @@ type WorktreeTotal struct {
 	Today   int64 `json:"today"`
 	Median  int64 `json:"median"`
 	Runaway bool  `json:"runaway"`
+	Removed bool  `json:"removed"`
+
+	PriorDays       int   `json:"prior_days"`
+	MedianNewOutput int64 `json:"median_new_output"`
 }
 
 // Read reports the file at path: the last days days, today included, of
@@ -310,6 +368,7 @@ func (f *file) report(days int, worktree string, now time.Time) Report {
 		rep.Daily = append(rep.Daily, DayTotal{Day: d})
 	}
 	daily := map[string]map[string]int64{} // worktree → day → total
+	work := map[string]map[string]int64{}  // worktree → day → input, cache writes and output
 	byWT := map[string]*WorktreeTotal{}
 	for _, r := range f.Days {
 		if worktree != "" && r.Worktree != worktree {
@@ -319,6 +378,10 @@ func (f *file) report(days int, worktree string, now time.Time) Report {
 			daily[r.Worktree] = map[string]int64{}
 		}
 		daily[r.Worktree][r.Day] = sat(daily[r.Worktree][r.Day], r.Total())
+		if work[r.Worktree] == nil {
+			work[r.Worktree] = map[string]int64{}
+		}
+		work[r.Worktree][r.Day] = sat(work[r.Worktree][r.Day], sat(sat(r.Input, r.CacheWrite), r.Output))
 		i, ok := at[r.Day]
 		if !ok {
 			continue
@@ -327,7 +390,7 @@ func (f *file) report(days int, worktree string, now time.Time) Report {
 		rep.Daily[i].add(r.Tokens)
 		w := byWT[r.Worktree]
 		if w == nil {
-			w = &WorktreeTotal{Worktree: r.Worktree}
+			w = &WorktreeTotal{Worktree: r.Worktree, Removed: r.Removed}
 			byWT[r.Worktree] = w
 		}
 		w.add(r.Tokens)
@@ -341,13 +404,15 @@ func (f *file) report(days int, worktree string, now time.Time) Report {
 	for name, w := range byWT {
 		w.Total = w.Tokens.Total()
 		w.Today = daily[name][today]
-		var prior []int64
+		var prior, priorWork []int64
 		for i := 1; i <= runawayWindow; i++ {
-			if n := daily[name][now.AddDate(0, 0, -i).Format(time.DateOnly)]; n > 0 {
+			d := now.AddDate(0, 0, -i).Format(time.DateOnly)
+			if n := daily[name][d]; n > 0 {
 				prior = append(prior, n)
+				priorWork = append(priorWork, work[name][d])
 			}
 		}
-		w.Median = median(prior)
+		w.Median, w.PriorDays, w.MedianNewOutput = median(prior), len(prior), median(priorWork)
 		w.Runaway = len(prior) >= runawayMinDays && w.Today >= runawayFloor && w.Today > runawayFactor*w.Median
 		rep.Worktrees = append(rep.Worktrees, *w)
 	}

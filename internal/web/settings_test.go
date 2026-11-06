@@ -337,7 +337,7 @@ func TestSettingsSecretNoLeak(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- f.s.Run(ctx) }()
 	defer func() { cancel(); <-done }()
-	sub := f.s.subscribe("ftest", "", parseSort("name"), "settings")
+	sub := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "settings")
 	defer f.s.unsubscribe(sub)
 
 	var bodies []string
@@ -503,7 +503,7 @@ func TestSettingsFileConflict(t *testing.T) {
 		t.Errorf("job %+v", snap)
 	}
 	// The settings pages' jobs fragment marks it.
-	sub := f.s.subscribe("ftest", "", parseSort("name"), "settings")
+	sub := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "settings")
 	defer f.s.unsubscribe(sub)
 	f.s.mu.Lock()
 	html, err := render("jobs", f.s.subJobs(sub, f.s.c.Jobs.Jobs("ftest", "")))
@@ -530,7 +530,7 @@ func TestSettingsViewJobs(t *testing.T) {
 	f.ended(t)
 	f.do(req("POST", "/p/ftest/settings/apply", form("edits", `[{"op":"link.hide","label":"Mailer previews"}]`, "hash", testHash)))
 	f.ended(t)
-	sub := f.s.subscribe("ftest", "", parseSort("name"), "settings")
+	sub := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "settings")
 	defer f.s.unsubscribe(sub)
 	var ids []string
 	for drained := false; !drained; {

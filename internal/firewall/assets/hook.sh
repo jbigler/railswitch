@@ -35,7 +35,7 @@
 # subdomains), the worktree's container names and *.dns.podman, each by
 # asking the network's own resolver, and puts every address it answers
 # into allowd4 as it goes, with a timeout: a host whose addresses rotate
-# keeps working. Every other name gets REFUSED, which closes DNS as a way
+# keeps working. Every other name gets NXDOMAIN, which closes DNS as a way
 # out. The poststop hook (hook.sh <prefix> <dir> stop) ends it.
 #
 # crun runs hooks inside podman's rootless user namespace, where this process
@@ -361,7 +361,8 @@ if [[ -n "$filter" ]]; then
     printf '# dnsmasq=%s\n' "$DNSMASQ" # fw allow restarts this one, not whichever its PATH finds
     printf '%s\n' port=53 listen-address=127.0.0.1 bind-dynamic no-resolv no-hosts no-poll cache-size=0 \
       user=root group=root "query-port=$QPORT" "pid-file=$DNSDIR/$cid.pid" "log-facility=$DNSDIR/$cid.log" \
-      "server=//$gateway" "server=/dns.podman/$gateway"
+      "server=//$gateway" "server=/dns.podman/$gateway" \
+      "address=/#/" # any other name: NXDOMAIN, which fails at once (REFUSED reads as "temporary", and installers retry for minutes)
     for n in ${names[@]+"${names[@]}"}; do
       printf 'server=/%s/%s\nnftset=/%s/4#inet#%s#allowd4\n' "$n" "$gateway" "$n" "$TABLE"
     done
@@ -370,6 +371,11 @@ if [[ -n "$filter" ]]; then
   nsenter -t "$pid" -n "$DNSMASQ" --conf-file="$conf" </dev/null >>"$LOG" 2>&1 || die "dnsmasq did not start for pid $pid (see $LOG)"
   for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -s "$DNSDIR/$cid.pid" ]] && break; sleep 0.5; done
   [[ -s "$DNSDIR/$cid.pid" ]] || die "dnsmasq wrote no pid file for pid $pid (see $LOG)"
+  # It ends with the container, whatever happens to the poststop hook: a
+  # dnsmasq left running kept a oneshot unit (deps) from finishing. The
+  # watcher checks the container's process once a second.
+  setsid bash -c 'while kill -0 "$1" 2>/dev/null; do sleep 1; done; kill "$(cat "$2" 2>/dev/null)" 2>/dev/null' \
+    _ "$pid" "$DNSDIR/$cid.pid" </dev/null >/dev/null 2>&1 &
 fi
 
 {

@@ -62,8 +62,10 @@ Arch, Fedora and Debian's are), every container firewalled under
   answers for an allowed name is allowed for an hour after it was first
   added (a later lookup doesn't extend it), beside the addresses resolved
   at start.
-- Every other name gets `REFUSED`: DNS is no longer a way out, and a
-  name an app needs but the list lacks shows up as a lookup failure.
+- Every other name gets `NXDOMAIN` ("no such name"): DNS is no longer a
+  way out, and a name an app needs but the list lacks fails at once as
+  "Name or service not known". (Not `REFUSED`: programs see that as a
+  temporary failure, and npm and Bundler retried it for minutes.)
 - Asking any of the container's networks' resolvers (each network's
   gateway: the dev network's and the proxy's) directly is blocked; only
   the filter may. It sends from port 953: below 1024, so nothing in the
@@ -75,7 +77,10 @@ Arch, Fedora and Debian's are), every container firewalled under
   outlast the time. A timed allow opens the addresses the host resolves
   now, and says the filter won't answer the name, so code that looks it
   up still fails; allow it without `--for` for that.
-- It ends with the container.
+- It ends with the container: the poststop hook stops it, and a watcher
+  the hook starts beside it ends it within a second of the container's
+  process, should that hook not run. (A dnsmasq left running kept a
+  one-shot unit, `deps`, from ever finishing.)
 
 A `meta:<name>` entry adds addresses, not names: list the host names the
 app uses beside it (`["accounts.google.com", "meta:google"]`). Without

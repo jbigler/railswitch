@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"flag"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -281,6 +283,9 @@ func runHook(t *testing.T, root string, env []string, annotations map[string]str
 	return runHookAt(t, filepath.Join("assets", "hook.sh"), root, env, annotations)
 }
 
+// hookPid is the container process the OCI state names.
+var hookPid = 4242
+
 // runHookAt runs the hook script at script, which reads its allowlists next
 // to it.
 func runHookAt(t *testing.T, script, root string, env []string, annotations map[string]string) ([]byte, error) {
@@ -289,7 +294,7 @@ func runHookAt(t *testing.T, script, root string, env []string, annotations map[
 		"ociVersion":  "1.0.2",
 		"id":          "0123456789abcdef0123456789abcdef",
 		"status":      "creating",
-		"pid":         4242,
+		"pid":         hookPid,
 		"bundle":      "/run/bundle",
 		"annotations": annotations,
 	})
@@ -744,7 +749,7 @@ func TestHookDNSFilter(t *testing.T) {
 	for _, want := range []string{
 		"# gateway=10.89.7.1\n", "# dnsmasq=/", "listen-address=127.0.0.1\n", "no-resolv\n", "cache-size=0\n",
 		"server=//10.89.7.1\n", "server=/dns.podman/10.89.7.1\n",
-		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=953\n",
+		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=953\n", "address=/#/\n",
 	} {
 		if !strings.Contains(string(conf), want) {
 			t.Errorf("conf lacks %q:\n%s", want, conf)
@@ -779,9 +784,20 @@ func TestHookDNSFilter(t *testing.T) {
 	// No dnsmasq: the start fails, naming it.
 	root = t.TempDir()
 	env = withDNS(t, root, false)
+	// Keep the shims and the host's tools, but not a dnsmasq the host has:
+	// its directories, linked one by one, without it.
+	tools := t.TempDir()
+	for _, d := range []string{filepath.Dir(lookTool(t, "nsenter")), "/usr/bin", "/bin", "/usr/sbin", "/sbin"} {
+		ents, _ := os.ReadDir(d)
+		for _, e := range ents {
+			if e.Name() != "dnsmasq" {
+				_ = os.Symlink(filepath.Join(d, e.Name()), filepath.Join(tools, e.Name())) // the first directory's wins
+			}
+		}
+	}
 	for i, kv := range env {
-		if strings.HasPrefix(kv, "PATH=") { // keep the shims, drop a real dnsmasq the host may have
-			env[i] = "PATH=" + strings.SplitN(strings.TrimPrefix(kv, "PATH="), ":", 2)[0] + ":" + filepath.Dir(lookTool(t, "nsenter")) + ":/usr/bin:/bin"
+		if strings.HasPrefix(kv, "PATH=") {
+			env[i] = "PATH=" + strings.SplitN(strings.TrimPrefix(kv, "PATH="), ":", 2)[0] + ":" + tools
 		}
 	}
 	if msg, err := runHookAt(t, script, root, env, ann); err == nil || !strings.Contains(string(msg), "no dnsmasq") {
@@ -797,6 +813,40 @@ func TestHookDNSFilter(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "dnsmasq.argv")); err == nil {
 		t.Error("log mode started the DNS filter")
 	}
+	// The filter ends with the container's process even without the
+	// poststop hook: a dnsmasq left running kept a oneshot unit (deps) from
+	// ever finishing.
+	t.Run("ends with the container", func(t *testing.T) {
+		ctr := exec.Command("sleep", "60")
+		if err := ctr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = ctr.Process.Kill() })
+		hookPid = ctr.Process.Pid
+		t.Cleanup(func() { hookPid = 4242 })
+		root := t.TempDir()
+		enforce := maps.Clone(ann)
+		enforce["filial.firewall.mode"] = "enforce"
+		if msg, err := runHookAt(t, script, root, withDNS(t, root, true), enforce); err != nil {
+			t.Fatalf("hook: %v\n%s", err, msg)
+		}
+		b, _ := os.ReadFile(filepath.Join(root, "state", "dns", "0123456789ab.pid"))
+		dns, err := strconv.Atoi(strings.TrimSpace(string(b)))
+		if err != nil {
+			t.Fatalf("pid file %q: %v", b, err)
+		}
+		time.Sleep(1500 * time.Millisecond)
+		if syscall.Kill(dns, 0) != nil {
+			t.Fatal("the filter ended while the container runs")
+		}
+		_ = ctr.Process.Kill()
+		_ = ctr.Wait()
+		for end := time.Now().Add(5 * time.Second); syscall.Kill(dns, 0) == nil; time.Sleep(100 * time.Millisecond) {
+			if time.Now().After(end) {
+				t.Fatal("the filter outlived the container by 5 s")
+			}
+		}
+	})
 }
 
 // lookTool is the shim directory's tool name (hookEnv's first PATH entry).

@@ -93,6 +93,7 @@ resolved at start is often not the one the app gets a moment later:
 | `meta:github` | GitHub's web, API and git ranges (`api.github.com/meta`) |
 | `meta:google` | Google's own services: `goog.json` without every range that overlaps `cloud.json`, so not the Google Cloud addresses any rented server lives in. Without `cloud.json` nothing is added (D180). It still opens every Google front end, and those also serve what anyone can publish on Google: App Engine (`*.appspot.com`), Cloud Run (`*.run.app`), Firebase Hosting (`*.web.app`), Apps Script and Forms. The firewall checks addresses, not names, so a container with `meta:google` can send data to such a page. Use it for the app when it needs Google; avoid it in an `agent` list |
 | `meta:datadog-us5` | Datadog US5's API ranges |
+| `meta:anthropic` | Anthropic's inbound ranges, where `api.anthropic.com`, `claude.ai` and `platform.claude.com` answer: `160.79.104.0/23` and `153.61.224.0/22` ([Anthropic's list](https://platform.claude.com/docs/en/api/ip-addresses), 2026-11-06). Fixed in the hook, since Anthropic publishes no machine-readable list; nothing to fetch. The `claude` agent has it (D185) |
 
 For example, an app that signs in with Google at start:
 `allow.app = ["accounts.google.com", "meta:google"]`.
@@ -166,6 +167,10 @@ agent's own firewall is only as strong as the app's.
   gained `allow`. Until `railswitch lock --accept`, nvim runs the old copy
   without those hosts, so plugin and language-server downloads from
   `raw.githubusercontent.com` and PyPI are blocked under enforce.
+- A project with the `claude` agent gets a pending review (D185): its
+  `allow` gained `meta:anthropic` and `platform.claude.com`. Until
+  `railswitch lock --accept`, the agent runs the old copy, which allows only
+  the addresses `api.anthropic.com` and `claude.ai` resolve to at its start.
 
 ## Panic (D181)
 

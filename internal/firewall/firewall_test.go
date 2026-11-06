@@ -928,3 +928,23 @@ func TestFirewallAllowDNS(t *testing.T) {
 		_ = exec.Command("kill", p).Run()
 	}
 }
+
+// TestHookMetaAnthropic (D185): meta:anthropic is Anthropic's fixed inbound
+// ranges, with nothing to fetch.
+func TestHookMetaAnthropic(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "nft.out")
+	root := t.TempDir()
+	if msg, err := runHook(t, root, hookEnv(t, out), map[string]string{
+		"filial.firewall": "none", "filial.firewall.mode": "enforce",
+		"filial.firewall.networks": "filial-feat-dev", "filial.firewall.extra": "meta:anthropic",
+	}); err != nil {
+		t.Fatalf("hook: %v\n%s", err, msg)
+	}
+	rules, _ := os.ReadFile(out)
+	allow := string(rules)[strings.Index(string(rules), "set allow4"):strings.Index(string(rules), "set allowt4")]
+	for _, w := range []string{"160.79.104.0/23", "153.61.224.0/22"} {
+		if !strings.Contains(allow, w) {
+			t.Errorf("allow4 lacks %s:\n%s", w, allow)
+		}
+	}
+}

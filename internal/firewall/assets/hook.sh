@@ -150,10 +150,14 @@ add() { allow+=("$1"); labels+=("$1 $2"); }
 # GitHub, Google and Datadog publish their ranges; resolving one hostname
 # would miss most of them (Google answers each lookup from a rotating pool).
 # Needs curl and jq on the host; without them, or offline, the entry is
-# skipped and named in the log.
+# skipped and named in the log. Anthropic's are fixed, so they're here.
 meta_ranges() {
   local url filter json cidr
   case "$1" in
+    # Anthropic's inbound ranges, where its API and sign-in answer, as its "IP
+    # addresses" docs page lists them on 2026-11-06 (the link: docs/firewall.md).
+    # No machine-readable list is published; update this one when the page changes.
+    anthropic)    for cidr in 160.79.104.0/23 153.61.224.0/22; do add "$cidr" meta:anthropic; done; return 0 ;;
     google)       google_ranges; return 0 ;;
     github)       url=https://api.github.com/meta
                   filter='(.web + .api + .git)[]' ;;

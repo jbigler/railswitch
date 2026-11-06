@@ -922,7 +922,7 @@ func (l *loader) checkAgent(dir string, a *Agent) bool {
 	l.file(file, "image.file", dir, a.Image.File)
 	l.file(file, "entrypoint", dir, a.Entrypoint)
 	for i, h := range a.Allow {
-		// meta:<name> is a published range set the firewall hook fetches (meta:github, meta:google).
+		// meta:<name> is a published range set the firewall hook fetches (meta:github, meta:google, meta:anthropic).
 		if !hostRe.MatchString(strings.TrimPrefix(h, "meta:")) {
 			l.add(file, "allow[%d]: %q is not a host name or meta:<name>", i, h)
 		}

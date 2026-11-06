@@ -81,7 +81,7 @@ func TestUsageViews(t *testing.T) {
 		`<a href="/p/ftest/b" data-usage-wt="b"><rect class="u-c0"`,
 		`class="u-other"`, `title="w5 61k, w6 51k, w7 41k"`, "3 others", "Oct 22 · others: w5 61k",
 		// the removed one is muted, never linked
-		`<rect class="u-removed"`, `<li class="muted"><span class="chip u-removed" aria-hidden="true"></span><span class="mono name">gone (removed 2026-10-25)</span>`,
+		`<rect class="u-removed"`, `<li class="muted"><span class="swatch u-removed" aria-hidden="true"></span><span class="mono name">gone (removed 2026-10-25)</span>`,
 		`href="/p/ftest/b?days=7" data-days="7"`, `data-days="14" class="on" aria-current="true"`,
 		"Oct 14", "Oct 27",
 	} {

@@ -335,7 +335,7 @@ body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
 .u-c0,.u-new{--u:var(--blue)}.u-c1,.u-out{--u:var(--accent)}.u-c2{--u:var(--purple)}.u-c3{--u:var(--yellow)}.u-c4{--u:color-mix(in srgb,var(--blue) 45%,var(--bg))}.u-c5{--u:color-mix(in srgb,var(--accent) 45%,var(--bg))}
 .u-other{--u:color-mix(in srgb,var(--muted) 65%,var(--bg))}.u-removed{--u:var(--border)}
 .u-new.runaway{--u:var(--yellow)}.u-out.runaway{--u:color-mix(in srgb,var(--yellow) 55%,var(--bg))}
-.chip{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--u);flex:none}
+.swatch{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--u);flex:none}
 .usage{padding:0 14px 8px;max-width:440px}
 .usage-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 6px}
 .usage-hd .lbl{margin:0}

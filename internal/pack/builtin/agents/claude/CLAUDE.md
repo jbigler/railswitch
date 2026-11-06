@@ -25,13 +25,23 @@ Outbound traffic is filtered by a firewall the host applies to this container
 from outside. You cannot change it from in here: there is no sudo and no
 NET_ADMIN.
 
-- A connection to a host that is not on the allowlist fails immediately
-  ("Connection refused" / "No route to host" / "administratively prohibited").
-  That is the firewall, not an outage: do not retry or work around it.
-- If you need a host, name it and ask the human to run
-  `railswitch fw allow agent-$RAILSWITCH_AGENT <host>`, or to add it to
-  `[agents.<name>] allow` in project.toml, where `<name>` is the value of
-  `$RAILSWITCH_AGENT` in your environment.
+- A host name that is not on the allowlist does not resolve: the lookup
+  fails at once ("Could not resolve host", "no such host", NXDOMAIN,
+  `getaddrinfo ENOTFOUND`). A connection to an address that is not allowed
+  fails at once too ("Connection refused" / "No route to host" /
+  "administratively prohibited"). Either is the firewall, not an outage or
+  a typo: do not retry or work around it.
+- Tools often hide the host behind their own message. `gh` downloads
+  release files from `release-assets.githubusercontent.com` and Actions
+  logs from `results-receiver.actions.githubusercontent.com`, not
+  `api.github.com`; a "failed to download" or "unable to retrieve" there is
+  usually the firewall. Find the host (`--verbose`, `GH_DEBUG=api`, or
+  `curl -v`) before you report it.
+- If you need a host, name it and ask the human to add it to
+  `[agents.<name>] allow` in project.toml (`<name>` is the value of
+  `$RAILSWITCH_AGENT`), then restart you. `railswitch fw allow
+  agent-$RAILSWITCH_AGENT <host>` opens it at once, but only until this
+  container restarts.
 
 # Git worktrees: NEVER prune, add or remove from inside this container
 

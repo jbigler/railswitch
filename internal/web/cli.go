@@ -547,9 +547,10 @@ type packDoc struct {
 	Slot     string `json:"slot"`
 	Service  string `json:"service"`
 	Runtimes []struct {
-		Name     string   `json:"name"`
-		From     []string `json:"from"`
-		Fallback string   `json:"fallback"`
+		Name       string   `json:"name"`
+		From       []string `json:"from"`
+		Fallback   string   `json:"fallback"`
+		DropSuffix string   `json:"drop_suffix"`
 	} `json:"runtimes"`
 	Ports []struct {
 		Name      string `json:"name"`

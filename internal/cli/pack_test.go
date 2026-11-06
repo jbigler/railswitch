@@ -253,3 +253,28 @@ func TestPackLsJSON(t *testing.T) {
 		t.Errorf("text:\n%s", out)
 	}
 }
+
+// pack show lists a runtime's drop_suffix (D178): a reviewer sees that a
+// value read from a source is cut.
+func TestPackShowDropSuffix(t *testing.T) {
+	ws, _ := filialWS(t)
+	if err := os.CopyFS(filepath.Join(ws, "packs", "phoenix"), os.DirFS(filepath.Join("..", "..", "testdata", "fixtures", "phoenix", "packs", "phoenix"))); err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Runtimes []struct {
+			Name       string `json:"name"`
+			DropSuffix string `json:"drop_suffix"`
+		} `json:"runtimes"`
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "pack", "show", "local:phoenix@1")), &doc); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range doc.Runtimes {
+		got[r.Name] = r.DropSuffix
+	}
+	if got["elixir"] != "-otp-[0-9]+" || got["erlang"] != "" {
+		t.Errorf("drop_suffix by runtime: %q", got)
+	}
+}

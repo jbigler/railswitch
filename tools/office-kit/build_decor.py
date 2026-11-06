@@ -43,6 +43,74 @@ def draw_term(px, w, h):
     px[h - 16:h - 9, 6:14, :3] = 1.0  # cursor
 
 
+def _line(px, x0, y0, x1, y1, v, t=1):
+    n = int(max(abs(x1 - x0), abs(y1 - y0))) + 1
+    for k in range(n + 1):
+        x, y = int(x0 + (x1 - x0) * k / n), int(y0 + (y1 - y0) * k / n)
+        px[max(y - t, 0):y + t, max(x - t, 0):x + t, :3] = v
+
+
+def draw_chart(px, w, h):
+    """A dashboard: a header, three line series on a grid, a gauge row."""
+    r = random.Random(17)
+    px[0:6, :, :3] = 0.9
+    top, bot = 22, int(h * 0.72)
+    for y in range(top, bot + 1, (bot - top) // 5):
+        px[y, 8:w - 8, :3] = 0.18
+    for x in range(8, w - 8, (w - 16) // 8):
+        px[top:bot, x, :3] = 0.18
+    for v in (1.0, 0.6, 0.35):
+        y = (top + bot) / 2
+        prev = None
+        for x in range(8, w - 8, 12):
+            y = min(max(y + (r.random() - .5) * 40, top + 4), bot - 4)
+            if prev:
+                _line(px, prev[0], prev[1], x, y, v)
+            prev = (x, y)
+    for i in range(4):  # gauges: a filled share of a bar
+        x0, y0, bw = 8 + i * (w - 16) // 4, int(h * 0.8), (w - 16) // 4 - 10
+        px[y0:y0 + 14, x0:x0 + bw, :3] = 0.15
+        px[y0:y0 + 14, x0:x0 + int(bw * (0.2 + r.random() * 0.75)), :3] = 0.75
+        px[y0 + 22:y0 + 27, x0:x0 + int(bw * 0.6), :3] = 0.45
+
+
+def draw_nodes(px, w, h):
+    """A network map: nodes joined by links, a few flagged."""
+    r = random.Random(23)
+    yy, xx = np.mgrid[0:h, 0:w]
+    nodes = [(int(20 + r.random() * (w - 40)), int(30 + r.random() * (h - 50))) for _ in range(14)]
+    for i, (x, y) in enumerate(nodes):
+        for j in r.sample(range(len(nodes)), 2):
+            if j != i:
+                _line(px, x, y, nodes[j][0], nodes[j][1], 0.3)
+    for i, (x, y) in enumerate(nodes):
+        d = np.hypot(xx - x, yy - y)
+        px[d < 7, :3] = 1.0 if i % 5 == 0 else 0.6
+        if i % 5 == 0:
+            px[np.abs(d - 12) < 1.2, :3] = 0.9  # a flagged node's ring
+        px[y + 12:y + 16, x - 10:x + 14, :3] = 0.4  # its label
+    px[0:6, :, :3] = 0.9
+
+
+def draw_table(px, w, h):
+    """A status table: rows of columns, a dot per row, one row selected, progress bars."""
+    r = random.Random(29)
+    px[0:6, :, :3] = 0.9
+    px[14:22, 8:w - 8, :3] = 0.55  # the column heads
+    cols = [8, 40, int(w * 0.4), int(w * 0.62), int(w * 0.8)]
+    sel = 4
+    for k, y in enumerate(range(30, h - 70, 16)):
+        if k == sel:
+            px[y - 3:y + 11, 4:w - 4, :3] = 0.25
+        px[y + 1:y + 7, cols[0] + 4:cols[0] + 10, :3] = 1.0 if r.random() < 0.75 else 0.3
+        for c in cols[1:]:
+            px[y:y + 6, c:c + int(18 + r.random() * 60), :3] = 0.4 + r.random() * 0.5
+    for i in range(3):
+        y0 = h - 60 + i * 18
+        px[y0:y0 + 10, 8:w - 8, :3] = 0.12
+        px[y0:y0 + 10, 8:8 + int((w - 16) * (0.15 + r.random() * 0.8)), :3] = 0.8
+
+
 def draw_poster(px, w, h):
     yy, xx = np.mgrid[0:h, 0:w]
     g = yy / h
@@ -61,6 +129,9 @@ def draw_poster(px, w, h):
 M.update(
     screenUI=mat('RS_Screen_UI', '#000000', 0, .25, emit='#22e6ff', strength=2, image=make_image('RS_ScreenUI', 512, 320, draw_ui), emit_image=True),
     screenTerm=mat('RS_Screen_Term', '#000000', 0, .25, emit='#22e6ff', strength=2, image=make_image('RS_ScreenTerm', 512, 384, draw_term), emit_image=True),
+    screenChart=mat('RS_Screen_Chart', '#000000', 0, .25, emit='#22e6ff', strength=2, image=make_image('RS_ScreenChart', 512, 320, draw_chart), emit_image=True),
+    screenNodes=mat('RS_Screen_Nodes', '#000000', 0, .25, emit='#22e6ff', strength=2, image=make_image('RS_ScreenNodes', 512, 320, draw_nodes), emit_image=True),
+    screenTable=mat('RS_Screen_Table', '#000000', 0, .25, emit='#22e6ff', strength=2, image=make_image('RS_ScreenTable', 512, 384, draw_table), emit_image=True),
     screenOff=mat('RS_ScreenOff', '#050608', .2, .08),
     poster=mat('RS_Poster', '#000000', 0, .8, emit='#ffffff', strength=0.35, image=make_image('RS_Poster', 256, 384, draw_poster), emit_image=True),
     beige=mat('RS_BeigePlastic', '#2c2f36', .35, .5),  # retro units in gunmetal, in the family
@@ -73,7 +144,13 @@ M.update(
     warm=mat('RS_Glow_Warm', emit='#ff7a2a', strength=5),
 )
 # the poster's base color also comes from its image so it reads lit or unlit
-SCREENS = [M['screen'], M['screenUI'], M['screenTerm']]
+SCREENS = [M['screen'], M['screenUI'], M['screenTerm'], M['screenChart'], M['screenNodes'], M['screenTable']]
+
+
+def screen_deck(r):
+    """Screen designs in shuffled rounds: no design repeats until every one has shown."""
+    while True:
+        yield from r.sample(SCREENS, len(SCREENS))
 
 
 def note(a, x, y, z, rz=0.0, s=0.07):
@@ -110,6 +187,7 @@ def laptop(a, screen=None, open_angle=0.25):
 def monitor_wall(a, seed=1):
     """Pole rig with six mismatched screens, one dead, sticky notes and dangling cables."""
     r = random.Random(seed)
+    deck = screen_deck(r)
     a.box(.7, .05, .45, M['trim'], 0, .025, 0)
     a.cyl(.035, .035, 2.15, M['body'], 0, 1.1, 0, 16)
     sizes = [(.62, .36), (.7, .4), (.55, .33), (.62, .36), (.48, .3), (.62, .36)]
@@ -120,7 +198,7 @@ def monitor_wall(a, seed=1):
     for i, ((x, y), (w, h)) in enumerate(zip(slots, sizes)):
         ry = -x * .25
         with a.at(x, y, 0, ry=ry, rz=(r.random() - .5) * .04):
-            monitor(a, w, h, stand=False, screen=M['screenOff'] if i == dead else SCREENS[r.randrange(3)])
+            monitor(a, w, h, stand=False, screen=M['screenOff'] if i == dead else next(deck))
             a.box(.12, .1, .04, M['dark'], 0, 0, -.03)  # VESA mount
             if r.random() < .5:
                 note(a, w / 2 - .05, -h / 2 + .06, .0137, (r.random() - .5) * .3)
@@ -135,6 +213,7 @@ def monitor_wall(a, seed=1):
 def monitor_bank(a, cols=4, rows=3, seed=3):
     """Wall-mounted bank of screens with two CRTs inset. Origin at the floor, back on the wall."""
     r = random.Random(seed)
+    deck = screen_deck(r)
     cw, ch = .62, .38
     W, H = cols * (cw + .03) + .1, rows * (ch + .03) + .1
     y0 = 1.0
@@ -149,10 +228,10 @@ def monitor_bank(a, cols=4, rows=3, seed=3):
         if i in crts:
             a.box(cw, ch, .02, M['dark'], x, y, .07)
             with a.at(x, y - ch * .45, .02):
-                crt(a, .36, SCREENS[r.randrange(3)], M['dark'])
+                crt(a, .36, next(deck), M['dark'])
         else:
             with a.at(x, y, .08):
-                monitor(a, cw, ch, stand=False, screen=M['screenOff'] if r.random() < .08 else SCREENS[r.randrange(3)])
+                monitor(a, cw, ch, stand=False, screen=M['screenOff'] if r.random() < .08 else next(deck))
     for k in range(5):  # cable fall from the bank to the floor
         x = -W / 2 + .2 + k * (W - .4) / 4
         a.cable([(x, y0 + .05, .04), (x + .05, y0 - .3, .1), (x - .03, .4, .12), (x + .1, .01, .3 + k * .05)], .007, M['dark'])
@@ -161,13 +240,14 @@ def monitor_bank(a, cols=4, rows=3, seed=3):
 def monitor_stack(a, seed=2):
     """Desk-clamped pole with a 2×2 screen stack and a CRT beside. Origin on the desk surface."""
     r = random.Random(seed)
+    deck = screen_deck(r)
     a.box(.12, .03, .12, M['trim'], 0, .015, -.32)
     a.cyl(.022, .022, .95, M['trim'], 0, .49, -.32, 12)
     for y in (.35, .74):
         a.box(1.3, .03, .03, M['trim'], 0, y, -.3)
     for x, y, rx in ((-.33, .35, 0), (.33, .35, 0), (-.33, .74, .14), (.33, .74, .14)):
         with a.at(x, y, -.25, ry=-x * .35, rx=rx):
-            monitor(a, .62, .36, stand=False, screen=SCREENS[r.randrange(3)])
+            monitor(a, .62, .36, stand=False, screen=next(deck))
         a.cable([(x, y - .18, -.28), (x * .5, y - .3, -.33), (0, .05, -.36), (.1, .0, -.38)], .005, M['dark'])
     note(a, -.62, .27, -.235, .1)
     note(a, .58, .64, -.205, -.15)
@@ -216,6 +296,13 @@ def data_pad(a, screen=None):
         a.plane(.18, .12, screen or M['screenUI'])
 
 
+def mouse(a):
+    """A mouse on its pad. Origin on the desk surface."""
+    a.box(.22, .003, .18, M['dark'], 0, .0015, 0)
+    a.box(.06, .022, .1, M['trim'], 0, .014, 0)
+    a.box(.004, .003, .035, M['neon2'], 0, .026, -.025)  # the wheel
+
+
 def desk_clutter(a, seed=1):
     """A desk's worth of mess. Origin on the desk surface, spread over about 1.2 × 0.5 m."""
     r = random.Random(seed)
@@ -240,9 +327,10 @@ def workstation_lived(a, seed=3):
     h, width = .75, 2.2
     desk(a, width, .85, h)
     with a.at(-.1, h, 0): monitor_stack(a, seed)
-    with a.at(-.75, h, .15, ry=.35): laptop(a)
-    with a.at(0, h, .2): keyboard(a)
-    with a.at(.2, h, .1): desk_clutter(a, seed)
+    with a.at(0, h, .3): keyboard(a)  # front and centre, where the user sits
+    with a.at(.37, h, .3): mouse(a)
+    with a.at(.78, h, .27, ry=-.25): laptop(a)  # front right: the stack's CRT is behind
+    with a.at(-.5, h, -.05): desk_clutter(a, seed)  # left of and behind the keyboard: nothing on the keys
     with a.at(1.0, h, -.25, ry=2.6): desk_lamp(a)
     with a.at(width / 2 + .2, 0, -.15): pc_tower(a)
     with a.at(-width / 2 - .35, 0, .1, ry=.3): trash_bin(a, seed)

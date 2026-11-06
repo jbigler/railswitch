@@ -84,6 +84,9 @@ func TestActions(t *testing.T) {
 		{"task term", "/p/ftest/b/task", form("task", "console", "term", "1"), 202, append(slices.Clone(wsb), "task", "--new-term", "console"), ""},
 		{"task unknown", "/p/ftest/b/task", form("task", "nope"), 404, nil, ""},
 		{"task bad args", "/p/ftest/b/task", form("task", "test", "args", `"x`), 422, nil, "unterminated"},
+		{"agent stop", "/p/ftest/b/agent-stop", form("agent", "claude"), 202, append(slices.Clone(wsb), "agent", "stop", "claude"), ""},
+		{"agent stop unknown", "/p/ftest/b/agent-stop", form("agent", "nope"), 404, nil, ""},
+		{"agent stop flag", "/p/ftest/b/agent-stop", form("agent", "--all"), 404, nil, ""},
 	} {
 		f := newFixture(t)
 		w := f.do(req("POST", c.path, c.form))
@@ -234,7 +237,7 @@ func TestPages(t *testing.T) {
 			}
 		}
 		html := strings.HasPrefix(w.Header().Get("Content-Type"), "text/html")
-		if body := w.Body.String(); html && (strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") || (strings.Contains(body, "<script") && !strings.Contains(body, `<script src="/static/app.js" defer></script>`))) {
+		if body := w.Body.String(); html && (strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") || (strings.Contains(body, "<script") && !strings.Contains(body, `<script src="/static/app.js" type="module"></script>`))) {
 			t.Errorf("%s: inline style or script (CSP)", c.path)
 		}
 	}

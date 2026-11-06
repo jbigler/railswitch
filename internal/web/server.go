@@ -124,6 +124,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /theme.css", s.theme)
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
+	m.HandleFunc("POST /p/{prefix}/{slug}/agent-stop", s.agentStop)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
 	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
@@ -608,6 +609,33 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 	s.start(w, r, jobs.Spec{
 		Project: p.Prefix, Slug: wt.Slug, Label: a.label, Dir: p.Workspace,
 		Argv: append([]string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug}, a.args...), Window: a.window,
+	}, nil, worktreePath(p, wt.Slug))
+}
+
+// agentStop stops one of the worktree's agents (D176): `agent stop
+// <name>`, the name checked against its agent ls.
+func (s *Server) agentStop(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	name := r.PostFormValue("agent")
+	if !agentName.MatchString(name) {
+		http.Error(w, "unknown agent", http.StatusNotFound)
+		return
+	}
+	agents, err := readAgents(r.Context(), s.c.CLI, p.Workspace, wt.Slug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !slices.ContainsFunc(agents, func(a agentRow) bool { return a.Name == name }) {
+		http.Error(w, "unknown agent", http.StatusNotFound)
+		return
+	}
+	s.start(w, r, jobs.Spec{
+		Project: p.Prefix, Slug: wt.Slug, Label: "stop agent " + name, Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "agent", "stop", name},
 	}, nil, worktreePath(p, wt.Slug))
 }
 

@@ -128,6 +128,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
 	m.HandleFunc("POST /p/{prefix}/{slug}/restart/{service}", s.restartService)
+	m.HandleFunc("POST /p/{prefix}/{slug}/fw-allow/{service}", s.fwAllowLive)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-default/{verb}", s.agentDefault)
 	m.HandleFunc("POST /p/{prefix}/{slug}/snapshots/{verb}", s.snapshotAction)
 	m.HandleFunc("POST /p/{prefix}/{slug}/queue/{verb}", s.queueAction)

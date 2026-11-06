@@ -306,8 +306,13 @@ shows what each one does before anything is written.
   edits (`firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`).
   "Blocked, or would be under enforce" loads after the page from
   `GET /p/<prefix>/settings/blocked` (`railswitch --json fw show`): each
-  rejected address with its host and an "Allow in <list>" button (staging
-  `firewall.allow.add`) when it resolves and the container has a list; a
+  rejected address with its host and an "Add to <list> list" button (staging
+  `firewall.allow.add`: lasting, from each container's next start) when it
+  resolves and the container has a list. A container under enforce that
+  runs a worktree's service also gets "Allow for" with 10 minutes, 1 hour
+  or until it restarts (D184): `POST /p/<prefix>/<slug>/fw-allow/<service>`
+  (`host`, `for`: `10m`, `1h` or `restart`) runs `railswitch fw allow
+  [--for <d>] <service> <host>` as a job, in that running container now. A
   data container has nothing to allow; a container with no hook is
   named.
 - **Hooks** (D126): a box per `[hooks]` list (`deps`, `start`, `create`),

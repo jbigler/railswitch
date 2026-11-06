@@ -26,13 +26,12 @@
 {{end}}<li class="stack-trunk muted">└ <span class="mono">{{.Trunk}}</span></li></ol>
 {{end}}{{end}}</section>
 {{end}}
-<section class="dcard" data-panel="agent"><h2 class="lbl">Agent <a class="quiet-link" href="{{.AgentDefaultURL}}" data-dialog="agentdefault">Default config…</a></h2>
+{{template "usage-card" .UsageCard}}<section class="dcard" data-panel="agent"><h2 class="lbl">Agent <a class="quiet-link" href="{{.AgentDefaultURL}}" data-dialog="agentdefault">Default config…</a></h2>
 {{with .RunningAgent}}<div class="agent-now on"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b><span class="mono">{{.Name}}</span> is running</b>{{with $.Agent}}<span class="{{.Class}}">{{cap .Label}}</span>{{end}}</div><div class="agent-acts"><button type="button" class="ln main" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent">Open terminal</button><form method="post" action="{{$.AgentStopURL}}" data-post data-confirm="Stop {{.Name}}? Its session ends; what it changed in the worktree stays."><input type="hidden" name="agent" value="{{.Name}}"><button class="ln danger">Stop {{.Name}}</button></form></div></div>
 {{with $.Agent}}{{if .Message}}<div class="msg">{{.Message}}</div>{{end}}{{end}}
 {{if gt (len $.AgentTerms) 1}}<div class="agent-others"><span class="muted">Other agents:</span>{{range $.AgentTerms}}{{if not .Running}} <span><b class="mono">{{.Name}}</b> <span class="muted">stopped</span></span> <button type="button" class="ln" data-switch-url="{{$.AgentStopURL}}" data-switch-from="{{$.RunningAgent.Name}}" data-switch-term="{{.URL}}" data-switch-to="{{.Name}}">Switch to {{.Name}}</button>{{end}}{{end}}</div>
 {{end}}{{else}}<div class="agent-now"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b>No agent running</b><span class="muted">An agent starts in this worktree's container when its terminal opens.</span></div><div class="agent-acts">{{range $i, $a := .AgentTerms}}<button type="button" class="ln{{if eq $i 0}} main{{end}}" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent">Start {{.Name}}</button>{{end}}</div></div>
 {{end}}{{if .AgentSetupURL}}<div class="agent-others"><span class="muted">Setup:</span>{{range .AgentTerms}}<form method="post" action="{{$.AgentSetupURL}}" data-post data-confirm="Run {{.Name}}'s setup commands again? They run at its next start; a running {{.Name}} needs a stop and a start."><input type="hidden" name="agent" value="{{.Name}}"><button class="ln quiet">Run {{.Name}}'s setup again</button></form>{{end}}</div>
-{{end}}{{with .Usage}}<div class="usage-line{{if $.Runaway}} yellow{{else}} muted{{end}}">{{if $.Runaway}}⚠ {{end}}{{.}}</div>
 {{end}}{{template "queue-detail" .Queue}}
 </section>
 {{with .Tests}}<section class="dcard" data-panel="tests"><h2 class="lbl">Tests</h2>
@@ -60,3 +59,20 @@ a secret set job's stdin; Start waits for the last one. */}}
 {{if .StartURL}}<form method="post" action="{{.StartURL}}" data-start-base data-base="{{.Base}}"><button class="ln main" disabled>Start {{.Base}}</button></form>
 <p class="note" data-starting hidden>Starting {{.Base}}: its output is in {{.Base}}'s jobs.</p>{{end}}
 </section>{{end}}
+
+{{/* The worktree's agent usage, at the top of its Agent tab (D187): a
+table, the daily bars (new tokens below, output above) on a round axis
+with the usual day dashed, and two meters. SVG attributes and classes
+only. */}}
+{{define "usage-card"}}{{with .}}<section class="dcard wide usage-card" data-panel="agent"><div class="usage-hd"><h2 class="lbl">Usage · this worktree</h2>{{template "usage-range" .Ranges}}</div>
+{{if .Empty}}<p class="muted usage-note">{{.Empty}}</p>
+{{else}}<table class="usage-table"><thead><tr><th scope="col"></th><th scope="col"><span class="chip u-new" aria-hidden="true"></span> New</th><th scope="col"><span class="chip u-out" aria-hidden="true"></span> Output</th><th scope="col">Cache reads</th><th scope="col">Cost</th></tr></thead>
+<tbody>{{range $i, $r := .Table}}<tr{{if and (eq $i 0) $.Runaway}} class="yellow" title="Over 3 times its usual day"{{end}}><th scope="row">{{if and (eq $i 0) $.Runaway}}⚠ {{end}}{{.Label}}</th><td>{{.New}}</td><td>{{.Output}}</td><td class="muted">{{.CacheRead}}</td><td class="muted">{{.Cost}}</td></tr>{{end}}</tbody></table>
+<div class="usage-plot"><div class="usage-y" aria-hidden="true"><span>{{.YTop}}</span><span>{{.YMid}}</span><span>0</span></div><div class="usage-main">
+<svg class="usage-bars" viewBox="0 0 {{.W}} {{.H}}" preserveAspectRatio="none" role="img" aria-label="New tokens and output per day for {{.Days}} days{{if .Usual}}, against the worktree's usual day{{end}}"><line class="grid" x1="0" x2="{{.W}}" y1="{{.GridY}}" y2="{{.GridY}}"/>{{range .Bars}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"><title>{{.Title}}</title></rect>{{end}}{{with .Usual}}<line class="usual" x1="0" x2="{{$.W}}" y1="{{.Y}}" y2="{{.Y}}"><title>{{.Title}}</title></line>{{end}}</svg>
+<div class="usage-days" aria-hidden="true">{{range .Days3}}<span>{{.}}</span>{{end}}</div></div></div>
+{{with .Note}}<p class="muted usage-note">{{.}}</p>{{end}}
+{{end}}<div class="usage-meters">{{with .Context}}{{template "meter" .}}{{else}}<div class="meter"><span class="muted">This session's context</span><span class="muted">No session running</span></div>{{end}}{{with .Share}}{{template "meter" .}}{{end}}</div>
+</section>{{end}}{{end}}
+
+{{define "meter"}}<div class="meter"><span class="muted">{{.Label}}</span><svg class="meter-bar" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="{{.Aria}}"><rect class="track" width="100" height="8"/><rect class="fill" width="{{.Fill}}" height="8"/></svg><span><b>{{.Value}}</b> {{.Of}}</span></div>{{end}}

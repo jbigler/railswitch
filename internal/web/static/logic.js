@@ -56,3 +56,13 @@ export function taskWay({ shift, terminal, panel }) {
   if (shift) return "window";
   return terminal || panel ? "panel" : "job";
 }
+
+// pageQuery is a project page's query for its sort and usage range
+// (D187): "" for the defaults (name, 14 days), keys in Go's order.
+export function pageQuery(sort, days) {
+  const q = new URLSearchParams();
+  if (days && String(days) !== "14") q.set("days", String(days));
+  if (sort && sort !== "name") q.set("sort", sort);
+  const s = q.toString();
+  return s ? "?" + s : "";
+}

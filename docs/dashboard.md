@@ -185,14 +185,25 @@ still wider than the window scrolls its pane.
   units than the rendered ones (`overview`'s `stale`, after a settings
   change, say) shows "restart to apply" by its name and in the detail;
   **Restart** clears it. A row that changes group resends the list.
-- **Agent usage** (under the list, D162): the project's agents' tokens
-  per day for the last 14 days, one bar per day (today's in the accent
-  colour; a bar's tooltip is its day, its tokens and the cost when the
-  agent's package reports one), headed by the sum. It is `agent usage
-  --all --days 14 --json`, read with the PRs (every 60 s with a page
-  open, and on Refresh PRs); absent while those days have no usage. The
-  chart is SVG drawn by the page's template with attributes and classes
-  only (the CSP allows no inline style).
+- **Agent usage** (under the list, D162, D187): "Agent usage · <N>
+  days: <total>" and a **7 / 14 / 30** switch, then one bar per day
+  stacked by worktree. It counts new tokens (input and cache writes) and
+  output; cache reads, cheap rereads, are left out. The 6 worktrees
+  with the most in the range get a colour each (theme colours that
+  differ in lightness, blue and orange first), the rest share one muted
+  "others" segment whose tooltip lists them. A removed worktree keeps a
+  segment of its own, muted, never linked, named `<name> (removed
+  <day>)`. Each other segment links to its worktree's Agent tab; every
+  segment's tooltip (SVG `<title>`) is its day, worktree and tokens.
+  Under the bars, the first and last day, then a legend: colour, name,
+  total. It is `agent usage --all --days 30 --json`, read with the PRs
+  (every 60 s with a page open, and on Refresh PRs), each range cut from
+  it; absent while the range has no usage. The range is the page's
+  `?days=` (7, 14 or 30; 14 without one): a click on the switch changes
+  it in place (the stream restarts) and this browser remembers it for
+  every project, like the sort. The chart is SVG drawn by the page's
+  template with attributes and classes only (the CSP allows no inline
+  style).
 - **Secrets to set** (above the detail, only while a secret `up` needs
   is unset: `secret ls`'s `up`, read once per page load with 5 s to
   answer; none when it can't be read): "Set these secrets to start
@@ -272,10 +283,27 @@ still wider than the window scrolls its pane.
     "Setup:" and **Run <name>'s setup again** per agent (D188): after a
     confirm, `railswitch agent setup --again <name>` as a job, the name
     checked against `agent ls`; its setup commands run at the agent's
-    next start (an agent with none reports so). Then the worktree's
-    usage from `agent usage` (`<n> tokens today · <m> in 14 days`,
-    ` · $<cost>` when reported, yellow with `⚠` while `runaway`), the
-    queue, and the **Default config…** link beside the card's label.
+    next start (an agent with none reports so). Then the queue, and
+    the **Default config…** link beside the card's label. Above it, on
+    the Agent tab only, **Usage · this worktree** (D187) with the same
+    7 / 14 / 30 switch as the project chart: a table, rows Today and
+    `<N> days`, columns New (input and cache writes), Output, Cache
+    reads (muted) and Cost (`not reported` when the package reports
+    none); the Today row is yellow with `⚠` while `runaway`. Then the
+    daily bars, new below and output above (today's yellow while
+    runaway), on an axis rounded up to 1, 2, 2.5 or 5 times a power of
+    ten, labelled at the top, the middle (one gridline) and 0, with the
+    first, middle and last day under it, and a dashed usual-day line at
+    `median_new_output` once the worktree has 3 earlier days of use
+    among the 14 before today (until then, "Usual-day line appears with
+    3 earlier days of use (<k> so far)."). Then two meters side by side:
+    "This session's context · <how long it has run>", the running
+    agent's session context (`agent ls`'s `usage.context`) as `<n> of
+    200k` (no package reports its model's window; the meter assumes
+    200k and says so), or "No session running"; and "Share of the
+    project, <N> days", `<p>% · <x> of <y>` of new tokens and output.
+    With no usage in the range, "No usage in <N> days" instead of the
+    table, the bars and the share.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
   - **Database:** **Snapshots…** (D157).

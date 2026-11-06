@@ -86,7 +86,7 @@ func importDir(raw string) (string, bool) {
 // templateImportPage reviews the folder ?dir=.
 func (s *Server) templateImportPage(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	pv := s.pageData("", "", sortKey{By: "name"})
+	pv := s.pageData("", "", sortKey{By: "name"}, usageDefault)
 	jv := newJobs(s.c.Jobs.Jobs(machineKey, ""), nil, "")
 	s.mu.Unlock()
 	v := importView{

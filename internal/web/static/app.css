@@ -331,12 +331,44 @@ body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
 .svc .mem>span{display:block;height:100%;background:var(--green)}
 .svc .mem.warn>span{background:var(--yellow)}
 .svc .mem.crit>span{background:var(--red)}
-.usage{padding:0 14px 8px}
-.usage-sum{text-transform:none;letter-spacing:0}
-.usage-chart{display:block;width:100%;max-width:420px;height:56px}
-.usage-chart .bar{fill:var(--blue)}
-.usage-chart .bar.today{fill:var(--accent)}
-.usage-line{margin-top:4px}
+/* Agent usage (D187): the project chart under the list and the Agent tab's card. Series colours differ in lightness too; --u is a series' colour. */
+.u-c0,.u-new{--u:var(--blue)}.u-c1,.u-out{--u:var(--accent)}.u-c2{--u:var(--purple)}.u-c3{--u:var(--yellow)}.u-c4{--u:color-mix(in srgb,var(--blue) 45%,var(--bg))}.u-c5{--u:color-mix(in srgb,var(--accent) 45%,var(--bg))}
+.u-other{--u:color-mix(in srgb,var(--muted) 65%,var(--bg))}.u-removed{--u:var(--border)}
+.u-new.runaway{--u:var(--yellow)}.u-out.runaway{--u:color-mix(in srgb,var(--yellow) 55%,var(--bg))}
+.chip{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--u);flex:none}
+.usage{padding:0 14px 8px;max-width:440px}
+.usage-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 6px}
+.usage-hd .lbl{margin:0}
+.usage-sum{color:var(--text)}
+.usage-range a{padding:1px 8px;font-size:12px}
+.usage-chart{display:block;width:100%;height:110px;border-bottom:1px solid var(--border)}
+.usage-chart rect,.usage-bars rect{fill:var(--u)}
+.usage-chart rect{stroke:var(--bg);stroke-width:1px;vector-effect:non-scaling-stroke}
+.usage-chart a:hover rect,.usage-chart a:focus rect{fill:color-mix(in srgb,var(--u) 75%,var(--text))}
+.usage-days{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px}
+.usage-legend{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.usage-legend li{display:flex;align-items:center;gap:8px}
+.usage-legend .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+body:not([data-tab=agent]) .wt .usage-card{display:none}
+.usage-card .usage-hd{margin:0 0 8px}
+.usage-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px}
+.usage-table th,.usage-table td{padding:4px 0 4px 8px;text-align:right;border-bottom:0;border-top:1px solid var(--sel);white-space:nowrap}
+.usage-table thead th{border-top:0;font-weight:400;font-size:12px;padding-top:0}
+.usage-table th[scope=row]{text-align:left;padding-left:0;color:var(--text);font-weight:700}
+.usage-table tr.yellow th[scope=row]{color:var(--yellow)}
+.usage-table tbody tr:first-child td:not(.muted){font-weight:700}
+.usage-plot{display:flex;gap:6px}
+.usage-y{display:flex;flex-direction:column;justify-content:space-between;height:132px;margin:-6px 0;font-size:10px;color:var(--muted);text-align:right;min-width:2.2em;line-height:12px}
+.usage-main{flex:1;min-width:0}
+.usage-bars{display:block;width:100%;height:120px;border-bottom:1px solid var(--border);overflow:visible}
+.usage-bars line{vector-effect:non-scaling-stroke;stroke-width:1px}
+.usage-bars .grid{stroke:var(--sel)}
+.usage-bars .usual{stroke:var(--text);stroke-dasharray:5 4}
+.usage-note{font-size:12px;margin:6px 0 0}
+.usage-meters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;font-size:12px;margin-top:12px}
+.meter{display:flex;flex-direction:column;gap:4px;min-width:0}
+.meter-bar{display:block;width:100%;height:8px;border-radius:4px}
+.meter-bar .track{fill:var(--sel)}.meter-bar .fill{fill:var(--blue)}
 .set-table td.size{white-space:nowrap}
 #note textarea{display:block;width:100%;box-sizing:border-box}
 

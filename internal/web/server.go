@@ -331,9 +331,10 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	pv := s.pageData(p.Prefix, wt.Slug, k)
+	days := parseDays(r.URL.Query().Get("days"))
+	pv := s.pageData(p.Prefix, wt.Slug, k, days)
 	s.mu.Unlock()
-	pv.Pane, pv.ListURL = "list", "/p/"+p.Prefix+k.query()
+	pv.Pane, pv.ListURL = "list", "/p/"+p.Prefix+pageQuery(k, days)
 	if r.PathValue("slug") != "" {
 		pv.Pane = "detail"
 	}
@@ -386,7 +387,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if !write([]byte("retry: 2000\n\n")) {
 		return
 	}
-	sub := s.subscribe(prefix, q.Get("w"), parseSort(q.Get("sort")), view)
+	sub := s.subscribe(prefix, q.Get("w"), parseSort(q.Get("sort")), parseDays(q.Get("days")), view)
 	defer s.unsubscribe(sub)
 	ping := time.NewTicker(s.ping)
 	defer ping.Stop()

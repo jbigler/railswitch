@@ -3,7 +3,7 @@
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fuzzy, target, hookLines, addTaskEdits, taskWay } from "../static/logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery } from "../static/logic.js";
 
 test("fuzzy matches letters in order, spaces ignored", () => {
   assert.ok(fuzzy("pgset", "page settings") > 0);
@@ -43,4 +43,12 @@ test("taskWay: Shift is a window; a terminal task or the box a panel; else a job
   assert.equal(taskWay({ shift: false, terminal: true, panel: false }), "panel", "a terminal task ignores an unticked box");
   assert.equal(taskWay({ shift: false, terminal: false, panel: true }), "panel");
   assert.equal(taskWay({ shift: false, terminal: false, panel: false }), "job");
+});
+
+test("pageQuery: the defaults leave the URL bare, keys in Go's order", () => {
+  assert.equal(pageQuery("name", "14"), "");
+  assert.equal(pageQuery("", ""), "");
+  assert.equal(pageQuery("-pr", "14"), "?sort=-pr");
+  assert.equal(pageQuery("name", "30"), "?days=30");
+  assert.equal(pageQuery("pr", 7), "?days=7&sort=pr");
 });

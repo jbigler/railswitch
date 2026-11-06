@@ -405,6 +405,7 @@ func prLabel(p *pr) string {
 
 type pageView struct {
 	Title, Prefix, Sel, Sort string
+	Days                     int // the usage views' range (D187)
 	// Pane is the one a narrow window shows: list, or detail when the URL
 	// names a worktree (docs/dashboard.md Narrow windows). ListURL is the
 	// detail's way back.
@@ -415,7 +416,7 @@ type pageView struct {
 	Banner        bannerView
 	List          listView
 	Detail        detailView
-	Usage         *usageView // nil: no agent usage in the chart's days
+	Usage         *usageView // nil: no agent usage in the chart's days (D187)
 	Jobs          jobsView
 	Secrets       *secretsCard // nil: every secret is set
 }
@@ -744,8 +745,7 @@ type detailView struct {
 	Tests                             *testsView // nil: no test task
 	TaskURL                           string     // posts a task to run as a job
 	Queue                             queueList  // the agent work queue (D159)
-	Usage                             string     // its agents' usage (D162); "" for none
-	Runaway                           bool       // that usage is far above its usual day
+	UsageCard                         *usageCard // its agents' usage (D162, D187); nil before it is read
 }
 
 type linkView struct{ Label, URL, Class string }

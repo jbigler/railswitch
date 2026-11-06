@@ -299,7 +299,7 @@ func (s *Server) newPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
-	pv := s.pageData("", "", sortKey{By: "name"})
+	pv := s.pageData("", "", sortKey{By: "name"}, usageDefault)
 	s.mu.Unlock()
 	v := newView{
 		Title: "New project · RailSwitch", Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner,

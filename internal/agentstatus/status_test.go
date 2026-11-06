@@ -88,7 +88,8 @@ func TestStatusUsage(t *testing.T) {
 	if s.Usage == nil || *s.Usage != (Usage{Input: 12, Output: 3400, CacheRead: 56000, CacheWrite: 780}) {
 		t.Fatalf("usage = %+v", s.Usage)
 	}
-	for _, bad := range []string{`{"input":-1}`, `{"output":100000000000000}`, `"lots"`, `{"input":1.5}`, `{"input":1e99}`, `null`, `{"cost":-1}`, `{"cost":1e7}`, `{"cost":"1"}`} {
+	for _, bad := range []string{`{"input":-1}`, `{"output":100000000000000}`, `"lots"`, `{"input":1.5}`, `{"input":1e99}`, `null`, `{"cost":-1}`, `{"cost":1e7}`, `{"cost":"1"}`,
+		`{"session":"a/b"}`, `{"session":"` + strings.Repeat("a", 129) + `"}`, `{"session":"x\u001b"}`, `{"context":-1}`, `{"context":1e14}`, `{"started":-5}`, `{"started":1e12}`} {
 		s := read(`{"v":1,"state":"working","message":"","ts":1,"usage":` + bad + `}`)
 		if s.State != "working" || s.Usage != nil {
 			t.Errorf("usage %s: state %q usage %+v, want working without usage", bad, s.State, s.Usage)
@@ -96,6 +97,10 @@ func TestStatusUsage(t *testing.T) {
 	}
 	if s := read(`{"v":1,"state":"done","message":"","ts":1,"usage":{"input":1,"cost":0.25}}`); s.Usage == nil || s.Usage.Cost == nil || *s.Usage.Cost != 0.25 {
 		t.Errorf("cost: %+v", s.Usage)
+	}
+	s = read(`{"v":1,"state":"done","message":"","ts":1,"usage":{"input":1,"session":"0b7e-4f.x_1","context":148000,"started":1792900000}}`)
+	if s.Usage == nil || *s.Usage != (Usage{Input: 1, Session: "0b7e-4f.x_1", Context: 148000, Started: 1792900000}) {
+		t.Errorf("session: %+v", s.Usage)
 	}
 	if s := read(`{"v":1,"state":"idle","message":"","ts":1}`); s.Usage != nil {
 		t.Errorf("no usage: %+v", s.Usage)

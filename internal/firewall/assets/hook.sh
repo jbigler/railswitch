@@ -324,6 +324,7 @@ if [[ -n "$filter" ]]; then
   {
     printf '# railswitch DNS filter for %s (D182): written by hook.sh at each start.\n' "$cid"
     printf '# gateway=%s\n' "$gateway"
+    printf '# dnsmasq=%s\n' "$DNSMASQ" # fw allow restarts this one, not whichever its PATH finds
     printf '%s\n' port=53 listen-address=127.0.0.1 bind-dynamic no-resolv no-hosts no-poll cache-size=0 \
       user=root group=root "query-port=$QPORT" "pid-file=$DNSDIR/$cid.pid" "log-facility=$DNSDIR/$cid.log" \
       "server=//$gateway" "server=/dns.podman/$gateway"

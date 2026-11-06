@@ -682,7 +682,7 @@ func TestHookDNSFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"# gateway=10.89.7.1\n", "listen-address=127.0.0.1\n", "no-resolv\n", "cache-size=0\n",
+		"# gateway=10.89.7.1\n", "# dnsmasq=/", "listen-address=127.0.0.1\n", "no-resolv\n", "cache-size=0\n",
 		"server=//10.89.7.1\n", "server=/dns.podman/10.89.7.1\n",
 		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=953\n",
 	} {
@@ -769,8 +769,15 @@ func TestFirewallAllowDNS(t *testing.T) {
 		"nsenter": "#!/bin/bash\nwhile (( $# )) && [[ $1 != -n ]]; do shift; done\nshift\nexec \"$@\"\n",
 		"nft":     "#!/bin/bash\n",
 		"getent":  "#!/bin/bash\necho \"203.0.113.9 STREAM $2\"\n",
-		// As dnsmasq does: daemonize (off the output pipe), write the pid file.
-		"dnsmasq": "#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\nsleep 300 >/dev/null 2>&1 & echo $! >\"$pf\"\n",
+		// A dnsmasq first on PATH that isn't the hook's: never run.
+		"dnsmasq": "#!/bin/bash\necho \"the PATH's dnsmasq ran\" >&2\nexit 1\n",
+	}
+	// The hook's dnsmasq, named in the config. As dnsmasq does: daemonize
+	// (off the output pipe), write the pid file.
+	hookBin := t.TempDir()
+	dnsmasq := filepath.Join(hookBin, "dnsmasq")
+	if err := os.WriteFile(dnsmasq, []byte("#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\nsleep 300 >/dev/null 2>&1 & echo $! >\"$pf\"\n"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	for name, body := range shims {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
@@ -782,7 +789,7 @@ func TestFirewallAllowDNS(t *testing.T) {
 	}
 	conf := filepath.Join(dnsDir, "0123456789ab.conf")
 	pidFile := filepath.Join(dnsDir, "0123456789ab.pid")
-	base := "# gateway=10.89.7.1\npid-file=" + pidFile + "\nserver=/api.example.com/10.89.7.1\n"
+	base := "# gateway=10.89.7.1\n# dnsmasq=" + dnsmasq + "\npid-file=" + pidFile + "\nserver=/api.example.com/10.89.7.1\n"
 	if err := os.WriteFile(conf, []byte(base), 0o600); err != nil {
 		t.Fatal(err)
 	}

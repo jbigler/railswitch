@@ -78,10 +78,13 @@ stop_dns() {
 # dns_add PID CID NAME…: let container CID's DNS filter answer NAMEs too,
 # then restart it (dnsmasq reads its server and nftset lines at start).
 dns_add() {
-  local pid="$1" c="$2" gw n old; shift 2
+  local pid="$1" c="$2" gw dm n old; shift 2
   local conf="$DNSDIR/$c.conf"
   gw="$(sed -n 's/^# gateway=//p' "$conf")"
   [[ "$gw" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "$conf names no gateway"
+  # The dnsmasq the hook ran (the user's PATH may find another, one without nftset).
+  dm="$(sed -n 's/^# dnsmasq=//p' "$conf")"
+  [[ "$dm" == /* && -x "$dm" ]] || die "$conf names no dnsmasq: restart the container"
   for n in "$@"; do
     grep -qxF "server=/$n/$gw" "$conf" && continue
     printf 'server=/%s/%s\nnftset=/%s/4#inet#%s#allowd4\n' "$n" "$gw" "$n" "$TABLE" >>"$conf"
@@ -92,7 +95,7 @@ dns_add() {
     for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$old" 2>/dev/null || break; sleep 0.2; done
   fi
   rm -f "$DNSDIR/$c.pid"
-  in_netns "$pid" "$(command -v dnsmasq)" --conf-file="$conf" </dev/null || die "the DNS filter did not restart; restart the container"
+  in_netns "$pid" "$dm" --conf-file="$conf" </dev/null || die "the DNS filter did not restart; restart the container"
 }
 
 cmd_show() {

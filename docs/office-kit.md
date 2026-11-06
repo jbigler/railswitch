@@ -193,6 +193,16 @@ separate textures, not GLB: the dashboard's content policy refuses the
 the same names would otherwise rename the build's to `<name>.001` and
 export those.
 
+Outside the author's machine a rebuild differs from the checked-in models
+in float noise, so check in only the models a change touched. `--only`
+still builds every set but exports just the named pieces (and their
+textures); the other files stay as checked in, and `pieces.py` runs as
+usual. An unknown name fails and lists the pieces:
+
+```sh
+blender --background --python tools/office-kit/build_all.py -- --only Furn_Workstation_Lived Tech_MonitorStack
+```
+
 `tools/office-kit/preview.html` is a sample floor for checking the kit. Like
 every floor it has one pet, chosen with the Pet picker or `?pet=` (`cat`, `dog`
 roam; `parrot` flies between two perches; `sleeper`, `aquarium`, `jellyfish`,

@@ -4,7 +4,7 @@
 # Blender's Z up (front -Y) at the end, so the glTF export lands back in three.js
 # exactly as authored. Neon surfaces all use RS_Neon_Accent: recolor it in three.js
 # by material name (emissive) to change the highlight color.
-import bpy, bmesh, math, random, os
+import bpy, bmesh, math, random, os, sys
 import numpy as np
 from mathutils import Vector, Matrix, Euler
 from contextlib import contextmanager
@@ -12,6 +12,14 @@ from contextlib import contextmanager
 OUT = os.environ.get('OFFICE_KIT_OUT') or os.path.normpath(
     os.path.join(os.path.dirname(__file__), '..', '..', 'internal', 'web', 'static', 'office', 'sets', 'cyberpunk'))
 os.makedirs(OUT, exist_ok=True)
+
+# `-- --only <piece>...` builds everything but exports only these pieces
+# (the rest keep their checked-in files); build_all.py checks the names.
+_args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+if _args and (_args[0] != '--only' or len(_args) < 2):
+    sys.exit('usage: blender --background --python build_all.py [-- --only <piece>...]')
+ONLY = set(_args[1:]) or None
+BUILT = set()  # every piece the sets built, exported or not
 
 # ---------- collections: each set builds into its own, cleared on rebuild ----------
 def use_collection(name):
@@ -77,6 +85,9 @@ def export_all(objs):
                 trim_uvs(c)
         bpy.context.view_layer.objects.active = o
         o.location = (0, 0, 0)
+        BUILT.add(o.name)
+        if ONLY and o.name not in ONLY:
+            continue
         # .gltf + .bin with the textures as files beside them: the dashboard's CSP
         # (default-src 'self') refuses the blob: URLs three.js makes for embedded images
         bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, o.name + '.gltf'), use_selection=True,

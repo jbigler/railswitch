@@ -488,16 +488,19 @@ func TestHookMetaGoogle(t *testing.T) {
 	}
 	for _, c := range []struct {
 		name       string
-		noCloud    bool
+		cloud      string // "": the fixture; "fail": the fetch fails; else the body served
 		want, none []string
+		why        string // in hook.log
 	}{
-		{"cloud subtracted", false, []string{"8.8.8.0/24", "74.125.0.0/16"}, []string{"34.64.0.0/10", "35.192.0.0/14", "2001:4860"}},
-		{"no cloud.json", true, nil, []string{"8.8.8.0/24", "74.125.0.0/16", "34.64.0.0/10"}},
+		{"cloud subtracted", "", []string{"8.8.8.0/24", "74.125.0.0/16"}, []string{"34.64.0.0/10", "35.192.0.0/14", "2001:4860"}, ""},
+		{"no cloud.json", "fail", nil, []string{"8.8.8.0/24", "74.125.0.0/16", "34.64.0.0/10"}, "meta:google (cloud.json fetch failed)"},
+		// A 200 that isn't the list: without the check, goog's lines were read as cloud's.
+		{"cloud.json not the list", "<html>sign in to the wifi</html>", nil, []string{"8.8.8.0/24", "74.125.0.0/16", "34.64.0.0/10"}, "meta:google (cloud.json has no ranges)"},
 	} {
 		out := filepath.Join(t.TempDir(), "nft.out")
 		bin := t.TempDir()
 		// curl -fsS --max-time 15 <url>: the fixture named by the URL's file.
-		curl := "#!/bin/bash\nu=\"${@: -1}\"\nf=\"$RANGES/${u##*/}\"\n[[ -n ${NOCLOUD:-} && $f == */cloud.json ]] && exit 22\ncat \"$f\"\n"
+		curl := "#!/bin/bash\nu=\"${@: -1}\"\nf=\"$RANGES/${u##*/}\"\n[[ ${CLOUD:-} == fail && $f == */cloud.json ]] && exit 22\n[[ -n ${CLOUD:-} && $f == */cloud.json ]] && { printf %s \"$CLOUD\"; exit 0; }\ncat \"$f\"\n"
 		if err := os.WriteFile(filepath.Join(bin, "curl"), []byte(curl), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -507,8 +510,8 @@ func TestHookMetaGoogle(t *testing.T) {
 				env[i] = "PATH=" + bin + ":" + strings.TrimPrefix(kv, "PATH=")
 			}
 		}
-		if c.noCloud {
-			env = append(env, "NOCLOUD=1")
+		if c.cloud != "" {
+			env = append(env, "CLOUD="+c.cloud)
 		}
 		root := t.TempDir()
 		if msg, err := runHook(t, root, env, map[string]string{
@@ -529,7 +532,7 @@ func TestHookMetaGoogle(t *testing.T) {
 				t.Errorf("%s: allow4 has %s:\n%s", c.name, n, allow)
 			}
 		}
-		if log, _ := os.ReadFile(filepath.Join(root, "hook.log")); c.noCloud && !strings.Contains(string(log), "meta:google (cloud.json fetch failed)") {
+		if log, _ := os.ReadFile(filepath.Join(root, "hook.log")); c.why != "" && !strings.Contains(string(log), c.why) {
 			t.Errorf("%s: log does not say why:\n%s", c.name, log)
 		}
 	}

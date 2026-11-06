@@ -132,12 +132,18 @@ meta_ranges() {
 # server rented there lives in. Without cloud.json nothing is added, rather
 # than every Google Cloud customer.
 google_ranges() {
-  local goog cloud cidr
+  local goog cloud cidr gl cl
   if ! command -v curl >/dev/null || ! command -v jq >/dev/null; then
     unresolved+=("meta:google (needs curl and jq)"); return 0
   fi
   goog="$(curl -fsS --max-time 15 https://www.gstatic.com/ipranges/goog.json 2>/dev/null)" || { unresolved+=("meta:google (fetch failed)"); return 0; }
   cloud="$(curl -fsS --max-time 15 https://www.gstatic.com/ipranges/cloud.json 2>/dev/null)" || { unresolved+=("meta:google (cloud.json fetch failed)"); return 0; }
+  # A 200 that isn't the list (a captive portal, a new schema) parses to
+  # nothing; an empty cloud list would let awk read goog's lines as cloud's.
+  gl="$(jq -r '.prefixes[].ipv4Prefix // empty' <<<"$goog" 2>/dev/null)" || gl=""
+  cl="$(jq -r '.prefixes[].ipv4Prefix // empty' <<<"$cloud" 2>/dev/null)" || cl=""
+  [[ -n "$gl" ]] || { unresolved+=("meta:google (goog.json has no ranges)"); return 0; }
+  [[ -n "$cl" ]] || { unresolved+=("meta:google (cloud.json has no ranges)"); return 0; }
   while read -r cidr; do
     [[ "$cidr" =~ $ipv4 ]] && add "$cidr" meta:google
   done < <(awk '
@@ -146,7 +152,7 @@ google_ranges() {
     BEGIN { n = 0 }
     FNR == NR { cl[n] = lo($1); ch[n] = hi($1); n++; next }
     { s = lo($1); e = hi($1); for (i = 0; i < n; i++) if (s <= ch[i] && cl[i] <= e) next; print $1 }
-  ' <(jq -r '.prefixes[].ipv4Prefix // empty' <<<"$cloud" 2>/dev/null) <(jq -r '.prefixes[].ipv4Prefix // empty' <<<"$goog" 2>/dev/null))
+  ' <(printf '%s\n' "$cl") <(printf '%s\n' "$gl"))
 }
 
 resolve() {

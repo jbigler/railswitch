@@ -2,12 +2,15 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/render"
+	"github.com/jbigler/railswitch/internal/safefile"
 )
 
 // SetupAgainResult is what AgentSetupAgain did.
@@ -60,6 +63,25 @@ func (l *L) AgentSetupAgain(ctx context.Context, slug, name string, all bool) (*
 		}
 	}
 	return r, nil
+}
+
+// AgentSetupLog is agent name's last setup run's output in worktree slug
+// (render.AgentSetupLog in its home): the agent's name, and nil when there
+// is none. The agent writes its home: the log is read as hostile (no
+// symlink, bounded); print it through safefile.Printable.
+func (l *L) AgentSetupLog(ctx context.Context, slug, name string) (string, []byte, error) {
+	m, in, err := l.load(ctx, slug)
+	if err != nil {
+		return "", nil, err
+	}
+	if name, err = l.agentName(m, name); err != nil {
+		return "", nil, &UsageError{Msg: err.Error()}
+	}
+	data, err := safefile.Read(filepath.Join(in.Values["agent.home"], name, render.AgentSetupLog), safefile.Limit)
+	if errors.Is(err, fs.ErrNotExist) {
+		return name, nil, nil
+	}
+	return name, data, err
 }
 
 // clearSetupMarkers removes the setup markers from home, an agent's home,

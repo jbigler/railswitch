@@ -76,7 +76,7 @@ var completionFlags = map[string][]string{
 	"agent default apply":    {"--all"},
 	"agent default promote":  {"--all"},
 	"agent usage":            {"--all", "--days="},
-	"agent setup":            {"--again", "--all"},
+	"agent setup":            {"--again", "--all", "--log"},
 	"build":                  {"--force", "--pull"},
 	"containerfile eject":    {"--force"},
 	"containerfile show":     {"--default"},

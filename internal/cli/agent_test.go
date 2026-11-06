@@ -149,12 +149,26 @@ func TestAgentSetupCLI(t *testing.T) {
 		t.Errorf("no home: exit %d out %q err %q", code, out, errs)
 	}
 	mustRun(t, "-C", ws, "render")
-	marker := filepath.Join(ws, ".railswitch", "agent-home", "feat", "claude", ".railswitch-setup-00")
+	home := filepath.Join(ws, ".railswitch", "agent-home", "feat", "claude")
+	marker := filepath.Join(home, ".railswitch-setup-00")
 	if err := os.WriteFile(marker, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if code, out, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--log"); code != 0 || out != "claude has no setup log in feat\n" {
+		t.Errorf("--log without one: exit %d out %q", code, out)
+	}
+	// The log is the agent's: control characters are printed as spaces.
+	if err := os.WriteFile(filepath.Join(home, ".railswitch-setup.log"), []byte("setup claude: true\nsetup claude: exit 1: \x1b[2Jx\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--log", "claude"); code != 0 || out != "setup claude: true\nsetup claude: exit 1:  [2Jx\n" {
+		t.Errorf("--log: exit %d out %q", code, out)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--log", "--again"); code != 2 {
+		t.Errorf("--log --again: exit %d; want 2", code)
+	}
 	code, out, errs = runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--again", "claude")
-	if code != 0 || out != "setup runs again at claude's next start in: feat\n" {
+	if code != 0 || out != "the last setup run's end (railswitch agent setup --log claude):\nsetup claude: true\nsetup claude: exit 1:  [2Jx\nsetup runs again at claude's next start in: feat\n" {
 		t.Errorf("agent setup --again: exit %d out %q err %q", code, out, errs)
 	}
 	if _, err := os.Lstat(marker); !os.IsNotExist(err) {

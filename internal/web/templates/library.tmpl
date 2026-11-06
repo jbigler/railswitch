@@ -57,7 +57,7 @@
 {{end}}{{with .App}}<dt>App</dt><dd><span class="mono">{{.Service}}</span> · <span class="mono">{{.Server}}</span> on port {{.Port}}</dd>
 <dt>Health</dt><dd class="mono">{{.Health}}</dd>
 {{end}}{{if .Slot}}<dt>Slot</dt><dd>{{.Slot}} · service <span class="mono">{{.Service}}</span></dd>
-{{end}}{{range .Runtimes}}<dt>Runtime</dt><dd><span class="mono">{{.Name}}</span> from <span class="mono">{{range $i, $f := .From}}{{if $i}}, {{end}}{{$f}}{{end}}</span>{{if .Fallback}} · fallback {{.Fallback}}{{end}}</dd>
+{{end}}{{range .Runtimes}}<dt>Runtime</dt><dd><span class="mono">{{.Name}}</span> from <span class="mono">{{range $i, $f := .From}}{{if $i}}, {{end}}{{$f}}{{end}}</span>{{if .Fallback}} · fallback {{.Fallback}}{{end}}{{with .DropSuffix}} · drops a trailing <span class="mono">{{.}}</span>{{end}}</dd>
 {{end}}{{range .Ports}}<dt>Port</dt><dd><span class="mono">{{.Name}}</span> {{.Base}} + worktree ID{{if .Container}} → {{.Container}}{{end}}</dd>
 {{end}}{{with .Pin}}<dt>Pin</dt><dd><span class="mono">{{.Name}}</span> default {{.Default}}</dd>
 {{end}}{{if .Gives}}<dt>Gives</dt><dd class="mono">{{range $i, $g := .Gives}}{{if $i}}, {{end}}{{$g}}{{end}}</dd>

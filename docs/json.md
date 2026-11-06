@@ -741,7 +741,10 @@ reading adds the growth since the last one to the local day of the status
 file's `ts` (today's when `ts` is 0, in the future or past the 90 days
 kept). Each session's counter is compared with its own last reading
 (D187), so two sessions writing one status file in turn don't count each
-other's totals again; a session first read counts all of its counter. A
+other's totals again; a session first read counts all of its counter,
+except right after the upgrade to session ids: a session first read with
+an id goes on from its worktree and agent's last reading without one when
+that isn't higher (the same session, now named), once. A
 status file without a `session` (an older package) is compared with the
 agent's last reading instead: a count that drops (or a cost that drops)
 is a new session, all of its counter new, and a new session that already

@@ -208,6 +208,19 @@ func (f *file) apply(samples []Sample, now time.Time) bool {
 	for _, s := range samples {
 		key := s.key()
 		prev, seen := f.Last[key]
+		// The upgrade to per-session keys (D187): a session first read with
+		// a session id goes on from the reading its worktree and agent had
+		// without one, when it isn't lower (the same session, now named), so
+		// its tokens so far don't count twice. Once only: that reading goes.
+		if legacy := s.Worktree + "/" + s.Agent; !seen && legacy != key {
+			if l, ok := f.Last[legacy]; ok {
+				if !lower(s.Usage, l.Usage) {
+					prev, seen = l, true
+				}
+				delete(f.Last, legacy)
+				changed = true
+			}
+		}
 		cur := fromStatus(s.Usage)
 		delta := cur
 		if seen && !lower(s.Usage, prev.Usage) {

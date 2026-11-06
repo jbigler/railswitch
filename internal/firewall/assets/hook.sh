@@ -299,7 +299,7 @@ last_rule() { block "$1" | sed -e 's/^[[:space:]]*//' -e '/^$/d' | tail -n 1; }
 line_of() { block output | grep -nF -- "$1" | head -n 1 | cut -d: -f1; }
 floor_set="$(set_text floor4)"
 for f in "${FLOOR[@]}"; do
-  grep -qF -- "$f" <<<"$floor_set" || die "verify: floor4 lacks $f"
+  grep -qwF -- "$f" <<<"$floor_set" || die "verify: floor4 lacks $f"
 done
 fl="$(line_of '@floor4')"; al="$(line_of '@allow4')"; tl="$(line_of '@allowt4')"; dl="$(line_of '@allowd4')"
 [[ -n "$fl" && -n "$al" && -n "$tl" && -n "$dl" && "$fl" -lt "$al" && "$fl" -lt "$tl" && "$fl" -lt "$dl" ]] || die "verify: the floor rule is not ahead of the allow rules"

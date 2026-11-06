@@ -730,6 +730,7 @@ type detailView struct {
 	AgentTerms                        []agentTerm  // an agent terminal per configured agent
 	TermWindowURL                     string       // the term action: a window on the desktop
 	AgentStopURL                      string       // POST agent=<name>: railswitch agent stop <name> (D176)
+	AgentSetupURL                     string       // POST agent=<name>: railswitch agent setup --again <name> (D187)
 	RunningAgent                      *agentTerm   // the agent running in this worktree (one at most, D62); nil: none
 	RemoveURL, TasksURL               string       // RemoveURL "" for the base worktree
 	DownURL                           string
@@ -849,6 +850,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 	}
 	v.TermWindowURL = path + "/act/term"
 	v.AgentStopURL = path + "/agent-stop"
+	v.AgentSetupURL = path + "/agent-setup"
 	tty := "/p/" + prefix + "/tty/" + wt.Slug + "/"
 	// One per configured agent: each is a service agent-<name> (on demand
 	// or not), so the page can open any of them.

@@ -18,7 +18,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch [--json] agent usage [--days N] [--all] | railswitch agent queue add|ls|rm|clear|next | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch [--json] agent usage [--days N] [--all] | railswitch agent queue add|ls|rm|clear|next | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent setup --again [<name>] [--all] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -58,6 +58,8 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		return cmdAgentQueue(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "usage":
 		return cmdAgentUsage(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "setup":
+		return cmdAgentSetup(ctx, e, args[1:])
 	}
 	a, code, ok := agentArgs(e, args)
 	if !ok {
@@ -126,6 +128,44 @@ func cmdAgentUpdate(ctx context.Context, e *env, args []string) int {
 	}
 	if err := l.AgentUpdate(ctx, slug, fs.Arg(0)); err != nil {
 		return e.failCommand(err)
+	}
+	return 0
+}
+
+// railswitch agent setup --again [<name>] [--all]: the agent's
+// [agents.<name>] setup runs again at its next start in the worktree
+// (--all: every worktree) (D187). --again is required: setup alone
+// would read as running it now.
+func cmdAgentSetup(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("agent setup")
+	again := fs.Bool("again", false, "run the setup again at the agent's next start")
+	all := fs.Bool("all", false, "in every worktree of the project")
+	pos, code, ok := parseMixed(fs, args)
+	if !ok {
+		return code
+	}
+	if !*again || len(pos) > 1 {
+		return e.usageErr("usage: railswitch agent setup --again [<name>] [--all]")
+	}
+	l, slug, code := e.lifecycle(ctx, "agent setup")
+	if code != 0 {
+		return code
+	}
+	r, err := l.AgentSetupAgain(ctx, slug, strings.Join(pos, ""), *all)
+	if err != nil {
+		var u *lifecycle.UsageError
+		if errors.As(err, &u) {
+			return e.usageErr("%s", u.Msg)
+		}
+		return e.fail(err)
+	}
+	if len(r.Cleared) == 0 {
+		fmt.Fprintf(e.stdout, "%s has not run here yet: its setup runs at its first start\n", r.Agent)
+		return 0
+	}
+	fmt.Fprintf(e.stdout, "setup runs again at %s's next start in: %s\n", r.Agent, strings.Join(r.Cleared, ", "))
+	if len(r.Running) > 0 {
+		fmt.Fprintf(e.stdout, "%s is running in: %s; stop it (railswitch agent stop %s) and start it again\n", r.Agent, strings.Join(r.Running, ", "), r.Agent)
 	}
 	return 0
 }

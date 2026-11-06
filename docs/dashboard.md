@@ -268,7 +268,11 @@ still wider than the window scrolls its pane.
     "No agent running" and a **Start <name>** per configured agent (the
     first one filled), each opening its terminal. Agents are the
     services `agent-<name>`, on demand or not; with none listed, the
-    agent the overview names, else the default. Then the worktree's
+    agent the overview names, else the default. Under the box,
+    "Setup:" and **Run <name>'s setup again** per agent (D187): after a
+    confirm, `railswitch agent setup --again <name>` as a job, the name
+    checked against `agent ls`; its setup commands run at the agent's
+    next start (an agent with none reports so). Then the worktree's
     usage from `agent usage` (`<n> tokens today · <m> in 14 days`,
     ` · $<cost>` when reported, yellow with `⚠` while `runaway`), the
     queue, and the **Default config…** link beside the card's label.

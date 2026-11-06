@@ -123,10 +123,49 @@ func TestAgentStopCLI(t *testing.T) {
 	}
 }
 
+// TestAgentSetupCLI: --again is required; no setup list is a usage error;
+// a home with markers loses them and says when setup runs.
+func TestAgentSetupCLI(t *testing.T) {
+	ws, _ := lockedWS(t)
+	for _, args := range [][]string{{"agent", "setup"}, {"agent", "setup", "--again", "a", "b"}} {
+		if code, _, _ := runIn(t, append([]string{"-C", ws, "-w", "feat"}, args...)...); code != 2 {
+			t.Errorf("%q: exit %d; want 2", args, code)
+		}
+	}
+	if code, _, errs := runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--again", "claude"); code != 2 || !strings.Contains(errs, "no setup commands") {
+		t.Errorf("no setup list: exit %d err %q", code, errs)
+	}
+	toml := filepath.Join(ws, "project.toml")
+	data, err := os.ReadFile(toml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(toml, []byte(strings.Replace(string(data), "[agents.claude]\n", "[agents.claude]\nsetup = [\"true\"]\n", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "lock")
+	code, out, errs := runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--again")
+	if code != 0 || !strings.Contains(out, "has not run here yet") {
+		t.Errorf("no home: exit %d out %q err %q", code, out, errs)
+	}
+	mustRun(t, "-C", ws, "render")
+	marker := filepath.Join(ws, ".railswitch", "agent-home", "feat", "claude", ".railswitch-setup-00")
+	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errs = runIn(t, "-C", ws, "-w", "feat", "agent", "setup", "--again", "claude")
+	if code != 0 || out != "setup runs again at claude's next start in: feat\n" {
+		t.Errorf("agent setup --again: exit %d out %q err %q", code, out, errs)
+	}
+	if _, err := os.Lstat(marker); !os.IsNotExist(err) {
+		t.Errorf("marker: %v", err)
+	}
+}
+
 func TestCompleteAgent(t *testing.T) {
 	ws, _ := lockedWS(t)
 	t.Chdir(ws)
-	if got, want := complete(t, "agent", ""), []string{"add", "claude", "default", "ls", "probe", "queue", "screen", "send", "stop", "update", "usage"}; !slices.Equal(got, want) {
+	if got, want := complete(t, "agent", ""), []string{"add", "claude", "default", "ls", "probe", "queue", "screen", "send", "setup", "stop", "update", "usage"}; !slices.Equal(got, want) {
 		t.Errorf("agent: %q; want %q", got, want)
 	}
 	if got := complete(t, "agent", "claude", ""); len(got) != 0 {

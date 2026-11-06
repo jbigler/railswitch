@@ -125,6 +125,7 @@ func New(c Config) *Server {
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-stop", s.agentStop)
+	m.HandleFunc("POST /p/{prefix}/{slug}/agent-setup", s.agentSetup)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
 	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
@@ -616,6 +617,18 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 // agentStop stops one of the worktree's agents (D176): `agent stop
 // <name>`, the name checked against its agent ls.
 func (s *Server) agentStop(w http.ResponseWriter, r *http.Request) {
+	s.agentJob(w, r, "stop agent ", "stop")
+}
+
+// agentSetup has the agent's setup commands run again at its next start
+// (`agent setup --again <name>`, D187).
+func (s *Server) agentSetup(w http.ResponseWriter, r *http.Request) {
+	s.agentJob(w, r, "setup again ", "setup", "--again")
+}
+
+// agentJob runs `agent <verb...> <name>` as a job for the form's agent,
+// one of the worktree's `agent ls`.
+func (s *Server) agentJob(w http.ResponseWriter, r *http.Request, label string, verb ...string) {
 	p, wt, ok := s.lookup(w, r)
 	if !ok {
 		return
@@ -635,8 +648,8 @@ func (s *Server) agentStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.start(w, r, jobs.Spec{
-		Project: p.Prefix, Slug: wt.Slug, Label: "stop agent " + name, Dir: p.Workspace,
-		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "agent", "stop", name},
+		Project: p.Prefix, Slug: wt.Slug, Label: label + name, Dir: p.Workspace,
+		Argv: append(append([]string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "agent"}, verb...), name),
 	}, nil, worktreePath(p, wt.Slug))
 }
 

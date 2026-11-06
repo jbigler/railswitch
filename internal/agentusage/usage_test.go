@@ -333,3 +333,33 @@ func TestRetireKeepsSessions(t *testing.T) {
 		t.Errorf("last %v", f.Last)
 	}
 }
+
+// TestApplyUpgradeHandsOver (D187): the session read before the upgrade
+// (no id) goes on under its id without counting again; a lower count under
+// a new id is another session, all new; the old reading is used once.
+func TestApplyUpgradeHandsOver(t *testing.T) {
+	now := at("2026-11-04", 10)
+	named := func(id string, in int64) Sample {
+		s := sample("a", "x", in, 0, now)
+		s.Usage.Session = id
+		return s
+	}
+	f := file{Last: map[string]last{}}
+	f.apply([]Sample{sample("a", "x", 1000, 0, now)}, now) // before the upgrade: 1000
+	f.apply([]Sample{named("s1", 1040)}, now)              // the same session, now named: +40
+	if _, ok := f.Last["a/x"]; ok {
+		t.Error("the reading without a session survived the handover")
+	}
+	f.apply([]Sample{named("s2", 5)}, now) // another session: all of it
+	if got, want := rowsOf(&f)["2026-11-04 a x"], int64(1000+40+5); got != want {
+		t.Errorf("total %d; want %d", got, want)
+	}
+
+	// A first named count below the old reading is a new session: all new.
+	g := file{Last: map[string]last{}}
+	g.apply([]Sample{sample("a", "x", 1000, 0, now)}, now)
+	g.apply([]Sample{named("s3", 30)}, now)
+	if got, want := rowsOf(&g)["2026-11-04 a x"], int64(1000+30); got != want {
+		t.Errorf("lower first count: total %d; want %d", got, want)
+	}
+}

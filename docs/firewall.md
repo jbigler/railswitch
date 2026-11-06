@@ -82,6 +82,21 @@ app uses beside it (`["accounts.google.com", "meta:google"]`). Without
 dnsmasq nothing changes: containers resolve any name, and `doctor` warns.
 Installing it takes effect at the next render and container start.
 
+An entry `meta:<name>` is a provider's published address ranges instead,
+fetched by the host when a container starts (it needs `curl` and `jq`;
+offline, it is skipped and named in `hook.log`). Use it for a provider
+that answers each lookup from a large rotating pool, where the address
+resolved at start is often not the one the app gets a moment later:
+
+| Entry | Ranges |
+|---|---|
+| `meta:github` | GitHub's web, API and git ranges (`api.github.com/meta`) |
+| `meta:google` | Google's own services: `goog.json` without every range that overlaps `cloud.json`, so not the Google Cloud addresses any rented server lives in. Without `cloud.json` nothing is added (D180). It still opens every Google front end, and those also serve what anyone can publish on Google: App Engine (`*.appspot.com`), Cloud Run (`*.run.app`), Firebase Hosting (`*.web.app`), Apps Script and Forms. The firewall checks addresses, not names, so a container with `meta:google` can send data to such a page. Use it for the app when it needs Google; avoid it in an `agent` list |
+| `meta:datadog-us5` | Datadog US5's API ranges |
+
+For example, an app that signs in with Google at start:
+`allow.app = ["accounts.google.com", "meta:google"]`.
+
 ## Mode
 
 | Mode | What it does |
@@ -115,10 +130,12 @@ agent's own firewall is only as strong as the app's.
   above). A container started before D179 has no set for timed
   allows: restart it first.
 - Settings, Firewall card (docs/dashboard.md): the mode, each list, and
-  "Blocked, or would be under enforce" with an Allow button per resolved
-  host. Edits are staged and applied like any other Settings edit
-  (`firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`:
-  docs/json.md).
+  "Blocked, or would be under enforce" with, per resolved host, "Add to
+  <list> list" (staged and applied like any other Settings edit:
+  `firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`,
+  docs/json.md; a container gets it from its next start) and, in a
+  container under enforce, "Allow for" 10 minutes, 1 hour or until it
+  restarts: `fw allow` in the running container, now (D184).
 
 ## Sharing
 

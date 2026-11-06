@@ -127,7 +127,7 @@ exists, else an option under `options/<name>/`).
 {
   "ref": "rails@1", "kind": "pack", "source": "built in", "path": "",
   "app": {"service": "rails", "server": "bin/dev", "port": 3000, "health": "curl -fsS http://localhost:3000/up"},
-  "runtimes": [{"name": "bun", "from": [".bun-version", "package.json:packageManager.bun"], "fallback": ""}],
+  "runtimes": [{"name": "bun", "from": [".bun-version", "package.json:packageManager.bun"], "fallback": "", "drop_suffix": ""}],
   "ports": [{"name": "debug", "base": 33000, "container": 0}, {"name": "app", "base": 13000, "container": 3000}],
   "pin": null, "gives": [], "readme": ""
 }
@@ -141,7 +141,7 @@ exists, else an option under `options/<name>/`).
 | `path` | string | A local package's directory; `""` for a built-in. |
 | `app` | object | A pack's app: `service`, `server`, `port`, `health`. Absent for an option. |
 | `slot`, `service` | string | An option's slot and service id. Absent for a pack. |
-| `runtimes` | array | A pack's version chains, by name: `name`, `from` (sources, in order), `fallback` (`""`: none). |
+| `runtimes` | array | A pack's version chains, by name: `name`, `from` (sources, in order), `fallback` (`""`: none), `drop_suffix` (the regexp whose match is cut off the end of a value read from a source, D178; `""`: none). |
 | `ports` | array | Published ports: `name`, `base` (the host port is `base` + worktree ID), `container` (`0` for `same_port`). |
 | `pin` | object or null | An option's version pin: `name`, `default`. |
 | `gives` | array of strings | The env names an option gives the app, sorted. |

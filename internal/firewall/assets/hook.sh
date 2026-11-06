@@ -147,12 +147,14 @@ unresolved=()
 
 add() { allow+=("$1"); labels+=("$1 $2"); }
 
-# GitHub and Datadog publish their ranges; resolving one hostname would miss
-# most of them. Needs curl and jq on the host; without them, or offline, the
-# entry is skipped and named in the log.
+# GitHub, Google and Datadog publish their ranges; resolving one hostname
+# would miss most of them (Google answers each lookup from a rotating pool).
+# Needs curl and jq on the host; without them, or offline, the entry is
+# skipped and named in the log.
 meta_ranges() {
   local url filter json cidr
   case "$1" in
+    google)       google_ranges; return 0 ;;
     github)       url=https://api.github.com/meta
                   filter='(.web + .api + .git)[]' ;;
     datadog-us5)  url=https://ip-ranges.us5.datadoghq.com/api.json
@@ -166,6 +168,34 @@ meta_ranges() {
   while read -r cidr; do
     [[ "$cidr" =~ $ipv4 ]] && add "$cidr" "meta:$1"
   done < <(jq -r "$filter" <<<"$json" 2>/dev/null)
+}
+
+# google_ranges adds Google's own service ranges: goog.json without every
+# range that overlaps cloud.json, Google Cloud's customer space, which any
+# server rented there lives in. Without cloud.json nothing is added, rather
+# than every Google Cloud customer.
+google_ranges() {
+  local goog cloud cidr gl cl
+  if ! command -v curl >/dev/null || ! command -v jq >/dev/null; then
+    unresolved+=("meta:google (needs curl and jq)"); return 0
+  fi
+  goog="$(curl -fsS --max-time 15 https://www.gstatic.com/ipranges/goog.json 2>/dev/null)" || { unresolved+=("meta:google (fetch failed)"); return 0; }
+  cloud="$(curl -fsS --max-time 15 https://www.gstatic.com/ipranges/cloud.json 2>/dev/null)" || { unresolved+=("meta:google (cloud.json fetch failed)"); return 0; }
+  # A 200 that isn't the list (a captive portal, a new schema) parses to
+  # nothing; an empty cloud list would let awk read goog's lines as cloud's.
+  gl="$(jq -r '.prefixes[].ipv4Prefix // empty' <<<"$goog" 2>/dev/null)" || gl=""
+  cl="$(jq -r '.prefixes[].ipv4Prefix // empty' <<<"$cloud" 2>/dev/null)" || cl=""
+  [[ -n "$gl" ]] || { unresolved+=("meta:google (goog.json has no ranges)"); return 0; }
+  [[ -n "$cl" ]] || { unresolved+=("meta:google (cloud.json has no ranges)"); return 0; }
+  while read -r cidr; do
+    [[ "$cidr" =~ $ipv4 ]] && add "$cidr" meta:google
+  done < <(awk '
+    function lo(c,  a, p) { split(c, a, "/"); split(a[1], p, "."); return ((p[1] * 256 + p[2]) * 256 + p[3]) * 256 + p[4] }
+    function hi(c,  a) { split(c, a, "/"); return lo(c) + 2 ^ (32 - a[2]) - 1 }
+    BEGIN { n = 0 }
+    FNR == NR { cl[n] = lo($1); ch[n] = hi($1); n++; next }
+    { s = lo($1); e = hi($1); for (i = 0; i < n; i++) if (s <= ch[i] && cl[i] <= e) next; print $1 }
+  ' <(printf '%s\n' "$cl") <(printf '%s\n' "$gl"))
 }
 
 names=()      # host names, for the DNS filter

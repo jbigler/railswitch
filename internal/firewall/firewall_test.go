@@ -492,6 +492,66 @@ esac
 	}
 }
 
+// TestHookMetaGoogle: meta:google is goog.json without every range that
+// overlaps cloud.json (Google Cloud's customers); without cloud.json,
+// nothing.
+func TestHookMetaGoogle(t *testing.T) {
+	ranges, err := filepath.Abs(filepath.Join("testdata", "ipranges"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name       string
+		cloud      string // "": the fixture; "fail": the fetch fails; else the body served
+		want, none []string
+		why        string // in hook.log
+	}{
+		{"cloud subtracted", "", []string{"8.8.8.0/24", "74.125.0.0/16"}, []string{"34.64.0.0/10", "35.192.0.0/14", "2001:4860"}, ""},
+		{"no cloud.json", "fail", nil, []string{"8.8.8.0/24", "74.125.0.0/16", "34.64.0.0/10"}, "meta:google (cloud.json fetch failed)"},
+		// A 200 that isn't the list: without the check, goog's lines were read as cloud's.
+		{"cloud.json not the list", "<html>sign in to the wifi</html>", nil, []string{"8.8.8.0/24", "74.125.0.0/16", "34.64.0.0/10"}, "meta:google (cloud.json has no ranges)"},
+	} {
+		out := filepath.Join(t.TempDir(), "nft.out")
+		bin := t.TempDir()
+		// curl -fsS --max-time 15 <url>: the fixture named by the URL's file.
+		curl := "#!/bin/bash\nu=\"${@: -1}\"\nf=\"$RANGES/${u##*/}\"\n[[ ${CLOUD:-} == fail && $f == */cloud.json ]] && exit 22\n[[ -n ${CLOUD:-} && $f == */cloud.json ]] && { printf %s \"$CLOUD\"; exit 0; }\ncat \"$f\"\n"
+		if err := os.WriteFile(filepath.Join(bin, "curl"), []byte(curl), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		env := append(hookEnv(t, out), "RANGES="+ranges)
+		for i, kv := range env {
+			if strings.HasPrefix(kv, "PATH=") {
+				env[i] = "PATH=" + bin + ":" + strings.TrimPrefix(kv, "PATH=")
+			}
+		}
+		if c.cloud != "" {
+			env = append(env, "CLOUD="+c.cloud)
+		}
+		root := t.TempDir()
+		if msg, err := runHook(t, root, env, map[string]string{
+			"filial.firewall": "none", "filial.firewall.mode": "log",
+			"filial.firewall.networks": "filial-feat-dev", "filial.firewall.extra": "meta:google",
+		}); err != nil {
+			t.Fatalf("%s: hook: %v\n%s", c.name, err, msg)
+		}
+		rules, _ := os.ReadFile(out)
+		allow := string(rules)[strings.Index(string(rules), "set allow4"):strings.Index(string(rules), "set local4")]
+		for _, w := range c.want {
+			if !strings.Contains(allow, w) {
+				t.Errorf("%s: allow4 lacks %s:\n%s", c.name, w, allow)
+			}
+		}
+		for _, n := range c.none {
+			if strings.Contains(allow, n) {
+				t.Errorf("%s: allow4 has %s:\n%s", c.name, n, allow)
+			}
+		}
+		if log, _ := os.ReadFile(filepath.Join(root, "hook.log")); c.why != "" && !strings.Contains(string(log), c.why) {
+			t.Errorf("%s: log does not say why:\n%s", c.name, log)
+		}
+	}
+}
+
 // TestHookFloor (D179): the hook's FLOOR is config.FirewallFloor, its
 // floor4 set holds it, and the floor rule comes before every allow rule,
 // after the container's own networks; the output chain ends in the deny

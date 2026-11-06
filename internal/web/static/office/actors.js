@@ -51,9 +51,10 @@ export function agentAndroid(k, desk = {}) {
   g.tick = (dt, t) => {
     const waits = state === 'permission' || state === 'question';
     ring.color.copy(base).multiplyScalar(waits ? 0.6 + Math.abs(Math.sin(t * 4)) * 0.8 : 1);
-    // Stand to work, sit otherwise; waiting on you keeps the posture it had.
+    // Stand to work, sit otherwise; waiting on you finishes the move it was
+    // in to the nearer end and holds there (never a half-crouch).
     const u = g.userData;
-    const want = state === 'working' ? 0 : waits ? raw : 1;
+    const want = state === 'working' ? 0 : waits ? Math.round(raw) : 1;
     raw += Math.max(-dt / SIT_TIME, Math.min(dt / SIT_TIME, want - raw));
     const s = (u.sit = raw * raw * (3 - 2 * raw)); // eased, no jolt at either end
     u.floorY ??= g.position.y;

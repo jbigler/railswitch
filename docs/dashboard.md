@@ -1187,7 +1187,7 @@ any open page.
     android does. The desk is a sit-stand one (D183): while the agent
     works, its android stands and types, the desk raised to standing height
     with its screens and the chair pushed back; otherwise it sits, the desk
-    down. Waiting on you, it stays as it was. Its eyes and ring show the
+    down. Waiting on you, it finishes rising or sitting, whichever is nearer, and stays so. Its eyes and ring show the
     agent's state (pulsing while it waits on you); it opens the agent's state and message and the agent
     itself in a live terminal (D149): a running service agent's session at
     once, else after **Connect** (connecting runs `up`), with **Open

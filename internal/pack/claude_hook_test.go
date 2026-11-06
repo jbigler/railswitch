@@ -3,12 +3,14 @@ package pack
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -255,6 +257,39 @@ func TestHookSession(t *testing.T) {
 	// No session_id (an older Claude): the counts alone.
 	if u := run(`{"hook_event_name":"Stop","transcript_path":` + tp + `}`); len(u) != 4 {
 		t.Errorf("no session: %v", u)
+	}
+}
+
+// The transcript is read in time linear in its length: a 20k-message one
+// takes well under a second. The old reduce copied its map on every line,
+// several times slower and quadratic; 10 s leaves CI room.
+func TestHookLongTranscript(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("jq not on PATH")
+	}
+	var b strings.Builder
+	for i := range 20000 {
+		fmt.Fprintf(&b, `{"type":"assistant","timestamp":"2026-11-04T10:00:00Z","message":{"id":"m%d","usage":{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":3,"cache_creation_input_tokens":4}}}`+"\n", i)
+	}
+	tr := filepath.Join(t.TempDir(), "long.jsonl")
+	if err := os.WriteFile(tr, []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "claude.json")
+	tp, _ := json.Marshal(tr)
+	cmd := exec.Command("bash", claudeHook)
+	cmd.Stdin = strings.NewReader(`{"hook_event_name":"Stop","session_id":"s","transcript_path":` + string(tp) + `}`)
+	cmd.Env = append(withoutStatus(os.Environ()), "RAILSWITCH_STATUS_FILE="+file)
+	start := time.Now()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("hook took %v on 20k messages", d)
+	}
+	data, _ := os.ReadFile(file)
+	if !strings.Contains(string(data), `"input":20000,"output":40000,"cache_read":60000,"cache_write":80000`) || !strings.Contains(string(data), `"context":8`) {
+		t.Errorf("status %s", data)
 	}
 }
 

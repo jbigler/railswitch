@@ -44,9 +44,10 @@ Stop | SessionStart)
     # last one) is skipped instead of losing the whole count
     usage=$(jq -cnR --arg session "$session" --argjson now "$(date +%s)" --argjson prev "$prevusage" '
       def n: numbers // 0;
-      reduce (inputs | fromjson? | objects) as $l ({by: {}, last: null, first: null};
+      # $m is bound in the generator: an "as" in the body would copy .by on
+      # every line, quadratic in the transcript
+      reduce (inputs | fromjson? | objects | [., (.message // {})]) as [$l, $m] ({by: {}, last: null, first: null};
         .first //= ([$l.timestamp | strings | sub("\\.[0-9]+"; "") | try fromdateiso8601 catch empty][0])
-        | ($l.message // {}) as $m
         | if $l.type == "assistant" and ($m | type) == "object" and ($m.id | type) == "string" and ($m.usage | type) == "object" then
             .by[$m.id] = $m.usage
             # a subagent request (a sidechain) is not the session context

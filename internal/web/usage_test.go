@@ -185,3 +185,28 @@ func TestUsageMaths(t *testing.T) {
 		t.Errorf("pageQuery = %q", q)
 	}
 }
+
+// The range links keep the sort and carry one query: days=7 and a sort
+// that isn't the default.
+func TestUsageRangeLinks(t *testing.T) {
+	f := newFixture(t)
+	f.cli.set(usageCmd, ftestUsage())
+	sub := f.s.subscribe("ftest", "b", parseSort("-pr"), 7, "")
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(context.Background())
+	evs := drain(sub)
+	for _, id := range []string{"usage", "detail"} {
+		e, _ := byID(evs, id)
+		for _, want := range []string{`href="/p/ftest/b?days=7&amp;sort=-pr" data-days="7" class="on"`, `href="/p/ftest/b?sort=-pr" data-days="14"`, `href="/p/ftest/b?days=30&amp;sort=-pr" data-days="30"`} {
+			if !strings.Contains(e.HTML, want) {
+				t.Errorf("%s lacks %q", id, want)
+			}
+		}
+		if strings.Count(e.HTML, "?days=7?") > 0 || strings.Contains(e.HTML, "-pr?") {
+			t.Errorf("%s has a second ?: %s", id, e.HTML)
+		}
+	}
+	if u, _ := byID(evs, "usage"); !strings.Contains(u.HTML, `<a href="/p/ftest/b?days=7&amp;sort=-pr" data-usage-wt="b">`) {
+		t.Errorf("segment link: %s", u.HTML)
+	}
+}

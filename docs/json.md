@@ -750,9 +750,11 @@ session that ends between two readings loses its growth since the last
 one. Each sum is capped at 10^15.
 
 `wt rm` renames a removed worktree's rows `<name> (removed <YYYY-MM-DD>)`,
-marked `removed`, and forgets its counters, under the same lock (D187):
-the project keeps its usage, and a new worktree of the same name starts
-at zero.
+marked `removed`, and forgets its counter without a session, under the
+same lock (D187): the project keeps its usage, and a new worktree of the
+same name starts at zero. Its sessions' counters stay (unique ids no new
+worktree matches), so a reading taken before the removal and recorded
+after it adds nothing.
 
 The file is `~/.local/share/railswitch/usage/<prefix>.json` (0600, its
 directory 0700, written atomically under `<prefix>.json.lock`): one JSON

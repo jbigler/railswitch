@@ -271,9 +271,14 @@ func TestRetire(t *testing.T) {
 	if err := Retire(path, "a", now); err != nil {
 		t.Fatal(err)
 	}
-	// The same session's status again (a new worktree named a reusing the
-	// status file's last value) counts as new, under a.
+	// A poll that read a's status before it was removed records after
+	// Retire (the race with wt rm): its session was counted, nothing more.
 	if err := Record(path, []Sample{s(150, now)}, now); err != nil {
+		t.Fatal(err)
+	}
+	// A new worktree named a, its own session: from zero.
+	fresh := Sample{Worktree: "a", Agent: "x", Usage: agentstatus.Usage{Input: 40, Session: "T"}, TS: now.Unix()}
+	if err := Record(path, []Sample{fresh}, now); err != nil {
 		t.Fatal(err)
 	}
 	rep, err := Read(path, 2, "", now)
@@ -285,7 +290,7 @@ func TestRetire(t *testing.T) {
 		got[w.Worktree] = w
 	}
 	old := got["a (removed 2026-11-04)"]
-	if !old.Removed || old.Total != 150 || old.Today != 50 || got["a"].Removed || got["a"].Total != 150 || got["b"].Total != 7 || len(got) != 3 {
+	if !old.Removed || old.Total != 150 || old.Today != 50 || got["a"].Removed || got["a"].Total != 40 || got["b"].Total != 7 || len(got) != 3 {
 		t.Errorf("worktrees %+v", rep.Worktrees)
 	}
 	for _, r := range rep.Rows {
@@ -311,5 +316,20 @@ func TestApplyCapsSessions(t *testing.T) {
 	}
 	if _, ok := f.Last["a/x/s999"]; !ok {
 		t.Error("the newest session was dropped")
+	}
+}
+
+// Retire drops a worktree's counter without a session (an older package's
+// status file), not its sessions'.
+func TestRetireKeepsSessions(t *testing.T) {
+	f := file{Last: map[string]last{}}
+	now := at("2026-11-04", 10)
+	f.apply([]Sample{sample("a", "x", 5, 0, now), {Worktree: "a", Agent: "x", Usage: agentstatus.Usage{Input: 9, Session: "S"}, TS: now.Unix()}, sample("ab", "x", 1, 0, now)}, now)
+	f.retire("a", now)
+	_, legacy := f.Last["a/x"]
+	_, session := f.Last["a/x/S"]
+	_, other := f.Last["ab/x"]
+	if legacy || !session || !other {
+		t.Errorf("last %v", f.Last)
 	}
 }

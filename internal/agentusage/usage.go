@@ -157,7 +157,8 @@ func Record(path string, samples []Sample, now time.Time) error {
 }
 
 // Retire renames worktree's rows in the file at path to "<worktree>
-// (removed <today>)", marked removed, and forgets its counters, under the
+// (removed <today>)", marked removed, and forgets its counters without a
+// session (retire says why the others stay), under the
 // file's lock (D187): the project's totals keep its usage, and a new
 // worktree of the same name starts at zero.
 func Retire(path, worktree string, now time.Time) error {
@@ -286,9 +287,14 @@ func (f *file) capSessions() bool {
 }
 
 func (f *file) retire(worktree string, now time.Time) bool {
+	// Session counters stay: a poll that read the worktree's status before
+	// it was removed and records after this would otherwise count its
+	// sessions again under the old name. Session ids are unique, so a new
+	// worktree of that name never matches them. Only the counters without
+	// a session go.
 	changed := false
 	for k := range f.Last {
-		if strings.HasPrefix(k, worktree+"/") {
+		if strings.HasPrefix(k, worktree+"/") && strings.Count(k, "/") == 1 {
 			delete(f.Last, k)
 			changed = true
 		}

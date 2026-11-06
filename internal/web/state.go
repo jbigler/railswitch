@@ -685,11 +685,11 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 		usage = p.usage
 	}
 	wtURL := func(slug string) string { return "/p/" + prefix + "/" + slug + pageQuery(k, days) }
-	pv.Usage = newUsage(usage, days, usageLinks(wtURL(sel), k, days), wtURL)
+	pv.Usage = newUsage(usage, days, usageLinks("/p/"+prefix+"/"+sel, k, days), wtURL)
 	for _, r := range rows {
 		if r.WT.Slug == sel {
 			pv.Detail = newDetail(prefix, r, projectPRRepo(rows))
-			pv.Detail.UsageCard = newUsageCard(usage, sel, days, usageLinks(wtURL(sel), k, days), r.WT.Agent, s.c.Now())
+			pv.Detail.UsageCard = newUsageCard(usage, sel, days, usageLinks("/p/"+prefix+"/"+sel, k, days), r.WT.Agent, s.c.Now())
 			pv.Detail.Switching = s.switching(prefix, sel)
 		}
 	}

@@ -225,7 +225,7 @@ document.addEventListener("click", (e) => {
   // The usage range (D187): kept in the URL and this browser, and the
   // stream restarts to send the usage views for it.
   const daysLink = t.closest("a[data-days]");
-  if (daysLink) {
+  if (daysLink && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
     e.preventDefault();
     body.dataset.days = daysLink.dataset.days;
     remember(daysStore, daysLink.dataset.days);

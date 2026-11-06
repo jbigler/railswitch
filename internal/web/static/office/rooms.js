@@ -789,6 +789,11 @@ export async function lab(slug, n, ui) {
   const top = agentDesk.getObjectByName('Desk_SitStand_Top'); // absent in a set without the piece: then nothing rises
   if (top) for (const o of onTop) top.attach(o);
   const chair = put(k, scene, 'Furn_Chair', -10.25, 0, 6.6, -PI / 2);
+  // It moves (pushed back for the agent to stand): a collider is read once,
+  // so it would stay where the chair was. The partner keeps walkers off it.
+  const chairCols = [];
+  chair.traverse((c) => { if (/_COL\d*$/.test(c.name)) chairCols.push(c); });
+  for (const c of chairCols) c.removeFromParent();
   pickable(agentDesk, 'Agent console: open it here or in a terminal window', () => ui.agent(slug));
   const theirs = pickable(wallScreen(scene, -11.92, 2.7, 6.6, PI / 2, 1.6, 0.9), 'Agent console: open it here or in a terminal window', () => ui.agent(slug));
   const partner = agentAndroid(k, { top, travel: k.point('Furn_Desk_SitStand', 'stand')[1] - deskTop, chair });

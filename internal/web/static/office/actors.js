@@ -48,6 +48,7 @@ export function agentAndroid(k, desk = {}) {
     visor.color.copy(base);
     ring.color.copy(base);
   };
+  const back = new THREE.Vector3(); // the chair's push-back, reused every frame
   g.tick = (dt, t) => {
     const waits = state === 'permission' || state === 'question';
     ring.color.copy(base).multiplyScalar(waits ? 0.6 + Math.abs(Math.sin(t * 4)) * 0.8 : 1);
@@ -64,7 +65,7 @@ export function agentAndroid(k, desk = {}) {
     if (desk.top) desk.top.position.y = topY + (desk.travel ?? 0) * (1 - s);
     if (desk.chair) { // pushed back as it stands, pulled in to sit
       chairHome ??= desk.chair.position.clone();
-      const back = new THREE.Vector3(Math.sin(g.rotation.y), 0, Math.cos(g.rotation.y)).multiplyScalar(-0.4 * (1 - s));
+      back.set(Math.sin(g.rotation.y), 0, Math.cos(g.rotation.y)).multiplyScalar(-0.4 * (1 - s));
       desk.chair.position.copy(chairHome).add(back);
     }
   };

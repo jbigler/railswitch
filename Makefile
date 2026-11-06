@@ -4,7 +4,7 @@ VERSION ?= dev
 # step with the workflows' install step.
 STATICCHECK_VERSION = 2026.2.2
 
-.PHONY: check build test
+.PHONY: check build test live
 
 check:
 	test -z "$$(gofmt -l cmd internal)"
@@ -19,3 +19,7 @@ test:
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "-X github.com/jbigler/railswitch/internal/buildinfo.Version=$(VERSION)" -o railswitch ./cmd/railswitch
+
+# The dashboard on test fixtures, for a look in a browser (internal/web/live_test.go).
+live:
+	RS_LIVE=1 go test ./internal/web -run '^TestLive$$' -count=1 -timeout 0 -v

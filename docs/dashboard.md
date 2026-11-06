@@ -1358,6 +1358,17 @@ for the page, which puts it in Jellyfin's URLs (`ApiKey` and `api_key`: a
 `<video>` can't send a header). Give it a key you would let your browser
 hold.
 
+### Looking at pages in a browser
+
+`make live` serves the dashboard on test fixtures at
+`http://127.0.0.1:7799/p/ftest` (`internal/web/live_test.go`; another
+address with `RS_LIVE_ADDR`) until stopped. Every request gets the
+guard's Host, cookie and Origin, so a plain browser gets through. It
+embeds the static files when built: rerun it after an edit. In the
+office, `?cam=x,y,z&look=x,y,z` holds the camera there, whatever the
+mode or the view the page remembered, e.g. the agent's desk:
+`/p/ftest/virtual-office/cyberpunk/?cam=-9.55,1.95,5.75&look=-10.95,0.85,6.65#floor/b`.
+
 ## Commands
 
 The commands the dashboard reads and runs. Their `--json` output is in

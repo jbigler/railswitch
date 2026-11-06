@@ -77,10 +77,12 @@ agent's own firewall is only as strong as the app's.
   not ranges. A container started before D179 has no set for timed
   allows: restart it first.
 - Settings, Firewall card (docs/dashboard.md): the mode, each list, and
-  "Blocked, or would be under enforce" with an Allow button per resolved
-  host. Edits are staged and applied like any other Settings edit
-  (`firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`:
-  docs/json.md).
+  "Blocked, or would be under enforce" with, per resolved host, "Add to
+  <list> list" (staged and applied like any other Settings edit:
+  `firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`,
+  docs/json.md; a container gets it from its next start) and, in a
+  container under enforce, "Allow for" 10 minutes, 1 hour or until it
+  restarts: `fw allow` in the running container, now (D184).
 
 ## Sharing
 

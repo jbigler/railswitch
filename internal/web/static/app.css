@@ -79,6 +79,8 @@ tr.sel td:first-child{box-shadow:inset 3px 0 var(--accent);font-weight:800}
 .msg{margin-top:4px;padding:6px 8px;background:var(--bg2);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere}
 .actions{display:flex;flex-wrap:wrap;align-items:center}
 .actions form,.job-hd form{display:inline;margin-left:6px}
+.fw-live{display:inline-flex;align-items:center;gap:4px}
+.fw-live .ln{margin:0}
 .gap{width:14px}
 .actions.top{margin:8px 0 2px}
 

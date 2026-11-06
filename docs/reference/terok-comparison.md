@@ -11,7 +11,7 @@ and decision row:
 | 4 | Check the live ruleset | Built: #140, D179 |
 | 5 | Stand-in tokens | Set aside (below) |
 | 6 | Git gate | Set aside (below) |
-| 7 | `railswitch panic` | Built: #143, D181 |
+| 7 | `railswitch panic` | Built: #143, D181 (cuts every running container off the network and pauses it, not only agents; restarting the worktree undoes it) |
 | 8 | Empty `/etc/hosts` | Built: #143, D181 (`--hosts-file=none`, not `--no-hosts`) |
 
 Also from this work: `meta:google` (#142, D180), Google's service ranges
@@ -72,8 +72,9 @@ closed. Until this note, nothing in this repo mentioned terok.
 ## Candidates
 
 Ranked by value for the effort. Each item adopted gets a D-row in
-`docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`. The last row is
-D175.
+`docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`. Each item's
+"Gap" describes main before #140 to #144; the line numbers and claims there
+no longer hold once those merge.
 
 ### 1. An address floor no allow entry can open (small)
 
@@ -201,17 +202,20 @@ a deadline:
 The containers stay on disk for forensics.
 
 **Shape:** stop every agent container across projects by exact name (the
-registry knows them) and switch each firewall table to drop-all. Follow
+registry knows them) and switch each firewall table to drop-all. *As built
+(D181):* every running container is quarantined and paused rather than
+stopped, since Quadlet restarts a stopped or crashed one with normal rules. Follow
 the AGENTS.md rule: never `--filter`. Needs `--json`, and a synopsis in
 `help.go`.
 
-### 8. Empty `/etc/hosts` (trivial, unverified)
+### 8. Empty `/etc/hosts` (trivial)
 
 **terok:** `--hosts-file none` keeps host-private names out of containers.
 
-**Unverified:** whether Quadlet at podman 5.3 exposes this as a key or
-needs `PodmanArgs=`. Containers reach each other by DNS on the dev
-network, so check that nothing reads `/etc/hosts` first.
+**Settled (D181):** Quadlet has no key for it, so it is
+`PodmanArgs=--hosts-file=none`, which podman 5.3 has. `/etc/hosts` still
+holds `localhost`, the container's own name and `host.containers.internal`;
+service names resolve through aardvark, so nothing else read it.
 
 ## Not worth taking
 

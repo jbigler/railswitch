@@ -24,6 +24,14 @@ for name, fn, col in ASSETS:
     objs[name] = a.build()
     add_colliders(objs[name], col)
 
+# The sit-stand desk: the frame, with its top a child node (Desk_SitStand_Top)
+# kit.js moves between sitting and standing height (SITSTAND_TRAVEL above).
+# The collider is the frame at its standing height: walkers stay clear at both.
+ss = Asset('Furn_Desk_SitStand'); sitstand_base(ss); objs['Furn_Desk_SitStand'] = ss.build()
+top = Asset('Desk_SitStand_Top'); sitstand_top(top)
+attach(top.build(), objs['Furn_Desk_SitStand'], (0, 0, 0))
+add_colliders(objs['Furn_Desk_SitStand'], [(1.6, SITSTAND_LOW + SITSTAND_TRAVEL, .75, 0, (SITSTAND_LOW + SITSTAND_TRAVEL) / 2, 0)])
+
 ft = Asset('Arch_Floor_4m'); floor_tile(ft); f = ft.build(); f.data.transform(Matrix.Rotation(-math.pi / 2, 4, 'X'))
 objs['Arch_Floor_4m'] = f
 add_colliders(f, [(4, .1, 4, 0, -.05, 0)])

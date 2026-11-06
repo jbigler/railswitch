@@ -53,8 +53,8 @@ export const KIT_NAMES = ['Arch_Floor_4m', 'Arch_Wall_Plain_4m', 'Arch_Wall_Plai
   'Arch_Ceiling_Sprinkler_4m', 'Arch_Ceiling_Fan', 'Arch_Ceiling_Vent', 'Arch_WallPipes_4m',
   'Light_CeilingPanel', 'Light_PendantBox',
   'Tech_ServerRack', 'Tech_ServerRack_B', 'Tech_ToolCart', 'Tech_TerminalKiosk', 'Tech_MonitorBank',
-  'Tech_MonitorStack', 'Tech_Laptop', 'Tech_MonitorWall_A',
-  'Furn_Workstation_Lived', 'Furn_Workstation_Lived_B', 'Furn_Desk', 'Furn_CoffeeTable',
+  'Tech_MonitorStack', 'Tech_Laptop', 'Tech_Keyboard', 'Tech_MonitorWall_A',
+  'Furn_Workstation_Lived', 'Furn_Workstation_Lived_B', 'Furn_Desk', 'Furn_Desk_SitStand', 'Furn_CoffeeTable',
   'Deco_Boxes', 'Deco_Crate', 'Deco_MiniFridge', 'Deco_CorkBoard', 'Deco_NeonSign', 'Deco_Extinguisher', 'Deco_DeskLamp', 'Deco_Mug',
   'Pet_Cat_Walk', 'Pet_Cat_Sitting', 'Pet_Dog_Walk', 'Pet_Dog_Lying', 'Furn_DogBed', 'Deco_PetBowls', 'Pet_Parrot_Fly',
   'Furn_ParrotPerch', 'Pet_Cat_Curled', 'Pet_Aquarium', 'Pet_JellyfishTank', 'Pet_Gecko_Terrarium',
@@ -348,7 +348,7 @@ function residents(k, scene, deco, ui, androids) {
   for (let i = 0; i < androids; i++) {
     const a = wanderer(k, models[(deco.seed + i) % 3], rng(deco.seed + 31 * i), ui.say);
     scene.add(a);
-    roam(a, null, { start: { ...starts[i], ry: deco.r() * PI * 2 }, speed: 0.8, stride: 1.1, height: 1.9, radius: 0.3, idle: [3, 10], shy: 1.4 });
+    roam(a, null, { start: { ...starts[i], ry: deco.r() * PI * 2 }, speed: 0.8, stride: 1.1, height: 1.9, radius: 0.3, idle: [3, 10], shy: 1.4, bob: 0.03, sway: 0.035 });
   }
   return { ticks, start: () => later.forEach((f) => f()) };
 }
@@ -775,15 +775,29 @@ export async function lab(slug, n, ui) {
   const desk = put(k, scene, deco.pick(['Furn_Workstation_Lived', 'Furn_Workstation_Lived_B']), -10.7, 0, 3.9, PI / 2);
   pickable(desk, 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
   const mine = pickable(wallScreen(scene, -11.92, 2.65, 3.9, PI / 2, 2.2, 1.2), 'Your desk: terminal, Neovim, links', () => ui.desk(slug));
-  const agentDesk = put(k, scene, 'Furn_Desk', -10.95, 0, 6.6, PI / 2);
-  const deskTop = k.point('Furn_Desk', 'top')[1]; // the agent's desk
-  put(k, scene, 'Tech_MonitorStack', -10.75, deskTop, 6.6, PI / 2);
-  put(k, scene, 'Deco_DeskLamp', -11.05, deskTop, 5.6, 2.6 + PI / 2);
-  put(k, scene, 'Deco_Mug', -10.7, deskTop, 7.4);
+  // The agent's desk is a sit-stand one (Furn_Desk_SitStand): its top, and
+  // what stands on it, rises while the agent works and it stands to it.
+  const agentDesk = put(k, scene, 'Furn_Desk_SitStand', -10.95, 0, 6.6, PI / 2);
+  const deskTop = k.point('Furn_Desk_SitStand', 'top')[1];
+  const onTop = [
+    put(k, scene, 'Tech_MonitorStack', -10.95, deskTop, 6.6, PI / 2),
+    put(k, scene, 'Deco_DeskLamp', -11.15, deskTop, 5.95, 2.6 + PI / 2),
+    put(k, scene, 'Deco_Mug', -10.75, deskTop, 7.2),
+    put(k, scene, 'Tech_Keyboard', -10.75, deskTop, 6.6, PI / 2), // at the front edge, its keys to the agent
+  ];
+  agentDesk.updateMatrixWorld(true);
+  const top = agentDesk.getObjectByName('Desk_SitStand_Top'); // absent in a set without the piece: then nothing rises
+  if (top) for (const o of onTop) top.attach(o);
+  const chair = put(k, scene, 'Furn_Chair', -10.25, 0, 6.6, -PI / 2);
+  // It moves (pushed back for the agent to stand): a collider is read once,
+  // so it would stay where the chair was. The partner keeps walkers off it.
+  const chairCols = [];
+  chair.traverse((c) => { if (/_COL\d*$/.test(c.name)) chairCols.push(c); });
+  for (const c of chairCols) c.removeFromParent();
   pickable(agentDesk, 'Agent console: open it here or in a terminal window', () => ui.agent(slug));
   const theirs = pickable(wallScreen(scene, -11.92, 2.7, 6.6, PI / 2, 1.6, 0.9), 'Agent console: open it here or in a terminal window', () => ui.agent(slug));
-  const partner = agentAndroid(k);
-  partner.position.set(-9.95, 0, 6.6);
+  const partner = agentAndroid(k, { top, travel: k.point('Furn_Desk_SitStand', 'stand')[1] - deskTop, chair });
+  partner.position.set(-10.25, 0, 6.6); // a third of a metre from the desk's front edge: its hands reach it
   partner.rotation.y = -PI / 2; // faces its monitors
   partner.userData.block = true;
   pickable(partner, 'Your agent partner: status, screen, type to it', () => ui.agent(slug));

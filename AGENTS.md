@@ -9,7 +9,8 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - Features: `docs/dashboard.md`, `docs/packs.md`, `docs/templates.md`, `docs/libraries.md`, `docs/firewall.md`, `docs/nvim.md`, and `docs/completion.md`. The user guide is `docs/guide/`.
 
 ## Commands
-- `make check` runs `gofmt -l` (must print nothing), `go vet ./...`, `staticcheck ./...`, and `go test ./...`. Staticcheck runs through `go run` at the Makefile's `STATICCHECK_VERSION`, so there is nothing to install.
+- `make check` runs `gofmt -l` (must print nothing), `go vet ./...`, `staticcheck ./...`, `go test ./...`, and `node --test internal/web/jstest/*.test.js`. Staticcheck runs through `go run` at the Makefile's `STATICCHECK_VERSION`, so there is nothing to install. The JS tests need Node 18 or later and no packages.
+- The dashboard's JS logic that needs no page lives in `internal/web/static/logic.js` (an ES module `app.js` imports); test it in `internal/web/jstest/` with `node:test`. No npm, no `package.json`.
 - `make build` writes `./railswitch`. `VERSION=` sets `buildinfo.Version`.
 - `--help`: every `e.flags(name)` has a line in `internal/cli/help.go` `synopses` with its arguments (`TestEveryFlagSetHasSynopsis` checks). Flags print with `--`; one dash still parses.
 - Integration tests carry `//go:build integration`. The full end-to-end test needs a systemd user session, so you run it by hand.

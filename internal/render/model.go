@@ -922,7 +922,7 @@ func (m *Model) values(wt Worktree) (*Instance, error) {
 				v[name], v[name+".major"] = "", ""
 				continue
 			}
-			val, src = r.Value, "runtimes."+name+" ("+r.Source+")"
+			val, src = ch.Value(r.Value), "runtimes."+name+" ("+r.Source+")"
 		}
 		if err := setVersion(name, val, src); err != nil {
 			return nil, err

@@ -456,6 +456,9 @@ type runtimeDoc struct {
 	Name     string   `json:"name"`
 	From     []string `json:"from"`
 	Fallback string   `json:"fallback"`
+	// DropSuffix is the regexp whose match is cut off the end of a value
+	// read from a source (D178); "": none.
+	DropSuffix string `json:"drop_suffix"`
 }
 
 type pinDoc struct {
@@ -540,7 +543,7 @@ func showDoc(cat *pack.Catalog, ref pack.Ref) (*packDoc, error) {
 		doc.Kind, files, ports = "pack", p.Files, p.Ports
 		doc.App = &packAppDoc{Service: p.App.Service, Server: p.App.Server, Port: p.App.Port, Health: p.App.Health}
 		for _, n := range slices.Sorted(maps.Keys(p.Runtimes)) {
-			doc.Runtimes = append(doc.Runtimes, runtimeDoc{Name: n, From: orEmpty(p.Runtimes[n].From), Fallback: p.Runtimes[n].Fallback})
+			doc.Runtimes = append(doc.Runtimes, runtimeDoc{Name: n, From: orEmpty(p.Runtimes[n].From), Fallback: p.Runtimes[n].Fallback, DropSuffix: p.Runtimes[n].DropSuffix})
 		}
 	} else {
 		o, err := cat.Option(ref)

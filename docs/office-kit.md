@@ -40,7 +40,7 @@ it changes everywhere at once:
 |---|---|---|
 | `RS_Neon_Accent` | neon strips, outlines, fan rings | `setAccent` |
 | `RS_LED_Accent` | status LEDs, the black cat's eyes | `setAccent` |
-| `RS_Screen`, `RS_Screen_UI`, `RS_Screen_Term` | screens: a grayscale emissive texture tinted by the emissive color | `setAccent` |
+| `RS_Screen`, `RS_Screen_UI`, `RS_Screen_Term`, `RS_Screen_Chart`, `RS_Screen_Nodes`, `RS_Screen_Table` | screens: a grayscale emissive texture tinted by the emissive color; a monitor group deals the six in shuffled rounds, so neighbours differ | `setAccent` |
 | `RS_Neon_Secondary` | violet trim, the sign, jellyfish tentacles | `setSecondary` |
 | `RS_FloorDisplay` | the elevator's floor number: blank, for a canvas texture | – |
 | `RS_RackDisplay`, `RS_VendScreen`, `RS_ArcadeScreen` | a rack's status display, a vending machine's menu, an arcade's screen: blank, the page draws on them | – |
@@ -77,7 +77,8 @@ them all; `kit.setElevatorDoors(node, 0..1)` opens a landing or the cab.
 | `Jelly_<n>_T1`…`T8` | each tentacle sways on its own and flares as its bell contracts |
 | `CatWalk_Leg_FL`…`_BR`, `DogWalk_Leg_FL`…`_BR` | trot from the root's `userData.gait` and `phase` |
 | `ParrotFly_Wing_L`, `ParrotFly_Wing_R` | spread and beat from the root's `userData.flap` |
-| `<Android>_Head`, `_Arm_L/R`, `_Leg_L/R` | the androids walk (legs and arms in opposite phase) from an ancestor's `userData.gait` and `phase`; arms type while `userData.typing`; heads look around |
+| `<Android>_Head`, `_Arm_L/R`, `_Leg_L/R`, and under them `_Forearm_L/R`, `_Shin_L/R` (D183) | the androids walk from an ancestor's `userData.gait` and `phase`: hips and shoulders in opposite phase, the knee bending through the swing and straightening to land, soft elbows; a roamer given `bob` and `sway` also dips the body twice a stride and rolls it over the standing foot. Arms type while `userData.typing`; `userData.sit` (0 to 1) folds the legs to sit on a chair and rests the forearms; heads look around. A set whose androids lack the forearm and shin nodes walks as before, each limb swung whole |
+| `Desk_SitStand_Top` (under `Furn_Desk_SitStand`) | the sit-stand desk's top, raised from sitting (its `top` point, 0.74 m) to standing (its `stand` point, 1.1 m) by the page; what stands on it rides with it |
 
 ## Roaming
 
@@ -116,7 +117,7 @@ relative to the floor piece.
   node `GlassDoor` with its collider, under a transom); floor-to-ceiling,
   frames only at the ends, the joints, floor and ceiling; centred on their
   line, seen from both sides.
-- **Furn**: `Desk`, `Chair`, `Workstation_2Mon`, `Workstation_3Mon`,
+- **Furn**: `Desk`, `Desk_SitStand` (a frame with a top that rises, D183), `Chair`, `Workstation_2Mon`, `Workstation_3Mon`,
   `Workstation_Lived`, `Workstation_Lived_B`, `Sofa`, `Sofa_Short`,
   `CoffeeTable`, `Bookshelf`, `CatTree`, `DogBed`, `ParrotPerch`.
 - **Tech**: `Monitor`, `WallDisplay`, `MonitorStack` (desk-top), `MonitorWall_A`,
@@ -159,7 +160,8 @@ relative to the floor piece.
   `Deco_CoatRack` (a jacket, a cap, a scarf), `Deco_Whiteboard` (a 2.4 ×
   1.2 m dark glass board in glowing marker: a diagram, a checklist), `Deco_Backpack`, `Furn_Stool`, `Deco_BookStack`,
   `Deco_PizzaBoxes`. No plant has a white pot.
-- **Char**: humanoid androids, simple but anatomical (one smooth shell for
+- **Char**: humanoid androids, simple but anatomical, jointed at the
+  knees and elbows (one smooth shell for
   chest, waist and hips; a sculpted face with glowing eyes and round ear
   units; dark glowing joints; neck cables; about 6.7k triangles, over the
   hero budget). `Android_Agent` (the agent's partner: its eyes

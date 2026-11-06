@@ -774,6 +774,11 @@ func TestHookDNSFilter(t *testing.T) {
 	if _, err := os.Stat(pidFile); err == nil {
 		t.Error("the pid file survived poststop")
 	}
+	// hook.log says what poststop did (ended it, or found it gone: the
+	// watcher may have been first), with the pid it read.
+	if log, _ := os.ReadFile(filepath.Join(root, "hook.log")); !strings.Contains(string(log), "0123456789ab stop: ") || !strings.Contains(string(log), "(pid "+strings.TrimSpace(string(pid))+")") {
+		t.Errorf("hook.log has no stop line for the filter's pid:\n%s", log)
+	}
 	if p := strings.TrimSpace(string(pid)); p != "" {
 		if err := exec.Command("kill", "-0", p).Run(); err == nil {
 			t.Errorf("the filter (pid %s) still runs after poststop", p)

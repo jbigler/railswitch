@@ -81,7 +81,9 @@ Arch, Fedora and Debian's are), every container firewalled under
   the hook starts beside it ends it within a second of the container's
   process, should that hook not run. Both send SIGKILL: dnsmasq can start
   with SIGTERM blocked. (A dnsmasq left running kept a one-shot unit,
-  `deps`, from ever finishing.)
+  `deps`, from ever finishing.) `hook.log` gets a line for each stop:
+  `<id> stop: ended the DNS filter (pid N)`, or `was already gone` when
+  the watcher was first.
 
 A `meta:<name>` entry adds addresses, not names: list the host names the
 app uses beside it (`["accounts.google.com", "meta:google"]`). Without

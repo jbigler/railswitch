@@ -249,11 +249,14 @@ yours: templates leave them out.
 
 ## Claude's instructions
 
-railswitch's instructions for Claude (the browser, the container) are
+railswitch's instructions for Claude (the browser, the firewall, git
+worktrees) are
 refreshed on every start as `~/.claude/railswitch.md`, and
 `~/.claude/CLAUDE.md` imports them with one line, `@railswitch.md`.
 The rest of `CLAUDE.md` is yours: lines a tool adds there (`rtk init`'s
-`@RTK.md`, say) or you write survive restarts.
+`@RTK.md`, say) or you write survive restarts. They tell it how a blocked host shows
+(a name that doesn't resolve, or a refused connection) and to ask you to
+allow the host rather than retry.
 
 ## A default config for every worktree
 

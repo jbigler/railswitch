@@ -17,6 +17,9 @@ allow = [
   "github.com",
   "api.github.com",
   "codeload.github.com",
+  "release-assets.githubusercontent.com",   # gh: release files (gh extension install, gh release download)
+  "objects.githubusercontent.com",          # gh: older release files and LFS
+  "actions.githubusercontent.com",          # gh run view --log (results-receiver.*); subdomains resolve too
 ]
 
 [image]                       # built on the agent base image

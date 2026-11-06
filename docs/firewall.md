@@ -179,6 +179,13 @@ agent's own firewall is only as strong as the app's.
   `allow` gained `meta:anthropic` and `platform.claude.com`. Until
   `railswitch lock --accept`, the agent runs the old copy, which allows only
   the addresses `api.anthropic.com` and `claude.ai` resolve to at its start.
+- A project with the `claude` agent gets another pending review (D189):
+  its `allow` gained GitHub's download hosts,
+  `release-assets.githubusercontent.com`, `objects.githubusercontent.com`
+  and `actions.githubusercontent.com`, which `gh` needs for extensions,
+  release files and Actions logs. The job logs API's redirect to Azure blob
+  storage stays blocked: those addresses are shared with every storage
+  account. `gh run view --log-failed` gives the same output.
 
 ## Panic (D181)
 

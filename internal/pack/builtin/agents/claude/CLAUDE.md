@@ -31,12 +31,9 @@ NET_ADMIN.
   fails at once too ("Connection refused" / "No route to host" /
   "administratively prohibited"). Either is the firewall, not an outage or
   a typo: do not retry or work around it.
-- Tools often hide the host behind their own message. `gh` downloads
-  release files from `release-assets.githubusercontent.com` and Actions
-  logs from `results-receiver.actions.githubusercontent.com`, not
-  `api.github.com`; a "failed to download" or "unable to retrieve" there is
-  usually the firewall. Find the host (`--verbose`, `GH_DEBUG=api`, or
-  `curl -v`) before you report it.
+- Tools often hide the host behind their own message ("failed to
+  download", "unable to retrieve"). Find the host (`--verbose`,
+  `GH_DEBUG=api`, or `curl -v`) before you report it.
 - If you need a host, name it and ask the human to add it to
   `[agents.<name>] allow` in project.toml (`<name>` is the value of
   `$RAILSWITCH_AGENT`), then restart you. `railswitch fw allow

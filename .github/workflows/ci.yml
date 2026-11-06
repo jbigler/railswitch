@@ -23,6 +23,12 @@ jobs:
           go install honnef.co/go/tools/cmd/staticcheck@2026.2.2
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - run: make check
+      # Again with dnsmasq on the host: a test that reads the host (the DNS
+      # filter's check looks for a real dnsmasq) must not change with it.
+      - name: Go tests with dnsmasq installed
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq dnsmasq-base
+          go test -count=1 ./...
 
   quadlet:
     runs-on: ubuntu-latest
@@ -37,3 +43,20 @@ jobs:
       - run: go test -v -tags integration ./internal/render/ -run TestQuadletDryRun
         env:
           RAILSWITCH_QUADLET: /usr/libexec/podman/quadlet
+
+  # The firewall hook under a real podman, crun and dnsmasq: crun starts
+  # hooks with SIGTERM blocked, which unit tests' stand-ins can't show.
+  firewall-live:
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/podman/stable:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: dnf install -y -q dnsmasq nftables util-linux procps-ng
+      - run: go test -v -count=1 -tags integration ./internal/firewall/ -run TestLiveDNSFilterEnds
+        env:
+          RAILSWITCH_LIVE_REQUIRED: "1"

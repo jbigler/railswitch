@@ -1,0 +1,3 @@
+# Branches each append decision rows at the roadmap table's end: keep both
+# sides' lines on merge. internal/roadmap_test.go checks the result.
+docs/superpowers/plans/*-roadmap.md merge=union

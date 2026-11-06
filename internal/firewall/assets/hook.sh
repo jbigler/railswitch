@@ -101,10 +101,14 @@ DNSDIR="$STATE/dns"
 # container is already gone.
 if [[ "${3:-}" == stop ]]; then
   if [[ -f "$DNSDIR/$cid.pid" ]]; then
-    dpid="$(cat "$DNSDIR/$cid.pid" 2>/dev/null)"
+    dpid="$(cat "$DNSDIR/$cid.pid" 2>/dev/null)" || true
     # SIGKILL: dnsmasq can start with SIGTERM blocked (a signal mask it
     # inherits from whatever runs the hooks), and then a plain kill does nothing.
-    [[ "$dpid" =~ ^[0-9]+$ ]] && kill -KILL "$dpid" 2>/dev/null || true
+    if [[ "$dpid" =~ ^[0-9]+$ ]] && kill -KILL "$dpid" 2>/dev/null; then
+      log "$cid stop: ended the DNS filter (pid $dpid)"
+    else
+      log "$cid stop: the DNS filter (pid ${dpid:-none}) was already gone"
+    fi
   fi
   rm -f "$DNSDIR/$cid.conf" "$DNSDIR/$cid.pid" "$DNSDIR/$cid.log"
   exit 0

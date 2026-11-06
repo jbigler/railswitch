@@ -621,7 +621,7 @@ func (s *Server) agentStop(w http.ResponseWriter, r *http.Request) {
 }
 
 // agentSetup has the agent's setup commands run again at its next start
-// (`agent setup --again <name>`, D187).
+// (`agent setup --again <name>`, D188).
 func (s *Server) agentSetup(w http.ResponseWriter, r *http.Request) {
 	s.agentJob(w, r, "setup again ", "setup", "--again")
 }

@@ -22,7 +22,7 @@ type SetupAgainResult struct {
 
 // AgentSetupAgain has agent name's [agents.<name>] setup (D133) run again
 // at its next start in worktree slug (all: every worktree), by removing
-// the setup markers from its home there (D187). A worktree whose agent
+// the setup markers from its home there (D188). A worktree whose agent
 // never ran has no home: its setup runs at the first start anyway.
 func (l *L) AgentSetupAgain(ctx context.Context, slug, name string, all bool) (*SetupAgainResult, error) {
 	m, err := l.model(ctx)

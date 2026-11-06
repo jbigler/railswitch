@@ -134,7 +134,7 @@ func cmdAgentUpdate(ctx context.Context, e *env, args []string) int {
 
 // railswitch agent setup --again [<name>] [--all]: the agent's
 // [agents.<name>] setup runs again at its next start in the worktree
-// (--all: every worktree) (D187); it prints the end of the last run's log
+// (--all: every worktree) (D188); it prints the end of the last run's log
 // first. railswitch agent setup --log [<name>]: that log. --again or --log
 // is required: setup alone would read as running it now.
 func cmdAgentSetup(ctx context.Context, e *env, args []string) int {

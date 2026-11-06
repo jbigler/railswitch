@@ -131,6 +131,23 @@ type PackImage struct {
 type Chain struct {
 	From     []string `toml:"from"`
 	Fallback string   `toml:"fallback"`
+	// DropSuffix (runtimes only) is a regexp: the end of the value that
+	// matches it is dropped, e.g. "-otp-[0-9]+" for a version manager that
+	// writes 1.18.4-otp-28 where an image tag wants 1.18.4 (D178).
+	DropSuffix string `toml:"drop_suffix"`
+}
+
+// Value is v without the end DropSuffix matches; v when it has none (Load
+// refuses a DropSuffix that doesn't compile).
+func (c Chain) Value(v string) string {
+	if c.DropSuffix == "" {
+		return v
+	}
+	re, err := regexp.Compile("(?:" + c.DropSuffix + ")$")
+	if err != nil {
+		return v
+	}
+	return re.ReplaceAllString(v, "")
 }
 
 // Volume.Data values; "" means DataPersistent.

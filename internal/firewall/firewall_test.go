@@ -523,6 +523,14 @@ func TestHookFloor(t *testing.T) {
 func TestHookVerifies(t *testing.T) {
 	for name, edit := range map[string]func(string) string{
 		"floor range missing": func(r string) string { return strings.Replace(r, "169.254.0.0/16,", "", 1) },
+		// 0.0.0.0/8 is also the tail of 10.0.0.0/8: a substring match missed it.
+		"0.0.0.0/8 missing": func(r string) string {
+			i := strings.Index(r, "{ 0.0.0.0/8,10.0.0.0/8")
+			if i < 0 {
+				t.Fatalf("floor4 not listed as expected:\n%s", r)
+			}
+			return r[:i+2] + r[i+len("{ 0.0.0.0/8,"):]
+		},
 		"floor after allow": func(r string) string {
 			r = strings.Replace(r, "    ip daddr @floor4 goto deny\n", "", 1)
 			return strings.Replace(r, "    ip daddr @allowt4 accept\n", "    ip daddr @allowt4 accept\n    ip daddr @floor4 goto deny\n", 1)

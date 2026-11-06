@@ -34,7 +34,7 @@ resolved at start is often not the one the app gets a moment later:
 | Entry | Ranges |
 |---|---|
 | `meta:github` | GitHub's web, API and git ranges (`api.github.com/meta`) |
-| `meta:google` | Google's own services: `goog.json` without every range that overlaps `cloud.json`, so not the Google Cloud addresses any rented server lives in. Without `cloud.json` nothing is added (D180) |
+| `meta:google` | Google's own services: `goog.json` without every range that overlaps `cloud.json`, so not the Google Cloud addresses any rented server lives in. Without `cloud.json` nothing is added (D180). It still opens every Google front end, and those also serve what anyone can publish on Google: App Engine (`*.appspot.com`), Cloud Run (`*.run.app`), Firebase Hosting (`*.web.app`), Apps Script and Forms. The firewall checks addresses, not names, so a container with `meta:google` can send data to such a page. Use it for the app when it needs Google; avoid it in an `agent` list |
 | `meta:datadog-us5` | Datadog US5's API ranges |
 
 For example, an app that signs in with Google at start:

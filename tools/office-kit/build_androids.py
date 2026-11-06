@@ -1,9 +1,12 @@
 # Androids: humanoid, after the references: anatomical armour plates (metaball
 # shapes) over an exposed mechanical core, cables at the neck and waist,
 # glowing joints, a sculpted face with glowing eyes and round ear units.
-# Nodes Head, Arm_L/R, Leg_L/R (pivots at the neck, shoulders, hips) for
-# kit.js: legs and arms walk from the root's gait and phase; the agent's arms
-# type while it works. exec build_kit.py first, in the same globals.
+# Nodes Head, Arm_L/R, Leg_L/R (pivots at the neck, shoulders, hips), each
+# limb with its lower half as a child, Forearm_L/R and Shin_L/R (pivots at
+# the elbows and knees), for kit.js: a walk that bends the knees and swings
+# soft elbows, from the root's gait and phase; the agent's arms type while it
+# works, and its legs fold when it sits. exec build_kit.py first, in the same
+# globals.
 use_collection('CyberOfficeAndroids')
 
 AM = dict(
@@ -93,49 +96,66 @@ def head_fn(name, shell, core, eyes, glow):
     return o
 
 
-def arm_fn(name, s, shell, core, glow):
-    """Deltoid, biceps and a tapering forearm as one smooth limb; a dark elbow,
-    simple fingers."""
+ELBOW_Y, KNEE = -.3, (0, -.46, .025)  # the lower limbs' pivots, from the shoulder and hip
+
+
+def arm_fn(name, fore_name, s, shell, core, glow):
+    """Deltoid and biceps as the upper arm; a child forearm (fore_name, its
+    pivot the dark elbow) tapering to simple fingers. The upper arm with its
+    forearm attached."""
     a = Asset(name)
-    e = Vector((s * .008, -.3, 0))
-    d = Vector((0, -math.cos(.2), math.sin(.2)))  # forearm, a little forward
-    a.sphere(.034, core, *e, seg=8, rings=5)
-    with a.at(*e, rz=math.pi / 2):
-        a.torus(.034, .005, glow, 14, 4)
-    hand = e + d * .28
-    for k in range(4):                                                 # fingers: simple segments
-        z = hand.z - .022 + k * .015
-        L = .07 - abs(k - 1.5) * .008
-        a.box(.013, L, .012, core, hand.x, hand.y - .03 - L / 2, z + .005)
-    a.box(.015, .05, .015, core, hand.x - s * .026, hand.y - .035, hand.z + .03, rx=.5)   # thumb
     limb = meta(name + '_Limb', [
         ('e', (s * .02, -.015, 0), .068, (1.0, 1.05, 1.05)),           # deltoid
         ('c', (s * .015, -.06, 0), (s * .008, -.27, 0), .042),         # upper arm
-        ('e', (s * .004, -.15, .018), .044, (1, 1.6, 1)),              # biceps
-        ('c', tuple(e + d * .04), tuple(e + d * .14), .038),          # forearm
-        ('c', tuple(e + d * .14), tuple(e + d * .24), .03),           #   tapering to the wrist
-        ('e', tuple(hand), .036, (.45, 1.2, .9))], .006, [shell], target=650)       # back of the hand
-    o = a.build()
-    join(o, [limb])
-    return o
+        ('e', (s * .004, -.15, .018), .044, (1, 1.6, 1))], .006, [shell], target=320)   # biceps
+    upper = a.build()
+    join(upper, [limb])
+    # The forearm in its own frame: the elbow at its origin.
+    f = Asset(fore_name)
+    d = Vector((0, -math.cos(.2), math.sin(.2)))  # forearm, a little forward
+    f.sphere(.034, core, 0, 0, 0, seg=8, rings=5)
+    with f.at(0, 0, 0, rz=math.pi / 2):
+        f.torus(.034, .005, glow, 14, 4)
+    hand = d * .28
+    for k in range(4):                                                 # fingers: simple segments
+        z = hand.z - .022 + k * .015
+        L = .07 - abs(k - 1.5) * .008
+        f.box(.013, L, .012, core, hand.x, hand.y - .03 - L / 2, z + .005)
+    f.box(.015, .05, .015, core, hand.x - s * .026, hand.y - .035, hand.z + .03, rx=.5)   # thumb
+    fl = meta(fore_name + '_Limb', [
+        ('c', tuple(d * .04), tuple(d * .14), .038),                  # forearm
+        ('c', tuple(d * .14), tuple(d * .24), .03),                   #   tapering to the wrist
+        ('e', tuple(hand), .036, (.45, 1.2, .9))], .006, [shell], target=330)       # back of the hand
+    fore = f.build()
+    join(fore, [fl])
+    attach(fore, upper, (s * .008, ELBOW_Y, 0))
+    return upper
 
 
-def leg_fn(name, shell, core, glow):
-    """A full thigh tapering to the knee, a calf, a slim ankle, a sleek foot;
-    a dark knee."""
+def leg_fn(name, shin_name, shell, core, glow):
+    """A full thigh tapering to the knee; a child shin (shin_name, its pivot
+    the dark knee): calf, a slim ankle, a sleek foot. The thigh with its shin
+    attached."""
     a = Asset(name)
-    a.sphere(.04, core, 0, -.46, .025, seg=8, rings=5)
-    with a.at(0, -.46, .025, rz=math.pi / 2):
-        a.torus(.04, .005, glow, 14, 4)
     limb = meta(name + '_Limb', [
         ('c', (0, -.03, 0), (0, -.22, .01), .078),                     # upper thigh
-        ('c', (0, -.22, .01), (0, -.41, .01), .06),                    # lower thigh
-        ('c', (0, -.5, -.005), (0, -.66, -.012), .052),               # calf
-        ('c', (0, -.66, -.008), (0, -.85, 0), .036),                  # shin to the ankle
-        ('e', (0, -.9, .055), .05, (.75, .5, 2.1))], .007, [shell], target=750)   # foot
-    o = a.build()
-    join(o, [limb])
-    return o
+        ('c', (0, -.22, .01), (0, -.41, .01), .06)], .007, [shell], target=380)   # lower thigh
+    thigh = a.build()
+    join(thigh, [limb])
+    # The shin in its own frame: the knee at its origin.
+    kx, ky, kz = KNEE
+    b = Asset(shin_name)
+    b.sphere(.04, core, 0, 0, 0, seg=8, rings=5)
+    with b.at(0, 0, 0, rz=math.pi / 2):
+        b.torus(.04, .005, glow, 14, 4)
+    sl = meta(shin_name + '_Limb', [
+        ('c', (0, -.5 - ky, -.005 - kz), (0, -.66 - ky, -.012 - kz), .052),   # calf
+        ('c', (0, -.66 - ky, -.008 - kz), (0, -.85 - ky, 0 - kz), .036),      # shin to the ankle
+        ('e', (0, -.9 - ky, .055 - kz), .05, (.75, .5, 2.1))], .007, [shell], target=370)   # foot
+    shin = b.build()
+    join(shin, [sl])
+    attach(shin, thigh, KNEE)
+    return thigh
 
 
 def android(name, prefix, shell, core, eyes, glow, ring=None):
@@ -147,8 +167,8 @@ def android(name, prefix, shell, core, eyes, glow, ring=None):
         join(root, [a.build()])
     attach(head_fn(f'{prefix}_Head', shell, core, eyes, glow), root, (0, NECK, 0))
     for s, side in ((1, 'L'), (-1, 'R')):  # _L at +x
-        attach(arm_fn(f'{prefix}_Arm_{side}', s, shell, core, glow), root, (s * .19, SHOULDER, 0))
-        attach(leg_fn(f'{prefix}_Leg_{side}', shell, core, glow), root, (s * .095, HIP, 0))
+        attach(arm_fn(f'{prefix}_Arm_{side}', f'{prefix}_Forearm_{side}', s, shell, core, glow), root, (s * .19, SHOULDER, 0))
+        attach(leg_fn(f'{prefix}_Leg_{side}', f'{prefix}_Shin_{side}', shell, core, glow), root, (s * .095, HIP, 0))
     return root
 
 

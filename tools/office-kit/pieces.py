@@ -19,6 +19,7 @@ OUT = os.path.normpath(os.path.join(WEB, 'kit', 'pieces.json'))
 # Where the layout (rooms.js) puts things on a piece, in its own frame.
 POINTS = {
     'Furn_Desk': {'top': [0, 0.75, 0]},
+    'Furn_Desk_SitStand': {'top': [0, 0.74, 0], 'stand': [0, 1.1, 0]},  # the top's local y: sitting, and raised
     'Furn_Workstation_Lived': {'top': [0, 0.75, 0]},
     'Furn_Workstation_Lived_B': {'top': [0, 0.75, 0]},
     'Furn_CoffeeCounter': {'top': [0, 0.94, 0]},
@@ -122,7 +123,8 @@ def changed(old, new):
         if a.get('points', {}) != b.get('points', {}):
             return True
         for k in ('min', 'max'):
-            if any(abs(x - y) > 0.001 for x, y in zip(a[k], b[k])):
+            # more than 1 mm: the boxes are rounded to 1 mm, and 0.161 - 0.16 is a hair over 0.001
+            if any(abs(x - y) > 0.001 + 1e-9 for x, y in zip(a[k], b[k])):
                 return True
     return False
 

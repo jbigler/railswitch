@@ -699,6 +699,36 @@ def desk(a, width=2.0, depth=0.8, height=0.75):
         a.box(pw, .006, .006, M['neon'], x, .004, front + .01)
 
 
+SITSTAND_LOW, SITSTAND_TRAVEL = .74, .36  # a sit-stand desk's top: sitting height, and how far it rises
+
+
+def sitstand_base(a, width=1.6, depth=.75):
+    """A sit-stand desk's frame: T feet, the outer columns, a low crossbar.
+    Its top (sitstand_top) is a child node kit.js raises and lowers."""
+    leg = width / 2 - .14
+    for s in (-1, 1):
+        x = s * leg
+        a.box(.07, .04, depth - .05, M['trim'], x, .02, 0)                       # foot
+        a.box(.004, .004, depth - .1, M['neon'], x, .042, 0)                      # a neon line on it
+        a.box(.075, .66 - .04, .075, M['dark'], x, .04 + (.66 - .04) / 2, 0)     # outer column, to 0.66
+        a.box(.085, .02, .085, M['trim'], x, .66, 0)                              # its collar
+    a.box(2 * leg - .07, .04, .04, M['dark'], 0, .3, -.12)                       # crossbar
+
+
+def sitstand_top(a, width=1.6, depth=.75, h=SITSTAND_LOW):
+    """The top at sitting height h, with the inner columns that slide in the
+    base's (down to 0.27, so raised by SITSTAND_TRAVEL they stay in), a frame
+    under it and a little control panel at the front right."""
+    leg = width / 2 - .14
+    a.box(width, .035, depth, M['body'], 0, h - .0175, 0)
+    a.box(width, .008, .008, M['neon'], 0, h - .039, depth / 2 - .004)          # the front edge
+    a.box(2 * leg + .08, .04, .06, M['dark'], 0, h - .055, 0)                    # frame under the top
+    for s in (-1, 1):
+        a.box(.06, h - .035 - .27, .06, M['trim'], s * leg, .27 + (h - .035 - .27) / 2, 0)   # inner column
+    a.box(.14, .025, .05, M['dark'], width / 2 - .22, h - .05, depth / 2 - .04)  # control panel
+    a.box(.03, .006, .004, M['neon2'], width / 2 - .25, h - .045, depth / 2 - .014)   # its up/down light
+
+
 def monitor(a, width=0.62, height=0.36, stand=True, screen=None):
     y = .2 + height / 2 if stand else 0
     a.box(width, height, .025, M['dark'], 0, y, 0)

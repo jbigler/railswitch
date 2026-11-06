@@ -25,7 +25,7 @@ import (
 const Dir = ".railswitch/firewall"
 
 // hookPath is the PATH the hook runs with.
-const hookPath = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+var hookPath = "PATH=" + strings.Join(render.HookPathDirs, ":")
 
 //go:embed assets/hook.sh assets/firewall.sh
 var assets embed.FS
@@ -96,24 +96,37 @@ func Files(prefix, ws, networkDir string, st *pack.Stack, fw config.Firewall) (m
 		out[path.Join(Dir, AllowFile(a.Service))] = render.File{Data: list, Mode: 0o644}
 	}
 
+	out[render.ResolvConfRel] = render.File{Data: []byte(render.ResolvConf), Mode: 0o644}
 	fwDir := filepath.Join(ws, filepath.FromSlash(Dir))
-	var d descriptor
-	d.Version = "1.0.0"
-	d.Hook.Path = filepath.Join(fwDir, "hook.sh")
-	d.Hook.Args = []string{"hook.sh", prefix, fwDir}
-	d.Hook.Env = []string{hookPath, "NETWORK_DIR=" + networkDir}
-	d.Hook.Timeout = 60
-	d.When.Annotations = map[string]string{`^` + prefix + `\.firewall$`: ".*"}
-	d.Stages = []string{"createRuntime"}
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(d); err != nil {
-		return nil, err
+	// The firewall at createRuntime; at poststop, hook.sh … stop ends the
+	// container's DNS filter (D182).
+	for rel, stage := range map[string]string{descriptorRel(prefix): "createRuntime", stopDescriptorRel(prefix): "poststop"} {
+		var d descriptor
+		d.Version = "1.0.0"
+		d.Hook.Path = filepath.Join(fwDir, "hook.sh")
+		d.Hook.Args = []string{"hook.sh", prefix, fwDir}
+		if stage == "poststop" {
+			d.Hook.Args = append(d.Hook.Args, "stop")
+		}
+		d.Hook.Env = []string{hookPath, "NETWORK_DIR=" + networkDir}
+		d.Hook.Timeout = 60
+		d.When.Annotations = map[string]string{`^` + prefix + `\.firewall$`: ".*"}
+		d.Stages = []string{stage}
+		var b bytes.Buffer
+		enc := json.NewEncoder(&b)
+		enc.SetEscapeHTML(false)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(d); err != nil {
+			return nil, err
+		}
+		out[rel] = render.File{Data: b.Bytes(), Mode: 0o644}
 	}
-	out[descriptorRel(prefix)] = render.File{Data: b.Bytes(), Mode: 0o644}
 	return out, nil
+}
+
+// stopDescriptorRel is project prefix's poststop hook descriptor (D182).
+func stopDescriptorRel(prefix string) string {
+	return path.Join(Dir, "hooks.d", prefix+"-firewall-stop.json")
 }
 
 // descriptorRel is project prefix's hook descriptor, as a workspace-relative

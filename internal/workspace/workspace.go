@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/buildinfo"
 	"github.com/jbigler/railswitch/internal/config"
@@ -754,7 +755,23 @@ func ReadHost(ctx context.Context, r sys.Runner) (render.Host, error) {
 		}
 		*f.dst = strings.TrimSpace(string(res.Stdout))
 	}
+	h.DNSFilter = HasDNSFilter(ctx, r, render.HookPathDirs)
 	return h, nil
+}
+
+// HasDNSFilter reports whether the first dnsmasq in dirs (the hook's PATH,
+// render.HookPathDirs) was built with nftset, which the DNS filter needs
+// (D182).
+func HasDNSFilter(ctx context.Context, r sys.Runner, dirs []string) bool {
+	for _, d := range dirs {
+		p := filepath.Join(d, "dnsmasq")
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+		res, err := r.Run(ctx, sys.Cmd{Name: p, Args: []string{"--version"}, Timeout: 5 * time.Second})
+		return err == nil && slices.Contains(strings.Fields(string(res.Stdout)), "nftset")
+	}
+	return false
 }
 
 // branchOf is the branch checked out in worktree dir, read from its git

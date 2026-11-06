@@ -178,6 +178,18 @@ const IS_COL = /_COL\d*$/;
 // World owns the renderer, the camera, its orbit, walking and picking. A
 // clickable object carries userData.pick = {tip, act()}; its first such
 // ancestor wins.
+// fixedView reads ?cam=x,y,z&look=x,y,z (a camera held there, whatever the
+// mode); null without both, or with anything but numbers.
+function fixedView(search) {
+  const q = new URLSearchParams(search);
+  const nums = (k) => {
+    const v = (q.get(k) ?? '').split(',').map(Number);
+    return v.length === 3 && v.every(Number.isFinite) ? v : null;
+  };
+  const cam = nums('cam'), at = nums('look');
+  return cam && at ? { cam, look: at } : null;
+}
+
 export class World {
   constructor(el) {
     this.el = el;
@@ -501,6 +513,7 @@ export class World {
   }
 
   frame() {
+    this.fixed ??= fixedView(location.search) ?? false;
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 0.1);
     const t = this.timer.getElapsed();
@@ -519,6 +532,10 @@ export class World {
         wall.getWorldDirection(FWD);
         wall.visible = FWD.dot(TO.subVectors(this.camera.position, wall.position)) > 0;
       }
+    }
+    if (this.fixed) { // ?cam=x,y,z&look=x,y,z: a held view, for screenshots
+      this.camera.position.set(...this.fixed.cam);
+      this.camera.lookAt(...this.fixed.look);
     }
     animate(this.scene, t);
     this.bloom.strength = look('bloom', 0.28);

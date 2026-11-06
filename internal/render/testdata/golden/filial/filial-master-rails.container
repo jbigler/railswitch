@@ -8,7 +8,7 @@ Wants=filial-master-browser.service filial-master-nvim.service railswitch-traefi
 After=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service filial-master-browser.service filial-master-nvim.service railswitch-traefik.service railswitch-dozzle.service railswitch-dashboard.service
 
 [Container]
-Label=filial.unit-hash=87fa26d965bb
+Label=filial.unit-hash=b50e0e93fa41
 Image=localhost/filial/base:ruby3.3.6-node22.11.0-b8f5776f
 ContainerName=filial-master-rails
 Network=filial-master-dev.network:alias=rails
@@ -53,7 +53,7 @@ Annotation=filial.firewall=app
 Annotation=filial.firewall.networks=filial-master-dev,filial_proxy
 Annotation=filial.firewall.mode=enforce
 Annotation=filial.firewall.lists=741c42189628
-PodmanArgs=--cpus=6 --interactive
+PodmanArgs=--hosts-file=none --cpus=6 --interactive
 LogDriver=journald
 Entrypoint=/usr/local/bin/entrypoint-app.sh
 Exec=bin/dev

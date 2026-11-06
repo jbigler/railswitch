@@ -132,6 +132,7 @@ railswitch db dump                    # the databases (not Rails' test ones) and
 railswitch db restore                 # put them back into this worktree (asks first; `db restore storage`: storage only)
 railswitch db snapshot before-migrate # a named dump of this worktree, kept for it (no name: a timestamp)
 railswitch db snapshot ls             # its snapshots, newest first, with their sizes
+railswitch panic                      # something is wrong: cut every container off the network and pause it
 railswitch db snapshot restore before-migrate  # reset its data to one (asks first); db snapshot rm <name> deletes one
 railswitch down                       # stops it AND deletes its volumes (asks first)
 railswitch wt rm feature-x            # --force: even with uncommitted changes (lost)

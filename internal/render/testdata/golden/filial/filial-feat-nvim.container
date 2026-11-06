@@ -5,7 +5,7 @@
 Description=filial nvim of worktree feat
 
 [Container]
-Label=filial.unit-hash=c8ca5bcbbe59
+Label=filial.unit-hash=0e75e58dfc70
 Image=localhost/filial/nvim:ruby3.3.6-node22.11.0-9bd7a1f4
 ContainerName=filial-feat-nvim
 Network=filial-feat-dev.network:alias=nvim
@@ -43,7 +43,7 @@ Annotation=filial.firewall.networks=filial-feat-dev,filial_proxy
 Annotation=filial.firewall.mode=enforce
 Annotation=filial.firewall.lists=c984e792ce51
 Annotation=filial.firewall.extra=api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org,github.com
-PodmanArgs=--cpus=2 --tty --interactive
+PodmanArgs=--hosts-file=none --cpus=2 --tty --interactive
 LogDriver=journald
 Entrypoint=/usr/local/bin/entrypoint-nvim.sh
 Exec=/usr/local/bin/nvim --headless --listen 0.0.0.0:7777

@@ -317,7 +317,7 @@ func TestWorker(t *testing.T) {
 	}
 	for _, l := range []string{
 		"Requires=filial-master-deps.service filial-master-db.service filial-master-cache.service filial-master-storage.service",
-		"PodmanArgs=--cpus=6", "DropCapability=all", "NoNewPrivileges=true", "Memory=2g", "PidsLimit=4096",
+		"PodmanArgs=--hosts-file=none --cpus=6", "DropCapability=all", "NoNewPrivileges=true", "Memory=2g", "PidsLimit=4096",
 		"UserNS=keep-id:uid=1000,gid=1000", "Exec=bundle exec sidekiq",
 	} {
 		hasLine(t, units, w, l)
@@ -472,8 +472,8 @@ func TestAppDependencies(t *testing.T) {
 	}
 	hasLine(t, units, rails, "UserNS=keep-id:uid=1000,gid=1000")
 	hasLine(t, units, rails, "User=1000:1000")
-	hasLine(t, units, rails, "PodmanArgs=--cpus=6 --interactive") // stdin stays open: tailwindcss:watch
-	hasLine(t, units, "filial-master-nvim.container", "PodmanArgs=--cpus=2 --tty --interactive")
+	hasLine(t, units, rails, "PodmanArgs=--hosts-file=none --cpus=6 --interactive") // stdin stays open: tailwindcss:watch
+	hasLine(t, units, "filial-master-nvim.container", "PodmanArgs=--hosts-file=none --cpus=2 --tty --interactive")
 	hasLine(t, units, "filial-master-nvim.container", "SuccessExitStatus=1")
 	hasLine(t, units, "filial-master-nvim.container", "Volume="+ws+"/.railswitch/home/master:/home/appuser:z")
 	hasLine(t, units, "filial-master-db.container", "Notify=healthy")

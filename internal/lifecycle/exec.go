@@ -101,7 +101,8 @@ type runOpts struct {
 	// Full: every network of the service, with the same --add-host entries
 	// as its unit (an agent reaches routed hosts through Traefik).
 	Full bool
-	// Name is the container's --name; "" sets none.
+	// Name is the container's --name; "" names it after the service,
+	// "<prefix>-<slug>-<svc>-run-<n>", so panic reaches it (D181).
 	Name string
 	// Entrypoint overrides the image's entrypoint; "" keeps it.
 	Entrypoint string
@@ -139,13 +140,15 @@ func (l *L) transient(m *render.Model, in *render.Instance, s *render.Service, e
 		}
 	}
 	// --init: a command as PID 1 would ignore hangupScript's SIGHUP.
-	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i", "--init", "--preserve-fds", "1"}
+	args := []string{"--hooks-dir", render.HooksDir(ws), "run", "--rm", "-i", "--init", "--preserve-fds", "1", render.HostsFileArg}
 	if l.TTY {
 		args = append(args, "-t")
 	}
-	if opts.Name != "" {
-		args = append(args, "--name", opts.Name)
+	name := opts.Name
+	if name == "" {
+		name = containerOf(m, in.Worktree.Slug, s.ID) + "-run-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	}
+	args = append(args, "--name", name)
 	cmd := hangup(argv)
 	if opts.Entrypoint != "" {
 		// The watcher goes in front of the entrypoint: behind it, the

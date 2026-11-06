@@ -77,7 +77,7 @@ func TestAgentServices(t *testing.T) {
 	if _, ok := units["filial-feat-agent-claude.container"]; ok {
 		t.Error("an on-demand agent has a unit")
 	}
-	hasLine(t, units, "filial-feat-agent-probe.container", "PodmanArgs=--cpus=4 --tty --interactive")
+	hasLine(t, units, "filial-feat-agent-probe.container", "PodmanArgs=--hosts-file=none --cpus=4 --tty --interactive")
 }
 
 // D55: an agent's firewall is enforced whatever [firewall] mode says; the

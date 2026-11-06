@@ -7,7 +7,7 @@ Wants=railswitch-traefik.service
 After=railswitch-traefik.service
 
 [Container]
-Label=filial.unit-hash=faf8da59103f
+Label=filial.unit-hash=4a2a85784395
 Image=localhost/filial/playwright:1.54.0-8ed7a43c
 ContainerName=filial-feat-browser
 Network=filial-feat-dev.network:alias=browser
@@ -33,7 +33,7 @@ Label="traefik.http.routers.filial-feat-vnc.rule=Host(`vnc.feat.filial.localhost
 Label=traefik.http.routers.filial-feat-vnc.entrypoints=web
 Label=traefik.http.routers.filial-feat-vnc.service=filial-feat-vnc
 Label=traefik.http.services.filial-feat-vnc.loadbalancer.server.port=8080
-PodmanArgs=--cpus=2
+PodmanArgs=--hosts-file=none --cpus=2
 LogDriver=journald
 Entrypoint=/usr/local/bin/entrypoint-playwright.sh
 

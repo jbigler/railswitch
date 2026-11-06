@@ -758,7 +758,10 @@ The file is `~/.local/share/railswitch/usage/<prefix>.json` (0600, its
 directory 0700, written atomically under `<prefix>.json.lock`): one JSON
 object, `{"schema": 1, "last": {"<worktree>/<agent>": {...}}, "days":
 [<row>...]}`, `last` each counter as last read, keyed
-`<worktree>/<agent>/<session>` (`<worktree>/<agent>` without a session). Days older than 90 are
+`<worktree>/<agent>/<session>` (`<worktree>/<agent>` without a session).
+Only the 8 most recently read sessions per worktree and agent are kept
+(session ids come from a file the container writes): a session that
+returns after 8 newer ones counts all of its counter again. Days older than 90 are
 dropped. A file with a `schema` above 1 is refused as written by a newer
 railswitch (D39); `overview` then records nothing but still answers.
 

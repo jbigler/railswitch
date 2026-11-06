@@ -2,6 +2,7 @@ package agentusage
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -291,5 +292,24 @@ func TestRetire(t *testing.T) {
 		if r.Removed != strings.Contains(r.Worktree, "removed") {
 			t.Errorf("row %+v", r)
 		}
+	}
+}
+
+// A container writing a new session id on every status write can't grow
+// the file without bound: each worktree and agent keeps maxSessions
+// counters, the most recently seen.
+func TestApplyCapsSessions(t *testing.T) {
+	f := file{Last: map[string]last{}}
+	now := at("2026-11-04", 10)
+	for i := range 1000 {
+		ts := now.Add(time.Duration(i) * time.Second)
+		f.apply([]Sample{{Worktree: "a", Agent: "x", Usage: agentstatus.Usage{Input: 1, Session: fmt.Sprintf("s%d", i)}, TS: ts.Unix()}}, ts)
+	}
+	f.apply([]Sample{sample("b", "x", 5, 0, now)}, now.Add(time.Hour))
+	if len(f.Last) != maxSessions+1 {
+		t.Errorf("last has %d keys; want %d", len(f.Last), maxSessions+1)
+	}
+	if _, ok := f.Last["a/x/s999"]; !ok {
+		t.Error("the newest session was dropped")
 	}
 }

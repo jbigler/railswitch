@@ -247,6 +247,41 @@ func (f *file) apply(samples []Sample, now time.Time) bool {
 			changed = true
 		}
 	}
+	return f.capSessions() || changed
+}
+
+// maxSessions is how many sessions' counters file.Last keeps per worktree
+// and agent, the most recently seen. Session ids come from a status file
+// a container writes: one with a new id on every write would otherwise
+// grow the file by a key per poll (every 2 to 10 s) for 90 days. The
+// cost: a session that comes back after 8 newer ones counts all of its
+// counter again, a bounded overcount.
+const maxSessions = 8
+
+// capSessions drops the session counters past maxSessions per worktree
+// and agent; it reports whether it dropped any.
+func (f *file) capSessions() bool {
+	type seen struct {
+		key  string
+		seen int64
+	}
+	by := map[string][]seen{}
+	for k, l := range f.Last {
+		if i := strings.LastIndexByte(k, '/'); strings.Count(k, "/") == 2 {
+			by[k[:i]] = append(by[k[:i]], seen{k, l.Seen})
+		}
+	}
+	changed := false
+	for _, ss := range by {
+		if len(ss) <= maxSessions {
+			continue
+		}
+		slices.SortFunc(ss, func(a, b seen) int { return cmp.Or(cmp.Compare(b.seen, a.seen), cmp.Compare(a.key, b.key)) })
+		for _, s := range ss[maxSessions:] {
+			delete(f.Last, s.key)
+		}
+		changed = true
+	}
 	return changed
 }
 

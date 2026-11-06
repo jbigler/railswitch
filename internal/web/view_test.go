@@ -420,9 +420,14 @@ func TestDetailActions(t *testing.T) {
 		{Service: "db", Role: "data", State: "inactive/dead", Container: "ftest-feat-login-db", Restartable: true},
 		{Service: "agent-bot", Role: "agent", State: "active/running", Container: "ftest-feat-login-agent-bot"},
 		{Service: "agent-svc", Role: "agent", State: "active/running", Container: "ftest-feat-login-agent-svc", Restartable: true},
+		{Service: "deps", Role: "deps", State: "inactive/dead", Container: "ftest-feat-login-deps"},
 	}
 	d := newDetail("ftest", r, "")
-	web, db, bot, svc := d.Services[0], d.Services[1], d.Services[2], d.Services[3]
+	web, db, bot, svc, deps := d.Services[0], d.Services[1], d.Services[2], d.Services[3], d.Services[4]
+	// a oneshot's log is its journal, not Dozzle's: a job prints it, even once it has exited (D186)
+	if deps.LogsURL != "" || deps.LogsPost != "/p/ftest/feat-login/logs/deps" || web.LogsPost != "" {
+		t.Errorf("deps: %+v; web: %+v", deps, web)
+	}
 	if web.LogsURL != "http://logs.localhost/show?name=ftest-feat-login-web" || web.RestartURL != "/p/ftest/feat-login/restart/web" {
 		t.Errorf("web: %+v", web)
 	}
@@ -440,7 +445,7 @@ func TestDetailActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`, `action="/p/ftest/feat-login/restart/agent-svc" data-post data-confirm="Restart agent-svc? Its session ends`} {
+	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`, `action="/p/ftest/feat-login/restart/agent-svc" data-post data-confirm="Restart agent-svc? Its session ends`, `<form method="post" action="/p/ftest/feat-login/logs/deps" data-post><button title="Print the journal of deps in Jobs">Logs</button></form>`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %q", want)
 		}

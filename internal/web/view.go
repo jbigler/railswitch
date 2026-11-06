@@ -750,8 +750,10 @@ type detailView struct {
 type linkView struct{ Label, URL, Class string }
 
 // serviceView is a service row: LogsURL (Dozzle, by container name) while
-// its container runs, RestartURL while a restartable one runs.
-type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, RestartURL, Confirm string }
+// its container runs, RestartURL while a restartable one runs. A oneshot
+// (deps) logs to its unit's journal, which Dozzle never sees: LogsPost, in
+// any state, starts a job that prints it (D186).
+type serviceView struct{ Name, State, Word, Glyph, Class, LogsURL, LogsPost, RestartURL, Confirm string }
 
 type agentView struct{ Name, Glyph, Label, Class, Message string }
 
@@ -808,7 +810,9 @@ func newDetail(prefix string, r row, repo string) detailView {
 	for _, s := range wt.Services {
 		g, c, word := serviceLook(s.State)
 		sv := serviceView{Name: s.Service, State: s.State, Word: word, Glyph: g, Class: c}
-		if (word == "running" || word == "starting") && s.Container != "" {
+		if s.Role == "deps" {
+			sv.LogsPost = path + "/logs/" + s.Service
+		} else if (word == "running" || word == "starting") && s.Container != "" {
 			sv.LogsURL = logsURL + "show?name=" + url.QueryEscape(s.Container)
 			if s.Restartable {
 				sv.RestartURL = path + "/restart/" + s.Service

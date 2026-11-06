@@ -129,6 +129,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
 	m.HandleFunc("POST /p/{prefix}/{slug}/restart/{service}", s.restartService)
+	m.HandleFunc("POST /p/{prefix}/{slug}/logs/{service}", s.serviceLogs)
 	m.HandleFunc("POST /p/{prefix}/{slug}/fw-allow/{service}", s.fwAllowLive)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-default/{verb}", s.agentDefault)
 	m.HandleFunc("POST /p/{prefix}/{slug}/snapshots/{verb}", s.snapshotAction)
@@ -654,6 +655,24 @@ func (s *Server) restartService(w http.ResponseWriter, r *http.Request) {
 	s.start(w, r, jobs.Spec{
 		Project: p.Prefix, Slug: wt.Slug, Label: "restart " + svc, Dir: p.Workspace,
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "restart", svc},
+	}, nil, worktreePath(p, wt.Slug))
+}
+
+// serviceLogs prints a oneshot service's (deps) journal as a job (D186):
+// Dozzle shows only podman's log, which a oneshot doesn't write.
+func (s *Server) serviceLogs(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	svc := r.PathValue("service")
+	if !slices.ContainsFunc(wt.Services, func(x service) bool { return x.Service == svc && x.Role == "deps" }) {
+		http.Error(w, "unknown service", http.StatusNotFound)
+		return
+	}
+	s.start(w, r, jobs.Spec{
+		Project: p.Prefix, Slug: wt.Slug, Label: "logs " + svc, Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "logs", svc},
 	}, nil, worktreePath(p, wt.Slug))
 }
 

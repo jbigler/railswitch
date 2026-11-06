@@ -71,7 +71,8 @@ DNSDIR="$STATE/dns"
 stop_dns() {
   local p
   p="$(cat "$DNSDIR/$1.pid" 2>/dev/null)" || true
-  [[ "$p" =~ ^[0-9]+$ ]] && kill "$p" 2>/dev/null || true
+  # SIGKILL: the filter may have SIGTERM blocked (see hook.sh's stop).
+  [[ "$p" =~ ^[0-9]+$ ]] && kill -KILL "$p" 2>/dev/null || true
   rm -f "$DNSDIR/$1.conf" "$DNSDIR/$1.pid" "$DNSDIR/$1.log"
 }
 
@@ -91,7 +92,7 @@ dns_add() {
   done
   old="$(cat "$DNSDIR/$c.pid" 2>/dev/null)" || true
   if [[ "$old" =~ ^[0-9]+$ ]]; then
-    kill "$old" 2>/dev/null || true
+    kill -KILL "$old" 2>/dev/null || true # SIGKILL: see stop_dns
     for _ in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$old" 2>/dev/null || break; sleep 0.2; done
   fi
   rm -f "$DNSDIR/$c.pid"

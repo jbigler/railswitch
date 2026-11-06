@@ -755,9 +755,14 @@ func ReadHost(ctx context.Context, r sys.Runner) (render.Host, error) {
 		}
 		*f.dst = strings.TrimSpace(string(res.Stdout))
 	}
-	h.DNSFilter = HasDNSFilter(ctx, r, render.HookPathDirs)
+	h.DNSFilter = HasDNSFilter(ctx, r, DNSFilterDirs)
 	return h, nil
 }
+
+// DNSFilterDirs are where a load looks for the DNS filter's dnsmasq: the
+// hook's PATH. Tests whose fake runner counts calls empty it, so the
+// host's dnsmasq doesn't add one.
+var DNSFilterDirs = render.HookPathDirs
 
 // HasDNSFilter reports whether the first dnsmasq in dirs (the hook's PATH,
 // render.HookPathDirs) was built with nftset, which the DNS filter needs

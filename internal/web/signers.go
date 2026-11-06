@@ -83,7 +83,7 @@ type signerKeyView struct {
 
 func (s *Server) machinePage(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
-	pv := s.pageData("", "", sortKey{By: "name"})
+	pv := s.pageData("", "", sortKey{By: "name"}, usageDefault)
 	jv := newJobs(s.c.Jobs.Jobs(machineKey, ""), nil, "")
 	s.mu.Unlock()
 	v := machineView{

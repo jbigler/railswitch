@@ -62,7 +62,7 @@ func TestRowChangeEvents(t *testing.T) {
 	for _, sel := range []string{"b", "main"} {
 		f := newFixture(t)
 		ctx := context.Background()
-		sub := f.s.subscribe("ftest", sel, parseSort("name"), "")
+		sub := f.s.subscribe("ftest", sel, parseSort("name"), usageDefault, "")
 		defer f.s.unsubscribe(sub)
 		f.s.pollOnce(ctx)
 		first := drain(sub)
@@ -100,7 +100,7 @@ func TestRowChangeEvents(t *testing.T) {
 func TestOrderChangeSendsList(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	drain(sub)
@@ -124,7 +124,7 @@ func TestOrderChangeSendsList(t *testing.T) {
 func TestNotifications(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("hello", "master", parseSort("name"), "")
+	sub := f.s.subscribe("hello", "master", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	long := strings.Repeat("é", 150) + strings.Repeat("x", 150)
 	steps := []struct {
@@ -184,7 +184,7 @@ func TestNeedCount(t *testing.T) {
 	ctx := context.Background()
 	f.cli.set("--json -C /ws/ftest overview", ftestOverview("jb/b", "up", agentJSON("permission", "rm?", false)))
 	f.cli.set("--json -C /ws/hello overview", helloOverview(agentJSON("question", "which db?", false)))
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	evs := drain(sub)
@@ -220,7 +220,7 @@ func TestPRError(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	f.cli.fail("--json -C /ws/ftest pr ls", errors.New("pr ls: gh: not logged in"))
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	banners := 0
 	for i := range 3 {
@@ -261,7 +261,7 @@ func TestPRError(t *testing.T) {
 func TestCadence(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "", parseSort("name"), "")
+	sub := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	count := func() (int, int, int, int) {
 		return f.cli.count("--json -C /ws/ftest overview"), f.cli.count("--json -C /ws/hello overview"),
@@ -315,7 +315,7 @@ func TestCadence(t *testing.T) {
 func TestJobEndDuringRead(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	f.clock.Add(2 * time.Second)
@@ -356,7 +356,7 @@ func TestGhStack(t *testing.T) {
   {"name":"jb/a","current":false,"merged":true,"queued":false,"needs_rebase":false,"pr":{"number":2140,"state":"merged"}},
   {"name":"jb/b","current":true,"merged":false,"queued":false,"needs_rebase":true,"pr":{"number":2141,"state":"open","checks":"pass","review":"approved"}},
   {"name":"jb/c","current":false,"merged":false,"queued":false,"needs_rebase":false,"pr":null}]},"error":""}]}`)
-	sub := f.s.subscribe("ftest", "b", parseSort("name"), "")
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
 	defer f.s.unsubscribe(sub)
 	f.s.pollOnce(ctx)
 	evs := drain(sub)
@@ -416,7 +416,7 @@ func TestSwitchingFromJobs(t *testing.T) {
 	detail := func() string {
 		f.s.mu.Lock()
 		defer f.s.mu.Unlock()
-		return f.s.pageData("ftest", "b", sortKey{By: "name"}).Detail.Switching
+		return f.s.pageData("ftest", "b", sortKey{By: "name"}, usageDefault).Detail.Switching
 	}
 	if got := detail(); got != "jb/q" {
 		t.Errorf("Switching while running = %q, want jb/q", got)

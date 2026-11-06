@@ -69,6 +69,7 @@ type jobInfo struct {
 type subscriber struct {
 	prefix, sel string
 	sort        sortKey
+	days        int // the usage views' range (D187)
 	// view is "" for a project's page; "settings" (a settings page) or
 	// "new" (the new page, prefix the project it creates) get only the
 	// project-level jobs; "library" (the Library page) gets them and the
@@ -104,8 +105,8 @@ func (sub *subscriber) diff(typ, id, html string, job *jobInfo) {
 	sub.send(event{Type: typ, ID: id, HTML: html, Job: job})
 }
 
-func (s *Server) subscribe(prefix, sel string, k sortKey, view string) *subscriber {
-	sub := &subscriber{prefix: prefix, sel: sel, sort: k, view: view, ch: make(chan event, subBuffer), gone: make(chan struct{}), sent: map[string]string{}}
+func (s *Server) subscribe(prefix, sel string, k sortKey, days int, view string) *subscriber {
+	sub := &subscriber{prefix: prefix, sel: sel, sort: k, days: days, view: view, ch: make(chan event, subBuffer), gone: make(chan struct{}), sent: map[string]string{}}
 	s.mu.Lock()
 	s.subs[sub] = struct{}{}
 	s.push(sub)
@@ -504,7 +505,7 @@ func (s *Server) push(sub *subscriber) {
 	if sub.view == "new" {
 		shown = "" // the header and switcher of no project
 	}
-	pv := s.pageData(shown, sub.sel, sub.sort)
+	pv := s.pageData(shown, sub.sel, sub.sort, sub.days)
 	for _, f := range []struct {
 		id   string
 		data any
@@ -608,7 +609,7 @@ func (s *Server) rows(prefix string, k sortKey, sel string) ([]row, string) {
 }
 
 // pageData is everything a page of prefix shows. s.mu is held.
-func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
+func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 	rows, sel := s.rows(prefix, k, sel)
 	need := 0
 	var strip stripView
@@ -672,7 +673,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 		}
 	}
 	pv := pageView{
-		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(),
+		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(), Days: days,
 		Header: headerView{Prefix: prefix, Need: need}, Projects: projects, Strip: strip, Banner: banner,
 		List:   newList(prefix, rows, sel, k),
 		Detail: detailView{Empty: true},
@@ -683,11 +684,12 @@ func (s *Server) pageData(prefix, sel string, k sortKey) pageView {
 	if p := s.state[prefix]; p != nil {
 		usage = p.usage
 	}
-	pv.Usage = newUsage(usage)
+	wtURL := func(slug string) string { return "/p/" + prefix + "/" + slug + pageQuery(k, days) }
+	pv.Usage = newUsage(usage, days, usageLinks("/p/"+prefix+"/"+sel, k, days), wtURL)
 	for _, r := range rows {
 		if r.WT.Slug == sel {
 			pv.Detail = newDetail(prefix, r, projectPRRepo(rows))
-			pv.Detail.Usage, pv.Detail.Runaway = usageLine(usage, sel)
+			pv.Detail.UsageCard = newUsageCard(usage, sel, days, usageLinks("/p/"+prefix+"/"+sel, k, days), r.WT.Agent, s.c.Now())
 			pv.Detail.Switching = s.switching(prefix, sel)
 		}
 	}

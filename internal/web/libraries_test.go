@@ -146,9 +146,9 @@ func TestLibraryAddJob(t *testing.T) {
 // page's stream doesn't.
 func TestLibraryFetchJob(t *testing.T) {
 	f := librariesFixture(t)
-	lib := f.s.subscribe("ftest", "", parseSort("name"), "library")
+	lib := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "library")
 	defer f.s.unsubscribe(lib)
-	set := f.s.subscribe("ftest", "", parseSort("name"), "settings")
+	set := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "settings")
 	defer f.s.unsubscribe(set)
 	drain := func(sub *subscriber) string {
 		var html string

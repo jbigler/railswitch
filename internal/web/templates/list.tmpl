@@ -21,7 +21,15 @@ what its agent waits on), the PR over the tests on the right. */}}
 <div class="tests">{{with .Tests}}<span class="{{.Class}}" title="{{.Title}}">{{.Glyph}} {{.Text}}</span>{{if .Stale}} <span class="stale">stale</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</div></td>
 </tr>{{end}}
 
-{{/* The project's agent usage per day (D162): SVG attributes only, the
-CSP allows no inline style. */}}
-{{define "usage"}}<div id="usage" class="usage">{{with .}}<div class="lbl">Agent usage <span class="usage-sum">{{.Summary}}</span></div>
-<svg class="usage-chart" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="Agent usage, {{.Summary}}">{{range .Bars}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"><title>{{.Title}}</title></rect>{{end}}</svg>{{end}}</div>{{end}}
+{{/* The project's agent usage per day, stacked by worktree (D162, D187):
+SVG attributes and classes only, the CSP allows no inline style. A
+worktree's segment links to its Agent tab; a removed one's is muted and
+unlinked. */}}
+{{define "usage"}}<div id="usage" class="usage">{{with .}}<div class="usage-hd"><span class="lbl">Agent usage · {{.Days}} days: <b class="usage-sum">{{.Total}}</b></span>{{template "usage-range" .Ranges}}</div>
+<svg class="usage-chart" viewBox="0 0 {{.W}} {{.H}}" preserveAspectRatio="none" role="img" aria-label="New tokens and output per day for {{.Days}} days, by worktree">{{range .Segs}}{{if .URL}}<a href="{{.URL}}" data-usage-wt="{{.Slug}}">{{end}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"><title>{{.Title}}</title></rect>{{if .URL}}</a>{{end}}{{end}}</svg>
+<div class="usage-days" aria-hidden="true"><span>{{.First}}</span><span>{{.Last}}</span></div>
+<ul class="usage-legend">{{range .Legend}}<li{{if .Muted}} class="muted"{{end}}{{with .Title}} title="{{.}}"{{end}}><span class="chip {{.Class}}" aria-hidden="true"></span><span class="mono name">{{.Name}}</span><span>{{.Total}}</span></li>{{end}}</ul>{{end}}</div>{{end}}
+
+{{/* The usage views' day range (D187): the page keeps it in ?days= and
+the browser remembers it. */}}
+{{define "usage-range"}}<span class="seg usage-range" role="group" aria-label="Days shown">{{range .}}<a href="{{.URL}}" data-days="{{.N}}"{{if .On}} class="on" aria-current="true"{{end}}>{{.N}}</a>{{end}}</span>{{end}}

@@ -339,7 +339,7 @@ func settingsURL(prefix string) string { return "/p/" + prefix + "/settings" }
 
 // chrome fills the parts every page shares. s.mu is held.
 func (s *Server) chrome(prefix string) (pageView, jobsView) {
-	pv := s.pageData(prefix, "", sortKey{By: "name"})
+	pv := s.pageData(prefix, "", sortKey{By: "name"}, usageDefault)
 	rows, _ := s.rows(prefix, sortKey{By: "name"}, "")
 	return pv, newJobs(s.c.Jobs.Jobs(prefix, ""), rows, "")
 }

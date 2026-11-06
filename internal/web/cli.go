@@ -102,12 +102,16 @@ type agent struct {
 	TS      int64  `json:"ts"`
 }
 
-// usage is an agent's session tokens (agentstatus.Usage).
+// usage is an agent's session tokens (agentstatus.Usage), with its
+// session's id, context and start when the package reports them (D187).
 type usage struct {
-	Input      int64 `json:"input"`
-	Output     int64 `json:"output"`
-	CacheRead  int64 `json:"cache_read"`
-	CacheWrite int64 `json:"cache_write"`
+	Input      int64  `json:"input"`
+	Output     int64  `json:"output"`
+	CacheRead  int64  `json:"cache_read"`
+	CacheWrite int64  `json:"cache_write"`
+	Session    string `json:"session"`
+	Context    int64  `json:"context"`
+	Started    int64  `json:"started"`
 }
 
 type link struct {

@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/jbigler/railswitch/internal/agentusage"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/podman"
 )
@@ -15,7 +17,7 @@ import (
 // Remove tears down the worktree target names (see resolve) and removes
 // it: its tailnet share is turned off (Unshare), its units are stopped, its
 // containers, per-worktree volumes and dev network removed by exact name,
-// its env and agent status dirs, database snapshots (D157), registry entry and checkout deleted, and the project
+// its env and agent status dirs, database snapshots (D157), registry entry and checkout deleted, its agent usage renamed "<slug> (removed <day>)" (D187), and the project
 // re-rendered (D28). The base worktree is refused, and so is a dirty one
 // unless force. force also deletes the worktree's home dirs (homeDirs:
 // nvim's and its agents'), which are kept otherwise: they hold logins.
@@ -67,6 +69,11 @@ func (m *Manager) Remove(ctx context.Context, target string, force bool) error {
 		if err := os.RemoveAll(filepath.Join(m.WS, ".railswitch", d, w.Slug)); err != nil {
 			return err
 		}
+	}
+	// After its status dir is gone, so that no poll counts its last
+	// sessions again under the old name (D187).
+	if err := agentusage.Retire(agentusage.Path(m.Data, m.Pfx), w.Slug, time.Now()); err != nil {
+		fmt.Fprintf(m.Out, "warning: %s's agent usage keeps its name: %v\n", w.Slug, err)
 	}
 	for _, d := range homeDirs {
 		home := filepath.Join(m.WS, ".railswitch", d, w.Slug)

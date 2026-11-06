@@ -226,7 +226,7 @@ func TestImagesSave(t *testing.T) {
 	f.do(req("POST", "/p/ftest/images/save/pg-client", form("hash", testHash, "text", text, "ack", "1")))
 	f.run.wait(t, 5)
 	f.ended(t)
-	sub := f.s.subscribe("ftest", "", parseSort("name"), "settings")
+	sub := f.s.subscribe("ftest", "", parseSort("name"), usageDefault, "settings")
 	defer f.s.unsubscribe(sub)
 	f.s.mu.Lock()
 	html, err := render("jobs", f.s.subJobs(sub, f.s.c.Jobs.Jobs("ftest", "")))

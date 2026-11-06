@@ -28,7 +28,7 @@ unlinked. */}}
 {{define "usage"}}<div id="usage" class="usage">{{with .}}<div class="usage-hd"><span class="lbl">Agent usage · {{.Days}} days: <b class="usage-sum">{{.Total}}</b></span>{{template "usage-range" .Ranges}}</div>
 <svg class="usage-chart" viewBox="0 0 {{.W}} {{.H}}" preserveAspectRatio="none" role="img" aria-label="New tokens and output per day for {{.Days}} days, by worktree">{{range .Segs}}{{if .URL}}<a href="{{.URL}}" data-usage-wt="{{.Slug}}">{{end}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"><title>{{.Title}}</title></rect>{{if .URL}}</a>{{end}}{{end}}</svg>
 <div class="usage-days" aria-hidden="true"><span>{{.First}}</span><span>{{.Last}}</span></div>
-<ul class="usage-legend">{{range .Legend}}<li{{if .Muted}} class="muted"{{end}}{{with .Title}} title="{{.}}"{{end}}><span class="chip {{.Class}}" aria-hidden="true"></span><span class="mono name">{{.Name}}</span><span>{{.Total}}</span></li>{{end}}</ul>{{end}}</div>{{end}}
+<ul class="usage-legend">{{range .Legend}}<li{{if .Muted}} class="muted"{{end}}{{with .Title}} title="{{.}}"{{end}}><span class="swatch {{.Class}}" aria-hidden="true"></span><span class="mono name">{{.Name}}</span><span>{{.Total}}</span></li>{{end}}</ul>{{end}}</div>{{end}}
 
 {{/* The usage views' day range (D187): the page keeps it in ?days= and
 the browser remembers it. */}}

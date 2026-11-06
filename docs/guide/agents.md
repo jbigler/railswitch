@@ -216,6 +216,30 @@ agent's session with its exit status; the agent starts anyway, and the
 next start goes on from the command that failed. A changed command runs
 again, so make commands safe to run twice where you can (`--force` above).
 
+What a setup run prints shows in the agent's terminal until the agent
+starts over it, and is kept in its home as `~/.railswitch-setup.log`
+(the last run only, at most 256 KiB, its end): on the host,
+`<workspace>/.railswitch/agent-home/<worktree>/<agent>/.railswitch-setup.log`.
+A failed run's last line names it. Print it with:
+
+```sh
+railswitch agent setup --log claude
+```
+
+To run the whole list again (a tool it installed broke, or you removed
+it), clear its markers, then start the agent again:
+
+```sh
+railswitch agent setup --again claude         # this worktree
+railswitch agent setup --again claude --all   # every worktree
+```
+
+It first prints the end of the last run's log, then removes
+`~/.railswitch-setup-*` and `~/.railswitch-setup.d` from the agent's home
+and nothing else; a running agent keeps running, so stop it
+(`railswitch agent stop claude`) and start it again. The dashboard's
+Agent card has the same action, **Run claude's setup again**.
+
 They run with no terminal, so nothing can prompt; pass the flags that
 answer instead. For `gh skill install` that means a skill name or
 `--all` (without either it only lists the repository's skills) and

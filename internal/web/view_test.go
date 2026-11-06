@@ -390,6 +390,12 @@ func TestDetailAgentTerms(t *testing.T) {
 		!strings.Contains(html, `<input type="hidden" name="agent" value="claude"><button class="ln danger">Stop claude</button>`) || strings.Contains(html, "Stop omp") {
 		t.Errorf("Stop buttons wrong:\n%s", html)
 	}
+	// D188: every agent can have its setup run again, after a confirm.
+	for _, n := range []string{"claude", "omp"} {
+		if !strings.Contains(html, `<form method="post" action="/p/ftest/feat-login/agent-setup" data-post data-confirm="Run `+n+`'s setup commands again?`) {
+			t.Errorf("no setup form for %s:\n%s", n, html)
+		}
+	}
 }
 
 // TestDetailActions: the actions follow the stack's state; a running

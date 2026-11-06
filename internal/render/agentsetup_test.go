@@ -150,6 +150,18 @@ func TestAgentSetupScriptRuns(t *testing.T) {
 	if markers() != 0 || !strings.Contains(errs, "setup probe: exit 1: false") || !strings.Contains(errs, "failed; it runs again") || !strings.Contains(out, "entry a1 a 2") {
 		t.Errorf("failure: markers %d\nout %q\nerr %q", markers(), out, errs)
 	}
+	// The run's output, the failing command's included, is in the log.
+	logf := filepath.Join(home, AgentSetupLog)
+	if data, _ := os.ReadFile(logf); !strings.Contains(string(data), "setup probe: exit 1: false") || !strings.Contains(string(data), "~/.railswitch-setup.log") {
+		t.Errorf("log %q", data)
+	}
+	// It keeps the last run only, cut to its end past the bound.
+	if _, errs := run([]string{"head -c 300000 /dev/zero | tr '\\0' x; echo; echo boom >&2; false"}); !strings.Contains(errs, "boom") {
+		t.Errorf("big run: %.200q", errs)
+	}
+	if data, _ := os.ReadFile(logf); len(data) > agentSetupLogMax || !strings.Contains(string(data), "boom") || strings.Contains(string(data), "exit 1: false\n") {
+		t.Errorf("log: %d bytes, ends %q", len(data), data[max(0, len(data)-200):])
+	}
 	// A run that failed goes on from the failing command: the ones before
 	// it, which may not run twice (gh extension install), don't run again.
 	once, flag := filepath.Join(dir, "once"), filepath.Join(dir, "flag")
@@ -158,7 +170,7 @@ func TestAgentSetupScriptRuns(t *testing.T) {
 		t.Fatalf("first run: %q", errs)
 	}
 	writeExec(flag, "")
-	if out, errs := run(resume); strings.Contains(errs, "failed") || strings.Contains(out, "touch") || markers() != 1 {
+	if out, errs := run(resume); strings.Contains(errs, "failed") || strings.Contains(errs, "touch") || markers() != 1 {
 		t.Errorf("resume: markers %d\nout %q\nerr %q", markers(), out, errs)
 	}
 	os.RemoveAll(filepath.Join(home, ".railswitch-setup.d"))

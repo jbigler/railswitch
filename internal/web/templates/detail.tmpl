@@ -31,6 +31,7 @@
 {{with $.Agent}}{{if .Message}}<div class="msg">{{.Message}}</div>{{end}}{{end}}
 {{if gt (len $.AgentTerms) 1}}<div class="agent-others"><span class="muted">Other agents:</span>{{range $.AgentTerms}}{{if not .Running}} <span><b class="mono">{{.Name}}</b> <span class="muted">stopped</span></span> <button type="button" class="ln" data-switch-url="{{$.AgentStopURL}}" data-switch-from="{{$.RunningAgent.Name}}" data-switch-term="{{.URL}}" data-switch-to="{{.Name}}">Switch to {{.Name}}</button>{{end}}{{end}}</div>
 {{end}}{{else}}<div class="agent-now"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b>No agent running</b><span class="muted">An agent starts in this worktree's container when its terminal opens.</span></div><div class="agent-acts">{{range $i, $a := .AgentTerms}}<button type="button" class="ln{{if eq $i 0}} main{{end}}" data-term="{{.URL}}" data-term-label="{{.Name}}" data-term-agent data-term-tab="agent">Start {{.Name}}</button>{{end}}</div></div>
+{{end}}{{if .AgentSetupURL}}<div class="agent-others"><span class="muted">Setup:</span>{{range .AgentTerms}}<form method="post" action="{{$.AgentSetupURL}}" data-post data-confirm="Run {{.Name}}'s setup commands again? They run at its next start; a running {{.Name}} needs a stop and a start."><input type="hidden" name="agent" value="{{.Name}}"><button class="ln quiet">Run {{.Name}}'s setup again</button></form>{{end}}</div>
 {{end}}{{template "queue-detail" .Queue}}
 </section>
 {{with .Tests}}<section class="dcard" data-panel="tests"><h2 class="lbl">Tests</h2>

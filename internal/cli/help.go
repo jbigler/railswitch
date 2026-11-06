@@ -16,6 +16,7 @@ var synopses = map[string]string{
 	"agent default apply":    "agent default apply [<name>] [--all]",
 	"agent default promote":  "agent default promote [<name>] [--all]",
 	"agent stop":             "agent stop [<name>]",
+	"agent setup":            "agent setup --again [<name>] [--all] | --log [<name>]  (setup runs again at its next start; the last run's output)",
 	"agent queue add":        "agent queue add [--issue <n>] [<text>...]  (default: the text on stdin)",
 	"agent queue clear":      "agent queue clear",
 	"agent queue ls":         "agent queue ls",

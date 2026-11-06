@@ -18,7 +18,7 @@ import (
 	"github.com/jbigler/railswitch/internal/term"
 )
 
-const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch [--json] agent usage [--days N] [--all] | railswitch agent queue add|ls|rm|clear|next | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
+const agentUsage = "usage: railswitch agent [--new-term] [--no-token | --watch] [<name>] [-- args...] | railswitch [--json] agent ls | railswitch [--json] agent screen [<name>] | railswitch agent send [<name>] (text on stdin) | railswitch [--json] agent usage [--days N] [--all] | railswitch agent queue add|ls|rm|clear|next | railswitch agent stop [<name>] | railswitch agent update [<name>] | railswitch agent setup --again [<name>] [--all] | railswitch agent setup --log [<name>] | railswitch agent add <name> [--use <ref>] [--run on-demand|service] | railswitch agent default promote|apply [<name>] [--all]"
 
 // executable is the running railswitch binary, re-executed by --new-term;
 // tests replace it.
@@ -58,6 +58,8 @@ func cmdAgent(ctx context.Context, e *env, args []string) int {
 		return cmdAgentQueue(ctx, e, args[1:])
 	case len(args) > 0 && args[0] == "usage":
 		return cmdAgentUsage(ctx, e, args[1:])
+	case len(args) > 0 && args[0] == "setup":
+		return cmdAgentSetup(ctx, e, args[1:])
 	}
 	a, code, ok := agentArgs(e, args)
 	if !ok {
@@ -128,6 +130,82 @@ func cmdAgentUpdate(ctx context.Context, e *env, args []string) int {
 		return e.failCommand(err)
 	}
 	return 0
+}
+
+// railswitch agent setup --again [<name>] [--all]: the agent's
+// [agents.<name>] setup runs again at its next start in the worktree
+// (--all: every worktree) (D188); it prints the end of the last run's log
+// first. railswitch agent setup --log [<name>]: that log. --again or --log
+// is required: setup alone would read as running it now.
+func cmdAgentSetup(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("agent setup")
+	again := fs.Bool("again", false, "run the setup again at the agent's next start")
+	all := fs.Bool("all", false, "with --again: in every worktree of the project")
+	logOnly := fs.Bool("log", false, "print the last setup run's output")
+	pos, code, ok := parseMixed(fs, args)
+	if !ok {
+		return code
+	}
+	if *again == *logOnly || *all && !*again || len(pos) > 1 {
+		return e.usageErr("usage: railswitch agent setup --again [<name>] [--all] | railswitch agent setup --log [<name>] | railswitch agent setup --log [<name>]")
+	}
+	l, slug, code := e.lifecycle(ctx, "agent setup")
+	if code != 0 {
+		return code
+	}
+	name := strings.Join(pos, "")
+	agent, log, err := l.AgentSetupLog(ctx, slug, name)
+	if *logOnly {
+		if err != nil {
+			return e.setupErr(err)
+		}
+		if log == nil {
+			fmt.Fprintf(e.stdout, "%s has no setup log in %s\n", agent, slug)
+		}
+		e.printLog(log, 0)
+		return 0
+	}
+	if err == nil && log != nil { // an unreadable log doesn't stop --again
+		fmt.Fprintf(e.stdout, "the last setup run's end (railswitch agent setup --log %s):\n", agent)
+		e.printLog(log, 20)
+	}
+	r, err := l.AgentSetupAgain(ctx, slug, name, *all)
+	if err != nil {
+		return e.setupErr(err)
+	}
+	if len(r.Cleared) == 0 {
+		fmt.Fprintf(e.stdout, "%s has not run here yet: its setup runs at its first start\n", r.Agent)
+		return 0
+	}
+	fmt.Fprintf(e.stdout, "setup runs again at %s's next start in: %s\n", r.Agent, strings.Join(r.Cleared, ", "))
+	if len(r.Running) > 0 {
+		fmt.Fprintf(e.stdout, "%s is running in: %s; stop it (railswitch agent stop %s) and start it again\n", r.Agent, strings.Join(r.Running, ", "), r.Agent)
+	}
+	return 0
+}
+
+// setupErr reports a lifecycle error: a usage one with exit 2.
+func (e *env) setupErr(err error) int {
+	var u *lifecycle.UsageError
+	if errors.As(err, &u) {
+		return e.usageErr("%s", u.Msg)
+	}
+	return e.fail(err)
+}
+
+// printLog prints log, an agent-written file, line by line through
+// safefile.Printable; with n > 0 only its last n lines.
+func (e *env) printLog(log []byte, n int) {
+	lines := strings.Split(strings.TrimRight(string(log), "\n"), "\n")
+	if len(log) == 0 {
+		lines = nil
+	}
+	if n > 0 && len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	for _, line := range lines {
+		fmt.Fprintln(e.stdout, safefile.Printable(line))
+	}
 }
 
 // railswitch [--json] agent screen [<name>]: the service agent's screen as

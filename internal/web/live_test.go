@@ -32,7 +32,7 @@ func TestLive(t *testing.T) {
 	 {"name":"ftest-b-web","firewall":"firewalled","profiles":["app"],"mode":"enforce","rejected":[{"addr":"1.2.3.5","proto":"tcp","port":"443","host":"api.stripe.com"}]},
 	 {"name":"ftest-b-db","firewall":"firewalled","profiles":["none"],"mode":"enforce","rejected":[{"addr":"9.9.9.9","proto":"udp","port":"53","host":"dns.example"}]}]}`)
 	f.cli.set(usageCmd, ftestUsage()) // the usage views (D187): /p/ftest/b, its Agent tab
-	f.cli.set(reviewKey, reviewJSON) // /p/ftest/review: chips and flagged notes
+	f.cli.set(reviewKey, reviewJSON)  // /p/ftest/review: chips and flagged notes
 	f.cli.set("--json -C /ws/ftest overview", ftestOverview("jb/b", "up", bRunning))
 	go f.s.Run(t.Context()) // the pollers: the PRs and agent usage arrive with a page open
 	h := f.s.Handler()

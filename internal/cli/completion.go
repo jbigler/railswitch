@@ -84,6 +84,7 @@ var completionFlags = map[string][]string{
 	"dashboard colors set":   {"--base=", "--dark"},
 	"down":                   {"--yes"},
 	"exec":                   {"--fresh"},
+	"fw allow":               {"--for="},
 	"db restore":             {"--from=", "--yes"},
 	"db snapshot restore":    {"--yes"},
 	"gc":                     {"--dry-run", "--volumes", "--yes"},

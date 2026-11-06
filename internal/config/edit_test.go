@@ -790,3 +790,19 @@ func TestTerminalTask(t *testing.T) {
 		t.Fatalf("remove: %q, %v", got, err)
 	}
 }
+
+// TestCheckFloor (D179): an address or range in a private, link-local or
+// cloud-metadata range is refused, whatever the allow list; one that
+// contains such a range (0.0.0.0/0) too; public ones and names pass.
+func TestCheckFloor(t *testing.T) {
+	for _, h := range []string{"169.254.169.254", "10.1.2.3", "192.168.1.0/24", "172.20.0.1", "100.100.1.1", "0.0.0.0/0", "128.0.0.0/1", "8.0.0.0/5"} {
+		if err := CheckAllowHost(h); err == nil || !strings.Contains(err.Error(), "never opens") {
+			t.Errorf("CheckAllowHost(%q) = %v; want a floor error", h, err)
+		}
+	}
+	for _, h := range []string{"8.8.8.8", "203.0.113.0/24", "api.github.com", "meta:github", "172.32.0.1"} {
+		if err := CheckAllowHost(h); err != nil {
+			t.Errorf("CheckAllowHost(%q) = %v", h, err)
+		}
+	}
+}

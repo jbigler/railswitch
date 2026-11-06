@@ -22,6 +22,7 @@ args = { ELIXIR_VERSION = "{elixir}", OTP_MAJOR = "{erlang.major}" }
 [runtimes.elixir]                       # the official image has a tag per Elixir patch and OTP major
 from = [".tool-versions:elixir", "mise.toml:elixir", ".mise.toml:elixir"]
 fallback = "1.19.6"
+drop_suffix = "-otp-[0-9]+"             # asdf and mise write 1.18.4-otp-28; the tag adds -otp-<erlang major> itself
 
 [runtimes.erlang]
 from = [".tool-versions:erlang", "mise.toml:erlang", ".mise.toml:erlang"]

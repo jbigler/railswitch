@@ -30,8 +30,8 @@ Then copy this directory to `<workspace>/packs/phoenix/` and run
 - **Versions.** `.tool-versions` names `elixir <version>` and
   `erlang <version>`: the image is
   `docker.io/library/elixir:<elixir>-otp-<erlang major>-slim`, so the Elixir
-  version must be one that image has a tag for, written without asdf's
-  `-otp-NN` suffix (`elixir 1.19.6`, not `elixir 1.19.6-otp-28`).
+  version must be one that image has a tag for. asdf's `-otp-NN` suffix
+  (`elixir 1.19.6-otp-28`) is dropped (the pack's `drop_suffix`).
 - **mix.lock.** The first `deps` run writes it; commit it. Later runs use
   `mix deps.get --check-locked`, which refuses a `mix.lock` that needs
   changing: change dependencies with `railswitch deps -- mix deps.get`.

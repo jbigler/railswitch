@@ -127,3 +127,32 @@ func TestDetectRulesRefused(t *testing.T) {
 		}
 	}
 }
+
+// TestDropSuffix: a runtime's drop_suffix takes the matching end off a
+// value (D178); one that doesn't compile, or on db_name, is refused.
+func TestDropSuffix(t *testing.T) {
+	c := Chain{DropSuffix: "-otp-[0-9]+"}
+	for in, want := range map[string]string{"1.18.4-otp-28": "1.18.4", "1.18.4": "1.18.4", "1.18.4-otp-28-x": "1.18.4-otp-28-x", "": ""} {
+		if got := c.Value(in); got != want {
+			t.Errorf("Value(%q) = %q; want %q", in, got, want)
+		}
+	}
+	if got := (Chain{}).Value("1.18.4-otp-28"); got != "1.18.4-otp-28" {
+		t.Errorf("no drop_suffix: %q", got)
+	}
+	for _, add := range []string{
+		"\n[runtimes.ex]\nfrom = [\".tool-versions:ex\"]\ndrop_suffix = \"-otp-[\"\n",
+		"\n[db_name]\nfallback = \"x\"\ndrop_suffix = \"-x\"\n",
+	} {
+		fsys := minimal()
+		fsys["packs/p/pack.toml"].Data = append(fsys["packs/p/pack.toml"].Data, []byte(add)...)
+		if _, err := Load(fsys); err == nil || !strings.Contains(err.Error(), "drop_suffix") {
+			t.Errorf("Load with %q = %v; want a drop_suffix error", add, err)
+		}
+	}
+	fsys := minimal()
+	fsys["packs/p/pack.toml"].Data = append(fsys["packs/p/pack.toml"].Data, []byte("\n[runtimes.ex]\nfrom = [\".tool-versions:ex\"]\nfallback = \"1.0\"\ndrop_suffix = \"-otp-[0-9]+\"\n")...)
+	if _, err := Load(fsys); err != nil {
+		t.Errorf("Load with a drop_suffix = %v", err)
+	}
+}

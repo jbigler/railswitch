@@ -129,12 +129,36 @@ func TestFwAllow(t *testing.T) {
 	mustRun(t, "-C", ws, "render")
 
 	f := fakeHost()
-	if code, _, errs := runWith(t, f, "-C", ws, "-w", "master", "fw", "allow", "nvim", "example.com", "10.1.2.3"); code != 0 {
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "master", "fw", "allow", "nvim", "example.com", "203.0.113.7"); code != 0 {
 		t.Fatalf("fw allow: exit %d, stderr %q", code, errs)
 	}
 	argv, env := fwCall(t, f)
-	if !slices.Equal(argv, []string{filepath.Join(ws, ".railswitch", "firewall", "firewall.sh"), "allow", "nvim", "example.com", "10.1.2.3"}) || env["WORKTREE"] != "master" {
+	if !slices.Equal(argv, []string{filepath.Join(ws, ".railswitch", "firewall", "firewall.sh"), "allow", "nvim", "example.com", "203.0.113.7"}) || env["WORKTREE"] != "master" {
 		t.Errorf("argv %v, WORKTREE %q", argv, env["WORKTREE"])
+	}
+
+	// D179: --for reaches the script in seconds; the floor is refused here.
+	f = fakeHost()
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "master", "fw", "allow", "--for", "30m", "nvim", "example.com"); code != 0 {
+		t.Fatalf("fw allow --for: exit %d, stderr %q", code, errs)
+	}
+	if argv, _ := fwCall(t, f); !slices.Equal(argv[1:], []string{"allow", "--for", "1800s", "nvim", "example.com"}) {
+		t.Errorf("--for argv %v", argv)
+	}
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"nvim", "169.254.169.254"}, "never opens"},
+		{[]string{"nvim", "10.0.0.0/8"}, "never opens"},
+		{[]string{"--for", "30m", "nvim", "203.0.113.0/24"}, "is a range"},
+		{[]string{"--for", "200h", "nvim", "example.com"}, "between 1s and"},
+		{[]string{"--for", "-5m", "nvim", "example.com"}, "between 1s and"},
+	} {
+		args := append([]string{"-C", ws, "-w", "master", "fw", "allow"}, c.args...)
+		if code, _, errs := runIn(t, args...); code != 2 || !strings.Contains(errs, c.want) {
+			t.Errorf("%v: exit %d, stderr %q; want 2 and %q", c.args, code, errs, c.want)
+		}
 	}
 
 	for _, args := range [][]string{

@@ -253,15 +253,23 @@ still wider than the window scrolls its pane.
     the branch, `◀ HEAD` on the current one, `queued`, `⚠`; the merged
     ones folded, the trunk last. Every other open branch's name checks
     it out here (see Actions).
-  - **Agent:** state and message, then the worktree's usage from `agent
-    usage`: `<n> tokens today · <m> in 14 days`, ` · $<cost>` when
-    reported, in yellow with `⚠` while it is `runaway`; the queue;
-    a button per configured agent (`claude ▣`, `● claude ▣` while it
-    runs: each a service `agent-<name>`, on demand or not; with none
-    listed, one for the agent the overview names, else the default) that
-    opens its terminal panel on the Agent tab (below), as the Terminal
-    menu's `Agent: <name> ▣` does; the **Default config…** link beside its
-    label.
+  - **Agent** (D176), the running agent first: one agent runs per
+    worktree (D62). With one running, a green box says "`<name>` is
+    running" with its state (Idle, Working, Waiting for reply…),
+    **Open terminal** (its terminal panel on the Agent tab, below, as the
+    Terminal menu's `Agent: <name>` does) and **Stop <name>** (after a
+    confirm, `railswitch agent stop <name>` as a job, the name checked
+    against the worktree's `agent ls`); its message under it; then
+    "Other agents:" each stopped one with **Switch to <name>**, which
+    after a confirm stops the running agent and, when that job ends
+    well, opens the other's terminal, which starts it. With none running,
+    "No agent running" and a **Start <name>** per configured agent (the
+    first one filled), each opening its terminal. Agents are the
+    services `agent-<name>`, on demand or not; with none listed, the
+    agent the overview names, else the default. Then the worktree's
+    usage from `agent usage` (`<n> tokens today · <m> in 14 days`,
+    ` · $<cost>` when reported, yellow with `⚠` while `runaway`), the
+    queue, and the **Default config…** link beside the card's label.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
   - **Database:** **Snapshots…** (D157).
@@ -306,8 +314,13 @@ shows what each one does before anything is written.
   edits (`firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`).
   "Blocked, or would be under enforce" loads after the page from
   `GET /p/<prefix>/settings/blocked` (`railswitch --json fw show`): each
-  rejected address with its host and an "Allow in <list>" button (staging
-  `firewall.allow.add`) when it resolves and the container has a list; a
+  rejected address with its host and an "Add to <list> list" button (staging
+  `firewall.allow.add`: lasting, from each container's next start) when it
+  resolves and the container has a list. A container under enforce that
+  runs a worktree's service also gets "Allow for" with 10 minutes, 1 hour
+  or until it restarts (D184): `POST /p/<prefix>/<slug>/fw-allow/<service>`
+  (`host`, `for`: `10m`, `1h` or `restart`) runs `railswitch fw allow
+  [--for <d>] <service> <host>` as a job, in that running container now. A
   data container has nothing to allow; a container with no hook is
   named.
 - **Hooks** (D126): a box per `[hooks]` list (`deps`, `start`, `create`),
@@ -1176,9 +1189,11 @@ any open page.
     panel (D149, as on the worktree page), **Terminal window** (`term`) and
     **Neovim window** (`nvim --new-term`) a window on this machine. **The
     agent's desk** and its wall screen open the agent panel, as the
-    android does; the agent's android stands at it, its eyes and ring in
-    the agent's state (pulsing while it waits on you), its hands typing
-    while it works; it opens the agent's state and message and the agent
+    android does. The desk is a sit-stand one (D183): while the agent
+    works, its android stands and types, the desk raised to standing height
+    with its screens and the chair pushed back; otherwise it sits, the desk
+    down. Waiting on you, it finishes rising or sitting, whichever is nearer, and stays so. Its eyes and ring show the
+    agent's state (pulsing while it waits on you); it opens the agent's state and message and the agent
     itself in a live terminal (D149): a running service agent's session at
     once, else after **Connect** (connecting runs `up`), with **Open
     console window** beside it; with a package that counts them (claude@1),

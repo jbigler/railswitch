@@ -114,6 +114,40 @@ function motion(o) {
   return {};
 }
 
+// limbAngle is an android limb's rotation about x from its rest pose, for
+// the walk cycle (u.phase: strides, u.gait: 0 standing to 1 walking), the
+// agent's typing (u.typing) and its sitting (u.sit: 0 to 1). Negative swings
+// forward. A model with knees and elbows (Shin_L/R, Forearm_L/R under the
+// leg and arm) walks with them: the knee bends as the leg swings through
+// and straightens to land, the elbows stay soft; one without swings each
+// limb whole, as the kit's first androids did.
+function limbAngle(o, part, side, u, t, seed) {
+  const gait = u.gait ?? 0, sit = u.sit ?? 0;
+  const ph = (u.phase ?? 0) * Math.PI * 2 + (side === 'L' ? 0 : Math.PI); // this side's leg
+  const jointed = (o.userData.jointed ??= o.children.some((c) => /_(Shin|Forearm)_[LR]$/.test(c.name)));
+  const walking = 1 - sit;
+  switch (part) {
+    case 'Leg': { // the hip: forward while sin > 0; folded flat to sit
+      const swing = -Math.sin(ph) * (jointed ? 0.5 : 0.55) * gait;
+      return swing * walking - sit * Math.PI / 2;
+    }
+    case 'Shin': { // the knee: bent through the swing (the leg moving forward: cos > 0), most just after
+      // the toe leaves the ground, before the leg passes under the hip (ph = 0); nearly straight in stance
+      const flex = (Math.max(0, Math.cos(ph + 0.4)) ** 2 * 1.0 + 0.1) * gait;
+      return flex * walking + sit * Math.PI / 2;
+    }
+    case 'Arm': { // the shoulder: against the same side's leg; reaching for the keys while typing
+      if (u.typing) return jointed ? -0.55 : -0.95 + Math.sin(t * 14 + (side === 'L' ? 0 : 1.7)) * 0.05;
+      return (Math.sin(ph) * (jointed ? 0.4 : 0.45) * gait) * walking - (jointed ? 0.25 : 0.6) * sit + Math.sin(t * 1.3 + seed) * 0.03;
+    }
+    case 'Forearm': { // the elbow: soft, more as the arm swings forward; level over the keys while typing
+      if (u.typing) return -0.95 + Math.sin(t * 14 + (side === 'L' ? 0 : 1.7)) * 0.06;
+      return -(0.12 + (0.22 + 0.3 * Math.max(0, -Math.sin(ph))) * gait) * walking - 1.0 * sit; // seated: forearms over the lap
+    }
+  }
+  return 0;
+}
+
 // Remember each moving node's authored transform once, then offset from it.
 function rest(o) {
   return (o.userData.rest ??= { p: o.position.clone(), r: o.rotation.clone(), s: o.scale.clone() });
@@ -153,14 +187,8 @@ export function animate(root, t) {
       return;
     }
     if (n.endsWith('_Bubbles')) { const r = rest(o); o.position.y = r.p.y + ((t * 0.08) % 0.06); return; }
-    const limb = /_(Leg|Arm)_([LR])$/.exec(n);
-    if (limb) { // androids: legs and arms swing in opposite phase; arms type while userData.typing
-      const r = rest(o), u = motion(o), arm = limb[1] === 'Arm';
-      const swing = Math.sin((u.phase ?? 0) * Math.PI * 2 + (limb[2] === 'L' ? 0 : Math.PI) + (arm ? Math.PI : 0)) * (u.gait ?? 0);
-      if (arm && u.typing) o.rotation.x = r.r.x - 0.95 + Math.sin(t * 14 + (limb[2] === 'L' ? 0 : 1.7)) * 0.05;
-      else o.rotation.x = r.r.x + swing * (arm ? 0.45 : 0.55) + (arm ? Math.sin(t * 1.3 + seed) * 0.03 : 0);
-      return;
-    }
+    const limb = /_(Leg|Arm|Shin|Forearm)_([LR])$/.exec(n);
+    if (limb) { o.rotation.x = rest(o).r.x + limbAngle(o, limb[1], limb[2], motion(o), t, seed); return; }
     const leg = /_Leg_([FB])([LR])$/.exec(n);
     if (leg) { // trot: front-left with back-right, front-right with back-left
       const r = rest(o), u = motion(o);
@@ -217,10 +245,11 @@ const angleTo = (from, to) => ((to - from + Math.PI * 3) % (Math.PI * 2)) - Math
  *   colliders kit.colliders(scene); boxes from the floor up to `height` block the pet
  *   bounds    { minX, maxX, minZ, maxZ, y }: the walkable floor, world coordinates
  *   homes     [{ x, z, ry }]: spots it goes back to (a bed), with chance homeChance
+ *   bob, sway a biped's body dip (m) and roll (rad) per step at full gait; 0 for a pet
  * Both models must be in the scene; the roamer sets their position, rotation and visibility.
  */
 export function createRoamer({ walk, rest = null, colliders = [], bounds, start = null, homes = [], homeChance = 0.35,
-  radius = 0.25, height = 0.5, speed = 0.6, stride = 0.35, idle = [4, 12], shy = 1.2, cell = 0.25, rng = Math.random }) {
+  radius = 0.25, height = 0.5, speed = 0.6, stride = 0.35, idle = [4, 12], shy = 1.2, cell = 0.25, bob = 0, sway = 0, rng = Math.random }) {
   const cols = Math.ceil((bounds.maxX - bounds.minX) / cell), rows = Math.ceil((bounds.maxZ - bounds.minZ) / cell);
   const boxes = [];
   for (const c of colliders) {
@@ -310,6 +339,11 @@ export function createRoamer({ walk, rest = null, colliders = [], bounds, start 
   const place = () => {
     for (const o of [walk, rest]) if (o) { o.position.set(x, bounds.y, z); o.rotation.y = heading; }
     walk.userData.gait = gait;
+    // A biped's body: highest as a leg passes under it, lowest with both feet down
+    // (twice a stride), rolling a little over the leg it stands on.
+    const p = walk.userData.phase * Math.PI * 2;
+    walk.position.y -= bob * gait * Math.sin(p) ** 2;
+    walk.rotation.z = sway * gait * Math.sin(p);
   };
   show(); place();
 

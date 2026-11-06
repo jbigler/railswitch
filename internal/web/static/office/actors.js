@@ -13,9 +13,20 @@ export const stateColor = {
   off: 0x56627a,
 };
 
-// agentAndroid is the agent partner, standing at its desk; set(state)
-// recolours its visor and ring (its own copies of their materials).
-export function agentAndroid(k) {
+// SIT_DROP is how far an android's body comes down to sit on a chair: its
+// hips (0.93 m standing) to just above the seat (0.51 m).
+const SIT_DROP = 0.39;
+// SIT_TIME is how long (s) the agent takes to sit down or stand up, the
+// desk going down or up with it, as a real sit-stand desk does.
+const SIT_TIME = 2.5;
+
+// agentAndroid is the agent partner at its sit-stand desk; set(state)
+// recolours its visor and ring (its own copies of their materials). It
+// stands while the agent works, the desk's top raised (desk.top, by
+// desk.travel), and sits otherwise, its chair (desk.chair) pulled in; the
+// arms type while it works. Without desk.top (a set lacking the desk) it
+// still sits and stands; only the top stays put.
+export function agentAndroid(k, desk = {}) {
   const g = k.spawn('Char_Android_Agent');
   const visor = new THREE.MeshBasicMaterial({ toneMapped: false });
   const ring = new THREE.MeshBasicMaterial({ toneMapped: false });
@@ -27,16 +38,36 @@ export function agentAndroid(k) {
   const base = new THREE.Color();
   let state = 'off';
   g.userData.typing = false;
+  g.userData.sit = 1; // 0 standing, 1 sitting, eased: what the limbs and the desk follow
+  let raw = 1; // the same, not eased
+  const topY = desk.top?.position.y ?? 0;
+  let chairHome = null;
   g.set = (s) => {
     state = stateColor[s] ? s : 'off';
     base.setHex(stateColor[state]).multiplyScalar(1.6);
     visor.color.copy(base);
     ring.color.copy(base);
-    g.userData.typing = state === 'working';
   };
+  const back = new THREE.Vector3(); // the chair's push-back, reused every frame
   g.tick = (dt, t) => {
     const waits = state === 'permission' || state === 'question';
     ring.color.copy(base).multiplyScalar(waits ? 0.6 + Math.abs(Math.sin(t * 4)) * 0.8 : 1);
+    // Stand to work, sit otherwise; waiting on you finishes the move it was
+    // in to the nearer end and holds there (never a half-crouch).
+    const u = g.userData;
+    const want = state === 'working' ? 0 : waits ? Math.round(raw) : 1;
+    raw += Math.max(-dt / SIT_TIME, Math.min(dt / SIT_TIME, want - raw));
+    const s = (u.sit = raw * raw * (3 - 2 * raw)); // eased, no jolt at either end
+    u.floorY ??= g.position.y;
+    g.position.y = u.floorY - SIT_DROP * s;
+    // The arms type only once it is up and the desk with it.
+    u.typing = state === 'working' && raw < 0.05;
+    if (desk.top) desk.top.position.y = topY + (desk.travel ?? 0) * (1 - s);
+    if (desk.chair) { // pushed back as it stands, pulled in to sit
+      chairHome ??= desk.chair.position.clone();
+      back.set(Math.sin(g.rotation.y), 0, Math.cos(g.rotation.y)).multiplyScalar(-0.4 * (1 - s));
+      desk.chair.position.copy(chairHome).add(back);
+    }
   };
   g.set('off');
   return g;

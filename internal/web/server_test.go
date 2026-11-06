@@ -56,6 +56,14 @@ func TestActions(t *testing.T) {
 		{"agent console", "/p/ftest/b/act/agent", form(), 202, append(slices.Clone(wsb), "agent", "--new-term"), ""},
 		{"restart a service", "/p/ftest/b/restart/web", form(), 202, append(slices.Clone(wsb), "restart", "web"), ""},
 		{"restart an unknown service", "/p/ftest/b/restart/nope", form(), 404, nil, ""},
+		{"allow live for a while", "/p/ftest/b/fw-allow/web", form("host", "pay.example.com", "for", "10m"), 202, append(slices.Clone(wsb), "fw", "allow", "--for", "10m", "web", "pay.example.com"), ""},
+		{"allow live until restart", "/p/ftest/b/fw-allow/web", form("host", "pay.example.com", "for", "restart"), 202, append(slices.Clone(wsb), "fw", "allow", "web", "pay.example.com"), ""},
+		{"allow live, other time", "/p/ftest/b/fw-allow/web", form("host", "pay.example.com", "for", "2h"), 422, nil, "for:"},
+		{"allow live flag host", "/p/ftest/b/fw-allow/web", form("host", "--for", "for", "10m"), 422, nil, "not a host"},
+		{"allow live range", "/p/ftest/b/fw-allow/web", form("host", "203.0.113.0/24", "for", "10m"), 422, nil, "not a host"},
+		{"allow live meta", "/p/ftest/b/fw-allow/web", form("host", "meta:github", "for", "10m"), 422, nil, "not a host"},
+		{"allow live floor", "/p/ftest/b/fw-allow/web", form("host", "169.254.169.254", "for", "10m"), 422, nil, "not a host"},
+		{"allow live unknown service", "/p/ftest/b/fw-allow/nope", form("host", "pay.example.com", "for", "10m"), 404, nil, ""},
 		{"agent default promote", "/p/ftest/b/agent-default/promote", form("name", "claude", "all", "1"), 202, append(slices.Clone(wsb), "agent", "default", "promote", "claude", "--all"), ""},
 		{"agent default apply", "/p/ftest/b/agent-default/apply", form("name", "claude"), 202, append(slices.Clone(wsb), "agent", "default", "apply", "claude"), ""},
 		{"agent default other", "/p/ftest/b/agent-default/rm", form("name", "claude"), 404, nil, ""},
@@ -76,6 +84,9 @@ func TestActions(t *testing.T) {
 		{"task term", "/p/ftest/b/task", form("task", "console", "term", "1"), 202, append(slices.Clone(wsb), "task", "--new-term", "console"), ""},
 		{"task unknown", "/p/ftest/b/task", form("task", "nope"), 404, nil, ""},
 		{"task bad args", "/p/ftest/b/task", form("task", "test", "args", `"x`), 422, nil, "unterminated"},
+		{"agent stop", "/p/ftest/b/agent-stop", form("agent", "claude"), 202, append(slices.Clone(wsb), "agent", "stop", "claude"), ""},
+		{"agent stop unknown", "/p/ftest/b/agent-stop", form("agent", "nope"), 404, nil, ""},
+		{"agent stop flag", "/p/ftest/b/agent-stop", form("agent", "--all"), 404, nil, ""},
 	} {
 		f := newFixture(t)
 		w := f.do(req("POST", c.path, c.form))
@@ -226,7 +237,7 @@ func TestPages(t *testing.T) {
 			}
 		}
 		html := strings.HasPrefix(w.Header().Get("Content-Type"), "text/html")
-		if body := w.Body.String(); html && (strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") || (strings.Contains(body, "<script") && !strings.Contains(body, `<script src="/static/app.js" defer></script>`))) {
+		if body := w.Body.String(); html && (strings.Contains(body, " style=") || strings.Contains(body, "<style") || strings.Contains(body, "onclick") || (strings.Contains(body, "<script") && !strings.Contains(body, `<script src="/static/app.js" type="module"></script>`))) {
 			t.Errorf("%s: inline style or script (CSP)", c.path)
 		}
 	}

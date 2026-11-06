@@ -178,8 +178,8 @@ func TestAgentAllow(t *testing.T) {
 	if got := listed(files(t, fw)[".railswitch/firewall/agent.allow"].Data); len(got) != 0 {
 		t.Errorf("agent.allow without allow.agent: %v", got)
 	}
-	fw.Allow["agent"] = []string{"api.example.com", "10.0.0.0/8"}
-	if got := listed(files(t, fw)[".railswitch/firewall/agent.allow"].Data); !slices.Equal(got, []string{"api.example.com", "10.0.0.0/8"}) {
+	fw.Allow["agent"] = []string{"api.example.com", "203.0.113.0/24"}
+	if got := listed(files(t, fw)[".railswitch/firewall/agent.allow"].Data); !slices.Equal(got, []string{"api.example.com", "203.0.113.0/24"}) {
 		t.Errorf("agent.allow %v", got)
 	}
 }
@@ -240,14 +240,15 @@ func TestScriptsParse(t *testing.T) {
 	}
 }
 
-// hookEnv puts shims on PATH: nsenter runs its args after -n, nft copies
-// stdin to $OUT.
+// hookEnv puts shims on PATH: nsenter runs its args after -n, nft -f copies
+// stdin to $OUT, and nft list prints it back without its first two lines
+// (table, delete table), or $LIST when set: the live table to verify.
 func hookEnv(t *testing.T, out string) []string {
 	t.Helper()
 	bin := t.TempDir()
 	shims := map[string]string{
 		"nsenter": "#!/bin/bash\nwhile (( $# )) && [[ $1 != -n ]]; do shift; done\nshift\nexec \"$@\"\n",
-		"nft":     "#!/bin/bash\ncat >\"$OUT\"\n",
+		"nft":     "#!/bin/bash\nif [[ $1 == list ]]; then if [[ -n ${LIST:-} ]]; then cat \"$LIST\"; else tail -n +3 \"$OUT\"; fi; else cat >\"$OUT\"; fi\n",
 	}
 	for name, body := range shims {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
@@ -534,6 +535,132 @@ func TestHookMetaGoogle(t *testing.T) {
 		}
 		if log, _ := os.ReadFile(filepath.Join(root, "hook.log")); c.why != "" && !strings.Contains(string(log), c.why) {
 			t.Errorf("%s: log does not say why:\n%s", c.name, log)
+		}
+	}
+}
+
+// TestHookFloor (D179): the hook's FLOOR is config.FirewallFloor, its
+// floor4 set holds it, and the floor rule comes before every allow rule,
+// after the container's own networks; the output chain ends in the deny
+// chain, which ends in the mode's verdict.
+func TestHookFloor(t *testing.T) {
+	src, err := os.ReadFile(filepath.Join("assets", "hook.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "FLOOR=(" + strings.Join(config.FirewallFloor, " ") + ")"; !strings.Contains(string(src), want) {
+		t.Errorf("hook.sh lacks %s", want)
+	}
+	for mode, verdict := range map[string]string{"enforce": "reject with icmpx admin-prohibited", "log": "accept"} {
+		root := t.TempDir()
+		out := filepath.Join(t.TempDir(), "nft.out")
+		if msg, err := runHook(t, root, hookEnv(t, out), map[string]string{
+			"filial.firewall":          "none",
+			"filial.firewall.mode":     mode,
+			"filial.firewall.networks": "filial-feat-dev",
+		}); err != nil {
+			t.Fatalf("%s: hook: %v\n%s", mode, err, msg)
+		}
+		rules, _ := os.ReadFile(out)
+		r := string(rules)
+		for _, f := range config.FirewallFloor {
+			if !strings.Contains(r, f) {
+				t.Errorf("%s: ruleset lacks floor %s", mode, f)
+			}
+		}
+		local, floor, allow := strings.Index(r, "@local4 accept"), strings.Index(r, "@floor4 goto deny"), strings.Index(r, "@allow4 accept")
+		if !(local >= 0 && local < floor && floor < allow && floor < strings.Index(r, "@allowt4 accept")) {
+			t.Errorf("%s: want local4, then floor4, then the allow sets:\n%s", mode, r)
+		}
+		if !strings.Contains(r, "    goto deny\n  }\n  chain deny {") || !strings.Contains(r, "    "+verdict+"\n  }\n}") {
+			t.Errorf("%s: output does not end in goto deny, or deny not in %q:\n%s", mode, verdict, r)
+		}
+	}
+}
+
+// TestHookVerifies (D179): a live table that lacks a floor range, or whose
+// floor rule comes after the allow rules, fails the start.
+func TestHookVerifies(t *testing.T) {
+	for name, edit := range map[string]func(string) string{
+		"floor range missing": func(r string) string { return strings.Replace(r, "169.254.0.0/16,", "", 1) },
+		// 0.0.0.0/8 is also the tail of 10.0.0.0/8: a substring match missed it.
+		"0.0.0.0/8 missing": func(r string) string {
+			i := strings.Index(r, "{ 0.0.0.0/8,10.0.0.0/8")
+			if i < 0 {
+				t.Fatalf("floor4 not listed as expected:\n%s", r)
+			}
+			return r[:i+2] + r[i+len("{ 0.0.0.0/8,"):]
+		},
+		"floor after allow": func(r string) string {
+			r = strings.Replace(r, "    ip daddr @floor4 goto deny\n", "", 1)
+			return strings.Replace(r, "    ip daddr @allowt4 accept\n", "    ip daddr @allowt4 accept\n    ip daddr @floor4 goto deny\n", 1)
+		},
+		"no verdict": func(r string) string { return strings.Replace(r, "    reject with icmpx admin-prohibited\n", "", 1) },
+	} {
+		// Apply once to learn the table, then hand the hook an edited copy.
+		probe := filepath.Join(t.TempDir(), "nft.out")
+		ann := map[string]string{"filial.firewall": "none", "filial.firewall.mode": "enforce", "filial.firewall.networks": "filial-feat-dev"}
+		if msg, err := runHook(t, t.TempDir(), hookEnv(t, probe), ann); err != nil {
+			t.Fatalf("probe: %v\n%s", err, msg)
+		}
+		applied, _ := os.ReadFile(probe)
+		lines := strings.SplitN(string(applied), "\n", 3)
+		live := filepath.Join(t.TempDir(), "live")
+		if err := os.WriteFile(live, []byte(edit(lines[2])), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		msg, err := runHook(t, t.TempDir(), append(hookEnv(t, filepath.Join(t.TempDir(), "nft.out")), "LIST="+live), ann)
+		if err == nil || !strings.Contains(string(msg), "verify:") {
+			t.Errorf("%s: hook passed or failed for another reason: %v\n%s", name, err, msg)
+		}
+	}
+}
+
+// TestFirewallAllowFor (D179): allow --for puts each address in allowt4
+// with the timeout; without it, in allow4; a range with --for is refused.
+func TestFirewallAllowFor(t *testing.T) {
+	bin := t.TempDir()
+	log := filepath.Join(t.TempDir(), "nft.args")
+	shims := map[string]string{
+		// podman unshare nsenter … runs its command; inspect answers id and pid.
+		"podman":  "#!/bin/bash\ncase \"$1\" in\n  inspect) [[ \"$*\" == *Pid* ]] && echo 4242 || echo 0123456789abcdef ;;\n  unshare) shift; exec \"$@\" ;;\nesac\n",
+		"nsenter": "#!/bin/bash\nwhile (( $# )) && [[ $1 != -n ]]; do shift; done\nshift\nexec \"$@\"\n",
+		"nft":     "#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$LOG\"\n",
+		"getent":  "#!/bin/bash\necho \"203.0.113.9 STREAM $2\"\n",
+	}
+	for name, body := range shims {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "state"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "state", "0123456789ab"), []byte("profiles=app\nmode=enforce\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(args ...string) (string, error) {
+		cmd := exec.Command("bash", append([]string{filepath.Join("assets", "firewall.sh"), "allow"}, args...)...)
+		cmd.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"), "LOG="+log,
+			"FIREWALL_DIR="+dir, "PREFIX=filial", "WORKTREE=api")
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+	if out, err := run("--for", "1800s", "rails", "example.com", "198.51.100.4"); err != nil {
+		t.Fatalf("allow --for: %v\n%s", err, out)
+	}
+	if out, err := run("rails", "example.com"); err != nil {
+		t.Fatalf("allow: %v\n%s", err, out)
+	}
+	got, _ := os.ReadFile(log)
+	want := "add element inet wt_firewall allowt4 { 203.0.113.9 timeout 1800s,198.51.100.4 timeout 1800s }\nadd element inet wt_firewall allow4 { 203.0.113.9 }\n"
+	if string(got) != want {
+		t.Errorf("nft calls:\n%s\nwant:\n%s", got, want)
+	}
+	for _, args := range [][]string{{"--for", "1800s", "rails", "198.51.100.0/24"}, {"--for", "30m", "rails", "example.com"}} {
+		if out, err := run(args...); err == nil {
+			t.Errorf("%v: succeeded\n%s", args, out)
 		}
 	}
 }

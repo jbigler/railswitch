@@ -708,7 +708,7 @@ func TestHookDNSFilter(t *testing.T) {
 		shims := map[string]string{"getent": "#!/bin/bash\necho \"198.51.100.20 STREAM $2\"\n"}
 		if dnsmasq {
 			// The stand-in records its argv and, as dnsmasq does, writes its pid file.
-			shims["dnsmasq"] = "#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\nsleep 300 & echo $! >\"$pf\"\n"
+			shims["dnsmasq"] = "#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\n(trap '' TERM; exec sleep 300) & echo $! >\"$pf\"\n"
 		}
 		for name, body := range shims {
 			if err := os.WriteFile(filepath.Join(bin, name), []byte(body), 0o755); err != nil {
@@ -886,7 +886,7 @@ func TestFirewallAllowDNS(t *testing.T) {
 	// (off the output pipe), write the pid file.
 	hookBin := t.TempDir()
 	dnsmasq := filepath.Join(hookBin, "dnsmasq")
-	if err := os.WriteFile(dnsmasq, []byte("#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\nsleep 300 >/dev/null 2>&1 & echo $! >\"$pf\"\n"), 0o755); err != nil {
+	if err := os.WriteFile(dnsmasq, []byte("#!/bin/bash\nprintf '%s\\n' \"$*\" >>\"$DNSLOG\"\nconf=${1#--conf-file=}\npf=$(sed -n 's/^pid-file=//p' \"$conf\")\n(trap '' TERM; exec sleep 300) >/dev/null 2>&1 & echo $! >\"$pf\"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	for name, body := range shims {
@@ -904,7 +904,7 @@ func TestFirewallAllowDNS(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The running filter.
-	old := exec.Command("sleep", "300")
+	old := exec.Command("bash", "-c", "trap '' TERM; exec sleep 300") // ignores SIGTERM, as a dnsmasq with it blocked does
 	if err := old.Start(); err != nil {
 		t.Fatal(err)
 	}

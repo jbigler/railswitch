@@ -102,7 +102,9 @@ DNSDIR="$STATE/dns"
 if [[ "${3:-}" == stop ]]; then
   if [[ -f "$DNSDIR/$cid.pid" ]]; then
     dpid="$(cat "$DNSDIR/$cid.pid" 2>/dev/null)"
-    [[ "$dpid" =~ ^[0-9]+$ ]] && kill "$dpid" 2>/dev/null || true
+    # SIGKILL: dnsmasq can start with SIGTERM blocked (a signal mask it
+    # inherits from whatever runs the hooks), and then a plain kill does nothing.
+    [[ "$dpid" =~ ^[0-9]+$ ]] && kill -KILL "$dpid" 2>/dev/null || true
   fi
   rm -f "$DNSDIR/$cid.conf" "$DNSDIR/$cid.pid" "$DNSDIR/$cid.log"
   exit 0
@@ -374,7 +376,7 @@ if [[ -n "$filter" ]]; then
   # It ends with the container, whatever happens to the poststop hook: a
   # dnsmasq left running kept a oneshot unit (deps) from finishing. The
   # watcher checks the container's process once a second.
-  setsid bash -c 'while kill -0 "$1" 2>/dev/null; do sleep 1; done; kill "$(cat "$2" 2>/dev/null)" 2>/dev/null' \
+  setsid bash -c 'while kill -0 "$1" 2>/dev/null; do sleep 1; done; kill -KILL "$(cat "$2" 2>/dev/null)" 2>/dev/null' \
     _ "$pid" "$DNSDIR/$cid.pid" </dev/null >/dev/null 2>&1 &
 fi
 

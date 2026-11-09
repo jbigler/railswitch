@@ -99,6 +99,7 @@ resolved at start is often not the one the app gets a moment later:
 | Entry | Ranges |
 |---|---|
 | `meta:github` | GitHub's web, API and git ranges (`api.github.com/meta`) |
+| `meta:copilot` | GitHub Copilot's ranges (`api.github.com/meta`'s `copilot`): GitHub's own and a few Azure addresses. nvim has it (D194); not in `meta:github`, which agents have |
 | `meta:google` | Google's own services: `goog.json` without every range that overlaps `cloud.json`, so not the Google Cloud addresses any rented server lives in. Without `cloud.json` nothing is added (D180). It still opens every Google front end, and those also serve what anyone can publish on Google: App Engine (`*.appspot.com`), Cloud Run (`*.run.app`), Firebase Hosting (`*.web.app`), Apps Script and Forms. The firewall checks addresses, not names, so a container with `meta:google` can send data to such a page. Use it for the app when it needs Google; avoid it in an `agent` list |
 | `meta:datadog-us5` | Datadog US5's API ranges |
 | `meta:anthropic` | Anthropic's inbound ranges, where `api.anthropic.com`, `claude.ai` and `platform.claude.com` answer: `160.79.104.0/23` and `153.61.224.0/22` ([Anthropic's list](https://platform.claude.com/docs/en/api/ip-addresses), 2026-11-06). Fixed in the hook, since Anthropic publishes no machine-readable list; nothing to fetch. The `claude` agent has it (D185) |

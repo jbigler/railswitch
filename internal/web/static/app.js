@@ -11,7 +11,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sortStore = "railswitch.sort." + prefix;
 const projectStore = "railswitch.project";
-const tabStore = "railswitch.tab";
+const tabStore = "railswitch.tab." + prefix + "."; // + the slug, in sessionStorage
 const wtStore = "railswitch.wt." + prefix;
 const daysStore = "railswitch.usagedays"; // the usage views' range (D187)
 
@@ -149,13 +149,28 @@ function afterSwap(id) {
 }
 
 // The detail's tabs: Overview shows every card, another tab only its own
-// (CSS, from body[data-tab]); the choice is kept for the next page.
+// (CSS, from body[data-tab]). Each worktree keeps its own for the browser
+// tab's session (sessionStorage); one not yet shown opens on Overview.
+
+function tabFor(slug) {
+  try {
+    return sessionStorage.getItem(tabStore + slug);
+  } catch {
+    return null;
+  }
+}
+function keepTab(slug, tab) {
+  try {
+    sessionStorage.setItem(tabStore + slug, tab);
+  } catch {}
+}
 
 function showTab(tab) {
   const tabs = $$("#detail [data-tab]");
   if (!tabs.length) return;
-  if (tab) remember(tabStore, tab);
-  tab = tab || recall(tabStore) || "overview";
+  const slug = $("#detail").dataset.slug || "";
+  if (tab) keepTab(slug, tab);
+  tab = tab || tabFor(slug) || "overview";
   if (!tabs.some((b) => b.dataset.tab === tab)) tab = "overview";
   body.dataset.tab = tab;
   tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
@@ -239,7 +254,7 @@ document.addEventListener("click", (e) => {
   const usageWT = t.closest("#usage a[data-usage-wt]");
   if (usageWT && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     e.preventDefault();
-    remember(tabStore, "agent");
+    keepTab(usageWT.dataset.usageWt, "agent");
     select(usageWT.dataset.usageWt, true);
     return;
   }

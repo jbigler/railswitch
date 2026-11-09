@@ -887,12 +887,18 @@ the list's groups order by state, D170). The sort orders each group.
 
 The worktree's **Terminal ▾** menu opens a live terminal in the page (D149),
 docked under the worktree's jobs; several can be open at once, and one
-already open is shown again rather than opened twice. The panels stay
-through a switch of tab or worktree (each is titled with its worktree).
+already open is shown again rather than opened twice. A panel belongs to
+its worktree (D191): it shows only while that worktree is shown, on every
+tab, and switching to another worktree hides it without ending it. Its
+program keeps running, and the panel comes back as it was, at the window's
+size, when you return. Each worktree's row in the list counts its open
+panels (`▣2`). Removing a worktree closes its panels. Switching project
+loads another page, so it ends them all (leaving asks first).
 An agent's terminal (from the Agent card or the menu) shows the Agent
-tab first. There the worktree's agent terminal takes the Agent
-card's place and the window's height below the tabs, until it is closed;
-the card comes back then. The menu
+tab first and shows only there. There the worktree's agent terminal
+takes the Agent card's place and the window's height below the tabs,
+until it is closed; the card comes back then. Every worktree can have its
+own agent terminal open at once. The menu
 ends with **Open window ↗**, the `terminal` action below: a window on the
 desktop, not in the page.
 
@@ -931,7 +937,8 @@ stays in the terminal. To fill the screen as well, use the browser's own
 fullscreen (F11), which Esc doesn't end. The dashboard doesn't use the
 page fullscreen API: Esc always ends it in Firefox.
 
-Limits: 8 terminals open at once across the dashboard (the ninth says so);
+Limits: 8 terminals open at once across the dashboard, hidden ones
+included (the ninth says so);
 a peer that stops answering pings for 10 s (a dead `ssh -L` tunnel) is
 dropped and its program ended. Nothing a terminal carries is logged. The
 terminal is

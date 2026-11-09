@@ -38,4 +38,4 @@ func TestNvimEnvAndFirewall(t *testing.T) {
 }
 
 // nvimHosts are the nvim tool's own allow hosts (tool.toml allow, D119).
-const nvimHosts = "api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org"
+const nvimHosts = "api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org,githubcopilot.com,api.individual.githubcopilot.com,proxy.individual.githubcopilot.com,api.business.githubcopilot.com,proxy.business.githubcopilot.com,api.enterprise.githubcopilot.com,proxy.enterprise.githubcopilot.com,copilot-proxy.githubusercontent.com,origin-tracker.githubusercontent.com"

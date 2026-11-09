@@ -5,8 +5,22 @@ entrypoint = "entrypoints/entrypoint-nvim.sh"
 firewall = ["agent", "deps"]
 # Beyond the deps list (registries, github.com and its downloads): GitHub's
 # API and raw files (lazy.nvim, mason's registry and releases) and PyPI
-# (mason's Python servers). More: [firewall] allow.agent in project.toml.
-allow = ["api.github.com", "raw.githubusercontent.com", "pypi.org", "files.pythonhosted.org"]
+# (mason's Python servers); GitHub Copilot's suggestions (D194): its domain,
+# whose subdomains the DNS filter allows, and each plan's api and proxy
+# hosts by name for a host without the filter (no telemetry hosts). More:
+# [firewall] allow.agent in project.toml.
+allow = [
+  "api.github.com", "raw.githubusercontent.com", "pypi.org", "files.pythonhosted.org",
+  "githubcopilot.com",
+  "api.individual.githubcopilot.com",
+  "proxy.individual.githubcopilot.com",
+  "api.business.githubcopilot.com",
+  "proxy.business.githubcopilot.com",
+  "api.enterprise.githubcopilot.com",
+  "proxy.enterprise.githubcopilot.com",
+  "copilot-proxy.githubusercontent.com",
+  "origin-tracker.githubusercontent.com",
+]
 
 # Mounts, and nothing else (D33: no ~/.ssh, SSH agent socket or host gitconfig):
 worktree = true               # the worktree at /app, the base worktree's .git, the pack's [[worktree_volumes]]

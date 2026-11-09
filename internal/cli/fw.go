@@ -139,6 +139,14 @@ type fwContainer struct {
 	Profiles []string     `json:"profiles"`
 	Mode     string       `json:"mode"` // enforce, log, off; "" unless firewalled
 	Rejected []fwRejected `json:"rejected"`
+	Refused  []fwRefused  `json:"refused"` // names its DNS filter refused (D195), the latest first
+}
+
+// fwRefused is a name a container's DNS filter answered "no such name"
+// (D182), and how many lookups of it the filter's log still holds.
+type fwRefused struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
 }
 
 // fwRejected is one address the firewall rejected (enforce) or would
@@ -151,7 +159,7 @@ type fwRejected struct {
 }
 
 // fwShowJSON runs firewall.sh show with FW_FORMAT=tsv and prints its C
-// (container) and R (rejected) lines as one JSON document.
+// (container), R (rejected) and N (refused name) lines as one JSON document.
 func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string) int {
 	var out bytes.Buffer
 	_, err := e.run.Run(ctx, sys.Cmd{
@@ -170,7 +178,7 @@ func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string)
 		f := strings.Split(strings.TrimRight(line, "\n"), "\t")
 		switch {
 		case f[0] == "C" && len(f) == 5:
-			c := fwContainer{Name: f[1], Firewall: f[2], Profiles: []string{}, Mode: f[4], Rejected: []fwRejected{}}
+			c := fwContainer{Name: f[1], Firewall: f[2], Profiles: []string{}, Mode: f[4], Rejected: []fwRejected{}, Refused: []fwRefused{}}
 			if f[3] != "" {
 				c.Profiles = strings.Split(f[3], ",")
 			}
@@ -179,6 +187,13 @@ func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string)
 		case f[0] == "R" && len(f) == 6:
 			if i, ok := byName[f[1]]; ok {
 				doc.Containers[i].Rejected = append(doc.Containers[i].Rejected, fwRejected{Addr: f[2], Proto: f[3], Port: f[4], Host: f[5]})
+			}
+		case f[0] == "N" && len(f) == 4:
+			// The name came from a lookup in the container: firewall.sh passes
+			// only host names, and this checks again.
+			n, err := strconv.Atoi(f[3])
+			if i, ok := byName[f[1]]; ok && err == nil && n > 0 && config.CheckAllowHost(f[2]) == nil && !strings.ContainsAny(f[2], "/:") {
+				doc.Containers[i].Refused = append(doc.Containers[i].Refused, fwRefused{Name: f[2], Count: n})
 			}
 		}
 	}

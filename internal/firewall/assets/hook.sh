@@ -368,8 +368,11 @@ if [[ -n "$filter" ]]; then
     printf '# railswitch DNS filter for %s (D182): written by hook.sh at each start.\n' "$cid"
     printf '# gateway=%s\n' "$gateway"
     printf '# dnsmasq=%s\n' "$DNSMASQ" # fw allow restarts this one, not whichever its PATH finds
+    # log-queries: its "config <name> is NXDOMAIN" lines are the names fw
+    # show lists as refused (firewall.sh dns_refused, which bounds the log).
     printf '%s\n' port=53 listen-address=127.0.0.1 bind-dynamic no-resolv no-hosts no-poll cache-size=0 \
       user=root group=root "query-port=$QPORT" "pid-file=$DNSDIR/$cid.pid" "log-facility=$DNSDIR/$cid.log" \
+      log-queries \
       "server=//$gateway" "server=/dns.podman/$gateway" \
       "address=/#/" # any other name: NXDOMAIN, which fails at once (REFUSED reads as "temporary", and installers retry for minutes)
     for n in ${names[@]+"${names[@]}"}; do

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -28,6 +29,10 @@ type fwDoc struct {
 			Port  string `json:"port"`
 			Host  string `json:"host"`
 		} `json:"rejected"`
+		Refused []struct {
+			Name  string `json:"name"`
+			Count int    `json:"count"`
+		} `json:"refused"`
 	} `json:"containers"`
 }
 
@@ -42,6 +47,9 @@ type fwBlockedRow struct {
 	Container, Mode, Addr, Port, Host string
 	Profile                           string // the list a host is allowed in; "": none can (a data container)
 	Slug, Service                     string // the worktree service the container runs; "": none (e.g. exec's)
+	// Refused: a name the DNS filter refused (D195). fw allow --for opens
+	// addresses only, so only "until it restarts" makes the name resolve.
+	Refused bool
 }
 
 // liveFor is a live allow's choices: the form value, and fw allow's --for
@@ -122,6 +130,15 @@ func (s *Server) settingsBlocked(w http.ResponseWriter, r *http.Request) {
 	for _, c := range doc.Containers {
 		if c.Firewall == "none" {
 			v.None = append(v.None, c.Name)
+		}
+		// A name its DNS filter refused (D195): no address, but a host to
+		// allow like any other.
+		for _, x := range c.Refused {
+			row := fwBlockedRow{Container: c.Name, Mode: c.Mode, Port: fmt.Sprintf("name refused (DNS), %d lookups", x.Count), Host: x.Name, Profile: allowProfile(c.Profiles), Refused: true}
+			if o, ok := owner[c.Name]; ok && c.Mode == "enforce" {
+				row.Slug, row.Service = o[0], o[1]
+			}
+			v.Rows = append(v.Rows, row)
 		}
 		for _, x := range c.Rejected {
 			row := fwBlockedRow{Container: c.Name, Mode: c.Mode, Addr: x.Addr, Port: x.Proto + "/" + x.Port, Host: x.Host, Profile: allowProfile(c.Profiles)}

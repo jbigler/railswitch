@@ -358,7 +358,11 @@ shows what each one does before anything is written.
   (`host`, `for`: `10m`, `1h` or `restart`) runs `railswitch fw allow
   [--for <d>] <service> <host>` as a job, in that running container now. A
   data container has nothing to allow; a container with no hook is
-  named.
+  named. A name a container's DNS filter refused (D195) is a row too,
+  "name refused (DNS), <n> lookups", with the name as its host and the
+  same buttons; "Allow for" offers only "until it restarts", since a
+  timed allow opens addresses and the DNS filter would still refuse the
+  name.
 - **Hooks** (D126): a box per `[hooks]` list (`deps`, `start`, `create`),
   one command per line, in order; blank lines are dropped. Leaving a
   changed box stages `hooks.set` with the whole list (an empty box removes

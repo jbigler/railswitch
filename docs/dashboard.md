@@ -231,9 +231,10 @@ still wider than the window scrolls its pane.
     (with a `test` task), Database (with a data service) and Jobs.
     Overview shows every card, each its own height; another tab only its
     own, full width.
-    The tab is remembered in the browser's `localStorage` for every
-    worktree and project; one a worktree lacks shows Overview. A live
-    update keeps it.
+    Each worktree remembers its own tab while the browser tab is open
+    (`sessionStorage`; a reload or a project switch keeps it, closing the
+    browser tab forgets it). A worktree not yet shown opens on Overview,
+    as does one whose tab it lacks. A live update keeps it.
   - **Services** (full width): one aligned row per service: a glyph, the
     name and a plain state word, `running`, `starting`, `stopping`,
     `reloading`, `busy`, `failed`, `stopped`, `on demand` or `unknown`,

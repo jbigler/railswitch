@@ -189,7 +189,7 @@ func TestAllOK(t *testing.T) {
 	f.On([]string{filepath.Join(h.HookDirs[0], "dnsmasq"), "--version"}, sys.Result{Stdout: []byte("Dnsmasq version 2.93\nCompile time options: IPv6 GNU-getopt DBus conntrack ipset nftset auth DNSSEC\n")}, nil)
 
 	got := h.Run(context.Background(), f, ws)
-	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "proxy subnet", "git-guard", "cgroup v2", "pass", "gpg", "gpg secret key")
+	want := append(slices.Clone(hostChecks), "firewall descriptor", "units current", "proxy subnet", "git-guard", "worktree names", "cgroup v2", "pass", "gpg", "gpg secret key")
 	if !slices.Equal(names(got), want) {
 		t.Fatalf("checks = %q\nwant %q", names(got), want)
 	}
@@ -210,6 +210,18 @@ func TestAllFail(t *testing.T) {
 	ws := workspaceAt(t, false)
 	writeConfig(t, ws.Dirs, "[secrets]\ndriver = \"pass\"\ndriver_opts = { key = \"ABCD1234\" }\n")
 	writeHook(t, ws)
+	// a worktree added before the dashboard took its name for a page
+	reg, err := machine.Open(ws.Dirs.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reg.AddWorktree("filial", "notes", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := reg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reg.Close()
 	f := fakeHost()
 	f.On(podmanVersion, sys.Result{Stdout: []byte("4.9.3\n")}, nil)
 	f.On([]string{"systemctl", "--user", "is-enabled", "railswitch-dashboard.service"}, sys.Result{ExitCode: 1, Stdout: []byte("disabled\n")}, errors.New("exit 1"))
@@ -223,7 +235,7 @@ func TestAllFail(t *testing.T) {
 	h.Dashboards = []string{dashboardServer(t, http.StatusForbidden, "forbidden host\n")}
 
 	got := h.Run(context.Background(), f, ws)
-	if len(got) != len(hostChecks)+8 {
+	if len(got) != len(hostChecks)+9 {
 		t.Fatalf("checks = %q", names(got))
 	}
 	for _, c := range got {
@@ -246,6 +258,9 @@ func TestAllFail(t *testing.T) {
 	}
 	if fix := m["gpg secret key"].Fix; !strings.Contains(fix, "driver_opts.key") {
 		t.Errorf("gpg key fix = %q, want it to name driver_opts.key", fix)
+	}
+	if d := m["worktree names"].Detail; !strings.Contains(d, "notes") || strings.Contains(d, "master") {
+		t.Errorf("worktree names detail = %q, want notes alone", d)
 	}
 	if fix := m["units current"].Fix; fix != "railswitch render" {
 		t.Errorf("units fix = %q", fix)

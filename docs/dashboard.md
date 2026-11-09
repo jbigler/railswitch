@@ -717,6 +717,17 @@ ids, key types and fingerprints are escaped like any other text.
   project's jobs mix in); one runs at a time, and the page shows them
   below the forms.
 
+## Reporting an issue
+
+Every page's header, and the Virtual Office's HUD, has **Report issue ↗**
+(D190). It opens `/issue` in a new tab, which redirects (303) to GitHub's
+new-issue form for railswitch with the body filled in: *What happened*,
+*What did you expect*, then the railswitch version and the page's route
+pattern, such as `/p/{prefix}/settings`. The pattern comes from the page's
+same-origin `Referer`; a path no `GET` route matches reads `unknown`. No
+project prefix, worktree slug, log or `doctor` output goes in. You read and
+edit everything on GitHub before you submit it.
+
 ## New project
 
 `/new` creates a project. Open it from the switcher ("New project…", the

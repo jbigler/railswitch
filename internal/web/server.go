@@ -120,6 +120,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/{slug}/agent-default", s.agentDefaultDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/snapshots", s.snapshotsDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/queue", s.queueDialog)
+	m.HandleFunc("GET /issue", s.issue)
 	m.HandleFunc("GET /colors", s.colorsDialog)
 	m.HandleFunc("GET /theme.css", s.theme)
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))

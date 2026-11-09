@@ -920,6 +920,13 @@ Mono (its Nerd Font builds first, so icons and prompt glyphs draw) and
 JetBrains Mono, else the system's monospace. Character widths follow Unicode 11
 (xterm.js's unicode11 addon), as tmux and the programs in the container count
 them: an emoji is two columns, so a redraw after one lands where it should.
+A program's copy over OSC 52 (nvim's `osc52` clipboard provider, an
+agent's copy command) goes to the browser's clipboard (xterm.js's clipboard
+addon), as kitty allows by default; a request to read the clipboard gets an
+empty answer, so a program in a container never sees what you copied
+elsewhere. The browser allows the write on `railswitch.localhost` (a secure
+context); Firefox only shortly after a key press in the page, so a copy a
+program makes on its own may not arrive.
 When the program exits the panel shows
 `[exited N]` and **Reopen**; if the dashboard restarts (a new railswitch
 binary), **Reconnect**: the agent and nvim pick up where they were, a shell

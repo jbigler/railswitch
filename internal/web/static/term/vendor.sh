@@ -21,4 +21,6 @@ get addon-webgl 0.18.0 lib/addon-webgl.js 9ffa9ac3ff6d47d4e6216ed1972ca8e0b5336c
 get addon-canvas 0.7.0 lib/addon-canvas.js 7b3e904d5bec98b54d26674994cf994396c4af0971010ffd0d4983229b65d933
 # Unicode 11 widths: an emoji is two columns, as tmux and the agent count it
 get addon-unicode11 0.8.0 lib/addon-unicode11.js b0c3be540a9984713aea996966c24ed1a639d11f60d44986b22661e3a8a148d0
+# OSC 52: a program copies to the browser's clipboard (term.js refuses reads)
+get addon-clipboard 0.1.0 lib/addon-clipboard.js c3fe3f1e8be371c7b2034170c6a2e3cc1b9dbe6c9f1f283cbc17ff456ef78818
 cp "$tmp/xterm/package/LICENSE" xterm.LICENSE.txt

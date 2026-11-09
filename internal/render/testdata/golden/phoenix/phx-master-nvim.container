@@ -5,7 +5,7 @@
 Description=phx nvim of worktree master
 
 [Container]
-Label=phx.unit-hash=20cc731b911a
+Label=phx.unit-hash=5e2c87cec86c
 Image=localhost/phx/nvim:elixir1.18.4-otp27-a096b056
 ContainerName=phx-master-nvim
 Network=phx-master-dev.network:alias=nvim
@@ -40,7 +40,7 @@ Annotation=phx.firewall=agent,deps
 Annotation=phx.firewall.networks=phx-master-dev,phx_proxy
 Annotation=phx.firewall.mode=enforce
 Annotation=phx.firewall.lists=9925bb3c3298
-Annotation=phx.firewall.extra=api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org,githubcopilot.com,api.individual.githubcopilot.com,proxy.individual.githubcopilot.com,api.business.githubcopilot.com,proxy.business.githubcopilot.com,api.enterprise.githubcopilot.com,proxy.enterprise.githubcopilot.com,copilot-proxy.githubusercontent.com,origin-tracker.githubusercontent.com
+Annotation=phx.firewall.extra=api.github.com,raw.githubusercontent.com,pypi.org,files.pythonhosted.org,githubcopilot.com,copilot-proxy.githubusercontent.com,origin-tracker.githubusercontent.com,meta:copilot
 PodmanArgs=--hosts-file=none --cpus=2 --tty --interactive
 LogDriver=journald
 Entrypoint=/usr/local/bin/entrypoint-nvim.sh

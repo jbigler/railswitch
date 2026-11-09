@@ -438,9 +438,11 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .d-acts{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
 .d-acts form{display:inline}
 .d-acts .ln{margin:0}
-.tabs{display:flex;flex-wrap:wrap;gap:4px 18px;padding:0 20px;border-bottom:1px solid var(--border)}
-.tabs button{font:inherit;font-weight:700;background:none;border:0;border-bottom:2px solid transparent;padding:8px 2px;color:var(--muted);cursor:pointer}
-.tabs button[aria-pressed=true]{color:var(--text);border-bottom-color:var(--accent)}
+/* Folder tabs: a shaded band; the chosen tab joins the content below. */
+.tabs{display:flex;flex-wrap:wrap;gap:2px;margin-top:6px;padding:6px 20px 0;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.tabs button{font:inherit;font-weight:700;background:none;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;padding:7px 16px;margin-bottom:-1px;color:var(--muted);cursor:pointer}
+.tabs button:hover{color:var(--text);background:var(--sel)}
+.tabs button[aria-pressed=true]{color:var(--text);background:var(--bg);border-color:var(--border);box-shadow:inset 0 3px 0 var(--accent)}
 .dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:14px;padding:16px 20px 0;align-items:start}
 .wt .dcard .services{grid-template-columns:repeat(auto-fill,minmax(min(19rem,100%),1fr))}
 .wt .dcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card);min-width:0} /* --card: white-ish on light, a step up on dark */

@@ -295,7 +295,7 @@ body[data-tab=agent][data-agent-term] .wt [data-panel=agent] { display: none; }
 body[data-tab=agent] .wt .term-panel:not(.max) { height: max(24rem, calc(100vh - 12rem)); }
 body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
 /* A worktree's open terminals, hidden or shown (D191). */
-.list tr[data-terms] a[data-row]::after { content: " ▣" attr(data-terms); color: var(--muted); font-weight: 400; }
+.list a[data-row][data-terms]::after { content: " ▣" attr(data-terms); color: var(--muted); font-weight: 400; }
 /* The PR page (D152). */
 .prpage h2{margin-top:1.4rem}
 .pr-meta,.pr-status{margin:.3rem 0}

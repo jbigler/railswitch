@@ -472,8 +472,10 @@ function termsShown() {
   for (const p of left) p.hidden = !termShown({ slug: p.dataset.slug, agent: "agent" in p.dataset }, slug, body.dataset.tab);
   for (const r of rows) {
     const n = left.filter((p) => p.dataset.slug === r.dataset.slug).length;
-    if (n) r.dataset.terms = n;
-    else delete r.dataset.terms;
+    const a = $("a[data-row]", r); // CSS attr() reads the link's own attribute
+    if (!a) continue;
+    if (n) a.dataset.terms = n;
+    else delete a.dataset.terms;
   }
   if (slug !== "" && left.some((p) => p.dataset.slug === slug && "agent" in p.dataset)) body.dataset.agentTerm = "";
   else delete body.dataset.agentTerm;

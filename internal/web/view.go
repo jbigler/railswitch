@@ -724,7 +724,7 @@ type detailView struct {
 	Links                             []linkView
 	AppURL                            string // the first app link: the header's Open app; "" for none
 	Services                          []serviceView
-	ServicesUp                        string // "2/9": services running of all, for the Services tab
+	ServicesUp                        string // "2/9": services running of all, in the Services card's heading
 	Agent                             *agentView
 	Actions                           []actionView
 	Terms                             []actionView // terminal panels: URL is the WebSocket path (D149)

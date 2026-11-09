@@ -453,5 +453,5 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .job-out summary{cursor:pointer;font-size:12px;padding:2px 0}
 /* Overview shows every card; another tab only its own. */
 body:where([data-tab]:not([data-tab=overview])) .wt [data-panel]{display:none} /* :where keeps it below the rules that show a tab's card */
-body[data-tab=services] .wt [data-panel=services],body[data-tab=agent] .wt [data-panel=agent],body[data-tab=tests] .wt [data-panel=tests],body[data-tab=database] .wt [data-panel=database],body[data-tab=jobs] .wt [data-panel=jobs]{display:block;grid-column:1/-1}
+body[data-tab=agent] .wt [data-panel=agent],body[data-tab=tests] .wt [data-panel=tests],body[data-tab=database] .wt [data-panel=database],body[data-tab=jobs] .wt [data-panel=jobs]{display:block;grid-column:1/-1}
 body[data-tab=jobs] .wt .jobs .none{display:block}

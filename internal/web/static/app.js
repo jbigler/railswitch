@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -133,6 +133,7 @@ function afterSwap(id) {
     filterSwitcher();
   } else if (id === "list") {
     filterList();
+    termsShown();
   } else if (id === "jobs") {
     [...watched.keys()].forEach(jobEnded);
   } else if (id === "detail") {
@@ -143,7 +144,7 @@ function afterSwap(id) {
     // A URL without one stays: a narrow window shows the list for it.
     if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
     showTab();
-    agentTermShown();
+    termsShown(); // showTab returns early on a detail without tabs
   }
 }
 
@@ -173,6 +174,7 @@ function showTab(tab) {
   if (!tabs.some((b) => b.dataset.tab === tab)) tab = "overview";
   body.dataset.tab = tab;
   tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+  termsShown();
 }
 
 // The list's filter: a worktree shows while its name or branch holds the
@@ -389,11 +391,11 @@ function hideToast() {
 
 // Keys.
 
-// Terminal panels (D149): docked in #terms, under the jobs and outside the
-// detail that SSE replaces, so switching tabs or worktrees keeps them;
-// each closes its WebSocket when removed. A button with data-term-tab
-// shows that tab first; a terminal already open is shown again, not
-// opened twice.
+// Terminal panels (D149, D191): docked in #terms, under the jobs and outside
+// the detail that SSE replaces, so switching tabs or worktrees keeps them
+// running; termsShown shows only the shown worktree's. Each closes its
+// WebSocket when removed. A button with data-term-tab shows that tab first;
+// a terminal already open is shown again, not opened twice.
 async function openTermPanel(btn) {
   const dock = $("#terms");
   if (!dock) return;
@@ -409,7 +411,8 @@ async function openTermPanel(btn) {
   panel.className = "term-panel";
   // Not data-term: a click in the panel would then open it again.
   panel.dataset.termUrl = btn.dataset.term;
-  if ("termAgent" in btn.dataset) panel.dataset.agentOf = slug;
+  panel.dataset.slug = slug;
+  if ("termAgent" in btn.dataset) panel.dataset.agent = "";
   const head = document.createElement("header");
   const title = document.createElement("span");
   title.className = "mono";
@@ -444,12 +447,13 @@ async function openTermPanel(btn) {
     full.textContent = on ? "Restore" : "Maximize";
     t?.focus();
   });
-  x.addEventListener("click", () => {
+  panel.closeTerm = () => {
     t?.close();
     panel.remove();
-    agentTermShown();
-  });
-  agentTermShown();
+    termsShown();
+  };
+  x.addEventListener("click", panel.closeTerm);
+  termsShown();
 }
 
 // switchAgent stops the running agent (D176) and, once that job ends
@@ -467,12 +471,28 @@ function switchAgent(btn) {
   });
 }
 
-// agentTermShown marks the body while the shown worktree's agent terminal
-// is open: on the Agent tab it takes the Agent card's place (CSS).
-function agentTermShown() {
+// termsShown (D191) shows the shown worktree's panels and hides the rest,
+// which keep running: an agent's only on the Agent tab, where it takes the
+// Agent card's place (CSS, from body[data-agent-term]). A worktree gone
+// from the list has its panels closed; each row counts its open ones.
+function termsShown() {
   const slug = $("#detail")?.dataset.slug || "";
-  const on = slug !== "" && $$("#terms .term-panel").some((p) => p.dataset.agentOf === slug);
-  if (on) body.dataset.agentTerm = "";
+  const rows = $$("#list tr[data-slug]");
+  const panels = $$("#terms .term-panel");
+  if ($("#list")) {
+    const live = new Set(rows.map((r) => r.dataset.slug));
+    for (const p of panels) if (!live.has(p.dataset.slug)) p.closeTerm?.();
+  }
+  const left = $$("#terms .term-panel");
+  for (const p of left) p.hidden = !termShown({ slug: p.dataset.slug, agent: "agent" in p.dataset }, slug, body.dataset.tab);
+  for (const r of rows) {
+    const n = left.filter((p) => p.dataset.slug === r.dataset.slug).length;
+    const a = $("a[data-row]", r); // CSS attr() reads the link's own attribute
+    if (!a) continue;
+    if (n) a.dataset.terms = n;
+    else delete a.dataset.terms;
+  }
+  if (slug !== "" && left.some((p) => p.dataset.slug === slug && "agent" in p.dataset)) body.dataset.agentTerm = "";
   else delete body.dataset.agentTerm;
 }
 

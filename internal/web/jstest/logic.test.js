@@ -3,7 +3,7 @@
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery } from "../static/logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown } from "../static/logic.js";
 
 test("fuzzy matches letters in order, spaces ignored", () => {
   assert.ok(fuzzy("pgset", "page settings") > 0);
@@ -51,4 +51,13 @@ test("pageQuery: the defaults leave the URL bare, keys in Go's order", () => {
   assert.equal(pageQuery("-pr", "14"), "?sort=-pr");
   assert.equal(pageQuery("name", "30"), "?days=30");
   assert.equal(pageQuery("pr", 7), "?days=7&sort=pr");
+});
+
+test("termShown: a panel shows only in its worktree, an agent's only on the Agent tab", () => {
+  assert.ok(termShown({ slug: "a", agent: false }, "a", "overview"));
+  assert.ok(!termShown({ slug: "a", agent: false }, "b", "overview"), "another worktree's panel hides");
+  assert.ok(termShown({ slug: "a", agent: true }, "a", "agent"));
+  assert.ok(!termShown({ slug: "a", agent: true }, "a", "services"), "an agent panel off the Agent tab hides");
+  assert.ok(!termShown({ slug: "a", agent: true }, "b", "agent"), "another worktree's agent panel hides");
+  assert.ok(!termShown({ slug: "", agent: false }, "", "overview"), "no worktree shown");
 });

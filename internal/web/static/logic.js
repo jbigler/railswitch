@@ -66,3 +66,9 @@ export function pageQuery(sort, days) {
   const s = q.toString();
   return s ? "?" + s : "";
 }
+
+// termShown (D191): a terminal panel shows only while its worktree is the
+// one shown, and an agent's only on the Agent tab.
+export function termShown(panel, slug, tab) {
+  return slug !== "" && panel.slug === slug && (!panel.agent || tab === "agent");
+}

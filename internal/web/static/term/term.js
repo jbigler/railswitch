@@ -41,7 +41,7 @@ function load() {
     }
     // the font first: the terminal measures its cell once, when it opens
     const font = document.fonts?.load(`${FONT_SIZE}px ${FONT}`).catch(() => {}) ?? Promise.resolve();
-    loaded = Promise.all([font, script('/static/term/xterm.js')]).then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-canvas.js'), script('/static/term/addon-webgl.js')]));
+    loaded = Promise.all([font, script('/static/term/xterm.js')]).then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-canvas.js'), script('/static/term/addon-webgl.js'), script('/static/term/addon-unicode11.js')]));
   }
   return loaded;
 }
@@ -160,10 +160,16 @@ export function openTerminal(el, url, opts = {}) {
   load().then(() => {
     if (closed) return;
     term = new window.Terminal({
-      cursorBlink: true, scrollback: 5000, allowProposedApi: false,
+      // proposed API: term.unicode, for the Unicode 11 widths below; only this page's code reaches it
+      cursorBlink: true, scrollback: 5000, allowProposedApi: true,
       fontFamily: FONT, fontSize: FONT_SIZE,
       theme: { ...cssTheme(el), ...(opts.theme || {}) },
     });
+    // Unicode 11 widths (an emoji is two columns), as tmux and the programs
+    // in the container count them: xterm's default, Unicode 6, counts one,
+    // so a redraw after an emoji put letters a column or a line off.
+    term.loadAddon(new window.Unicode11Addon.Unicode11Addon());
+    term.unicode.activeVersion = '11';
     fit = new window.FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open(screen);

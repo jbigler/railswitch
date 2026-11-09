@@ -1288,7 +1288,8 @@ any open page.
 - Every floor has one pet: a cat or a shiba that roams, a macaw that flies
   between two perches, a cat asleep on a crate, an aquarium, a jellyfish
   tank or a gecko; and androids that wander (one or two per floor, two in
-  the lobby). Click them.
+  the lobby). They stop for you and give way to each other; two meeting
+  head-on each turn off after a moment. Click them.
 - **First person is a film set** (after Blade Runner's interiors and
   KitBash3D's cyberpunk sets), on a modest GPU: no shadows, no pass beyond
   bloom. Light from practicals, warm where people sit (café, lounge,

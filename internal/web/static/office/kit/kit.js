@@ -14,7 +14,7 @@
 //   kit.animate(scene, t);                  // per frame, t in seconds: pets, fans, bubbles
 //   kit.setElevatorDoors(floorNode, 0..1);  // 0 closed, 1 open (also works on the cab)
 //   const cat = createRoamer({ walk: kit.spawn('Pet_Cat_Walk'), rest: kit.spawn('Pet_Cat_Sitting'), colliders, bounds });
-//   cat.update(dt, player);                 // per frame: wanders, rests, stops near the player
+//   cat.update(dt, player, [dog]);          // per frame: wanders, rests, stops near the player, gives way to other roamers
 //   const bird = createFlyer({ bird: kit.spawn('Pet_Parrot_Fly'), perches });
 //
 // Units are meters, origin on the floor (ceiling pieces: on the ceiling, hanging
@@ -239,7 +239,7 @@ const angleTo = (from, to) => ((to - from + Math.PI * 3) % (Math.PI * 2)) - Math
 /**
  * A pet that wanders a floor: it rests a while, picks a free spot (or one of its
  * homes), walks there around the colliders, and rests again. It stops while the
- * player is within `shy` meters.
+ * player is within `shy` meters, and gives way to another roamer just ahead of it.
  *   walk      the walking model (Pet_Cat_Walk, Pet_Dog_Walk): legs animate from its userData
  *   rest      the model shown while resting (Pet_Cat_Sitting, Pet_Dog_Lying), or null
  *   colliders kit.colliders(scene); boxes from the floor up to `height` block the pet
@@ -333,7 +333,7 @@ export function createRoamer({ walk, rest = null, colliders = [], bounds, start 
   const home0 = start ?? homes[0];
   let x, z, heading = home0?.ry ?? 0;
   if (home0) { x = home0.x; z = home0.z; } else { const k = open[Math.floor(rng() * open.length)]; x = cx(k % cols); z = cz((k / cols) | 0); }
-  let path = [], target = null, walking = false, timer = between(idle, rng), gait = 0;
+  let path = [], target = null, walking = false, timer = rng() * idle[1], gait = 0, waited = 0; // first rest: any point in one, so some set off at once
   walk.userData.phase = 0; walk.userData.gait = 0;
   const show = () => { walk.visible = walking || !rest; if (rest) rest.visible = !walking; };
   const place = () => {
@@ -349,8 +349,8 @@ export function createRoamer({ walk, rest = null, colliders = [], bounds, start 
 
   return {
     get position() { return { x, z, heading, walking }; },
-    /** dt in seconds; avoid: the player's position ({x, z}), or null. */
-    update(dt, avoid = null) {
+    /** dt in seconds; avoid: the player's position ({x, z}), or null; others: the floor's other roamers. */
+    update(dt, avoid = null, others = []) {
       if (!walking) {
         timer -= dt;
         if (timer <= 0) {
@@ -371,7 +371,15 @@ export function createRoamer({ walk, rest = null, colliders = [], bounds, start 
         const dx = wx - x, dz = wz - z, d = Math.hypot(dx, dz);
         const turn = d > 1e-4 ? angleTo(heading, Math.atan2(dx, dz)) : 0;
         heading += clamp(turn, -3.5 * dt, 3.5 * dt);
-        if (!(avoid && Math.hypot(avoid.x - x, avoid.z - z) < shy)) {
+        // another roamer within reach and in front: wait; still blocked after 2 s, go elsewhere (two head-on both turn back)
+        const fx = Math.sin(heading), fz = Math.cos(heading);
+        const blocked = others.some((o) => {
+          const p = o.position, ox = p.x - x, oz = p.z - z;
+          return Math.hypot(ox, oz) < 2 * radius + 0.4 && ox * fx + oz * fz > 0;
+        });
+        waited = blocked ? waited + dt : 0;
+        if (waited > 2) { walking = false; waited = 0; timer = 0.5; show(); }
+        else if (!blocked && !(avoid && Math.hypot(avoid.x - x, avoid.z - z) < shy)) {
           want = Math.abs(turn) > 1.2 ? 0.25 : 1; // turn mostly on the spot
           const step = Math.min(d, speed * want * dt);
           if (d > 1e-4) { x += dx / d * step; z += dz / d * step; }

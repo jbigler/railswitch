@@ -167,6 +167,9 @@ meta_ranges() {
     google)       google_ranges; return 0 ;;
     github)       url=https://api.github.com/meta
                   filter='(.web + .api + .git)[]' ;;
+    # GitHub Copilot's own list: GitHub's ranges and a few Azure ones (D194)
+    copilot)      url=https://api.github.com/meta
+                  filter='.copilot[]' ;;
     datadog-us5)  url=https://ip-ranges.us5.datadoghq.com/api.json
                   filter='.api.prefixes_ipv4[]' ;;
     *) unresolved+=("meta:$1 (unknown)"); return 0 ;;

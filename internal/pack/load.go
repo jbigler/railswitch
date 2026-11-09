@@ -978,8 +978,8 @@ func (l *loader) checkTool(dir string, t *Tool) bool {
 	l.ports(file, "tool "+t.Name, t.Ports)
 	l.links(file, t.Links)
 	for i, h := range t.Allow {
-		if !hostRe.MatchString(h) {
-			l.add(file, "allow[%d]: %q is not a host name", i, h)
+		if !hostRe.MatchString(strings.TrimPrefix(h, "meta:")) { // hook.sh takes meta: ranges in a tool's extra list too
+			l.add(file, "allow[%d]: %q is not a host name or meta:<name>", i, h)
 		}
 	}
 	return ok && len(l.errs) == n

@@ -34,7 +34,7 @@ A mismatch fails the container's start, as a failed load does.
 | The app, its workers, `railswitch exec` | `app` | `app.allow`: the pack's `app.allow`, then `[firewall] allow.app` |
 | `deps` (installs) | `deps` | `deps.allow`: the pack's `deps.allow` (its registries), then `[firewall] allow.deps` |
 | An agent | `agent-<name>` | its package's `allow`, `[agents.<name>] allow`, then `[firewall] allow.agent` |
-| nvim | `agent`, `deps` | both lists, plus the tool's own `allow` (GitHub's API and raw files, PyPI) and the config repo's host |
+| nvim | `agent`, `deps` | both lists, plus the tool's own `allow` (GitHub's API and raw files, PyPI, GitHub Copilot's suggestion hosts) and the config repo's host |
 | Data (database, cache, storage) | `none` | nothing: a data container needs no outside access |
 
 Each container gets only its own list. The deps list holds package

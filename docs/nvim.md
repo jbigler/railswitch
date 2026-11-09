@@ -371,6 +371,12 @@ shared by every worktree (the `nvim_share` volume).
 nvim follows the project's firewall mode (`enforce` when the project has
 agents). It may reach the `deps` and `agent` lists (package registries,
 `github.com` and its downloads), its tool's own `allow` (GitHub's API and
-raw files, PyPI) and the config repo's host. A plugin or language server
+raw files, PyPI, and GitHub Copilot's suggestion hosts, D194:
+`githubcopilot.com` with its subdomains, each plan's `api.` and `proxy.`
+hosts, `copilot-proxy` and `origin-tracker.githubusercontent.com`; not its
+telemetry) and the config repo's host. Under the DNS filter a name off
+these lists gets "no such name", which `fw show` and the Firewall card
+don't list: a plugin that reports itself online but does nothing may be
+missing one (`:!getent hosts <name>` prints nothing). A plugin or language server
 from elsewhere needs its host in `[firewall] allow.agent` (the Settings
 page's Firewall card). docs/firewall.md.

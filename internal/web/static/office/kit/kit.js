@@ -333,7 +333,7 @@ export function createRoamer({ walk, rest = null, colliders = [], bounds, start 
   const home0 = start ?? homes[0];
   let x, z, heading = home0?.ry ?? 0;
   if (home0) { x = home0.x; z = home0.z; } else { const k = open[Math.floor(rng() * open.length)]; x = cx(k % cols); z = cz((k / cols) | 0); }
-  let path = [], target = null, walking = false, timer = between(idle, rng), gait = 0, waited = 0;
+  let path = [], target = null, walking = false, timer = rng() * idle[1], gait = 0, waited = 0; // first rest: any point in one, so some set off at once
   walk.userData.phase = 0; walk.userData.gait = 0;
   const show = () => { walk.visible = walking || !rest; if (rest) rest.visible = !walking; };
   const place = () => {

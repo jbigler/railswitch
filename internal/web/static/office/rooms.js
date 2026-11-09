@@ -296,11 +296,14 @@ function residents(k, scene, deco, ui, androids) {
   const ticks = [];
   const later = [];
   const roamers = []; // each gives way to the others
-  const roam = (walk, rest, opts) => later.push(() => {
-    const r = createRoamer({ walk, rest, colliders: k.colliders(scene), bounds: FLOOR, rng: rng(deco.seed + later.length), ...opts });
-    roamers.push(r);
-    ticks.push((dt) => r.update(dt, ui.viewer(), roamers.filter((o) => o !== r)));
-  });
+  const roam = (walk, rest, opts) => {
+    const seed = deco.seed + later.length; // read now: by start() every roamer would see the same length
+    later.push(() => {
+      const r = createRoamer({ walk, rest, colliders: k.colliders(scene), bounds: FLOOR, rng: rng(seed), ...opts });
+      roamers.push(r);
+      ticks.push((dt) => r.update(dt, ui.viewer(), roamers.filter((o) => o !== r)));
+    });
+  };
   const pair = (walkName, restName, opts) => {
     const walk = mine(k.spawn(walkName));
     const rest = mine(k.spawn(restName));

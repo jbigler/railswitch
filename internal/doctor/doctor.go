@@ -81,7 +81,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	}
 	out = append(out, h.dnsFilter(ctx, r), sshKeygen(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
-		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws))
+		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws), worktreeNames(ws))
 	}
 	out = append(out, h.cgroup())
 	out = append(out, h.secrets(ctx, r, ws)...)
@@ -305,6 +305,35 @@ func gitGuard(ctx context.Context, r sys.Runner, ws *workspace.Workspace) Check 
 		parts[i] = f.Kind + " " + f.Path
 	}
 	c.Detail = fmt.Sprintf("%d finding(s): %s", len(fs), strings.Join(parts, ", "))
+	return c
+}
+
+// worktreeNames warns of a worktree whose slug the dashboard has since
+// taken for a page (naming.ReservedSlug): wt add refuses one now, but one
+// added before keeps working everywhere but its dashboard page.
+func worktreeNames(ws *workspace.Workspace) Check {
+	c := Check{Name: "worktree names", Warn: true}
+	reg, err := machine.Read(ws.Dirs.Data)
+	if errors.Is(err, fs.ErrNotExist) {
+		c.OK, c.Detail = true, "no worktree is registered"
+		return c
+	}
+	if err != nil {
+		c.Detail, c.Fix = err.Error(), "fix the registry named in detail"
+		return c
+	}
+	var bad []string
+	for _, e := range reg.WorktreesOf(ws.Project.Project.Prefix) {
+		if naming.ReservedSlug(e.Slug) {
+			bad = append(bad, e.Slug)
+		}
+	}
+	if len(bad) == 0 {
+		c.OK, c.Detail = true, "no worktree takes a dashboard page's name"
+		return c
+	}
+	c.Detail = "the dashboard shows its own page at /p/" + ws.Project.Project.Prefix + "/<name>, not the worktree: " + strings.Join(bad, ", ")
+	c.Fix = "railswitch wt rm <name>, then railswitch wt add --name <other name> <branch>"
 	return c
 }
 

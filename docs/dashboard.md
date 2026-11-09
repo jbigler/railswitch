@@ -917,7 +917,10 @@ and the dashboard's colours apply. An nvim panel runs `railswitch nvim` with
 `NVIM_BACKGROUND` set to `light` or `dark` by its background, for the
 `nvim-attach` hook ([nvim.md](nvim.md#hooks)). The font is the first installed of Maple
 Mono (its Nerd Font builds first, so icons and prompt glyphs draw) and
-JetBrains Mono, else the system's monospace. When the program exits the panel shows
+JetBrains Mono, else the system's monospace. Character widths follow Unicode 11
+(xterm.js's unicode11 addon), as tmux and the programs in the container count
+them: an emoji is two columns, so a redraw after one lands where it should.
+When the program exits the panel shows
 `[exited N]` and **Reopen**; if the dashboard restarts (a new railswitch
 binary), **Reconnect**: the agent and nvim pick up where they were, a shell
 starts afresh. railswitch's own refusals (another agent running, unset

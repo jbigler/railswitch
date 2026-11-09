@@ -41,7 +41,7 @@ function load() {
     }
     // the font first: the terminal measures its cell once, when it opens
     const font = document.fonts?.load(`${FONT_SIZE}px ${FONT}`).catch(() => {}) ?? Promise.resolve();
-    loaded = Promise.all([font, script('/static/term/xterm.js')]).then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-canvas.js'), script('/static/term/addon-webgl.js'), script('/static/term/addon-unicode11.js')]));
+    loaded = Promise.all([font, script('/static/term/xterm.js')]).then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-canvas.js'), script('/static/term/addon-webgl.js'), script('/static/term/addon-unicode11.js'), script('/static/term/addon-clipboard.js')]));
   }
   return loaded;
 }
@@ -72,6 +72,18 @@ function tag(name, cls, text) {
   if (text !== undefined) e.textContent = text;
   return e;
 }
+
+// clipboard is the OSC 52 provider: it writes the system clipboard (`c`,
+// or no selection named) and answers every read with nothing. Writing
+// needs a secure context (railswitch.localhost is one) and, in Firefox, a
+// recent key press: a copy that can't be made is dropped quietly.
+const clipboard = {
+  readText() { return ''; },
+  writeText(sel, text) {
+    if (sel !== 'c' && sel !== '') return;
+    return navigator.clipboard?.writeText(text).catch(() => {});
+  },
+};
 
 // openTerminal fills el with a terminal connected to url (a path).
 // opts.theme overrides colours. Returns {close, focus}.
@@ -170,6 +182,10 @@ export function openTerminal(el, url, opts = {}) {
     // so a redraw after an emoji put letters a column or a line off.
     term.loadAddon(new window.Unicode11Addon.Unicode11Addon());
     term.unicode.activeVersion = '11';
+    // OSC 52: a program's copy (nvim's osc52 provider, an agent's) goes to
+    // the browser's clipboard, as kitty's default allows. Reads are refused:
+    // a program in the container never sees what you copied elsewhere.
+    term.loadAddon(new window.ClipboardAddon.ClipboardAddon(undefined, clipboard));
     fit = new window.FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open(screen);

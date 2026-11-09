@@ -1,6 +1,8 @@
 /* Terminals (D149): the host element, its screen and the status overlay. */
 .term-host { position: relative; min-height: 12rem; overflow: hidden; }
-.term-screen { position: absolute; inset: 0.25rem; }
-.term-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+/* Its own stacking context: xterm's layers (z-index up to 10) stay under the overlay,
+   whose buttons then take the click. */
+.term-screen { position: absolute; inset: 0.25rem; z-index: 0; }
+.term-overlay { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   background: rgba(0, 0, 0, 0.6); color: #eee; font: 0.95rem ui-monospace, monospace; text-align: center; padding: 1rem; }
 .term-overlay[hidden] { display: none; }

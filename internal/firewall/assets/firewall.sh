@@ -177,6 +177,13 @@ cmd_show() {
       printf '\n%s  profiles=%s mode=%s\n' "$name" "$profiles" "$mode"
     fi
     [[ "$mode" == off ]] && continue
+    # LAN exceptions (D196): "lan <addr>:<port> <host>" lines the hook wrote.
+    local lpair lhost
+    while read -r lpair lhost; do
+      [[ "$lpair" =~ ^[0-9.]+:[0-9]+$ && "$lhost" =~ ^[A-Za-z0-9.-]+$ ]] || continue
+      if [[ "$TSV" ]]; then printf 'L\t%s\t%s\t%s\t%s\n' "$name" "${lpair%:*}" "${lpair##*:}" "$lhost"
+      else printf '  LAN exception (config.toml [[lan]]): %s tcp/%s  %s\n' "${lpair%:*}" "${lpair##*:}" "$lhost"; fi
+    done < <(sed -n 's/^lan //p' "$f")
     local pid entries refused rname rcount
     pid="$(podman inspect -f '{{.State.Pid}}' "$id")"
     entries="$( { set_entries "$pid" blocked4; set_entries "$pid" blocked6; } | sort -u)"

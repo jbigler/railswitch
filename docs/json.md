@@ -590,7 +590,8 @@ worktree's), docs/firewall.md. Exit 1 when `firewall.sh` refuses.
 {"containers": [
   {"name": "masto-main-rails", "firewall": "firewalled", "profiles": ["app"], "mode": "log",
    "rejected": [{"addr": "104.16.169.120", "proto": "tcp", "port": "443", "host": ""}],
-   "refused": [{"name": "proxy.individual.githubcopilot.com", "count": 4}]}
+   "refused": [{"name": "proxy.individual.githubcopilot.com", "count": 4}],
+   "lan": [{"addr": "192.168.1.20", "port": "443", "host": "search.home.example.com"}]}
 ]}
 ```
 
@@ -601,6 +602,7 @@ worktree's), docs/firewall.md. Exit 1 when `firewall.sh` refuses.
 | `profiles` | array | Its profiles (`app`, `deps`, `agent-<name>`, `none`, …); `[]` unless firewalled. |
 | `mode` | string | `enforce`, `log` or `off`; `""` unless firewalled. |
 | `rejected` | array | What it rejected (enforce) or would have (log) since it started: `addr`, `proto`, `port`, `host` (the name the address resolves back to, `""` for none). |
+| `lan` | array | The LAN addresses and TCP ports it may reach past the floor, from config.toml's `[[lan]]` (D196): `addr`, `port`, `host` (the name or address the entry gave). `[]` without one. |
 | `refused` | array | Names its DNS filter answered "no such name" (D182, D195), which never became packets and so are not in `rejected`: `name` (a host name; the container chose it), `count` (lookups its filter's log still holds). The latest first, at most 50. `[]` without a DNS filter, and for a container started before D195 until it restarts. |
 
 ## `wt ls`
@@ -1551,7 +1553,10 @@ fixed order. A workspace that doesn't load (a bad `project.toml`, no
 its project checks are skipped. The pass secret driver's checks (`pass`,
 `gpg`, `gpg secret key`) are listed only when the machine config's
 `[secrets] driver` is `pass` (D37); a machine config that can't be read is a
-failed `machine config` check. `machine mounts` is listed only when the
+failed `machine config` check. `LAN exceptions` is listed only when
+config.toml has `[[lan]]` entries (D196): it passes, and its detail names
+each one (service → host:port), each a hole in the firewall's floor.
+`machine mounts` is listed only when the
 machine config has `[[mount]]` entries (D57); it fails when a non-optional
 source is missing. `worktree names` (inside a workspace) warns of a
 registered worktree whose name the dashboard has since taken for a page
@@ -1588,7 +1593,7 @@ code, and the text output shows it as `warn`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `dnsmasq (DNS filter)`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `worktree names`, `cgroup v2`, `machine mounts`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
+| `name` | string | The check: `workspace`, `podman >= 5.3`, `quadlet generator`, `podman.socket active`, `unprivileged port 80`, `nft`, `nsenter`, `getent`, `jq`, `curl`, `dnsmasq (DNS filter)`, `ssh-keygen -Y`, `machine subnet free`, `networks isolated`, `firewall descriptor`, `units current`, `proxy subnet`, `git-guard`, `worktree names`, `cgroup v2`, `machine mounts`, `LAN exceptions`, `pass`, `gpg`, `gpg secret key` or `machine config`. A binary's name (`nft`, `pass`, …) checks that it is on `PATH`. `quadlet generator` passes when `/usr/libexec/podman/quadlet` or `/usr/lib/podman/quadlet` exists. |
 | `ok` | boolean | The check passed. |
 | `warn` | boolean | A failed check is only a warning (`git-guard`, `worktree names`, `ssh-keygen -Y`, `dnsmasq (DNS filter)`): it doesn't change the exit code. `false` for a passed check. |
 | `detail` | string | What was found, e.g. the podman version, a binary's path, or the error. |

@@ -614,6 +614,14 @@ func TestHookVerifies(t *testing.T) {
 			return strings.Replace(r, "    ip daddr @allowt4 accept\n", "    ip daddr @allowt4 accept\n    ip daddr @floor4 goto deny\n", 1)
 		},
 		"no verdict": func(r string) string { return strings.Replace(r, "    reject with icmpx admin-prohibited\n", "", 1) },
+		// D196: the LAN rule must sit right before the floor, address and port.
+		"lan after floor": func(r string) string {
+			r = strings.Replace(r, "    ip daddr . tcp dport @lan4 accept\n", "", 1)
+			return strings.Replace(r, "    ip daddr @floor4 goto deny\n", "    ip daddr @floor4 goto deny\n    ip daddr . tcp dport @lan4 accept\n", 1)
+		},
+		"lan by address alone": func(r string) string {
+			return strings.Replace(r, "ip daddr . tcp dport @lan4 accept", "ip daddr @lan4 accept", 1)
+		},
 	} {
 		// Apply once to learn the table, then hand the hook an edited copy.
 		probe := filepath.Join(t.TempDir(), "nft.out")
@@ -1000,6 +1008,51 @@ func TestHookMetaAnthropic(t *testing.T) {
 	for _, w := range []string{"160.79.104.0/23", "153.61.224.0/22"} {
 		if !strings.Contains(allow, w) {
 			t.Errorf("allow4 lacks %s:\n%s", w, allow)
+		}
+	}
+}
+
+// TestHookLAN (D196): a [[lan]] entry passes the floor for its address and
+// TCP port only, right before the floor; a public or metadata address is
+// left out, and a malformed entry fails the start.
+func TestHookLAN(t *testing.T) {
+	root := t.TempDir()
+	out := filepath.Join(t.TempDir(), "nft.out")
+	ann := map[string]string{
+		"filial.firewall":          "none",
+		"filial.firewall.mode":     "enforce",
+		"filial.firewall.networks": "filial-feat-dev",
+		"filial.firewall.lan":      "192.168.1.20:443,10.0.0.5:8080,8.8.8.8:53,169.254.169.254:80,100.100.1.2:22",
+	}
+	if msg, err := runHook(t, root, hookEnv(t, out), ann); err != nil {
+		t.Fatalf("hook: %v\n%s", err, msg)
+	}
+	rules, _ := os.ReadFile(out)
+	r := string(rules)
+	if !strings.Contains(r, "set lan4 { type ipv4_addr . inet_service; elements = { 192.168.1.20 . 443,10.0.0.5 . 8080,100.100.1.2 . 22 } }") {
+		t.Errorf("lan4 is not the three LAN pairs:\n%s", r)
+	}
+	for _, bad := range []string{"8.8.8.8", "169.254.169.254"} {
+		if strings.Contains(r, bad) {
+			t.Errorf("ruleset holds %s:\n%s", bad, r)
+		}
+	}
+	local, lan, floor := strings.Index(r, "@local4 accept"), strings.Index(r, "ip daddr . tcp dport @lan4 accept"), strings.Index(r, "@floor4 goto deny")
+	if !(local >= 0 && local < lan && lan < floor) {
+		t.Errorf("want local4, then lan4, then floor4:\n%s", r)
+	}
+	st, err := os.ReadFile(filepath.Join(root, "state", "0123456789ab"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(st), "lan 192.168.1.20:443 192.168.1.20\n") {
+		t.Errorf("state lacks the LAN pair for fw show:\n%s", st)
+	}
+
+	for _, bad := range []string{"192.168.1.20", "192.168.1.20:0", "192.168.1.20:70000", "x$(id):80"} {
+		ann["filial.firewall.lan"] = bad
+		if msg, err := runHook(t, t.TempDir(), hookEnv(t, filepath.Join(t.TempDir(), "nft.out")), ann); err == nil || !strings.Contains(string(msg), "firewall.lan") {
+			t.Errorf("%q: hook passed or failed for another reason: %v\n%s", bad, err, msg)
 		}
 	}
 }

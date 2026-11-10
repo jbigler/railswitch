@@ -461,6 +461,7 @@ func (w *Workspace) Model(reg *machine.Registry, host render.Host) (*render.Mode
 		Generated: gen,
 		Host:      host,
 		Mounts:    mounts,
+		LAN:       machineLAN(cfg, prefix),
 		Overlay:   w.overlay,
 	})
 }
@@ -510,6 +511,17 @@ func (w *Workspace) baseSlug() (string, error) {
 		return "", fmt.Errorf("[project] base_branch %q: %w", b, err)
 	}
 	return slug, nil
+}
+
+// machineLAN are cfg's [[lan]]s of project prefix (D196).
+func machineLAN(cfg *machine.Config, prefix string) []render.MachineLAN {
+	var out []render.MachineLAN
+	for _, l := range cfg.LAN {
+		if len(l.Projects) == 0 || slices.Contains(l.Projects, prefix) {
+			out = append(out, render.MachineLAN{Service: l.Service, Host: l.Host})
+		}
+	}
+	return out
 }
 
 // machineMounts are cfg's [[mount]]s of project prefix (D57), and which of

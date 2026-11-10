@@ -66,6 +66,12 @@ type MachineMount struct {
 	Index                   int
 }
 
+// MachineLAN is a config.toml [[lan]] of this project (D196): Host is
+// "<host>:<port>".
+type MachineLAN struct {
+	Service, Host string
+}
+
 // Inputs is everything Build reads.
 type Inputs struct {
 	Workspace string
@@ -77,6 +83,7 @@ type Inputs struct {
 	Generated map[string]string // D17 values from config.GeneratedFile (D132)
 	Host      Host
 	Mounts    []MachineMount // machine-local mounts (D57), already filtered to this project
+	LAN       []MachineLAN   // machine-local LAN exceptions (D196), already filtered to this project
 	// Overlay holds workspace Containerfiles read instead of the disk file,
 	// by workspace-relative path (nil: missing), so a render judges a change
 	// before it is written.
@@ -135,7 +142,10 @@ type Service struct {
 	// FirewallExtra are hosts the firewall hook allows s besides its
 	// profiles': nvim's config repo host (D54).
 	FirewallExtra []string
-	Oneshot       bool
+	// FirewallLAN are config.toml's [[lan]] exceptions to the floor for s
+	// (D196), "<host>:<port>".
+	FirewallLAN []string
+	Oneshot     bool
 	// OnDemand: the service has no Quadlet unit and no app wants it; it runs
 	// as a transient container (an on-demand agent).
 	OnDemand bool
@@ -391,6 +401,11 @@ func (b *builder) services() error {
 			s.Mounts = append(s.Mounts, Mount{Source: literal(b.ws(GitDir)), Target: GitConfigMount, Options: "ro,z"})
 		}
 		s.Mounts = append(s.Mounts, b.machineMounts(s.ID)...)
+		for _, l := range b.in.LAN {
+			if l.Service == s.ID && !slices.Contains(s.FirewallLAN, l.Host) {
+				s.FirewallLAN = append(s.FirewallLAN, l.Host)
+			}
+		}
 	}
 	return nil
 }

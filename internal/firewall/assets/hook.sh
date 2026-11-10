@@ -120,6 +120,7 @@ mode="$(field_str "$P.firewall.mode")" || true
 extra="$(field_str "$P.firewall.extra")" || true
 networks="$(field_str "$P.firewall.networks")" || true
 dns="$(field_str "$P.firewall.dns")" || true
+lan="$(field_str "$P.firewall.lan")" || true
 
 case "$mode" in
   enforce|log|off) ;;
@@ -242,6 +243,41 @@ done
 read -ra extras <<<"${extra//,/ }"
 for e in ${extras[@]+"${extras[@]}"}; do wanted=1; entry "$e"; done
 
+# LAN exceptions (D196): config.toml's [[lan]] entries for this service,
+# "<host>:<port>". Each address the host has in the floor's private ranges
+# passes the floor for that TCP port alone; 0.0.0.0/8 and 169.254.0.0/16
+# (cloud metadata) never do, nor does any other port of the host.
+lan4=()       # "address . port"
+lanlabels=()  # "address:port host", for fw show
+lan_private() {
+  local a b
+  IFS=. read -r a b _ <<<"$1"
+  (( a == 10 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31) || (a == 100 && b >= 64 && b <= 127) ))
+}
+read -ra lans <<<"${lan//,/ }"
+for e in ${lans[@]+"${lans[@]}"}; do
+  h="${e%:*}"; port="${e##*:}"
+  { [[ "$e" == *:* && "$port" =~ ^[0-9]{1,5}$ ]] && (( port >= 1 && port <= 65535 )); } || die "bad $P.firewall.lan entry '$e': want <host>:<port>"
+  ips=()
+  if [[ "$h" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+    ips=("$h")
+  elif [[ "$h" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    names+=("$h") # the DNS filter answers it
+    mapfile -t ips < <(getent ahostsv4 "$h" 2>/dev/null | awk '{ print $1 }' | sort -u)
+  else
+    die "bad $P.firewall.lan host '$h'"
+  fi
+  found=""
+  for ip in ${ips[@]+"${ips[@]}"}; do
+    if lan_private "$ip"; then
+      lan4+=("$ip . $port"); lanlabels+=("$ip:$port $h"); found=1
+    else
+      unresolved+=("lan $h: $ip is not a LAN address (an allow list opens it)")
+    fi
+  done
+  [[ -n "$found" ]] || unresolved+=("lan $e")
+done
+
 # A profile that wanted addresses and got none means host DNS or the network
 # is down. Enforcing would start a container that cannot reach anything it
 # needs, so say so instead.
@@ -302,6 +338,8 @@ table inet $TABLE {
   set allowd4 { type ipv4_addr; flags timeout; timeout 1h; }
   set local4 { type ipv4_addr; flags interval; auto-merge; $(elements ${local4[@]+"${local4[@]}"}) }
   set floor4 { type ipv4_addr; flags interval; elements = { $floor } }
+  # LAN exceptions (D196): address . TCP port pairs that pass the floor.
+  set lan4 { type ipv4_addr . inet_service; $(elements ${lan4[@]+"${lan4[@]}"}) }
   # Everything that met the final verdict: rejected under enforce, would have
   # been under log. Read by fw:show; entries age out after a week.
   set blocked4 { type ipv4_addr . inet_proto . inet_service; flags dynamic,timeout; timeout 7d; size 4096; }
@@ -312,6 +350,7 @@ table inet $TABLE {
     ct state established,related accept
 $([[ -n "$filter" ]] && for g in "${gateways[@]}"; do printf '    ip daddr %s udp dport 53 udp sport != %s goto deny\n    ip daddr %s tcp dport 53 goto deny\n' "$g" "$QPORT" "$g"; done)
     ip daddr @local4 accept
+    ip daddr . tcp dport @lan4 accept
     ip daddr @floor4 goto deny
     ip daddr @allow4 accept
     ip daddr @allowt4 accept
@@ -346,6 +385,13 @@ for f in "${FLOOR[@]}"; do
 done
 fl="$(line_of '@floor4')"; al="$(line_of '@allow4')"; tl="$(line_of '@allowt4')"; dl="$(line_of '@allowd4')"
 [[ -n "$fl" && -n "$al" && -n "$tl" && -n "$dl" && "$fl" -lt "$al" && "$fl" -lt "$tl" && "$fl" -lt "$dl" ]] || die "verify: the floor rule is not ahead of the allow rules"
+# The LAN rule matches address and port together, right before the floor:
+# anywhere else, or as an address alone, it would open more.
+ll4="$(line_of '@lan4')"
+[[ -n "$ll4" && "$ll4" -eq $((fl - 1)) ]] && block output | sed -n "${ll4}p" | grep -qF 'ip daddr . tcp dport @lan4 accept' || die "verify: the LAN rule is not address and port, right before the floor"
+if (( ${#lan4[@]} )); then
+  grep -q 'elements' <<<"$(set_text lan4)" || die "verify: lan4 is empty, ${#lan4[@]} entries were asked for"
+fi
 [[ "$(last_rule output)" == "goto deny" ]] || die "verify: chain output does not end in goto deny"
 [[ "$(last_rule deny)" == "${verdict%% *}"* ]] || die "verify: chain deny does not end in ${verdict%% *}"
 if (( ${#allow[@]} )); then
@@ -393,5 +439,6 @@ fi
 {
   printf 'profiles=%s\nmode=%s\n' "$profiles" "$mode"
   printf 'label %s\n' ${labels[@]+"${labels[@]}"}
+  if (( ${#lanlabels[@]} )); then printf 'lan %s\n' "${lanlabels[@]}"; fi
 } >"$STATE/$cid"
 log "$cid pid=$pid profiles=$profiles mode=$mode allow=${#allow[@]} local=${local4[*]:-none} dns=$([[ -n "$filter" ]] && echo filter || echo open)${unresolved[*]:+ unresolved: ${unresolved[*]}}"

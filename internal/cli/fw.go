@@ -140,6 +140,15 @@ type fwContainer struct {
 	Mode     string       `json:"mode"` // enforce, log, off; "" unless firewalled
 	Rejected []fwRejected `json:"rejected"`
 	Refused  []fwRefused  `json:"refused"` // names its DNS filter refused (D195), the latest first
+	LAN      []fwLAN      `json:"lan"`     // config.toml [[lan]] exceptions to the floor (D196)
+}
+
+// fwLAN is a LAN address and TCP port a container may reach past the
+// floor (D196), and the host it was asked for under.
+type fwLAN struct {
+	Addr string `json:"addr"`
+	Port string `json:"port"`
+	Host string `json:"host"`
 }
 
 // fwRefused is a name a container's DNS filter answered "no such name"
@@ -159,7 +168,8 @@ type fwRejected struct {
 }
 
 // fwShowJSON runs firewall.sh show with FW_FORMAT=tsv and prints its C
-// (container), R (rejected) and N (refused name) lines as one JSON document.
+// (container), R (rejected), N (refused name) and L (LAN exception) lines
+// as one JSON document.
 func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string) int {
 	var out bytes.Buffer
 	_, err := e.run.Run(ctx, sys.Cmd{
@@ -178,7 +188,7 @@ func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string)
 		f := strings.Split(strings.TrimRight(line, "\n"), "\t")
 		switch {
 		case f[0] == "C" && len(f) == 5:
-			c := fwContainer{Name: f[1], Firewall: f[2], Profiles: []string{}, Mode: f[4], Rejected: []fwRejected{}, Refused: []fwRefused{}}
+			c := fwContainer{Name: f[1], Firewall: f[2], Profiles: []string{}, Mode: f[4], Rejected: []fwRejected{}, Refused: []fwRefused{}, LAN: []fwLAN{}}
 			if f[3] != "" {
 				c.Profiles = strings.Split(f[3], ",")
 			}
@@ -187,6 +197,10 @@ func (e *env) fwShowJSON(ctx context.Context, script string, env, rest []string)
 		case f[0] == "R" && len(f) == 6:
 			if i, ok := byName[f[1]]; ok {
 				doc.Containers[i].Rejected = append(doc.Containers[i].Rejected, fwRejected{Addr: f[2], Proto: f[3], Port: f[4], Host: f[5]})
+			}
+		case f[0] == "L" && len(f) == 5:
+			if i, ok := byName[f[1]]; ok {
+				doc.Containers[i].LAN = append(doc.Containers[i].LAN, fwLAN{Addr: f[2], Port: f[3], Host: f[4]})
 			}
 		case f[0] == "N" && len(f) == 4:
 			// The name came from a lookup in the container: firewall.sh passes

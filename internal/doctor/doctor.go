@@ -468,6 +468,20 @@ func networksIsolated(ctx context.Context, r sys.Runner, dirs machine.Dirs) Chec
 
 // mounts checks that every non-optional [[mount]] source exists (D57): a
 // missing one fails railswitch up's preflight.
+// lanExceptions lists config.toml's [[lan]] entries (D196): each is a hole
+// in the firewall's floor, so doctor names them all. It passes: LoadConfig
+// already refused a bad one.
+func lanExceptions(cfg *machine.Config) Check {
+	parts := make([]string, len(cfg.LAN))
+	for i, l := range cfg.LAN {
+		parts[i] = l.Service + " → " + l.Host + " (tcp)"
+		if len(l.Projects) > 0 {
+			parts[i] += " in " + strings.Join(l.Projects, ", ")
+		}
+	}
+	return Check{Name: "LAN exceptions", OK: true, Detail: strings.Join(parts, "; ")}
+}
+
 func mounts(cfg *machine.Config, cfgPath string) Check {
 	c := Check{Name: "machine mounts", Fix: "create the missing source, set optional = true on its [[mount]], or remove it from " + cfgPath}
 	var missing []string
@@ -509,6 +523,9 @@ func (h Host) secrets(ctx context.Context, r sys.Runner, ws *workspace.Workspace
 	var out []Check
 	if len(cfg.Mounts) > 0 {
 		out = append(out, mounts(cfg, cfgPath))
+	}
+	if len(cfg.LAN) > 0 {
+		out = append(out, lanExceptions(cfg))
 	}
 	if cfg.Secrets.Driver != "pass" {
 		return out

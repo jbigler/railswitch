@@ -33,6 +33,11 @@ type fwDoc struct {
 			Name  string `json:"name"`
 			Count int    `json:"count"`
 		} `json:"refused"`
+		LAN []struct {
+			Addr string `json:"addr"`
+			Port string `json:"port"`
+			Host string `json:"host"`
+		} `json:"lan"`
 	} `json:"containers"`
 }
 
@@ -41,6 +46,7 @@ type fwBlockedView struct {
 	Error  string
 	Rows   []fwBlockedRow
 	None   []string // containers with no hook (fw show's "NO FIREWALL")
+	LAN    []string // "<container>: <addr> tcp/<port> (<host>)", config.toml [[lan]] (D196)
 }
 
 type fwBlockedRow struct {
@@ -130,6 +136,9 @@ func (s *Server) settingsBlocked(w http.ResponseWriter, r *http.Request) {
 	for _, c := range doc.Containers {
 		if c.Firewall == "none" {
 			v.None = append(v.None, c.Name)
+		}
+		for _, l := range c.LAN {
+			v.LAN = append(v.LAN, fmt.Sprintf("%s: %s tcp/%s (%s)", c.Name, l.Addr, l.Port, l.Host))
 		}
 		// A name its DNS filter refused (D195): no address, but a host to
 		// allow like any other.

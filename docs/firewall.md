@@ -15,7 +15,8 @@ the container's own networks: `0.0.0.0/8`, the private ranges
 `100.64.0.0/10` (which Tailscale uses) and link-local `169.254.0.0/16`,
 which holds the cloud metadata address `169.254.169.254`. So a container
 can't reach your LAN, your tailnet or a cloud host's credentials through
-an allow entry, or through a hostname that resolves to one of them.
+an allow entry, or through a hostname that resolves to one of them
+(the one way through is a LAN exception, below).
 An allow entry, `[agents.<name>] allow` entry or `fw allow` argument
 that is such an address or range, or contains one (`0.0.0.0/0`), is
 refused with the reason. Under `log` they are recorded like anything
@@ -26,6 +27,42 @@ After loading the rules the hook reads them back from the kernel and
 checks them: the never-allowed set holds every range, its rule comes
 before the allow lists, and everything else ends in the mode's verdict.
 A mismatch fails the container's start, as a failed load does.
+
+## LAN exceptions (D196)
+
+A service on your LAN (a search server for an agent, a media server)
+is in the floor's private ranges. This machine's `config.toml` (not
+`project.toml`: an address on your LAN is this machine's, not the
+project's) can let one service reach one host on one TCP port:
+
+```toml
+[[lan]]
+service  = "agent-claude"            # a service id: agent-<name>, nvim, rails, …
+host     = "search.home.example.com" # a name or an IPv4 address; :<port> for another port than 443
+projects = ["shop"]                  # optional: only these prefixes
+
+[[lan]]
+service = "nvim"
+host    = "search.home.example.com"
+```
+
+The hook resolves the host when the container starts, and each address it
+has in `10/8`, `100.64/10`, `172.16/12` or `192.168/16` passes the floor
+for that TCP port only, by a rule right before the floor that it checks
+after loading. Another port of the same host, or another host, is still
+refused, and `169.254/16` (cloud metadata) and `0/8` never pass. A public
+address is left out (it belongs in an allow list), and under the DNS filter
+the name is answered. Entries are checked when config.toml loads: a range,
+a public address or a bad port is refused there. `fw show`, the Firewall
+card and `railswitch doctor` list every exception.
+
+An entry reaches a container when its unit is written again and the
+container starts from it: `railswitch restart` (or `up`, or a settings
+change), as for a `[[mount]]` (`railswitch restart <service>` alone
+restarts the unit as it was last written). With rootless podman, the
+machine's own LAN address is the container's network namespace, not the
+machine: reach a service on the machine itself through the worktree's
+services, not a LAN exception.
 
 ## Profiles: one list per kind of container (D119)
 

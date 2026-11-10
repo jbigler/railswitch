@@ -505,6 +505,20 @@ func TestDoctorMachineMounts(t *testing.T) {
 	}
 }
 
+// TestDoctorLAN (D196): doctor names every [[lan]] exception, and only
+// when there is one.
+func TestDoctorLAN(t *testing.T) {
+	ws := workspaceAt(t, true)
+	if _, ok := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["LAN exceptions"]; ok {
+		t.Error("a LAN exceptions check with no [[lan]]")
+	}
+	writeConfig(t, ws.Dirs, "[[lan]]\nservice = \"agent-claude\"\nhost = \"search.home.example.com\"\nprojects = [\"filial\"]\n")
+	c, ok := byName(host(t, "80", true).Run(context.Background(), fakeHost(), ws))["LAN exceptions"]
+	if !ok || !c.OK || c.Detail != "agent-claude → search.home.example.com:443 (tcp) in filial" {
+		t.Errorf("lan: %+v (present %v)", c, ok)
+	}
+}
+
 // writeHook installs an unbacked-up pre-commit hook in the workspace's base
 // worktree: a git-guard finding.
 func writeHook(t *testing.T, ws *workspace.Workspace) string {

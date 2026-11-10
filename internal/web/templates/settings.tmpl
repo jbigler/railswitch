@@ -209,5 +209,8 @@ the page. */}}
 {{end}}</tbody>
 </table>
 {{range .None}}<p class="yellow notice"><span class="mono">{{.}}</span> has no firewall: the hook did not run for it (railswitch doctor, then restart it).</p>
+{{end}}{{with .LAN}}<h3>LAN exceptions</h3>
+<p class="muted">This machine's config.toml <span class="mono">[[lan]]</span> lets these containers past the never-allowed ranges, to one address and TCP port each.</p>
+<ul class="mono">{{range .}}<li>{{.}}</li>{{end}}</ul>
 {{end}}{{end}}</div>
 {{end}}

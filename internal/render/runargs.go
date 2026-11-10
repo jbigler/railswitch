@@ -122,6 +122,9 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 	if in.DNSFilter(s) {
 		ann = append(ann, p+".firewall.dns=filter")
 	}
+	if len(s.FirewallLAN) > 0 {
+		ann = append(ann, p+".firewall.lan="+strings.Join(s.FirewallLAN, ","))
+	}
 	return ann
 }
 

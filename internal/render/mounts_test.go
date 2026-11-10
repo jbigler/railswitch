@@ -54,3 +54,24 @@ func TestMachineMountsRender(t *testing.T) {
 		t.Errorf("agent-claude (on-demand transient) vols lack the mount: %v", vols)
 	}
 }
+
+// TestMachineLANRender (D196): a [[lan]] entry becomes its service's
+// firewall.lan annotation, and only its service's.
+func TestMachineLANRender(t *testing.T) {
+	in := fixtureInputs(t, fixtureWS(t), nil)
+	in.LAN = []MachineLAN{
+		{Service: "nvim", Host: "search.home.example.com:443"},
+		{Service: "nvim", Host: "192.168.1.20:8080"},
+		{Service: "agent-claude", Host: "search.home.example.com:443"},
+	}
+	units, err := Quadlet(mustBuild(t, in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u := string(units["filial-master-nvim.container"]); !strings.Contains(u, "Annotation=filial.firewall.lan=search.home.example.com:443,192.168.1.20:8080\n") {
+		t.Errorf("nvim unit lacks its firewall.lan:\n%s", u)
+	}
+	if u := string(units["filial-master-rails.container"]); strings.Contains(u, "firewall.lan") {
+		t.Errorf("rails unit has a firewall.lan:\n%s", u)
+	}
+}

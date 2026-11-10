@@ -4,8 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jbigler/railswitch/internal/naming"
@@ -20,6 +24,53 @@ type Config struct {
 	Schema  int           `toml:"schema"` // 1 (D39); a higher value is refused
 	Secrets SecretsConfig `toml:"secrets"`
 	Mounts  []Mount       `toml:"mount"` // [[mount]] (D57)
+	LAN     []LAN         `toml:"lan"`   // [[lan]] (D196)
+}
+
+// LAN is a machine-local exception to the firewall's floor (D196): the
+// service Service, in the projects Projects (prefixes; empty = every one),
+// may reach Host, "<name or IPv4 address>[:<port>]", on its LAN address and
+// that TCP port (443 when none is given). LoadConfig adds the port.
+type LAN struct {
+	Service  string   `toml:"service"`
+	Host     string   `toml:"host"`
+	Projects []string `toml:"projects"`
+}
+
+// lanHostRe is a host name: labels of letters, digits and inner hyphens.
+var lanHostRe = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$`)
+
+// lanPrivate are the floor's ranges a LAN exception may open; 0.0.0.0/8
+// and 169.254.0.0/16 (cloud metadata) it never does.
+var lanPrivate = []string{"10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.168.0.0/16"}
+
+// check validates lan[i] and gives its host a port.
+func (l *LAN) check(i int) error {
+	field := func(f string) string { return fmt.Sprintf("lan[%d].%s", i, f) }
+	if err := naming.ValidService(l.Service); err != nil {
+		return fmt.Errorf("%s: %w", field("service"), err)
+	}
+	host, port := l.Host, "443"
+	if h, p, ok := strings.Cut(l.Host, ":"); ok {
+		host, port = h, p
+	}
+	if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 || strconv.Itoa(n) != port {
+		return fmt.Errorf("%s: %q: the port is not 1 to 65535", field("host"), l.Host)
+	}
+	if ip := net.ParseIP(host).To4(); ip != nil {
+		if !slices.ContainsFunc(lanPrivate, func(c string) bool { _, n, _ := net.ParseCIDR(c); return n.Contains(ip) }) {
+			return fmt.Errorf("%s: %q is not a LAN address (10/8, 100.64/10, 172.16/12, 192.168/16); a public one goes in an allow list", field("host"), host)
+		}
+	} else if len(host) > 253 || !lanHostRe.MatchString(host) {
+		return fmt.Errorf("%s: %q is not a host name or IPv4 address", field("host"), host)
+	}
+	l.Host = host + ":" + port
+	for j, p := range l.Projects {
+		if err := naming.ValidPrefix(p); err != nil {
+			return fmt.Errorf("%s[%d]: %w", field("projects"), j, err)
+		}
+	}
+	return nil
 }
 
 // Mount is a machine-local bind mount (D57): Source (absolute, ~/ expanded
@@ -85,6 +136,11 @@ func LoadConfig(d Dirs) (*Config, error) {
 	}
 	for i := range c.Mounts {
 		if err := c.Mounts[i].check(i); err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+	}
+	for i := range c.LAN {
+		if err := c.LAN[i].check(i); err != nil {
 			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 	}

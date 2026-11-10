@@ -76,6 +76,26 @@ stop_dns() {
   rm -f "$DNSDIR/$1.conf" "$DNSDIR/$1.pid" "$DNSDIR/$1.log"
 }
 
+# dns_refused CID: the names container CID's DNS filter refused (its
+# "config <name> is NXDOMAIN" lines, log-queries), "<name> <lookups>" per
+# line, the latest first, at most 50. The names are the container's to
+# choose: only host names pass. The log grows with every query, so past
+# 2 MiB it is cut to its last 1 MiB, which dnsmasq reopens on SIGUSR2.
+dns_refused() {
+  local log="$DNSDIR/$1.log" p
+  [[ -f "$log" && ! -L "$log" ]] || return 0
+  if (( $(stat -c %s "$log") > 2097152 )); then
+    tail -c 1048576 "$log" >"$log.new" && mv -f "$log.new" "$log"
+    p="$(cat "$DNSDIR/$1.pid" 2>/dev/null)" || true
+    [[ "$p" =~ ^[0-9]+$ ]] && kill -USR2 "$p" 2>/dev/null || true
+  fi
+  tail -c 1048576 "$log" \
+    | LC_ALL=C sed -n -E 's/^[A-Z][a-z]{2} +[0-9]{1,2} [0-9:]{8} dnsmasq\[[0-9]+\]: config ([A-Za-z0-9.-]{1,253}) is NXDOMAIN$/\1/p' \
+    | LC_ALL=C tr 'A-Z' 'a-z' \
+    | awk '/^[a-z0-9-]+(\.[a-z0-9-]+)+$/ { n[$0]++; last[$0] = NR } END { for (k in n) print last[k], k, n[k] }' \
+    | sort -rn | head -n 50 | cut -d' ' -f2-
+}
+
 # dns_add PID CID NAME…: let container CID's DNS filter answer NAMEs too,
 # then restart it (dnsmasq reads its server and nftset lines at start).
 dns_add() {
@@ -157,11 +177,20 @@ cmd_show() {
       printf '\n%s  profiles=%s mode=%s\n' "$name" "$profiles" "$mode"
     fi
     [[ "$mode" == off ]] && continue
-    local pid entries
+    local pid entries refused rname rcount
     pid="$(podman inspect -f '{{.State.Pid}}' "$id")"
     entries="$( { set_entries "$pid" blocked4; set_entries "$pid" blocked6; } | sort -u)"
+    refused="$(dns_refused "${id:0:12}")"
+    # Names the DNS filter refused never became packets (D182): listed apart.
+    if [[ -n "$refused" ]]; then
+      [[ "$TSV" ]] || printf '  refused names (DNS filter), lookups:\n'
+      while read -r rname rcount; do
+        if [[ "$TSV" ]]; then printf 'N\t%s\t%s\t%s\n' "$name" "$rname" "$rcount"
+        else printf '    %-60s %s\n' "$rname" "$rcount"; fi
+      done <<<"$refused"
+    fi
     if [[ -z "$entries" ]]; then
-      [[ "$TSV" ]] || printf '  nothing %s\n' "$([[ "$mode" == log ]] && echo 'would have been rejected' || echo rejected)"
+      [[ "$TSV" || -n "$refused" ]] || printf '  nothing %s\n' "$([[ "$mode" == log ]] && echo 'would have been rejected' || echo rejected)"
       continue
     fi
     [[ "$TSV" ]] || printf '  %s:\n' "$([[ "$mode" == log ]] && echo 'would reject under enforce' || echo rejected)"

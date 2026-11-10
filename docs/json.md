@@ -589,7 +589,8 @@ worktree's), docs/firewall.md. Exit 1 when `firewall.sh` refuses.
 ```json
 {"containers": [
   {"name": "masto-main-rails", "firewall": "firewalled", "profiles": ["app"], "mode": "log",
-   "rejected": [{"addr": "104.16.169.120", "proto": "tcp", "port": "443", "host": ""}]}
+   "rejected": [{"addr": "104.16.169.120", "proto": "tcp", "port": "443", "host": ""}],
+   "refused": [{"name": "proxy.individual.githubcopilot.com", "count": 4}]}
 ]}
 ```
 
@@ -600,6 +601,7 @@ worktree's), docs/firewall.md. Exit 1 when `firewall.sh` refuses.
 | `profiles` | array | Its profiles (`app`, `deps`, `agent-<name>`, `none`, …); `[]` unless firewalled. |
 | `mode` | string | `enforce`, `log` or `off`; `""` unless firewalled. |
 | `rejected` | array | What it rejected (enforce) or would have (log) since it started: `addr`, `proto`, `port`, `host` (the name the address resolves back to, `""` for none). |
+| `refused` | array | Names its DNS filter answered "no such name" (D182, D195), which never became packets and so are not in `rejected`: `name` (a host name; the container chose it), `count` (lookups its filter's log still holds). The latest first, at most 50. `[]` without a DNS filter, and for a container started before D195 until it restarts. |
 
 ## `wt ls`
 

@@ -65,7 +65,15 @@ Arch, Fedora and Debian's are), every container firewalled under
 - Every other name gets `NXDOMAIN` ("no such name"): DNS is no longer a
   way out, and a name an app needs but the list lacks fails at once as
   "Name or service not known". (Not `REFUSED`: programs see that as a
-  temporary failure, and npm and Bundler retried it for minutes.)
+  temporary failure, and npm and Bundler retried it for minutes.) Such a
+  name never becomes a packet, so it isn't among the rejected addresses:
+  `fw show` lists it apart as a refused name (D195), from the filter's
+  query log (`log-queries`, its `config <name> is NXDOMAIN` lines), which
+  `fw show` cuts to its last 1 MiB once it passes 2 MiB. The names are
+  the container's choice, so only host names are shown, and an agent can
+  put one there on purpose: allow a name because you know you need it.
+  The log goes with the container, so refused names show for running
+  containers only.
 - Asking any of the container's networks' resolvers (each network's
   gateway: the dev network's and the proxy's) directly is blocked; only
   the filter may. It sends from port 953: below 1024, so nothing in the
@@ -131,7 +139,8 @@ agent's own firewall is only as strong as the app's.
 
 - `railswitch fw show [service] [--json]`: every container's profiles and
   mode, and what was blocked (or, in log mode, would have been), with the
-  host each address resolves to (docs/json.md).
+  host each address resolves to, and the names its DNS filter refused
+  (D195; docs/json.md).
 - `railswitch fw allow [--for <duration>] <service> <host>…`: allow a
   host in a running container until it restarts. With `--for` (`30m`,
   `2h`, at most `168h`) the kernel drops the allow when the time is up,

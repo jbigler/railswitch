@@ -18,14 +18,15 @@ import (
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
-var wantScope = []string{"systemd-run", "--user", "--scope", "--collect", "--quiet", "--"}
+var wantScope = []string{"systemd-run", "--user", "--scope", "--collect", "--quiet"}
 
 // scopeRunner records every argv and runs it for real without the
 // systemd-run prefix (no systemd in tests).
 type scopeRunner struct {
 	mu     sync.Mutex
 	calls  [][]string
-	stdins [][]byte // nil when the call had no stdin
+	stdins [][]byte        // nil when the call had no stdin
+	active map[string]bool // systemctl is-active answers, by unit
 }
 
 func (s *scopeRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
@@ -39,10 +40,19 @@ func (s *scopeRunner) Run(ctx context.Context, c sys.Cmd) (sys.Result, error) {
 	s.calls = append(s.calls, full)
 	s.stdins = append(s.stdins, in)
 	s.mu.Unlock()
-	if len(full) <= len(wantScope) || !slices.Equal(full[:len(wantScope)], wantScope) {
+	if c.Name == "systemctl" {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if len(full) == 5 && full[2] == "is-active" && s.active[full[4]] {
+			return sys.Result{}, nil
+		}
+		return sys.Result{ExitCode: 3}, sys.ErrExit
+	}
+	n := len(wantScope)
+	if len(full) <= n+2 || !slices.Equal(full[:n], wantScope) || !strings.HasPrefix(full[n], "--unit=railswitch-job-") || full[n+1] != "--" {
 		return sys.Result{}, errors.New("not wrapped in a scope")
 	}
-	c.Name, c.Args = full[len(wantScope)], full[len(wantScope)+1:]
+	c.Name, c.Args = full[n+2], full[n+3:]
 	return sys.Exec{}.Run(ctx, c)
 }
 
@@ -101,8 +111,8 @@ func run(t *testing.T, h *Hub, s Spec) Snapshot {
 func TestStartWrapsInScope(t *testing.T) {
 	h, r, _ := newHub(t)
 	s := sh("p", "a", "exit 0")
-	run(t, h, s)
-	want := append(slices.Clone(wantScope), s.Argv...)
+	j := run(t, h, s)
+	want := slices.Concat(wantScope, []string{"--unit=railswitch-job-" + j.ID + ".scope", "--"}, s.Argv)
 	if len(r.calls) != 1 || !slices.Equal(r.calls[0], want) {
 		t.Fatalf("calls = %q, want [%q]", r.calls, want)
 	}
@@ -499,5 +509,73 @@ func TestStartInputStdin(t *testing.T) {
 	defer r.mu.Unlock()
 	if r.stdins[1] != nil {
 		t.Errorf("Start stdin %q, want none", r.stdins[1])
+	}
+}
+
+// #30: a job a previous dashboard left running keeps its log, which New
+// goes on capping until the job's scope ends, then removes; a log whose
+// job has ended, or that names no job, is removed at once.
+func TestNewCapsOrphanLog(t *testing.T) {
+	defer func(d time.Duration) { unitCheckEvery = d }(unitCheckEvery)
+	unitCheckEvery = 50 * time.Millisecond
+	dir := filepath.Join(t.TempDir(), "jobs")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	orphan, ended, other := "20261110-120000-1", "20261110-110000-2", "notes"
+	for _, id := range []string{orphan, ended, other} {
+		if err := os.WriteFile(filepath.Join(dir, id+".log"), []byte("x\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unit := "railswitch-job-" + orphan + ".scope"
+	r := &scopeRunner{active: map[string]bool{unit: true, "railswitch-job-" + other + ".scope": true}}
+	if _, err := New(r, dir, func(context.Context) []string { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{ended, other} {
+		if _, err := os.Stat(filepath.Join(dir, id+".log")); !os.IsNotExist(err) {
+			t.Errorf("%s.log kept: %v", id, err)
+		}
+	}
+	// The orphan floods its log past the backstop: the tail truncates it.
+	log := filepath.Join(dir, orphan+".log")
+	f, err := os.OpenFile(log, os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	chunk := bytes.Repeat([]byte("y"), 1<<20)
+	for range backstop>>20 + 4 {
+		if _, err := f.Write(chunk); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		fi, err := os.Stat(log)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fi.Size() < LogLimit {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("orphan log still %d bytes", fi.Size())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	r.mu.Lock()
+	r.active[unit] = false
+	r.mu.Unlock()
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		if _, err := os.Stat(log); os.IsNotExist(err) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("orphan log kept after its job ended")
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }

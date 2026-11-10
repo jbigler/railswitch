@@ -631,10 +631,14 @@ take the default (a new home, or one `agent default apply` named), puts
 the default in place and removes the file. The built-in `claude@1` does
 it with its `apply-default.sh`.
 
-Every agent container has the project's shared notes (D141) at `~/notes`
+Every agent container has the project's shared notes (D141) at `~/notes`,
+read-only, its worktree's notes inbox (D197) at `~/notes-inbox`, writable,
 and `/usr/local/bin/railswitch-notes`, which prints what an agent should
 read at session start: the rule for using the notes, then their file names
-(which say what each holds), newest first. Delivering it is the package's job, as it knows how its agent reads
+(which say what each holds), newest first, then the suggestions from this
+worktree not yet reviewed. An agent suggests a note by writing it to
+`~/notes-inbox`; the user accepts it into `~/notes` or rejects it (`notes
+inbox`, or the dashboard's Notes page). Delivering it is the package's job, as it knows how its agent reads
 context: `claude@1` registers it as a SessionStart hook; a package whose
 agent reads a context file can write its output into that file from its
 entrypoint, between markers it rewrites at every start. An agent whose own

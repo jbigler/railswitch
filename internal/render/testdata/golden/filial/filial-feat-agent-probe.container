@@ -5,7 +5,7 @@
 Description=filial agent-probe of worktree feat
 
 [Container]
-Label=filial.unit-hash=5b19a1ef03a6
+Label=filial.unit-hash=be8353d2e8e0
 Image=localhost/filial/agent-probe:ruby3.3.6-node22.11.0-ac1150a1
 ContainerName=filial-feat-agent-probe
 Network=filial-feat-dev.network:alias=agent-probe
@@ -24,7 +24,8 @@ Volume=/WORKSPACES/filial/worktrees/master/.git/hooks:/WORKSPACES/filial/worktre
 Volume=/WORKSPACES/filial/.railswitch/status/feat:/run/railswitch/status:rw,z
 Volume=/WORKSPACES/filial/.railswitch/agent-home/feat/probe:/home/appuser:z
 Volume=/WORKSPACES/filial/.railswitch/agent-memory/probe:/home/appuser/.probe-memory:z
-Volume=/WORKSPACES/filial/notes:/home/appuser/notes:z
+Volume=/WORKSPACES/filial/notes:/home/appuser/notes:ro,z
+Volume=/WORKSPACES/filial/.railswitch/notes-inbox/feat:/home/appuser/notes-inbox:rw,z
 Volume=/WORKSPACES/filial/.railswitch/hooks/railswitch-notes.sh:/usr/local/bin/railswitch-notes:ro,z
 Volume=/WORKSPACES/filial/.railswitch/hooks/agent-tmux.conf:/usr/local/share/railswitch/agent-tmux.conf:ro,z
 Volume=/WORKSPACES/filial/git:/etc/railswitch-git:ro,z

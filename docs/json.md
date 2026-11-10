@@ -1016,6 +1016,48 @@ note or a symlink in its place exits 1 and changes nothing. With `--json`,
 both print `{"hash": …}`: the note's new hash, the one the next edit passes
 as `--if-hash` (`""` after `rm`).
 
+## `notes inbox ls`
+
+The notes agents suggest (D197): each regular file named as a note in
+`<workspace>/.railswitch/notes-inbox/<slug>/`, one folder per worktree,
+newest first across all of them. Agents write those folders, so they are
+read as `notes ls` reads `notes/`: a symlink, directory or other name is
+left out, and so is a folder that is not named as a worktree slug.
+
+```json
+{"suggestions": [{"worktree": "feat", "name": "use_bin_dev.md", "size": 120, "modified": "2026-11-10T09:12:00Z", "replaces": false}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `suggestions` | array | Never null. |
+| `worktree` | string | The slug of the worktree whose agents suggested it. |
+| `name`, `size`, `modified` | | As in `notes ls`. |
+| `replaces` | boolean | A note of that name exists, which accepting it replaces. |
+
+## `notes inbox show <worktree> <name>`
+
+One suggestion, read as `notes show` reads a note, with the note it would
+replace. The text form prints the suggestion as `notes show` does.
+
+```json
+{"worktree": "feat", "name": "use_bin_dev.md", "text": "…", "hash": "sha256:…", "note": null}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `worktree`, `name`, `text` | string | The suggestion. |
+| `hash` | string | `sha256:<hex>` of its bytes: what `notes inbox accept` takes as `--hash`. |
+| `note` | object or null | The note of that name (`name`, `text`, `hash`), or null when there is none. |
+
+`notes inbox accept <worktree> <name> --hash <h> [--as <note>]` writes the
+suggestion's bytes as note `<note>` (default `<name>`), replacing one of
+that name, then removes the suggestion. `h` is the hash you reviewed: an
+agent's edit since, a symlink, or text that is not UTF-8 exits 1 and
+changes nothing. With `--json` it prints `{"name": …, "hash": …}`.
+`notes inbox reject <worktree> <name>` removes the suggestion (a symlink is
+removed, never followed).
+
 ## `overview`
 
 One project (`-C`): every registered worktree, in registry order (by ID),

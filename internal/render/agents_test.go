@@ -246,7 +246,7 @@ func TestApplyCreatesHomeSubdirs(t *testing.T) {
 
 func TestPlanStatusDirs(t *testing.T) {
 	p, ws, qdir := filialPlan(t)
-	want := []string{".railswitch/status/master", ".railswitch/status/feat", "notes", "git", ".railswitch/agent-default/claude", ".railswitch/agent-memory/probe"}
+	want := []string{".railswitch/status/master", ".railswitch/notes-inbox/master", ".railswitch/status/feat", ".railswitch/notes-inbox/feat", "notes", "git", ".railswitch/agent-default/claude", ".railswitch/agent-memory/probe"}
 	if !slices.Equal(p.StatusDirs, want) {
 		t.Errorf("StatusDirs = %v; want %v", p.StatusDirs, want)
 	}

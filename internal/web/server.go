@@ -114,6 +114,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/palette", s.tasksDialog) // no worktree: pages and worktrees only
 	m.HandleFunc("GET /p/{prefix}/notes", s.notesPage)
 	m.HandleFunc("POST /p/{prefix}/notes/write/{name}", s.cyberNoteWrite)
+	m.HandleFunc("POST /p/{prefix}/notes/inbox/{slug}/{name}", s.notesInboxPost)
 	m.HandleFunc("GET /p/{prefix}/{slug}/stats", s.stats)
 	m.HandleFunc("GET /p/{prefix}/{slug}/pr", s.prPage)
 	m.HandleFunc("POST /p/{prefix}/{slug}/pr/{action}", s.prAction)

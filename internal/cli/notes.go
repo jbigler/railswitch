@@ -23,7 +23,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const notesUsage = "usage: railswitch [--json] notes ls | [--json] notes show <name> | notes write <name> --if-hash <hash> | notes rm <name> --if-hash <hash>"
+const notesUsage = "usage: railswitch [--json] notes ls | [--json] notes show <name> | notes write <name> --if-hash <hash> | notes rm <name> --if-hash <hash> | notes inbox ..."
 
 // noteName is a note's file name: what railswitch shows, writes or removes.
 var noteName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$`)
@@ -60,6 +60,8 @@ func cmdNotes(_ context.Context, e *env, args []string) int {
 		return notesWrite(e, args[1:])
 	case "rm":
 		return notesRm(e, args[1:])
+	case "inbox":
+		return notesInbox(e, args[1:])
 	}
 	return e.usageErr("notes: unknown subcommand %q\n%s", args[0], notesUsage)
 }
@@ -170,14 +172,19 @@ func notesShow(e *env, args []string) int {
 		}
 		return 0
 	}
-	// An agent wrote it: no escapes reach the terminal, line breaks stay.
-	fmt.Fprint(e.stdout, strings.Map(func(r rune) rune {
+	fmt.Fprint(e.stdout, printableText(data))
+	return 0
+}
+
+// printableText is a note's text for a terminal: an agent wrote it, so no
+// escapes get through; line breaks and tabs stay.
+func printableText(data []byte) string {
+	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && r != '\n' && r != '\t' {
 			return ' '
 		}
 		return r
-	}, string(data)))
-	return 0
+	}, string(data))
 }
 
 // railswitch notes write <name> --if-hash <h>: stdin replaces note name

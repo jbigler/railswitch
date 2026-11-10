@@ -19,6 +19,21 @@ CDP bridge on 127.0.0.1:9222). Without a browser the server is not configured.
 - The human can watch and use the same browser, so it suits cooperative
   debugging (e.g. ask them to log in by hand).
 
+# Reaching the app with curl
+
+`$WORKTREE_HOST` ends in `.localhost`, and curl sends every `*.localhost`
+name to 127.0.0.1 without reading /etc/hosts, where the name points at the
+worktree's proxy. Nothing listens on 127.0.0.1 in here, so plain
+`curl http://$WORKTREE_HOST/` fails with "Connection refused". Pin the
+address yourself:
+
+    curl --resolve "$WORKTREE_HOST:80:$(getent hosts "$WORKTREE_HOST" | awk '{print $1; exit}')" "http://$WORKTREE_HOST/up"
+
+Ruby, Node and other tools that resolve through the system read /etc/hosts
+and need nothing special. Don't switch to the app's service name and port
+instead: the app builds its URLs from `$WORKTREE_HOST`, and may refuse
+requests for any other host.
+
 # Network egress is allowlisted from the host
 
 Outbound traffic is filtered by a firewall the host applies to this container

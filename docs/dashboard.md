@@ -1120,7 +1120,7 @@ Every action is a job (below).
 - The last 20 jobs are kept; older finished ones and their logs are
   dropped. Logs from a previous dashboard run are deleted at start, except
   a log whose job is still running (its scope, by exact name, is active,
-  D198): the new dashboard keeps capping it as it does its own jobs,
+  D200): the new dashboard keeps capping it as it does its own jobs,
   without showing it, and deletes it when the job ends.
 
 Messages (job started, a refusal) show bottom right for a few seconds,

@@ -1,0 +1,2 @@
+["-C","/ws","stack","ls"]
+{"available":false,"worktrees":[{"slug":"master","branch":"","stack":null,"error":""},{"slug":"feat","branch":"","stack":null,"error":""}]}

@@ -1,0 +1,2 @@
+["dashboard","colors"]
+{"light":{"base":"flexoki","overrides":{},"colors":{"accent":"#BC5215","bg":"#FFFCF0","bg2":"#F2F0E5","blue":"#205EA6","border":"#CECDC3","green":"#536907","muted":"#6F6E69","purple":"#5E409D","red":"#AF3029","sel":"#E6E4D9","text":"#100F0F","yellow":"#8E6B01"}},"dark":{"base":"flexoki","overrides":{},"colors":{"accent":"#DA702C","bg":"#100F0F","bg2":"#1C1B1A","blue":"#4385BE","border":"#403E3C","green":"#879A39","muted":"#878580","purple":"#8B7EC8","red":"#D14D41","sel":"#282726","text":"#CECDC3","yellow":"#D0A215"}},"warnings":{"light":[],"dark":[]}}

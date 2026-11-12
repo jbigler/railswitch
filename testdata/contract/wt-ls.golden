@@ -1,0 +1,2 @@
+["-C","/ws","wt","ls"]
+[{"slug":"master","id":1,"branch":"","dir":"/ws/worktrees/master","dirty":false,"share":null},{"slug":"feat","id":2,"branch":"","dir":"/ws/worktrees/feat","dirty":false,"share":null}]

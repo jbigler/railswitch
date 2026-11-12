@@ -1,0 +1,347 @@
+package web
+
+import (
+	"bytes"
+	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+)
+
+const contractDir = "../../testdata/contract"
+
+// contractPages are the pages the contract test requests: together they
+// run every read the dashboard makes, but those in contractSkip.
+var contractPages = []string{
+	"/p/filial", "/p/filial/feat", "/p/filial/feat/tasks", "/p/filial/feat/agent-default",
+	"/p/filial/feat/snapshots", "/p/filial/feat/queue", "/p/filial/feat/remove",
+	"/p/filial/notes?n=a.md", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy",
+	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=rails@1",
+	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
+	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",
+	"/machine", "/new", "/colors",
+}
+
+// contractSkip are the readJSON calls the contract does not cover, as
+// "<file>:<function>", each with its reason.
+var contractSkip = map[string]string{
+	"libraries.go:libraryTrust":            "a POST; library ls is read by the machine page",
+	"library.go:libraryNew":                "a POST; pack ls is read by the library page",
+	"review.go:reviewAccept":               "a POST; lock --review is read by the review page",
+	"office.go:cyberPage":                  "reads office set ls only for an installed set; officeDefault reads it",
+	"pr.go:prPage":                         "pr show needs a branch and gh; the fixture's worktrees have neither",
+	"newproject.go:newDetect":              "project detect clones a repository",
+	"newproject.go:newReview":              "new --dry-run needs a repository",
+	"newproject.go:newCreate":              "new --dry-run needs a repository",
+	"packageimport.go:packImportPage":      "pack import needs a folder to import",
+	"packageimport.go:packImport":          "pack import needs a folder to import",
+	"templateimport.go:templateImportPage": "template import needs a folder to import",
+	"templateimport.go:templateImport":     "template import needs a folder to import",
+	"templates.go:readTemplate":            "template show needs a template; the fixture has none",
+}
+
+// contractAbsent are the JSON keys a dashboard struct declares that the
+// Filial fixture's documents never hold, each with its reason: an entry
+// "<contract file> <path>" covers every key that starts with it. A key
+// here is not checked.
+var contractAbsent = map[string]string{
+	"agent-ls [].default.":                      "no agent has a default",
+	"agent-usage .rows[].removed":               "omitempty: no removed worktree",
+	"fw-show .containers[].":                    "no container runs, so none has a firewall",
+	"library-ls .libraries[].":                  "no library",
+	"lock-review .packages[].":                  "the lock is current: nothing to review",
+	"office-set-ls .sets[].reason":              "omitempty: every set is valid",
+	"office-tv .jellyfin.":                      "no TV source",
+	"overview .signer_warnings[].":              "no library, so no signer warning",
+	"overview .template.":                       "the project came from no template",
+	"overview .worktrees[].agent.usage.context": "omitempty: the status file has none",
+	"overview .worktrees[].agent.usage.session": "omitempty: the status file has none",
+	"overview .worktrees[].agent.usage.started": "omitempty: the status file has none",
+	"overview .worktrees[].tests.last.":         "no test task has run",
+	"pack-ls .":                                 "omitempty library: only built-ins",
+	"pack-ls-project .":                         "omitempty library: only built-ins",
+	"pack-show .pin.":                           "rails@1 pins nothing",
+	"pack-show .service":                        "omitempty: a pack has none",
+	"pack-show .slot":                           "omitempty: a pack has none",
+	"pr-ls [].pr.":                              "no worktree has a PR: no branch, no gh",
+	"project-show .tasks[].":                    "omitempty fresh and terminal: no task sets them",
+	"signer-ls .libraries[].":                   "no library",
+	"stack-ls .worktrees[].stack.":              "gh stack is not available",
+	"task-ls [].":                               "omitempty fresh and terminal: no task sets them",
+	"template-ls .templates[].":                 "no template",
+	"tidy .items[].":                            "nothing to tidy",
+}
+
+// TestDashboardContract is the dashboard's side of the dashboard contract
+// (D197). testdata/contract holds, per read command, the
+// arguments the dashboard passes and the document the CLI prints
+// (internal/cli's TestDashboardContract keeps them true). Here the pages
+// run on those documents, and the test fails when the dashboard runs a
+// read with no contract file, declares a JSON key its document lacks, has
+// a readJSON call no page reached, or a contract file nothing read.
+func TestDashboardContract(t *testing.T) {
+	files, err := filepath.Glob(filepath.Join(contractDir, "*.golden"))
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no contract files: %v", err)
+	}
+	f := newFixture(t)
+	names := map[string]string{} // fakeCLI key -> contract file's name
+	f.cli.out = map[string]string{}
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		head, doc, _ := bytes.Cut(data, []byte("\n"))
+		var args []string
+		if err := json.Unmarshal(head, &args); err != nil {
+			t.Fatalf("%s: line 1 is not a JSON array of arguments: %v", file, err)
+		}
+		key := "--json " + strings.Join(args, " ")
+		names[key] = strings.TrimSuffix(filepath.Base(file), ".golden")
+		f.cli.out[key] = string(doc)
+	}
+
+	var mu sync.Mutex
+	declared, seen := map[string]bool{}, map[string]bool{}
+	read := map[string]bool{}  // contract files a readJSON decoded
+	sites := map[string]bool{} // "<file>:<line>" of the readJSON calls that ran
+	decodeHook = func(args []string, raw []byte, v any) {
+		mu.Lock()
+		defer mu.Unlock()
+		pcs := make([]uintptr, 8)
+		frames := runtime.CallersFrames(pcs[:runtime.Callers(3, pcs)]) // skip Callers, the hook, readJSON
+		if fr, _ := frames.Next(); fr.File != "" {
+			sites[filepath.Base(fr.File)+":"+strconv.Itoa(fr.Line)] = true
+		}
+		name := names["--json "+strings.Join(args, " ")]
+		read[name] = true
+		var doc any
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Errorf("%s: %v", name, err)
+			return
+		}
+		typ := reflect.TypeOf(v).Elem()
+		declaredKeys(typ, name+" ", declared, nil)
+		seenKeys(typ, doc, name+" ", seen)
+	}
+	t.Cleanup(func() { decodeHook = nil })
+
+	// The PR poll reads only for a project a page asked to refresh.
+	if w := f.do(req("POST", "/p/filial/prs/refresh", form())); w.Code >= 400 {
+		t.Fatalf("prs/refresh: %d %s", w.Code, w.Body)
+	}
+	f.s.pollOnce(t.Context())
+	for _, p := range contractPages {
+		if w := f.do(req("GET", p, nil)); w.Code >= 400 {
+			t.Errorf("GET %s: %d %s", p, w.Code, w.Body)
+		}
+	}
+
+	for _, c := range f.cli.Calls() {
+		if key := strings.Join(c, " "); c[0] == "--json" && names[key] == "" {
+			t.Errorf("the dashboard read %q, which has no contract file: add one in %s with line 1 %s, then run go test ./internal/cli -run TestDashboardContract -update", key, contractDir, jsonArgs(c[1:]))
+		}
+	}
+	for _, name := range names {
+		if !read[name] {
+			t.Errorf("no page read contract file %s: add its page to contractPages, or remove the file", name)
+		}
+	}
+	used := map[string]bool{}
+	for _, k := range sorted(declared) {
+		if seen[k] {
+			continue
+		}
+		absent := false
+		for p := range contractAbsent {
+			if strings.HasPrefix(k, p) {
+				absent, used[p] = true, true
+			}
+		}
+		if !absent {
+			t.Errorf("the dashboard reads key %q, which the CLI's document lacks (renamed? else name it in contractAbsent)", k)
+		}
+	}
+	for p := range contractAbsent {
+		if !used[p] {
+			t.Errorf("contractAbsent names %q, but the document has every key under it", p)
+		}
+	}
+	calls := readJSONCalls(t)
+	for _, c := range calls {
+		ran := false
+		for l := c.from; l <= c.to; l++ {
+			ran = ran || sites[c.file+":"+strconv.Itoa(l)]
+		}
+		_, skip := contractSkip[c.file+":"+c.fn]
+		switch {
+		case !ran && !skip:
+			t.Errorf("%s:%d: no page in contractPages reaches this readJSON in %s (add its page, or name %q in contractSkip)", c.file, c.from, c.fn, c.file+":"+c.fn)
+		case ran && skip:
+			t.Errorf("contractSkip names %s:%s, but a page reached it", c.file, c.fn)
+		}
+	}
+	for k := range contractSkip {
+		if !slices.ContainsFunc(calls, func(c readCall) bool { return c.file+":"+c.fn == k }) {
+			t.Errorf("contractSkip names %q, which has no readJSON call", k)
+		}
+	}
+}
+
+// declaredKeys adds the path of every JSON key t declares, as json.Unmarshal
+// reads it; seenKeys those of them doc holds. A slice adds "[]" to the
+// path, a map "{}".
+func declaredKeys(t reflect.Type, path string, out map[string]bool, stack []reflect.Type) {
+	if slices.Contains(stack, t) || reflect.PointerTo(t).Implements(reflect.TypeFor[json.Unmarshaler]()) {
+		return
+	}
+	stack = append(stack, t)
+	switch t.Kind() {
+	case reflect.Pointer:
+		declaredKeys(t.Elem(), path, out, stack)
+	case reflect.Slice, reflect.Array:
+		declaredKeys(t.Elem(), path+"[]", out, stack)
+	case reflect.Map:
+		declaredKeys(t.Elem(), path+"{}", out, stack)
+	case reflect.Struct:
+		for _, fl := range jsonFields(t) {
+			if fl.name != "" {
+				out[path+"."+fl.name] = true
+				declaredKeys(fl.typ, path+"."+fl.name, out, stack)
+			} else {
+				declaredKeys(fl.typ, path, out, stack)
+			}
+		}
+	}
+}
+
+func seenKeys(t reflect.Type, doc any, path string, out map[string]bool) {
+	if reflect.PointerTo(t).Implements(reflect.TypeFor[json.Unmarshaler]()) {
+		return
+	}
+	switch t.Kind() {
+	case reflect.Pointer:
+		seenKeys(t.Elem(), doc, path, out)
+	case reflect.Slice, reflect.Array:
+		list, _ := doc.([]any)
+		for _, e := range list {
+			seenKeys(t.Elem(), e, path+"[]", out)
+		}
+	case reflect.Map:
+		m, _ := doc.(map[string]any)
+		for _, e := range m {
+			seenKeys(t.Elem(), e, path+"{}", out)
+		}
+	case reflect.Struct:
+		m, ok := doc.(map[string]any)
+		if !ok {
+			return
+		}
+		for _, fl := range jsonFields(t) {
+			if fl.name == "" {
+				seenKeys(fl.typ, doc, path, out)
+			} else if v, ok := m[fl.name]; ok {
+				out[path+"."+fl.name] = true
+				seenKeys(fl.typ, v, path+"."+fl.name, out)
+			}
+		}
+	}
+}
+
+type jsonField struct {
+	name string // "": an embedded struct, its keys its parent's
+	typ  reflect.Type
+}
+
+func jsonFields(t reflect.Type) []jsonField {
+	var out []jsonField
+	for i := range t.NumField() {
+		fl := t.Field(i)
+		name, _, _ := strings.Cut(fl.Tag.Get("json"), ",")
+		switch {
+		case name == "-" || !fl.IsExported() && !fl.Anonymous:
+		case fl.Anonymous && name == "":
+			out = append(out, jsonField{"", fl.Type})
+		case name == "":
+			out = append(out, jsonField{fl.Name, fl.Type})
+		default:
+			out = append(out, jsonField{name, fl.Type})
+		}
+	}
+	return out
+}
+
+type readCall struct {
+	file, fn string
+	from, to int // its lines
+}
+
+// readJSONCalls are the package's readJSON calls outside its tests.
+func readJSONCalls(t *testing.T) []readCall {
+	t.Helper()
+	fset := token.NewFileSet()
+	names, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []readCall
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range file.Decls {
+			fd, ok := d.(*ast.FuncDecl)
+			if !ok || fd.Body == nil {
+				continue
+			}
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				if ix, ok := call.Fun.(*ast.IndexExpr); ok {
+					if id, ok := ix.X.(*ast.Ident); ok && id.Name == "readJSON" {
+						out = append(out, readCall{name, fd.Name.Name, fset.Position(call.Pos()).Line, fset.Position(call.End()).Line})
+					}
+				}
+				return true
+			})
+		}
+	}
+	if len(out) == 0 {
+		t.Fatal("found no readJSON call")
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].file+strconv.Itoa(out[i].from) < out[j].file+strconv.Itoa(out[j].from)
+	})
+	return out
+}
+
+func sorted(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func jsonArgs(args []string) string {
+	b, _ := json.Marshal(args)
+	return string(b)
+}

@@ -73,13 +73,23 @@ export function termShown(panel, slug, tab) {
   return slug !== "" && panel.slug === slug && (!panel.agent || tab === "agent");
 }
 
-// settingsTab (D201) is the Settings tab to show: the one the address's
+// settingsTab (D201) is the tab a tabbed page (Settings, Library) shows: the one the address's
 // #hash names (a card's old id counts), else the one kept for the session,
 // else the first.
 export function settingsTab(hash, kept, tabs) {
-  const alias = { hooks: "commands", "agent-setup": "commands" };
+  const alias = { hooks: "commands", "agent-setup": "commands", import: "add" };
   for (const t of [alias[hash] || hash, kept]) {
     if (tabs.includes(t)) return t;
   }
   return tabs[0];
+}
+
+// noteFileName is the file name a note's typed title makes (Go's
+// noteFileName, which decides; this one shows it while you type):
+// "Agent queue design" is "agent_queue_design.md"; a file name stays.
+export function noteFileName(title) {
+  title = title.trim();
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$/.test(title)) return title;
+  const name = title.replace(/\.md$/, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).join("_");
+  return name ? name.slice(0, 100).replace(/_+$/, "") + ".md" : "";
 }

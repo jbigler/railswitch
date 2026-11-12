@@ -3,7 +3,7 @@
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab } from "../static/logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab, noteFileName } from "../static/logic.js";
 
 test("settingsTab: the hash wins, then the kept tab, then the first", () => {
   const tabs = ["stack", "firewall", "commands", "tasks"];
@@ -11,6 +11,7 @@ test("settingsTab: the hash wins, then the kept tab, then the first", () => {
   assert.equal(settingsTab("agent-setup", "", tabs), "commands", "a card's old id");
   assert.equal(settingsTab("template", "firewall", tabs), "firewall", "a hash that is no tab");
   assert.equal(settingsTab("", "gone", tabs), "stack");
+  assert.equal(settingsTab("import", "", ["packages", "add"]), "add", "the Library's Import link");
 });
 
 test("fuzzy matches letters in order, spaces ignored", () => {
@@ -68,4 +69,12 @@ test("termShown: a panel shows only in its worktree, an agent's only on the Agen
   assert.ok(!termShown({ slug: "a", agent: true }, "a", "services"), "an agent panel off the Agent tab hides");
   assert.ok(!termShown({ slug: "a", agent: true }, "b", "agent"), "another worktree's agent panel hides");
   assert.ok(!termShown({ slug: "", agent: false }, "", "overview"), "no worktree shown");
+});
+
+test("noteFileName: a title is a snake-case file name, a file name stays", () => {
+  assert.equal(noteFileName("Agent queue design"), "agent_queue_design.md");
+  assert.equal(noteFileName("  what's next?\n"), "what_s_next.md");
+  assert.equal(noteFileName("Keep_This-Name.md"), "Keep_This-Name.md");
+  assert.equal(noteFileName("!!"), "");
+  assert.equal(noteFileName("a".repeat(99) + " b c"), "a".repeat(99) + ".md");
 });

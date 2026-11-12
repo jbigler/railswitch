@@ -48,7 +48,7 @@ func TestLibrariesSection(t *testing.T) {
 	}
 	body := w.Body.String()
 	contains(t, "library", body,
-		`<section class="card" id="libraries">`, `<h2>Libraries</h2>`,
+		`<section class="spanel" data-spanel="libraries" id="libraries">`, `<h2>Libraries</h2>`,
 		`<h3><span class="mono">acme</span> <span class="chip green">trusted</span></h3>`,
 		`<dd class="mono">https://github.com/acme/lib · main</dd>`, `<dd class="mono">github.com/acme/lib</dd>`,
 		`2026-10-29T09:00:00Z · serial 4 · <span class="mono">0123456789ab</span> · 2 packages`,
@@ -70,7 +70,7 @@ func TestLibrariesSection(t *testing.T) {
 	)
 	for _, ref := range []string{"acme:pgx@1", "acme:django@1"} {
 		row := section(body, `data-ref="`+ref+`"`)
-		if !strings.Contains(row[:strings.Index(row, "</li>")], `<span class="chip">library acme</span>`) {
+		if !strings.Contains(row[:strings.Index(row, "</li>")], `<span class="muted src">library acme</span>`) {
 			t.Errorf("%s not marked as acme's: %s", ref, row)
 		}
 	}
@@ -94,7 +94,7 @@ func TestLibrariesSection(t *testing.T) {
 
 	f.cli.fail(libLsKey, errors.New("libraries.toml: written by a newer railswitch"))
 	w = f.do(req("GET", "/p/ftest/library", nil))
-	if w.Code != 200 || !strings.Contains(w.Body.String(), "Libraries unavailable: libraries.toml: written by a newer railswitch") || !strings.Contains(w.Body.String(), "<h2>Packs</h2>") {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "Libraries unavailable: libraries.toml: written by a newer railswitch") || !strings.Contains(w.Body.String(), "<h3>Packs</h3>") {
 		t.Errorf("failed library ls: %d %s", w.Code, w.Body)
 	}
 }

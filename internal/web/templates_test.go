@@ -52,8 +52,8 @@ func TestTemplatesTab(t *testing.T) {
 	f.cli.set("--json template show rails-pg@2", railsPgShow)
 	body := f.do(req("GET", "/p/ftest/library", nil)).Body.String()
 	contains(t, "library", body, "<h2>Templates</h2>",
-		`<li data-template="rails-pg@2"><a href="/p/ftest/library?template=rails-pg%402"><span class="mono">rails-pg@2</span> <span class="muted">Rails with PostgreSQL</span><span class="sp"></span><span class="chip">machine</span></a></li>`,
-		`<span class="chip">library acme</span>`)
+		`<li data-template="rails-pg@2"><a href="/p/ftest/library?template=rails-pg%402"><span class="mono">rails-pg@2</span> <span class="muted">Rails with PostgreSQL</span><span class="sp"></span><span class="muted src">machine</span></a></li>`,
+		`<span class="muted src">library acme</span>`)
 	if strings.Contains(body, "--evil") {
 		t.Error("a malformed template ref is listed")
 	}
@@ -82,7 +82,7 @@ func TestTemplatesTab(t *testing.T) {
 	}
 	f.cli.fail("--json template ls", errors.New("templates broke"))
 	body = f.do(req("GET", "/p/ftest/library", nil)).Body.String()
-	contains(t, "library", body, "Templates unavailable: templates broke", "<h2>Packs</h2>")
+	contains(t, "library", body, "Templates unavailable: templates broke", "<h3>Packs</h3>")
 }
 
 func TestSaveAsTemplateJob(t *testing.T) {

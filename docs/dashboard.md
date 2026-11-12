@@ -566,12 +566,19 @@ included.
 
 ## Library
 
-`/p/<prefix>/library` (`Library` in the header) lists the packages from
+`/p/<prefix>/library` (`Library` in the header) is four tabs, like
+Settings (D206): **Packages**, **Templates**, **Libraries** and **Add**
+(New pack, New option, Import a package). The tab stays for the browser
+tab's session; `#templates`, `#libraries` and `#import` in the address
+open theirs. A picked package or template shows in the right pane, which
+is narrow while it holds only jobs.
+
+Packages lists those of
 `railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
 each `built in`, `local` (the workspace's `packs/<name>/` and
 `options/<name>/`) or `library <alias>` (a library package,
 `<alias>:<name>@N`; from `pack ls`'s `library`, else the ref's prefix).
-"used by this project" marks the refs the project's stack uses
+"in use" marks the refs the project's stack uses
 (`used` of `railswitch --json project show`). A library package is
 read-only like a built-in (View; a write is refused, 422), can't be the
 start of a New pack or New option, and its page says which library it
@@ -1208,14 +1215,23 @@ working blue, your turn yellow, idle and off muted.
 
 `/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
 notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
-first, and opens one in an editor (`?n=<name>`, `notes show`). **Save**
+first, and opens one. A note shows as a title made of its file name's words
+(`agent_queue_design.md` is "Agent queue design": agents name notes in
+snake case) and when it last changed; the file name shows under the title of an
+open note; on a narrow window, where the note is under the lists, the
+page scrolls to it. The title can be edited: Save then writes the text as a
+new note under the name the new title makes (`?as=<title>`; refused when a
+note has that name) and removes the old one, so a note that changed since
+you opened it stays beside the new one, and the page says so. It opens one in an editor (`?n=<name>`, `notes show`). **Save**
 posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
 handler the office's Notes kiosk uses, which runs `notes write <name>
 --if-hash <hash>` with the text on stdin: a note changed since you opened
 it is refused, the CLI's message stays under the box, and your text stays
 in it. **Delete** asks first, then runs `notes rm <name> --if-hash
-<hash>`. **New note** takes a name (`[A-Za-z0-9][A-Za-z0-9._-]{0,99}.md`)
-and opens an empty editor (`?new=<name>`) whose Save creates it
+<hash>`. **New note** takes a title and makes the file name from it in snake
+case ("Agent queue design" is `agent_queue_design.md`; a file name
+`[A-Za-z0-9][A-Za-z0-9._-]{0,99}.md` is taken as it is)
+and opens an empty editor (`?new=<title>`) whose Save creates it
 (`--if-hash ""`, refused when the name exists).
 
 Agents can't write the notes (D199); they suggest them. **Suggested**

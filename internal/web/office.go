@@ -234,7 +234,10 @@ func (s *Server) cyberNote(w http.ResponseWriter, r *http.Request) {
 const noteMaxBytes = 1 << 20
 
 // cyberNoteWrite saves (POST …/notes/{name}?if-hash=) or removes
-// (…?rm=1) a note; if-hash "" creates one.
+// (…?rm=1) a note; if-hash "" creates one. as=<title or file name> that
+// names another file renames it: the text is written as a new note, which
+// the CLI refuses when one has the name, and then the old one is removed.
+// X-Note-Name is the name the text has now.
 func (s *Server) cyberNoteWrite(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.cyberProject(w, r)
 	if !ok {
@@ -269,7 +272,35 @@ func (s *Server) cyberNoteWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "a note is text", http.StatusBadRequest)
 		return
 	}
-	s.cyberJSON(w, r, text, "-C", p.Workspace, "notes", "write", n, "--if-hash", hash)
+	dst := n
+	if as := q.Get("as"); as != "" && as != noteTitle(n) {
+		if !noteName.MatchString(as) {
+			as = noteFileName(as)
+		}
+		if !noteName.MatchString(as) {
+			http.Error(w, "bad note title: it needs a letter or a digit", http.StatusBadRequest)
+			return
+		}
+		dst = as
+	}
+	w.Header().Set("X-Note-Name", dst)
+	if dst == n {
+		s.cyberJSON(w, r, text, "-C", p.Workspace, "notes", "write", n, "--if-hash", hash)
+		return
+	}
+	out, err := s.c.CLI.RunInput(r.Context(), text, "--json", "-C", p.Workspace, "notes", "write", dst, "--if-hash", "")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	if hash != "" {
+		if _, err := s.c.CLI.Run(r.Context(), "-C", p.Workspace, "notes", "rm", n, "--if-hash", hash); err != nil {
+			http.Error(w, "saved as "+dst+", but "+n+" is still there: "+err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(out)
 }
 
 // boardMaxBytes is the largest whiteboard save the page sends: the CLI's

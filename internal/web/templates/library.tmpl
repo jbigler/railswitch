@@ -7,26 +7,26 @@
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Library</h1>
-<p class="note">The built-in packages, this workspace's own (<code>local:</code>) and those of this machine's libraries (<code>&lt;alias&gt;:</code>). Built-in and library packages are read-only; start a local copy of a built-in with New pack or New option.</p>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
-{{end}}{{template "libraries" .}}{{range .Groups}}<section class="card">
-<h2>{{.Title}}</h2>
+{{end}}<nav class="tabs stabs" aria-label="Library sections"><button type="button" data-stab="packages">Packages</button><button type="button" data-stab="templates">Templates</button><button type="button" data-stab="libraries">Libraries</button>{{if not .Error}}<button type="button" data-stab="add">Add</button>{{end}}</nav>
+<section class="spanel" data-spanel="packages">
+<p class="note">Built-in and library packages are read-only; this workspace's own are <code>local:</code>. Pick one to see its files.</p>
+{{range .Groups}}<h3>{{.Title}}</h3>
 <ul class="lib-list">
-{{range .Items}}<li{{if .Current}} class="cur"{{end}} data-ref="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Note}} <span class="muted">{{.Note}}</span>{{end}}<span class="sp"></span>{{if .Used}}<span class="chip green">used by this project</span>{{end}}<span class="chip">{{template "lib-source" .}}</span></a></li>
+{{range .Items}}<li{{if .Current}} class="cur"{{end}} data-ref="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Note}} <span class="muted">{{.Note}}</span>{{end}}<span class="sp"></span>{{if .Used}}<span class="chip green" title="This project uses it">in use</span>{{end}}<span class="muted src">{{template "lib-source" .}}</span></a></li>
 {{else}}<li class="muted">None.</li>
 {{end}}</ul>
-</section>
-{{end}}{{template "lib-templates" .}}{{if not .Error}}<section class="card">
-<h2>New pack</h2>
+{{end}}</section>
+{{template "lib-templates" .}}{{template "libraries" .}}{{if not .Error}}<section class="spanel" data-spanel="add" id="import">
+<h3>New pack</h3>
 <form method="post" action="{{.NewURL}}" class="add-row" data-job="new-package" data-next="{{.EditorBase}}">
 <input type="hidden" name="kind" value="pack">
 <input name="name" placeholder="name" class="mono" autocomplete="off" required pattern="[a-z][a-z0-9\-]*" aria-label="Pack name">
 <select name="from" aria-label="Start from"><option value="">blank</option>{{range .CopyPacks}}<option value="{{.}}">{{.}}</option>{{end}}</select>
 <button class="ln">Create</button>
 </form>
-</section>
-<section class="card">
-<h2>New option</h2>
+<h3>New option</h3>
+<p class="note">A copy keeps the built-in's slot; a blank option takes the slot picked here. The manifest opens in the editor.</p>
 <form method="post" action="{{.NewURL}}" class="add-row" data-job="new-package" data-next="{{.EditorBase}}">
 <input type="hidden" name="kind" value="option">
 <input name="name" placeholder="name" class="mono" autocomplete="off" required pattern="[a-z][a-z0-9\-]*" aria-label="Option name">
@@ -34,16 +34,13 @@
 <select name="slot" aria-label="Slot">{{range .Slots}}<option value="{{.}}">{{.}}</option>{{end}}</select>
 <button class="ln">Create</button>
 </form>
-<p class="note">A copy keeps the built-in's slot; a blank option takes the slot picked here. The manifest opens in the editor.</p>
-</section>
-<section class="card" id="import">
-<h2>Import a package</h2>
-<form method="get" action="{{.ImportURL}}" class="new-form">
-<label class="field">Folder <input name="dir" class="mono" required autocomplete="off" spellcheck="false" maxlength="4096" placeholder="/home/you/Downloads/rails"></label>
-<label class="field">As <input name="as" class="mono" autocomplete="off" pattern="[a-z][a-z0-9\-]*" placeholder="its own name"></label>
-<div class="btns"><button class="ln main">Review</button></div>
+<h3>Import a package</h3>
+<p class="note">A folder from <code>pack export</code> or a package's Export. It becomes a <code>local:</code> package; you review every file, flagged lines included, before anything is written.</p>
+<form method="get" action="{{.ImportURL}}" class="add-row">
+<input name="dir" class="mono" required autocomplete="off" spellcheck="false" maxlength="4096" placeholder="/home/you/Downloads/rails" aria-label="Folder">
+<input name="as" class="mono lib-as" autocomplete="off" pattern="[a-z][a-z0-9\-]*" placeholder="name (its own)" aria-label="Import as">
+<button class="ln">Review</button>
 </form>
-<p class="note">A folder from <code>pack export</code> or Export below. It becomes this workspace's <code>local:</code> package; you see every file, flagged lines included, before anything is written.</p>
 </section>
 {{end}}</section>
 <section class="pane">
@@ -91,12 +88,12 @@
 
 {{/* lib-templates is the Templates section: `template ls`, this
 machine's templates and the libraries'. */}}
-{{define "lib-templates"}}<section class="card" id="templates">
+{{define "lib-templates"}}<section class="spanel" data-spanel="templates" id="templates">
 <h2>Templates</h2>
-<p class="note">A template is a pack, its options and your overrides, ready to start a project from (New project). Save a project as one in its Settings.</p>
+<p class="note">A template is a pack, its options and your overrides, to start a project from. Save a project as one in its Settings.</p>
 {{if .TemplatesError}}<p class="red set-error">Templates unavailable: {{.TemplatesError}}</p>
 {{end}}<ul class="lib-list">
-{{range .Templates}}<li{{if .Current}} class="cur"{{end}} data-template="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Description}} <span class="muted">{{.Description}}</span>{{end}}<span class="sp"></span><span class="chip">{{.Source}}</span></a></li>
+{{range .Templates}}<li{{if .Current}} class="cur"{{end}} data-template="{{.Ref}}"><a href="{{.URL}}"><span class="mono">{{.Ref}}</span>{{if .Description}} <span class="muted">{{.Description}}</span>{{end}}<span class="sp"></span><span class="muted src">{{.Source}}</span></a></li>
 {{else}}{{if not .TemplatesError}}<li class="muted">None.</li>
 {{end}}{{end}}</ul>
 </section>
@@ -134,9 +131,9 @@ questions and files. */}}
 {{/* libraries is the Libraries section: the machine's package libraries,
 Fetch, Trust this key or Confirm rotation for a fetch that waits on its
 signer, and Add library. */}}
-{{define "libraries"}}<section class="card" id="libraries">
+{{define "libraries"}}<section class="spanel" data-spanel="libraries" id="libraries">
 <h2>Libraries</h2>
-<p class="note">Signed package libraries on this machine, for every project. A library's packages can be installed once its signer is trusted, and only after their Install review.</p>
+<p class="note">Signed package libraries on this machine, for every project. Its packages install once its signer is trusted, each after its Install review.</p>
 {{if .LibrariesError}}<p class="red set-error">Libraries unavailable: {{.LibrariesError}}</p>
 {{end}}{{range .Libraries}}{{$alias := .Alias}}<div class="lib-repo" data-alias="{{.Alias}}">
 <h3><span class="mono">{{.Alias}}</span> {{if .Status}}<span class="chip {{.StatusClass}}">{{.Status}}</span>{{else}}<span class="chip">not fetched</span>{{end}}</h3>
@@ -170,13 +167,13 @@ signer, and Add library. */}}
 </form>
 </div>
 {{else}}{{if not .LibrariesError}}<p class="muted">No libraries.</p>
-{{end}}{{end}}<div class="lbl">Add library</div>
+{{end}}{{end}}<h3>Add library</h3>
+<p class="note">The alias prefixes its packages' refs (<code>&lt;alias&gt;:django@1</code>). Adding fetches it; a signer not trusted yet waits here for Trust this key.</p>
 <form method="post" action="{{.LibAddURL}}" class="add-row" data-job="library-add">
 <input name="url" placeholder="https://github.com/owner/library" class="mono" autocomplete="off" spellcheck="false" required aria-label="Library URL">
 <input name="alias" placeholder="alias" class="mono" autocomplete="off" spellcheck="false" required maxlength="20" pattern="[a-z][a-z0-9\-]{0,19}" aria-label="Alias">
 <input name="branch" placeholder="branch" class="mono" autocomplete="off" spellcheck="false" aria-label="Branch (empty: the default)">
 <button class="ln">Add library</button>
 </form>
-<p class="note">The alias prefixes its packages' refs (<code>&lt;alias&gt;:django@1</code>). Adding fetches it; a signer not trusted yet waits here for Trust this key.</p>
 </section>
 {{end}}

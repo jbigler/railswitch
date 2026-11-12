@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab, noteFileName } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -749,19 +749,24 @@ function startSettings() {
   } catch {
     staged = [];
   }
-  let kept = "";
-  try {
-    kept = sessionStorage.getItem(stabStore) || "";
-  } catch {}
-  showStab(settingsTab(location.hash.slice(1), kept, $$("[data-stab]").map((b) => b.dataset.stab)));
+  startStabs();
   syncLeft();
   if (staged.length) preview();
   loadBlocked();
 }
 
-// showStab shows one Settings section, as the worktree's tabs do, and
+// startStabs opens a tabbed page (Settings, Library) on its tab.
+function startStabs() {
+  let kept = "";
+  try {
+    kept = sessionStorage.getItem(stabStore) || "";
+  } catch {}
+  showStab(settingsTab(location.hash.slice(1), kept, $$("[data-stab]").map((b) => b.dataset.stab)));
+}
+
+// showStab shows one section of the page, as the worktree's tabs do, and
 // keeps it for the browser tab's session.
-const stabStore = "rs-stab-" + prefix;
+const stabStore = "rs-stab-" + view + "-" + prefix;
 function showStab(tab) {
   try {
     sessionStorage.setItem(stabStore, tab);
@@ -769,6 +774,11 @@ function showStab(tab) {
   $$("[data-stab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stab === tab)));
   $$("[data-spanel]").forEach((p) => (p.hidden = p.dataset.spanel !== tab));
 }
+
+document.addEventListener("click", (e) => {
+  const stab = e.target.closest("[data-stab]");
+  if (stab) showStab(stab.dataset.stab);
+});
 
 // loadBlocked swaps in the Firewall card's "Would be blocked", which the
 // server reads after the page: it inspects every container.
@@ -1023,8 +1033,6 @@ function addReady(f) {
 if (view.startsWith("settings")) {
   document.addEventListener("click", (e) => {
     const t = e.target;
-    const stab = t.closest("[data-stab]");
-    if (stab) return showStab(stab.dataset.stab);
     const secretSet = t.closest("[data-secret-set]");
     if (secretSet) {
       const f = $("form.secret-set");
@@ -1603,6 +1611,8 @@ function startNew() {
 // and the text stays in the box.
 
 function startNotes() {
+  // one column: the opened note or suggestion is under the lists.
+  if (matchMedia("(max-width:800px)").matches) $(".pane .editor")?.scrollIntoView();
   const f = $("#note");
   if (!f) return;
   const err = $("#note-err");
@@ -1611,15 +1621,29 @@ function startNotes() {
     const r = await fetch(f.action + "?" + new URLSearchParams(q), {
       method: "POST", body: text, credentials: "same-origin", headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
-    if (r.ok) return true;
+    if (r.ok) return r;
     err.textContent = (await r.text()).trim();
     err.hidden = false;
     toast(err.textContent, true);
     return false;
   }
+  // The title names the file: a changed one saves under the name it makes.
+  const title = f.elements.title;
+  const was = title.value;
+  title.addEventListener("input", () => {
+    $("#note-file").textContent = title.value.trim() === was ? name : noteFileName(title.value) || "needs a letter or a digit";
+  });
+  title.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    f.elements.text.focus();
+  });
   f.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (await write({ "if-hash": f.dataset.hash }, f.elements.text.value)) location.href = f.dataset.back + "?n=" + encodeURIComponent(name);
+    const q = { "if-hash": f.dataset.hash };
+    if (title.value.trim() !== was) q.as = title.value.trim();
+    const r = await write(q, f.elements.text.value);
+    if (r) location.href = f.dataset.back + "?n=" + encodeURIComponent(r.headers.get("X-Note-Name") || name);
   });
   $("[data-note-rm]", f)?.addEventListener("click", async () => {
     if (!confirm("Delete " + name + "?")) return;
@@ -1648,6 +1672,7 @@ function startNotes() {
   if (view) {
     afterSwap("header");
     if (view === "settings") startSettings();
+    if (view === "library") startStabs();
     if (view === "editor") startEditor();
     if (view === "notes") startNotes();
     connect();

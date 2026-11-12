@@ -11,33 +11,37 @@ suggestion was shown at, so an edit since is refused. */}}
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Notes</h1>
-<p class="note">The workspace's <code>notes/</code>, which every agent of every worktree reads. Agents can't write them: they suggest notes, and you accept or reject each.</p>
-<h2>Suggested{{if .Inbox}} <span class="chip yellow">{{len .Inbox}}</span>{{end}}</h2>
-<ul class="lib-list">
-{{range .Inbox}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?w={{.Worktree}}&amp;s={{.Name}}"><span class="mono">{{.Name}}</span> <span class="muted">{{.Worktree}} · {{.Size}} B{{if .Replaces}} · replaces a note{{end}}</span></a></li>
+<p class="note">The workspace's <code>notes/</code>, which every agent reads. Agents can't write them: they suggest notes, and you accept or reject each.</p>
+<section class="spanel">
+<h3>Suggested{{if .Inbox}} <span class="chip yellow">{{len .Inbox}}</span>{{end}}</h3>
+<ul class="lib-list striped">
+{{range .Inbox}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?w={{.Worktree}}&amp;s={{.Name}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span>{{if .Replaces}}<span class="chip yellow">replaces a note</span>{{end}}<span class="muted src">{{.Worktree}}</span></a></li>
 {{else}}<li class="muted">No suggestions.</li>
 {{end}}</ul>
-<h2>Notes</h2>
-<ul class="lib-list">
-{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="mono">{{.Name}}</span> <span class="muted">{{.Size}} B · {{.Modified}}</span></a></li>
+<h3>Notes</h3>
+<ul class="lib-list striped">
+{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span><span class="muted src">{{.When}}</span></a></li>
 {{else}}<li class="muted">No notes.</li>
 {{end}}</ul>
 <form method="get" action="{{.URL}}" class="add-row">
-<input name="new" placeholder="name.md" class="mono" autocomplete="off" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,99}\.md" aria-label="New note's name">
+<input name="new" placeholder="Title of a new note" autocomplete="off" required maxlength="120" pattern=".*[A-Za-z0-9].*" title="A title with a letter or a digit; its file name is made from it" aria-label="New note's title">
 <button class="ln">New note</button>
 </form>
+</section>
 </section>
 <section class="pane">
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{with .Open}}<form method="post" action="{{$.SaveURL}}" id="note" class="editor" autocomplete="off" data-hash="{{.Hash}}" data-back="{{$.URL}}">
-<h2 class="mono ed-file">{{.Name}}{{if $.New}} <span class="chip">new note</span>{{end}}</h2>
+<h2 class="ed-file"><textarea name="title" rows="1" required maxlength="120" spellcheck="true" aria-label="Title; changing it renames the note" data-name="{{.Name}}">{{noteTitle .Name}}</textarea></h2>
+<div class="mono muted nf"><span id="note-file">{{.Name}}</span>{{if $.New}} <span class="chip">new note</span>{{end}}</div>
 <textarea name="text" class="mono" spellcheck="false" rows="28" aria-label="{{.Name}}">
 {{.Text}}</textarea>
 <div id="note-err" class="red" hidden></div>
 <div class="btns"><a class="ln dim" href="{{$.URL}}">Close</a>{{if not $.New}}<button type="button" class="ln danger" data-note-rm>Delete</button>{{end}}<button class="ln main">Save</button></div>
 </form>
 {{else}}{{with .Sugg}}<form method="post" action="{{$.InboxPost}}" class="editor" autocomplete="off">
-<h2 class="mono ed-file">{{.Name}} <span class="chip">suggested by {{.Worktree}}</span></h2>
+<h2 class="ed-file">{{noteTitle .Name}} <span class="chip">suggested by {{.Worktree}}</span></h2>
+<div class="mono muted nf">{{.Name}}</div>
 <div class="lbl">{{if .Note}}New text{{else}}Text{{end}}</div>
 <pre class="out readme">{{.Text}}</pre>
 {{with .Note}}<div class="lbl">It replaces the current note</div>

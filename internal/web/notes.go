@@ -3,6 +3,9 @@ package web
 import (
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/naming"
 )
@@ -64,6 +67,60 @@ type noteRow struct {
 	Current  bool   `json:"-"`
 }
 
+// Title and When are how the lists show a row.
+func (n noteRow) Title() string  { return noteTitle(n.Name) }
+func (n noteRow) When() string   { return noteWhen(n.Modified) }
+func (n inboxRow) Title() string { return noteTitle(n.Name) }
+
+var noteWord = regexp.MustCompile(`([a-z0-9])([A-Z])|([A-Z])([A-Z][a-z])|[-_]+`)
+
+// noteTitle is a note's file name as words: agents name notes in snake
+// case ("agent_queue_design.md" is "Agent queue design"; camel case
+// splits too), which reads badly in a list. Only the first word gets a
+// capital; a word all in capitals ("HTTP") keeps them. An open note shows
+// the file name under it.
+func noteTitle(name string) string {
+	t := strings.TrimSuffix(name, ".md")
+	// twice: a match takes the letter the next one would start at ("aBC").
+	for range 2 {
+		t = noteWord.ReplaceAllString(t, "$1$3 $2$4")
+	}
+	words := strings.Fields(t)
+	if len(words) == 0 {
+		return name
+	}
+	for i, w := range words {
+		if i > 0 && (len(w) == 1 || w != strings.ToUpper(w)) {
+			words[i] = strings.ToLower(w[:1]) + w[1:]
+		}
+	}
+	t = strings.Join(words, " ")
+	return strings.ToUpper(t[:1]) + t[1:]
+}
+
+var notWord = regexp.MustCompile(`[^A-Za-z0-9]+`)
+
+// noteFileName is the file name of a new note typed as a title, in the
+// agents' snake case: "Agent queue design" is "agent_queue_design.md",
+// which noteTitle reads back. "" when the title has no letter or digit.
+func noteFileName(title string) string {
+	words := strings.Fields(notWord.ReplaceAllString(strings.ToLower(strings.TrimSuffix(title, ".md")), " "))
+	name := strings.Join(words, "_")
+	if name == "" {
+		return ""
+	}
+	return strings.TrimRight(name[:min(len(name), 100)], "_") + ".md"
+}
+
+// noteWhen is an RFC 3339 time to the minute, or s as it is.
+func noteWhen(s string) string {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return s
+	}
+	return t.Local().Format("2006-01-02 15:04")
+}
+
 type noteShow struct {
 	Name string `json:"name"`
 	Text string `json:"text"`
@@ -83,8 +140,12 @@ func (s *Server) notesPage(w http.ResponseWriter, r *http.Request) {
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, URL: base}
 	q := r.URL.Query()
 	if n := q.Get("new"); n != "" {
+		// a title, unless it is a file name already
 		if !noteName.MatchString(n) {
-			http.Error(w, "bad note name: letters, digits, . _ - and .md at the end", http.StatusBadRequest)
+			n = noteFileName(n)
+		}
+		if !noteName.MatchString(n) {
+			http.Error(w, "bad note title: it needs a letter or a digit", http.StatusBadRequest)
 			return
 		}
 		v.Open, v.New = &noteShow{Name: n}, true

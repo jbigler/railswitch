@@ -3,7 +3,7 @@
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab, noteFileName } from "../static/logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termID, settingsTab, noteFileName } from "../static/logic.js";
 
 test("settingsTab: the hash wins, then the kept tab, then the first", () => {
   const tabs = ["stack", "firewall", "commands", "tasks"];
@@ -62,13 +62,20 @@ test("pageQuery: the defaults leave the URL bare, keys in Go's order", () => {
   assert.equal(pageQuery("pr", 7), "?days=7&sort=pr");
 });
 
-test("termShown: a panel shows only in its worktree, an agent's only on the Agent tab", () => {
-  assert.ok(termShown({ slug: "a", agent: false }, "a", "overview"));
-  assert.ok(!termShown({ slug: "a", agent: false }, "b", "overview"), "another worktree's panel hides");
+test("termShown: a panel shows only in its worktree, an agent's on the Agent tab, another on Terminals", () => {
+  assert.ok(termShown({ slug: "a", agent: false }, "a", "terminals"));
+  assert.ok(!termShown({ slug: "a", agent: false }, "a", "overview"), "a shell off the Terminals tab hides");
+  assert.ok(!termShown({ slug: "a", agent: false }, "b", "terminals"), "another worktree's panel hides");
   assert.ok(termShown({ slug: "a", agent: true }, "a", "agent"));
-  assert.ok(!termShown({ slug: "a", agent: true }, "a", "services"), "an agent panel off the Agent tab hides");
+  assert.ok(!termShown({ slug: "a", agent: true }, "a", "terminals"), "an agent panel off the Agent tab hides");
   assert.ok(!termShown({ slug: "a", agent: true }, "b", "agent"), "another worktree's agent panel hides");
-  assert.ok(!termShown({ slug: "", agent: false }, "", "overview"), "no worktree shown");
+  assert.ok(!termShown({ slug: "", agent: false }, "", "terminals"), "no worktree shown");
+});
+
+test("termID: one terminal, however its query is written", () => {
+  assert.equal(termID("/p/a/tty/b/task?task=t&args=a%20b"), termID("/p/a/tty/b/task?args=a+b&task=t"));
+  assert.notEqual(termID("/p/a/tty/b/task?task=t&args=a"), termID("/p/a/tty/b/task?task=t"));
+  assert.equal(termID("/p/a/tty/b/shell"), "/p/a/tty/b/shell");
 });
 
 test("noteFileName: a title is a snake-case file name, a file name stays", () => {

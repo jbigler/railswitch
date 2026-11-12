@@ -162,6 +162,9 @@ func (s *Server) loop(ctx context.Context, wakeup <-chan struct{}, poll func(con
 
 // Run polls the projects and forwards job events until ctx ends.
 func (s *Server) Run(ctx context.Context) error {
+	s.ttyMu.Lock()
+	s.ttyBase = ctx
+	s.ttyMu.Unlock()
 	evs, stop := s.c.Jobs.Subscribe()
 	var wg sync.WaitGroup
 	wg.Go(func() {
@@ -677,7 +680,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 	}
 	pv := pageView{
 		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(), Days: days,
-		Header: headerView{Prefix: prefix, Need: need}, Projects: projects, Strip: strip, Banner: banner,
+		Header: headerView{Prefix: prefix, Need: need, Terms: s.ttyOpen(), TermsMax: ttyMax}, Projects: projects, Strip: strip, Banner: banner,
 		List:   newList(prefix, rows, sel, k),
 		Detail: detailView{Empty: true},
 		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),

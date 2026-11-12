@@ -463,8 +463,9 @@ func title(need int) string {
 }
 
 type headerView struct {
-	Prefix string
-	Need   int
+	Prefix          string
+	Need            int
+	Terms, TermsMax int // terminals running across the dashboard, and the most there can be (D205)
 }
 
 type projectsView struct{ Items []switchItem }
@@ -771,7 +772,7 @@ func (v detailView) Tabs() tabsView {
 	if v.SnapshotsURL != "" {
 		t = append(t, tabView{Key: "database", Label: "Database"})
 	}
-	return tabsView{Label: "Worktree sections", Tabs: append(t, tabView{Key: "jobs", Label: "Jobs"})}
+	return tabsView{Label: "Worktree sections", Tabs: append(t, tabView{Key: "terminals", Label: "Terminals"}, tabView{Key: "jobs", Label: "Jobs"})}
 }
 
 // serviceView is a service row: LogsURL (Dozzle, by container name) while

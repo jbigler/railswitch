@@ -12,14 +12,6 @@ const sendMax = 16 << 10; // the server reads at most 64 KiB per frame
 const FONT = '"Maple Mono NF", "Maple Mono NF CN", "Maple Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono", ui-monospace, Menlo, monospace';
 const FONT_SIZE = 14;
 
-// open counts live terminals: while any is, leaving the page asks first
-// (Ctrl-W, delete-word in a shell, closes the tab before the terminal
-// sees it). Both the dashboard and the office get it from here.
-let open = 0;
-addEventListener('beforeunload', (e) => {
-  if (open > 0) e.preventDefault();
-});
-
 let loaded = null;
 function script(src) {
   return new Promise((ok, fail) => {
@@ -86,9 +78,10 @@ const clipboard = {
 };
 
 // openTerminal fills el with a terminal connected to url (a path).
-// opts.theme overrides colours. Returns {close, focus}.
+// opts.theme overrides colours; opts.quiet leaves the focus where it is.
+// Returns {close, detach, focus}: close ends the terminal's program,
+// detach leaves it running.
 export function openTerminal(el, url, opts = {}) {
-  open++;
   el.classList.add('term-host');
   const screen = tag('div', 'term-screen');
   const overlay = tag('div', 'term-overlay');
@@ -126,14 +119,19 @@ export function openTerminal(el, url, opts = {}) {
     const ws = new WebSocket(q);
     ws.binaryType = 'arraybuffer';
     sock = ws;
+    replaying = true; // until the server says the rest is live
     let exit = null;
     ws.onopen = () => {
       overlay.hidden = true;
-      term.focus();
+      if (!opts.quiet) term.focus(); // quiet: the page showed it again, nobody asked
+      opts.quiet = false; // a Reconnect is asked for
     };
     ws.onmessage = (ev) => {
       if (typeof ev.data === 'string') {
-        try { exit = JSON.parse(ev.data).exit; } catch { /* not ours */ }
+        let m = {};
+        try { m = JSON.parse(ev.data); } catch { /* not ours */ }
+        if (m.live) term.write('', () => { if (sock === ws) replaying = false; }); // once what came before is drawn
+        else exit = m.exit;
         return;
       }
       term.write(new Uint8Array(ev.data));
@@ -149,7 +147,13 @@ export function openTerminal(el, url, opts = {}) {
   }
 
   const enc = new TextEncoder();
+  // replaying: the server is sending what the terminal printed before this
+  // page showed it (D205). The program asked the terminal questions in
+  // there (its size, its colours); xterm.js would answer them a second
+  // time, and the program would read the answers as typing.
+  let replaying = true;
   const sendBytes = (b) => {
+    if (replaying) return;
     if (!sock || sock.readyState !== WebSocket.OPEN) return; // nothing typed before the open
     for (let i = 0; i < b.length; i += sendMax) sock.send(b.subarray(i, i + sendMax));
   };
@@ -222,16 +226,20 @@ export function openTerminal(el, url, opts = {}) {
     connect();
   }, (e) => show(e.message));
 
+  // The panel goes. end: its program ends too; else it keeps running for
+  // the page that shows it next, as when a page only goes away (D205).
+  const leave = (end) => {
+    if (closed) return;
+    closed = true;
+    clearTimeout(timer);
+    observer?.disconnect();
+    if (end && sock?.readyState === WebSocket.OPEN) sock.send('{"close":true}');
+    sock?.close(1000);
+    term?.dispose();
+  };
   return {
-    close() {
-      if (closed) return;
-      closed = true;
-      open--;
-      clearTimeout(timer);
-      observer?.disconnect();
-      sock?.close(1000);
-      term?.dispose();
-    },
+    close() { leave(true); },
+    detach() { leave(false); },
     focus() { term?.focus(); },
   };
 }

@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab, noteFileName } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termID, settingsTab, noteFileName } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -118,8 +118,18 @@ function markCurrent() {
   if (best) best.setAttribute("aria-current", "page");
 }
 
+// headerHeight tells the CSS how tall the header is (it wraps in a narrow
+// window): it stays at the top, and what sticks or scrolls into view
+// below it keeps clear of it.
+function headerHeight() {
+  document.documentElement.style.setProperty("--hd-h", ($("#header")?.offsetHeight || 0) + "px");
+}
+addEventListener("resize", headerHeight);
+headerHeight(); // every page, before its own start
+
 function afterSwap(id) {
   if (id === "header") {
+    headerHeight();
     markCurrent();
     // Worktrees returns to the worktree last shown (after markCurrent,
     // which matches the plain link).
@@ -391,22 +401,27 @@ function hideToast() {
 
 // Keys.
 
-// Terminal panels (D149, D191): docked in #terms, under the jobs and outside
-// the detail that SSE replaces, so switching tabs or worktrees keeps them
-// running; termsShown shows only the shown worktree's. Each closes its
-// WebSocket when removed. A button with data-term-tab shows that tab first;
-// a terminal already open is shown again, not opened twice.
-async function openTermPanel(btn) {
+// Terminal panels (D149, D191): docked in #terms, outside the detail that
+// SSE replaces, so switching tabs or worktrees keeps them; termsShown
+// shows only the shown worktree's, an agent's on the Agent tab and the
+// others on Terminals. A button with data-term-tab shows that tab first; a
+// terminal already open is shown again, not opened twice. The ✕ ends the
+// terminal's program; leaving the page doesn't (D205): the server keeps it
+// running, and restoreTerms shows it again. again is such a terminal
+// ({slug}): its panel opens without taking the tab, the scroll or the focus.
+async function openTermPanel(btn, again) {
   const dock = $("#terms");
   if (!dock) return;
-  if (btn.dataset.termTab) showTab(btn.dataset.termTab);
-  const open = $$(".term-panel", dock).find((p) => p.dataset.termUrl === btn.dataset.term);
+  if (!again && btn.dataset.termTab) showTab(btn.dataset.termTab);
+  const key = termID(btn.dataset.term);
+  const open = $$(".term-panel", dock).find((p) => termID(p.dataset.termUrl) === key);
   if (open) {
+    if (again) return;
     open.scrollIntoView({ block: "nearest" });
     open.focusTerm?.();
     return;
   }
-  const slug = $("#detail")?.dataset.slug || "";
+  const slug = again ? again.slug : $("#detail")?.dataset.slug || "";
   const panel = document.createElement("section");
   panel.className = "term-panel";
   // Not data-term: a click in the panel would then open it again.
@@ -431,11 +446,11 @@ async function openTermPanel(btn) {
   head.append(title, full, x);
   panel.append(head, host);
   dock.prepend(panel);
-  panel.scrollIntoView({ block: "nearest" }); // the dock sits below the jobs
+  if (!again) panel.scrollIntoView({ block: "nearest" });
   let t = null;
   try {
     const { openTerminal } = await import("/static/term/term.js");
-    t = openTerminal(host, btn.dataset.term);
+    t = openTerminal(host, btn.dataset.term, { quiet: !!again });
     panel.focusTerm = () => t.focus();
   } catch (err) {
     host.textContent = String(err.message || err);
@@ -471,28 +486,65 @@ function switchAgent(btn) {
   });
 }
 
-// termsShown (D191) shows the shown worktree's panels and hides the rest,
-// which keep running: an agent's only on the Agent tab, where it takes the
-// Agent card's place (CSS, from body[data-agent-term]). A worktree gone
-// from the list has its panels closed; each row counts its open ones.
+// parked are the terminals the server kept running from before this page
+// loaded (D205) that aren't shown yet: each opens when its worktree and
+// tab show, at that panel's size and not a hidden panel's.
+let parked = []; // {slug, agent, dataset}: openTermPanel's button, and termShown's panel
+
+// restoreTerms asks the server for the project's terminals and parks them.
+async function restoreTerms() {
+  if (!$("#terms") || !prefix) return;
+  let rows;
+  try {
+    const r = await fetch("/p/" + encodeURIComponent(prefix) + "/ttys", { credentials: "same-origin" });
+    if (!r.ok) return;
+    rows = await r.json();
+  } catch {
+    return; // the dashboard went away: the Terminal menu still opens them
+  }
+  for (const t of rows) {
+    const agent = t.kind === "agent";
+    parked.push({ slug: t.slug, agent, dataset: { term: t.url, termLabel: t.label, ...(agent ? { termAgent: "" } : {}) } });
+  }
+  termsShown();
+}
+
+// termsShown (D191, D205) shows the shown worktree's panels and hides the
+// rest, which keep running: an agent's only on the Agent tab, where it
+// takes the Agent card's place (CSS, from body[data-agent-term]), the
+// others only on Terminals. A worktree gone from the list has its panels
+// closed; each row counts its terminals, and the Terminals tab its own.
 function termsShown() {
   const slug = $("#detail")?.dataset.slug || "";
+  const tab = body.dataset.tab;
   const rows = $$("#list tr[data-slug]");
   const panels = $$("#terms .term-panel");
   if ($("#list")) {
     const live = new Set(rows.map((r) => r.dataset.slug));
     for (const p of panels) if (!live.has(p.dataset.slug)) p.closeTerm?.();
+    parked = parked.filter((t) => live.has(t.slug));
   }
+  const due = parked.filter((t) => termShown(t, slug, tab));
+  parked = parked.filter((t) => !due.includes(t));
+  for (const t of due) openTermPanel(t, t); // its panel is in the dock before this returns
   const left = $$("#terms .term-panel");
-  for (const p of left) p.hidden = !termShown({ slug: p.dataset.slug, agent: "agent" in p.dataset }, slug, body.dataset.tab);
+  for (const p of left) p.hidden = !termShown({ slug: p.dataset.slug, agent: "agent" in p.dataset }, slug, tab);
+  const all = [...left.map((p) => ({ slug: p.dataset.slug, agent: "agent" in p.dataset })), ...parked];
   for (const r of rows) {
-    const n = left.filter((p) => p.dataset.slug === r.dataset.slug).length;
+    const n = all.filter((t) => t.slug === r.dataset.slug).length;
     const a = $("a[data-row]", r); // CSS attr() reads the link's own attribute
     if (!a) continue;
     if (n) a.dataset.terms = n;
     else delete a.dataset.terms;
   }
-  if (slug !== "" && left.some((p) => p.dataset.slug === slug && "agent" in p.dataset)) body.dataset.agentTerm = "";
+  const mine = all.filter((t) => slug !== "" && t.slug === slug);
+  const others = mine.filter((t) => !t.agent).length;
+  const tb = $("#detail [data-tab=terminals]");
+  if (tb && others) tb.dataset.n = others;
+  else if (tb) delete tb.dataset.n;
+  if (others) delete body.dataset.noTerms;
+  else body.dataset.noTerms = "";
+  if (mine.some((t) => t.agent)) body.dataset.agentTerm = "";
   else delete body.dataset.agentTerm;
 }
 
@@ -591,7 +643,7 @@ function runPaletteTask(it, shift) {
   if (way === "panel") {
     it.closest("dialog").close();
     const url = f.dataset.tty + "task?task=" + encodeURIComponent(name) + (args ? "&args=" + encodeURIComponent(args) : "");
-    return openTermPanel({ dataset: { term: url, termLabel: args ? name + " " + args : name } });
+    return openTermPanel({ dataset: { term: url, termLabel: args ? name + " " + args : name, termTab: "terminals" } });
   }
   const data = new URLSearchParams(new FormData(f));
   data.set("task", name);
@@ -1705,6 +1757,7 @@ function startNotes() {
   }
   afterSwap("header");
   showTab();
+  restoreTerms();
   $("#wt-filter")?.addEventListener("input", filterList);
   connect();
 })();

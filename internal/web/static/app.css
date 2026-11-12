@@ -310,8 +310,16 @@ body:has(.term-panel.max) { overflow: hidden; }
 /* On the Agent tab the worktree's agent terminal takes the Agent card's
    place, and the room below the tabs. */
 body[data-tab=agent][data-agent-term] .wt [data-panel=agent] { display: none; }
-body[data-tab=agent] .wt .term-panel:not(.max) { height: max(24rem, calc(100vh - 12rem)); }
-body[data-tab=agent][data-agent-term] .wt .terms { margin-top: 16px; }
+body[data-tab=agent] .wt .term-panel:not(.max), body[data-tab=terminals] .wt .term-panel:not(.max) { height: max(24rem, calc(100vh - 12rem - var(--hd-h, 0px))); }
+body[data-tab=agent][data-agent-term] .wt .terms, body[data-tab=terminals] .wt .terms { margin-top: 16px; }
+/* The Terminals tab (D205): the worktree's other terminals, their count on
+   the tab, and a line when there are none. */
+.tabs button[data-n]::after { content: " " attr(data-n); color: var(--muted); font-weight: 400; }
+#terms-none { display: none; margin: 16px 20px; }
+body[data-tab=terminals][data-no-terms] #terms-none { display: block; }
+/* The header stays at the top (D205); --hd-h is its height (app.js). */
+.hd { position: sticky; top: 0; z-index: 20; }
+html { scroll-padding-top: var(--hd-h, 0px); }
 /* A worktree's open terminals, hidden or shown (D191). */
 .list a[data-row][data-terms]::after { content: " ▣" attr(data-terms); color: var(--muted); font-weight: 400; }
 /* The PR page (D152). */
@@ -394,7 +402,7 @@ body:not([data-tab=agent]) .wt .usage-card{display:none}
 
 /* Settings: Staged changes and Apply stay in view while the left column
    scrolls (wide windows; a narrow one stacks the columns). */
-@media (min-width:801px){.grid.settings>.pane{position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}}
+@media (min-width:801px){.grid.settings>.pane{position:sticky;top:var(--hd-h,0px);align-self:start;max-height:calc(100vh - var(--hd-h,0px));overflow-y:auto}}
 
 /* Narrow windows (docs/dashboard.md): one column; the project page shows
    the list or a worktree's detail, as data-pane says. */

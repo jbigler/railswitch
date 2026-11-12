@@ -27,6 +27,18 @@ const contractDir = "../../testdata/contract"
 // internal/web's TestDashboardContract decodes the same files.
 func TestDashboardContract(t *testing.T) {
 	ws, _ := gitWS(t)
+	// A repository project detect can read a stack from.
+	master := filepath.Join(ws, "worktrees", "master")
+	writeFile(t, filepath.Join(master, "Gemfile"), "source \"https://rubygems.org\"\ngem \"rails\"\ngem \"pg\"\ngem \"redis\"\n")
+	writeFile(t, filepath.Join(master, "config", "application.rb"), "")
+	gitIn(t, master, "add", "Gemfile", "config")
+	gitIn(t, master, "commit", "-q", "-m", "Gemfile")
+	// The machine: the project exported as a template, and two folders
+	// someone could hand over, a template and a package.
+	home := os.Getenv("HOME")
+	mustRun(t, "-C", ws, "template", "export", "--name", "filial-stack")
+	mustRun(t, "-C", ws, "template", "export", "--name", "given", "--to", filepath.Join(home, "given"))
+	mustRun(t, "-C", ws, "pack", "export", "redis@1", "--to", filepath.Join(home, "redis"))
 	mustRun(t, "-C", ws, "render")
 	f := fakeHost()
 	f.Passthrough = []string{"git"}
@@ -59,8 +71,9 @@ func TestDashboardContract(t *testing.T) {
 		ws, "/ws",
 		os.Getenv("XDG_CONFIG_HOME"), "/xdg/config",
 		os.Getenv("XDG_DATA_HOME"), "/xdg/data",
-		os.Getenv("HOME"), "/home/user",
+		home, "/home/user",
 	)
+	real := strings.NewReplacer("/ws", ws, "/home/user", home) // a contract file's arguments, here
 	dates := regexp.MustCompile(`20\d\d-\d\d-\d\d(T[0-9:.]+(Z|[+-]\d\d:\d\d))?`)
 	added := regexp.MustCompile(`"added":\d+`) // a queued message's time
 	clean := func(out string) string {
@@ -88,7 +101,7 @@ func TestDashboardContract(t *testing.T) {
 				t.Fatal(err)
 			}
 			for i, a := range args {
-				args[i] = strings.ReplaceAll(a, "/ws", ws)
+				args[i] = real.Replace(a)
 			}
 			// gh api graphql answers two questions: a PR's merge state for
 			// pr show, the review apps for the rest.

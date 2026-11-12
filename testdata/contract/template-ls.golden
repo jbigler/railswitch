@@ -1,2 +1,2 @@
 ["template","ls"]
-{"templates":[]}
+{"templates":[{"ref":"filial-stack@1","name":"filial-stack","version":1,"description":"","source":"machine","packages":["rails@1","postgres@1","redis@1","rustfs@1","playwright@1"]}]}

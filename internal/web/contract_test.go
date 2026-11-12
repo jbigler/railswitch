@@ -31,13 +31,21 @@ var contractPages = []string{
 	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=rails@1",
 	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
 	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",
-	"/machine", "/new", "/colors",
+	"/p/filial/library?template=filial-stack@1", "/p/filial/library/import?dir=/home/user/redis&as=myredis",
+	"/machine", "/machine/templates/import?dir=/home/user/given", "/new", "/colors",
 }
 
-// contractPosts are the requests behind the reads that take stdin, by
-// contract file: each is built from the file's arguments and stdin, so the
-// hash and the text are the file's and the rest is the dashboard's.
+// contractPosts are the POST requests behind reads, by contract file:
+// those of the new-project form, and those that take stdin, each built
+// from the file's arguments and stdin, so the hash and the text are the
+// file's and the rest is the dashboard's.
 var contractPosts = map[string]func(args []string, stdin string) *http.Request{
+	"project-detect": func([]string, string) *http.Request {
+		return req("POST", "/new/detect", form("repo", "file:///ws/worktrees/master"))
+	},
+	"new-dry-run": func([]string, string) *http.Request {
+		return req("POST", "/new/review", form("repo", "file:///ws/worktrees/master", "prefix", "shop", "dir", "/home/user/shop", "template", "filial-stack@1"))
+	},
 	"settings-preview": func(_ []string, stdin string) *http.Request {
 		return jsonPost("/p/filial/settings/preview", stdin)
 	},
@@ -52,18 +60,13 @@ var contractPosts = map[string]func(args []string, stdin string) *http.Request{
 // contractSkip are the readJSON calls the contract does not cover, as
 // "<file>:<function>", each with its reason.
 var contractSkip = map[string]string{
-	"libraries.go:libraryTrust":            "a POST; library ls is read by the machine page",
-	"library.go:libraryNew":                "a POST; pack ls is read by the library page",
-	"review.go:reviewAccept":               "a POST; lock --review is read by the review page",
-	"office.go:cyberPage":                  "reads office set ls only for an installed set; officeDefault reads it",
-	"newproject.go:newDetect":              "project detect clones a repository",
-	"newproject.go:newReview":              "new --dry-run needs a repository",
-	"newproject.go:newCreate":              "new --dry-run needs a repository",
-	"packageimport.go:packImportPage":      "pack import needs a folder to import",
-	"packageimport.go:packImport":          "pack import needs a folder to import",
-	"templateimport.go:templateImportPage": "template import needs a folder to import",
-	"templateimport.go:templateImport":     "template import needs a folder to import",
-	"templates.go:readTemplate":            "template show needs a template; the fixture has none",
+	"libraries.go:libraryTrust":        "a POST; library ls is read by the machine page",
+	"library.go:libraryNew":            "a POST; pack ls is read by the library page",
+	"review.go:reviewAccept":           "a POST; lock --review is read by the review page",
+	"office.go:cyberPage":              "reads office set ls only for an installed set; officeDefault reads it",
+	"newproject.go:newCreate":          "a POST; new --dry-run is read by the review step",
+	"packageimport.go:packImport":      "a POST; pack import is read by the import page",
+	"templateimport.go:templateImport": "a POST; template import is read by the import page",
 }
 
 // contractAbsent are the JSON keys a dashboard struct declares that the
@@ -76,6 +79,15 @@ var contractAbsent = map[string]string{
 	"containerfile-check .used":                 "containerfile write prints no used key; pack file write does",
 	"pack-file-check .steps[].":                 "the edit changes no image",
 	"settings-preview .install.":                "the edit installs no library package",
+	"new-dry-run .install.":                     "the template installs no library package",
+	"pack-import .bundles_compared_with":        "omitempty: the folder is one package, not a bundle",
+	"pack-import .ejected":                      "omitempty: a package import ejects nothing",
+	"pack-import .packages[].files[].flags[].":  "no file of the package is flagged",
+	"pack-import .replaces.":                    "the package replaces none",
+	"template-import .compared_with":            "omitempty: a package import's key",
+	"template-import .ejected":                  "omitempty: the template ejects nothing",
+	"template-import .replaces.":                "the template replaces none",
+	"template-show .ask[].answer":               "omitempty: show has no answers",
 	"library-ls .libraries[].":                  "no library",
 	"lock-review .packages[].":                  "the lock is current: nothing to review",
 	"office-set-ls .sets[].reason":              "omitempty: every set is valid",
@@ -95,7 +107,6 @@ var contractAbsent = map[string]string{
 	"project-show .tasks[].":                    "omitempty fresh and terminal: no task sets them",
 	"signer-ls .libraries[].":                   "no library",
 	"task-ls [].":                               "omitempty fresh and terminal: no task sets them",
-	"template-ls .templates[].":                 "no template",
 	"tidy .items[].":                            "nothing to tidy",
 }
 
@@ -132,7 +143,9 @@ func TestDashboardContract(t *testing.T) {
 		f.cli.out[key] = string(doc)
 		if post := contractPosts[name]; post != nil {
 			posts = append(posts, post(args, stdin))
-			stdins[key] = stdin
+			if stdin != "" {
+				stdins[key] = stdin
+			}
 		} else if stdin != "" {
 			t.Errorf("%s has stdin, but contractPosts has no request for it", file)
 		}

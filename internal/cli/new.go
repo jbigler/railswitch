@@ -29,6 +29,7 @@ import (
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/template"
+	"github.com/jbigler/railswitch/internal/tomlfile"
 	"github.com/jbigler/railswitch/internal/workspace"
 	"github.com/jbigler/railswitch/internal/worktree"
 )
@@ -511,7 +512,7 @@ func writeProject(dir string, pl *newPlan) ([]string, error) {
 	}
 	if t := pl.tpl; t != nil {
 		for _, n := range slices.Sorted(maps.Keys(t.Containerfiles)) {
-			if _, err := writeContainerfile(dir, workspaceFile(n), t.Containerfiles[n], true); err != nil {
+			if err := writeContainerfile(dir, workspaceFile(n), t.Containerfiles[n], true); err != nil {
 				return nil, err
 			}
 		}
@@ -931,21 +932,40 @@ func (sp secretPlan) apply(secrets map[string]config.Secret) map[string]config.S
 // write makes the plan's edits to project.toml at proj and returns the
 // declared secrets' names (all unset).
 func (sp secretPlan) write(proj string) ([]string, error) {
+	data, err := os.ReadFile(proj)
+	if err != nil {
+		return nil, err
+	}
+	fi, err := os.Stat(proj)
+	if err != nil {
+		return nil, err
+	}
+	next, names, err := sp.edit(proj, string(data))
+	if err != nil || next == string(data) {
+		return names, err
+	}
+	return names, tomlfile.WriteAtomic(proj, []byte(next), fi.Mode().Perm())
+}
+
+// edit makes the plan's edits to data, the text of the project.toml at
+// proj, and returns the declared secrets' names too.
+func (sp secretPlan) edit(proj, data string) (string, []string, error) {
 	var names []string
+	var err error
 	for _, d := range sp.declare {
-		if err := config.AddSecret(proj, d.Name, d.Secret); err != nil {
-			return nil, err
+		if data, err = config.AddSecretText(proj, data, d.Name, d.Secret); err != nil {
+			return "", nil, err
 		}
 		names = append(names, d.Name)
 	}
 	for _, x := range sp.extend {
 		for _, id := range x.Services {
-			if err := config.AddSecretService(proj, x.Name, id); err != nil {
-				return nil, err
+			if data, err = config.AddSecretServiceText(proj, data, x.Name, id); err != nil {
+				return "", nil, err
 			}
 		}
 	}
-	return names, nil
+	return data, names, nil
 }
 
 // ejectNames are the defaults the stack builds, in eject order: base

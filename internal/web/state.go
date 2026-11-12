@@ -308,6 +308,9 @@ func (s *Server) loadProjects(ctx context.Context) error {
 // read was scheduled, so a job ending during the read keeps it due.
 func (s *Server) applyOverview(prefix string, ov overview, err error) {
 	for _, spec := range s.storeOverview(prefix, ov, err) {
+		if startHook != nil {
+			startHook(spec)
+		}
 		if _, err := s.c.Jobs.Start(context.Background(), spec); err != nil {
 			s.mu.Lock()
 			if p := s.state[prefix]; p != nil {

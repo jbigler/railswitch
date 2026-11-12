@@ -554,9 +554,16 @@ func (s *Server) theme(w http.ResponseWriter, r *http.Request) {
 
 // Actions.
 
+// startHook, when set, sees every job the dashboard starts. Only the
+// contract test sets it (D197).
+var startHook func(jobs.Spec)
+
 // start runs spec as a job with stdin (nil: none): 202 with its id, 409
 // while busy.
 func (s *Server) start(w http.ResponseWriter, r *http.Request, spec jobs.Spec, stdin []byte, back string) {
+	if startHook != nil {
+		startHook(spec)
+	}
 	snap, err := s.c.Jobs.StartInput(r.Context(), spec, stdin)
 	if errors.Is(err, jobs.ErrBusy) {
 		http.Error(w, err.Error(), http.StatusConflict)

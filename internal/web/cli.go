@@ -421,8 +421,16 @@ func readJSON[T any](ctx context.Context, c CLI, args ...string) (T, error) {
 	if err := json.Unmarshal(out, &v); err != nil {
 		return v, fmt.Errorf("%s: %w", strings.Join(args, " "), err)
 	}
+	if decodeHook != nil {
+		decodeHook(args, out, &v)
+	}
 	return v, nil
 }
+
+// decodeHook, which only the dashboard contract test sets (D197), sees
+// each document readJSON, readPreview and readCheck decoded: its
+// arguments, its bytes, a pointer to the value.
+var decodeHook func(args []string, raw []byte, v any)
 
 func readProjects(ctx context.Context, c CLI) ([]projectRow, error) {
 	return readJSON[[]projectRow](ctx, c, "project", "ls")
@@ -485,6 +493,9 @@ func readPreview(ctx context.Context, c CLI, ws string, edits []byte) (previewDo
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return v, fmt.Errorf("settings preview: %w", err)
+	}
+	if decodeHook != nil {
+		decodeHook([]string{"-C", ws, "settings", "preview"}, out, &v)
 	}
 	return v, nil
 }
@@ -599,6 +610,9 @@ func readCheck(ctx context.Context, c CLI, text []byte, args ...string) (checkDo
 	}
 	if err := json.Unmarshal(out, &v); err != nil {
 		return v, fmt.Errorf("%s: %w", strings.Join(args, " "), err)
+	}
+	if decodeHook != nil {
+		decodeHook(args, out, &v)
 	}
 	return v, nil
 }

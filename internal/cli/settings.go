@@ -282,32 +282,24 @@ type fileChange struct {
 // included (bytes and mode; a file that did not exist is removed, with the
 // directories made for it), so the workspace is as it was; the units a
 // failed render already wrote are not touched.
-func (e *env) commit(ctx context.Context, root string, changes []fileChange, lock *workspace.Accept) (err error) {
+func (e *env) commit(ctx context.Context, root string, changes []fileChange, lock *workspace.Accept) error {
+	return e.commitThen(ctx, root, changes, lock, nil)
+}
+
+// commitThen is commit with a step between the lock and the render: then
+// gets the workspace as locked and returns more changes to write (agent
+// add's Containerfiles, which copy what the lock accepted) or does work
+// that must succeed for the changes to stay (secret add's podman secret).
+func (e *env) commitThen(ctx context.Context, root string, changes []fileChange, lock *workspace.Accept, then func(*workspace.Workspace) ([]fileChange, error)) (err error) {
 	var undo []func() error
 	defer func() {
-		if err == nil {
-			return
-		}
-		var rerr error
-		for i := len(undo) - 1; i >= 0; i-- {
-			rerr = errors.Join(rerr, undo[i]())
-		}
-		if rerr != nil {
-			err = errors.Join(err, fmt.Errorf("restoring the workspace: %w", rerr))
+		if err != nil {
+			err = rollback(err, undo)
 		}
 	}()
-	var wrote []string
-	for _, c := range changes {
-		restore, err := keep(root, filepath.Join(root, filepath.FromSlash(c.Rel)))
-		if err != nil {
-			return err
-		}
-		undo = append(undo, restore)
-		line, err := applyChange(root, c)
-		if err != nil {
-			return err
-		}
-		wrote = append(wrote, line)
+	wrote, err := writeChanges(root, changes, &undo)
+	if err != nil {
+		return err
 	}
 	if lock != nil {
 		lockPath := filepath.Join(root, "stack.lock")
@@ -325,6 +317,22 @@ func (e *env) commit(ctx context.Context, root string, changes []fileChange, loc
 	if err != nil {
 		return err
 	}
+	if then != nil {
+		more, err := then(w)
+		if err != nil {
+			return err
+		}
+		lines, err := writeChanges(root, more, &undo)
+		if err != nil {
+			return err
+		}
+		wrote = append(wrote, lines...)
+		if len(more) > 0 { // the render sees the new files
+			if w, err = workspace.Load(ctx, root, ""); err != nil {
+				return err
+			}
+		}
+	}
 	d, err := e.render(ctx, w, false)
 	if err != nil {
 		return err
@@ -334,6 +342,55 @@ func (e *env) commit(ctx context.Context, root string, changes []fileChange, loc
 	}
 	e.printRendered(d)
 	return nil
+}
+
+// writeChanges writes changes under root and returns a line for each. It
+// appends to undo how to put each file back, before it touches the file.
+func writeChanges(root string, changes []fileChange, undo *[]func() error) ([]string, error) {
+	var wrote []string
+	for _, c := range changes {
+		restore, err := keep(root, filepath.Join(root, filepath.FromSlash(c.Rel)))
+		if err != nil {
+			return nil, err
+		}
+		*undo = append(*undo, restore)
+		line, err := applyChange(root, c)
+		if err != nil {
+			return nil, err
+		}
+		wrote = append(wrote, line)
+	}
+	return wrote, nil
+}
+
+// rollback runs undo, last first, and returns err with what failed added.
+func rollback(err error, undo []func() error) error {
+	var rerr error
+	for i := len(undo) - 1; i >= 0; i-- {
+		rerr = errors.Join(rerr, undo[i]())
+	}
+	if rerr != nil {
+		err = errors.Join(err, fmt.Errorf("restoring the workspace: %w", rerr))
+	}
+	return err
+}
+
+// writeThenRender writes changes, all or none, then renders a locked
+// project (renderLocked: a render that can't run is a warning). It is
+// commit without the lock and without putting the files back when the
+// render fails, for containerfile eject and new: they are how a project
+// that does not render yet (no stack.lock, a missing Containerfile) is
+// repaired, and what they write is a built-in default or a skeleton.
+func (e *env) writeThenRender(ctx context.Context, root string, changes []fileChange) int {
+	var undo []func() error
+	wrote, err := writeChanges(root, changes, &undo)
+	if err != nil {
+		return e.fail(rollback(err, undo))
+	}
+	for _, line := range wrote {
+		fmt.Fprintln(e.stdout, line)
+	}
+	return e.renderLocked(ctx, root)
 }
 
 // applyChange writes or removes c under root, atomically, and says which.

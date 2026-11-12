@@ -1,0 +1,2 @@
+["-C","/ws","fw","show"]
+{"containers":[{"name":"filial-master-rails","firewall":"firewalled","profiles":["app"],"mode":"log","rejected":[{"addr":"104.16.0.1","proto":"tcp","port":"443","host":"api.example.com"}],"refused":[{"name":"proxy.example.com","count":4}],"lan":[{"addr":"192.168.1.20","port":"443","host":"search.home.example.com"}]}]}

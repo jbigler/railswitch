@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -744,9 +744,25 @@ function startSettings() {
   } catch {
     staged = [];
   }
+  let kept = "";
+  try {
+    kept = sessionStorage.getItem(stabStore) || "";
+  } catch {}
+  showStab(settingsTab(location.hash.slice(1), kept, $$("[data-stab]").map((b) => b.dataset.stab)));
   syncLeft();
   if (staged.length) preview();
   loadBlocked();
+}
+
+// showStab shows one Settings section, as the worktree's tabs do, and
+// keeps it for the browser tab's session.
+const stabStore = "rs-stab-" + prefix;
+function showStab(tab) {
+  try {
+    sessionStorage.setItem(stabStore, tab);
+  } catch {}
+  $$("[data-stab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stab === tab)));
+  $$("[data-spanel]").forEach((p) => (p.hidden = p.dataset.spanel !== tab));
 }
 
 // loadBlocked swaps in the Firewall card's "Would be blocked", which the
@@ -756,7 +772,12 @@ async function loadBlocked() {
   if (!el) return;
   try {
     const r = await fetch(el.dataset.src, { credentials: "same-origin" });
-    if (r.ok) swap("fw-blocked", await r.text());
+    if (!r.ok) return;
+    swap("fw-blocked", await r.text());
+    const n = Number($("#fw-blocked").dataset.count || 0);
+    const badge = $("#fw-count");
+    badge.textContent = n;
+    badge.hidden = !n;
   } catch {
     // the dashboard went away: the placeholder stays
   }
@@ -793,14 +814,10 @@ function syncLeft() {
     $$("input[name=fw-mode]", fw).forEach((r) => (r.checked = r.value === mode));
     $$("tr.fwhost", fw).forEach((row) => row.classList.toggle("staged", !!stagedFor("fw " + row.dataset.prof + " " + row.dataset.host)));
   }
-  $$(".opt").forEach((row) => {
+  $$(".sopt").forEach((row) => {
     const e = stagedFor(row.hasAttribute("data-pack") ? "pack" : "option " + row.dataset.key);
-    const ref = e ? e.ref : row.dataset.ref;
-    $$("input[type=radio]", row).forEach((r) => (r.checked = r.value === ref));
+    $("select", row).value = e ? e.ref : row.dataset.ref;
     row.classList.toggle("staged", !!e);
-    const nw = $(".opt-new", row);
-    nw.hidden = !e;
-    nw.textContent = e ? "→ " + e.ref : "";
   });
   $$("tr.env").forEach((row) => {
     const e = stagedFor("env " + row.dataset.name);
@@ -829,8 +846,9 @@ function syncLeft() {
       const td = document.createElement("td");
       const undo = document.createElement("button");
       undo.type = "button";
-      undo.className = "ln";
+      undo.className = "ln rm";
       undo.dataset.envUndo = "";
+      td.className = "act";
       undo.textContent = "Undo";
       td.append(undo);
       row.append(td);
@@ -1000,10 +1018,24 @@ function addReady(f) {
 if (view.startsWith("settings")) {
   document.addEventListener("click", (e) => {
     const t = e.target;
-    const change = t.closest("[data-change]");
-    if (change) {
-      const c = $(".choices", change.closest(".opt"));
-      c.hidden = !c.hidden;
+    const stab = t.closest("[data-stab]");
+    if (stab) return showStab(stab.dataset.stab);
+    const secretSet = t.closest("[data-secret-set]");
+    if (secretSet) {
+      const f = $("form.secret-set");
+      f.hidden = false;
+      f.elements.name.value = secretSet.dataset.secretSet;
+      $("[data-secret-name]", f).textContent = secretSet.dataset.secretSet;
+      return f.elements.value.focus();
+    }
+    if (t.closest("[data-secret-cancel]")) {
+      const f = $("form.secret-set");
+      f.reset();
+      f.hidden = true;
+      return;
+    }
+    if (t.closest("[data-fw-allow-selected]")) {
+      for (const box of $$(".fw-pick:checked")) stage({ op: "firewall.allow.add", key: box.dataset.prof, value: box.dataset.host }, false);
       return;
     }
     const undo = t.closest("[data-undo]");
@@ -1050,10 +1082,14 @@ if (view.startsWith("settings")) {
 
   document.addEventListener("change", (e) => {
     const t = e.target;
-    const opt = t.closest(".opt");
+    const opt = t.closest(".sopt");
     if (t.name === "fw-mode") return stage({ op: "firewall.mode", value: t.value }, t.value === $("#firewall").dataset.mode);
-    if (opt && t.type === "radio" && opt.hasAttribute("data-pack")) return stage({ op: "pack", ref: t.value }, t.value === opt.dataset.ref);
-    if (opt && t.type === "radio") return stage({ op: "option", key: opt.dataset.key, ref: t.value }, t.value === opt.dataset.ref);
+    if (opt && opt.hasAttribute("data-pack")) return stage({ op: "pack", ref: t.value }, t.value === opt.dataset.ref);
+    if (opt) return stage({ op: "option", key: opt.dataset.key, ref: t.value }, t.value === opt.dataset.ref);
+    if (t.classList.contains("fw-pick")) {
+      $("[data-fw-allow-selected]").disabled = !$(".fw-pick:checked");
+      return;
+    }
     if (t.classList.contains("env-value")) {
       const row = t.closest("tr");
       return stage({ op: "env.set", name: row.dataset.name, value: t.value }, t.value === row.dataset.value);
@@ -1130,6 +1166,7 @@ if (view.startsWith("settings")) {
         });
       } else {
         f.reset(); // the value leaves the page at once
+        if (f.classList.contains("secret-set")) f.hidden = true;
         startJob(f.action, data, secretDone);
       }
     }

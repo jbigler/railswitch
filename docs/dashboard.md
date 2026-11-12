@@ -320,7 +320,18 @@ still wider than the window scrolls its pane.
 `project.toml`. Changes are staged, not applied: the right-hand panel
 shows what each one does before anything is written.
 
-**Left column**
+**Left column** (D201)
+
+The title row has **Save as template** and **Edit project.toml** on its
+right. Under it, one line names the project, its repository, base branch
+and prefix (read-only: the prefix names every container, volume, network
+and hostname). Then come the tabs, the same bar as a worktree's: Stack,
+Firewall, Commands, Environment, Links, Tasks and Secrets. One section
+shows at a time; the page opens on the tab its address names (`#tasks`,
+`#firewall`; `#hooks` and `#agent-setup` open Commands), else the one
+last shown in this browser tab, else Stack. The staged panel stays
+beside every tab. Each section starts with a one-line note; the longer
+explanation is behind a disclosure.
 
 - **Template changed** (first, only while `overview`'s `template_update`
   is true): the template's ref and the recorded hash, and that nothing
@@ -332,43 +343,50 @@ shows what each one does before anything is written.
   waiting; then it runs `railswitch template check --accept <sha>` as a
   project-level job. When the job ends ok the page reloads and the
   notice is gone.
-- **Project:** name, repository, base branch and prefix. Read-only; the
-  prefix is fixed because it names every container, volume, network and
-  hostname.
 - **Stack and options:** first the pack (D115), when `project show`'s
   `pack.choices` offers another (a local copy, a library's, another
   version: each with the same app service, and only one the project's
   options work with); then one row per slot and
-  extra `[options]` key with its current package. "Change" opens its choices (the current one tagged
-  `current`); picking another stages it and the row shows `→ <new>`.
-  Picking the current one again unstages it. "Add service" (a key and an
-  option from `project show`'s `add_choices`) stages a new extra key (D81);
-  setting an extra key to `none` removes it.
-- **Firewall** (D119, docs/firewall.md): the mode (Default, with what it
-  is now, Enforce, Log only, Off) and the `app`, `deps` and `agent` allow
-  lists, each host with Remove and an add row; all staged like the other
-  edits (`firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`).
-  "Blocked, or would be under enforce" loads after the page from
-  `GET /p/<prefix>/settings/blocked` (`railswitch --json fw show`): each
-  rejected address with its host and an "Add to <list> list" button (staging
-  `firewall.allow.add`: lasting, from each container's next start) when it
-  resolves and the container has a list. A container under enforce that
-  runs a worktree's service also gets "Allow for" with 10 minutes, 1 hour
-  or until it restarts (D184): `POST /p/<prefix>/<slug>/fw-allow/<service>`
-  (`host`, `for`: `10m`, `1h` or `restart`) runs `railswitch fw allow
-  [--for <d>] <service> <host>` as a job, in that running container now. A
-  data container has nothing to allow; a container with no hook is
-  named. A name a container's DNS filter refused (D195) is a row too,
-  "name refused (DNS), <n> lookups", with the name as its host and the
-  same buttons; "Allow for" offers only "until it restarts", since a
-  timed allow opens addresses and the DNS filter would still refuse the
-  name.
-- **Hooks** (D126): a box per `[hooks]` list (`deps`, `start`, `create`),
+  extra `[options]` key, each a select of its choices. Picking another
+  stages it and marks the row; picking the current one again unstages
+  it. Slots at `none` come last, dimmed. "Add another service" opens a
+  form (a key and an option from `project show`'s `add_choices`) that
+  stages a new extra key (D81); setting an extra key to `none` removes
+  it.
+- **Firewall** (D119, docs/firewall.md): the mode ("Default (<what it
+  is>)", Enforce, Log only, Off), then the blocked list, then **Allowed
+  hosts**: one table of the `app`, `deps` and `agent` allow lists (host,
+  the list it is for, Remove) with one add row (a host and the list);
+  all staged like the other edits (`firewall.mode`,
+  `firewall.allow.add`, `firewall.allow.remove`).
+  The blocked list loads after the page from
+  `GET /p/<prefix>/settings/blocked` (`railswitch --json fw show`) and
+  its count shows on the Firewall tab. It is titled "Blocked", "Would be
+  blocked under enforce" or "Blocked, or would be under enforce" by the
+  containers' modes, and has one group per container (its name, its
+  mode, the list its hosts go to), the most refused name first. A row
+  is a rejected address with its host, or a name the container's DNS
+  filter refused (D195: "DNS" and "<n> tries"). **Allow** stages
+  `firewall.allow.add` (lasting, from each container's next start) when
+  the row has a host and the container has a list; ticking rows and
+  pressing **Allow selected** stages them together. A container under
+  enforce that runs a worktree's service also gets a live allow (D184):
+  **Allow for** with 10 minutes, 1 hour or until it restarts, or, for a
+  refused name, only **Allow until restart**, since a timed allow opens
+  addresses and the DNS filter would still refuse the name.
+  `POST /p/<prefix>/<slug>/fw-allow/<service>` (`host`, `for`: `10m`,
+  `1h` or `restart`) runs `railswitch fw allow [--for <d>] <service>
+  <host>` as a job, in that running container now. One of the project's
+  own names (`*.<prefix>.localhost`) is marked "this project's own
+  service" and has no button. A data container has nothing to allow; a
+  container with no hook is named.
+- **Commands** holds the hooks and the agent setup. **App hooks**
+  (D126): a box per `[hooks]` list (`deps`, `start`, `create`),
   one command per line, in order; blank lines are dropped. Leaving a
   changed box stages `hooks.set` with the whole list (an empty box removes
   it); changing it back unstages it. The preview's restart list shows
   what a `deps` or `start` change restarts (`create` restarts nothing).
-- **Agent setup** (D133, only with agents): a box per agent, its
+  **Agent setup** (D133, only with agents): a box per agent, its
   `[agents.<name>] setup` one command per line; leaving a changed box
   stages `agent.setup` with the whole list (empty removes it).
 - **Environment:** the project's `[env]`. Editing a value stages it when
@@ -402,21 +420,22 @@ shows what each one does before anything is written.
   focuses its command: the palette's "new task" opens it.
 - **Secrets:** one row per declared secret: services, delivery (`file` or
   `env <VAR>`), set (with its date) or not set; never the value. "Set
-  value" runs `railswitch secret set <name>` as a job; "Add a secret"
+  value" opens one value field under the list for that secret; Save
+  runs `railswitch secret set <name>` as a job; "Add a secret"
   (name, the services that receive it, an optional env variable, value)
   runs `railswitch secret add <name> --service <id>… [--env VAR]`. The
   value goes only to the job's stdin; the field clears as soon as you
   press the button. Secrets act at once; they are not staged. An add
   whose value podman does not store leaves no declaration, so it can be
   sent again.
-- **Save as template:** a name (`[a-z][a-z0-9-]*`) and a version (a
+- **Save as template** (the title row's button, which opens its form): a name (`[a-z][a-z0-9-]*`) and a version (a
   whole number from 1) run `railswitch template export --name <n>
   --version <N>` as a project-level job. It writes
   `~/.config/railswitch/templates/<n>.stack/`; the CLI refuses a version
   already saved. The server refuses (400, no job) another name or
   version.
-- **Edit project.toml** opens the raw editor (below), for everything
-  else: services, routes, firewall, agents, image, tools, versions.
+- **Edit project.toml** (the title row) opens the raw editor (below),
+  for everything else: services, routes, agents, image, tools, versions.
 
 **Staged changes** (the right column, which stays in view while the left
 one scrolls, on a window wider than 800px)
@@ -1085,7 +1104,7 @@ Every action is a job (below).
   on a worktree or page it opens it. With a worktree selected, when no task
   is named exactly what the filter says, the list ends with "new task
   <filter>…" (Enter on it, the first line when nothing else matches, or a
-  click): the Settings page's Tasks card with that name filled in.
+  click): the Settings page's Tasks tab with that name filled in.
 - **Cancel** on a running job stops it.
 
 ## Jobs

@@ -44,19 +44,35 @@ type fwDoc struct {
 type fwBlockedView struct {
 	Prefix string
 	Error  string
-	Rows   []fwBlockedRow
-	None   []string // containers with no hook (fw show's "NO FIREWALL")
-	LAN    []string // "<container>: <addr> tcp/<port> (<host>)", config.toml [[lan]] (D196)
+	Title  string           // "Blocked", or what it would be under enforce
+	Count  int              // the rows a host can be allowed for
+	Groups []fwBlockedGroup // one per container with rows
+	None   []string         // containers with no hook (fw show's "NO FIREWALL")
+	LAN    []string         // "<container>: <addr> tcp/<port> (<host>)", config.toml [[lan]] (D196)
+}
+
+// fwBlockedGroup is a container's rows, the most refused first.
+type fwBlockedGroup struct {
+	Container, Mode string
+	Profile         string // the list its hosts are allowed in; "": none can (a data container)
+	Rows            []fwBlockedRow
 }
 
 type fwBlockedRow struct {
-	Container, Mode, Addr, Port, Host string
-	Profile                           string // the list a host is allowed in; "": none can (a data container)
-	Slug, Service                     string // the worktree service the container runs; "": none (e.g. exec's)
+	Addr, Host, Profile string
+	Reason              string // "DNS", or the address and port rejected
+	Count               int    // a refused name's lookups; 0 for an address
+	Slug, Service       string // the worktree service the container runs; "": none (e.g. exec's)
 	// Refused: a name the DNS filter refused (D195). fw allow --for opens
 	// addresses only, so only "until it restarts" makes the name resolve.
 	Refused bool
+	// Own: one of the project's own *.<prefix>.localhost names, which no
+	// allow list is for.
+	Own bool
 }
+
+// CanList reports whether the row's host can go into an allow list.
+func (r fwBlockedRow) CanList() bool { return r.Host != "" && r.Profile != "" && !r.Own }
 
 // liveFor is a live allow's choices: the form value, and fw allow's --for
 // ("": until the container restarts).
@@ -133,6 +149,8 @@ func (s *Server) settingsBlocked(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	own := "." + p.Prefix + ".localhost"
+	enforce, other := false, false
 	for _, c := range doc.Containers {
 		if c.Firewall == "none" {
 			v.None = append(v.None, c.Name)
@@ -140,22 +158,40 @@ func (s *Server) settingsBlocked(w http.ResponseWriter, r *http.Request) {
 		for _, l := range c.LAN {
 			v.LAN = append(v.LAN, fmt.Sprintf("%s: %s tcp/%s (%s)", c.Name, l.Addr, l.Port, l.Host))
 		}
+		g := fwBlockedGroup{Container: c.Name, Mode: c.Mode, Profile: allowProfile(c.Profiles)}
+		add := func(row fwBlockedRow) {
+			row.Profile = g.Profile
+			row.Own = strings.HasSuffix("."+row.Host, own)
+			if o, ok := owner[c.Name]; ok && c.Mode == "enforce" {
+				row.Slug, row.Service = o[0], o[1]
+			}
+			if row.CanList() {
+				v.Count++
+			}
+			g.Rows = append(g.Rows, row)
+		}
 		// A name its DNS filter refused (D195): no address, but a host to
 		// allow like any other.
 		for _, x := range c.Refused {
-			row := fwBlockedRow{Container: c.Name, Mode: c.Mode, Port: fmt.Sprintf("name refused (DNS), %d lookups", x.Count), Host: x.Name, Profile: allowProfile(c.Profiles), Refused: true}
-			if o, ok := owner[c.Name]; ok && c.Mode == "enforce" {
-				row.Slug, row.Service = o[0], o[1]
-			}
-			v.Rows = append(v.Rows, row)
+			add(fwBlockedRow{Host: x.Name, Reason: "DNS", Count: x.Count, Refused: true})
 		}
 		for _, x := range c.Rejected {
-			row := fwBlockedRow{Container: c.Name, Mode: c.Mode, Addr: x.Addr, Port: x.Proto + "/" + x.Port, Host: x.Host, Profile: allowProfile(c.Profiles)}
-			if o, ok := owner[c.Name]; ok && c.Mode == "enforce" {
-				row.Slug, row.Service = o[0], o[1]
-			}
-			v.Rows = append(v.Rows, row)
+			add(fwBlockedRow{Addr: x.Addr, Host: x.Host, Reason: strings.TrimSpace(x.Addr + " " + x.Proto + "/" + x.Port)})
 		}
+		if len(g.Rows) == 0 {
+			continue
+		}
+		slices.SortStableFunc(g.Rows, func(a, b fwBlockedRow) int { return b.Count - a.Count })
+		enforce, other = enforce || c.Mode == "enforce", other || c.Mode != "enforce"
+		v.Groups = append(v.Groups, g)
+	}
+	switch {
+	case enforce && other:
+		v.Title = "Blocked, or would be under enforce"
+	case other:
+		v.Title = "Would be blocked under enforce"
+	default:
+		v.Title = "Blocked"
 	}
 	s.html(w, http.StatusOK, "fw-blocked", v)
 }

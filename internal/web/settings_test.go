@@ -113,18 +113,18 @@ func TestSettingsPageRenders(t *testing.T) {
 	}
 	body := w.Body.String()
 	for _, want := range []string{
-		"Ftest App", "git@github.com:o/r.git", "fixed: it names every container, volume, network and hostname",
-		`class="opt" data-key="cache" data-ref="kv@1"`,
-		`<input type="radio" name="opt-cache" value="kv@1" checked> <span class="mono">kv@1</span> <span class="tag">current</span>`,
+		"Ftest App", "git@github.com:o/r.git", `prefix <span class="mono">ftest</span>`,
+		`class="sopt" data-key="cache" data-ref="kv@1"`,
+		`<option value="kv@1" selected>kv@1</option>`,
 		`value="local:kv2@1">`, `data-key="analytics"`, `<span class="muted">extra</span>`,
 		`data-name="BIND" data-value="0.0.0.0"`,
-		`data-label="Flipper" data-hidden="false"`, `<span class="chip">project</span>`,
-		`data-label="Mailer previews" data-hidden="true"`, `<span class="chip">pack web@1</span>`,
-		"{worktree.host}/flipper", "Use <code>{worktree.host}</code>",
+		`data-label="Flipper" data-hidden="false"`, `<td class="muted">project</td>`,
+		`data-label="Mailer previews" data-hidden="true"`, `<td class="muted">pack web@1</td>`,
+		"{worktree.host}/flipper", "<code>{worktree.host}</code>, <code>{worktree.slug}</code>",
 		`<span class="green">set 2026-10-25</span>`, `<span class="yellow">not set</span>`, "env API_KEY", "web, db",
 		`name="services" value="web"`, `name="services" value="db"`,
 		`data-preview="/p/ftest/settings/preview"`, `action="/p/ftest/settings/secret"`, `href="/p/ftest/settings/file"`,
-		"Nothing staged. Change a setting on the left to see what it does.",
+		"Nothing staged.",
 		`data-view="settings"`,
 		`<form class="add-row" data-stage="service">`, `<option value="local:kv2@1">local:kv2@1</option>`,
 	} {
@@ -162,9 +162,9 @@ func TestSettingsTasks(t *testing.T) {
 	f := settingsFixture(t)
 	body := f.do(req("GET", "/p/ftest/settings?task=db:seed", nil)).Body.String()
 	for _, want := range []string{
-		`<section class="card" id="tasks">`,
+		`<section class="spanel" data-spanel="tasks" id="tasks">`, `<button type="button" data-stab="tasks">Tasks</button>`,
 		`data-name="console" data-source="hidden" data-command=""`, `<span class="mono muted">bin/rails console</span>`, "pack, hidden", "data-task-restore",
-		`data-name="lint" data-source="project"`, `value="bin/rubocop"`, `<button type="button" class="ln danger" data-task-remove>Remove</button>`,
+		`data-name="lint" data-source="project"`, `value="bin/rubocop"`, `<button type="button" class="ln rm" data-task-remove>Remove</button>`,
 		`data-name="test" data-source="project"`, "project, over the pack's", `data-task-remove title="bin/rails test">Back to the pack's</button>`,
 		`data-name="test:system" data-source="pack"`, "data-task-hide",
 		`<input type="checkbox" class="task-fresh" checked aria-label="Run lint in a new container">`, `<input type="checkbox" class="task-fresh" aria-label="Run test in a new container">`,

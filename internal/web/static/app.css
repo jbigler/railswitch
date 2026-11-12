@@ -242,12 +242,8 @@ form[data-apply] label.ack,form[data-create] label.ack{display:block;margin:8px 
 
 .toast{position:fixed;inset:auto 16px 16px auto;margin:0;max-width:460px;padding:8px 12px;color:var(--text);background:var(--bg2);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap}
 .toast.err{color:var(--red);border-color:var(--red)}
-#hooks label.hook{display:block;margin:10px 0}
-#hooks label.hook textarea{display:block;width:100%;margin-top:4px;resize:vertical}
-#hooks label.hook.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
-#agent-setup label.agent-setup{display:block;margin:10px 0}
-#agent-setup label.agent-setup textarea{display:block;width:100%;margin-top:4px;resize:vertical}
-#agent-setup label.agent-setup.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+label.hook.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+label.agent-setup.staged textarea{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
 .stacked{font-size:.85em;color:var(--muted);white-space:nowrap}
 .gh-stack{list-style:none;margin:2px 0 4px;padding:0}
 .gh-stack li{padding:1px 0}
@@ -457,3 +453,49 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 body:where([data-tab]:not([data-tab=overview])) .wt [data-panel]{display:none} /* :where keeps it below the rules that show a tab's card */
 body[data-tab=agent] .wt [data-panel=agent],body[data-tab=tests] .wt [data-panel=tests],body[data-tab=database] .wt [data-panel=database],body[data-tab=jobs] .wt [data-panel=jobs]{display:block;grid-column:1/-1}
 body[data-tab=jobs] .wt .jobs .none{display:block}
+
+/* Settings as tabs (D201): one section at a time, the staged pane beside it. */
+@media (min-width:801px){.grid.settings{grid-template-columns:minmax(0,1fr) 340px}}
+.set-hd{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px}
+.set-hd .ln{margin:0}
+.set-proj{margin:6px 0 0;color:var(--muted)}
+.set-proj b{color:var(--text)}
+.set-left>.note{padding:6px 0}
+.tpl-save{position:relative}
+.tpl-save summary{list-style:none;cursor:pointer}
+.tpl-save-body{position:absolute;right:0;top:calc(100% + 4px);z-index:5;width:min(24rem,90vw);padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px}
+.stabs{margin:10px -16px 12px}
+.tabs .badge,.badge{font-size:11px;padding:0 6px;border-radius:9px;background:var(--accent);color:var(--bg)}
+.spanel>h2{display:none}
+.spanel h3{font-size:14px;margin:16px 0 6px}
+.spanel>.note,.spanel details.more .note{padding:0 0 8px}
+details.more{margin:0 0 10px}
+details.more summary{cursor:pointer;color:var(--blue);font-weight:700}
+.sopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(20rem,100%),1fr));gap:8px 28px;margin-bottom:10px}
+.sopts.unused{padding-top:10px;border-top:1px solid var(--sel)}
+.sopts:empty{display:none}
+.sopt{display:flex;align-items:center;gap:10px}
+.sopt-key{flex:0 0 7rem}
+.sopt select{flex:1;min-width:0;padding:5px 6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px}
+.sopt.staged select{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
+.ln.rm{background:none;border-color:transparent;color:var(--muted);font-weight:600}
+.ln.rm:hover{color:var(--red);border-color:var(--border)}
+.set-table td.act{text-align:right;white-space:nowrap}
+.set-table td.act .ln{margin:0}
+.set-table td.when,.set-table td.num{white-space:nowrap}
+.set-table td.num{text-align:right}
+.set-table td.pick{width:24px}
+.cmd-row{display:grid;grid-template-columns:minmax(8rem,16rem) minmax(0,1fr);gap:12px;align-items:start;margin:10px 0}
+.cmd-row textarea{width:100%;padding:6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px;resize:vertical;field-sizing:content;min-height:2.2em}
+.cmd-row textarea:placeholder-shown{background:var(--bg);border-style:dashed}
+.add-row input:placeholder-shown{background:var(--bg);border-style:dashed}
+.fw-hd{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:14px}
+.fw-hd h3{margin:0}
+.fw-hd .muted{flex:1;min-width:12rem;font-size:13px}
+.fw-hd .ln{margin:0}
+.fw-group{font-size:14px;font-weight:400;margin:12px 0 0;padding:0 5px 6px;border-bottom:1px solid var(--border)}
+.secret-set{margin:8px 0;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:4px}
+.secret-set label{display:flex;flex:1;align-items:center;gap:8px}
+.secret-set input[type=password]{flex:1;width:auto}
+.add-secret summary.ln{display:inline-block;list-style:none;color:var(--blue);margin-top:8px}
+@media (max-width:800px){.cmd-row{grid-template-columns:minmax(0,1fr)}}

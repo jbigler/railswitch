@@ -55,7 +55,7 @@ picked.
 ## Moving an existing project to enforce
 
 Leave it on `log` for a while, use the app, then look at what log mode
-recorded in the Firewall card and allow what the app really needs before
+recorded in the Firewall tab and allow what the app really needs before
 switching. Hosts change behind CDNs; the lists hold names, resolved at
 each start.
 

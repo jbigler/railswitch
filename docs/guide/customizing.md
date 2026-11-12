@@ -7,18 +7,23 @@ running worktrees restart, anything it blocks) before **Apply** writes
 
 ## Settings
 
-- **Stack and options:** the pack, and each slot's option; **Add service**
-  for one more (a second database). Switching a database to `none` leaves
-  its volume behind, and the page says so.
-- **Firewall:** the mode and the allow lists ([The firewall](firewall.md)).
-- **Hooks:** the commands railswitch runs inside the containers, one box
-  per list, one command per line ([Hooks](#hooks)).
-- **Environment** and **Worktree links** (shortcuts on each worktree's
-  row, with `{worktree.host}` filled in).
+The page has a tab for each of these:
+
+- **Stack:** the pack, and each slot's option, each a list to pick from;
+  **Add another service** for one more (a second database). Switching a
+  database to `none` leaves its volume behind, and the page says so.
+- **Firewall:** the mode, what was blocked (with a button to allow it)
+  and the allowed hosts ([The firewall](firewall.md)).
+- **Commands:** the commands railswitch runs inside the containers, one
+  box per list, one command per line ([Hooks](#hooks)), and each agent's
+  setup commands.
+- **Environment**, **Links** (shortcuts on each worktree's row, with
+  `{worktree.host}` filled in) and **Tasks**.
 - **Secrets:** set or replace a value; it's sent on stdin, never in a URL
   or a file.
-- **project.toml:** the whole file in an editor, for anything without a
-  control. It's checked before it's saved.
+
+**Edit project.toml**, beside the title, opens the whole file in an
+editor, for anything without a control. It's checked before it's saved.
 
 Everything has a command too: `railswitch settings preview` and `settings
 apply` take the same edits as JSON; `project show` and `project write`

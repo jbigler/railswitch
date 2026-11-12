@@ -1,6 +1,6 @@
 {{define "staged"}}<section id="staged" class="staged" data-hash="{{.Hash}}" data-count="{{.Count}}"{{if .Blocked}} data-blocked{{end}}>
 <h2>Staged changes · {{.Count}}</h2>
-{{if not .Cards}}<p class="note">Nothing staged. Change a setting on the left to see what it does.</p>
+{{if not .Cards}}<p class="note">Nothing staged.</p>
 {{else}}{{if .Error}}<p class="red">Preview failed: {{.Error}}</p>
 {{end}}{{range .Cards}}<div class="card stagecard edge-{{.Class}}" data-index="{{.Index}}">
 <div class="stage-hd"><b>{{.Title}}</b><span class="sp"></span>{{if .Label}}<span class="chip {{.Class}}">{{.Label}}</span>{{end}}</div>

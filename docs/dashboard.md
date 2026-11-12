@@ -499,12 +499,14 @@ blocks) the project's other jobs. Its output shows under the panel.
 builds. Every `RUN` line in these Containerfiles runs on this machine
 during the build, outside the firewall.
 
-- **Worktree:** one chip per worktree; the base worktree is shown first
-  (`?wt=<slug>` picks another; an unknown slug is a 404).
+- **Worktree:** a list of the worktrees; the base worktree is shown first,
+  and picking another loads its chain (`?wt=<slug>`; an unknown slug is a
+  404).
 - The project's warnings from `railswitch --json -w <slug> containerfile
   list`, then the **build chain** in build order: step, kind (`base`,
   `addon`, `agent-base`, `agent`, or `image` for a tool or an option's
-  image), file, `FROM` images and tag, and Edit. A file whose default changed since it was
+  image; left out when the page is narrow, and each step stacks when it is narrower still), file, the image's tag with its
+  `FROM` images under it, and Edit. A file whose default changed since it was
   ejected (`default_changed`) carries a **default changed** badge that
   opens its editor.
 - **New addon:** a name (lower-case letters, digits and `-`) runs

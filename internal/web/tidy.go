@@ -78,6 +78,17 @@ func (s *Server) tidyPage(w http.ResponseWriter, r *http.Request) {
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, Jobs: jv,
 		URL: tidyURL(p.Prefix),
 	}
+	s.html(w, http.StatusOK, "tidy", v)
+}
+
+// tidyItems is the page's candidates, which it fetches after it shows:
+// `tidy --json` asks for PR states and sizes every image, so it is slow.
+func (s *Server) tidyItems(w http.ResponseWriter, r *http.Request) {
+	p, _, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	v := tidyView{URL: tidyURL(p.Prefix)}
 	doc, err := readJSON[tidyDoc](r.Context(), s.c.CLI, "-C", p.Workspace, "tidy")
 	if err != nil {
 		v.Error = err.Error()
@@ -110,7 +121,7 @@ func (s *Server) tidyPage(w http.ResponseWriter, r *http.Request) {
 		}
 		v.Items = append(v.Items, row)
 	}
-	s.html(w, http.StatusOK, "tidy", v)
+	s.html(w, http.StatusOK, "tidy-body", v)
 }
 
 // tidyRemove runs `tidy --rm [--force] <id>...` as a project-level job:

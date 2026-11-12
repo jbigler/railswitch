@@ -160,6 +160,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/settings/template/export", s.templateExport)
 	m.HandleFunc("POST /p/{prefix}/settings/template/accept", s.templateAccept)
 	m.HandleFunc("GET /p/{prefix}/tidy", s.tidyPage)
+	m.HandleFunc("GET /p/{prefix}/tidy/items", s.tidyItems)
 	m.HandleFunc("POST /p/{prefix}/tidy", s.tidyRemove)
 	m.HandleFunc("GET /p/{prefix}/images", s.imagesPage)
 	m.HandleFunc("GET /p/{prefix}/images/edit/{name}", s.imagesEditor)

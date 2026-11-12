@@ -1218,7 +1218,8 @@ notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
 first, and opens one. A note shows as a title made of its file name's words
 (`agent_queue_design.md` is "Agent queue design": agents name notes in
 snake case) and when it last changed; the file name shows under the title of an
-open note. It opens one in an editor (`?n=<name>`, `notes show`). **Save**
+open note; on a narrow window, where the note is under the lists, the
+page scrolls to it. It opens one in an editor (`?n=<name>`, `notes show`). **Save**
 posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
 handler the office's Notes kiosk uses, which runs `notes write <name>
 --if-hash <hash>` with the text on stdin: a note changed since you opened

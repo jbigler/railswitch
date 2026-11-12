@@ -1611,6 +1611,8 @@ function startNew() {
 // and the text stays in the box.
 
 function startNotes() {
+  // one column: the opened note or suggestion is under the lists.
+  if (matchMedia("(max-width:800px)").matches) $(".pane .editor")?.scrollIntoView();
   const f = $("#note");
   if (!f) return;
   const err = $("#note-err");

@@ -167,7 +167,8 @@ still wider than the window scrolls its pane.
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
-- **List** (D170): a filter field (a worktree shows while its name or
+- **List** (D170): in a wide window it stays under the header and scrolls
+  on its own (D209); the page scrolls the worktree shown beside it. It has a filter field (a worktree shows while its name or
   branch holds the text; a group with none showing hides; it is the
   page's, so a live update keeps it), `↻` (Refresh PRs) and `+ New`;
   the sort bar; then the worktrees in three groups, each headed with

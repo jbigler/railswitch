@@ -463,8 +463,9 @@ func title(need int) string {
 }
 
 type headerView struct {
-	Prefix string
-	Need   int
+	Prefix          string
+	Need            int
+	Terms, TermsMax int // terminals running across the dashboard, and the most there can be (D205)
 }
 
 type projectsView struct{ Items []switchItem }

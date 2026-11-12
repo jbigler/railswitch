@@ -67,10 +67,18 @@ export function pageQuery(sort, days) {
   return s ? "?" + s : "";
 }
 
-// termShown (D191): a terminal panel shows only while its worktree is the
-// one shown, and an agent's only on the Agent tab.
+// termShown (D191, D205): a terminal panel shows only while its worktree
+// is the one shown: an agent's on the Agent tab, any other on Terminals.
 export function termShown(panel, slug, tab) {
-  return slug !== "" && panel.slug === slug && (!panel.agent || tab === "agent");
+  return slug !== "" && panel.slug === slug && tab === (panel.agent ? "agent" : "terminals");
+}
+
+// termID names a terminal by its URL, however its query is written: the
+// server's list and a button spell the same one differently.
+export function termID(url) {
+  const u = new URL(url, "http://x");
+  u.searchParams.sort();
+  return u.pathname + u.search;
 }
 
 // settingsTab (D201) is the tab a tabbed page (Settings, Library) shows: the one the address's

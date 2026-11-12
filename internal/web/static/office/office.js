@@ -165,7 +165,8 @@ function closePanel() {
 
 // termIn adds a live terminal (D149) to a panel body: url is
 // /p/{prefix}/tty/{slug}/{kind}[?agent=]. The panel's cleanup must call the
-// returned close.
+// returned detach: the terminal is the dashboard's too (D205), and keeps
+// running there.
 const officeTheme = { background: '#05080d', foreground: '#c8f7ff', cursor: '#29e7ff', cursorAccent: '#05080d', selectionBackground: '#1d4f63' };
 function termIn(body, url) {
   $('panel').classList.add('wide');
@@ -267,10 +268,10 @@ function showDesk(slug) {
     const w = labOf(slug);
     body.append(el('p', {}, '⎇ ', el('strong', {}, w?.branch || slug), ' · ', el('span', { class: `state-${w?.stack}` }, w?.stack || '')));
     let t = null;
-    const open = (kind) => { t?.close(); body.querySelector('.term')?.remove(); t = termIn(body, ttyURL(slug, kind)); };
+    const open = (kind) => { t?.detach(); body.querySelector('.term')?.remove(); t = termIn(body, ttyURL(slug, kind)); };
     const hasNvim = w?.services.some((s) => s.service === 'nvim');
     body.append(el('div', { class: 'row' },
-      btn('▣ Shell', () => open('shell'), { title: 'A shell in the app container, here; it ends when this panel closes' }),
+      btn('▣ Shell', () => open('shell'), { title: 'A shell in the app container, here; it keeps running when this panel closes, until it is ended from ▣ in the dashboard' }),
       hasNvim ? btn('✎ Neovim', () => open('nvim'), { title: 'Neovim here; it keeps running when this panel closes' }) : null,
       btn('Terminal window', () => job(`${base}/${encodeURIComponent(slug)}/act/term`, body)),
       hasNvim ? btn('Neovim window', () => job(`${base}/${encodeURIComponent(slug)}/act/nvim`, body)) : null));
@@ -284,7 +285,7 @@ function showDesk(slug) {
       body.append(el('p', {}, ext(`#${w.pr.number} ↗`, safeURL(w.pr.url)), ' ', w.pr.title));
       body.append(el('a', { class: 'hud-btn', href: `${base}/${encodeURIComponent(slug)}/pr` }, 'PR page: checks, reviews, merge'));
     }
-    return () => t?.close();
+    return () => t?.detach();
   });
 }
 
@@ -306,7 +307,7 @@ function showAgent(slug) {
     let name = a && (names.includes(a.name) || !names.length) ? a.name : names[0];
     let t = null;
     const open = () => {
-      t?.close();
+      t?.detach();
       body.querySelector('.term')?.remove();
       t = termIn(body, ttyURL(slug, 'agent') + (name ? `?agent=${encodeURIComponent(name)}` : ''));
     };
@@ -314,7 +315,7 @@ function showAgent(slug) {
       const sel = el('select', { on: { change: (e) => { name = e.target.value; open(); } } }, names.map((n) => el('option', { value: n, selected: n === name }, n)));
       body.append(el('div', { class: 'row' }, 'Agent: ', sel));
     }
-    if (!names.length) body.append(el('p', { class: 'muted' }, 'This floor has no service agent: the agent runs for this panel and stops when it closes.'));
+    if (!names.length) body.append(el('p', { class: 'muted' }, 'This floor has no service agent: the agent starts with this panel and keeps running when it closes, until its terminal is ended from ▣ in the dashboard.'));
     body.append(el('div', { class: 'row' }, btn('Open console window ▣', () => job(`${base}/${encodeURIComponent(slug)}/act/agent`, body))));
     // Connecting runs `railswitch agent`, which starts the floor first: only
     // a running service agent is joined without asking.
@@ -326,7 +327,7 @@ function showAgent(slug) {
       body.append(el('div', { class: 'row' }, go), note);
     }
     redraw = drawStatus;
-    return () => { t?.close(); redraw = null; };
+    return () => { t?.detach(); redraw = null; };
   });
 }
 

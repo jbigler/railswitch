@@ -62,6 +62,8 @@ func TestDashboardContract(t *testing.T) {
 	// What the bare fixture lacks: a note, a database snapshot, a queued
 	// message, an agent that reported.
 	mustRunStdin(t, f, "a note\n", "-C", ws, "notes", "write", "a.md", "--if-hash", "")
+	// An agent in feat suggests a new text for it (D199).
+	writeFile(t, filepath.Join(ws, ".railswitch", "notes-inbox", "feat", "a.md"), "a suggestion\n")
 	f.On([]string{"podman", "container", "inspect", "--format", "{{.State.Running}}", "filial-feat-db"}, sys.Result{Stdout: []byte("true\n")}, nil)
 	f.On([]string{"podman", "exec", "filial-feat-db"}, sys.Result{Stdout: []byte("PGDMP")}, nil)
 	f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\n")}, nil)

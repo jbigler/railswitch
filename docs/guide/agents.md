@@ -292,27 +292,37 @@ so a promoted plugin list works everywhere at once.
 What the project's agents should all know (a command that must be run a
 certain way, a gotcha, a convention) goes in the project's notes: one
 folder, `notes/` in the workspace, which every agent of every kind (Claude,
-your own packages) reads and writes as `~/notes/`, in every worktree.
+your own packages) reads as `~/notes/`, in every worktree. Agents can't
+change it: they suggest notes, and you decide what goes in.
 
 - **A note is a Markdown file named for what it says,** words joined by
-  underscores: `run_db_prepare_after_a_schema_change.md`. Agents write
-  them; so can you, with any editor.
+  underscores: `run_db_prepare_after_a_schema_change.md`. You write them,
+  with any editor or by accepting an agent's suggestion.
+- **Agents suggest notes in their worktree's inbox** (`~/notes-inbox/`):
+  a new note, or the whole new text of an existing one under its name.
+  `railswitch notes inbox ls` lists every worktree's suggestions, `notes
+  inbox show <worktree> <name>` prints one, `notes inbox accept <worktree>
+  <name> --hash <hash> [--as <name>]` moves it into `notes/` (the hash
+  `show --json` printed, so an edit since you read it is refused), and
+  `notes inbox reject <worktree> <name>` drops it. The dashboard's Notes
+  page does the same with a count of what's waiting. One agent can't
+  slip instructions to every other agent this way: nothing reaches them
+  until you accept it.
 - **Every agent starts with the list of notes:** the rule for using them,
   then every note's file name, newest first. Only names: it reads a whole
   note when its name is relevant (or searches them with `grep`), so the
   notes' size never costs context. Claude gets this at every session start and after a
   compaction; a package of your own gets it the way it delivers context
   (see [the package format](../packs.md)).
-- **Saved notes are for everyone at once:** a note one agent writes is in
-  every other agent's index at its next start, and any agent can read it
-  right away.
+- **Accepted notes are for everyone at once:** a note is in every agent's
+  index at its next start, and any agent can read it right away.
 - **They are kept:** `wt rm` and `down` never touch `notes/`; back it up,
   edit it or commit it somewhere as you like.
 - **From railswitch:** `railswitch notes ls` lists them, `notes show
   <name>` prints one, `notes write <name> --if-hash <hash>` replaces it
   with stdin (the hash `notes show --json` printed; `--if-hash ""` adds a
-  new note), and `notes rm <name> --if-hash <hash>` removes it. A note an
-  agent changed since you read it is refused, not overwritten.
+  new note), and `notes rm <name> --if-hash <hash>` removes it. A note
+  changed since you read it is refused, not overwritten.
 
 Never put secrets, credentials or personal data in a note, and in a
 healthcare project no patient data: every agent reads them.

@@ -159,3 +159,91 @@ func TestNotesRace(t *testing.T) {
 		t.Errorf("%d of %d saves from one version won; want 1", won, n)
 	}
 }
+
+// D199: an agent's suggestion is listed, shown with the note it replaces,
+// accepted only at the hash reviewed, and rejected by exact name; a
+// symlink in an inbox is never read or followed.
+func TestNotesInbox(t *testing.T) {
+	ws, dir := notesWS(t)
+	f := fakeHost()
+	inbox := filepath.Join(ws, ".railswitch", "notes-inbox", "feat")
+	if err := os.MkdirAll(inbox, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if out := mustRun(t, "-C", ws, "--json", "notes", "inbox", "ls"); out != `{"suggestions":[]}`+"\n" {
+		t.Errorf("empty inbox: %q", out)
+	}
+	mustRunStdin(t, f, "old\n", "-C", ws, "notes", "write", "a.md", "--if-hash", "")
+	write := func(name, text string) {
+		if err := os.WriteFile(filepath.Join(inbox, name), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("a.md", "new\n")
+	write("b.md", "b\n")
+	secret := filepath.Join(t.TempDir(), "secret")
+	if err := os.WriteFile(secret, []byte("token"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, filepath.Join(inbox, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+
+	var ls struct{ Suggestions []inboxRow }
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "notes", "inbox", "ls")), &ls); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, r := range ls.Suggestions {
+		if r.Worktree != "feat" {
+			t.Errorf("row %+v", r)
+		}
+		got[r.Name] = r.Replaces
+	}
+	if len(got) != 2 || !got["a.md"] || got["b.md"] {
+		t.Errorf("ls %+v", ls.Suggestions)
+	}
+
+	var doc inboxDoc
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "notes", "inbox", "show", "feat", "a.md")), &doc); err != nil || doc.Text != "new\n" || doc.Note == nil || doc.Note.Text != "old\n" {
+		t.Fatalf("show: %+v %v", doc, err)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "notes", "inbox", "show", "feat", "link.md"); code != 1 {
+		t.Errorf("show through a symlink: exit %d", code)
+	}
+	// The agent edits it after the review: the reviewed hash no longer matches.
+	write("a.md", "do something else\n")
+	if code, _, errs := runIn(t, "-C", ws, "notes", "inbox", "accept", "feat", "a.md", "--hash", doc.Hash); code != 1 || !strings.Contains(errs, "changed") {
+		t.Errorf("accept a changed suggestion: exit %d %s", code, errs)
+	}
+	write("a.md", "new\n")
+	mustRun(t, "-C", ws, "notes", "inbox", "accept", "feat", "a.md", "--hash", doc.Hash)
+	if b, _ := os.ReadFile(filepath.Join(dir, "a.md")); string(b) != "new\n" {
+		t.Errorf("accepted note %q", b)
+	}
+	if _, err := os.Lstat(filepath.Join(inbox, "a.md")); !os.IsNotExist(err) {
+		t.Errorf("accepted suggestion left in the inbox: %v", err)
+	}
+	// --as renames it on the way in.
+	var b inboxDoc
+	if err := json.Unmarshal([]byte(mustRun(t, "-C", ws, "--json", "notes", "inbox", "show", "feat", "b.md")), &b); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, "-C", ws, "notes", "inbox", "accept", "feat", "b.md", "--hash", b.Hash, "--as", "better_name.md")
+	if _, err := os.Stat(filepath.Join(dir, "better_name.md")); err != nil {
+		t.Error(err)
+	}
+	// Reject removes the link itself, never its target.
+	mustRun(t, "-C", ws, "notes", "inbox", "reject", "feat", "link.md")
+	if _, err := os.Stat(secret); err != nil {
+		t.Errorf("reject followed the symlink: %v", err)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "notes", "inbox", "reject", "feat", "link.md"); code != 1 {
+		t.Errorf("reject a missing suggestion: exit %d", code)
+	}
+	for _, bad := range [][]string{{"../x", "a.md"}, {"Feat", "a.md"}, {"feat", "../a.md"}} {
+		if code, _, _ := runIn(t, append([]string{"-C", ws, "notes", "inbox", "reject"}, bad...)...); code != 2 {
+			t.Errorf("reject %v: exit %d", bad, code)
+		}
+	}
+}

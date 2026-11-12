@@ -27,7 +27,7 @@ const contractDir = "../../testdata/contract"
 var contractPages = []string{
 	"/p/filial", "/p/filial/feat", "/p/filial/feat/tasks", "/p/filial/feat/agent-default",
 	"/p/filial/feat/snapshots", "/p/filial/feat/pr", "/p/filial/feat/queue", "/p/filial/feat/remove",
-	"/p/filial/notes?n=a.md", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy",
+	"/p/filial/notes?n=a.md&w=feat&s=a.md", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy",
 	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=redis@1", "/p/filial/library?ref=rails@1",
 	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
 	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",

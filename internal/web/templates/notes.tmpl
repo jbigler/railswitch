@@ -1,6 +1,7 @@
 {{/* The agents' shared notes (D155). Save posts the text to SaveURL
 with the hash it was opened at; the CLI refuses it when the note changed
-since. */}}
+since. Agents only suggest notes (D199): Accept posts the hash the
+suggestion was shown at, so an edit since is refused. */}}
 {{define "notes"}}<!doctype html>
 <html lang="en">
 {{template "head" .}}
@@ -10,7 +11,13 @@ since. */}}
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Notes</h1>
-<p class="note">What the agents (and you) keep in the workspace's <code>notes/</code>, shared by every worktree.</p>
+<p class="note">The workspace's <code>notes/</code>, which every agent of every worktree reads. Agents can't write them: they suggest notes, and you accept or reject each.</p>
+<h2>Suggested{{if .Inbox}} <span class="chip yellow">{{len .Inbox}}</span>{{end}}</h2>
+<ul class="lib-list">
+{{range .Inbox}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?w={{.Worktree}}&amp;s={{.Name}}"><span class="mono">{{.Name}}</span> <span class="muted">{{.Worktree}} · {{.Size}} B{{if .Replaces}} · replaces a note{{end}}</span></a></li>
+{{else}}<li class="muted">No suggestions.</li>
+{{end}}</ul>
+<h2>Notes</h2>
 <ul class="lib-list">
 {{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="mono">{{.Name}}</span> <span class="muted">{{.Size}} B · {{.Modified}}</span></a></li>
 {{else}}<li class="muted">No notes.</li>
@@ -29,8 +36,18 @@ since. */}}
 <div id="note-err" class="red" hidden></div>
 <div class="btns"><a class="ln dim" href="{{$.URL}}">Close</a>{{if not $.New}}<button type="button" class="ln danger" data-note-rm>Delete</button>{{end}}<button class="ln main">Save</button></div>
 </form>
-{{else}}{{if not .Error}}<p class="note">Open a note on the left, or start a new one.</p>
-{{end}}{{end}}</section>
+{{else}}{{with .Sugg}}<form method="post" action="{{$.InboxPost}}" class="editor" autocomplete="off">
+<h2 class="mono ed-file">{{.Name}} <span class="chip">suggested by {{.Worktree}}</span></h2>
+<div class="lbl">{{if .Note}}New text{{else}}Text{{end}}</div>
+<pre class="out readme">{{.Text}}</pre>
+{{with .Note}}<div class="lbl">It replaces the current note</div>
+<pre class="out readme">{{.Text}}</pre>
+{{end}}<input type="hidden" name="hash" value="{{.Hash}}">
+<label class="lbl">Save as <input name="as" value="{{.Name}}" class="mono" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,99}\.md"></label>
+<div class="btns"><a class="ln dim" href="{{$.URL}}">Close</a><button class="ln danger" name="op" value="reject" formnovalidate>Reject</button><button class="ln main" name="op" value="accept">Accept</button></div>
+</form>
+{{else}}{{if not .Error}}<p class="note">Open a note or a suggestion on the left, or start a new note.</p>
+{{end}}{{end}}{{end}}</section>
 </main>
 {{template "common-dialogs" .}}
 </body>

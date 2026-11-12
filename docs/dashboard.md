@@ -1194,6 +1194,15 @@ in it. **Delete** asks first, then runs `notes rm <name> --if-hash
 and opens an empty editor (`?new=<name>`) whose Save creates it
 (`--if-hash ""`, refused when the name exists).
 
+Agents can't write the notes (D199); they suggest them. **Suggested**
+above the notes lists every worktree's suggestions (`notes inbox ls`),
+with a count and whether each replaces a note. Opening one (`?w=<slug>&s=<name>`,
+`notes inbox show`) shows its text, read-only, and the note it would
+replace. **Accept** posts `op=accept`, the hash it was shown at and a
+**Save as** name to `/p/<prefix>/notes/inbox/<slug>/<name>`, which runs
+`notes inbox accept`: an agent's edit since is refused. **Reject** runs
+`notes inbox reject`.
+
 ## Virtual Office
 
 `Office` in the header opens `/p/<prefix>/virtual-office`, which

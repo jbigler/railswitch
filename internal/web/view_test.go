@@ -446,7 +446,7 @@ func TestDetailActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`, `action="/p/ftest/feat-login/restart/agent-svc" data-post data-confirm="Restart agent-svc? Its session ends`, `<form method="post" action="/p/ftest/feat-login/logs/deps" data-post><button title="Print the journal of deps in Jobs">Logs</button></form>`} {
+	for _, want := range []string{`<a href="http://logs.localhost/show?name=ftest-feat-login-web" target="_blank" rel="noopener"`, `<form method="post" action="/p/ftest/feat-login/restart/web" data-post>`, `action="/p/ftest/feat-login/restart/agent-svc" data-post data-confirm="Restart agent-svc? Its session ends`, `<form method="post" action="/p/ftest/feat-login/logs/deps" data-post data-show-job><button title="Print the journal of deps in Jobs">Logs</button></form>`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("detail lacks %q", want)
 		}

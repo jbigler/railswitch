@@ -145,6 +145,7 @@ function afterSwap(id) {
     filterList();
     termsShown();
   } else if (id === "jobs") {
+    showJob();
     [...watched.keys()].forEach(jobEnded);
   } else if (id === "detail") {
     const slug = $("#detail").dataset.slug || "";
@@ -222,6 +223,7 @@ function pageURL(slug) {
 function select(slug, push) {
   $$("#list tr[data-slug]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.slug === slug));
   body.dataset.sel = slug;
+  hideToast(); // a "Running" toast is about the worktree left: its job is not in the next list
   // A click opens the detail (a narrow window shows one pane); ↑↓ doesn't.
   if (push) body.dataset.pane = "detail";
   // ↑↓ on the list keeps its URL, so Back returns to the list, not a detail.
@@ -369,7 +371,8 @@ async function post(f, data, url = f.action) {
   });
   if (r.ok) {
     const j = await r.json().catch(() => ({}));
-    toast(j.label ? "Started: " + j.label : "Done", false);
+    if (j.id) followJob(j, f.hasAttribute("data-show-job"));
+    else toast(j.label ? "Started: " + j.label : "Done", false);
     if (f.hasAttribute("data-close")) {
       const d = f.closest("dialog");
       if (d) d.close();
@@ -380,18 +383,41 @@ async function post(f, data, url = f.action) {
   }
 }
 
+// followJob says a started job is running until the jobs list shows it
+// ended (a click on the toast hides it sooner), and with show scrolls to
+// the job when it appears and when it ends: its output is what was asked for.
+function followJob(j, show) {
+  toast("Running: " + j.label + ". You can keep working; its output is under Jobs.", false, true);
+  if (show) reveal = j.id;
+  watched.set(j.id, (state) => {
+    toast(j.label + ": " + state, state !== "ok");
+    if (show) document.getElementById("job-" + j.id)?.scrollIntoView({ block: "start" });
+  });
+  showJob();
+  jobEnded(j.id); // it may have ended before this answer came
+}
+
+// showJob scrolls to the job followJob asked to show, once it is listed.
+let reveal = null;
+function showJob() {
+  const el = reveal && document.getElementById("job-" + reveal);
+  if (!el) return;
+  reveal = null;
+  el.scrollIntoView({ block: "start" });
+}
+
 // The toast is a popover: shown again each time, it goes on top of the
 // top layer, above a modal dialog that is open (an error a dialog's form
 // caused would otherwise sit behind it).
 let toastTimer = null;
-function toast(text, err) {
+function toast(text, err, stay) {
   const t = $("#toast");
   t.textContent = text;
   t.classList.toggle("err", !!err);
   hideToast();
   t.showPopover();
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(hideToast, err ? 8000 : 3000);
+  if (!stay) toastTimer = setTimeout(hideToast, err ? 8000 : 3000);
 }
 
 function hideToast() {
@@ -1348,6 +1374,17 @@ function jobNext(f) {
       return f.dataset.next;
   }
   return "";
+}
+
+// Tidy's candidates come after the page: the read behind them is slow.
+if (view === "tidy") {
+  const el = $("#tidy-body[data-src]");
+  fetch(el.dataset.src, { credentials: "same-origin" })
+    .then(async (r) => {
+      if (r.ok) swap("tidy-body", await r.text());
+      else el.textContent = "The candidates could not be read: " + (await r.text()).trim();
+    })
+    .catch(() => (el.textContent = "The candidates could not be read: the dashboard did not answer. Reload to try again."));
 }
 
 if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr" || view === "tidy") {

@@ -22,7 +22,18 @@ func TestTidyPage(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	body := w.Body.String()
-	contains(t, "tidy", body, `data-view="tidy"`, `action="/p/ftest/tidy"`, "gh: not logged in",
+	// The page shows before the slow read: it names where its candidates are.
+	contains(t, "tidy", body, `data-view="tidy"`, `id="tidy-body" data-src="/p/ftest/tidy/items"`)
+	noCSPViolation(t, "tidy", body)
+	if n := f.cli.count("--json -C /ws/ftest tidy"); n != 0 {
+		t.Errorf("the page read tidy %d times before it showed", n)
+	}
+	w = f.do(req("GET", "/p/ftest/tidy/items", nil))
+	if w.Code != 200 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	body = w.Body.String()
+	contains(t, "tidy items", body, `<div id="tidy-body">`, `action="/p/ftest/tidy"`, "gh: not logged in",
 		`name="id" value="wt:ftest/b" checked`, "PR #7 merged", "1.0 kB",
 		`name="dirty" value="wt:ftest/c" aria-label`, `name="id" value="wt:ftest/d" aria-label`, "stopped over 14 days", "idle since 2026-01-06 (last commit)", "≥ 0 B", ">dirty<",
 		`name="id" value="image:localhost/ftest/base:3.3-deadbeef" checked`, "no stack uses it", "3.0 kB")

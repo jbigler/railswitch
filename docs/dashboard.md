@@ -252,7 +252,7 @@ still wider than the window scrolls its pane.
     restarts it alone; a service agent's asks first, as its session ends
     with it; deps, a oneshot that logs to its unit's journal and so never
     to Dozzle, has `Logs` in every state, which starts a job running
-    `railswitch logs deps` and shows the journal in Jobs (D186); while it runs, a small bar of its memory against its limit,
+    `railswitch logs deps`, shows the journal in Jobs (D186) and scrolls to it, when the job appears and when it ends (D211); while it runs, a small bar of its memory against its limit,
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
     tooltip, D161.
   - **Links** (Overview only; full width, under Services): the links,
@@ -561,6 +561,10 @@ no stack uses (what `gc` would remove), with why and its size, and the
 total. A worktree's size is its checkout's (a walk that stops after
 200,000 entries shows "≥"); an image's is podman's, shared layers
 included.
+
+The page shows at once, with "Working out what could go…", and fetches
+the list (`/p/<prefix>/tidy/items`) behind it (D211): the read asks for PR
+states and sizes every image, which can take many seconds.
 
 - A clean worktree whose PR is merged or closed, and an unused image,
   start ticked; a worktree that is only idle (the idle time can come from
@@ -1185,6 +1189,12 @@ Every action is a job (below).
   job you watched run keeps its output open after it ends, and one you
   open or close stays so. Other pages show
   every job's output open: there it is the result.
+- A button that starts a job on the worktree page (start, stop, restart,
+  a task, Logs…) shows "Running: <job>. You can keep working; its output
+  is under Jobs." at the bottom right, until the jobs list shows the job
+  ended; then "<job>: ok" (or failed, cancelled) replaces it (D211). A
+  click hides it, and so does choosing another worktree, whose jobs list
+  doesn't hold the job.
 - States: running, ok, failed (with the exit code), cancelled.
 - The hub keeps the last 5000 lines and 4 MiB per job (lines cut at 64 KiB,
   ANSI escapes stripped); the page shows the last 500 with "… N earlier

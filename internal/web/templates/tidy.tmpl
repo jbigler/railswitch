@@ -7,6 +7,17 @@
 <section class="left set-left">
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Tidy</h1>
+<div id="tidy-body" data-src="{{.URL}}/items"><p class="muted"><span class="spin" aria-hidden="true"></span> Working out what could go: reading worktrees, PR states and image sizes…</p></div>
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}
+{{define "tidy-body"}}<div id="tidy-body">
 <p class="note">What could go: worktrees whose PR is merged or closed, or whose stack has been stopped over {{.Days}} days, and images no stack uses. Each is checked again when it is removed. Only a clean worktree whose PR is done, and an unused image, start ticked; one that is only idle, or dirty (uncommitted changes), you tick yourself.</p>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{if .Warnings}}<div class="warnings">{{range .Warnings}}<p class="yellow">{{.}}</p>
@@ -26,12 +37,4 @@
 {{end}}</form>
 <p class="note">A worktree goes as <code>wt rm</code> removes it (its containers, volumes and checkout; the branch stays in git); an image as <code>podman rmi &lt;name&gt;</code>.</p>
 </section>
-</section>
-<section class="pane">
-{{template "jobs" .Jobs}}
-</section>
-</main>
-{{template "common-dialogs" .}}
-</body>
-</html>
-{{end}}
+</div>{{end}}

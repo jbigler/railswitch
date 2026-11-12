@@ -3,7 +3,15 @@
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown } from "../static/logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab } from "../static/logic.js";
+
+test("settingsTab: the hash wins, then the kept tab, then the first", () => {
+  const tabs = ["stack", "firewall", "commands", "tasks"];
+  assert.equal(settingsTab("tasks", "firewall", tabs), "tasks");
+  assert.equal(settingsTab("agent-setup", "", tabs), "commands", "a card's old id");
+  assert.equal(settingsTab("template", "firewall", tabs), "firewall", "a hash that is no tab");
+  assert.equal(settingsTab("", "gone", tabs), "stack");
+});
 
 test("fuzzy matches letters in order, spaces ignored", () => {
   assert.ok(fuzzy("pgset", "page settings") > 0);

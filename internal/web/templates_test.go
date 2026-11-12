@@ -88,7 +88,7 @@ func TestTemplatesTab(t *testing.T) {
 func TestSaveAsTemplateJob(t *testing.T) {
 	f := settingsFixture(t)
 	body := f.do(req("GET", "/p/ftest/settings", nil)).Body.String()
-	contains(t, "settings", body, "<h2>Save as template</h2>",
+	contains(t, "settings", body, `<summary class="ln dim">Save as template</summary>`,
 		`action="/p/ftest/settings/template/export" class="add-row" data-job="template-export"`, `name="version" type="number" min="1"`)
 	if strings.Contains(body, `id="template"`) {
 		t.Error("a template notice without a template")

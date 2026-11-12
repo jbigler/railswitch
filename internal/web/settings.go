@@ -99,7 +99,8 @@ type firewallView struct {
 	// OptedOut: the project has agents but its mode lets the app out.
 	OptedOut   bool
 	Modes      []fwModeView
-	Profiles   []fwProfileView
+	Profiles   []fwProfileView // the allow lists, for the add row's choice
+	Hosts      []fwHostView    // every list's hosts, in one table
 	BlockedURL string
 }
 
@@ -134,24 +135,31 @@ type fwModeView struct {
 
 type fwProfileView struct {
 	Name, Note string
-	Hosts      []string
+}
+
+// fwHostView is one allowed host and the list it is in.
+type fwHostView struct {
+	Host, Prof, Note string
 }
 
 // fwProfileNotes say whom each allow list lets out.
 var fwProfileNotes = map[string]string{
-	"app":   "the app and its workers: the hosts your app itself calls (APIs, mail relays)",
-	"deps":  "dependency installs, beyond the pack's registries; nvim too",
-	"agent": "every agent, beyond its package's own list; nvim too",
+	"app":   "the app and its workers",
+	"deps":  "dependency installs, nvim",
+	"agent": "every agent, nvim",
 }
 
 func newFirewallView(f firewallShow, blockedURL string) firewallView {
 	v := firewallView{Mode: f.Mode, Default: f.Default, Effective: f.Effective, BlockedURL: blockedURL,
 		OptedOut: f.Default == "enforce" && f.Effective != "enforce"}
-	for _, m := range []struct{ value, label string }{{"", "Default"}, {"enforce", "Enforce"}, {"log", "Log only"}, {"off", "Off"}} {
+	for _, m := range []struct{ value, label string }{{"", "Default (" + f.Default + ")"}, {"enforce", "Enforce"}, {"log", "Log only"}, {"off", "Off"}} {
 		v.Modes = append(v.Modes, fwModeView{Value: m.value, Label: m.label, Current: m.value == f.Mode})
 	}
 	for _, prof := range []string{"app", "deps", "agent"} {
-		v.Profiles = append(v.Profiles, fwProfileView{Name: prof, Note: fwProfileNotes[prof], Hosts: f.Allow[prof]})
+		v.Profiles = append(v.Profiles, fwProfileView{Name: prof, Note: fwProfileNotes[prof]})
+		for _, h := range f.Allow[prof] {
+			v.Hosts = append(v.Hosts, fwHostView{Host: h, Prof: prof, Note: fwProfileNotes[prof]})
+		}
 	}
 	return v
 }
@@ -159,6 +167,7 @@ func newFirewallView(f firewallShow, blockedURL string) firewallView {
 type optionView struct {
 	Key, Ref string
 	Slot     bool
+	Unused   bool // a slot at "none": shown dimmed, after the ones in use
 	Choices  []choiceView
 }
 
@@ -383,7 +392,7 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 		v.Pack = &pv
 	}
 	for _, o := range show.Options {
-		ov := optionView{Key: o.Key, Ref: o.Ref, Slot: o.Slot}
+		ov := optionView{Key: o.Key, Ref: o.Ref, Slot: o.Slot, Unused: o.Ref == "none"}
 		for _, c := range o.Choices {
 			ov.Choices = append(ov.Choices, choiceView{Ref: c, Current: c == o.Ref})
 		}

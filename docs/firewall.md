@@ -185,7 +185,7 @@ agent's own firewall is only as strong as the app's.
   not ranges. A hostname is allowed by its addresses only (DNS filter,
   above). A container started before D179 has no set for timed
   allows: restart it first.
-- Settings, Firewall card (docs/dashboard.md): the mode, each list, and
+- Settings, Firewall tab (docs/dashboard.md): the mode, each list, and
   "Blocked, or would be under enforce" with, per resolved host, "Add to
   <list> list" (staged and applied like any other Settings edit:
   `firewall.mode`, `firewall.allow.add`, `firewall.allow.remove`,
@@ -209,7 +209,7 @@ agent's own firewall is only as strong as the app's.
   containers and nvim the next time each container starts (`up` restarts
   them: their units changed). Its `app` list starts empty, so anything the
   app calls out to is blocked until you allow it. Before the restart,
-  `railswitch fw show` (or the Firewall card) lists what log mode
+  `railswitch fw show` (or the Firewall tab) lists what log mode
   recorded; allow those hosts first, or set `mode = "log"` to keep the old
   behaviour (the card then warns that the app is a way out).
 - Found on the first host run: Node's corepack downloaded Yarn from

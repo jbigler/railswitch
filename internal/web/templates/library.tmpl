@@ -8,7 +8,7 @@
 <div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
 <h1>Library</h1>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
-{{end}}<nav class="tabs stabs" aria-label="Library sections"><button type="button" data-stab="packages">Packages</button><button type="button" data-stab="templates">Templates</button><button type="button" data-stab="libraries">Libraries</button>{{if not .Error}}<button type="button" data-stab="add">Add</button>{{end}}</nav>
+{{end}}{{template "tabs" .Tabs}}
 <section class="spanel" data-spanel="packages">
 <p class="note">Built-in and library packages are read-only; this workspace's own are <code>local:</code>. Pick one to see its files.</p>
 {{range .Groups}}<h3>{{.Title}}</h3>
@@ -140,7 +140,7 @@ signer, and Add library. */}}
 <dl class="kv">
 <dt>Repository</dt><dd class="mono">{{.URL}}{{if .Branch}} · {{.Branch}}{{end}}</dd>
 {{if .ID}}<dt>Library</dt><dd class="mono">{{.ID}}</dd>
-{{end}}<dt>Fetched</dt><dd>{{if .Fetched}}{{.Fetched}} · serial {{.Serial}}{{if .Commit}} · <span class="mono">{{.Commit}}</span>{{end}} · {{.Packages}} {{if eq .Packages 1}}package{{else}}packages{{end}}{{else}}never{{end}}</dd>
+{{end}}<dt>Fetched</dt><dd>{{if .Fetched}}{{when .Fetched}} · serial {{.Serial}}{{if .Commit}} · <span class="mono">{{.Commit}}</span>{{end}} · {{.Packages}} {{if eq .Packages 1}}package{{else}}packages{{end}}{{else}}never{{end}}</dd>
 </dl>
 {{with .Pending}}<div class="lib-trust{{if .Known}} danger{{end}}">
 {{if .Rotation}}<b>Confirm rotation</b>

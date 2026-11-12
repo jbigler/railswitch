@@ -51,7 +51,7 @@ func TestLibrariesSection(t *testing.T) {
 		`<section class="spanel" data-spanel="libraries" id="libraries">`, `<h2>Libraries</h2>`,
 		`<h3><span class="mono">acme</span> <span class="chip green">trusted</span></h3>`,
 		`<dd class="mono">https://github.com/acme/lib · main</dd>`, `<dd class="mono">github.com/acme/lib</dd>`,
-		`2026-10-29T09:00:00Z · serial 4 · <span class="mono">0123456789ab</span> · 2 packages`,
+		shortTime("2026-10-29T09:00:00Z")+` · serial 4 · <span class="mono">0123456789ab</span> · 2 packages`,
 		`action="/machine/libraries/fetch"`, `<input type="hidden" name="alias" value="acme">`,
 		// beta: Trust this key, with the fingerprint to check
 		`<h3><span class="mono">beta</span> <span class="chip yellow">unknown-signer</span></h3>`,

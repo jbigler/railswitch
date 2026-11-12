@@ -156,7 +156,7 @@ func TestDetailFragment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(html, `<a class="pr-line green" href="https://github.com/o/r/pull/2141"`) {
+	if !strings.Contains(html, `<a class="pill pr-line green" href="https://github.com/o/r/pull/2141"`) {
 		t.Errorf("the header's PR line is no link:\n%s", html)
 	}
 	// The links are the Links card's.
@@ -166,14 +166,14 @@ func TestDetailFragment(t *testing.T) {
 	}
 	si := li + strings.Index(html[li:], "</section>")
 	links := anchorRe.FindAllStringSubmatch(html[li:si], -1)
-	if len(links) == 0 || links[0][2] != "App" || !strings.Contains(" "+links[0][1]+" ", " main ") {
-		t.Errorf("first link %q, want App with class main:\n%s", links, html)
+	if len(links) == 0 || links[0][2] != "App" {
+		t.Errorf("first link %q, want App:\n%s", links, html)
 	}
 	var labels []string
 	for _, l := range links {
 		labels = append(labels, l[2])
-		if strings.Contains(" "+l[1]+" ", " dim ") {
-			t.Errorf("running stack: link %s has class dim", l[2])
+		if l[1] != "ln" { // D208: one style
+			t.Errorf("link %s has class %q, want ln", l[2], l[1])
 		}
 	}
 	if want := []string{"App", "Flipper", "Evil", "Browser (VNC)", "PR", "Logs"}; !slices.Equal(labels, want) {
@@ -191,15 +191,9 @@ func TestDetailFragment(t *testing.T) {
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("stopped", false, nil), ""))
-	li = strings.Index(html, ">Links<")
-	si = li + strings.Index(html[li:], "</section>")
-	for _, l := range anchorRe.FindAllStringSubmatch(html[li:si], -1) {
-		if l[2] == "Logs" {
-			continue
-		}
-		if !strings.Contains(" "+l[1]+" ", " dim ") {
-			t.Errorf("stopped stack: link %s class %q lacks dim", l[2], l[1])
-		}
+	// D208: a stopped stack has nothing to open, and its services fold.
+	if strings.Contains(html, ">Links<") || !strings.Contains(html, `<details class="svc-fold" data-keep="services"><summary>`) {
+		t.Errorf("stopped stack: a Links card, or the services not folded:\n%s", html)
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("up", true, nil), ""))
@@ -459,8 +453,8 @@ func TestDetailActions(t *testing.T) {
 	}
 }
 
-// TestReviewAppLink: a PR with a review app links it next to PR, never
-// greyed (the PR's CI deployed it, not this stack).
+// TestReviewAppLink: a PR with a review app links it next to PR, on a
+// stopped stack too (the PR's CI deployed it, not this stack).
 func TestReviewAppLink(t *testing.T) {
 	p := &pr{Number: 7, URL: "https://github.com/o/r/pull/7", State: "open", ReviewApp: "https://app-pr-7.example.dev"}
 	d := newDetail("ftest", fixtureRow("stopped", false, p), "")

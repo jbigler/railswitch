@@ -75,6 +75,7 @@ func TestActions(t *testing.T) {
 		{"snapshot named", "/p/ftest/b/snapshots/take", form("name", "pre"), 202, append(slices.Clone(wsb), "db", "snapshot", "pre"), ""},
 		{"snapshot flag", "/p/ftest/b/snapshots/take", form("name", "--yes"), 422, nil, "bad snapshot"},
 		{"snapshot restore", "/p/ftest/b/snapshots/restore", form("name", "before-migrate"), 202, append(slices.Clone(wsb), "db", "snapshot", "restore", "--yes", "before-migrate"), ""},
+		{"db dump", "/p/ftest/b/snapshots/dump", form(), 202, append(slices.Clone(wsb), "db", "dump"), ""},
 		{"snapshot rm", "/p/ftest/b/snapshots/rm", form("name", "before-migrate"), 202, append(slices.Clone(wsb), "db", "snapshot", "rm", "before-migrate"), ""},
 		{"snapshot restore unknown", "/p/ftest/b/snapshots/restore", form("name", "nope"), 404, nil, "unknown snapshot"},
 		{"snapshot other verb", "/p/ftest/b/snapshots/ls", form(), 404, nil, ""},

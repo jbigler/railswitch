@@ -144,7 +144,7 @@ func TestNoteTitle(t *testing.T) {
 	if got := noteTitle(noteFileName("Agent queue design")); got != "Agent queue design" {
 		t.Errorf("a title does not come back: %q", got)
 	}
-	if got := noteWhen("soon"); got != "soon" {
-		t.Errorf("noteWhen of no time = %q", got)
+	if got := shortTime("soon"); got != "soon" {
+		t.Errorf("shortTime of no time = %q", got)
 	}
 }

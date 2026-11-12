@@ -254,11 +254,13 @@ still wider than the window scrolls its pane.
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
     tooltip, D161.
   - **Links** (Overview only; full width, under Services): the links,
-    App first and filled, then the project's and the stack's, all greyed
-    while the stack is stopped; then PR, **Review app** when `pr ls`
-    finds one (the PR's GitHub deployment) and Logs, quieter.
-  - **Pull request** (Overview only; with a PR or a gh stack; full
-    width, under Links): **PR page** and, without a stack, the PR line.
+    all in one style (D208): App first, then the project's and the
+    stack's, then PR, **Review app** when `pr ls` finds one (the PR's
+    GitHub deployment) and Logs. A stopped stack keeps only PR and
+    Review app, and has no card with neither. Its services fold into
+    one line, "9 services, stopped", that opens the list.
+  - **Stack** (Overview only; with a gh stack; full width, under
+    Links): **PR page**; the worktree's own PR is the pill in the head.
     When its branch is in a gh stack (`stack ls`, read with the PRs),
     the stack, in gh stack view's words: `◆ Stack #10350` (linked to the
     stack on GitHub) · `Base: master` · `22 branches (8 merged)`, and
@@ -308,7 +310,12 @@ still wider than the window scrolls its pane.
     table, the bars and the share.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
-  - **Database:** **Snapshots…** (D157).
+  - **Database** (its own tab, D208): **Snapshots…** (D157), and
+    **Use this worktree's data**, which after a confirm runs `railswitch
+    db dump` as a job: it writes the worktree's databases and storage to
+    the workspace's `db-dumps/`, which a new worktree starts from.
+  - Tests and Database show on their own tabs, not on Overview: the
+    head's pills carry the test result and the PR there.
   - Agent, Tests and Database come last, side by side: each has its own
     tab too.
   - **Jobs** (full width, below the cards; left out of Overview while

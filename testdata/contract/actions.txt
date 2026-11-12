@@ -9,6 +9,7 @@
 ["-C","/ws/ftest","-w","b","agent","queue","rm","3"]
 ["-C","/ws/ftest","-w","b","agent","setup","--again","claude"]
 ["-C","/ws/ftest","-w","b","agent","stop","claude"]
+["-C","/ws/ftest","-w","b","db","dump"]
 ["-C","/ws/ftest","-w","b","db","snapshot","pre"]
 ["-C","/ws/ftest","-w","b","db","snapshot","restore","--yes","before-migrate"]
 ["-C","/ws/ftest","-w","b","db","snapshot","rm","before-migrate"]

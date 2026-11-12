@@ -1,6 +1,9 @@
 {{/* The detail's Database area (D157): opens the snapshots dialog. */}}
 {{define "detail-database"}}{{if .SnapshotsURL}}<section class="dcard" data-panel="database"><h2 class="lbl">Database</h2>
-<div class="actions"><a class="ln" href="{{.SnapshotsURL}}" data-dialog="snapshots">Snapshots…</a></div>
+<table class="set-table db-rows"><tbody>
+<tr><td><b>Snapshots</b><div class="muted">Named copies of this worktree's databases and storage, to restore here later.</div></td><td class="act"><a class="ln" href="{{.SnapshotsURL}}" data-dialog="snapshots">Snapshots…</a></td></tr>
+<tr><td><b>Starting data</b><div class="muted">A new worktree starts from the workspace's <code>db-dumps/</code>. This writes this worktree's databases and storage there.</div></td><td class="act"><form method="post" action="{{.SnapshotsURL}}/dump" data-post data-confirm="Use {{.Slug}}'s data as the starting data of new worktrees? It replaces the dumps in db-dumps/; the database must be running."><button class="ln">Use this worktree's data</button></form></td></tr>
+</tbody></table>
 </section>
 {{end}}{{end}}
 

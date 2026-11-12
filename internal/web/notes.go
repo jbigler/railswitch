@@ -69,7 +69,7 @@ type noteRow struct {
 
 // Title and When are how the lists show a row.
 func (n noteRow) Title() string  { return noteTitle(n.Name) }
-func (n noteRow) When() string   { return noteWhen(n.Modified) }
+func (n noteRow) When() string   { return shortTime(n.Modified) }
 func (n inboxRow) Title() string { return noteTitle(n.Name) }
 
 var noteWord = regexp.MustCompile(`([a-z0-9])([A-Z])|([A-Z])([A-Z][a-z])|[-_]+`)
@@ -112,8 +112,8 @@ func noteFileName(title string) string {
 	return strings.TrimRight(name[:min(len(name), 100)], "_") + ".md"
 }
 
-// noteWhen is an RFC 3339 time to the minute, or s as it is.
-func noteWhen(s string) string {
+// shortTime is an RFC 3339 time to the minute, or s as it is.
+func shortTime(s string) string {
 	t, err := time.Parse(time.RFC3339, s)
 	if err != nil {
 		return s

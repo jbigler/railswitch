@@ -403,6 +403,13 @@ body:not([data-tab=agent]) .wt .usage-card{display:none}
 /* Settings: Staged changes and Apply stay in view while the left column
    scrolls (wide windows; a narrow one stacks the columns). */
 @media (min-width:801px){.grid.settings>.pane{position:sticky;top:var(--hd-h,0px);align-self:start;max-height:calc(100vh - var(--hd-h,0px));overflow-y:auto}}
+/* The worktree page (D209): the list stays under the header and scrolls on
+   its own; the page scrolls the worktree shown. The line between them is
+   the pane's, as tall as the page. */
+@media (min-width:801px){
+.grid.wt>.left{position:sticky;top:var(--hd-h,0px);align-self:start;max-height:calc(100vh - var(--hd-h,0px));overflow-y:auto;border-right:0}
+.grid.wt>.pane{border-left:1px solid var(--border)}
+}
 
 /* Narrow windows (docs/dashboard.md): one column; the project page shows
    the list or a worktree's detail, as data-pane says. */

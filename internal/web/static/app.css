@@ -462,7 +462,31 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .tabs button:hover{color:var(--text);background:var(--sel)}
 .tabs button[aria-pressed=true]{color:var(--text);background:var(--bg);border-color:var(--border);box-shadow:inset 0 3px 0 var(--accent)}
 .dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:14px;padding:16px 20px 0;align-items:start}
-.wt .dcard .services{grid-template-columns:repeat(auto-fill,minmax(min(19rem,100%),1fr))}
+.wt .dcard .services{grid-template-columns:repeat(auto-fill,minmax(min(max(19rem,30%),100%),1fr))} /* three columns at most */
+.svc.idle .name,.svc.idle .st{opacity:.6}
+.stack-rows{width:auto;max-width:100%;margin:4px 0}
+.stack-rows td{padding:3px 14px 3px 6px;vertical-align:baseline}
+.stack-rows td:is(.pn,.chk,.st,.rv){white-space:nowrap}
+.stack-rows td.chk{padding-right:6px;text-align:center}
+.stack-rows td.bn{overflow-wrap:anywhere}
+.stack-rows tr:nth-child(even) td{background:color-mix(in srgb,var(--bg2) 60%,var(--card))}
+.stack-rows tr.head td{background:var(--sel)}
+.stack-merged{margin:4px 0 0 6px}
+.stack-merged ol{list-style:none;margin:2px 0 0 1.2em;padding:0}
+.agents td{vertical-align:middle;padding-top:6px;padding-bottom:6px}
+.agents td.ag-name{white-space:nowrap;width:1%;padding-right:20px}
+.agents .agent-dot{display:inline-block;vertical-align:-1px;margin-right:8px}
+.agents tr.on .agent-dot{background:var(--green);border-color:var(--green)}
+.agents tr.on td{background:color-mix(in srgb,var(--green) 9%,var(--card))}
+.ag-acts{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px}
+.ag-acts .ln{margin:0}
+.ag-acts form{display:inline}
+.ag-note{padding:6px 0 0}
+.ag-end{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 18px;margin-top:8px}
+.ag-end .queue{margin:0}
+.ag-end>.quiet-link{color:var(--muted);text-decoration:none}
+.ag-end>.quiet-link:hover{color:var(--blue);text-decoration:underline}
+.t-detail{font-size:13px;margin-top:2px}
 .wt .dcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card);min-width:0} /* --card: white-ish on light, a step up on dark */
 .wt .dcard.wide{grid-column:1/-1}
 .wt .dcard>.lbl{margin:0 0 8px}

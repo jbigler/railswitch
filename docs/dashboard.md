@@ -1091,8 +1091,8 @@ Every action is a job (below).
 ## Jobs
 
 - A job is a child `railswitch -C <workspace> [-w <slug>] <args>` in a
-  `systemd-run --user --scope`, so restarting the dashboard doesn't kill a
-  running `up`. It gets the session's display, SSH agent and terminal
+  `systemd-run --user --scope` named `railswitch-job-<id>.scope`, so
+  restarting the dashboard doesn't kill a running `up`. It gets the session's display, SSH agent and terminal
   variables from `systemctl --user show-environment`, plus `NO_COLOR=1`,
   which keeps its log plain. A job that opens a terminal window (terminal,
   nvim, agent, a task in a window) gets no `NO_COLOR`: the window's
@@ -1118,7 +1118,10 @@ Every action is a job (below).
   `~/.local/share/railswitch/dashboard/jobs/<id>.log` (0600), truncated past
   8 MiB with "… output dropped".
 - The last 20 jobs are kept; older finished ones and their logs are
-  dropped. Logs from a previous dashboard run are deleted at start.
+  dropped. Logs from a previous dashboard run are deleted at start, except
+  a log whose job is still running (its scope, by exact name, is active,
+  D200): the new dashboard keeps capping it as it does its own jobs,
+  without showing it, and deletes it when the job ends.
 
 Messages (job started, a refusal) show bottom right for a few seconds,
 above an open dialog too.

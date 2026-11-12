@@ -11,8 +11,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,7 +32,18 @@ const (
 )
 
 // scope wraps every job, so a dashboard restart doesn't kill it.
-var scope = []string{"systemd-run", "--user", "--scope", "--collect", "--quiet", "--"}
+var scope = []string{"systemd-run", "--user", "--scope", "--collect", "--quiet"}
+
+// jobUnit is the scope unit of job id: New finds a job a previous
+// dashboard left running by this exact name.
+func jobUnit(id string) string { return "railswitch-job-" + id + ".scope" }
+
+// jobID is a job's ID as Start makes it; a log named otherwise is no job's.
+var jobID = regexp.MustCompile(`^[0-9]{8}-[0-9]{6}-[0-9]+$`)
+
+// unitCheckEvery is how often an orphan's tail asks whether its job still
+// runs (a var: tests shorten it).
+var unitCheckEvery = 5 * time.Second
 
 // publishEvery is the shortest gap between two output events of a job.
 const publishEvery = 100 * time.Millisecond
@@ -119,12 +132,56 @@ func New(r sys.Runner, logDir string, env func(context.Context) []string) (*Hub,
 	if err != nil {
 		return nil, fmt.Errorf("jobs: %w", err)
 	}
+	h := &Hub{r: r, dir: logDir, env: env, subs: map[*subscriber]struct{}{}}
 	for _, p := range old {
+		// A job a previous dashboard left running still writes its log:
+		// removed, it would grow unseen and uncapped (#30). Keep capping it
+		// until the job ends.
+		if id := strings.TrimSuffix(filepath.Base(p), ".log"); jobID.MatchString(id) && h.unitActive(jobUnit(id)) {
+			if t, err := openLog(p); err == nil {
+				go h.drain(p, jobUnit(id), t, unitCheckEvery)
+				continue
+			}
+		}
 		if err := os.Remove(p); err != nil {
 			return nil, fmt.Errorf("jobs: %w", err)
 		}
 	}
-	return &Hub{r: r, dir: logDir, env: env, subs: map[*subscriber]struct{}{}}, nil
+	return h, nil
+}
+
+// unitActive reports whether systemd user unit unit is active.
+func (h *Hub) unitActive(unit string) bool {
+	_, err := h.r.Run(context.Background(), sys.Cmd{Name: "systemctl", Args: []string{"--user", "is-active", "--quiet", unit}})
+	return err == nil
+}
+
+// drain caps the log of an orphaned job, unit, as follow does a job's,
+// discarding its lines, and removes it once the job has ended. If the log
+// can't be read, the job is stopped: unread, it would grow without bound.
+func (h *Hub) drain(path, unit string, t *logTail, every time.Duration) {
+	defer func() {
+		t.Close()
+		_ = os.Remove(path)
+	}()
+	tick := time.NewTicker(pollEvery)
+	defer tick.Stop()
+	check := time.NewTicker(every)
+	defer check.Stop()
+	for {
+		if _, _, _, err := t.poll(); err != nil {
+			_, _ = h.r.Run(context.Background(), sys.Cmd{Name: "systemctl", Args: []string{"--user", "stop", unit}})
+			return
+		}
+		select {
+		case <-t.wake:
+		case <-tick.C:
+		case <-check.C:
+			if !h.unitActive(unit) {
+				return
+			}
+		}
+	}
 }
 
 // Start runs s as a new job. It fails with ErrBusy while a job of the same
@@ -258,7 +315,7 @@ func (h *Hub) run(ctx context.Context, j *job, t *logTail, env []string) {
 	}
 	res, err := h.r.Run(ctx, sys.Cmd{
 		Name:      scope[0],
-		Args:      append(slices.Clone(scope[1:]), s.Argv...),
+		Args:      slices.Concat(scope[1:], []string{"--unit=" + jobUnit(j.snap.ID), "--"}, s.Argv),
 		Dir:       s.Dir,
 		Env:       env,
 		Stdin:     in,

@@ -1218,7 +1218,10 @@ above an open dialog too.
   are no desktop notifications without one.
 - Polling: `railswitch --json overview` every 2 s for a project with a page open,
   every 10 s for the others (so their waiting agents reach the strip);
-  `railswitch --json pr ls` every 60 s for a project with a page open;
+  `railswitch --json pr ls` every 60 s for a project with a page open,
+  and at once when an overview shows a worktree on another branch than
+  the one before (D210: a `git switch` in a terminal; the stack shows the
+  new branch as current meanwhile);
   `railswitch --json stats` of the selected worktree every 10 s, by the
   page itself (`GET /p/<prefix>/<slug>/stats`) and only while its tab is
   visible: one `podman stats` per looking tab, not per worktree.

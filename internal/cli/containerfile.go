@@ -606,7 +606,7 @@ func containerfileEject(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	return e.commitRepair(ctx, root, changes)
+	return e.writeThenRender(ctx, root, changes)
 }
 
 // renderLocked renders a locked project after a Containerfile change, as
@@ -672,5 +672,5 @@ USER appuser
 	if err != nil {
 		return e.fail(err)
 	}
-	return e.commitRepair(ctx, root, changes)
+	return e.writeThenRender(ctx, root, changes)
 }

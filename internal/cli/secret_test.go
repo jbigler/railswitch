@@ -446,7 +446,7 @@ func TestSecretSetDriverMoveCreateFails(t *testing.T) {
 	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("file\n")}, nil)
 	f.On([]string{"podman", "secret", "create"}, sys.Result{ExitCode: 125}, fmt.Errorf("podman: %w (exit 125): pass: no key", sys.ErrExit))
 	code, _, errs := runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token")
-	if code == 0 || !strings.Contains(errs, "filial_github_token is now unset") || !strings.Contains(errs, "railswitch secret set github_token") {
+	if code == 0 || !strings.Contains(errs, "filial_github_token is now unset") || !strings.Contains(errs, "run the command again") {
 		t.Fatalf("exit %d, stderr %q", code, errs)
 	}
 }

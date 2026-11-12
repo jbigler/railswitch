@@ -490,10 +490,7 @@ during the build, outside the firewall.
   opens its editor.
 - **New addon:** a name (lower-case letters, digits and `-`) runs
   `railswitch containerfile new <name>` as a project-level job; when it
-  ends ok the editor opens on the new file. In a project that rendered
-  before, a new addon or a reset that does not render fails and leaves
-  the files as they were; in one that did not render yet, the file is
-  written and the job warns.
+  ends ok the editor opens on the new file.
 
 **Editor** (`/p/<prefix>/images/edit/<name>`): the file from `railswitch
 --json containerfile show <name>` in a text area. "Load from file…" reads

@@ -327,8 +327,10 @@ func (e *env) commitThen(ctx context.Context, root string, changes []fileChange,
 			return err
 		}
 		wrote = append(wrote, lines...)
-		if w, err = workspace.Load(ctx, root, ""); err != nil {
-			return err
+		if len(more) > 0 { // the render sees the new files
+			if w, err = workspace.Load(ctx, root, ""); err != nil {
+				return err
+			}
 		}
 	}
 	d, err := e.render(ctx, w, false)
@@ -373,20 +375,13 @@ func rollback(err error, undo []func() error) error {
 	return err
 }
 
-// commitRepair is commit for a change that may be what makes the project
-// render (containerfile eject and new: a missing Containerfile, no
-// stack.lock yet). A project that rendered before the change gets commit,
-// so a change that breaks it is put back. One that did not is written and
-// rendered if it can be: a failed render there is a warning.
-func (e *env) commitRepair(ctx context.Context, root string, changes []fileChange) int {
-	if w, err := workspace.Load(ctx, root, ""); err == nil {
-		if _, err := w.Render(ctx, e.run, true); err == nil {
-			if err := e.commit(ctx, root, changes, nil); err != nil {
-				return e.fail(err)
-			}
-			return 0
-		}
-	}
+// writeThenRender writes changes, all or none, then renders a locked
+// project (renderLocked: a render that can't run is a warning). It is
+// commit without the lock and without putting the files back when the
+// render fails, for containerfile eject and new: they are how a project
+// that does not render yet (no stack.lock, a missing Containerfile) is
+// repaired, and what they write is a built-in default or a skeleton.
+func (e *env) writeThenRender(ctx context.Context, root string, changes []fileChange) int {
 	var undo []func() error
 	wrote, err := writeChanges(root, changes, &undo)
 	if err != nil {

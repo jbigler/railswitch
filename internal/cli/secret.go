@@ -124,7 +124,7 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 	// can be run again.
 	err = e.commitThen(ctx, w.Root, changes, nil, func(*workspace.Workspace) ([]fileChange, error) {
 		if e.storeSecret(ctx, w, m, name, sec, value, false) != 0 {
-			return nil, errors.New("secret add: the value was not stored, so project.toml is as it was")
+			return nil, errors.New("secret add failed, so project.toml is as it was: run secret add again")
 		}
 		return nil, nil
 	})
@@ -296,7 +296,7 @@ func (e *env) storeSecret(ctx context.Context, w *workspace.Workspace, m *render
 	}
 	if err := p.SecretCreate(ctx, pname, bytes.NewReader(value), replace, d); err != nil {
 		if removed != "" {
-			return e.fail(fmt.Errorf("secret %s: %w\npodman secret %s is now unset: its %s copy was removed; fix the %s driver and run railswitch secret set %s", name, err, pname, removed, configuredDriver(cfg), name))
+			return e.fail(fmt.Errorf("secret %s: %w\npodman secret %s is now unset: its %s copy was removed; fix the %s driver and run the command again", name, err, pname, removed, configuredDriver(cfg)))
 		}
 		return e.fail(fmt.Errorf("secret %s: %w", name, err))
 	}

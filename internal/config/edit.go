@@ -31,11 +31,6 @@ func SetImageBaseText(path, data, value string) (string, error) {
 	})
 }
 
-// SetImageBase is SetImageBaseText on the file at path.
-func SetImageBase(path, value string) error {
-	return editFile(path, func(data string) (string, error) { return SetImageBaseText(path, data, value) })
-}
-
 // AppendImageAddonText appends value to [image] addons, adding [image] and/or
 // addons as needed and keeping the order of the existing entries. An entry
 // already listed is an error.

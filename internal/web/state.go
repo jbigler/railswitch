@@ -387,6 +387,25 @@ func (s *Server) storeOverview(prefix string, ov overview, err error) []jobs.Spe
 		}
 		kinds[wt.Slug] = k
 	}
+	// A checkout made outside the dashboard (git switch in a terminal, #191):
+	// the PR and stack shown are the branch before's until they are read
+	// again, which is every prEvery. Read them now, and meanwhile show the
+	// stack at the new branch, as a switch made here does.
+	if p.ov != nil {
+		was := map[string]string{}
+		for _, wt := range p.ov.Worktrees {
+			was[wt.Slug] = wt.Branch
+		}
+		for _, wt := range ov.Worktrees {
+			if b, ok := was[wt.Slug]; ok && b != wt.Branch {
+				p.switched(wt.Slug, wt.Branch)
+				p.prNow = true
+			}
+		}
+		if p.prNow {
+			wake(s.wakePR)
+		}
+	}
 	p.kinds, p.known, p.ov = kinds, true, &ov
 	for sub := range s.subs {
 		for _, n := range notes {

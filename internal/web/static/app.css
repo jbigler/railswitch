@@ -177,6 +177,14 @@ a.pal-task{color:var(--text);text-decoration:none}
 .chain td.file,.chain td:nth-child(-n+2){white-space:nowrap}
 .chain .tag-cell .muted{font-size:12px}
 @media (max-width:1300px){.chain :is(th,td):nth-child(2):not([colspan]){display:none}}
+@media (max-width:700px){
+.chain thead{display:none}
+.chain tr{display:grid;grid-template-columns:1fr auto;align-items:center;border-bottom:1px solid var(--border)}
+.chain tbody td{border:0;padding-top:3px;padding-bottom:3px;background:none}
+.chain tbody tr:nth-child(even){background:color-mix(in srgb,var(--bg2) 60%,var(--bg))}
+.chain td.file,.chain td.tag-cell{grid-column:1/-1}
+.chain td.act{grid-row:1;grid-column:2}
+}
 .chain+h3+.note{padding:0}
 .chain~.add-row{max-width:26rem}
 .ed-file{overflow-wrap:anywhere}

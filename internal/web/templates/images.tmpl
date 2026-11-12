@@ -14,10 +14,10 @@
 {{end}}</div>
 {{end}}<section class="spanel">
 <table class="set-table chain">
-<thead><tr><th>Step</th><th>Kind</th><th>File</th><th>From</th><th>Tag</th><th></th></tr></thead>
+<thead><tr><th>Step</th><th>Kind</th><th>File</th><th>Image</th><th></th></tr></thead>
 <tbody>
-{{range .Steps}}<tr><td>{{.Name}}</td><td class="muted">{{.Kind}}</td><td class="mono file">{{.File}}{{if .DefaultChanged}} <a class="chip yellow" href="{{.EditURL}}" title="The default this file was ejected from changed since. Compare or reset in the editor.">Default changed</a>{{end}}</td><td class="mono tag-cell">{{.From}}</td><td class="mono tag-cell">{{.Tag}}</td><td class="act">{{if .EditURL}}<a class="ln" href="{{.EditURL}}">Edit</a>{{end}}</td></tr>
-{{else}}<tr><td colspan="6" class="muted">No images.</td></tr>
+{{range .Steps}}<tr><td>{{.Name}}</td><td class="muted">{{.Kind}}</td><td class="mono file">{{.File}}{{if .DefaultChanged}} <a class="chip yellow" href="{{.EditURL}}" title="The default this file was ejected from changed since. Compare or reset in the editor.">Default changed</a>{{end}}</td><td class="mono tag-cell">{{.Tag}}{{if .From}}<div class="muted">from {{.From}}</div>{{end}}</td><td class="act">{{if .EditURL}}<a class="ln" href="{{.EditURL}}">Edit</a>{{end}}</td></tr>
+{{else}}<tr><td colspan="5" class="muted">No images.</td></tr>
 {{end}}</tbody>
 </table>
 <h3>New addon</h3>

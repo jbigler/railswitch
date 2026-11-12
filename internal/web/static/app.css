@@ -175,6 +175,8 @@ a.pal-task{color:var(--text);text-decoration:none}
 .wt-pick{max-width:26rem;margin:8px 0}
 .tag-cell{overflow-wrap:anywhere}
 .chain td.file,.chain td:nth-child(-n+2){white-space:nowrap}
+.chain .tag-cell .muted{font-size:12px}
+@media (max-width:1300px){.chain :is(th,td):nth-child(2):not([colspan]){display:none}}
 .chain+h3+.note{padding:0}
 .chain~.add-row{max-width:26rem}
 .ed-file{overflow-wrap:anywhere}

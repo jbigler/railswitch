@@ -505,7 +505,8 @@ during the build, outside the firewall.
 - The project's warnings from `railswitch --json -w <slug> containerfile
   list`, then the **build chain** in build order: step, kind (`base`,
   `addon`, `agent-base`, `agent`, or `image` for a tool or an option's
-  image), file, `FROM` images and tag, and Edit. A file whose default changed since it was
+  image; left out on a narrow window), file, the image's tag with its
+  `FROM` images under it, and Edit. A file whose default changed since it was
   ejected (`default_changed`) carries a **default changed** badge that
   opens its editor.
 - **New addon:** a name (lower-case letters, digits and `-`) runs

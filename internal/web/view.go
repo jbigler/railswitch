@@ -20,7 +20,7 @@ import (
 //go:embed templates/*.tmpl
 var templateFiles embed.FS
 
-var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"cap": capFirst}).ParseFS(templateFiles, "templates/*.tmpl"))
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"cap": capFirst, "noteTitle": noteTitle}).ParseFS(templateFiles, "templates/*.tmpl"))
 
 // capFirst is s with its first letter upper case: a button's label from a
 // word that is also a command or job label ("start", "shell").

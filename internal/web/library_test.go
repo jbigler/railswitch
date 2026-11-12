@@ -66,7 +66,7 @@ func TestLibraryPage(t *testing.T) {
 	}
 	body := w.Body.String()
 	contains(t, "library", body,
-		`data-view="library"`, "<h2>Packs</h2>", "<h2>Options</h2>", "<h2>Agents</h2>",
+		`data-view="library"`, "<h3>Packs</h3>", "<h3>Options</h3>", "<h3>Agents</h3>",
 		`href="/p/ftest/library?ref=local%3Akv2%401"`, `href="/p/ftest/library?ref=bot%401"`,
 		`action="/p/ftest/library/new"`, `<option value="web@1">web@1</option>`, `<option value="kv@1">kv@1</option>`,
 		`<option value="database">database</option>`,
@@ -74,7 +74,7 @@ func TestLibraryPage(t *testing.T) {
 	for ref, used := range map[string]bool{"web@1": true, "kv@1": true, "bot@1": true, "local:kv2@1": false, "pg@1": false, "local:clj@1": false} {
 		row := section(body, `data-ref="`+ref+`"`)
 		row = row[:strings.Index(row, "</li>")]
-		if got := strings.Contains(row, "used by this project"); got != used {
+		if got := strings.Contains(row, ">in use<"); got != used {
 			t.Errorf("%s: used mark %t, want %t: %s", ref, got, used, row)
 		}
 	}

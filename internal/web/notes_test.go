@@ -81,3 +81,22 @@ func TestNotesPage(t *testing.T) {
 		}
 	}
 }
+
+func TestNoteTitle(t *testing.T) {
+	for name, want := range map[string]string{
+		"agentQueueDesign.md": "Agent Queue Design",
+		"HTTPServerNotes.md":  "HTTP Server Notes",
+		"aBC.md":              "A BC",
+		"db-restore_steps.md": "Db restore steps",
+		"plan2Rollout.md":     "Plan2 Rollout",
+		"a.md":                "A",
+		".md":                 ".md",
+	} {
+		if got := noteTitle(name); got != want {
+			t.Errorf("noteTitle(%q) = %q, want %q", name, got, want)
+		}
+	}
+	if got := noteWhen("soon"); got != "soon" {
+		t.Errorf("noteWhen of no time = %q", got)
+	}
+}

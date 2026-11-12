@@ -73,11 +73,11 @@ export function termShown(panel, slug, tab) {
   return slug !== "" && panel.slug === slug && (!panel.agent || tab === "agent");
 }
 
-// settingsTab (D201) is the Settings tab to show: the one the address's
+// settingsTab (D201) is the tab a tabbed page (Settings, Library) shows: the one the address's
 // #hash names (a card's old id counts), else the one kept for the session,
 // else the first.
 export function settingsTab(hash, kept, tabs) {
-  const alias = { hooks: "commands", "agent-setup": "commands" };
+  const alias = { hooks: "commands", "agent-setup": "commands", import: "add" };
   for (const t of [alias[hash] || hash, kept]) {
     if (tabs.includes(t)) return t;
   }

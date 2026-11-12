@@ -566,12 +566,19 @@ included.
 
 ## Library
 
-`/p/<prefix>/library` (`Library` in the header) lists the packages from
+`/p/<prefix>/library` (`Library` in the header) is four tabs, like
+Settings (D206): **Packages**, **Templates**, **Libraries** and **Add**
+(New pack, New option, Import a package). The tab stays for the browser
+tab's session; `#templates`, `#libraries` and `#import` in the address
+open theirs. A picked package or template shows in the right pane, which
+is narrow while it holds only jobs.
+
+Packages lists those of
 `railswitch --json pack ls`: Packs, Options (with their slot) and Agents,
 each `built in`, `local` (the workspace's `packs/<name>/` and
 `options/<name>/`) or `library <alias>` (a library package,
 `<alias>:<name>@N`; from `pack ls`'s `library`, else the ref's prefix).
-"used by this project" marks the refs the project's stack uses
+"in use" marks the refs the project's stack uses
 (`used` of `railswitch --json project show`). A library package is
 read-only like a built-in (View; a write is refused, 422), can't be the
 start of a New pack or New option, and its page says which library it
@@ -1208,7 +1215,9 @@ working blue, your turn yellow, idle and off muted.
 
 `/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
 notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
-first, and opens one in an editor (`?n=<name>`, `notes show`). **Save**
+first, and opens one. A note shows as a title made of its file name's words
+(`agentQueueDesign.md` is "Agent Queue Design": agents name notes in camel
+case), with the file name beside it and when it last changed. It opens one in an editor (`?n=<name>`, `notes show`). **Save**
 posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
 handler the office's Notes kiosk uses, which runs `notes write <name>
 --if-hash <hash>` with the text on stdin: a note changed since you opened

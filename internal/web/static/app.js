@@ -749,19 +749,24 @@ function startSettings() {
   } catch {
     staged = [];
   }
-  let kept = "";
-  try {
-    kept = sessionStorage.getItem(stabStore) || "";
-  } catch {}
-  showStab(settingsTab(location.hash.slice(1), kept, $$("[data-stab]").map((b) => b.dataset.stab)));
+  startStabs();
   syncLeft();
   if (staged.length) preview();
   loadBlocked();
 }
 
-// showStab shows one Settings section, as the worktree's tabs do, and
+// startStabs opens a tabbed page (Settings, Library) on its tab.
+function startStabs() {
+  let kept = "";
+  try {
+    kept = sessionStorage.getItem(stabStore) || "";
+  } catch {}
+  showStab(settingsTab(location.hash.slice(1), kept, $$("[data-stab]").map((b) => b.dataset.stab)));
+}
+
+// showStab shows one section of the page, as the worktree's tabs do, and
 // keeps it for the browser tab's session.
-const stabStore = "rs-stab-" + prefix;
+const stabStore = "rs-stab-" + view + "-" + prefix;
 function showStab(tab) {
   try {
     sessionStorage.setItem(stabStore, tab);
@@ -769,6 +774,11 @@ function showStab(tab) {
   $$("[data-stab]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.stab === tab)));
   $$("[data-spanel]").forEach((p) => (p.hidden = p.dataset.spanel !== tab));
 }
+
+document.addEventListener("click", (e) => {
+  const stab = e.target.closest("[data-stab]");
+  if (stab) showStab(stab.dataset.stab);
+});
 
 // loadBlocked swaps in the Firewall card's "Would be blocked", which the
 // server reads after the page: it inspects every container.
@@ -1023,8 +1033,6 @@ function addReady(f) {
 if (view.startsWith("settings")) {
   document.addEventListener("click", (e) => {
     const t = e.target;
-    const stab = t.closest("[data-stab]");
-    if (stab) return showStab(stab.dataset.stab);
     const secretSet = t.closest("[data-secret-set]");
     if (secretSet) {
       const f = $("form.secret-set");
@@ -1648,6 +1656,7 @@ function startNotes() {
   if (view) {
     afterSwap("header");
     if (view === "settings") startSettings();
+    if (view === "library") startStabs();
     if (view === "editor") startEditor();
     if (view === "notes") startNotes();
     connect();

@@ -49,12 +49,13 @@ func (s *Server) snapshotsDialog(w http.ResponseWriter, r *http.Request) {
 }
 
 // snapshotAction runs `db snapshot [<name>]`, `db snapshot restore --yes
-// <name>` (the page asked first) or `db snapshot rm <name>` as a job. A
+// <name>` (the page asked first), `db snapshot rm <name>` or, for dump,
+// `db dump` (the starting data of new worktrees, D208) as a job. A
 // name to restore or delete must be one ls lists; a new one is checked by
 // the CLI.
 func (s *Server) snapshotAction(w http.ResponseWriter, r *http.Request) {
 	verb := r.PathValue("verb")
-	if verb != "take" && verb != "restore" && verb != "rm" {
+	if verb != "take" && verb != "restore" && verb != "rm" && verb != "dump" {
 		http.Error(w, "unknown action", http.StatusNotFound)
 		return
 	}
@@ -66,6 +67,8 @@ func (s *Server) snapshotAction(w http.ResponseWriter, r *http.Request) {
 	argv := []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "db", "snapshot"}
 	label := "snapshot"
 	switch {
+	case verb == "dump":
+		argv, label = []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "db", "dump"}, "db dump"
 	case verb == "take" && name == "":
 	case verb == "take":
 		if badName(name) {

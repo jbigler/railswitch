@@ -20,7 +20,7 @@ import (
 //go:embed templates/*.tmpl
 var templateFiles embed.FS
 
-var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"cap": capFirst, "noteTitle": noteTitle}).ParseFS(templateFiles, "templates/*.tmpl"))
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{"cap": capFirst, "noteTitle": noteTitle, "when": shortTime}).ParseFS(templateFiles, "templates/*.tmpl"))
 
 // capFirst is s with its first letter upper case: a button's label from a
 // word that is also a command or job label ("start", "shell").
@@ -719,6 +719,7 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 
 type detailView struct {
 	Empty                             bool
+	Stopped                           bool // the stack is stopped: no Links card, the services folded
 	Slug, Branch                      string
 	PR                                *prView
 	StackGlyph, StackText, StackClass string
@@ -751,6 +752,29 @@ type detailView struct {
 
 type linkView struct{ Label, URL, Class string }
 
+// tabsView is a page's tab bar (the "tabs" template): Stab for a page
+// whose script is showStab (Settings, Library), else the worktree's tabs.
+type tabsView struct {
+	Label string
+	Stab  bool
+	Tabs  []tabView
+}
+
+// tabView is one tab; BadgeID names an empty count the script fills.
+type tabView struct{ Key, Label, BadgeID string }
+
+// Tabs is the worktree's tab bar: Tests and Database when it has them.
+func (v detailView) Tabs() tabsView {
+	t := []tabView{{Key: "overview", Label: "Overview"}, {Key: "agent", Label: "Agent"}}
+	if v.Tests != nil {
+		t = append(t, tabView{Key: "tests", Label: "Tests"})
+	}
+	if v.SnapshotsURL != "" {
+		t = append(t, tabView{Key: "database", Label: "Database"})
+	}
+	return tabsView{Label: "Worktree sections", Tabs: append(t, tabView{Key: "terminals", Label: "Terminals"}, tabView{Key: "jobs", Label: "Jobs"})}
+}
+
 // serviceView is a service row: LogsURL (Dozzle, by container name) while
 // its container runs, RestartURL while a restartable one runs. A oneshot
 // (deps) logs to its unit's journal, which Dozzle never sees: LogsPost, in
@@ -781,33 +805,28 @@ func newDetail(prefix string, r row, repo string) detailView {
 		TasksURL: path + "/tasks", PRPageURL: path + "/pr", AgentDefaultURL: path + "/agent-default", Stale: wt.Stale,
 		Stacked: newStacked(r, repo), Tests: newTests(wt.Tests, r.Now), TaskURL: path + "/task",
 	}
-	dim := ""
-	if wt.Stack == "stopped" {
-		dim = " dim"
-	}
+	v.Stopped = wt.Stack == "stopped"
 	for _, group := range []string{"app", "project", "stack"} {
 		for _, l := range wt.Links {
 			if l.Group != group {
 				continue
 			}
-			class := "ln"
-			if group == "app" {
-				class += " main"
-				if v.AppURL == "" {
-					v.AppURL = l.URL
-				}
+			if group == "app" && v.AppURL == "" {
+				v.AppURL = l.URL
 			}
-			v.Links = append(v.Links, linkView{Label: l.Label, URL: l.URL, Class: class + dim})
+			v.Links = append(v.Links, linkView{Label: l.Label, URL: l.URL, Class: "ln"})
 		}
 	}
 	if v.PR != nil && v.PR.URL != "" {
-		v.Links = append(v.Links, linkView{Label: "PR", URL: v.PR.URL, Class: "ln quiet" + dim})
+		v.Links = append(v.Links, linkView{Label: "PR", URL: v.PR.URL, Class: "ln"})
 	}
 	if r.PR != nil && r.PR.ReviewApp != "" {
-		// Deployed by the PR's own CI, not this stack: never greyed.
-		v.Links = append(v.Links, linkView{Label: "Review app", URL: r.PR.ReviewApp, Class: "ln quiet"})
+		v.Links = append(v.Links, linkView{Label: "Review app", URL: r.PR.ReviewApp, Class: "ln"})
 	}
-	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln quiet"})
+	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln"})
+	if v.Stopped { // only what a stopped stack can still open; with neither, no card (D208)
+		v.Links = slices.DeleteFunc(v.Links, func(l linkView) bool { return l.Label != "PR" && l.Label != "Review app" })
+	}
 	up := 0
 	for _, s := range wt.Services {
 		g, c, word := serviceLook(s.State)

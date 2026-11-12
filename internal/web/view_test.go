@@ -156,7 +156,7 @@ func TestDetailFragment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(html, `<a class="pr-line green" href="https://github.com/o/r/pull/2141"`) {
+	if !strings.Contains(html, `<a class="pill pr-line green" href="https://github.com/o/r/pull/2141"`) {
 		t.Errorf("the header's PR line is no link:\n%s", html)
 	}
 	// The links are the Links card's.
@@ -166,14 +166,14 @@ func TestDetailFragment(t *testing.T) {
 	}
 	si := li + strings.Index(html[li:], "</section>")
 	links := anchorRe.FindAllStringSubmatch(html[li:si], -1)
-	if len(links) == 0 || links[0][2] != "App" || !strings.Contains(" "+links[0][1]+" ", " main ") {
-		t.Errorf("first link %q, want App with class main:\n%s", links, html)
+	if len(links) == 0 || links[0][2] != "App" {
+		t.Errorf("first link %q, want App:\n%s", links, html)
 	}
 	var labels []string
 	for _, l := range links {
 		labels = append(labels, l[2])
-		if strings.Contains(" "+l[1]+" ", " dim ") {
-			t.Errorf("running stack: link %s has class dim", l[2])
+		if l[1] != "ln" { // D208: one style
+			t.Errorf("link %s has class %q, want ln", l[2], l[1])
 		}
 	}
 	if want := []string{"App", "Flipper", "Evil", "Browser (VNC)", "PR", "Logs"}; !slices.Equal(labels, want) {
@@ -191,15 +191,9 @@ func TestDetailFragment(t *testing.T) {
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("stopped", false, nil), ""))
-	li = strings.Index(html, ">Links<")
-	si = li + strings.Index(html[li:], "</section>")
-	for _, l := range anchorRe.FindAllStringSubmatch(html[li:si], -1) {
-		if l[2] == "Logs" {
-			continue
-		}
-		if !strings.Contains(" "+l[1]+" ", " dim ") {
-			t.Errorf("stopped stack: link %s class %q lacks dim", l[2], l[1])
-		}
+	// D208: a stopped stack has nothing to open, and its services fold.
+	if strings.Contains(html, ">Links<") || !strings.Contains(html, `<details class="svc-fold" data-keep="services"><summary>`) {
+		t.Errorf("stopped stack: a Links card, or the services not folded:\n%s", html)
 	}
 
 	html, _ = render("detail", newDetail("ftest", fixtureRow("up", true, nil), ""))
@@ -356,17 +350,18 @@ func TestDetailAgentTerms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// D176: claude runs, so its terminal is in the menu and the card's
-	// banner; omp's is in the menu, and the card switches to it.
+	// D176: claude runs, so its terminal is in the menu and its row of the
+	// card; omp's is in the menu, and its row switches to it.
 	for url, want := range map[string]int{"agent?agent=claude": 2, "agent?agent=omp": 1} {
 		if n := strings.Count(html, `data-term="/p/ftest/tty/feat-login/`+url+`"`); n != want {
 			t.Errorf("%s: %d terminal buttons, want %d", url, n, want)
 		}
 	}
 	for _, want := range []string{
-		`<div class="agent-now on"><span class="agent-dot" aria-hidden="true"></span><div class="agent-what"><b><span class="mono">claude</span> is running</b>`,
+		`<tr class="on"><td class="ag-name"><span class="agent-dot" aria-hidden="true"></span><b class="mono">claude</b></td><td class="ag-state">running`,
+		`<tr><td class="ag-name"><span class="agent-dot" aria-hidden="true"></span><b class="mono">omp</b></td><td class="ag-state"><span class="muted">stopped</span>`,
 		`>Open terminal</button>`,
-		`<button type="button" class="ln" data-switch-url="/p/ftest/feat-login/agent-stop" data-switch-from="claude" data-switch-term="/p/ftest/tty/feat-login/agent?agent=omp" data-switch-to="omp">Switch to omp</button>`,
+		`<button type="button" class="ln" data-switch-url="/p/ftest/feat-login/agent-stop" data-switch-from="claude" data-switch-term="/p/ftest/tty/feat-login/agent?agent=omp" data-switch-to="omp" title="Stop claude and start omp">Switch</button>`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("card lacks %q:\n%s", want, html)
@@ -375,19 +370,19 @@ func TestDetailAgentTerms(t *testing.T) {
 	if !strings.Contains(html, "Agent: claude ● ▣") || !strings.Contains(html, "Agent: omp ▣") {
 		t.Errorf("menu entries don't name the agents or mark the running one:\n%s", html)
 	}
-	// None running: no banner of a running one, a Start per agent, the first the main one.
+	// None running: no row is on, a Start per agent, the first the main one.
 	r.WT.Services[len(r.WT.Services)-2].State = "inactive/dead"
 	idle, err := render("detail", newDetail("ftest", r, ""))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(idle, "<b>No agent running</b>") || !strings.Contains(idle, `class="ln main" data-term="/p/ftest/tty/feat-login/agent?agent=claude"`) ||
-		!strings.Contains(idle, `>Start omp</button>`) || strings.Contains(idle, "Stop claude") || strings.Contains(idle, "Switch to") {
+	if strings.Contains(idle, `<tr class="on">`) || !strings.Contains(idle, `class="ln main" data-term="/p/ftest/tty/feat-login/agent?agent=claude"`) ||
+		!strings.Contains(idle, `title="Start omp">Start</button>`) || strings.Contains(idle, "Stop claude") || strings.Contains(idle, ">Switch<") {
 		t.Errorf("idle card wrong:\n%s", idle)
 	}
 	// D176: the running agent has a Stop; the stopped one doesn't.
 	if !strings.Contains(html, `<form method="post" action="/p/ftest/feat-login/agent-stop" data-post data-confirm="Stop claude?`) ||
-		!strings.Contains(html, `<input type="hidden" name="agent" value="claude"><button class="ln danger">Stop claude</button>`) || strings.Contains(html, "Stop omp") {
+		!strings.Contains(html, `<input type="hidden" name="agent" value="claude"><button class="ln danger" title="Stop claude">Stop</button>`) || strings.Contains(html, "Stop omp") {
 		t.Errorf("Stop buttons wrong:\n%s", html)
 	}
 	// D188: every agent can have its setup run again, after a confirm.
@@ -458,8 +453,8 @@ func TestDetailActions(t *testing.T) {
 	}
 }
 
-// TestReviewAppLink: a PR with a review app links it next to PR, never
-// greyed (the PR's CI deployed it, not this stack).
+// TestReviewAppLink: a PR with a review app links it next to PR, on a
+// stopped stack too (the PR's CI deployed it, not this stack).
 func TestReviewAppLink(t *testing.T) {
 	p := &pr{Number: 7, URL: "https://github.com/o/r/pull/7", State: "open", ReviewApp: "https://app-pr-7.example.dev"}
 	d := newDetail("ftest", fixtureRow("stopped", false, p), "")

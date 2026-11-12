@@ -41,6 +41,15 @@ const packAck = "I've read this file. A package's RUN lines run on this machine 
 // manifests is each package kind's manifest, which can't be deleted.
 var manifests = map[string]string{"pack": "pack.toml", "option": "option.toml", "agent": "agent.toml"}
 
+// Tabs is the Library page's tab bar; no Add when the catalog didn't load.
+func (v libraryView) Tabs() tabsView {
+	t := []tabView{{Key: "packages", Label: "Packages"}, {Key: "templates", Label: "Templates"}, {Key: "libraries", Label: "Libraries"}}
+	if v.Error == "" {
+		t = append(t, tabView{Key: "add", Label: "Add"})
+	}
+	return tabsView{Label: "Library sections", Stab: true, Tabs: t}
+}
+
 type libraryView struct {
 	Title, Prefix string
 	Header        headerView

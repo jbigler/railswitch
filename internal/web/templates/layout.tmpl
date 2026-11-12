@@ -68,3 +68,6 @@ Strip, Banner and Projects. */}}
 </body>
 </html>
 {{end}}
+
+{{/* tabs is a page's tab bar (Settings, Library, the worktree): a tabsView. */}}
+{{define "tabs"}}<nav class="tabs{{if .Stab}} stabs{{end}}" aria-label="{{.Label}}">{{range .Tabs}}<button type="button" {{if $.Stab}}data-stab{{else}}data-tab{{end}}="{{.Key}}">{{.Label}}{{with .BadgeID}} <span class="badge" id="{{.}}" hidden></span>{{end}}</button>{{end}}</nav>{{end}}

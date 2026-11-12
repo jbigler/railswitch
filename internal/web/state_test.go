@@ -369,7 +369,7 @@ func TestGhStack(t *testing.T) {
 	}
 	for _, want := range []string{
 		`◆ <a href="https://github.com/o/r/stack/10350" target="_blank" rel="noopener">Stack #10350</a> · Base: <span class="mono">main</span> · 3 branches (1 merged)`,
-		"⚠ restack needed", "◀ HEAD", `#2141</a> <span class="green">✓</span> <span class="green">ready</span> · <span class="blue">approved</span>`,
+		"⚠ restack needed", "◀ HEAD", `#2141</a></td><td class="chk"><span class="green" title="checks">✓</span></td><td class="st"><span class="green">ready</span></td><td class="rv"><span class="blue">approved</span></td>`,
 		`href="https://github.com/o/r/pull/2141"`, `href="https://github.com/o/r/pull/2140"`,
 		"✓ 1 merged", "no PR",
 	} {

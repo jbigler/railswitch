@@ -19,7 +19,7 @@
 {{if .Error}}<p class="red set-error">project.toml: {{.Error}}</p>
 {{else}}{{with .Project}}<p class="set-proj"><b>{{.Name}}</b> · <span class="mono">{{.Repo}}</span> · base <span class="mono">{{.BaseBranch}}</span> · prefix <span class="mono">{{.Prefix}}</span></p>
 {{end}}<p class="note">Changes are staged, not applied. The panel on the right shows what each one does before anything happens.</p>
-{{template "settings-template" .Template}}<nav class="tabs stabs" aria-label="Settings sections"><button type="button" data-stab="stack">Stack</button><button type="button" data-stab="firewall">Firewall <span class="badge" id="fw-count" hidden></span></button><button type="button" data-stab="commands">Commands</button><button type="button" data-stab="env">Environment</button><button type="button" data-stab="links">Links</button><button type="button" data-stab="tasks">Tasks</button><button type="button" data-stab="secrets">Secrets</button></nav>
+{{template "settings-template" .Template}}{{template "tabs" .Tabs}}
 
 <section class="spanel" data-spanel="stack">
 <h2>Stack and options</h2>

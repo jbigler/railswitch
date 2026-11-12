@@ -255,39 +255,41 @@ still wider than the window scrolls its pane.
     amber from 80 %, red from 95 %, with memory, CPU and PIDs in its
     tooltip, D161.
   - **Links** (Overview only; full width, under Services): the links,
-    App first and filled, then the project's and the stack's, all greyed
-    while the stack is stopped; then PR, **Review app** when `pr ls`
-    finds one (the PR's GitHub deployment) and Logs, quieter.
-  - **Pull request** (Overview only; with a PR or a gh stack; full
-    width, under Links): the PR line and
-    **PR page**. Then, when its branch is in a gh stack (`stack
-    ls`, read with the PRs), Stack, in gh stack view's words: `◆ Stack
-    #10350` (linked to the stack on GitHub) · `Base: master` · `22
-    branches (8 merged)`, and `⚠ restack needed` when a branch needs a
-    rebase; the open branches top first, each with its PR (number
-    linked, checks glyph, `draft`/`ready`, review such as `approved`),
-    the branch, `◀ HEAD` on the current one, `queued`, `⚠`; the merged
-    ones folded, the trunk last. Every other open branch's name checks
-    it out here (see Actions).
-  - **Agent** (D176), the running agent first: one agent runs per
-    worktree (D62). With one running, a green box says "`<name>` is
-    running" with its state (Idle, Working, Waiting for reply…),
-    **Open terminal** (its terminal panel on the Agent tab, below, as the
-    Terminal menu's `Agent: <name>` does) and **Stop <name>** (after a
-    confirm, `railswitch agent stop <name>` as a job, the name checked
-    against the worktree's `agent ls`); its message under it; then
-    "Other agents:" each stopped one with **Switch to <name>**, which
+    all in one style (D208): App first, then the project's and the
+    stack's, then PR, **Review app** when `pr ls` finds one (the PR's
+    GitHub deployment) and Logs. A stopped stack keeps only PR and
+    Review app, and has no card with neither. Its services fold into
+    one line, "9 services, stopped", that opens the list.
+  - **Stack** (Overview only; with a gh stack; full width, under
+    Links): **PR page**; the worktree's own PR is the pill in the head.
+    When its branch is in a gh stack (`stack ls`, read with the PRs),
+    the stack, in gh stack view's words: `◆ Stack #10350` (linked to the
+    stack on GitHub) · `Base: master` · `22 branches (8 merged)`, and
+    `⚠ restack needed` when a branch needs a rebase; then a table (D207)
+    of the open branches top first, a row each: the PR's number
+    (linked), its checks glyph, `draft`/`ready`, its review such as
+    `approved`, and the branch, with `◀ HEAD` on the current one (its
+    row shaded: it is the worktree's PR line), `queued` and `⚠ restack`.
+    The merged ones are folded under the table. Every other open
+    branch's name checks it out here (see Actions).
+  - **Agent** (D176; full width): one agent runs per worktree (D62).
+    A row per configured agent (D207): its name, `running` with its
+    state (idle, working, waiting for reply…) or `stopped`, and its
+    buttons. The running one, its row green, has **Open terminal** (its
+    terminal panel on the Agent tab, below, as the Terminal menu's
+    `Agent: <name>` does) and **Stop** (after a confirm, `railswitch
+    agent stop <name>` as a job, the name checked against the worktree's
+    `agent ls`). A stopped one has **Switch** while another runs, which
     after a confirm stops the running agent and, when that job ends
-    well, opens the other's terminal, which starts it. With none running,
-    "No agent running" and a **Start <name>** per configured agent (the
-    first one filled), each opening its terminal. Agents are the
-    services `agent-<name>`, on demand or not; with none listed, the
-    agent the overview names, else the default. Under the box,
-    "Setup:" and **Run <name>'s setup again** per agent (D188): after a
-    confirm, `railswitch agent setup --again <name>` as a job, the name
-    checked against `agent ls`; its setup commands run at the agent's
-    next start (an agent with none reports so). Then the queue, and
-    the **Default config…** link beside the card's label. Above it, on
+    well, opens this one's terminal, which starts it; with none running
+    it has **Start** (the first one filled), which opens its terminal.
+    Agents are the services `agent-<name>`, on demand or not; with none
+    listed, the agent the overview names, else the default. Each row's
+    `⋯` holds **Run setup again** (D188): after a confirm, `railswitch
+    agent setup --again <name>` as a job, the name checked against
+    `agent ls`; its setup commands run at the agent's next start (an
+    agent with none reports so). The running agent's message is under
+    the table, then the queue and the **Default config…** link. Above it, on
     the Agent tab only, **Usage · this worktree** (D187) with the same
     7 / 14 / 30 switch as the project chart: a table, rows Today and
     `<N> days`, columns New (input and cache writes), Output, Cache
@@ -309,7 +311,12 @@ still wider than the window scrolls its pane.
     table, the bars and the share.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
-  - **Database:** **Snapshots…** (D157).
+  - **Database** (its own tab, D208): **Snapshots…** (D157), and
+    **Use this worktree's data**, which after a confirm runs `railswitch
+    db dump` as a job: it writes the worktree's databases and storage to
+    the workspace's `db-dumps/`, which a new worktree starts from.
+  - Tests and Database show on their own tabs, not on Overview: the
+    head's pills carry the test result and the PR there.
   - Agent, Tests and Database come last, side by side: each has its own
     tab too.
   - **Jobs** (full width, below the cards; left out of Overview while
@@ -1037,7 +1044,7 @@ Every action is a job (below).
 - **start, restart, stop** run `railswitch up|restart|stop` in the
   worktree, as the stack's state allows: a stopped stack offers start; a
   running one restart and stop; a partial or failed one all three.
-- **Default config…** (next to the detail's Agent label) opens a dialog
+- **Default config…** (under the detail's agents) opens a dialog
   that reads `agent ls` for the worktree: per agent with `[config]
   paths`, where its default came from, **Make <worktree>'s <agent> config
   the default** (`agent default promote <agent> [--all]`, the box "and

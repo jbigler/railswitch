@@ -1216,7 +1216,7 @@ working blue, your turn yellow, idle and off muted.
 `/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
 notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
 first, and opens one. A note shows as a title made of its file name's words
-(`agentQueueDesign.md` is "Agent Queue Design": agents name notes in camel
+(`agentQueueDesign.md` is "Agent queue design": agents name notes in camel
 case), with the file name beside it and when it last changed. It opens one in an editor (`?n=<name>`, `notes show`). **Save**
 posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
 handler the office's Notes kiosk uses, which runs `notes write <name>

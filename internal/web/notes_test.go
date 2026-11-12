@@ -84,11 +84,11 @@ func TestNotesPage(t *testing.T) {
 
 func TestNoteTitle(t *testing.T) {
 	for name, want := range map[string]string{
-		"agentQueueDesign.md": "Agent Queue Design",
-		"HTTPServerNotes.md":  "HTTP Server Notes",
+		"agentQueueDesign.md": "Agent queue design",
+		"HTTPServerNotes.md":  "HTTP server notes",
 		"aBC.md":              "A BC",
 		"db-restore_steps.md": "Db restore steps",
-		"plan2Rollout.md":     "Plan2 Rollout",
+		"plan2Rollout.md":     "Plan2 rollout",
 		"a.md":                "A",
 		".md":                 ".md",
 	} {

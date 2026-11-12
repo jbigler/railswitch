@@ -75,18 +75,25 @@ func (n inboxRow) Title() string { return noteTitle(n.Name) }
 var noteWord = regexp.MustCompile(`([a-z0-9])([A-Z])|([A-Z])([A-Z][a-z])|[-_]+`)
 
 // noteTitle is a note's file name as words: agents name notes in camel
-// case ("agentQueueDesign.md" is "Agent Queue Design"), which reads badly
-// in a list. The page shows the file name beside it.
+// case ("agentQueueDesign.md" is "Agent queue design"), which reads badly
+// in a list. Only the first word gets a capital; a word all in capitals
+// ("HTTP") keeps them. The page shows the file name beside it.
 func noteTitle(name string) string {
 	t := strings.TrimSuffix(name, ".md")
 	// twice: a match takes the letter the next one would start at ("aBC").
 	for range 2 {
 		t = noteWord.ReplaceAllString(t, "$1$3 $2$4")
 	}
-	t = strings.Join(strings.Fields(t), " ")
-	if t == "" {
+	words := strings.Fields(t)
+	if len(words) == 0 {
 		return name
 	}
+	for i, w := range words {
+		if i > 0 && (len(w) == 1 || w != strings.ToUpper(w)) {
+			words[i] = strings.ToLower(w[:1]) + w[1:]
+		}
+	}
+	t = strings.Join(words, " ")
 	return strings.ToUpper(t[:1]) + t[1:]
 }
 

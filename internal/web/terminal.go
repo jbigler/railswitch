@@ -8,6 +8,7 @@ package web
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -231,6 +232,7 @@ func (m *ttyModes) set() []byte {
 // ttySession is one terminal: the program on its pseudo-terminal, the end
 // of its output, and the connection showing it, if any.
 type ttySession struct {
+	id                 string // names it in the dashboard's list
 	key                string // its command: one terminal per command
 	prefix, slug, kind string
 	label, url         string // the panel's name, and the path that opens it (no size)
@@ -395,7 +397,7 @@ func (s *Server) ttySession(r *http.Request, argv []string, label string, rows, 
 		return t, false, nil
 	}
 	if s.ttyOpen() >= ttyMax {
-		return nil, false, &ttyRefusal{4029, strconv.Itoa(ttyMax) + " terminals are open: close one"}
+		return nil, false, &ttyRefusal{4029, strconv.Itoa(ttyMax) + " terminals are running: end one from ▣ in the header"}
 	}
 	master, slave, err := pty.Open()
 	if err != nil {
@@ -418,8 +420,9 @@ func (s *Server) ttySession(r *http.Request, argv []string, label string, rows, 
 	if bg := r.URL.Query().Get("bg"); r.PathValue("kind") == "nvim" && (bg == "light" || bg == "dark") {
 		env = append(env, "NVIM_BACKGROUND="+bg)
 	}
+	s.ttySeq++
 	t = &ttySession{
-		key: key, prefix: r.PathValue("prefix"), slug: r.PathValue("slug"), kind: r.PathValue("kind"),
+		id: strconv.Itoa(s.ttySeq), key: key, prefix: r.PathValue("prefix"), slug: r.PathValue("slug"), kind: r.PathValue("kind"),
 		label: label, url: ttyURL(r), master: master, end: end,
 	}
 	if s.ttys == nil {
@@ -469,6 +472,7 @@ func (s *Server) ttySession(r *http.Request, argv []string, label string, rows, 
 			s.ttyPrune()
 		}
 		s.ttyMu.Unlock()
+		s.ttyChanged()
 	}()
 	return t, true, nil
 }
@@ -494,7 +498,73 @@ func (s *Server) ttyPrune() {
 // opened again while it dies is a new one.
 func (s *Server) ttyClose(t *ttySession) {
 	s.ttyForget(t)
+	t.mu.Lock()
+	t.drop(&ttyRefusal{4003, "this terminal was ended"})
+	t.mu.Unlock()
 	t.end()
+}
+
+// ttyChanged shows every page the header's new count of terminals.
+func (s *Server) ttyChanged() {
+	s.mu.Lock()
+	s.publish()
+	s.mu.Unlock()
+}
+
+// ttysView is the header's list of every terminal (D205).
+type ttysView struct {
+	Running, Max int
+	Items        []ttysRow
+}
+
+type ttysRow struct {
+	ID, Prefix, Slug, URL, Text string
+	Ended                       bool
+	Exit                        int
+}
+
+// ttysDialog lists the dashboard's terminals, every project's: where each
+// is, and a button that ends it.
+func (s *Server) ttysDialog(w http.ResponseWriter, r *http.Request) {
+	v := ttysView{Max: ttyMax}
+	s.ttyMu.Lock()
+	for _, t := range s.ttys {
+		t.mu.Lock()
+		row := ttysRow{ID: t.id, Prefix: t.prefix, Slug: t.slug, URL: "/p/" + t.prefix + "/" + t.slug, Text: t.kind, Ended: t.done, Exit: t.exit}
+		t.mu.Unlock()
+		if t.label != t.kind {
+			row.Text += ": " + t.label
+		}
+		if !row.Ended {
+			v.Running++
+		}
+		v.Items = append(v.Items, row)
+	}
+	s.ttyMu.Unlock()
+	slices.SortFunc(v.Items, func(a, b ttysRow) int {
+		return cmp.Or(strings.Compare(a.Prefix, b.Prefix), strings.Compare(a.Slug, b.Slug), strings.Compare(a.Text, b.Text))
+	})
+	s.html(w, http.StatusOK, "ttys", v)
+}
+
+// ttyEnd ends the terminal the list names, as its panel's close does.
+func (s *Server) ttyEnd(w http.ResponseWriter, r *http.Request) {
+	s.ttyMu.Lock()
+	var found *ttySession
+	for _, t := range s.ttys {
+		if t.id == r.PathValue("id") {
+			found = t
+		}
+	}
+	s.ttyMu.Unlock()
+	if found == nil {
+		http.Error(w, "that terminal has ended", http.StatusNotFound)
+		return
+	}
+	s.ttyClose(found)
+	s.ttyChanged() // an ended one the list held is gone from it now
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte("{}\n"))
 }
 
 // ttyForget drops a terminal: one closed, or an ended one a page has now
@@ -541,7 +611,9 @@ func (s *Server) tty(w http.ResponseWriter, r *http.Request) {
 	}
 	replay, a := t.attach()
 	defer t.detach(a)
-	if !fresh {
+	if fresh {
+		s.ttyChanged()
+	} else {
 		// A full-screen program draws again when its size changes: one
 		// column narrower, then the page's size.
 		go func() {

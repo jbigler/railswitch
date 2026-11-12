@@ -68,6 +68,7 @@ type Server struct {
 	ttyBase          context.Context // terminals' programs end with it (Run sets the dashboard's)
 	ttyMu            sync.Mutex
 	ttys             map[string]*ttySession // by command; ended ones stay until shown (D205)
+	ttySeq           int                    // the last terminal's id
 
 	wakeOV, wakePR chan struct{}
 
@@ -111,6 +112,8 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/virtual-office/whiteboard/{slug}", s.cyberBoardWrite)
 	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
 	m.HandleFunc("GET /p/{prefix}/ttys", s.ttyList)
+	m.HandleFunc("GET /ttys", s.ttysDialog)
+	m.HandleFunc("POST /ttys/{id}/end", s.ttyEnd)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/down", s.downDialog)

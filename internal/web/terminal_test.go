@@ -185,7 +185,7 @@ func TestTTYLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _, err = readAll(t, c, "")
-	if code, reason := closeOf(err); code != 4029 || reason != "8 terminals are open: close one" {
+	if code, reason := closeOf(err); code != 4029 || reason != "8 terminals are running: end one from ▣ in the header" {
 		t.Errorf("ninth: %d %q", code, reason)
 	}
 	if _, _, err := dialTTY(t, srv, "/p/ftest/tty/b/task?task=test&args=0&cols=80&rows=24", "", true); err != nil {
@@ -490,5 +490,44 @@ func TestTTYModes(t *testing.T) {
 	s.buf, s.cut = []byte("tail of a line\nscreen"), true
 	if replay, _ := s.attach(); string(replay) != "\x1b[?1049hscreen" {
 		t.Errorf("replay %q", replay)
+	}
+}
+
+// TestTTYEndFromList (D205): the header counts the running terminals of
+// every project, its list names each, and End there ends the program and
+// tells the page showing it.
+func TestTTYEndFromList(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "pid")
+	f, srv := ttyFixture(t, "echo $$ > "+pidFile+"; exec sleep 60")
+	contains(t, "no terminal", f.do(req("GET", "/ttys", nil)).Body.String(), "0 of 8 running", "No terminal is running.")
+	c, _, err := dialTTY(t, srv, "/p/ftest/tty/b/task?task=test&args=x&cols=80&rows=24", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitPID(t, pidFile)
+	contains(t, "header", f.do(req("GET", "/p/ftest", nil)).Body.String(), `href="/ttys" data-dialog="ttys"`, "▣ 1/8")
+	list := f.do(req("GET", "/ttys", nil)).Body.String()
+	contains(t, "list", list, "1 of 8 running", `<a href="/p/ftest/b">b</a>`, "task: test x", `action="/ttys/1/end" data-post data-close`)
+	noCSPViolation(t, "list", list)
+
+	if w := f.do(req("POST", "/ttys/9/end", nil)); w.Code != 404 {
+		t.Errorf("an unknown terminal: %d", w.Code)
+	}
+	if w := f.do(req("POST", "/ttys/1/end", nil)); w.Code != 200 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if _, _, err := readAll(t, c, ""); func() bool { code, _ := closeOf(err); return code != 4003 }() {
+		t.Errorf("the page's connection closed with %v, want 4003", err)
+	}
+	waitGone(t, pidFile)
+	deadline := time.Now().Add(2 * time.Second)
+	for f.s.ttyOpen() != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the ended terminal is still counted")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if body := f.do(req("GET", "/p/ftest", nil)).Body.String(); strings.Contains(body, `data-dialog="ttys"`) {
+		t.Error("the header still counts terminals")
 	}
 }

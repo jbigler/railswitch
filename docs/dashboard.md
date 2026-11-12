@@ -998,9 +998,17 @@ stays in the terminal. To fill the screen as well, use the browser's own
 fullscreen (F11), which Esc doesn't end. The dashboard doesn't use the
 page fullscreen API: Esc always ends it in Firefox.
 
+While any terminal runs, the header shows **▣ N/8** on every page: the
+terminals running across the dashboard, every project's. It opens a list
+of them, each with its project, its worktree (a link to its page) and what
+it runs, and **End**, which ends its program as its panel's ✕ does; a page
+showing that terminal says "this terminal was ended". A program that
+exited with no page showing it is listed as exited until its worktree page
+has shown its end.
+
 Limits: 8 terminals running at once across the dashboard, hidden ones and
-those no page shows included (the ninth says so: close one, from its
-worktree's row `▣`);
+those no page shows included (the ninth says "8 terminals are running: end
+one from ▣ in the header");
 a peer that stops answering pings for 10 s (a dead `ssh -L` tunnel) is
 dropped, and its terminal keeps running for the next page. A page that
 gets only the end of a long output is first sent the modes the program

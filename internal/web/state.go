@@ -680,7 +680,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 	}
 	pv := pageView{
 		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(), Days: days,
-		Header: headerView{Prefix: prefix, Need: need}, Projects: projects, Strip: strip, Banner: banner,
+		Header: headerView{Prefix: prefix, Need: need, Terms: s.ttyOpen(), TermsMax: ttyMax}, Projects: projects, Strip: strip, Banner: banner,
 		List:   newList(prefix, rows, sel, k),
 		Detail: detailView{Empty: true},
 		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),

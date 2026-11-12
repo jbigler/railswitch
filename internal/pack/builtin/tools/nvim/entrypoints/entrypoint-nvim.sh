@@ -62,4 +62,32 @@ if [ -z "$(ls -A ~/.local/share/nvim 2>/dev/null)" ]; then
 	echo "      nvim --headless '+Lazy! sync' +qa in this container." >&2
 fi
 
+# The clipboard (D203). The container has no display, and a headless server
+# picks its clipboard before any terminal attaches, so Neovim finds none and
+# a yank to + goes nowhere. This default copies over OSC 52 to the attached
+# terminals, and pastes back the server's own last copy: asking the terminal
+# for its clipboard makes some prompt on every paste and others hang it for
+# ten seconds. Loaded with --cmd, before the config, so a g:clipboard the
+# config sets wins.
+clip=~/.local/state/railswitch/clipboard.lua
+mkdir -p "${clip%/*}"
+cat >"$clip" <<'EOF'
+local last = { ['+'] = { {}, 'v' }, ['*'] = { {}, 'v' } }
+local function copy(reg)
+  return function(lines, regtype)
+    last[reg] = { lines, regtype }
+    require('vim.ui.clipboard.osc52').copy(reg)(lines)
+  end
+end
+local function paste(reg)
+  return function() return last[reg] end
+end
+vim.g.clipboard = {
+  name = 'railswitch-osc52',
+  copy = { ['+'] = copy('+'), ['*'] = copy('*') },
+  paste = { ['+'] = paste('+'), ['*'] = paste('*') },
+}
+EOF
+case "${1:-}" in nvim | */nvim) set -- "$@" --cmd "luafile $clip" ;; esac
+
 exec "$@"

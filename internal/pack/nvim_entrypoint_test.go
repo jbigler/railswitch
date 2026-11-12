@@ -81,3 +81,36 @@ func TestEntrypointNvimCloneFailure(t *testing.T) {
 		t.Errorf("no clone error:\n%s", out)
 	}
 }
+
+// D203: the entrypoint gives an nvim server (and only nvim) a clipboard
+// file, which nvim loads without error.
+func TestEntrypointNvimClipboard(t *testing.T) {
+	home, bin := t.TempDir(), t.TempDir()
+	// A stand-in nvim that prints its arguments.
+	if err := os.WriteFile(filepath.Join(bin, "nvim"), []byte("#!/bin/sh\necho \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	clip := filepath.Join(home, ".local/state/railswitch/clipboard.lua")
+	cmd := exec.Command("sh", nvimEntrypoint, filepath.Join(bin, "nvim"), "--headless")
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "--headless --cmd luafile " + clip + "\n"; string(out) != want {
+		t.Errorf("nvim ran with %q, want %q", out, want)
+	}
+	if out := runNvimEntrypoint(t, home, ""); strings.Contains(out, "luafile") {
+		t.Errorf("a command that is not nvim got the clipboard file:\n%s", out)
+	}
+
+	nvim, err := exec.LookPath("nvim")
+	if err != nil {
+		t.Skip("no nvim on PATH to load the clipboard file with")
+	}
+	check := exec.Command(nvim, "--clean", "--headless", "--cmd", "luafile "+clip, "+lua io.stdout:write(vim.g.clipboard.name)", "+qa")
+	check.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home}
+	if got, err := check.CombinedOutput(); err != nil || string(got) != "railswitch-osc52" {
+		t.Errorf("nvim loading the clipboard file: %q, %v", got, err)
+	}
+}

@@ -944,6 +944,15 @@ once. Restarting the dashboard ends them all. One terminal has one page:
 opened in a second browser tab, it leaves the first, which says so and
 offers **Retry**.
 
+The Virtual Office's desk and agent panels show these same terminals: a
+shell, nvim or agent opened there is the one the worktree page shows, and
+closing an office panel leaves it running. End it with its ✕ on the
+worktree page, or from **▣** in the header.
+
+While a page is sent what a terminal printed before, it sends the program
+nothing: the program's earlier questions to the terminal (its size, its
+colours) are in that output, and a second answer would arrive as typing.
+
 An agent's terminal (from the Agent card or the menu) shows the Agent
 tab first and shows only there. There the worktree's agent terminal
 takes the Agent card's place and the window's height below the tabs,

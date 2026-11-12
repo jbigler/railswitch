@@ -391,8 +391,10 @@ func TestTTYDetach(t *testing.T) {
 	if err := c3.Write(ctx, websocket.MessageBinary, []byte("x\r")); err != nil {
 		t.Fatal(err)
 	}
-	if out, _, err := readAll(t, c3, "after:x"); err != nil {
-		t.Fatalf("%q: %v", out, err)
+	// The mark between what was printed before and what is new: the page
+	// answers the program's questions only after it.
+	if out, text, err := readAll(t, c3, "after:x"); err != nil || text != `{"live":true}` {
+		t.Fatalf("%q, text %q: %v", out, text, err)
 	}
 	if n := f.s.ttyOpen(); n != 1 {
 		t.Errorf("%d terminals counted, want 1", n)

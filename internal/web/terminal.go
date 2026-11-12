@@ -674,13 +674,17 @@ func (s *Server) tty(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Output: what was printed before, then what is printed now.
+	// Output: what was printed before, a mark, then what is printed now.
 	for len(replay) > 0 {
 		n := min(len(replay), ttyChunk)
 		if c.Write(ctx, websocket.MessageBinary, replay[:n]) != nil {
 			return
 		}
 		replay = replay[n:]
+	}
+	// From here the output is new: the page may answer what it asks.
+	if c.Write(ctx, websocket.MessageText, []byte(`{"live":true}`)) != nil {
+		return
 	}
 	for {
 		select {

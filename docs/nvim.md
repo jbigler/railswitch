@@ -375,8 +375,8 @@ raw files, PyPI, and GitHub Copilot's suggestion hosts, D194:
 `githubcopilot.com` with its subdomains, `copilot-proxy` and
 `origin-tracker.githubusercontent.com`, and `meta:copilot`, GitHub's
 published Copilot addresses; not its telemetry) and the config repo's host. Under the DNS filter a name off
-these lists gets "no such name": `fw show nvim` and the Firewall card list
+these lists gets "no such name": `fw show nvim` and the Firewall tab list
 it as a refused name, with the button that allows it (D195). A plugin that
 reports itself online but does nothing may be missing one. A plugin or language server
 from elsewhere needs its host in `[firewall] allow.agent` (the Settings
-page's Firewall card). docs/firewall.md.
+page's Firewall tab). docs/firewall.md.

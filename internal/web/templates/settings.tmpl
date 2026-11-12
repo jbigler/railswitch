@@ -5,78 +5,77 @@
 {{template "top" .}}
 <main class="grid settings">
 <section class="left set-left">
-<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
-<h1>Settings</h1>
-<p class="note">Changes are staged, not applied. The panel on the right shows what each one does to data and to running worktrees before anything happens.</p>
+<div class="set-hd"><div><div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Settings</h1></div><span class="sp"></span>
+{{if not .Error}}<details class="tpl-save"><summary class="ln dim">Save as template</summary>
+<div class="tpl-save-body"><form method="post" action="{{.Template.ExportURL}}" class="add-row" data-job="template-export">
+<input name="name" placeholder="name" class="mono" autocomplete="off" spellcheck="false" required pattern="[a-z][a-z0-9\-]*" aria-label="Template name">
+<input name="version" type="number" min="1" step="1" value="1" class="mono" required aria-label="Template version">
+<button class="ln">Save</button>
+</form>
+<p class="note">Writes <span class="mono">~/.config/railswitch/templates/&lt;name&gt;.stack/</span> for every project on this machine: the stack, options, pins, env and secret names as questions with this project's values as defaults, and the Containerfiles you edited. The project's name, prefix and repository stay out; so do secret values. A version already saved is refused: save a higher one.</p></div>
+</details>
+{{end}}<a class="ln dim" href="{{.FileURL}}" title="For services, routes, agents, image, tools and versions">Edit project.toml</a></div>
 {{if .Error}}<p class="red set-error">project.toml: {{.Error}}</p>
-<p><a class="ln" href="{{.FileURL}}">Edit project.toml</a></p>
-{{else}}{{template "settings-template" .Template}}{{with .Project}}<section class="card">
-<h2>Project</h2>
-<dl class="kv">
-<dt>Name</dt><dd>{{.Name}}</dd>
-<dt>Repository</dt><dd><span class="mono">{{.Repo}}</span> · base branch <span class="mono">{{.BaseBranch}}</span></dd>
-<dt>Prefix</dt><dd><span class="mono">{{.Prefix}}</span> <span class="muted">· fixed: it names every container, volume, network and hostname</span></dd>
-</dl>
-</section>{{end}}
+{{else}}{{with .Project}}<p class="set-proj"><b>{{.Name}}</b> · <span class="mono">{{.Repo}}</span> · base <span class="mono">{{.BaseBranch}}</span> · prefix <span class="mono">{{.Prefix}}</span></p>
+{{end}}<p class="note">Changes are staged, not applied. The panel on the right shows what each one does before anything happens.</p>
+{{template "settings-template" .Template}}<nav class="tabs stabs" aria-label="Settings sections"><button type="button" data-stab="stack">Stack</button><button type="button" data-stab="firewall">Firewall <span class="badge" id="fw-count" hidden></span></button><button type="button" data-stab="commands">Commands</button><button type="button" data-stab="env">Environment</button><button type="button" data-stab="links">Links</button><button type="button" data-stab="tasks">Tasks</button><button type="button" data-stab="secrets">Secrets</button></nav>
 
-<section class="card">
+<section class="spanel" data-spanel="stack">
 <h2>Stack and options</h2>
-{{with .Pack}}<div class="opt" data-pack data-key="pack" data-ref="{{.Ref}}">
-<div class="opt-hd"><b>pack</b> <span class="mono opt-cur">{{.Ref}}</span> <span class="mono opt-new" hidden></span><span class="sp"></span><button type="button" class="ln dim" data-change>Change</button></div>
-<div class="choices" hidden>{{range .Choices}}<label class="choice"><input type="radio" name="stack-pack" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
-</div>
-{{end}}{{range .Options}}<div class="opt" data-key="{{.Key}}" data-ref="{{.Ref}}">
-<div class="opt-hd"><b>{{.Key}}</b>{{if not .Slot}} <span class="muted">extra</span>{{end}} <span class="mono opt-cur">{{.Ref}}</span> <span class="mono opt-new" hidden></span><span class="sp"></span><button type="button" class="ln dim" data-change>Change</button></div>
-<div class="choices" hidden>{{$k := .Key}}{{range .Choices}}<label class="choice"><input type="radio" name="opt-{{$k}}" value="{{.Ref}}"{{if .Current}} checked{{end}}> <span class="mono">{{.Ref}}</span>{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
-</div>
-{{else}}<p class="muted">No options.</p>
-{{end}}<form class="add-row" data-stage="service">
+<div class="sopts">{{with .Pack}}{{template "sopt" .}}{{end}}{{range .Options}}{{if not .Unused}}{{template "sopt" .}}{{end}}{{end}}</div>
+<div class="sopts unused">{{range .Options}}{{if .Unused}}{{template "sopt" .}}{{end}}{{end}}</div>
+<details class="more"><summary>Add another service</summary>
+<form class="add-row" data-stage="service">
 <input name="key" placeholder="service name" class="mono" autocomplete="off" required aria-label="Service name">
 <select name="ref" required aria-label="Option">{{range .Project.AddChoices}}<option value="{{.}}">{{.}}</option>{{end}}</select>
-<button class="ln" disabled>Add service</button>
+<button class="ln" disabled>Add</button>
 </form>
-<p class="note">Any other key runs an option as one more service, named after the key (a second database, ClickHouse beside Postgres).</p>
+<p class="note">A name that is not a slot runs an option as one more service, named after it (a second database, ClickHouse beside Postgres).</p>
+</details>
 </section>
 
-{{with .Firewall}}<section class="card" id="firewall" data-mode="{{.Mode}}">
+{{with .Firewall}}<section class="spanel" data-spanel="firewall" id="firewall" data-mode="{{.Mode}}">
 <h2>Firewall</h2>
-<p class="note">What each kind of container may reach outside this machine. Now: <b>{{.Effective}}</b>. The default is {{.Default}}{{if eq .Default "enforce"}}: the project has agents, and an agent edits the code the app, its workers and installs run{{end}}. Under enforce a host not listed is blocked; log only records what enforce would block.</p>
+<p class="note">What each kind of container may reach outside this machine. Now: <b>{{.Effective}}</b>.</p>
+<details class="more"><summary>How the modes work</summary><p class="note">The default is {{.Default}}{{if eq .Default "enforce"}}: the project has agents, and an agent edits the code the app, its workers and installs run{{end}}. Under enforce a host not listed is blocked; log only records what enforce would block.</p></details>
 {{if .OptedOut}}<p class="yellow notice">This project has agents and its firewall is {{.Effective}}: an agent can reach the network through code the app or its workers run. Pick Default or Enforce to close that.</p>
 {{end}}
-<div class="choices fw-modes">{{range .Modes}}<label class="choice"><input type="radio" name="fw-mode" value="{{.Value}}"{{if .Current}} checked{{end}}> {{.Label}}{{if .Current}} <span class="tag">current</span>{{end}}</label>{{end}}</div>
-{{range .Profiles}}{{$prof := .Name}}<h3><span class="mono">{{.Name}}</span> <span class="muted">· {{.Note}}</span></h3>
+<div class="choices fw-modes">{{range .Modes}}<label class="choice"><input type="radio" name="fw-mode" value="{{.Value}}"{{if .Current}} checked{{end}}> {{.Label}}</label>{{end}}</div>
+<div id="fw-blocked" data-src="{{.BlockedURL}}"><p class="muted">Reading what the firewall blocked…</p></div>
+<h3>Allowed hosts <span class="muted">· beyond the packages' own lists</span></h3>
 <table class="set-table">
+<thead><tr><th>Host</th><th>For</th><th></th></tr></thead>
 <tbody>
-{{range .Hosts}}<tr class="fwhost" data-prof="{{$prof}}" data-host="{{.}}"><td class="mono">{{.}}</td><td><button type="button" class="ln danger" data-fw-remove>Remove</button></td></tr>
-{{else}}<tr><td colspan="2" class="muted">Nothing beyond the packages' own lists.</td></tr>
+{{range .Hosts}}<tr class="fwhost" data-prof="{{.Prof}}" data-host="{{.Host}}"><td class="mono">{{.Host}}</td><td><span class="mono">{{.Prof}}</span> <span class="muted">· {{.Note}}</span></td><td class="act"><button type="button" class="ln rm" data-fw-remove>Remove</button></td></tr>
+{{else}}<tr><td colspan="3" class="muted">Nothing beyond the packages' own lists.</td></tr>
 {{end}}</tbody>
 </table>
 <form class="add-row" data-stage="fw">
-<input type="hidden" name="key" value="{{$prof}}">
-<input name="value" placeholder="host.example.com" class="mono" autocomplete="off" required aria-label="Host for {{$prof}}">
+<input name="value" placeholder="host.example.com" class="mono" autocomplete="off" required aria-label="Host">
+<select name="key" aria-label="For">{{range .Profiles}}<option value="{{.Name}}">{{.Name}} · {{.Note}}</option>{{end}}</select>
 <button class="ln" disabled>Allow</button>
 </form>
-{{end}}<div id="fw-blocked" data-src="{{.BlockedURL}}"><p class="muted">Reading what the firewall blocked…</p></div>
 </section>
-{{end}}<section class="card" id="hooks">
-<h2>Hooks</h2>
-<p class="note">Commands railswitch runs for you inside the containers, one per line, top to bottom, each in its own shell in <code>/app</code>. A failing <b>deps</b> or <b>start</b> command stops the app's start; a failing <b>create</b> command runs again on the next up. Changed lists are staged when you leave the box.</p>
-{{range .Hooks}}<label class="field hook" data-list="{{.Name}}" data-orig="{{.Text}}"><span><span class="mono">{{.Name}}</span> <span class="muted">· {{.Note}}</span></span>
-<textarea class="mono hook-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="{{if eq .Name "deps"}}gem list -i retest >/dev/null || gem install retest{{else if eq .Name "start"}}bin/rails db:test:prepare{{else}}bin/rails db:seed{{end}}">{{.Text}}</textarea></label>
-{{end}}</section>
-{{with .AgentSetups}}<section class="card" id="agent-setup">
-<h2>Agent setup</h2>
-<p class="note">Commands run in an agent's own container and home, one per line, before it first starts in a worktree, and again when you change them: tools its home keeps, like gh extensions and agent skills. A failing command is reported and the agent starts anyway; the next start goes on from it (the ones before don't run again). Commands run without a terminal: pass the flags that answer their questions (gh skill install: a skill or --all, and --agent). Agents are yours: templates leave them out.</p>
-{{range .}}<label class="field agent-setup" data-agent="{{.Name}}" data-orig="{{.Text}}"><span class="mono">{{.Name}}</span>
-<textarea class="mono agent-setup-cmds" rows="3" spellcheck="false" autocomplete="off" placeholder="gh extension install github/gh-stack --force&#10;gh skill install github/gh-stack --all --scope user --agent &lt;your agent&gt; --force">{{.Text}}</textarea></label>
-{{end}}</section>
-{{end}}
-<section class="card">
+{{end}}<section class="spanel" data-spanel="commands" id="hooks">
+<h2>Commands</h2>
+<p class="note">Commands railswitch runs for you inside the containers, one per line, top to bottom.</p>
+<details class="more"><summary>How they run</summary><p class="note">Each hook command runs in its own shell in <code>/app</code>. A failing <b>deps</b> or <b>start</b> command stops the app's start; a failing <b>create</b> command runs again on the next up. Agent setup is for tools an agent's home keeps, like gh extensions and agent skills. A failing setup command is reported and the agent starts anyway; the next start goes on from it (the ones before don't run again). Setup commands run without a terminal: pass the flags that answer their questions (gh skill install: a skill or --all, and --agent). Agents are yours: templates leave them out.</p></details>
+<h3>App hooks</h3>
+{{range .Hooks}}<label class="field hook cmd-row" data-list="{{.Name}}" data-orig="{{.Text}}"><span><span class="mono">{{.Name}}</span><br><span class="muted">{{.Note}}</span></span>
+<textarea class="mono hook-cmds" rows="2" spellcheck="false" autocomplete="off" placeholder="e.g. {{if eq .Name "deps"}}gem list -i retest >/dev/null || gem install retest{{else if eq .Name "start"}}bin/rails db:test:prepare{{else}}bin/rails db:seed{{end}}">{{.Text}}</textarea></label>
+{{end}}{{with .AgentSetups}}<h3 id="agent-setup">Agent setup <span class="muted">· in the agent's own container before it first starts, and again when changed</span></h3>
+{{range .}}<label class="field agent-setup cmd-row" data-agent="{{.Name}}" data-orig="{{.Text}}"><span class="mono">{{.Name}}</span>
+<textarea class="mono agent-setup-cmds" rows="2" spellcheck="false" autocomplete="off" placeholder="e.g. gh extension install github/gh-stack --force">{{.Text}}</textarea></label>
+{{end}}{{end}}</section>
+
+<section class="spanel" data-spanel="env">
 <h2>Environment</h2>
+<p class="note">The project's <code>[env]</code>, given to the app.</p>
 <table class="set-table" id="env-table">
 <thead><tr><th>Name</th><th>Value</th><th></th></tr></thead>
 <tbody>
-{{range .Project.Env}}<tr class="env" data-name="{{.Name}}" data-value="{{.Value}}"><td class="mono">{{.Name}}</td><td><input class="mono env-value" value="{{.Value}}" autocomplete="off" aria-label="{{.Name}}"></td><td><button type="button" class="ln danger" data-env-remove>Remove</button></td></tr>
+{{range .Project.Env}}<tr class="env" data-name="{{.Name}}" data-value="{{.Value}}"><td class="mono">{{.Name}}</td><td><input class="mono env-value" value="{{.Value}}" autocomplete="off" aria-label="{{.Name}}"></td><td class="act"><button type="button" class="ln rm" data-env-remove>Remove</button></td></tr>
 {{else}}<tr class="env-none"><td colspan="3" class="muted">No project env.</td></tr>
 {{end}}</tbody>
 </table>
@@ -85,69 +84,75 @@
 <input name="value" placeholder="value" class="mono" autocomplete="off" aria-label="Value">
 <button class="ln" disabled>Add</button>
 </form>
-<p class="note">The project's <code>[env]</code>, given to the app. A changed value is staged when you leave the field, and Add stages a new one: nothing is saved until you press Apply under Staged changes.</p>
 </section>
 
-<section class="card">
+<section class="spanel" data-spanel="links">
 <h2>Worktree links</h2>
+<p class="note">Links shown on each worktree. <code>{worktree.host}</code>, <code>{worktree.slug}</code> and <code>{branch}</code> are filled in per worktree.</p>
 <table class="set-table">
 <thead><tr><th>Show</th><th>Label</th><th>Address</th><th>From</th><th></th></tr></thead>
 <tbody>
 {{range .Links}}<tr class="link" data-label="{{.Label}}" data-hidden="{{.Hidden}}">
 <td>{{if .Own}}<input type="checkbox" checked disabled title="A project link always shows">{{else}}<input type="checkbox" class="link-show"{{if not .Hidden}} checked{{end}} aria-label="Show {{.Label}}">{{end}}</td>
-<td>{{.Label}}</td><td class="mono addr">{{.URL}}</td><td><span class="chip">{{.From}}</span></td>
-<td>{{if .Own}}<button type="button" class="ln danger" data-link-remove>Remove</button>{{end}}</td>
+<td>{{.Label}}</td><td class="mono addr">{{.URL}}</td><td class="muted">{{.From}}</td>
+<td class="act">{{if .Own}}<button type="button" class="ln rm" data-link-remove>Remove</button>{{end}}</td>
 </tr>
 {{else}}<tr><td colspan="5" class="muted">No links.</td></tr>
 {{end}}</tbody>
 </table>
 <form class="add-row" data-stage="link">
 <input name="label" placeholder="Label" autocomplete="off" required aria-label="Label">
-<input name="url" placeholder="Address" class="mono" autocomplete="off" required aria-label="Address">
-<button class="ln" disabled>Add link</button>
+<input name="url" placeholder="{worktree.host}/path" class="mono" autocomplete="off" required aria-label="Address">
+<button class="ln" disabled>Add</button>
 </form>
-<p class="note">Use <code>{worktree.host}</code>, <code>{worktree.slug}</code> or <code>{branch}</code>; they are filled in per worktree.</p>
 </section>
 
-<section class="card" id="tasks">
+<section class="spanel" data-spanel="tasks" id="tasks">
 <h2>Tasks</h2>
+<p class="note">Commands you run from the <kbd>:</kbd> palette or <code>railswitch task &lt;name&gt;</code>. A pack task you change becomes the project's.</p>
+<details class="more"><summary>More</summary><p class="note">The project's <code>[tasks]</code> over the pack's, run in the app with <code>sh -c</code> in <code>/app</code>. Hide keeps a pack task from the list (<code>name = ""</code>); Restore brings it back. A task with New container ticked (<code>fresh_tasks</code>) always runs in a throwaway container of the app image, never the running app: for a watcher such as retest. A task with Terminal ticked (<code>terminal_tasks</code>) opens in a terminal panel from the <kbd>:</kbd> palette, not as a job: for anything you watch or type into.</p></details>
 <table class="set-table">
 <thead><tr><th>Name</th><th>Command</th><th>From</th><th title="Runs in a new container, never the running app">New container</th><th title="The dashboard opens it in a terminal panel, not as a job">Terminal</th><th></th></tr></thead>
 <tbody>
 {{range .Project.Tasks}}<tr class="task" data-name="{{.Name}}" data-source="{{.Source}}" data-command="{{.Command}}" data-fresh="{{.Fresh}}" data-terminal="{{.Terminal}}" data-stock="{{.Pack}}">
 <td class="mono">{{.Name}}</td>
 <td>{{if eq .Source "hidden"}}<span class="mono muted">{{.Pack}}</span>{{else}}<input class="mono task-cmd" value="{{.Command}}" autocomplete="off" spellcheck="false" aria-label="Command of {{.Name}}">{{end}}</td>
-<td><span class="chip">{{if eq .Source "hidden"}}pack, hidden{{else if and (eq .Source "project") .Pack}}project, over the pack's{{else}}{{.Source}}{{end}}</span></td>
+<td class="muted">{{if eq .Source "hidden"}}pack, hidden{{else if and (eq .Source "project") .Pack}}project, over the pack's{{else}}{{.Source}}{{end}}</td>
 <td>{{if ne .Source "hidden"}}<input type="checkbox" class="task-fresh"{{if .Fresh}} checked{{end}} aria-label="Run {{.Name}} in a new container">{{end}}</td>
 <td>{{if ne .Source "hidden"}}<input type="checkbox" class="task-terminal"{{if .Terminal}} checked{{end}} aria-label="Open {{.Name}} in a terminal">{{end}}</td>
-<td>{{if eq .Source "hidden"}}<button type="button" class="ln" data-task-restore>Restore</button>{{else if eq .Source "pack"}}<button type="button" class="ln danger" data-task-hide>Hide</button>{{else if .Pack}}<button type="button" class="ln" data-task-remove title="{{.Pack}}">Back to the pack's</button>{{else}}<button type="button" class="ln danger" data-task-remove>Remove</button>{{end}}</td>
+<td class="act">{{if eq .Source "hidden"}}<button type="button" class="ln rm" data-task-restore>Restore</button>{{else if eq .Source "pack"}}<button type="button" class="ln rm" data-task-hide>Hide</button>{{else if .Pack}}<button type="button" class="ln rm" data-task-remove title="{{.Pack}}">Back to the pack's</button>{{else}}<button type="button" class="ln rm" data-task-remove>Remove</button>{{end}}</td>
 </tr>
 {{else}}<tr><td colspan="6" class="muted">No tasks.</td></tr>
 {{end}}</tbody>
 </table>
 <form class="add-row" data-stage="task">
 <input name="name" placeholder="name" class="mono" autocomplete="off" spellcheck="false" required aria-label="Task name" value="{{.NewTask}}">
-<input name="value" placeholder="bin/rails db:seed" class="mono" autocomplete="off" spellcheck="false" required aria-label="Task command"{{if .NewTask}} autofocus{{end}}>
+<input name="value" placeholder="e.g. bin/rails db:seed" class="mono" autocomplete="off" spellcheck="false" required aria-label="Task command"{{if .NewTask}} autofocus{{end}}>
 <label class="fresh"><input type="checkbox" name="fresh"> New container</label>
 <label class="fresh"><input type="checkbox" name="terminal"> Terminal</label>
-<button class="ln" disabled>Add task</button>
+<button class="ln" disabled>Add</button>
 </form>
-<p class="note">The project's <code>[tasks]</code> over the pack's, run from the <kbd>:</kbd> palette or <code>railswitch task &lt;name&gt;</code> in the app, with <code>sh -c</code> in <code>/app</code>. A changed command is staged when you leave the field; a pack task you change becomes the project's. Hide keeps a pack task from the list (<code>name = ""</code>); Restore brings it back. A task with New container ticked (<code>fresh_tasks</code>) always runs in a throwaway container of the app image, never the running app: for a watcher such as retest. A task with Terminal ticked (<code>terminal_tasks</code>) opens in a terminal panel from the <kbd>:</kbd> palette, not as a job: for anything you watch or type into.</p>
 </section>
 
-<section class="card">
+<section class="spanel" data-spanel="secrets">
 <h2>Secrets</h2>
+<p class="note">A value goes to podman on stdin and is never shown again. Secrets act at once; they are not staged. Running containers get a new value when they restart.</p>
 {{if .SecretsError}}<p class="red">{{.SecretsError}}</p>
 {{end}}<table class="set-table">
 <thead><tr><th>Name</th><th>Services</th><th>Delivery</th><th>Value</th><th></th></tr></thead>
 <tbody>
-{{range .Secrets}}<tr class="secret"><td class="mono">{{.Name}}</td><td class="mono">{{.Services}}</td><td class="mono">{{.Delivery}}</td><td>{{if .Set}}<span class="green">set {{.When}}</span>{{else}}<span class="yellow">not set</span>{{end}}</td>
-<td><form method="post" action="{{$.SecretURL}}" class="secret-form" data-job="secret"><input type="hidden" name="name" value="{{.Name}}"><input type="password" name="value" required autocomplete="off" placeholder="new value" aria-label="Value of {{.Name}}"><button class="ln">Set value</button></form></td></tr>
+{{range .Secrets}}<tr class="secret"><td class="mono">{{.Name}}</td><td class="mono">{{.Services}}</td><td class="mono">{{.Delivery}}</td><td class="when">{{if .Set}}<span class="green">set {{.When}}</span>{{else}}<span class="yellow">not set</span>{{end}}</td>
+<td class="act"><button type="button" class="ln" data-secret-set="{{.Name}}">Set value</button></td></tr>
 {{else}}<tr><td colspan="5" class="muted">No secrets declared.</td></tr>
 {{end}}</tbody>
 </table>
+<form method="post" action="{{.SecretURL}}" class="secret-form secret-set" data-job="secret" hidden>
+<input type="hidden" name="name">
+<label>New value for <span class="mono" data-secret-name></span> <input type="password" name="value" required autocomplete="off"></label>
+<button class="ln main">Save</button><button type="button" class="ln rm" data-secret-cancel>Cancel</button>
+</form>
 <details class="add-secret">
-<summary>Add a secret</summary>
+<summary class="ln">Add a secret</summary>
 <form method="post" action="{{.SecretURL}}" class="secret-form" data-job="secret">
 <input type="hidden" name="add" value="1">
 <label>Name <input name="name" required class="mono" autocomplete="off"></label>
@@ -157,20 +162,7 @@
 <div class="btns"><button class="ln main">Add secret</button></div>
 </form>
 </details>
-<p class="note">A value goes to podman on stdin and is never shown again. Running containers get a new value when they restart.</p>
 </section>
-
-<section class="card">
-<h2>Save as template</h2>
-<form method="post" action="{{.Template.ExportURL}}" class="add-row" data-job="template-export">
-<input name="name" placeholder="name" class="mono" autocomplete="off" spellcheck="false" required pattern="[a-z][a-z0-9\-]*" aria-label="Template name">
-<input name="version" type="number" min="1" step="1" value="1" class="mono" required aria-label="Template version">
-<button class="ln">Save as template</button>
-</form>
-<p class="note">Writes <span class="mono">~/.config/railswitch/templates/&lt;name&gt;.stack/</span> for every project on this machine: the stack, options, pins, env and secret names as questions with this project's values as defaults, and the Containerfiles you edited. The project's name, prefix and repository stay out; so do secret values. A version already saved is refused: save a higher one.</p>
-</section>
-
-<p class="set-file"><a class="ln" href="{{.FileURL}}">Edit project.toml</a> <span class="muted">for services, routes, firewall, agents, image, tools and versions</span></p>
 {{end}}</section>
 <section class="pane">
 {{template "staged" .Staged}}
@@ -196,19 +188,23 @@ the project was made from it; Accept records its new version. */}}
 {{end}}</section>
 {{end}}{{end}}
 
-{{/* fw-blocked is the Firewall card's "Would be blocked", loaded after
-the page. */}}
-{{define "fw-blocked"}}<div id="fw-blocked">
-<h3>Blocked, or would be under enforce</h3>
+{{/* sopt is one stack choice: the pack or an option, as a select. */}}
+{{define "sopt"}}<label class="sopt{{if .Unused}} muted{{end}}"{{if eq .Key "pack"}} data-pack{{end}} data-key="{{.Key}}" data-ref="{{.Ref}}"><span class="sopt-key"><b>{{.Key}}</b>{{if not .Slot}} <span class="muted">extra</span>{{end}}</span><select class="mono">{{range .Choices}}<option value="{{.Ref}}"{{if .Current}} selected{{end}}>{{.Ref}}</option>{{end}}</select></label>{{end}}
+
+{{/* fw-blocked is the Firewall tab's blocked list, loaded after the
+page: a group per container, the most refused name first. */}}
+{{define "fw-blocked"}}<div id="fw-blocked" data-count="{{.Count}}">
 {{if .Error}}<p class="red">Firewall state unavailable: {{.Error}}</p>
-{{else}}<table class="set-table">
-<thead><tr><th>Container</th><th>Address</th><th>Host</th><th></th></tr></thead>
-<tbody>
-{{range .Rows}}<tr><td class="mono">{{.Container}} <span class="chip">{{.Mode}}</span></td><td class="mono">{{.Addr}} {{.Port}}</td><td class="mono">{{.Host}}</td><td>{{if and .Host .Profile}}<button type="button" class="ln" data-fw-allow data-prof="{{.Profile}}" data-host="{{.Host}}" title="Stage it into project.toml: every {{.Profile}} container gets it from its next start">Add to {{.Profile}} list</button>{{if .Service}}<form class="fw-live" method="post" action="/p/{{$.Prefix}}/{{.Slug}}/fw-allow/{{.Service}}" data-post><input type="hidden" name="host" value="{{.Host}}"><button class="ln" title="Allow it in this running container now, until the time runs out">Allow for</button><select name="for" aria-label="How long">{{if not .Refused}}<option value="10m">10 minutes</option><option value="1h">1 hour</option>{{end}}<option value="restart">until it restarts</option></select></form>{{end}}{{else if not .Profile}}<span class="muted">a data container: nothing to allow</span>{{else}}<span class="muted">no host name: add the host by hand</span>{{end}}</td></tr>
-{{else}}<tr><td colspan="4" class="muted">Nothing blocked since the containers started.</td></tr>
+{{else}}<div class="fw-hd"><h3>{{.Title}}{{if .Count}} <span class="need">· {{.Count}}</span>{{end}}</h3>{{if .Groups}}<span class="muted">Allow stages the host into project.toml. Allow until restart and Allow for open it in the running container only.</span>{{end}}{{if .Count}}<button type="button" class="ln" data-fw-allow-selected disabled>Allow selected</button>{{end}}</div>
+{{if .Groups}}<table class="set-table fw-rows">
+<colgroup><col class="c-pick"><col><col class="c-why"><col class="c-n"><col class="c-act"></colgroup>
+{{range .Groups}}<tbody>
+<tr class="fw-group"><th colspan="5" scope="rowgroup"><span class="mono">{{.Container}}</span> <span class="chip">{{.Mode}}</span>{{if .Profile}} <span class="muted">· goes to the {{.Profile}} list</span>{{end}}</th></tr>
+{{range .Rows}}<tr><td class="pick">{{if .CanList}}<input type="checkbox" class="fw-pick" data-prof="{{.Profile}}" data-host="{{.Host}}" aria-label="Select {{.Host}}">{{end}}</td><td class="mono addr">{{if .Host}}{{.Host}}{{else}}{{.Addr}}{{end}}</td><td class="muted">{{.Reason}}</td><td class="muted num">{{if .Count}}{{.Count}} tries{{end}}</td><td class="act">{{if .Own}}<span class="muted">this project's own service: nothing to allow</span>{{else if .CanList}}<button type="button" class="ln" data-fw-allow data-prof="{{.Profile}}" data-host="{{.Host}}" title="Stage it into project.toml: every {{.Profile}} container gets it from its next start">Allow</button>{{if .Service}}<form class="fw-live" method="post" action="/p/{{$.Prefix}}/{{.Slug}}/fw-allow/{{.Service}}" data-post><input type="hidden" name="host" value="{{.Host}}">{{if .Refused}}<input type="hidden" name="for" value="restart"><button class="ln quiet" title="Allow it in this running container now, until it restarts">Allow until restart</button>{{else}}<button class="ln quiet" title="Allow it in this running container now, until the time runs out">Allow for</button><select name="for" aria-label="How long"><option value="10m">10 minutes</option><option value="1h">1 hour</option><option value="restart">until it restarts</option></select>{{end}}</form>{{end}}{{else if not .Profile}}<span class="muted">a data container: nothing to allow</span>{{else}}<span class="muted">no host name: add the host by hand</span>{{end}}</td></tr>
 {{end}}</tbody>
-</table>
-{{range .None}}<p class="yellow notice"><span class="mono">{{.}}</span> has no firewall: the hook did not run for it (railswitch doctor, then restart it).</p>
+{{end}}</table>
+{{else}}<p class="muted">Nothing blocked since the containers started.</p>
+{{end}}{{range .None}}<p class="yellow notice"><span class="mono">{{.}}</span> has no firewall: the hook did not run for it (railswitch doctor, then restart it).</p>
 {{end}}{{with .LAN}}<h3>LAN exceptions</h3>
 <p class="muted">This machine's config.toml <span class="mono">[[lan]]</span> lets these containers past the never-allowed ranges, to one address and TCP port each.</p>
 <ul class="mono">{{range .}}<li>{{.}}</li>{{end}}</ul>

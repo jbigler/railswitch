@@ -1,2 +1,2 @@
 ["-C","/ws","pr","ls"]
-[{"slug":"master","branch":"","pr":null},{"slug":"feat","branch":"","pr":null}]
+[{"slug":"master","branch":"master","pr":null},{"slug":"feat","branch":"feat","pr":{"number":7,"title":"Feat","url":"https://github.com/o/n/pull/7","state":"open","checks":"pass","review":"approved","review_app":"https://app-pr-7.example.dev"}}]

@@ -1,0 +1,2 @@
+{"args":["-C","/ws","settings","preview"],"stdin":"[{\"op\":\"firewall.mode\",\"value\":\"log\"}]"}
+{"hash":"sha256:021ecc077fcac939cab6140de9c72d0f1ba1a55fa309e25a2fdfc8d718b2e2a6","diff":"--- project.toml\n+++ project.toml\n@@ -61,6 +61,7 @@\n \n [firewall]\n allow.deps = [\"github.com\"]\n+mode = \"log\"\n \n [[links]]                                  # Worktree links (see 3.10)\n label = \"Admin\"\n","edits":[{"index":0,"impact":"none","reasons":[],"error":""}],"restart":[],"writes":[],"install":null}

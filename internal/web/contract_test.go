@@ -3,9 +3,11 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -24,12 +26,27 @@ const contractDir = "../../testdata/contract"
 // run every read the dashboard makes, but those in contractSkip.
 var contractPages = []string{
 	"/p/filial", "/p/filial/feat", "/p/filial/feat/tasks", "/p/filial/feat/agent-default",
-	"/p/filial/feat/snapshots", "/p/filial/feat/queue", "/p/filial/feat/remove",
+	"/p/filial/feat/snapshots", "/p/filial/feat/pr", "/p/filial/feat/queue", "/p/filial/feat/remove",
 	"/p/filial/notes?n=a.md", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy",
 	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=rails@1",
 	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
 	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",
 	"/machine", "/new", "/colors",
+}
+
+// contractPosts are the requests behind the reads that take stdin, by
+// contract file: each is built from the file's arguments and stdin, so the
+// hash and the text are the file's and the rest is the dashboard's.
+var contractPosts = map[string]func(args []string, stdin string) *http.Request{
+	"settings-preview": func(_ []string, stdin string) *http.Request {
+		return jsonPost("/p/filial/settings/preview", stdin)
+	},
+	"containerfile-check": func(args []string, stdin string) *http.Request {
+		return req("POST", "/p/filial/images/check/pg-client", form("hash", args[6], "text", stdin))
+	},
+	"pack-file-check": func(args []string, stdin string) *http.Request {
+		return req("POST", "/p/filial/library/check/local:probe@1/agent.toml", form("hash", args[8], "text", stdin))
+	},
 }
 
 // contractSkip are the readJSON calls the contract does not cover, as
@@ -39,7 +56,6 @@ var contractSkip = map[string]string{
 	"library.go:libraryNew":                "a POST; pack ls is read by the library page",
 	"review.go:reviewAccept":               "a POST; lock --review is read by the review page",
 	"office.go:cyberPage":                  "reads office set ls only for an installed set; officeDefault reads it",
-	"pr.go:prPage":                         "pr show needs a branch and gh; the fixture's worktrees have neither",
 	"newproject.go:newDetect":              "project detect clones a repository",
 	"newproject.go:newReview":              "new --dry-run needs a repository",
 	"newproject.go:newCreate":              "new --dry-run needs a repository",
@@ -57,7 +73,9 @@ var contractSkip = map[string]string{
 var contractAbsent = map[string]string{
 	"agent-ls [].default.":                      "no agent has a default",
 	"agent-usage .rows[].removed":               "omitempty: no removed worktree",
-	"fw-show .containers[].":                    "no container runs, so none has a firewall",
+	"containerfile-check .used":                 "containerfile write prints no used key; pack file write does",
+	"pack-file-check .steps[].":                 "the edit changes no image",
+	"settings-preview .install.":                "the edit installs no library package",
 	"library-ls .libraries[].":                  "no library",
 	"lock-review .packages[].":                  "the lock is current: nothing to review",
 	"office-set-ls .sets[].reason":              "omitempty: every set is valid",
@@ -73,10 +91,9 @@ var contractAbsent = map[string]string{
 	"pack-show .pin.":                           "rails@1 pins nothing",
 	"pack-show .service":                        "omitempty: a pack has none",
 	"pack-show .slot":                           "omitempty: a pack has none",
-	"pr-ls [].pr.":                              "no worktree has a PR: no branch, no gh",
+	"pr-show .threads[].":                       "no review thread (the type is the CLI's own prs.View)",
 	"project-show .tasks[].":                    "omitempty fresh and terminal: no task sets them",
 	"signer-ls .libraries[].":                   "no library",
-	"stack-ls .worktrees[].stack.":              "gh stack is not available",
 	"task-ls [].":                               "omitempty fresh and terminal: no task sets them",
 	"template-ls .templates[].":                 "no template",
 	"tidy .items[].":                            "nothing to tidy",
@@ -95,7 +112,9 @@ func TestDashboardContract(t *testing.T) {
 		t.Fatalf("no contract files: %v", err)
 	}
 	f := newFixture(t)
-	names := map[string]string{} // fakeCLI key -> contract file's name
+	names := map[string]string{}  // fakeCLI key -> contract file's name
+	stdins := map[string]string{} // fakeCLI key -> the stdin its contract file has
+	var posts []*http.Request
 	f.cli.out = map[string]string{}
 	for _, file := range files {
 		data, err := os.ReadFile(file)
@@ -103,13 +122,20 @@ func TestDashboardContract(t *testing.T) {
 			t.Fatal(err)
 		}
 		head, doc, _ := bytes.Cut(data, []byte("\n"))
-		var args []string
-		if err := json.Unmarshal(head, &args); err != nil {
-			t.Fatalf("%s: line 1 is not a JSON array of arguments: %v", file, err)
+		args, stdin, err := contractHead(head)
+		if err != nil {
+			t.Fatalf("%s: %v", file, err)
 		}
 		key := "--json " + strings.Join(args, " ")
-		names[key] = strings.TrimSuffix(filepath.Base(file), ".golden")
+		name := strings.TrimSuffix(filepath.Base(file), ".golden")
+		names[key] = name
 		f.cli.out[key] = string(doc)
+		if post := contractPosts[name]; post != nil {
+			posts = append(posts, post(args, stdin))
+			stdins[key] = stdin
+		} else if stdin != "" {
+			t.Errorf("%s has stdin, but contractPosts has no request for it", file)
+		}
 	}
 
 	var mu sync.Mutex
@@ -148,6 +174,17 @@ func TestDashboardContract(t *testing.T) {
 		}
 	}
 
+	for _, r := range posts {
+		if w := f.do(r); w.Code >= 400 {
+			t.Errorf("POST %s: %d %s", r.URL.Path, w.Code, w.Body)
+		}
+	}
+
+	for i, c := range f.cli.Calls() {
+		if want, ok := stdins[strings.Join(c, " ")]; ok && string(f.cli.stdins[i]) != want {
+			t.Errorf("the dashboard ran %q with stdin %q; its contract file has %q", strings.Join(c, " "), f.cli.stdins[i], want)
+		}
+	}
 	for _, c := range f.cli.Calls() {
 		if key := strings.Join(c, " "); c[0] == "--json" && names[key] == "" {
 			t.Errorf("the dashboard read %q, which has no contract file: add one in %s with line 1 %s, then run go test ./internal/cli -run TestDashboardContract -update", key, contractDir, jsonArgs(c[1:]))
@@ -344,4 +381,20 @@ func sorted(m map[string]bool) []string {
 func jsonArgs(args []string) string {
 	b, _ := json.Marshal(args)
 	return string(b)
+}
+
+// contractHead reads a contract file's first line: a JSON array of
+// arguments, or {"args": [...], "stdin": "..."}.
+func contractHead(head []byte) (args []string, stdin string, err error) {
+	if err = json.Unmarshal(head, &args); err == nil {
+		return args, "", nil
+	}
+	var h struct {
+		Args  []string `json:"args"`
+		Stdin string   `json:"stdin"`
+	}
+	if err = json.Unmarshal(head, &h); err != nil || len(h.Args) == 0 {
+		return nil, "", fmt.Errorf("line 1 is neither a JSON array of arguments nor {\"args\", \"stdin\"}: %v", err)
+	}
+	return h.Args, h.Stdin, nil
 }

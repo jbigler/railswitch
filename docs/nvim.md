@@ -366,6 +366,29 @@ worktree signs in every worktree's nvim at its next start. The same pattern serv
 under `~/.config` or `~/.local/state`; `~/.local/share/nvim` is already
 shared by every worktree (the `nvim_share` volume).
 
+## The clipboard (D203)
+
+A yank to `+` or `*` (every yank, with `clipboard=unnamedplus`) reaches the
+host's clipboard over OSC 52, through whichever terminal is attached: kitty
+and most terminals accept it by default, and so does the dashboard's nvim
+panel.
+
+The container has no display, and a headless server picks its clipboard
+before any terminal attaches, so on its own Neovim finds none ("No
+clipboard tool") and the yank goes nowhere. The entrypoint therefore starts
+the server with a default `g:clipboard` (`--cmd`, before your config):
+
+- **copy** sends the text to every attached terminal;
+- **paste** from `+` or `*` gives back the server's last copy, never the
+  host's clipboard. Asking the terminal for it makes kitty prompt on every
+  paste, and a terminal that doesn't answer hangs the paste for ten
+  seconds. To bring text in from the host, paste with the terminal
+  (`ctrl+shift+v`).
+
+A `vim.g.clipboard` your config sets replaces it; `vim.g.clipboard = false`
+gives Neovim's own choice back. It takes effect when the nvim container
+next starts (`railswitch restart nvim`).
+
 ## Firewall (D119)
 
 nvim follows the project's firewall mode (`enforce` when the project has

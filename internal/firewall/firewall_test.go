@@ -700,6 +700,8 @@ func TestHookDNSFilter(t *testing.T) {
 	ann := map[string]string{
 		"filial.firewall": "app", "filial.firewall.mode": "enforce",
 		"filial.firewall.networks": "filial-feat-dev,filial-feat-proxy", "filial.firewall.dns": "filter",
+		// D202: the worktree's own routed names.
+		"filial.firewall.hosts": "feat.filial.localhost:10.214.0.2,s3.feat.filial.localhost:10.214.0.2",
 	}
 	dir := t.TempDir()
 	script := filepath.Join(dir, "hook.sh")
@@ -758,6 +760,7 @@ func TestHookDNSFilter(t *testing.T) {
 		"# gateway=10.89.7.1\n", "# dnsmasq=/", "listen-address=127.0.0.1\n", "no-resolv\n", "cache-size=0\n",
 		"server=//10.89.7.1\n", "server=/dns.podman/10.89.7.1\n",
 		"server=/api.example.com/10.89.7.1\n", "nftset=/api.example.com/4#inet#wt_firewall#allowd4\n", "query-port=953\n", "address=/#/\n",
+		"host-record=feat.filial.localhost,10.214.0.2\n", "host-record=s3.feat.filial.localhost,10.214.0.2\n",
 	} {
 		if !strings.Contains(string(conf), want) {
 			t.Errorf("conf lacks %q:\n%s", want, conf)

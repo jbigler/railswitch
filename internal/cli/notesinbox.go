@@ -33,7 +33,7 @@ type inboxDoc struct {
 	Note *noteDoc `json:"note"` // the note it would replace; null: none
 }
 
-// railswitch notes inbox ls|show|accept|reject (D197): the notes agents
+// railswitch notes inbox ls|show|accept|reject (D199): the notes agents
 // suggest, <ws>/.railswitch/notes-inbox/<slug>/. Agents write those
 // folders, so they are read as notes are: regular files named as noteName,
 // never through a symlink; accept writes the bytes it hashed.

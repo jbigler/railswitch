@@ -153,7 +153,7 @@ func (m *Model) Plan() (*Plan, error) {
 		}
 		if hasAgents {
 			status = append(status, path.Join(statusDir, wt.Slug))
-			status = append(status, path.Join(NotesInboxDir, wt.Slug)) // D197
+			status = append(status, path.Join(NotesInboxDir, wt.Slug)) // D199
 		}
 	}
 	if hasAgents {

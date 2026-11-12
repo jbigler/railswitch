@@ -1018,7 +1018,7 @@ as `--if-hash` (`""` after `rm`).
 
 ## `notes inbox ls`
 
-The notes agents suggest (D197): each regular file named as a note in
+The notes agents suggest (D199): each regular file named as a note in
 `<workspace>/.railswitch/notes-inbox/<slug>/`, one folder per worktree,
 newest first across all of them. Agents write those folders, so they are
 read as `notes ls` reads `notes/`: a symlink, directory or other name is

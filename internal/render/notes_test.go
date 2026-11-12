@@ -12,7 +12,7 @@ import (
 )
 
 // Every agent mounts the shared notes read-only, its worktree's inbox and
-// railswitch-notes; nothing else does (D141, D197).
+// railswitch-notes; nothing else does (D141, D199).
 func TestNotesMounts(t *testing.T) {
 	m := mustBuild(t, fixtureInputs(t, fixtureWS(t), nil))
 	for _, s := range m.Services {

@@ -11,7 +11,7 @@ import (
 // and edits one (?n=<name>) or a new one (?new=<name>). It reads through
 // notes ls and notes show; saves and removals post to cyberNoteWrite at
 // /p/{prefix}/notes/write/{name}, the office kiosk's handler. Agents only
-// suggest notes (D197): the page lists every worktree's inbox, shows one
+// suggest notes (D199): the page lists every worktree's inbox, shows one
 // (?w=<slug>&s=<name>) beside the note it would replace, and accepts or
 // rejects it at /p/{prefix}/notes/inbox/{slug}/{name}.
 

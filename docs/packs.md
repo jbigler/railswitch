@@ -632,7 +632,7 @@ the default in place and removes the file. The built-in `claude@1` does
 it with its `apply-default.sh`.
 
 Every agent container has the project's shared notes (D141) at `~/notes`,
-read-only, its worktree's notes inbox (D197) at `~/notes-inbox`, writable,
+read-only, its worktree's notes inbox (D199) at `~/notes-inbox`, writable,
 and `/usr/local/bin/railswitch-notes`, which prints what an agent should
 read at session start: the rule for using the notes, then their file names
 (which say what each holds), newest first, then the suggestions from this

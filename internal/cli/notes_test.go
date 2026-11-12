@@ -160,7 +160,7 @@ func TestNotesRace(t *testing.T) {
 	}
 }
 
-// D197: an agent's suggestion is listed, shown with the note it replaces,
+// D199: an agent's suggestion is listed, shown with the note it replaces,
 // accepted only at the hash reviewed, and rejected by exact name; a
 // symlink in an inbox is never read or followed.
 func TestNotesInbox(t *testing.T) {

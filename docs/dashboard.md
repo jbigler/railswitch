@@ -1194,7 +1194,7 @@ in it. **Delete** asks first, then runs `notes rm <name> --if-hash
 and opens an empty editor (`?new=<name>`) whose Save creates it
 (`--if-hash ""`, refused when the name exists).
 
-Agents can't write the notes (D197); they suggest them. **Suggested**
+Agents can't write the notes (D199); they suggest them. **Suggested**
 above the notes lists every worktree's suggestions (`notes inbox ls`),
 with a count and whether each replaces a note. Opening one (`?w=<slug>&s=<name>`,
 `notes inbox show`) shows its text, read-only, and the note it would

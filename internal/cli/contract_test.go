@@ -170,6 +170,56 @@ func TestDashboardContract(t *testing.T) {
 			}
 		})
 	}
+	// The actions: every argv the dashboard's tests start as a job
+	// (internal/web's TestMain writes the file). A usage error (exit 2)
+	// means the dashboard passes arguments the CLI no longer takes. Any
+	// other failure is fine: the fake host runs nothing, git included.
+	t.Run("actions", func(t *testing.T) {
+		data, err := os.ReadFile(filepath.Join(contractDir, "actions.txt"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		here := strings.NewReplacer("/ws/ftest", ws, "/ws", ws, "/home/u", home)
+		for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			var args []string
+			if err := json.Unmarshal([]byte(line), &args); err != nil {
+				t.Fatalf("%s: %v", line, err)
+			}
+			for i, a := range args {
+				args[i] = here.Replace(a)
+				if i > 0 && args[i-1] == "-w" {
+					args[i] = "feat" // the fixture's worktree
+				}
+				if v, ok := actionNames[args[i]]; ok {
+					args[i] = v
+				}
+			}
+			code, _, errs := runStdin(t, fakeHost(), "", args...)
+			_, state := actionState[line]
+			switch {
+			case code == 2 && !state:
+				t.Errorf("the dashboard runs %s, a usage error: %s", line, errs)
+			case code != 2 && state:
+				t.Errorf("actionState names %s, which is no usage error", line)
+			}
+		}
+		for line := range actionState {
+			if !strings.Contains(string(data), line+"\n") {
+				t.Errorf("actionState names %s, which is not in actions.txt", line)
+			}
+		}
+	})
+}
+
+// actionNames maps a name the dashboard's tests use to the fixture's.
+var actionNames = map[string]string{"web": "rails", "token": "github_token"}
+
+// actionState are the actions that end as a usage error for the state the
+// fixture lacks, not for their arguments.
+var actionState = map[string]string{
+	`["-C","/ws/ftest","-w","b","agent","default","apply","claude"]`: "the agent has no default",
+	`["-C","/ws/ftest","-w","b","agent","setup","--again","claude"]`: "the agent has no setup commands",
+	`["-C","/ws/ftest","-w","b","restart","web"]`:                    "the service is not running",
 }
 
 // contractHead reads a contract file's first line.

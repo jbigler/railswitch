@@ -20,7 +20,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - Run `make check` before every commit.
 - A behaviour change updates its doc in `docs/`. A new design choice gets a Dnn row in the roadmap.
 - Every read command takes `--json` and prints one JSON document (D40). Its schema goes in `docs/json.md`.
-- A read the dashboard makes has a file in `testdata/contract/` (the dashboard contract, D197). A new or changed read: add the file with its arguments on line 1 (`{"args", "stdin"}` for a read with stdin), run `go test ./internal/cli -run TestDashboardContract -update`, then `go test ./internal/web`.
+- A read the dashboard makes has a file in `testdata/contract/` (the dashboard contract, D197). A new or changed read: add the file with its arguments on line 1 (`{"args", "stdin"}` for a read with stdin), run `go test ./internal/cli -run TestDashboardContract -update`, then `go test ./internal/web`. A new or changed action: test its route, run `go test ./internal/web -update` (it rewrites `testdata/contract/actions.txt`), then `go test ./internal/cli`.
 - Dependencies are the standard library, `github.com/BurntSushi/toml` and `github.com/coder/websocket` (the dashboard's terminals, D149: a WebSocket parser is security-sensitive); a new one needs as good a reason. The no-echo prompt uses `syscall` TCGETS and TCSETS.
 - Unit tests need no podman, systemd, gh, or network. `git` and `bash` are allowed. Fake commands with `internal/sys/systest`.
 - `project.toml`, `stack.lock`, `registry.toml`, `config.toml`, and `dashboard.toml` carry `schema = 1`. A file with a higher schema is refused as "written by a newer railswitch" (D39).

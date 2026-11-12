@@ -16,11 +16,11 @@ import (
 // user's file. Each edit re-parses its result with Load + Validate before it
 // replaces the file (temp + rename).
 
-// SetImageBase sets [image] base to value, adding [image] and/or base as
+// SetImageBaseText sets [image] base to value, adding [image] and/or base as
 // needed. The same value is a no-op; a different existing value is an error
 // naming it.
-func SetImageBase(path, value string) error {
-	return editImage(path, func(p *Project, d *doc) (string, error) {
+func SetImageBaseText(path, data, value string) (string, error) {
+	return editImage(path, data, func(p *Project, d *doc) (string, error) {
 		switch p.Image.Base {
 		case value:
 			return d.data, nil
@@ -31,11 +31,16 @@ func SetImageBase(path, value string) error {
 	})
 }
 
-// AppendImageAddon appends value to [image] addons, adding [image] and/or
+// SetImageBase is SetImageBaseText on the file at path.
+func SetImageBase(path, value string) error {
+	return editFile(path, func(data string) (string, error) { return SetImageBaseText(path, data, value) })
+}
+
+// AppendImageAddonText appends value to [image] addons, adding [image] and/or
 // addons as needed and keeping the order of the existing entries. An entry
 // already listed is an error.
-func AppendImageAddon(path, value string) error {
-	return editImage(path, func(p *Project, d *doc) (string, error) {
+func AppendImageAddonText(path, data, value string) (string, error) {
+	return editImage(path, data, func(p *Project, d *doc) (string, error) {
 		if slices.Contains(p.Image.Addons, value) {
 			return "", fmt.Errorf("%s: [image] addons already lists %q", path, value)
 		}
@@ -48,10 +53,15 @@ func AppendImageAddon(path, value string) error {
 	})
 }
 
+// AppendImageAddon is AppendImageAddonText on the file at path.
+func AppendImageAddon(path, value string) error {
+	return editFile(path, func(data string) (string, error) { return AppendImageAddonText(path, data, value) })
+}
+
 // editImage applies edit to path's [image] table, which must be a plain
 // [image] table holding only plain keys (or absent).
-func editImage(path string, edit func(*Project, *doc) (string, error)) error {
-	return editFile(path, func(d *doc) error {
+func editImage(path, data string, edit func(*Project, *doc) (string, error)) (string, error) {
+	return editText(path, data, func(d *doc) error {
 		for _, s := range d.stmts {
 			if len(s.path) == 0 || s.path[0] != "image" {
 				continue
@@ -68,40 +78,16 @@ func editImage(path string, edit func(*Project, *doc) (string, error)) error {
 	}, edit)
 }
 
-// editFile reads path and splits it into statements; check refuses a
-// shape the edit can't make by line (checked before decoding, so it is
-// reported even when the file does not decode). It then decodes the file
-// (Load) and edit returns the new contents. An unchanged result writes
-// nothing; any other result must Load and Validate before it replaces path.
-func editFile(path string, check func(*doc) error, edit func(*Project, *doc) (string, error)) error {
+// editFile is editText on the file at path: an unchanged result writes
+// nothing, any other replaces path (temp + rename).
+func editFile(path string, edit func(data string) (string, error)) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	d, err := parseDoc(string(data))
-	if err != nil {
-		return fmt.Errorf("%s: %w", path, err)
-	}
-	if err := check(d); err != nil {
+	out, err := edit(string(data))
+	if err != nil || out == string(data) {
 		return err
-	}
-	p, err := decode(path, data)
-	if err != nil {
-		return err
-	}
-	out, err := edit(p, d)
-	if err != nil {
-		return err
-	}
-	if out == d.data {
-		return nil
-	}
-	np, err := decode(path, []byte(out))
-	if err != nil {
-		return fmt.Errorf("edited %w", err)
-	}
-	if err := np.Validate(); err != nil {
-		return fmt.Errorf("%s after the edit: %w", path, err)
 	}
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -109,6 +95,42 @@ func editFile(path string, check func(*doc) error, edit func(*Project, *doc) (st
 	}
 	return tomlfile.WriteAtomic(path, []byte(out), fi.Mode().Perm())
 }
+
+// editText splits data, the text of the project.toml at path (named in
+// errors), into statements; check refuses a shape the edit can't make by
+// line (checked before decoding, so it is reported even when the text does
+// not decode). It then decodes the text and edit returns the new contents,
+// which must decode and Validate unless they are unchanged.
+func editText(path, data string, check func(*doc) error, edit func(*Project, *doc) (string, error)) (string, error) {
+	d, err := parseDoc(data)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", path, err)
+	}
+	if err := check(d); err != nil {
+		return "", err
+	}
+	p, err := decode(path, []byte(data))
+	if err != nil {
+		return "", err
+	}
+	out, err := edit(p, d)
+	if err != nil {
+		return "", err
+	}
+	if out == d.data {
+		return out, nil
+	}
+	np, err := decode(path, []byte(out))
+	if err != nil {
+		return "", fmt.Errorf("edited %w", err)
+	}
+	if err := np.Validate(); err != nil {
+		return "", fmt.Errorf("%s after the edit: %w", path, err)
+	}
+	return out, nil
+}
+
+func noCheck(*doc) error { return nil }
 
 // doc is a TOML file split into its statements (headers and key/values);
 // blank and comment-only lines belong to no statement.
@@ -447,10 +469,10 @@ func QuoteString(s string) string {
 	return b.String()
 }
 
-// AddSecret appends a [secrets.<name>] table holding s's non-empty fields at
+// AddSecretText appends a [secrets.<name>] table holding s's non-empty fields at
 // the end of path. A secret name already declared is an error.
-func AddSecret(path, name string, s Secret) error {
-	return editFile(path, func(*doc) error { return nil }, func(p *Project, d *doc) (string, error) {
+func AddSecretText(path, data, name string, s Secret) (string, error) {
+	return editText(path, data, noCheck, func(p *Project, d *doc) (string, error) {
 		if _, ok := p.Secrets[name]; ok {
 			return "", fmt.Errorf("%s: secret %s is already declared", path, name)
 		}
@@ -461,10 +483,15 @@ func AddSecret(path, name string, s Secret) error {
 	})
 }
 
-// AddAgent appends an [agents.<name>] table holding a's use and, when set,
+// AddSecret is AddSecretText on the file at path.
+func AddSecret(path, name string, s Secret) error {
+	return editFile(path, func(data string) (string, error) { return AddSecretText(path, data, name, s) })
+}
+
+// AddAgentText appends an [agents.<name>] table holding a's use and, when set,
 // run at the end of path. An agent name already declared is an error.
-func AddAgent(path, name string, a Agent) error {
-	return editFile(path, func(*doc) error { return nil }, func(p *Project, d *doc) (string, error) {
+func AddAgentText(path, data, name string, a Agent) (string, error) {
+	return editText(path, data, noCheck, func(p *Project, d *doc) (string, error) {
 		if _, ok := p.Agents[name]; ok {
 			return "", fmt.Errorf("%s: agent %s is already declared", path, name)
 		}
@@ -476,11 +503,11 @@ func AddAgent(path, name string, a Agent) error {
 	})
 }
 
-// AddSecretService adds service to secret name's services in path, as
+// AddSecretServiceText adds service to secret name's services in path, as
 // the array's last element (or a new services key); a service already
 // there changes nothing.
-func AddSecretService(path, name, service string) error {
-	return editFile(path, func(*doc) error { return nil }, func(p *Project, d *doc) (string, error) {
+func AddSecretServiceText(path, data, name, service string) (string, error) {
+	return editText(path, data, noCheck, func(p *Project, d *doc) (string, error) {
 		s, ok := p.Secrets[name]
 		if !ok {
 			return "", fmt.Errorf("%s: secret %s is not declared", path, name)

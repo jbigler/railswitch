@@ -9,7 +9,6 @@ import (
 	"io"
 	"maps"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -115,11 +114,25 @@ func secretAdd(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	defer clear(value)
-	if err := config.AddSecret(filepath.Join(w.Root, "project.toml"), name, sec); err != nil {
+	changes, err := withProjectEdit(w.Root, nil, func(proj, data string) (string, error) {
+		return config.AddSecretText(proj, data, name, sec)
+	})
+	if err != nil {
+		return e.fail(err)
+	}
+	// The declaration stays only when the value is stored, so a failed add
+	// can be run again.
+	err = e.commitThen(ctx, w.Root, changes, nil, func(*workspace.Workspace) ([]fileChange, error) {
+		if e.storeSecret(ctx, w, m, name, sec, value, false) != 0 {
+			return nil, errors.New("secret add: the value was not stored, so project.toml is as it was")
+		}
+		return nil, nil
+	})
+	if err != nil {
 		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "declared [secrets.%s] in project.toml\n", name)
-	return e.storeSecret(ctx, w, m, name, sec, value, false)
+	return 0
 }
 
 func secretSet(ctx context.Context, e *env, args []string) int {

@@ -41,7 +41,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 
 ## Code conventions
 - Build every worktree path with `naming.WorktreeDir(ws, slug)`, never `filepath.Join(ws, slug)` (D143).
-- Write project files through `env.commit` in `internal/cli/settings.go`. It writes every changed file, then `stack.lock`, then renders. If any step fails, it puts each file back byte for byte.
+- Write project files through `env.commit` in `internal/cli/settings.go`. It writes every changed file, then `stack.lock`, then renders. If any step fails, it puts each file back byte for byte. An edit of `project.toml` is text in, text out (`config.<Edit>Text`, or the `Set…`/`Add…` edits that take `data`); only `project new`, which has nothing to put back, uses the edits that take a path (D198).
 - Copy ejected files from `workspace.Accepted`, never from the raw catalog.
 - Never remove a directory in `render.Plan.StatusDirs`. These hold agent status, shared agent memory, and shared notes.
 - Templates hold no personal choices (D112). A template never carries `[tools]`, `[agents]`, or the editor's or agents' Containerfiles.

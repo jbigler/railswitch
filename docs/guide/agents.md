@@ -15,7 +15,9 @@ railswitch agent add helper --use local:helper@1 --run service
 ```
 
 That adds `[agents.<name>]` to `project.toml`, declares the secrets its
-package needs, and ejects its Containerfile so you can change its image.
+package needs, ejects its Containerfile so you can change its image, and
+renders. It is all or nothing: when a step fails, `project.toml`,
+`stack.lock` and the Containerfiles are as they were.
 Then set its secret, for Claude a token from `claude setup-token`:
 
 ```bash

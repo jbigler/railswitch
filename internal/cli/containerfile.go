@@ -157,67 +157,99 @@ func lookup(cat *pack.Catalog, st *pack.Stack, name string) (builtin, error) {
 // are found by filename). An existing file is refused unless force. It needs no
 // stack.lock: railswitch project new ejects before it locks.
 func Eject(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) error {
-	b, err := lookup(cat, st, name)
+	changes, err := ejectChanges(root, cat, st, name, force)
 	if err != nil {
 		return err
 	}
+	var undo []func() error
+	if _, err := writeChanges(root, changes, &undo); err != nil {
+		return rollback(err, undo)
+	}
+	return nil
+}
+
+// ejectChanges are the files Eject writes: the Containerfile and, when the
+// eject changes it, project.toml.
+func ejectChanges(root string, cat *pack.Catalog, st *pack.Stack, name string, force bool) ([]fileChange, error) {
+	b, err := lookup(cat, st, name)
+	if err != nil {
+		return nil, err
+	}
 	if b.kind == kindAddon && b.os != st.Pack.Image.OS {
-		return fmt.Errorf("addon %s of %s is for os %q, but pack %s builds on os %q", name, b.ref, b.os, st.PackRef, st.Pack.Image.OS)
+		return nil, fmt.Errorf("addon %s of %s is for os %q, but pack %s builds on os %q", name, b.ref, b.os, st.PackRef, st.Pack.Image.OS)
 	}
 	def, err := fs.ReadFile(b.files, b.file)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	rel := workspaceFile(name)
-	created, err := writeContainerfile(root, rel, workspace.EjectedContainerfile(b.ref, name, def), force)
-	if errors.Is(err, fs.ErrExist) {
-		return fmt.Errorf("%w: pass --force to replace it with the default", err)
+	if err := replaceable(root, rel, force); errors.Is(err, fs.ErrExist) {
+		return nil, fmt.Errorf("%w: pass --force to replace it with the default", err)
+	} else if err != nil {
+		return nil, err
 	}
+	changes := []fileChange{{Rel: rel, Data: workspace.EjectedContainerfile(b.ref, name, def), Mode: 0o644}}
+	if b.kind != kindBase && b.kind != kindAddon {
+		return changes, nil
+	}
+	return withProjectEdit(root, changes, func(proj, data string) (string, error) {
+		if b.kind == kindBase {
+			return config.SetImageBaseText(proj, data, rel)
+		}
+		p, err := config.Load(proj)
+		if err != nil || slices.Contains(p.Image.Addons, rel) {
+			return data, err
+		}
+		return config.AppendImageAddonText(proj, data, rel)
+	})
+}
+
+// withProjectEdit adds to changes root's project.toml as edit leaves it,
+// when edit changes it.
+func withProjectEdit(root string, changes []fileChange, edit func(proj, data string) (string, error)) ([]fileChange, error) {
+	proj := filepath.Join(root, "project.toml")
+	fi, err := os.Stat(proj)
 	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(proj)
+	if err != nil {
+		return nil, err
+	}
+	next, err := edit(proj, string(data))
+	if err != nil {
+		return nil, err
+	}
+	if next != string(data) {
+		changes = append(changes, fileChange{Rel: "project.toml", Data: []byte(next), Mode: fi.Mode().Perm()})
+	}
+	return changes, nil
+}
+
+// replaceable refuses (fs.ErrExist) a rel that exists under root, unless
+// replace.
+func replaceable(root, rel string, replace bool) error {
+	switch _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel))); {
+	case err == nil && !replace:
+		return fmt.Errorf("%s: %w", rel, fs.ErrExist)
+	case err == nil || errors.Is(err, fs.ErrNotExist):
+		return nil
+	default:
 		return err
 	}
-	proj := filepath.Join(root, "project.toml")
-	switch b.kind {
-	case kindBase:
-		err = config.SetImageBase(proj, rel)
-	case kindAddon:
-		var p *config.Project
-		if p, err = config.Load(proj); err == nil && !slices.Contains(p.Image.Addons, rel) {
-			err = config.AppendImageAddon(proj, rel)
-		}
-	}
-	return undoCreate(root, rel, created, err)
 }
 
 // writeContainerfile writes rel under root; an existing file is refused
-// (fs.ErrExist) unless replace. created reports whether the file is new.
-func writeContainerfile(root, rel string, data []byte, replace bool) (created bool, err error) {
+// (fs.ErrExist) unless replace.
+func writeContainerfile(root, rel string, data []byte, replace bool) error {
+	if err := replaceable(root, rel, replace); err != nil {
+		return err
+	}
 	path := filepath.Join(root, filepath.FromSlash(rel))
-	switch _, err := os.Lstat(path); {
-	case err == nil:
-		if !replace {
-			return false, fmt.Errorf("%s: %w", rel, fs.ErrExist)
-		}
-	case errors.Is(err, fs.ErrNotExist):
-		created = true
-	default:
-		return false, err
-	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return false, err
+		return err
 	}
-	return created, tomlfile.WriteAtomic(path, data, 0o644)
-}
-
-// undoCreate removes rel when it was just created and the project.toml
-// edit that goes with it (err) failed, so a retry starts clean.
-func undoCreate(root, rel string, created bool, err error) error {
-	if err != nil && created {
-		if rerr := os.Remove(filepath.Join(root, filepath.FromSlash(rel))); rerr != nil {
-			return errors.Join(err, rerr)
-		}
-	}
-	return err
+	return tomlfile.WriteAtomic(path, data, 0o644)
 }
 
 // projectStack loads root's project.toml and resolves its stack, on the
@@ -570,11 +602,11 @@ func containerfileEject(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
-	if err := Eject(root, cat, st, name, *force); err != nil {
+	changes, err := ejectChanges(root, cat, st, name, *force)
+	if err != nil {
 		return e.fail(err)
 	}
-	fmt.Fprintf(e.stdout, "wrote %s\n", workspaceFile(name))
-	return e.renderLocked(ctx, root)
+	return e.commitRepair(ctx, root, changes)
 }
 
 // renderLocked renders a locked project after a Containerfile change, as
@@ -623,7 +655,6 @@ func containerfileNew(ctx context.Context, e *env, args []string) int {
 	if _, ok := stackBuiltins(st)[name]; ok || builtinNames(cat)[name] {
 		return e.usageErr("containerfile new: %s is a built-in Containerfile; use railswitch containerfile eject %s", name, name)
 	}
-	proj := filepath.Join(root, "project.toml")
 	rel := workspaceFile(name)
 	skeleton := "# Addon for " + p.Project.Name + `. railswitch builds it on the previous image in the chain (see: railswitch containerfile list).
 ARG BASE_IMAGE
@@ -632,13 +663,14 @@ USER root
 # RUN apt-get update && apt-get install -y --no-install-recommends <packages> && rm -rf /var/lib/apt/lists/*
 USER appuser
 `
-	created, err := writeContainerfile(root, rel, []byte(skeleton), false)
-	if err == nil {
-		err = undoCreate(root, rel, created, config.AppendImageAddon(proj, rel))
+	if err := replaceable(root, rel, false); err != nil {
+		return e.fail(err)
 	}
+	changes, err := withProjectEdit(root, []fileChange{{Rel: rel, Data: []byte(skeleton), Mode: 0o644}}, func(proj, data string) (string, error) {
+		return config.AppendImageAddonText(proj, data, rel)
+	})
 	if err != nil {
 		return e.fail(err)
 	}
-	fmt.Fprintf(e.stdout, "wrote %s\n", rel)
-	return e.renderLocked(ctx, root)
+	return e.commitRepair(ctx, root, changes)
 }

@@ -26,7 +26,7 @@ func TestNotesPage(t *testing.T) {
 		{"/p/ftest/notes?n=a.md", 200, []string{`action="/p/ftest/notes/write/a.md"`, `data-hash="sha256:ab"`, "&lt;b&gt;hi&lt;/b&gt;", "data-note-rm"}},
 		{"/p/ftest/notes?new=b.md", 200, []string{`action="/p/ftest/notes/write/b.md"`, `data-hash=""`, "new note"}},
 		{"/p/ftest/notes?n=..%2Fx.md", 400, nil},
-		{"/p/ftest/notes?new=Agent+queue+design", 200, []string{`action="/p/ftest/notes/write/agentQueueDesign.md"`, "Agent queue design"}},
+		{"/p/ftest/notes?new=Agent+queue+design", 200, []string{`action="/p/ftest/notes/write/agent_queue_design.md"`, "Agent queue design"}},
 		{"/p/ftest/notes?new=---", 400, nil},
 		{"/p/nope/notes", 404, nil},
 	} {
@@ -86,6 +86,7 @@ func TestNotesPage(t *testing.T) {
 func TestNoteTitle(t *testing.T) {
 	for name, want := range map[string]string{
 		"agentQueueDesign.md": "Agent queue design",
+		"playwright_clicks_on_a_flash_over_an_open_modal_need_force_true.md": "Playwright clicks on a flash over an open modal need force true",
 		"HTTPServerNotes.md":  "HTTP server notes",
 		"aBC.md":              "A BC",
 		"db-restore_steps.md": "Db restore steps",
@@ -98,12 +99,13 @@ func TestNoteTitle(t *testing.T) {
 		}
 	}
 	for title, want := range map[string]string{
-		"Agent queue design":     "agentQueueDesign.md",
-		"HTTP server notes":      "HTTPServerNotes.md",
-		"  what's next? ":        "whatSNext.md",
-		"Plan2 rollout":          "plan2Rollout.md",
-		"!!":                     "",
-		strings.Repeat("a", 150): strings.Repeat("a", 100) + ".md",
+		"Agent queue design":             "agent_queue_design.md",
+		"HTTP server notes":              "http_server_notes.md",
+		"  what's next? ":                "what_s_next.md",
+		"Plan2 rollout":                  "plan2_rollout.md",
+		"!!":                             "",
+		strings.Repeat("a", 150):         strings.Repeat("a", 100) + ".md",
+		strings.Repeat("a", 99) + " b c": strings.Repeat("a", 99) + ".md",
 	} {
 		got := noteFileName(title)
 		if got != want {

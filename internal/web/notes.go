@@ -74,10 +74,11 @@ func (n inboxRow) Title() string { return noteTitle(n.Name) }
 
 var noteWord = regexp.MustCompile(`([a-z0-9])([A-Z])|([A-Z])([A-Z][a-z])|[-_]+`)
 
-// noteTitle is a note's file name as words: agents name notes in camel
-// case ("agentQueueDesign.md" is "Agent queue design"), which reads badly
-// in a list. Only the first word gets a capital; a word all in capitals
-// ("HTTP") keeps them. An open note shows the file name under it.
+// noteTitle is a note's file name as words: agents name notes in snake
+// case ("agent_queue_design.md" is "Agent queue design"; camel case
+// splits too), which reads badly in a list. Only the first word gets a
+// capital; a word all in capitals ("HTTP") keeps them. An open note shows
+// the file name under it.
 func noteTitle(name string) string {
 	t := strings.TrimSuffix(name, ".md")
 	// twice: a match takes the letter the next one would start at ("aBC").
@@ -100,24 +101,15 @@ func noteTitle(name string) string {
 var notWord = regexp.MustCompile(`[^A-Za-z0-9]+`)
 
 // noteFileName is the file name of a new note typed as a title, in the
-// agents' camel case: "Agent queue design" is "agentQueueDesign.md", which
-// noteTitle reads back. "" when the title has no letter or digit.
+// agents' snake case: "Agent queue design" is "agent_queue_design.md",
+// which noteTitle reads back. "" when the title has no letter or digit.
 func noteFileName(title string) string {
-	words := strings.Fields(notWord.ReplaceAllString(strings.TrimSuffix(title, ".md"), " "))
-	for i, w := range words {
-		switch {
-		case len(w) > 1 && w == strings.ToUpper(w): // "HTTP" stays
-		case i == 0:
-			words[i] = strings.ToLower(w[:1]) + w[1:]
-		default:
-			words[i] = strings.ToUpper(w[:1]) + w[1:]
-		}
-	}
-	name := strings.Join(words, "")
+	words := strings.Fields(notWord.ReplaceAllString(strings.ToLower(strings.TrimSuffix(title, ".md")), " "))
+	name := strings.Join(words, "_")
 	if name == "" {
 		return ""
 	}
-	return name[:min(len(name), 100)] + ".md"
+	return strings.TrimRight(name[:min(len(name), 100)], "_") + ".md"
 }
 
 // noteWhen is an RFC 3339 time to the minute, or s as it is.

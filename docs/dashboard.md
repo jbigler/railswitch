@@ -1216,16 +1216,16 @@ working blue, your turn yellow, idle and off muted.
 `/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
 notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
 first, and opens one. A note shows as a title made of its file name's words
-(`agentQueueDesign.md` is "Agent queue design": agents name notes in camel
-case) and when it last changed; the file name shows under the title of an
+(`agent_queue_design.md` is "Agent queue design": agents name notes in
+snake case) and when it last changed; the file name shows under the title of an
 open note. It opens one in an editor (`?n=<name>`, `notes show`). **Save**
 posts the text to `/p/<prefix>/notes/write/<name>?if-hash=<hash>`, the
 handler the office's Notes kiosk uses, which runs `notes write <name>
 --if-hash <hash>` with the text on stdin: a note changed since you opened
 it is refused, the CLI's message stays under the box, and your text stays
 in it. **Delete** asks first, then runs `notes rm <name> --if-hash
-<hash>`. **New note** takes a title and makes the file name from it in camel
-case ("Agent queue design" is `agentQueueDesign.md`; a file name
+<hash>`. **New note** takes a title and makes the file name from it in snake
+case ("Agent queue design" is `agent_queue_design.md`; a file name
 `[A-Za-z0-9][A-Za-z0-9._-]{0,99}.md` is taken as it is)
 and opens an empty editor (`?new=<title>`) whose Save creates it
 (`--if-hash ""`, refused when the name exists).

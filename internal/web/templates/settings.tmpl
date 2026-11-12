@@ -196,12 +196,13 @@ page: a group per container, the most refused name first. */}}
 {{define "fw-blocked"}}<div id="fw-blocked" data-count="{{.Count}}">
 {{if .Error}}<p class="red">Firewall state unavailable: {{.Error}}</p>
 {{else}}<div class="fw-hd"><h3>{{.Title}}{{if .Count}} <span class="need">· {{.Count}}</span>{{end}}</h3>{{if .Groups}}<span class="muted">Allow stages the host into project.toml. Allow until restart and Allow for open it in the running container only.</span>{{end}}{{if .Count}}<button type="button" class="ln" data-fw-allow-selected disabled>Allow selected</button>{{end}}</div>
-{{range .Groups}}<h4 class="fw-group"><span class="mono">{{.Container}}</span> <span class="chip">{{.Mode}}</span>{{if .Profile}} <span class="muted">· goes to the {{.Profile}} list</span>{{end}}</h4>
-<table class="set-table fw-rows">
-<tbody>
+{{if .Groups}}<table class="set-table fw-rows">
+<colgroup><col class="c-pick"><col><col class="c-why"><col class="c-n"><col class="c-act"></colgroup>
+{{range .Groups}}<tbody>
+<tr class="fw-group"><th colspan="5" scope="rowgroup"><span class="mono">{{.Container}}</span> <span class="chip">{{.Mode}}</span>{{if .Profile}} <span class="muted">· goes to the {{.Profile}} list</span>{{end}}</th></tr>
 {{range .Rows}}<tr><td class="pick">{{if .CanList}}<input type="checkbox" class="fw-pick" data-prof="{{.Profile}}" data-host="{{.Host}}" aria-label="Select {{.Host}}">{{end}}</td><td class="mono addr">{{if .Host}}{{.Host}}{{else}}{{.Addr}}{{end}}</td><td class="muted">{{.Reason}}</td><td class="muted num">{{if .Count}}{{.Count}} tries{{end}}</td><td class="act">{{if .Own}}<span class="muted">this project's own service: nothing to allow</span>{{else if .CanList}}<button type="button" class="ln" data-fw-allow data-prof="{{.Profile}}" data-host="{{.Host}}" title="Stage it into project.toml: every {{.Profile}} container gets it from its next start">Allow</button>{{if .Service}}<form class="fw-live" method="post" action="/p/{{$.Prefix}}/{{.Slug}}/fw-allow/{{.Service}}" data-post><input type="hidden" name="host" value="{{.Host}}">{{if .Refused}}<input type="hidden" name="for" value="restart"><button class="ln quiet" title="Allow it in this running container now, until it restarts">Allow until restart</button>{{else}}<button class="ln quiet" title="Allow it in this running container now, until the time runs out">Allow for</button><select name="for" aria-label="How long"><option value="10m">10 minutes</option><option value="1h">1 hour</option><option value="restart">until it restarts</option></select>{{end}}</form>{{end}}{{else if not .Profile}}<span class="muted">a data container: nothing to allow</span>{{else}}<span class="muted">no host name: add the host by hand</span>{{end}}</td></tr>
 {{end}}</tbody>
-</table>
+{{end}}</table>
 {{else}}<p class="muted">Nothing blocked since the containers started.</p>
 {{end}}{{range .None}}<p class="yellow notice"><span class="mono">{{.}}</span> has no firewall: the hook did not run for it (railswitch doctor, then restart it).</p>
 {{end}}{{with .LAN}}<h3>LAN exceptions</h3>

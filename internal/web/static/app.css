@@ -493,9 +493,19 @@ details.more summary{cursor:pointer;color:var(--blue);font-weight:700}
 .fw-hd h3{margin:0}
 .fw-hd .muted{flex:1;min-width:12rem;font-size:13px}
 .fw-hd .ln{margin:0}
-.fw-group{font-size:14px;font-weight:400;margin:12px 0 0;padding:0 5px 6px;border-bottom:1px solid var(--border)}
+.fw-rows{table-layout:fixed;margin-top:8px}
+.fw-rows .c-pick{width:34px}
+.fw-rows .c-why{width:16rem}
+.fw-rows .c-n{width:6rem}
+.fw-rows .c-act{width:23rem}
+.fw-rows tr.fw-group th{text-align:left;font-weight:400;padding:8px;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.fw-rows tr.fw-group .mono{font-size:13px;font-weight:700;color:var(--text)}
+.fw-rows tbody tr:nth-child(odd):not(.fw-group) td{background:color-mix(in srgb,var(--bg2) 60%,var(--bg))}
+.fw-rows td.addr{overflow-wrap:anywhere}
+@media (max-width:800px){.fw-rows{table-layout:auto}}
 .secret-set{margin:8px 0;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:4px}
 .secret-set label{display:flex;flex:1;align-items:center;gap:8px}
 .secret-set input[type=password]{flex:1;width:auto}
 .add-secret summary.ln{display:inline-block;list-style:none;color:var(--blue);margin-top:8px}
 @media (max-width:800px){.cmd-row{grid-template-columns:minmax(0,1fr)}}
+.fw-live select{padding:3px 6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px;font:inherit}

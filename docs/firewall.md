@@ -99,6 +99,13 @@ Arch, Fedora and Debian's are), every container firewalled under
   answers for an allowed name is allowed for an hour after it was first
   added (a later lookup doesn't extend it), beside the addresses resolved
   at start.
+- It answers the worktree's own routed names (`<slug>.<prefix>.localhost`,
+  `s3.<slug>.<prefix>.localhost`, …) with the proxy's address, the same
+  entries the container has in `/etc/hosts` (D202; the unit names them in
+  `<prefix>.firewall.hosts`). A lookup that skips `/etc/hosts`, such as
+  one for an IPv6 address, gets "no IPv6 address" for them, not "no such
+  name", so they are not listed as refused. They are no allow-list
+  entries: the proxy's address is on the worktree's own network.
 - Every other name gets `NXDOMAIN` ("no such name"): DNS is no longer a
   way out, and a name an app needs but the list lacks fails at once as
   "Name or service not known". (Not `REFUSED`: programs see that as a

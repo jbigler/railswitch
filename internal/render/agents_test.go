@@ -329,6 +329,35 @@ func TestAgentMemoryMount(t *testing.T) {
 	}
 }
 
+// TestDNSFilterOwnHosts (D202): a filtered container on the proxy network
+// names its /etc/hosts entries to the hook, so the filter answers them.
+func TestDNSFilterOwnHosts(t *testing.T) {
+	m, _ := filial(t, func(p *config.Project) { p.Firewall.Mode = "enforce" })
+	m.Inputs.Host.DNSFilter = true
+	units, err := Quadlet(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rails := string(units["filial-feat-rails.container"])
+	var hosts []string
+	for _, l := range strings.Split(rails, "\n") {
+		if h, ok := strings.CutPrefix(l, "AddHost="); ok {
+			hosts = append(hosts, h)
+		}
+	}
+	if len(hosts) == 0 || !strings.Contains(strings.Join(hosts, ","), "feat.filial.localhost:") {
+		t.Fatalf("AddHost lines = %q", hosts)
+	}
+	hasLine(t, units, "filial-feat-rails.container", "Annotation=filial.firewall.hosts="+strings.Join(hosts, ","))
+	m.Inputs.Host.DNSFilter = false
+	if units, err = Quadlet(m); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(units["filial-feat-rails.container"]), "firewall.hosts") {
+		t.Error("no filter, but the unit names hosts for it")
+	}
+}
+
 // TestDNSFilterUnits (D182): on a host with dnsmasq, an enforce-mode
 // firewalled container resolves at 127.0.0.1 and asks the hook for the
 // filter; a log-mode one doesn't; without dnsmasq, none does.

@@ -121,6 +121,7 @@ extra="$(field_str "$P.firewall.extra")" || true
 networks="$(field_str "$P.firewall.networks")" || true
 dns="$(field_str "$P.firewall.dns")" || true
 lan="$(field_str "$P.firewall.lan")" || true
+hosts="$(field_str "$P.firewall.hosts")" || true
 
 case "$mode" in
   enforce|log|off) ;;
@@ -408,6 +409,17 @@ fi
 # The DNS filter: its config, then dnsmasq in the container's network
 # namespace. It daemonizes; no pid file within 5 s fails the start.
 if [[ -n "$filter" ]]; then
+  # The worktree's own routed names (D202), as <host>:<ipv4>: /etc/hosts
+  # has them, but a lookup that skips it (one for an IPv6 address) got
+  # NXDOMAIN and fw show listed the name as refused. A host record answers
+  # the address and says "no IPv6 address" for the rest.
+  records=()
+  read -ra own <<<"${hosts//,/ }"
+  for e in ${own[@]+"${own[@]}"}; do
+    h="${e%:*}"; ip="${e##*:}"
+    [[ "$e" == *:* && "$h" =~ ^[A-Za-z0-9.-]+$ && "$ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || die "bad $P.firewall.hosts entry '$e': want <host>:<ipv4>"
+    records+=("host-record=$h,$ip")
+  done
   mkdir -p "$DNSDIR"
   conf="$DNSDIR/$cid.conf"
   {
@@ -424,6 +436,7 @@ if [[ -n "$filter" ]]; then
     for n in ${names[@]+"${names[@]}"}; do
       printf 'server=/%s/%s\nnftset=/%s/4#inet#%s#allowd4\n' "$n" "$gateway" "$n" "$TABLE"
     done
+    if (( ${#records[@]} )); then printf '%s\n' "${records[@]}"; fi
   } >"$conf"
   rm -f "$DNSDIR/$cid.pid"
   nsenter -t "$pid" -n "$DNSMASQ" --conf-file="$conf" </dev/null >>"$LOG" 2>&1 || die "dnsmasq did not start for pid $pid (see $LOG)"

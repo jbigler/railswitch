@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io/fs"
+	"net/netip"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -121,11 +122,30 @@ func (in *Instance) FirewallAnnotations(s *Service, networks []string) []string 
 	}
 	if in.DNSFilter(s) {
 		ann = append(ann, p+".firewall.dns=filter")
+		// The names /etc/hosts gives the container (AddHosts), for the
+		// filter to answer too (D202): a lookup that skips /etc/hosts, such
+		// as one for an IPv6 address, was refused and listed as blocked.
+		// AddHosts' error is the unit's own to report.
+		var own []string
+		hosts, _ := in.AddHosts(s)
+		for _, h := range hosts {
+			if _, ip, ok := strings.Cut(h, ":"); ok && isIPv4(ip) {
+				own = append(own, h)
+			}
+		}
+		if len(own) > 0 {
+			ann = append(ann, p+".firewall.hosts="+strings.Join(own, ","))
+		}
 	}
 	if len(s.FirewallLAN) > 0 {
 		ann = append(ann, p+".firewall.lan="+strings.Join(s.FirewallLAN, ","))
 	}
 	return ann
+}
+
+func isIPv4(s string) bool {
+	a, err := netip.ParseAddr(s)
+	return err == nil && a.Is4()
 }
 
 // firewallMode is s's firewall mode: its own (an agent's), else the project's.

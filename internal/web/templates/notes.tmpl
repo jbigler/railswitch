@@ -15,16 +15,16 @@ suggestion was shown at, so an edit since is refused. */}}
 <section class="spanel">
 <h3>Suggested{{if .Inbox}} <span class="chip yellow">{{len .Inbox}}</span>{{end}}</h3>
 <ul class="lib-list striped">
-{{range .Inbox}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?w={{.Worktree}}&amp;s={{.Name}}"><span class="nt">{{.Title}}</span> <span class="mono muted nf">{{.Name}}</span><span class="sp"></span>{{if .Replaces}}<span class="chip yellow">replaces a note</span>{{end}}<span class="muted src">{{.Worktree}}</span></a></li>
+{{range .Inbox}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?w={{.Worktree}}&amp;s={{.Name}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span>{{if .Replaces}}<span class="chip yellow">replaces a note</span>{{end}}<span class="muted src">{{.Worktree}}</span></a></li>
 {{else}}<li class="muted">No suggestions.</li>
 {{end}}</ul>
 <h3>Notes</h3>
 <ul class="lib-list striped">
-{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="nt">{{.Title}}</span> <span class="mono muted nf">{{.Name}}</span><span class="sp"></span><span class="muted src">{{.When}}</span></a></li>
+{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span><span class="muted src">{{.When}}</span></a></li>
 {{else}}<li class="muted">No notes.</li>
 {{end}}</ul>
 <form method="get" action="{{.URL}}" class="add-row">
-<input name="new" placeholder="name.md" class="mono" autocomplete="off" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,99}\.md" aria-label="New note's name">
+<input name="new" placeholder="Title of a new note" autocomplete="off" required maxlength="120" pattern=".*[A-Za-z0-9].*" title="A title with a letter or a digit; its file name is made from it" aria-label="New note's title">
 <button class="ln">New note</button>
 </form>
 </section>
@@ -32,14 +32,16 @@ suggestion was shown at, so an edit since is refused. */}}
 <section class="pane">
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{with .Open}}<form method="post" action="{{$.SaveURL}}" id="note" class="editor" autocomplete="off" data-hash="{{.Hash}}" data-back="{{$.URL}}">
-<h2 class="ed-file">{{noteTitle .Name}} <span class="mono muted nf">{{.Name}}</span>{{if $.New}} <span class="chip">new note</span>{{end}}</h2>
+<h2 class="ed-file">{{noteTitle .Name}}{{if $.New}} <span class="chip">new note</span>{{end}}</h2>
+<div class="mono muted nf">{{.Name}}</div>
 <textarea name="text" class="mono" spellcheck="false" rows="28" aria-label="{{.Name}}">
 {{.Text}}</textarea>
 <div id="note-err" class="red" hidden></div>
 <div class="btns"><a class="ln dim" href="{{$.URL}}">Close</a>{{if not $.New}}<button type="button" class="ln danger" data-note-rm>Delete</button>{{end}}<button class="ln main">Save</button></div>
 </form>
 {{else}}{{with .Sugg}}<form method="post" action="{{$.InboxPost}}" class="editor" autocomplete="off">
-<h2 class="ed-file">{{noteTitle .Name}} <span class="mono muted nf">{{.Name}}</span> <span class="chip">suggested by {{.Worktree}}</span></h2>
+<h2 class="ed-file">{{noteTitle .Name}} <span class="chip">suggested by {{.Worktree}}</span></h2>
+<div class="mono muted nf">{{.Name}}</div>
 <div class="lbl">{{if .Note}}New text{{else}}Text{{end}}</div>
 <pre class="out readme">{{.Text}}</pre>
 {{with .Note}}<div class="lbl">It replaces the current note</div>

@@ -26,7 +26,8 @@ func TestNotesPage(t *testing.T) {
 		{"/p/ftest/notes?n=a.md", 200, []string{`action="/p/ftest/notes/write/a.md"`, `data-hash="sha256:ab"`, "&lt;b&gt;hi&lt;/b&gt;", "data-note-rm"}},
 		{"/p/ftest/notes?new=b.md", 200, []string{`action="/p/ftest/notes/write/b.md"`, `data-hash=""`, "new note"}},
 		{"/p/ftest/notes?n=..%2Fx.md", 400, nil},
-		{"/p/ftest/notes?new=x.txt", 400, nil},
+		{"/p/ftest/notes?new=Agent+queue+design", 200, []string{`action="/p/ftest/notes/write/agentQueueDesign.md"`, "Agent queue design"}},
+		{"/p/ftest/notes?new=---", 400, nil},
 		{"/p/nope/notes", 404, nil},
 	} {
 		w := f.do(req("GET", c.path, nil))
@@ -95,6 +96,25 @@ func TestNoteTitle(t *testing.T) {
 		if got := noteTitle(name); got != want {
 			t.Errorf("noteTitle(%q) = %q, want %q", name, got, want)
 		}
+	}
+	for title, want := range map[string]string{
+		"Agent queue design":     "agentQueueDesign.md",
+		"HTTP server notes":      "HTTPServerNotes.md",
+		"  what's next? ":        "whatSNext.md",
+		"Plan2 rollout":          "plan2Rollout.md",
+		"!!":                     "",
+		strings.Repeat("a", 150): strings.Repeat("a", 100) + ".md",
+	} {
+		got := noteFileName(title)
+		if got != want {
+			t.Errorf("noteFileName(%q) = %q, want %q", title, got, want)
+		}
+		if got != "" && !noteName.MatchString(got) {
+			t.Errorf("noteFileName(%q) = %q is no note name", title, got)
+		}
+	}
+	if got := noteTitle(noteFileName("Agent queue design")); got != "Agent queue design" {
+		t.Errorf("a title does not come back: %q", got)
 	}
 	if got := noteWhen("soon"); got != "soon" {
 		t.Errorf("noteWhen of no time = %q", got)

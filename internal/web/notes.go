@@ -77,7 +77,7 @@ var noteWord = regexp.MustCompile(`([a-z0-9])([A-Z])|([A-Z])([A-Z][a-z])|[-_]+`)
 // noteTitle is a note's file name as words: agents name notes in camel
 // case ("agentQueueDesign.md" is "Agent queue design"), which reads badly
 // in a list. Only the first word gets a capital; a word all in capitals
-// ("HTTP") keeps them. The page shows the file name beside it.
+// ("HTTP") keeps them. An open note shows the file name under it.
 func noteTitle(name string) string {
 	t := strings.TrimSuffix(name, ".md")
 	// twice: a match takes the letter the next one would start at ("aBC").
@@ -95,6 +95,29 @@ func noteTitle(name string) string {
 	}
 	t = strings.Join(words, " ")
 	return strings.ToUpper(t[:1]) + t[1:]
+}
+
+var notWord = regexp.MustCompile(`[^A-Za-z0-9]+`)
+
+// noteFileName is the file name of a new note typed as a title, in the
+// agents' camel case: "Agent queue design" is "agentQueueDesign.md", which
+// noteTitle reads back. "" when the title has no letter or digit.
+func noteFileName(title string) string {
+	words := strings.Fields(notWord.ReplaceAllString(strings.TrimSuffix(title, ".md"), " "))
+	for i, w := range words {
+		switch {
+		case len(w) > 1 && w == strings.ToUpper(w): // "HTTP" stays
+		case i == 0:
+			words[i] = strings.ToLower(w[:1]) + w[1:]
+		default:
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	name := strings.Join(words, "")
+	if name == "" {
+		return ""
+	}
+	return name[:min(len(name), 100)] + ".md"
 }
 
 // noteWhen is an RFC 3339 time to the minute, or s as it is.
@@ -125,8 +148,12 @@ func (s *Server) notesPage(w http.ResponseWriter, r *http.Request) {
 		Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner, URL: base}
 	q := r.URL.Query()
 	if n := q.Get("new"); n != "" {
+		// a title, unless it is a file name already
 		if !noteName.MatchString(n) {
-			http.Error(w, "bad note name: letters, digits, . _ - and .md at the end", http.StatusBadRequest)
+			n = noteFileName(n)
+		}
+		if !noteName.MatchString(n) {
+			http.Error(w, "bad note title: it needs a letter or a digit", http.StatusBadRequest)
 			return
 		}
 		v.Open, v.New = &noteShow{Name: n}, true

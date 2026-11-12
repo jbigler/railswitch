@@ -112,6 +112,18 @@ func TestAgentAddLockRefused(t *testing.T) {
 	sameFiles(t, before, snapshot(t, ws))
 }
 
+// TestAgentAddRenderFails: an agent whose Containerfile does not render is
+// not added: project.toml, stack.lock and the ejected agent-base go back.
+func TestAgentAddRenderFails(t *testing.T) {
+	ws := noAgentWS(t)
+	writeFile(t, filepath.Join(ws, "containerfiles", "Containerfile.claude"), "FROM mine\n")
+	before := snapshot(t, ws)
+	if code, _, errs := runIn(t, "-C", ws, "agent", "add", "claude"); code != 1 || !strings.Contains(errs, "BASE_IMAGE") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	sameFiles(t, before, snapshot(t, ws))
+}
+
 // TestAgentAddEjectsAccepted: an agent coming back to the lock is locked
 // at what was accepted, and its Containerfile is ejected from that copy.
 func TestAgentAddEjectsAccepted(t *testing.T) {
@@ -169,7 +181,8 @@ func TestAgentAddReserved(t *testing.T) {
 func TestAgentAddUse(t *testing.T) {
 	ws := noAgentWS(t)
 	cf := filepath.Join(ws, "containerfiles", "Containerfile.claude")
-	writeFile(t, cf, "FROM mine\n")
+	mine := "ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\n# mine\n"
+	writeFile(t, cf, mine)
 	mustRun(t, "-C", ws, "agent", "add", "rev", "--use", "claude@1", "--run", "service")
 	p := loadProject(t, ws)
 	if a := p.Agents["rev"]; a.Use != "claude@1" || a.Run != "service" {
@@ -178,7 +191,7 @@ func TestAgentAddUse(t *testing.T) {
 	if s := p.Secrets["rev_token"]; strings.Join(s.Services, ",") != "agent-rev" {
 		t.Errorf("rev_token = %+v", s)
 	}
-	if got := readFile(t, cf); got != "FROM mine\n" {
+	if got := readFile(t, cf); got != mine {
 		t.Errorf("Containerfile.claude overwritten:\n%s", got)
 	}
 }

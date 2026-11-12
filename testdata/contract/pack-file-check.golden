@@ -1,0 +1,2 @@
+{"args":["-C","/ws","pack","file","write","local:probe@1","Containerfile.probe","--if-hash","sha256:a48fe9f33f320e5efc5e5274bf294c05ccdd041b35b1a0eedb7d6a0583f7dc93","--dry-run"],"stdin":"ARG BASE_IMAGE\nFROM ${BASE_IMAGE}\nCMD [\"sh\"]\nRUN true\n"}
+{"hash":"sha256:82acee94fe2695c10fa2c5959bbacc19a579053217e1b4ccdeec92dc9babb5a5","used":true,"steps":[],"restart":[],"errors":[]}

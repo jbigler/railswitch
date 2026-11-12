@@ -5,6 +5,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 
 - Decisions D1 and later, each with its reason: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`. Search for `| D<n> |`.
 - The spec, and in its §7 the gotchas that render lints check: `handoff/HANDOFF.md`.
+- The project's own terms: `GLOSSARY.md`. Add a term there when a change names a new concept.
 - `--json` schemas: `docs/json.md`.
 - Features: `docs/dashboard.md`, `docs/packs.md`, `docs/templates.md`, `docs/libraries.md`, `docs/firewall.md`, `docs/nvim.md`, and `docs/completion.md`. The user guide is `docs/guide/`.
 
@@ -19,6 +20,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - Run `make check` before every commit.
 - A behaviour change updates its doc in `docs/`. A new design choice gets a Dnn row in the roadmap.
 - Every read command takes `--json` and prints one JSON document (D40). Its schema goes in `docs/json.md`.
+- A read the dashboard makes has a file in `testdata/contract/` (the dashboard contract, D197). A new or changed read: add the file with its arguments on line 1 (`{"args", "stdin"}` for a read with stdin), run `go test ./internal/cli -run TestDashboardContract -update`, then `go test ./internal/web`. A new or changed action: test its route, run `go test ./internal/web -update` (it rewrites `testdata/contract/actions.txt`), then `go test ./internal/cli`.
 - Dependencies are the standard library, `github.com/BurntSushi/toml` and `github.com/coder/websocket` (the dashboard's terminals, D149: a WebSocket parser is security-sensitive); a new one needs as good a reason. The no-echo prompt uses `syscall` TCGETS and TCSETS.
 - Unit tests need no podman, systemd, gh, or network. `git` and `bash` are allowed. Fake commands with `internal/sys/systest`.
 - `project.toml`, `stack.lock`, `registry.toml`, `config.toml`, and `dashboard.toml` carry `schema = 1`. A file with a higher schema is refused as "written by a newer railswitch" (D39).
@@ -39,7 +41,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 
 ## Code conventions
 - Build every worktree path with `naming.WorktreeDir(ws, slug)`, never `filepath.Join(ws, slug)` (D143).
-- Write project files through `env.commit` in `internal/cli/settings.go`. It writes every changed file, then `stack.lock`, then renders. If any step fails, it puts each file back byte for byte.
+- Write project files through `env.commit` in `internal/cli/settings.go`. It writes every changed file, then `stack.lock`, then renders. If any step fails, it puts each file back byte for byte. An edit of `project.toml` is text in, text out (`config.<Edit>Text`, or the `Set…`/`Add…` edits that take `data`); only `project new`, which has nothing to put back, uses the edits that take a path (D198).
 - Copy ejected files from `workspace.Accepted`, never from the raw catalog.
 - Never remove a directory in `render.Plan.StatusDirs`. These hold agent status, shared agent memory, and shared notes.
 - Templates hold no personal choices (D112). A template never carries `[tools]`, `[agents]`, or the editor's or agents' Containerfiles.

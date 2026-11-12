@@ -406,7 +406,9 @@ shows what each one does before anything is written.
   (name, the services that receive it, an optional env variable, value)
   runs `railswitch secret add <name> --service <id>… [--env VAR]`. The
   value goes only to the job's stdin; the field clears as soon as you
-  press the button. Secrets act at once; they are not staged.
+  press the button. Secrets act at once; they are not staged. An add
+  whose value podman does not store leaves no declaration, so it can be
+  sent again.
 - **Save as template:** a name (`[a-z][a-z0-9-]*`) and a version (a
   whole number from 1) run `railswitch template export --name <n>
   --version <N>` as a project-level job. It writes

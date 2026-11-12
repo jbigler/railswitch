@@ -373,6 +373,22 @@ func TestSecretAdd(t *testing.T) {
 	}
 }
 
+// TestSecretAddStoreFails: a value podman does not store leaves no
+// declaration, so the add can be run again.
+func TestSecretAddStoreFails(t *testing.T) {
+	ws, _ := lockedWS(t)
+	before := snapshot(t, ws)
+	f := fakeHost()
+	unset(f, "filial_other")
+	f.On([]string{"podman", "secret", "create"}, sys.Result{ExitCode: 125}, fmt.Errorf("podman: %w (exit 125)", sys.ErrExit))
+	code, out, errs := runStdin(t, f, "AC123\n", "-C", ws, "secret", "add", "other", "--service", "rails")
+	if code != 1 || !strings.Contains(errs, "project.toml is as it was") {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	sameFiles(t, before, snapshot(t, ws))
+	noValue(t, f, "AC123", out, errs)
+}
+
 func TestSecretAddEnvCollision(t *testing.T) {
 	ws, _ := lockedWS(t)
 	path := filepath.Join(ws, "project.toml")
@@ -430,7 +446,7 @@ func TestSecretSetDriverMoveCreateFails(t *testing.T) {
 	f.On([]string{"podman", "secret", "inspect", "--format", "{{.Spec.Driver.Name}}"}, sys.Result{Stdout: []byte("file\n")}, nil)
 	f.On([]string{"podman", "secret", "create"}, sys.Result{ExitCode: 125}, fmt.Errorf("podman: %w (exit 125): pass: no key", sys.ErrExit))
 	code, _, errs := runStdin(t, f, "tok\n", "-C", ws, "secret", "set", "github_token")
-	if code == 0 || !strings.Contains(errs, "filial_github_token is now unset") || !strings.Contains(errs, "railswitch secret set github_token") {
+	if code == 0 || !strings.Contains(errs, "filial_github_token is now unset") || !strings.Contains(errs, "run the command again") {
 		t.Fatalf("exit %d, stderr %q", code, errs)
 	}
 }

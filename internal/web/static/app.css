@@ -509,3 +509,5 @@ details.more summary{cursor:pointer;color:var(--blue);font-weight:700}
 .add-secret summary.ln{display:inline-block;list-style:none;color:var(--blue);margin-top:8px}
 @media (max-width:800px){.cmd-row{grid-template-columns:minmax(0,1fr)}}
 .fw-live select{padding:3px 6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px;font:inherit}
+/* Every table in a Settings tab stripes its rows; :where keeps a staged or removed row's own colour on top. */
+.spanel :where(.set-table:not(.fw-rows) tbody tr:nth-child(even)) td{background:color-mix(in srgb,var(--bg2) 60%,var(--bg))}

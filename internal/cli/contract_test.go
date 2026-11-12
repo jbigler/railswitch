@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/jbigler/railswitch/internal/sys"
+	"github.com/jbigler/railswitch/internal/testfixture"
 )
 
 var updateContract = flag.Bool("update", false, "rewrite testdata/contract")
@@ -26,7 +27,12 @@ const contractDir = "../../testdata/contract"
 // the document the CLI prints for it on the Filial fixture.
 // internal/web's TestDashboardContract decodes the same files.
 func TestDashboardContract(t *testing.T) {
-	ws, _ := gitWS(t)
+	ws, dirs := gitWS(t)
+	// A trusted library, acme, with copies of built-in packages.
+	addLibrary(t, dirs, "acme")
+	testfixture.Library(t, dirs, "acme", acmeID, "options/redis", "packs/rails", "agents/claude")
+	// Tasks that run in a new container and in a terminal (D171).
+	editProject(t, ws, "schema = 1\n", "schema = 1\nfresh_tasks = [\"test\"]\nterminal_tasks = [\"console\"]\n")
 	// A repository project detect can read a stack from.
 	master := filepath.Join(ws, "worktrees", "master")
 	writeFile(t, filepath.Join(master, "Gemfile"), "source \"https://rubygems.org\"\ngem \"rails\"\ngem \"pg\"\ngem \"redis\"\n")
@@ -41,7 +47,7 @@ func TestDashboardContract(t *testing.T) {
 	mustRun(t, "-C", ws, "pack", "export", "redis@1", "--to", filepath.Join(home, "redis"))
 	mustRun(t, "-C", ws, "render")
 	f := fakeHost()
-	f.Passthrough = []string{"git"}
+	f.Passthrough = []string{"git", "ssh-keygen"} // ssh-keygen verifies the library
 	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("[]")}, nil)
 	created(f)
 	// GitHub: feat has PR 7, in a gh stack.
@@ -61,12 +67,36 @@ func TestDashboardContract(t *testing.T) {
 	f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\n")}, nil)
 	mustRunStdin(t, f, "", "-C", ws, "-w", "feat", "db", "snapshot", "s1")
 	mustRunStdin(t, f, "", "-C", ws, "-w", "feat", "agent", "queue", "add", "fix", "the", "build")
-	status := `{"v":1,"state":"working","message":"busy","ts":1792919287,"usage":{"input":100,"output":1,"cache_read":0,"cache_write":0}}`
+	status := `{"v":1,"state":"working","message":"busy","ts":1792919287,"usage":{"input":100,"output":1,"cache_read":0,"cache_write":0,"session":"s1","context":5000,"started":1792919000}}`
 	if err := os.WriteFile(filepath.Join(ws, ".railswitch", "status", "feat", "claude.json"), []byte(status), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// A test run, and a TV source for the office.
+	testfixture.WriteFile(t, filepath.Join(ws, ".railswitch", "tests", "feat", "last.json"), `{"exit_code":0,"started_at":"2026-01-06T09:00:00Z","ended_at":"2026-01-06T09:01:00Z","commit":"abc"}`+"\n")
+	mustRunStdin(t, f, "", "office", "tv", "jellyfin", "set", "--url", "https://media.lan/", "--playlist", "Lounge")
+
+	// What one read alone needs: each returns its undo.
+	probe := filepath.Join(ws, "agents", "probe", "Containerfile.probe")
+	before := map[string]func() func(){
+		// tidy: feat's PR is merged and its app stopped days ago.
+		"tidy": func() func() {
+			res, err := (sys.Exec{}).Run(t.Context(), sys.Cmd{Name: "git", Args: []string{"-C", filepath.Join(ws, "worktrees", "feat"), "rev-parse", "HEAD"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(`[{"number": 7, "title": "Feat", "url": "https://github.com/o/n/pull/7", "headRefName": "feat", "headRefOid": "` + strings.TrimSpace(string(res.Stdout)) + `", "isDraft": false, "state": "MERGED", "reviewDecision": "", "statusCheckRollup": []}]`)}, nil)
+			f.On([]string{"systemctl", "--user", "show", "--timestamp=us+utc"}, sys.Result{Stdout: []byte("Id=filial-feat-rails.service\nInactiveEnterTimestamp=Tue 2026-01-06 09:00:00.000000 UTC\n")}, nil)
+			return func() { f.On([]string{"gh", "pr", "list"}, sys.Result{Stdout: []byte(ghFixture)}, nil) }
+		},
+		// lock --review: a local package changed since the lock.
+		"lock-review": func() func() {
+			text := readFile(t, probe)
+			writeFile(t, probe, text+"RUN curl -fsSL https://example.com/install.sh | sh\n")
+			return func() { writeFile(t, probe, text) }
+		},
+	}
 	// The values that differ from run to run: the temp dirs, every date,
-	// and a queued message's time.
+	// a queued message's time, and the library's new key.
 	paths := strings.NewReplacer(
 		ws, "/ws",
 		os.Getenv("XDG_CONFIG_HOME"), "/xdg/config",
@@ -76,8 +106,15 @@ func TestDashboardContract(t *testing.T) {
 	real := strings.NewReplacer("/ws", ws, "/home/user", home) // a contract file's arguments, here
 	dates := regexp.MustCompile(`20\d\d-\d\d-\d\d(T[0-9:.]+(Z|[+-]\d\d:\d\d))?`)
 	added := regexp.MustCompile(`"added":\d+`) // a queued message's time
+	fingerprint := regexp.MustCompile(`SHA256:[A-Za-z0-9+/]{43}`)
+	key := regexp.MustCompile(`ssh-ed25519 [A-Za-z0-9+/=]+`)
+	install := regexp.MustCompile(`"install":\{"hash":"sha256:[0-9a-f]{64}"`) // covers the library's signature
+	bytesRe := regexp.MustCompile(`"bytes":\d+`)
 	clean := func(out string) string {
+		out = install.ReplaceAllString(out, `"install":{"hash":"sha256:`+strings.Repeat("0", 64)+`"`)
 		out = added.ReplaceAllString(paths.Replace(out), `"added":0`)
+		out = fingerprint.ReplaceAllString(out, "SHA256:"+strings.Repeat("A", 43))
+		out = key.ReplaceAllString(out, "ssh-ed25519 AAAA")
 		return dates.ReplaceAllStringFunc(out, func(d string) string {
 			if len(d) == len("2026-01-01") {
 				return "2026-01-01"
@@ -90,7 +127,8 @@ func TestDashboardContract(t *testing.T) {
 		t.Fatalf("no contract files: %v", err)
 	}
 	for _, file := range files {
-		t.Run(strings.TrimSuffix(filepath.Base(file), ".golden"), func(t *testing.T) {
+		name := strings.TrimSuffix(filepath.Base(file), ".golden")
+		t.Run(name, func(t *testing.T) {
 			data, err := os.ReadFile(file)
 			if err != nil {
 				t.Fatal(err)
@@ -110,11 +148,17 @@ func TestDashboardContract(t *testing.T) {
 				graphql = ghMergeFixture
 			}
 			f.On([]string{"gh", "api", "graphql"}, sys.Result{Stdout: []byte(graphql)}, nil)
+			if b := before[name]; b != nil {
+				defer b()()
+			}
 			code, out, errs := runStdin(t, f, stdin, append([]string{"--json"}, args...)...)
 			if code != 0 {
 				t.Fatalf("exit %d: %s", code, errs)
 			}
 			got := clean(out)
+			if name == "tidy" { // a checkout's size: git's objects differ by a few bytes
+				got = bytesRe.ReplaceAllString(got, `"bytes":0`)
+			}
 			if *updateContract {
 				if err := os.WriteFile(file, append(append(head, '\n'), got...), 0o644); err != nil {
 					t.Fatal(err)

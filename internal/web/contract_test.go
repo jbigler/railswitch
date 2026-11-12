@@ -28,7 +28,7 @@ var contractPages = []string{
 	"/p/filial", "/p/filial/feat", "/p/filial/feat/tasks", "/p/filial/feat/agent-default",
 	"/p/filial/feat/snapshots", "/p/filial/feat/pr", "/p/filial/feat/queue", "/p/filial/feat/remove",
 	"/p/filial/notes?n=a.md", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy",
-	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=rails@1",
+	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=redis@1", "/p/filial/library?ref=rails@1",
 	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
 	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",
 	"/p/filial/library?template=filial-stack@1", "/p/filial/library/import?dir=/home/user/redis&as=myredis",
@@ -53,61 +53,67 @@ var contractPosts = map[string]func(args []string, stdin string) *http.Request{
 		return req("POST", "/p/filial/images/check/pg-client", form("hash", args[6], "text", stdin))
 	},
 	"pack-file-check": func(args []string, stdin string) *http.Request {
-		return req("POST", "/p/filial/library/check/local:probe@1/agent.toml", form("hash", args[8], "text", stdin))
+		return req("POST", "/p/filial/library/check/local:probe@1/Containerfile.probe", form("hash", args[8], "text", stdin))
+	},
+}
+
+// contractRepeats are requests whose read a page or a contractPosts
+// request makes too, from another readJSON call: each is here to reach
+// that call. What they answer is not checked (most are refused after the
+// read).
+var contractRepeats = []func() *http.Request{
+	func() *http.Request { return req("GET", "/p/filial/virtual-office/other/", nil) },
+	func() *http.Request {
+		return req("POST", "/machine/libraries/trust", form("alias", "acme", "fingerprint", "SHA256:"+strings.Repeat("a", 43), "kind", "trust"))
+	},
+	func() *http.Request {
+		return req("POST", "/p/filial/library/new", form("kind", "option", "name", "mine", "slot", "cache"))
+	},
+	func() *http.Request {
+		return req("POST", "/p/filial/review/accept", form("hash", "sha256:"+strings.Repeat("0", 64)))
+	},
+	func() *http.Request {
+		return req("POST", "/new/create", form("repo", "file:///ws/worktrees/master", "prefix", "shop", "dir", "/home/user/shop", "template", "filial-stack@1", "accept_install", strings.Repeat("0", 64)))
+	},
+	func() *http.Request {
+		return req("POST", "/p/filial/library/import", form("dir", "/home/user/redis", "as", "myredis", "hash", strings.Repeat("0", 64)))
+	},
+	func() *http.Request {
+		return req("POST", "/machine/templates/import", form("dir", "/home/user/given", "hash", strings.Repeat("0", 64)))
 	},
 }
 
 // contractSkip are the readJSON calls the contract does not cover, as
 // "<file>:<function>", each with its reason.
-var contractSkip = map[string]string{
-	"libraries.go:libraryTrust":        "a POST; library ls is read by the machine page",
-	"library.go:libraryNew":            "a POST; pack ls is read by the library page",
-	"review.go:reviewAccept":           "a POST; lock --review is read by the review page",
-	"office.go:cyberPage":              "reads office set ls only for an installed set; officeDefault reads it",
-	"newproject.go:newCreate":          "a POST; new --dry-run is read by the review step",
-	"packageimport.go:packImport":      "a POST; pack import is read by the import page",
-	"templateimport.go:templateImport": "a POST; template import is read by the import page",
-}
+var contractSkip = map[string]string{}
 
+// A contract file "<command>.<case>.golden" is one of several documents of
+// a command: their keys are checked together, as "<command> <path>".
+//
 // contractAbsent are the JSON keys a dashboard struct declares that the
 // Filial fixture's documents never hold, each with its reason: an entry
 // "<contract file> <path>" covers every key that starts with it. A key
 // here is not checked.
 var contractAbsent = map[string]string{
-	"agent-ls [].default.":                      "no agent has a default",
-	"agent-usage .rows[].removed":               "omitempty: no removed worktree",
-	"containerfile-check .used":                 "containerfile write prints no used key; pack file write does",
-	"pack-file-check .steps[].":                 "the edit changes no image",
-	"settings-preview .install.":                "the edit installs no library package",
-	"new-dry-run .install.":                     "the template installs no library package",
-	"pack-import .bundles_compared_with":        "omitempty: the folder is one package, not a bundle",
-	"pack-import .ejected":                      "omitempty: a package import ejects nothing",
-	"pack-import .packages[].files[].flags[].":  "no file of the package is flagged",
-	"pack-import .replaces.":                    "the package replaces none",
-	"template-import .compared_with":            "omitempty: a package import's key",
-	"template-import .ejected":                  "omitempty: the template ejects nothing",
-	"template-import .replaces.":                "the template replaces none",
-	"template-show .ask[].answer":               "omitempty: show has no answers",
-	"library-ls .libraries[].":                  "no library",
-	"lock-review .packages[].":                  "the lock is current: nothing to review",
-	"office-set-ls .sets[].reason":              "omitempty: every set is valid",
-	"office-tv .jellyfin.":                      "no TV source",
-	"overview .signer_warnings[].":              "no library, so no signer warning",
-	"overview .template.":                       "the project came from no template",
-	"overview .worktrees[].agent.usage.context": "omitempty: the status file has none",
-	"overview .worktrees[].agent.usage.session": "omitempty: the status file has none",
-	"overview .worktrees[].agent.usage.started": "omitempty: the status file has none",
-	"overview .worktrees[].tests.last.":         "no test task has run",
-	"pack-ls .":                                 "omitempty library: only built-ins",
-	"pack-ls-project .":                         "omitempty library: only built-ins",
-	"pack-show .pin.":                           "rails@1 pins nothing",
-	"pack-show .service":                        "omitempty: a pack has none",
-	"pack-show .slot":                           "omitempty: a pack has none",
-	"pr-show .threads[].":                       "no review thread (the type is the CLI's own prs.View)",
-	"project-show .tasks[].":                    "omitempty fresh and terminal: no task sets them",
-	"signer-ls .libraries[].":                   "no library",
-	"task-ls [].":                               "omitempty fresh and terminal: no task sets them",
-	"tidy .items[].":                            "nothing to tidy",
+	"agent-ls [].default.":                     "no agent has a default",
+	"agent-usage .rows[].removed":              "omitempty: no removed worktree",
+	"containerfile-check .used":                "containerfile write prints no used key; pack file write does",
+	"library-ls .libraries[].pending.":         "no fetch waits for trust",
+	"new-dry-run .install.":                    "the template installs no library package",
+	"office-set-ls .sets[].reason":             "omitempty: every set is valid",
+	"overview .signer_warnings[].":             "the library's signer is trusted",
+	"overview .template.":                      "the project came from no template",
+	"pack-file-check .steps[].":                "the probe agent's image is no build step of a worktree",
+	"pack-import .bundles_compared_with":       "omitempty: the folder is one package, not a bundle",
+	"pack-import .ejected":                     "omitempty: a package import ejects nothing",
+	"pack-import .packages[].files[].flags[].": "no file of the package is flagged",
+	"pack-import .replaces.":                   "the package replaces none",
+	"pr-show .threads[].":                      "no review thread (the type is the CLI's own prs.View)",
+	"signer-ls .libraries[].revoked[].":        "no key is revoked",
+	"template-import .compared_with":           "omitempty: a package import's key",
+	"template-import .ejected":                 "omitempty: the template ejects nothing",
+	"template-import .replaces.":               "the template replaces none",
+	"template-show .ask[].answer":              "omitempty: show has no answers",
 }
 
 // TestDashboardContract is the dashboard's side of the dashboard contract
@@ -170,9 +176,12 @@ func TestDashboardContract(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 			return
 		}
+		// pack-show.option and pack-show.pack are one command's documents:
+		// a key either has is seen.
+		group, _, _ := strings.Cut(name, ".")
 		typ := reflect.TypeOf(v).Elem()
-		declaredKeys(typ, name+" ", declared, nil)
-		seenKeys(typ, doc, name+" ", seen)
+		declaredKeys(typ, group+" ", declared, nil)
+		seenKeys(typ, doc, group+" ", seen)
 	}
 	t.Cleanup(func() { decodeHook = nil })
 
@@ -191,6 +200,10 @@ func TestDashboardContract(t *testing.T) {
 		if w := f.do(r); w.Code >= 400 {
 			t.Errorf("POST %s: %d %s", r.URL.Path, w.Code, w.Body)
 		}
+	}
+
+	for _, r := range contractRepeats {
+		f.do(r())
 	}
 
 	for i, c := range f.cli.Calls() {

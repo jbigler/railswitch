@@ -1,2 +1,2 @@
 ["library","ls"]
-{"libraries":[]}
+{"libraries":[{"alias":"acme","url":"https://example.org/acme.git","branch":"","id":"example.org/acme/stack-library","status":"trusted","serial":1,"commit":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","fetched":"2026-01-01T00:00:00Z","packages":3,"pending":null}]}

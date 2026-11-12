@@ -1,0 +1,2 @@
+["-C","/ws","pack","show","redis@1"]
+{"ref":"redis@1","kind":"option","source":"built in","path":"","slot":"cache","service":"cache","runtimes":[],"ports":[],"pin":{"name":"redis","default":"8"},"gives":["REDIS_URL"],"readme":"","files":[{"path":"option.toml","size":653,"executable":false}]}

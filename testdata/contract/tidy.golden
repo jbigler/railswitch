@@ -1,2 +1,2 @@
 ["-C","/ws","tidy"]
-{"days":14,"items":[],"bytes":0,"warnings":[]}
+{"days":14,"items":[{"id":"wt:filial/feat","kind":"worktree","project":"filial","name":"feat","branch":"feat","reasons":["pr-merged","stopped"],"pr":7,"stack":"stopped","idle_since":"2026-01-01T00:00:00Z","idle_from":"systemd","dirty":false,"bytes":0,"partial":false}],"bytes":0,"warnings":[]}

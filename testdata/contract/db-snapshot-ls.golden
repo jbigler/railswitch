@@ -1,0 +1,2 @@
+["-C","/ws","-w","feat","db","snapshot","ls"]
+[{"name":"s1","created":"2026-01-01T00:00:00Z","bytes":25,"files":["filial_dev.dump","rustfs_data.tar.gz"]}]

@@ -79,26 +79,45 @@ func cmdAgentAdd(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 
-	restore, err := keep(root, proj)
+	fi, err := os.Stat(proj)
 	if err != nil {
 		return e.fail(err)
 	}
-	// project.toml goes back unless it is locked.
-	failed := func(err error) int {
-		if rerr := restore(); rerr != nil {
-			err = errors.Join(err, fmt.Errorf("restoring %s: %w", proj, rerr))
+	data, err := os.ReadFile(proj)
+	if err != nil {
+		return e.fail(err)
+	}
+	next, err := config.AddAgentText(proj, string(data), name, a)
+	if err != nil {
+		return e.fail(err)
+	}
+	next, secrets, err := plan.edit(proj, next)
+	if err != nil {
+		return e.fail(err)
+	}
+	// The ejects copy what the lock accepted (an agent the lock remembers
+	// is locked at that copy, not at its current content), so they come
+	// after it, in the same commit: a failed one puts everything back.
+	err = e.commitThen(ctx, root, []fileChange{{Rel: "project.toml", Data: []byte(next), Mode: fi.Mode().Perm()}}, &workspace.Accept{}, func(w *workspace.Workspace) ([]fileChange, error) {
+		st := w.Stack
+		i := slices.IndexFunc(st.Agents, func(c *pack.ChosenAgent) bool { return c.Name == name })
+		var changes []fileChange
+		for _, n := range []string{"agent-base", cfName(st.Agents[i].Agent.Image.File)} {
+			if _, err := os.Stat(filepath.Join(root, workspaceFile(n))); err == nil {
+				continue
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+			c, err := ejectChanges(root, w.Catalog, st, n, false)
+			if err != nil {
+				return nil, fmt.Errorf("eject %s: %w", n, err)
+			}
+			changes = append(changes, c...)
 		}
-		return e.fail(err)
-	}
-	if err := config.AddAgent(proj, name, a); err != nil {
-		return failed(err)
-	}
-	secrets, err := plan.write(proj)
+		return changes, nil
+	})
 	if err != nil {
-		return failed(err)
-	}
-	if err := workspace.Lock(ctx, root, workspace.Accept{}); err != nil {
-		return failed(err)
+		return e.fail(err)
 	}
 	fmt.Fprintf(e.stdout, "added [agents.%s] use = %q to %s\n", name, a.Use, proj)
 	for _, s := range secrets {
@@ -106,28 +125,6 @@ func cmdAgentAdd(ctx context.Context, e *env, args []string) int {
 	}
 	for _, x := range plan.extend {
 		fmt.Fprintf(e.stdout, "secret %s now goes to %s too\n", x.Name, chosen.Service)
-	}
-	fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, "stack.lock"))
-	// The ejects copy what the lock accepted (an agent the lock remembers
-	// is locked at that copy, not at its current content).
-	w, err := workspace.Load(ctx, root, "")
-	if err != nil {
-		return e.fail(err)
-	}
-	cat, st = w.Catalog, w.Stack
-	i = slices.IndexFunc(st.Agents, func(c *pack.ChosenAgent) bool { return c.Name == name })
-	chosen = st.Agents[i]
-	for _, n := range []string{"agent-base", cfName(chosen.Agent.Image.File)} {
-		rel := workspaceFile(n)
-		if _, err := os.Stat(filepath.Join(root, rel)); err == nil {
-			continue
-		} else if !errors.Is(err, fs.ErrNotExist) {
-			return e.fail(err)
-		}
-		if err := Eject(root, cat, st, n, false); err != nil {
-			return e.fail(fmt.Errorf("eject %s: %w", n, err))
-		}
-		fmt.Fprintf(e.stdout, "wrote %s\n", filepath.Join(root, rel))
 	}
 	for _, s := range secrets {
 		fmt.Fprintf(e.stdout, "next: railswitch secret set %s\n", s)

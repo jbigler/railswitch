@@ -48,7 +48,7 @@ func readString(t *testing.T, path string) string {
 
 func TestSetImageBaseKeepsComments(t *testing.T) {
 	path := writeProject(t, commented)
-	if err := SetImageBase(path, "containerfiles/Containerfile.base"); err != nil {
+	if err := setImageBase(path, "containerfiles/Containerfile.base"); err != nil {
 		t.Fatal(err)
 	}
 	got := readString(t, path)
@@ -57,7 +57,7 @@ func TestSetImageBaseKeepsComments(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 	// Same value again: a no-op.
-	if err := SetImageBase(path, "containerfiles/Containerfile.base"); err != nil {
+	if err := setImageBase(path, "containerfiles/Containerfile.base"); err != nil {
 		t.Fatal(err)
 	}
 	if got2 := readString(t, path); got2 != got {
@@ -68,7 +68,7 @@ func TestSetImageBaseKeepsComments(t *testing.T) {
 func TestSetImageBaseInExistingTable(t *testing.T) {
 	in := commented + "\n[image]   # the chain\naddons = [] # none yet\n\n# trailer\n"
 	path := writeProject(t, in)
-	if err := SetImageBase(path, "containerfiles/Containerfile.base"); err != nil {
+	if err := setImageBase(path, "containerfiles/Containerfile.base"); err != nil {
 		t.Fatal(err)
 	}
 	want := commented + "\n[image]   # the chain\naddons = [] # none yet\nbase = \"containerfiles/Containerfile.base\"\n\n# trailer\n"
@@ -80,7 +80,7 @@ func TestSetImageBaseInExistingTable(t *testing.T) {
 func TestSetImageBaseOtherValue(t *testing.T) {
 	in := commented + "\n[image]\nbase = \"containerfiles/Containerfile.mine\"\n"
 	path := writeProject(t, in)
-	err := SetImageBase(path, "containerfiles/Containerfile.base")
+	err := setImageBase(path, "containerfiles/Containerfile.base")
 	if err == nil || !strings.Contains(err.Error(), "Containerfile.mine") {
 		t.Fatalf("err = %v; want one naming Containerfile.mine", err)
 	}
@@ -161,7 +161,7 @@ func TestEditRefusesInline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			path := writeProject(t, tc.in)
 			for _, err := range []error{
-				SetImageBase(path, "containerfiles/Containerfile.base"),
+				setImageBase(path, "containerfiles/Containerfile.base"),
 				AppendImageAddon(path, "containerfiles/Containerfile.b"),
 			} {
 				if err == nil || !strings.Contains(err.Error(), "by hand") {
@@ -180,7 +180,7 @@ func TestEditRefusesInline(t *testing.T) {
 func TestEditSkipsStrings(t *testing.T) {
 	in := strings.Replace(commented, "# a comment line\n", "[env]\nA = \"\"\"\n[image] base = 'x' \\\"\"\"\"\nB = '[image] # \"'\nC = '''\n[image]'''\n", 1)
 	path := writeProject(t, in)
-	if err := SetImageBase(path, "containerfiles/Containerfile.base"); err != nil {
+	if err := setImageBase(path, "containerfiles/Containerfile.base"); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := readString(t, path), in+"\n[image]\nbase = \"containerfiles/Containerfile.base\"\n"; got != want {
@@ -805,4 +805,9 @@ func TestCheckFloor(t *testing.T) {
 			t.Errorf("CheckAllowHost(%q) = %v", h, err)
 		}
 	}
+}
+
+// setImageBase is SetImageBaseText on the file at path.
+func setImageBase(path, value string) error {
+	return editFile(path, func(data string) (string, error) { return SetImageBaseText(path, data, value) })
 }

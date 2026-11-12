@@ -667,6 +667,11 @@ function showMode(d) {
   $$(".colors-mode", d).forEach((m) => (m.hidden = m.dataset.mode !== mode));
 }
 
+// A select that picks what its page shows (Images' worktree) loads it.
+document.addEventListener("change", (e) => {
+  if (e.target.matches("select[data-submit]")) e.target.form.submit();
+});
+
 document.addEventListener("change", (e) => {
   if (!e.target.matches(".colors-form select.preset")) return;
   const f = e.target.form;

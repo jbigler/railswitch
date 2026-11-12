@@ -57,17 +57,17 @@ func TestImagesPage(t *testing.T) {
 	contains(t, "images", body,
 		`data-view="images"`,
 		"option kv@1 suggests addon kv-client, which [image] addons lacks",
-		`<td class="mono">Containerfile.pg-client</td>`, "localhost/ftest/base:3.3-ba118cc2", "docker.io/library/ruby:3.3-slim",
+		`<td class="mono file">Containerfile.pg-client</td>`, "localhost/ftest/base:3.3-ba118cc2", "docker.io/library/ruby:3.3-slim",
 		`<a class="ln" href="/p/ftest/images/edit/pg-client">Edit</a>`,
 		`<a class="ln" href="/p/ftest/images/edit/bot">Edit</a>`,
-		`<span class="chip">addon</span>`, `<span class="chip">agent</span>`,
-		`<a class="wtpick cur" href="/p/ftest/images?wt=main">main</a>`, `<a class="wtpick" href="/p/ftest/images?wt=b">b</a>`,
+		`<td class="muted">addon</td>`, `<td class="muted">agent</td>`,
+		`<option value="main" selected>main</option><option value="b">b</option>`,
 		`action="/p/ftest/images/new"`,
 	)
 	noCSPViolation(t, "images", body)
 
 	body = f.do(req("GET", "/p/ftest/images?wt=b", nil)).Body.String()
-	contains(t, "images b", body, "localhost/ftest/base:3.3-99999999", `<a class="wtpick cur" href="/p/ftest/images?wt=b">b</a>`)
+	contains(t, "images b", body, "localhost/ftest/base:3.3-99999999", `<option value="b" selected>b</option>`)
 	if strings.Contains(body, "pg-client") {
 		t.Error("worktree b's chain shows main's addon")
 	}

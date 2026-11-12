@@ -95,8 +95,8 @@ type imagesView struct {
 }
 
 type wtPick struct {
-	Slug, URL string
-	Current   bool
+	Slug    string
+	Current bool
 }
 
 type stepView struct {
@@ -153,7 +153,7 @@ func (s *Server) imagesPage(w http.ResponseWriter, r *http.Request) {
 		NewURL: base + "/new",
 	}
 	for _, wt := range ov.Worktrees {
-		v.Worktrees = append(v.Worktrees, wtPick{Slug: wt.Slug, URL: base + "?wt=" + wt.Slug, Current: wt.Slug == slug})
+		v.Worktrees = append(v.Worktrees, wtPick{Slug: wt.Slug, Current: wt.Slug == slug})
 	}
 	chain, err := readChain(r.Context(), s.c.CLI, p.Workspace, slug)
 	if err != nil {

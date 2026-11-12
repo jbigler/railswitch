@@ -83,3 +83,13 @@ export function settingsTab(hash, kept, tabs) {
   }
   return tabs[0];
 }
+
+// noteFileName is the file name a note's typed title makes (Go's
+// noteFileName, which decides; this one shows it while you type):
+// "Agent queue design" is "agent_queue_design.md"; a file name stays.
+export function noteFileName(title) {
+  title = title.trim();
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$/.test(title)) return title;
+  const name = title.replace(/\.md$/, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).join("_");
+  return name ? name.slice(0, 100).replace(/_+$/, "") + ".md" : "";
+}

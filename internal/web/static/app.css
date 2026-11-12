@@ -205,6 +205,9 @@ a.pal-task{color:var(--text);text-decoration:none}
 .lib-list li.cur a{font-weight:800}
 .lib-list .src{flex:0 0 auto;min-width:7rem;white-space:nowrap;font-size:12px;font-weight:400}
 body[data-view=notes] .ed-file{font-size:16px;line-height:1.3;margin-bottom:6px}
+.ed-file textarea{display:block;width:100%;font:inherit;color:inherit;background:none;border:1px solid transparent;border-radius:4px;padding:2px 5px;margin:0 -6px;resize:none;field-sizing:content;min-height:0;overflow:hidden}
+.ed-file textarea:hover{border-color:var(--border)}
+.ed-file textarea:focus{border-color:var(--accent);background:var(--bg2);outline:0}
 .editor .nf{font-size:12px;margin:0 0 8px;overflow-wrap:anywhere}
 .lib-list .nt{flex:999 1 12rem;min-width:0;overflow-wrap:anywhere}
 .lib-list li a{flex-wrap:wrap}

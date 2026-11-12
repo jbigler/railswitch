@@ -32,8 +32,8 @@ suggestion was shown at, so an edit since is refused. */}}
 <section class="pane">
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
 {{end}}{{with .Open}}<form method="post" action="{{$.SaveURL}}" id="note" class="editor" autocomplete="off" data-hash="{{.Hash}}" data-back="{{$.URL}}">
-<h2 class="ed-file">{{noteTitle .Name}}{{if $.New}} <span class="chip">new note</span>{{end}}</h2>
-<div class="mono muted nf">{{.Name}}</div>
+<h2 class="ed-file"><textarea name="title" rows="1" required maxlength="120" spellcheck="true" aria-label="Title; changing it renames the note" data-name="{{.Name}}">{{noteTitle .Name}}</textarea></h2>
+<div class="mono muted nf"><span id="note-file">{{.Name}}</span>{{if $.New}} <span class="chip">new note</span>{{end}}</div>
 <textarea name="text" class="mono" spellcheck="false" rows="28" aria-label="{{.Name}}">
 {{.Text}}</textarea>
 <div id="note-err" class="red" hidden></div>

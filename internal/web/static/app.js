@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, settingsTab, noteFileName } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -1621,15 +1621,29 @@ function startNotes() {
     const r = await fetch(f.action + "?" + new URLSearchParams(q), {
       method: "POST", body: text, credentials: "same-origin", headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
-    if (r.ok) return true;
+    if (r.ok) return r;
     err.textContent = (await r.text()).trim();
     err.hidden = false;
     toast(err.textContent, true);
     return false;
   }
+  // The title names the file: a changed one saves under the name it makes.
+  const title = f.elements.title;
+  const was = title.value;
+  title.addEventListener("input", () => {
+    $("#note-file").textContent = title.value.trim() === was ? name : noteFileName(title.value) || "needs a letter or a digit";
+  });
+  title.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    f.elements.text.focus();
+  });
   f.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (await write({ "if-hash": f.dataset.hash }, f.elements.text.value)) location.href = f.dataset.back + "?n=" + encodeURIComponent(name);
+    const q = { "if-hash": f.dataset.hash };
+    if (title.value.trim() !== was) q.as = title.value.trim();
+    const r = await write(q, f.elements.text.value);
+    if (r) location.href = f.dataset.back + "?n=" + encodeURIComponent(r.headers.get("X-Note-Name") || name);
   });
   $("[data-note-rm]", f)?.addEventListener("click", async () => {
     if (!confirm("Delete " + name + "?")) return;

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"io"
 	"net/http/httptest"
 	"strings"
@@ -49,6 +50,31 @@ func TestNotesPage(t *testing.T) {
 	}
 	if got := string(f.cli.stdins[len(f.cli.stdins)-1]); got != "new text" {
 		t.Errorf("stdin %q", got)
+	}
+	// A changed title writes the text under its file name, then removes the
+	// old note; the same title, or the note's own name, is a plain save.
+	f.cli.set("--json -C /ws/ftest notes write a_better_name.md --if-hash ", `{"hash":"sha256:ef"}`)
+	f.cli.set("-C /ws/ftest notes rm a.md --if-hash sha256:ab", `{}`)
+	r = req("POST", "/p/ftest/notes/write/a.md?if-hash=sha256:ab&as=A+better+name", nil)
+	r.Body = io.NopCloser(strings.NewReader("moved"))
+	if w := f.do(r); w.Code != 200 || w.Header().Get("X-Note-Name") != "a_better_name.md" || f.cli.count("-C /ws/ftest notes rm a.md --if-hash sha256:ab") != 1 {
+		t.Fatalf("rename: %d %s, name %q", w.Code, w.Body, w.Header().Get("X-Note-Name"))
+	}
+	// the write, then the rm
+	if got := string(f.cli.stdins[len(f.cli.stdins)-2]); got != "moved" {
+		t.Errorf("rename stdin %q", got)
+	}
+	r = req("POST", "/p/ftest/notes/write/a.md?if-hash=sha256:ab&as=A", nil)
+	r.Body = io.NopCloser(strings.NewReader("new text"))
+	if w := f.do(r); w.Code != 200 || w.Header().Get("X-Note-Name") != "a.md" || f.cli.count("-C /ws/ftest notes rm a.md --if-hash sha256:ab") != 1 {
+		t.Errorf("an unchanged title: %d %s", w.Code, w.Body)
+	}
+	// The name is taken: nothing is removed.
+	f.cli.fail("--json -C /ws/ftest notes write taken.md --if-hash ", errors.New("taken.md exists"))
+	r = req("POST", "/p/ftest/notes/write/a.md?if-hash=sha256:ab&as=Taken", nil)
+	r.Body = io.NopCloser(strings.NewReader("x"))
+	if w := f.do(r); w.Code != 422 || f.cli.count("-C /ws/ftest notes rm a.md --if-hash sha256:ab") != 1 {
+		t.Errorf("rename onto a note: %d %s", w.Code, w.Body)
 	}
 	r = req("POST", "/p/ftest/notes/write/a.md?if-hash=sha256:ab", nil)
 	r.Header.Del("Origin")

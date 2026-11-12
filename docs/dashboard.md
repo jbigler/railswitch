@@ -135,7 +135,8 @@ browser's back button works too). Clicking a worktree opens its detail;
 their two panes; a settings table
 still wider than the window scrolls its pane.
 
-- **Header** (D170): "RailSwitch", then the labelled **project** group:
+- **Header** (D170): it stays at the top of the window as the page
+  scrolls (D205). "RailSwitch", then the labelled **project** group:
   the project button (the prefix, or "choose"; opens the switcher) and,
   with a project, after a thin divider, `Worktrees` (its page, at the
   worktree last shown: kept per project in the browser's `localStorage`), `Images`,
@@ -228,9 +229,9 @@ still wider than the window scrolls its pane.
     as a job; only with a `test` task), **Terminal ▾** (below) and **⋯**:
     PR page, `Down…` and `Remove…` (see Actions).
   - **Tabs:** Overview, Agent, Tests
-    (with a `test` task), Database (with a data service) and Jobs.
-    Overview shows every card, each its own height; another tab only its
-    own, full width.
+    (with a `test` task), Database (with a data service), Terminals and
+    Jobs. Overview shows every card, each its own height; another tab only
+    its own, full width.
     Each worktree remembers its own tab while the browser tab is open
     (`sessionStorage`; a reload or a project switch keeps it, closing the
     browser tab forgets it). A worktree not yet shown opens on Overview,
@@ -312,7 +313,8 @@ still wider than the window scrolls its pane.
   - Agent, Tests and Database come last, side by side: each has its own
     tab too.
   - **Jobs** (full width, below the cards; left out of Overview while
-    there are none): see Jobs. The terminal panels dock under it.
+    there are none): see Jobs.
+  - **Terminals**: only on its own tab (D205); see Terminals.
 
 ## Settings
 
@@ -921,15 +923,27 @@ the list's groups order by state, D170). The sort orders each group.
 
 ## Terminals
 
-The worktree's **Terminal ▾** menu opens a live terminal in the page (D149),
-docked under the worktree's jobs; several can be open at once, and one
-already open is shown again rather than opened twice. A panel belongs to
-its worktree (D191): it shows only while that worktree is shown, on every
-tab, and switching to another worktree hides it without ending it. Its
-program keeps running, and the panel comes back as it was, at the window's
-size, when you return. Each worktree's row in the list counts its open
-panels (`▣2`). Removing a worktree closes its panels. Switching project
-loads another page, so it ends them all (leaving asks first).
+The worktree's **Terminal ▾** menu opens a live terminal in the page (D149);
+several can be open at once, and one already open is shown again rather
+than opened twice. A panel belongs to its worktree (D191): it shows only
+while that worktree is shown, and switching to another worktree hides it
+without ending it. A shell, nvim or a task shows on the **Terminals** tab
+(D205), which opens with it and counts the worktree's open ones; no other
+tab shows them. Each worktree's row in the list counts its terminals
+(`▣2`). Removing a worktree closes its panels.
+
+A terminal outlives the page (D205). Its program runs in the dashboard, not
+in the browser tab, until you close its panel (**✕**) or it exits:
+opening Settings, Tidy or another project, reloading, or closing the
+browser tab leaves it running, and nothing asks first. The worktree page
+shows the project's terminals again when it loads, each when its worktree
+and tab are shown, with what it printed meanwhile (the last 1 MiB; a
+full-screen program is made to draw again). A program that exited while
+no page showed it keeps its last output and exit code for the next page,
+once. Restarting the dashboard ends them all. One terminal has one page:
+opened in a second browser tab, it leaves the first, which says so and
+offers **Retry**.
+
 An agent's terminal (from the Agent card or the menu) shows the Agent
 tab first and shows only there. There the worktree's agent terminal
 takes the Agent card's place and the window's height below the tabs,
@@ -938,7 +952,7 @@ own agent terminal open at once. The menu
 ends with **Open window ↗**, the `terminal` action below: a window on the
 desktop, not in the page.
 
-| Button | Runs | When the panel closes |
+| Button | Runs | When its panel is closed (✕) |
 |--------|------|-----------------------|
 | **Agent: <name> ▣**, one per configured agent | `railswitch agent <name>`; with no agent service listed, one entry for the agent the overview shows, else the default. One agent runs per worktree (D62): with another one running, the panel shows its refusal | a service agent keeps running in its session (rejoin with the button or `railswitch agent`); an on-demand agent stops |
 | **nvim ▣** (when the worktree runs nvim) | `railswitch nvim` | nvim keeps running; only this UI goes |
@@ -976,17 +990,24 @@ kitty ignores, so through the session kitty sends Shift+Enter as a plain
 Enter. Map it in `kitty.conf` (`map shift+enter send_text all \x1b\r`);
 the agent takes the ESC Enter as a new line.
 
-The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself:
-while a terminal is open, leaving or closing the page asks first.
+The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself.
+A `Ctrl-W` meant for the shell closes the browser tab, and the terminal
+keeps running: open the dashboard again and it is there.
 **maximize** (then **restore**) makes the panel fill the window; Esc
 stays in the terminal. To fill the screen as well, use the browser's own
 fullscreen (F11), which Esc doesn't end. The dashboard doesn't use the
 page fullscreen API: Esc always ends it in Firefox.
 
-Limits: 8 terminals open at once across the dashboard, hidden ones
-included (the ninth says so);
+Limits: 8 terminals running at once across the dashboard, hidden ones and
+those no page shows included (the ninth says so: close one, from its
+worktree's row `▣`);
 a peer that stops answering pings for 10 s (a dead `ssh -L` tunnel) is
-dropped and its program ended. Nothing a terminal carries is logged. The
+dropped, and its terminal keeps running for the next page. A page that
+gets only the end of a long output is first sent the modes the program
+set (alternate screen, mouse, bracketed paste); a program that set
+anything else at its start and printed over 1 MiB since may need
+restarting. Nothing a terminal carries is logged, and its kept output is
+only in the dashboard's memory. The
 terminal is
 xterm.js drawn on a canvas, WebGL its fallback (the CSP blocks its DOM
 renderer; the canvas draws crisper text than WebGL in Firefox-family

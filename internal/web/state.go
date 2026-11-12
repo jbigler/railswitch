@@ -162,6 +162,9 @@ func (s *Server) loop(ctx context.Context, wakeup <-chan struct{}, poll func(con
 
 // Run polls the projects and forwards job events until ctx ends.
 func (s *Server) Run(ctx context.Context) error {
+	s.ttyMu.Lock()
+	s.ttyBase = ctx
+	s.ttyMu.Unlock()
 	evs, stop := s.c.Jobs.Subscribe()
 	var wg sync.WaitGroup
 	wg.Go(func() {

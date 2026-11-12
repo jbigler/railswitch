@@ -12,14 +12,6 @@ const sendMax = 16 << 10; // the server reads at most 64 KiB per frame
 const FONT = '"Maple Mono NF", "Maple Mono NF CN", "Maple Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono", ui-monospace, Menlo, monospace';
 const FONT_SIZE = 14;
 
-// open counts live terminals: while any is, leaving the page asks first
-// (Ctrl-W, delete-word in a shell, closes the tab before the terminal
-// sees it). Both the dashboard and the office get it from here.
-let open = 0;
-addEventListener('beforeunload', (e) => {
-  if (open > 0) e.preventDefault();
-});
-
 let loaded = null;
 function script(src) {
   return new Promise((ok, fail) => {
@@ -86,9 +78,9 @@ const clipboard = {
 };
 
 // openTerminal fills el with a terminal connected to url (a path).
-// opts.theme overrides colours. Returns {close, focus}.
+// opts.theme overrides colours; opts.quiet leaves the focus where it is.
+// Returns {close, focus}: close ends the terminal's program.
 export function openTerminal(el, url, opts = {}) {
-  open++;
   el.classList.add('term-host');
   const screen = tag('div', 'term-screen');
   const overlay = tag('div', 'term-overlay');
@@ -129,7 +121,8 @@ export function openTerminal(el, url, opts = {}) {
     let exit = null;
     ws.onopen = () => {
       overlay.hidden = true;
-      term.focus();
+      if (!opts.quiet) term.focus(); // quiet: the page showed it again, nobody asked
+      opts.quiet = false; // a Reconnect is asked for
     };
     ws.onmessage = (ev) => {
       if (typeof ev.data === 'string') {
@@ -226,9 +219,11 @@ export function openTerminal(el, url, opts = {}) {
     close() {
       if (closed) return;
       closed = true;
-      open--;
       clearTimeout(timer);
       observer?.disconnect();
+      // The panel's close ends the program; a page that only goes away
+      // leaves it running for the next one (D205).
+      if (sock?.readyState === WebSocket.OPEN) sock.send('{"close":true}');
       sock?.close(1000);
       term?.dispose();
     },

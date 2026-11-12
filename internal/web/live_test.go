@@ -1,10 +1,14 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/sys"
 )
 
 // TestLive serves the dashboard on test fixtures for a look in a browser:
@@ -34,6 +38,15 @@ func TestLive(t *testing.T) {
 	f.cli.set(usageCmd, ftestUsage()) // the usage views (D187): /p/ftest/b, its Agent tab
 	f.cli.set(reviewKey, reviewJSON)  // /p/ftest/review: chips and flagged notes
 	f.cli.set("--json -C /ws/ftest overview", ftestOverview("jb/b", "up", bRunning))
+	// Terminals: every kind runs this script, which prints what it was asked
+	// to run and echoes what is typed. Never a shell: this server lets
+	// every request in.
+	exe := filepath.Join(t.TempDir(), "railswitch")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\necho \"live fixture: railswitch $*\"\nexec cat\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f.s.c.Exe, f.s.c.Run = exe, sys.Exec{}
+	f.s.c.Env = func(context.Context) []string { return []string{"PATH=" + os.Getenv("PATH")} }
 	go f.s.Run(t.Context()) // the pollers: the PRs and agent usage arrive with a page open
 	h := f.s.Handler()
 	t.Logf("serving http://%s/p/ftest (stop with Ctrl-C)", addr)

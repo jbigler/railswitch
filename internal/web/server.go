@@ -63,8 +63,11 @@ type Server struct {
 	tick time.Duration // how often the pollers look whether a poll is due
 	ping time.Duration // SSE keep-alive
 
-	ttyN             atomic.Int32  // terminals open
-	ttyPing, ttyPong time.Duration // a terminal's ping interval and its pong deadline
+	ttyN             atomic.Int32    // terminals running
+	ttyPing, ttyPong time.Duration   // a terminal's ping interval and its pong deadline
+	ttyBase          context.Context // terminals' programs end with it (Run sets the dashboard's)
+	ttyMu            sync.Mutex
+	ttys             map[string]*ttySession // by command; ended ones stay until shown (D205)
 
 	wakeOV, wakePR chan struct{}
 
@@ -83,7 +86,7 @@ func New(c Config) *Server {
 	}
 	s := &Server{
 		c: c, tick: time.Second, ping: 15 * time.Second, ttyPing: ttyPingDef, ttyPong: ttyPongDef,
-		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1),
+		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1), ttyBase: context.Background(),
 		state: map[string]*projectState{}, subs: map[*subscriber]struct{}{},
 	}
 	static := StaticFS()
@@ -107,6 +110,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/virtual-office/whiteboard/{slug}", s.cyberBoard)
 	m.HandleFunc("POST /p/{prefix}/virtual-office/whiteboard/{slug}", s.cyberBoardWrite)
 	m.HandleFunc("GET /p/{prefix}/tty/{slug}/{kind}", s.tty)
+	m.HandleFunc("GET /p/{prefix}/ttys", s.ttyList)
 	m.HandleFunc("GET /events", s.events)
 	m.HandleFunc("GET /p/{prefix}/{slug}/remove", s.removeDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/down", s.downDialog)

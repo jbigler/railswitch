@@ -86,8 +86,10 @@ test("noteFileName: a title is a snake-case file name, a file name stays", () =>
   assert.equal(noteFileName("a".repeat(99) + " b c"), "a".repeat(99) + ".md");
 });
 
-test("termCloses: a shell always, an agent or editor that ended well, a task never", () => {
-  assert.ok(termCloses("/p/a/tty/b/shell", 130));
+test("termCloses: a shell typed into, anything else that ended well, a task never", () => {
+  assert.ok(termCloses("/p/a/tty/b/shell", 130, true), "exit after a failed command");
+  assert.ok(termCloses("/p/a/tty/b/shell", 0, false));
+  assert.ok(!termCloses("/p/a/tty/b/shell", 1, false), "a shell that could not start stays to be read");
   assert.ok(termCloses("/p/a/tty/b/agent?agent=x", 0));
   assert.ok(!termCloses("/p/a/tty/b/agent?agent=x", 1), "a failed agent stays to be read");
   assert.ok(termCloses("/p/a/tty/b/nvim", 0));

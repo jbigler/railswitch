@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termCloses, termFont, termID, settingsTab, noteFileName } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termCloses, termFont, termFontKey, termID, settingsTab, noteFileName } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -491,7 +491,7 @@ async function openTermPanel(btn, again) {
   try {
     const { openTerminal } = await import("/static/term/term.js");
     // Its program ended: the panel goes (#224), unless termCloses keeps it.
-    const onExit = (code) => termCloses(btn.dataset.term, code) && (panel.closeTerm(), true);
+    const onExit = (code, typed) => termCloses(btn.dataset.term, code, typed) && (panel.closeTerm(), true);
     t = openTerminal(host, btn.dataset.term, { quiet: !!again, onExit });
     panel.focusTerm = () => t.focus();
   } catch (err) {
@@ -763,7 +763,6 @@ async function openColors() {
 }
 
 // The Colours dialog's terminal font (#167): this browser's, by name.
-const termFontKey = "railswitch.term.font"; // term.js's fontKey
 document.addEventListener("change", (e) => {
   if (e.target.id !== "term-font") return;
   const name = termFont(e.target.value);

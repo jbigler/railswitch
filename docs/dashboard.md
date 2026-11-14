@@ -402,8 +402,9 @@ explanation is behind a disclosure.
   `[agents.<name>] setup` one command per line; leaving a changed box
   stages `agent.setup` with the whole list (empty removes it).
   **Default agent** (D215, only with two or more agents): a choice of
-  the configured agents, the one `project.toml` marks `default = true`
-  selected ("not set" when none is). Choosing another stages
+  the configured agents, the default agent selected (D140: the one
+  `project.toml` marks `default = true`, else the only one whose package
+  is the built-in default; "not set" when there is none). Choosing another stages
   `agent.default`, which marks it and unmarks the others. The default
   runs for `railswitch agent` without a name and takes the work queue. A
   running agent keeps running: `up` starts the default agent, when it
@@ -1006,10 +1007,12 @@ empty answer, so a program in a container never sees what you copied
 elsewhere. The browser allows the write on `railswitch.localhost` (a secure
 context); Firefox only shortly after a key press in the page, so a copy a
 program makes on its own may not arrive.
-When the program exits the panel closes (D216): a shell's always, an
-agent's or nvim's when it ended well (exit 0); the Terminal menu opens it
-again. A task's panel, and an agent's or nvim's that failed, stays and
-shows `[exited N]` and **Reopen**, so what it printed can be read. If the
+When the program exits the panel closes (D216): a shell's, an agent's or
+nvim's when it ended well (exit 0), and a shell's you pressed a key in
+whatever its code; the Terminal menu opens it again. A task's panel, an
+agent's or nvim's that failed, and a shell's that failed before any key
+(it could not start) stay and show `[exited N]` and **Reopen**, so what
+they printed can be read. If the
 dashboard restarts (a new railswitch
 binary), **Reconnect**: the agent and nvim pick up where they were, a shell
 starts afresh. railswitch's own refusals (another agent running, unset

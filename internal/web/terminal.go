@@ -649,6 +649,9 @@ func (s *Server) tty(w http.ResponseWriter, r *http.Request) {
 				s.ttyClose(t)
 				return
 			case !ok:
+				// Forgotten before the page is told: the same terminal
+				// opened again at once is a new one, not this dying one.
+				s.ttyForget(t)
 				closeWith(c, 4000, "bad message")
 				s.ttyClose(t)
 				return

@@ -12,6 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/jbigler/railswitch/internal/config"
+	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -52,7 +53,8 @@ type firewallRow struct {
 type agentRow struct {
 	Name  string   `json:"name"`
 	Setup []string `json:"setup"`
-	// Default: project.toml marks it default = true (D140).
+	// Default: it is the default agent (D140): marked default = true, or
+	// the only one whose package is the built-in default.
 	Default bool `json:"default"`
 }
 
@@ -226,8 +228,9 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	d.Tasks = render.MergeTasks(st.Pack.Tasks, p.Tasks, p.FreshTasks, p.TerminalTasks)
 	d.Hooks = hooksRow{Deps: append([]string{}, p.Hooks.Deps...), Start: append([]string{}, p.Hooks.Start...), Create: append([]string{}, p.Hooks.Create...)}
 	d.Agents = []agentRow{}
+	def, _ := lifecycle.DefaultAgent(p, st)
 	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
-		d.Agents = append(d.Agents, agentRow{Name: n, Setup: append([]string{}, p.Agents[n].Setup...), Default: p.Agents[n].Default})
+		d.Agents = append(d.Agents, agentRow{Name: n, Setup: append([]string{}, p.Agents[n].Setup...), Default: n == def})
 	}
 	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)

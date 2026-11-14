@@ -119,6 +119,9 @@ func SetDefaultAgent(data, name string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("project.toml: %w", err)
 		}
+		if other != name && !p.Agents[other].Default {
+			continue // nothing to change in it, however it is written
+		}
 		if err := d.plainAgent(other); err != nil {
 			return "", err
 		}

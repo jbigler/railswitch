@@ -89,7 +89,7 @@ type settingsView struct {
 	Firewall     firewallView
 	Hooks        []hookListView
 	AgentSetups  []hookListView // one per agent: Name, its setup as text
-	DefaultAgent string         // the agent project.toml marks default; "": none marked
+	DefaultAgent string         // the default agent (D140); "": none
 	Options      []optionView
 	Links        []linkRowView
 	NewTask      string // ?task=: the Tasks card's Add name, from the palette

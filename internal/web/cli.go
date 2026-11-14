@@ -229,7 +229,7 @@ type projectShow struct {
 type agentShow struct {
 	Name    string   `json:"name"`
 	Setup   []string `json:"setup"`
-	Default bool     `json:"default"` // project.toml marks it the default
+	Default bool     `json:"default"` // it is the default agent (D140)
 }
 
 // hooksShow is project show's hooks (D126): each list's commands.

@@ -1451,7 +1451,7 @@ What the settings page reads: the project's choices, env and links.
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
 | `hooks` | object | `deps`, `start`, `create`: each `[hooks]` list's commands in order (`[]` for none; D126). |
-| `agents` | array | Each `[agents.<name>]` by name: `name`, `setup` (its setup commands in order, never null; D133), `default` (it is marked `default = true`; D140). `[]` without agents. |
+| `agents` | array | Each `[agents.<name>]` by name: `name`, `setup` (its setup commands in order, never null; D133), `default` (it is the default agent, D140: marked `default = true`, or the only one whose package is the built-in default). `[]` without agents. |
 | `firewall` | object | `mode`: `[firewall] mode` (`""`: the default); `effective`: the mode the project's services get (`enforce` with agents, else `log`, unless `mode` is set: D119); `allow`: `app`, `deps`, `agent`, each `[firewall] allow.<profile>` (`[]` for none). |
 | `pack` | object | `ref`: `[stack] pack`; `choices`: the packs Settings offers, sorted, the current one among them: the newest built-in of each name, the workspace's `packs/<name>/` as `local:<name>@N` and the libraries' packs, each that loads with the current pack's app service (so `[stack] app` stays valid) and that the project's other lines resolve with (an option's `works_with`). |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |

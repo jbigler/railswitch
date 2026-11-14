@@ -64,6 +64,9 @@ export function kit(names) {
 }
 
 const FWD = new THREE.Vector3(), TO = new THREE.Vector3(); // per-frame scratch
+// CUT is the height the overview cuts the glass walls at: below the desks'
+// screens and the counters, so what stands behind the glass can be clicked.
+const CUT = 1.0;
 
 // free disposes what a room made for itself: geometries, materials (the
 // hover's copies too) and their textures, never the kit's shared ones.
@@ -197,6 +200,8 @@ export class World {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.5;
+    this.renderer.localClippingEnabled = true;
+    this.cutPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT); // keeps y <= constant
     el.appendChild(this.renderer.domElement);
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.05, 400);
     this.scene = new THREE.Scene();
@@ -304,6 +309,18 @@ export class World {
     if (u.air) u.air.visible = this.mode === 'walk';
     if (u.city) u.city.visible = this.mode === 'walk'; // the overview looks in from where the towers stand
     if (this.mode === 'walk') for (const w of u.walls ?? []) w.visible = true;
+    // the overview cuts the glass walls (u.glass) at CUT: their own copies of
+    // the materials, clipped by one plane that walking moves out of the way
+    if (u.glass && !u.glassCut) {
+      for (const g of u.glass) g.traverse((m) => {
+        if (!m.isMesh || IS_COL.test(m.name)) return;
+        m.material = m.material.clone();
+        m.material.clippingPlanes = [this.cutPlane];
+        m.userData.cut = true;
+      });
+      u.glassCut = true;
+    }
+    this.cutPlane.constant = this.mode === 'walk' ? 1e9 : CUT;
   }
 
   tick(fn) {
@@ -402,7 +419,7 @@ export class World {
   hits(x, y) {
     const r = this.renderer.domElement.getBoundingClientRect();
     this.ray.setFromCamera(new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), this.camera);
-    return this.ray.intersectObjects(this.scene.children, true).filter((h) => !IS_COL.test(h.object.name) && h.object.isMesh !== false && !h.object.isPoints && shown(h.object)); // dust and holo points never catch a click
+    return this.ray.intersectObjects(this.scene.children, true).filter((h) => !IS_COL.test(h.object.name) && h.object.isMesh !== false && !h.object.isPoints && shown(h.object) && !(h.object.userData.cut && h.point.y > this.cutPlane.constant)); // dust and holo points never catch a click, nor glass cut away
   }
 
   pick(x, y) {

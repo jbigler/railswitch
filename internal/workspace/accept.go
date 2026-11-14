@@ -37,7 +37,7 @@ func runAccepted(cat *pack.Catalog, p *config.Project, lock *config.Lock, s lock
 	var unusable []stackPkg
 	for _, x := range projectPackages(p) {
 		e, ok := lockedEntry(lock, x.kind, x.key, x.ref, cat.Libraries)
-		if slices.Contains(keep, x.ref) || slices.Contains(pending, x.ref) || !ok {
+		if slices.Contains(keep, x.ref) || slices.Contains(pending, x.ref) || !ok || installs(lock, x, cat.Libraries) {
 			continue
 		}
 		if files, err := catalogFiles(cat, x.kind, x.ref); err == nil && files != nil {
@@ -523,8 +523,9 @@ func CheckInstalled(root string, p *config.Project, libs pack.Libraries) error {
 
 // lockedEntry is what lock accepted for ref r of kind under key: its
 // table's entry, or the entry a write dropped (Removed). Load, ejects and
-// Lock all ask it, so a ref back from Removed runs and ejects its accepted
-// copy, as Lock keeps it.
+// Lock all ask it, so a built-in or local ref back from Removed runs and
+// ejects its accepted copy, as Lock keeps it. A library ref back from
+// Removed is an install (installs): runAccepted leaves it as resolved.
 func lockedEntry(lock *config.Lock, kind, key string, r pack.Ref, libs pack.Libraries) (config.LockEntry, bool) {
 	if o, ok := table(lock, kind)[key]; ok && Pins(o, r, libs) {
 		return o, true

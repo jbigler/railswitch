@@ -113,11 +113,10 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 	if err != nil {
 		return text, nil, nil
 	}
-	// Ejects copy what the lock will run: a built-in or local package back
-	// from [[removed]] at its accepted content (workspace.Accepted), never a
-	// change not reviewed yet; a library package new to the lock's tables
-	// is installed at its current verified content (the install review),
-	// which the workspace's catalog holds.
+	// Ejects copy what the lock will run (workspace.Accepted decides per
+	// ref, as Lock does): a ref the lock pins at its accepted content, never
+	// a change not reviewed yet; a library package new to the lock's tables
+	// at its current verified content (the install review).
 	cat, err := workspace.Accepted(e.WS.Root, p, e.WS.Catalog)
 	if err != nil {
 		return text, nil, err
@@ -125,21 +124,6 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 	st, err := cat.Resolve(p)
 	if err != nil {
 		return text, nil, nil
-	}
-	installed, err := e.WS.Catalog.Resolve(p)
-	if err != nil {
-		return text, nil, nil
-	}
-	filesOf := func(ch *pack.Chosen) fs.FS {
-		if ch.Ref.Library == "" {
-			return ch.Option.Files
-		}
-		for _, c := range installed.Options {
-			if c.Key == ch.Key {
-				return c.Option.Files
-			}
-		}
-		return ch.Option.Files
 	}
 	oldSt, err := e.WS.Catalog.Resolve(old)
 	if err != nil {
@@ -182,7 +166,7 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 		if _, err := os.Lstat(filepath.Join(e.WS.Root, "containerfiles", a.File)); err == nil {
 			continue // a copy you had: kept as it is
 		}
-		def, err := fs.ReadFile(filesOf(ch), a.File)
+		def, err := fs.ReadFile(ch.Option.Files, a.File)
 		if err != nil {
 			return "", nil, err
 		}
@@ -199,7 +183,7 @@ func (e Env) syncAddons(before, text string) (string, map[string][]byte, error) 
 		if _, err := os.Lstat(filepath.Join(e.WS.Root, "containerfiles", b)); err == nil {
 			continue // a copy you had: kept as it is
 		}
-		def, err := fs.ReadFile(filesOf(ch), b)
+		def, err := fs.ReadFile(ch.Option.Files, b)
 		if err != nil {
 			return "", nil, err
 		}

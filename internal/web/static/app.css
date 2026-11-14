@@ -587,7 +587,7 @@ details.more summary{cursor:pointer;color:var(--blue);font-weight:700}
 .spanel :where(.set-table:not(.fw-rows) tbody tr:nth-child(even)) td{background:color-mix(in srgb,var(--bg2) 60%,var(--bg))}
 
 /* The Whiteboard tab (D218): outside the detail the event stream redraws, filled when the tab shows. */
-#board{display:none;margin-top:16px}
+#board{display:none;margin:16px 20px} /* the margin .wt .terms has */
 body[data-tab=whiteboard] #board{display:block}
 .board-pic{display:block;max-width:100%;max-height:calc(100vh - 16rem);border:1px solid var(--border);border-radius:6px}
 .board-dl{margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--muted)}

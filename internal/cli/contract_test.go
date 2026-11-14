@@ -70,6 +70,8 @@ func TestDashboardContract(t *testing.T) {
 	f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\n")}, nil)
 	mustRunStdin(t, f, "", "-C", ws, "-w", "feat", "db", "snapshot", "s1")
 	mustRunStdin(t, f, "", "-C", ws, "-w", "feat", "agent", "queue", "add", "fix", "the", "build")
+	// A whiteboard with both pictures (D218).
+	mustRunStdin(t, f, `{"scene":{"type":"excalidraw","version":2,"elements":[{"id":"a"}],"appState":{},"files":{}},"png":"`+pngB64(t, 2, 1)+`","png_light":"`+pngB64(t, 1, 2)+`"}`, "-C", ws, "-w", "feat", "whiteboard", "write", "--if-hash", "")
 	// Written now, so agent usage counts it today whatever day the test runs;
 	// clean puts both times back to fixed ones.
 	now := time.Now().Unix()

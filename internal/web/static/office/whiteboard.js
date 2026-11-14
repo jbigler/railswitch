@@ -2,11 +2,12 @@
 // office; saving keeps the scene and a picture of it, which the board then
 // shows. Both live with the worktree (railswitch whiteboard), so the
 // drawing stays until wt rm. Excalidraw is vendored in /static/whiteboard/
-// (tools/whiteboard/build.sh) and loaded on first use.
+// (tools/whiteboard/build.sh) and loaded on first use. The dashboard's own
+// editor page (board.js, D218) loads it through here too.
 const ASSETS = '/static/whiteboard/';
 let lib = null;
 
-function load() {
+export function load() {
   if (!lib) {
     window.EXCALIDRAW_ASSET_PATH = new URL(ASSETS, location.href).href; // its fonts, from here (an absolute URL, or it falls back to a CDN)
     const css = document.createElement('link');
@@ -24,6 +25,16 @@ const b64 = async (blob) => {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 };
+
+// boardBody is what saving editor ed sends ({scene, png, png_light} as
+// JSON), or null for an empty board, which a save clears; png is the dark
+// picture's base64 ("" when cleared), for the office's glass board.
+export async function boardBody(ed) {
+  const { scene, png, light } = await ed.save();
+  if (!scene.elements.length) return { body: null, png: '' };
+  const pic = await b64(png);
+  return { body: JSON.stringify({ scene, png: pic, png_light: await b64(light) }), png: pic };
+}
 
 // picture decodes a board's base64 PNG for the 3D board ("" → null), with
 // no URL: the page's CSP allows images from 'self' only.
@@ -75,10 +86,9 @@ export async function editBoard(title, doc, save, onSaved) {
       done.disabled = cancel.disabled = true;
       status.textContent = 'saving…';
       try {
-        const { scene, png } = await ed.save();
-        const pic = png ? await b64(png) : '';
-        doc.hash = await save(scene.elements.length ? JSON.stringify({ scene, png: pic }) : null);
-        onSaved(scene.elements.length ? pic : '');
+        const { body, png } = await boardBody(ed);
+        doc.hash = await save(body);
+        onSaved(png);
         close();
       } catch (e) {
         status.textContent = `not saved: ${e.message}`;

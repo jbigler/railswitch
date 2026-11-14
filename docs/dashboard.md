@@ -232,8 +232,8 @@ still wider than the window scrolls its pane.
     as a job; only with a `test` task), **Terminal ▾** (below) and **⋯**:
     PR page, `Down…` and `Remove…` (see Actions).
   - **Tabs:** Overview, Agent, Tests
-    (with a `test` task), Database (with a data service), Terminals and
-    Jobs. Overview shows every card, each its own height; another tab only
+    (with a `test` task), Database (with a data service), Whiteboard,
+    Terminals and Jobs. Overview shows every card, each its own height; another tab only
     its own, full width.
     Each worktree remembers its own tab while the browser tab is open
     (`sessionStorage`; a reload or a project switch keeps it, closing the
@@ -325,6 +325,24 @@ still wider than the window scrolls its pane.
   - **Jobs** (full width, below the cards; left out of Overview while
     there are none): see Jobs.
   - **Terminals**: only on its own tab (D205); see Terminals.
+  - **Whiteboard** (only on its own tab, D218): the worktree's board, the
+    one the Virtual Office's glass wall shows (D151). The tab reads it
+    (`whiteboard show`) each time it is shown, not on live updates. It
+    shows the board's picture for the theme: the light picture in the
+    light theme, the dark one in the dark theme (a board saved before
+    D218 has only the dark one, shown in both until its next save).
+    **Edit** (**Draw** without a board) opens the editor on a page of its
+    own, `/p/<prefix>/<slug>/whiteboard`: Excalidraw filling the window,
+    in the dashboard's light or dark theme. **Save and close** writes the
+    drawing and both pictures (`whiteboard write`) and goes back to the
+    tab; **Discard changes** goes back without saving; leaving the page
+    another way with changes asks first. Saving an empty board clears
+    it, and a save is refused when the board was saved since the page
+    opened it. **Clear** asks first, then runs `whiteboard rm`, refused
+    the same way. **Download** gives the picture for the theme shown and
+    the drawing (`<slug>-whiteboard.excalidraw`, which opens in any
+    Excalidraw). `wt rm` deletes the board with the worktree, and the
+    Remove dialog says so when there is one.
 
 ## Settings
 
@@ -1413,8 +1431,9 @@ any open page.
     review, review app. **The whiteboard** (a glass board 2.4 m wide by the
     wall, D151) opens Excalidraw over the whole page: draw, write, paste a
     picture. **Save and close** keeps the drawing with the worktree
-    (`railswitch whiteboard`), and the board then shows it, in Excalidraw's
-    dark mode, until you change it or `wt rm` removes the worktree; an empty
+    (`railswitch whiteboard`, with a picture on white for the worktree
+    page's Whiteboard tab, D218), and the board then shows it, in
+    Excalidraw's dark mode, until you change it or `wt rm` removes the worktree; an empty
     board clears it. **Discard changes** closes without saving. A save is
     refused when someone saved the board since you opened it: open it again.
     While the editor is open the office ignores its own keys (`T`, `V`,

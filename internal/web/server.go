@@ -126,6 +126,9 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/{slug}/pr", s.prPage)
 	m.HandleFunc("POST /p/{prefix}/{slug}/pr/{action}", s.prAction)
 	m.HandleFunc("GET /p/{prefix}/{slug}/agent-default", s.agentDefaultDialog)
+	m.HandleFunc("GET /p/{prefix}/{slug}/whiteboard", s.boardEdit)
+	m.HandleFunc("GET /p/{prefix}/{slug}/whiteboard-panel", s.boardPanelPage)
+	m.HandleFunc("GET /p/{prefix}/{slug}/whiteboard-file", s.boardFile)
 	m.HandleFunc("GET /p/{prefix}/{slug}/snapshots", s.snapshotsDialog)
 	m.HandleFunc("GET /p/{prefix}/{slug}/queue", s.queueDialog)
 	m.HandleFunc("GET /issue", s.issue)
@@ -439,7 +442,9 @@ func (s *Server) removeDialog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unknown worktree", http.StatusNotFound)
 		return
 	}
-	s.html(w, http.StatusOK, "remove", removeView{Slug: wt.Slug, Dir: rows[i].Dir, Dirty: rows[i].Dirty, URL: "/p/" + p.Prefix + "/" + wt.Slug + "/remove"})
+	// A board that can't be read is no reason to hold up the dialog.
+	board, _ := readBoard(r.Context(), s.c.CLI, p.Workspace, wt.Slug)
+	s.html(w, http.StatusOK, "remove", removeView{Slug: wt.Slug, Dir: rows[i].Dir, Dirty: rows[i].Dirty, Board: board.Hash != "", URL: "/p/" + p.Prefix + "/" + wt.Slug + "/remove"})
 }
 
 // downDialog confirms down: what it deletes, and a snapshot first when the

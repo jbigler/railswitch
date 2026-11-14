@@ -585,3 +585,17 @@ details.more summary{cursor:pointer;color:var(--blue);font-weight:700}
 .fw-live select{padding:3px 6px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:4px;font:inherit}
 /* Every table in a Settings tab stripes its rows; :where keeps a staged or removed row's own colour on top. */
 .spanel :where(.set-table:not(.fw-rows) tbody tr:nth-child(even)) td{background:color-mix(in srgb,var(--bg2) 60%,var(--bg))}
+
+/* The Whiteboard tab (D218): outside the detail the event stream redraws, filled when the tab shows. */
+#board{display:none;margin-top:16px}
+body[data-tab=whiteboard] #board{display:block}
+.board-pic{display:block;max-width:100%;max-height:calc(100vh - 16rem);border:1px solid var(--border);border-radius:6px}
+.board-dl{margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--muted)}
+.board-dl .ln{margin:0}
+.dl-light{display:none}
+@media (prefers-color-scheme: light){.dl-light{display:inline-block}.dl-dark{display:none}}
+/* The editor page (D218) */
+body.board-edit{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+.board-edit>header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)}
+.board-edit .board-status{flex:1;color:var(--muted)}
+.board-edit .board-host{flex:1;position:relative;min-height:0}

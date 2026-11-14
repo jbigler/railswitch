@@ -1,0 +1,29 @@
+{{/* The Whiteboard tab's content (D218): the picture for the theme shown
+(the dark one when the board has no light one), and its buttons. */}}
+{{define "board-panel"}}<div class="board-panel" data-slug="{{.Slug}}">
+{{if .Hash}}{{if .Dark}}<picture>{{if .Light}}<source media="(prefers-color-scheme: light)" srcset="{{.FileURL}}board-light.png">{{end}}<img class="board-pic" src="{{.FileURL}}board.png" alt="The whiteboard of {{.Slug}}"></picture>
+{{else}}<p class="muted">This drawing has no picture: open it to see it.</p>
+{{end}}<div class="btns start"><a class="ln main" href="{{.EditURL}}">Edit</a><button type="button" class="ln danger" data-board-clear="{{.ClearURL}}">Clear</button>
+<span class="board-dl">Download {{if .Dark}}{{if .Light}}<a class="ln dl-light" href="{{.FileURL}}board-light.png&amp;dl=1" download>Picture</a><a class="ln dl-dark" href="{{.FileURL}}board.png&amp;dl=1" download>Picture</a>{{else}}<a class="ln" href="{{.FileURL}}board.png&amp;dl=1" download>Picture</a>{{end}}{{end}}<a class="ln" href="{{.FileURL}}board.excalidraw&amp;dl=1" download title="Opens in Excalidraw">Drawing (.excalidraw)</a></span></div>
+{{else}}<p class="muted">No drawing yet. The board is the one the Virtual Office's glass wall shows; it goes when the worktree is removed.</p>
+<div class="btns start"><a class="ln main" href="{{.EditURL}}">Draw</a></div>
+{{end}}</div>{{end}}
+
+{{/* The editor page (D218): Excalidraw filling the window, board.js. */}}
+{{define "board-edit"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/theme.css" id="theme">
+<script src="/static/board.js" type="module"></script>
+</head>
+<body class="board-edit" data-board="{{.BoardURL}}" data-back="{{.BackURL}}">
+<header><b class="mono">{{.Slug}}</b> · Whiteboard<span class="board-status" id="board-status">loading…</span>
+<button type="button" class="ln" id="board-discard">Discard changes</button><button type="button" class="ln main" id="board-save" disabled>Save and close</button></header>
+<div class="board-host" id="board-host"></div>
+</body>
+</html>
+{{end}}

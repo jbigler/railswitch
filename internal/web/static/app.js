@@ -186,6 +186,29 @@ function showTab(tab) {
   body.dataset.tab = tab;
   tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
   termsShown();
+  // The Whiteboard tab reads its board each time it is shown, not on each
+  // redraw of the detail (D218).
+  const shown = tab === "whiteboard" ? slug : "";
+  if (shown && shown !== boardShown) loadBoardPanel(shown);
+  boardShown = shown;
+}
+
+// The Whiteboard tab (D218): its content, read from the server.
+let boardShown = ""; // the worktree whose board the tab shows; "": the tab is hidden
+async function loadBoardPanel(slug) {
+  const box = $("#board");
+  if (!box) return;
+  let html;
+  try {
+    const r = await fetch("/p/" + encodeURIComponent(prefix) + "/" + encodeURIComponent(slug) + "/whiteboard-panel", { credentials: "same-origin" });
+    html = r.ok ? await r.text() : "";
+    if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+  } catch (e) {
+    html = "";
+    if (boardShown === slug) box.textContent = "The whiteboard did not load: " + e.message;
+    return;
+  }
+  if (boardShown === slug) box.innerHTML = html; // still the worktree shown
 }
 
 // The list's filter: a worktree shows while its name or branch holds the
@@ -296,6 +319,18 @@ document.addEventListener("click", (e) => {
   if (t.closest("[data-colors]")) return openColors();
   if (t.closest("[data-notify]")) {
     Notification.requestPermission().then(() => afterSwap("header"));
+    return;
+  }
+  // The Whiteboard tab's Clear (D218): refused when the board was saved
+  // since the tab read it.
+  const clear = t.closest("[data-board-clear]");
+  if (clear) {
+    if (!confirm("Clear this worktree's whiteboard? The drawing is deleted.")) return;
+    const slug = clear.closest(".board-panel").dataset.slug;
+    fetch(clear.dataset.boardClear, { method: "POST", credentials: "same-origin" }).then(async (r) => {
+      if (!r.ok) return toast("The whiteboard was not cleared: " + ((await r.text()).trim() || r.statusText), true);
+      if (boardShown === slug) loadBoardPanel(slug);
+    }, (e) => toast("The whiteboard was not cleared: " + e.message, true));
     return;
   }
   // A row of the Terminals list goes to its terminal (#226): the

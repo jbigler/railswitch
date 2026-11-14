@@ -775,7 +775,7 @@ func (v detailView) Tabs() tabsView {
 	if v.SnapshotsURL != "" {
 		t = append(t, tabView{Key: "database", Label: "Database"})
 	}
-	return tabsView{Label: "Worktree sections", Tabs: append(t, tabView{Key: "terminals", Label: "Terminals"}, tabView{Key: "jobs", Label: "Jobs"})}
+	return tabsView{Label: "Worktree sections", Tabs: append(t, tabView{Key: "whiteboard", Label: "Whiteboard"}, tabView{Key: "terminals", Label: "Terminals"}, tabView{Key: "jobs", Label: "Jobs"})}
 }
 
 // serviceView is a service row: LogsURL (Dozzle, by container name) while
@@ -970,6 +970,7 @@ type downView struct{ Slug, URL, SnapshotsURL string }
 type removeView struct {
 	Slug, Dir, URL string
 	Dirty          bool
+	Board          bool // it has a whiteboard drawing, which goes too (D218)
 }
 
 type agentDefaultView struct {

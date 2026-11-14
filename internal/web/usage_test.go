@@ -210,3 +210,20 @@ func TestUsageRangeLinks(t *testing.T) {
 		t.Errorf("segment link: %s", u.HTML)
 	}
 }
+
+// #227: a worktree keeps its colour whichever range ranks it.
+func TestUsageColourOf(t *testing.T) {
+	doc := &usageDoc{}
+	if err := json.Unmarshal([]byte(`{"rows":[{"worktree":"a","output":100},{"worktree":"b","output":50},{"worktree":"c","output":10}]}`), doc); err != nil {
+		t.Fatal(err)
+	}
+	id := func(s string) string { return s }
+	for _, c := range []struct {
+		top  []string
+		want string
+	}{{[]string{"a", "b", "c"}, "[0 1 2]"}, {[]string{"c", "b"}, "[2 1]"}, {[]string{"new", "b"}, "[0 1]"}} {
+		if got := fmt.Sprint(usageColourOf(doc, c.top, id)); got != c.want {
+			t.Errorf("colours of %v = %s, want %s", c.top, got, c.want)
+		}
+	}
+}

@@ -193,7 +193,9 @@ still wider than the window scrolls its pane.
   output; cache reads, cheap rereads, are left out. The 6 worktrees
   with the most in the range get a colour each (theme colours that
   differ in lightness, blue and orange first), the rest share one muted
-  "others" segment whose tooltip lists them. A removed worktree keeps a
+  "others" segment whose tooltip lists them. A worktree's colour is its
+  rank over all 30 days, so it stays the same when you switch the range
+  (D212). A removed worktree keeps a
   segment of its own, muted, never linked, named `<name> (removed
   <day>)`. Each other segment links to its worktree's Agent tab; every
   segment's tooltip (SVG `<title>`) is its day, worktree and tokens.
@@ -1080,7 +1082,14 @@ Every action is a job (below).
   already running: at the next overview). `next` checks the same again
   and types the first item through `agent prompt`, removing it only once
   typed; an agent working, or waiting on a permission or a question, is
-  never typed into. Each delivery shows in Jobs.
+  never typed into. Each delivery shows in Jobs. `next` types one line
+  before the item, the state now of the worktree's pull request (D213):
+  "Pull request status: #123 open (draft), head `abc1234`. Checked
+  14:02." (open, draft, merged with when and by whom, closed, or no pull
+  request for the branch). When `gh` fails or takes over 5 s the line
+  says the state is unknown and to run `gh pr view`; the item is typed
+  all the same. A project on no GitHub repo, or a line that would take
+  the text past 4096 bytes, gets no line.
 - **Open window ↗** (at the end of the Terminal menu) runs `railswitch
   term`: a new terminal tab or window on the host with your shell in the
   worktree's folder.

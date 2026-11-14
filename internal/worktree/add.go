@@ -5,6 +5,7 @@ package worktree
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
@@ -459,8 +461,34 @@ func (m *Manager) register(slug string) (machine.WorktreeEntry, error) {
 	return e, reg.Save()
 }
 
+// seedLimit is the largest seed file copied: a ctags file of a large app
+// is tens of MiB.
+const seedLimit = 64 << 20
+
+// readSeed reads regular file p of the base worktree through its os.Root:
+// containers write that worktree, and a symlink planted as p or as a folder
+// above it must never copy a host file into a new worktree (#57).
+func readSeed(base *os.Root, p string) ([]byte, error) {
+	f, err := base.OpenFile(p, os.O_RDONLY|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		if errors.Is(err, syscall.ELOOP) {
+			return nil, fmt.Errorf("symlink: %w", safefile.ErrRefused)
+		}
+		return nil, err
+	}
+	defer f.Close()
+	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
+		return nil, fmt.Errorf("not a regular file: %w", cmp.Or(err, safefile.ErrRefused))
+	}
+	data, err := io.ReadAll(io.LimitReader(f, seedLimit+1))
+	if err == nil && len(data) > seedLimit {
+		err = fmt.Errorf("larger than %d MiB: %w", seedLimit>>20, safefile.ErrRefused)
+	}
+	return data, err
+}
+
 // seed copies each seed file present in the base worktree and absent in
-// dir, at mode 0600. A file safefile refuses is skipped with a warning.
+// dir, at mode 0600. A file readSeed refuses is skipped with a warning.
 func (m *Manager) seed(base, dir string) error {
 	if len(m.SeedFiles) == 0 {
 		return nil
@@ -470,6 +498,11 @@ func (m *Manager) seed(base, dir string) error {
 		return err
 	}
 	defer root.Close()
+	from, err := os.OpenRoot(base)
+	if err != nil {
+		return err
+	}
+	defer from.Close()
 	for _, p := range m.SeedFiles {
 		if !filepath.IsLocal(p) {
 			fmt.Fprintf(m.Out, "warning: seed file %s skipped: not a path inside the worktree\n", p)
@@ -479,7 +512,7 @@ func (m *Manager) seed(base, dir string) error {
 		if lerr == nil {
 			continue // present in the new worktree: keep it
 		}
-		data, err := safefile.Read(filepath.Join(base, p), safefile.Limit)
+		data, err := readSeed(from, p)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}

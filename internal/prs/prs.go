@@ -28,6 +28,10 @@ type PR struct {
 	Review string `json:"review"` // "approved", "changes_requested", "pending", "none"
 	// ReviewApp is the URL of the PR's review app, "" for none: ReviewApps.
 	ReviewApp string `json:"review_app"`
+	// Merged and MergedBy are when a merged PR merged and who merged it
+	// (GitHub's text: print it through safefile.Printable).
+	Merged   time.Time `json:"-"`
+	MergedBy string    `json:"-"`
 }
 
 // ReviewApps fills in ReviewApp of each open or draft PR of prs: the
@@ -145,6 +149,8 @@ type ghPR struct {
 	State          string    `json:"state"`
 	ReviewDecision string    `json:"reviewDecision"`
 	Checks         []ghCheck `json:"statusCheckRollup"`
+	MergedAt       time.Time `json:"mergedAt"`
+	MergedBy       ghLogin   `json:"mergedBy"`
 }
 
 // NeutralDir is where railswitch runs gh when it names the repo itself:
@@ -169,7 +175,7 @@ func List(ctx context.Context, r sys.Runner, repo string, branches []string) ([]
 		res, err := r.Run(ctx, sys.Cmd{
 			Name: "gh",
 			Args: []string{"pr", "list", "--repo", repo, "--head=" + b, "--state", "all", "--limit", "20",
-				"--json", "number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"},
+				"--json", "number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup,mergedAt,mergedBy"},
 			Dir:     NeutralDir,
 			Env:     append(os.Environ(), "GH_PROMPT_DISABLED=1"),
 			Timeout: 30 * time.Second,
@@ -194,6 +200,7 @@ func List(ctx context.Context, r sys.Runner, repo string, branches []string) ([]
 				State:  state(p),
 				Checks: checks(p.Checks),
 				Review: review(p.ReviewDecision),
+				Merged: p.MergedAt, MergedBy: p.MergedBy.Login,
 			})
 		}
 	}

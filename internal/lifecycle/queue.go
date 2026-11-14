@@ -40,7 +40,10 @@ func QueueHold(a *AgentRow, delivered int64, now time.Time) string {
 // through AgentPrompt (so its refusals apply), and removes the item only
 // once it was typed. It returns the item delivered, or nil and why it
 // held. One delivery runs at a time per worktree; another is a hold.
-func (l *L) QueueNext(ctx context.Context, slug string) (*agentqueue.Item, string, error) {
+// lead (nil: none) is asked once the item may go, for a line to type before
+// it (D213: the PR's state now); a line that would take the text past
+// MaxSend is left out.
+func (l *L) QueueNext(ctx context.Context, slug string, lead func(context.Context) string) (*agentqueue.Item, string, error) {
 	ws := l.WS.Root
 	unlock, ok, err := agentqueue.TryDeliver(ws, slug)
 	if err != nil {
@@ -74,7 +77,13 @@ func (l *L) QueueNext(ctx context.Context, slug string) (*agentqueue.Item, strin
 		return nil, why, nil
 	}
 	it := q.Items[0]
-	if err := l.AgentPrompt(ctx, slug, name, it.Text); err != nil {
+	text := it.Text
+	if lead != nil {
+		if line := lead(ctx); line != "" && len(line)+2+len(text) <= MaxSend {
+			text = line + "\n\n" + text
+		}
+	}
+	if err := l.AgentPrompt(ctx, slug, name, text); err != nil {
 		return nil, "", err
 	}
 	err = agentqueue.Update(ws, slug, func(q *agentqueue.Queue) error {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -13,7 +14,9 @@ import (
 	"github.com/jbigler/railswitch/internal/agentqueue"
 	"github.com/jbigler/railswitch/internal/lifecycle"
 	"github.com/jbigler/railswitch/internal/prs"
+	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
+	"github.com/jbigler/railswitch/internal/workspace"
 )
 
 const agentQueueUsage = "usage: railswitch agent queue add [--issue <n>] [<text>...] (else the text on stdin) | railswitch [--json] agent queue ls | railswitch agent queue rm <id> | railswitch agent queue clear | railswitch agent queue next"
@@ -110,7 +113,7 @@ func cmdAgentQueue(ctx context.Context, e *env, args []string) int {
 		}
 		fmt.Fprintf(e.stdout, "cleared %s's queue\n", slug)
 	case "next":
-		it, why, err := l.QueueNext(ctx, slug)
+		it, why, err := l.QueueNext(ctx, slug, func(ctx context.Context) string { return e.prLead(ctx, l.WS, slug) })
 		if err != nil {
 			return e.fail(err)
 		}
@@ -151,4 +154,53 @@ func (e *env) queueText(ctx context.Context, repoURL string, n int, words []stri
 		return "", fmt.Errorf("agent queue add: no text")
 	}
 	return text, lifecycle.CheckSendText(text)
+}
+
+// prLeadTimeout is how long a queue delivery waits for gh.
+const prLeadTimeout = 5 * time.Second
+
+// prLead is the line a queue delivery types before its item (D213): the
+// state now of the pull request of worktree slug's branch, so an agent
+// back after a while doesn't act on the state it remembers. "" when the
+// project is on no GitHub repo or the worktree on no branch; a gh that
+// fails or is slow gives an "unknown" line, never an error.
+func (e *env) prLead(ctx context.Context, w *workspace.Workspace, slug string) string {
+	repo, err := prs.Repo(w.Project.Project.Repo)
+	if err != nil {
+		return ""
+	}
+	m, err := e.model(ctx, w)
+	if err != nil {
+		return ""
+	}
+	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == slug })
+	if i < 0 || m.Inputs.Worktrees[i].Branch == "" {
+		return ""
+	}
+	wt := m.Inputs.Worktrees[i]
+	ctx, cancel := context.WithTimeout(ctx, prLeadTimeout)
+	defer cancel()
+	list, err := prs.List(ctx, e.run, repo, []string{wt.Branch})
+	if err != nil {
+		return "Pull request status: unknown (gh did not answer). Run `gh pr view` before you state it or act on it."
+	}
+	return prLeadLine(prs.ForBranch(list, wt.Branch, e.headCommit(ctx, wt.Dir)), wt.Branch, time.Now())
+}
+
+// prLeadLine words p (nil: branch has none) as of now.
+func prLeadLine(p *prs.PR, branch string, now time.Time) string {
+	if p == nil {
+		return fmt.Sprintf("Pull request status: no pull request for branch %s. Checked %s.", safefile.Printable(branch), now.Format("15:04"))
+	}
+	state := p.State
+	switch {
+	case state == "draft":
+		state = "open (draft)"
+	case state == "merged" && !p.Merged.IsZero():
+		state += " " + p.Merged.Local().Format("2006-01-02 15:04")
+		if p.MergedBy != "" {
+			state += " by " + strings.TrimSpace(safefile.Printable(p.MergedBy))
+		}
+	}
+	return fmt.Sprintf("Pull request status: #%d %s, head `%.7s`. Checked %s.", p.Number, state, safefile.Printable(p.Head), now.Format("15:04"))
 }

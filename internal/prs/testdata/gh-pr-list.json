@@ -17,7 +17,7 @@
      {"__typename": "CheckRun", "name": "e2e", "status": "IN_PROGRESS", "conclusion": ""}]},
   {"number": 5, "title": "Status pending", "url": "https://github.com/o/n/pull/5", "headRefName": "status", "isDraft": false, "state": "OPEN", "reviewDecision": "",
    "statusCheckRollup": [{"__typename": "StatusContext", "context": "ext", "state": "PENDING"}]},
-  {"number": 6, "title": "Merged", "url": "https://github.com/o/n/pull/6", "headRefName": "merged", "isDraft": false, "state": "MERGED", "reviewDecision": "APPROVED",
+  {"number": 6, "title": "Merged", "url": "https://github.com/o/n/pull/6", "headRefName": "merged", "isDraft": false, "state": "MERGED", "mergedAt": "2026-11-13T09:30:00Z", "mergedBy": {"login": "ann"}, "reviewDecision": "APPROVED",
    "statusCheckRollup": [{"__typename": "CheckRun", "name": "ci", "status": "COMPLETED", "conclusion": "SUCCESS"}]},
   {"number": 7, "title": "Closed", "url": "https://github.com/o/n/pull/7", "headRefName": "closed", "isDraft": false, "state": "CLOSED", "reviewDecision": "",
    "statusCheckRollup": [{"__typename": "StatusContext", "context": "ext", "state": "ERROR"}]},

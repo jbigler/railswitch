@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/testfixture"
@@ -69,7 +70,10 @@ func TestDashboardContract(t *testing.T) {
 	f.On([]string{"podman", "exec", "filial-feat-db", "psql"}, sys.Result{Stdout: []byte("filial_dev\n")}, nil)
 	mustRunStdin(t, f, "", "-C", ws, "-w", "feat", "db", "snapshot", "s1")
 	mustRunStdin(t, f, "", "-C", ws, "-w", "feat", "agent", "queue", "add", "fix", "the", "build")
-	status := `{"v":1,"state":"working","message":"busy","ts":1792919287,"usage":{"input":100,"output":1,"cache_read":0,"cache_write":0,"session":"s1","context":5000,"started":1792919000}}`
+	// Written now, so agent usage counts it today whatever day the test runs;
+	// clean puts both times back to fixed ones.
+	now := time.Now().Unix()
+	status := fmt.Sprintf(`{"v":1,"state":"working","message":"busy","ts":%d,"usage":{"input":100,"output":1,"cache_read":0,"cache_write":0,"session":"s1","context":5000,"started":%d}}`, now, now-287)
 	if err := os.WriteFile(filepath.Join(ws, ".railswitch", "status", "feat", "claude.json"), []byte(status), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +116,14 @@ func TestDashboardContract(t *testing.T) {
 	key := regexp.MustCompile(`ssh-ed25519 [A-Za-z0-9+/=]+`)
 	install := regexp.MustCompile(`"install":\{"hash":"sha256:[0-9a-f]{64}"`) // covers the library's signature
 	bytesRe := regexp.MustCompile(`"bytes":\d+`)
+	stamps := regexp.MustCompile(`"(ts|started)":[1-9]\d*`) // the agent status written above
 	clean := func(out string) string {
+		out = stamps.ReplaceAllStringFunc(out, func(m string) string {
+			if strings.HasPrefix(m, `"ts"`) {
+				return `"ts":1792919287`
+			}
+			return `"started":1792919000`
+		})
 		out = install.ReplaceAllString(out, `"install":{"hash":"sha256:`+strings.Repeat("0", 64)+`"`)
 		out = added.ReplaceAllString(paths.Replace(out), `"added":0`)
 		out = fingerprint.ReplaceAllString(out, "SHA256:"+strings.Repeat("A", 43))

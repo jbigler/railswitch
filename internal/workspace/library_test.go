@@ -285,3 +285,72 @@ func TestSignerWarningsOtherLibrary(t *testing.T) {
 }
 
 func fsStat(fsys fs.FS, name string) (fs.FileInfo, error) { return fs.Stat(fsys, name) }
+
+// #43: a library ref back from [[removed]] is an install, so Load and
+// Accepted (ejects) hold its current content, as Lock installs it, not the
+// copy the lock accepted before.
+func TestLibraryBackFromRemovedIsCurrent(t *testing.T) {
+	ctx := context.Background()
+	root, lib := installRedis(t)
+	if err := Lock(ctx, root, Accept{All: true, Run: sys.Exec{}}); err != nil {
+		t.Fatal(err)
+	}
+	proj := filepath.Join(root, "project.toml")
+	setOption(t, root, "cache", "none")
+	replaceIn(t, proj, "redis    = \"8\"\n", "")
+	if err := Lock(ctx, root, Accept{}); err != nil {
+		t.Fatal(err)
+	}
+	testfixture.WriteFile(t, filepath.Join(lib.Dir(), "options", "redis", "NOTES.md"), "changed\n")
+	lib.Publish(t)
+	setOption(t, root, "cache", "acme:redis@1")
+	replaceIn(t, proj, "postgres = \"16\"", "postgres = \"16\"\nredis    = \"8\"")
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fsStat(w.Stack.Option("cache").Option.Files, "NOTES.md"); err != nil || len(w.Pending) != 0 {
+		t.Errorf("Load holds the removed copy: %v, Pending %v", err, w.Pending)
+	}
+	acc, err := Accepted(root, w.Project, w.Catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err := acc.Option(acmeRedis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fsStat(o.Files, "NOTES.md"); err != nil {
+		t.Errorf("Accepted holds the removed copy: %v", err)
+	}
+}
+
+// #43: a pinned library package that changed, with its accepted copy gone
+// from the store, can't be read from Accepted: no eject copies the update.
+func TestLibraryAcceptedCopyMissing(t *testing.T) {
+	ctx := context.Background()
+	root, lib := installRedis(t)
+	if err := Lock(ctx, root, Accept{All: true, Run: sys.Exec{}}); err != nil {
+		t.Fatal(err)
+	}
+	testfixture.WriteFile(t, filepath.Join(lib.Dir(), "options", "redis", "NOTES.md"), "changed\n")
+	lib.Publish(t)
+	if err := os.RemoveAll(filepath.Join(store(lib.Dirs).Dir, lockOf(t, root).Options["redis"].SHA256)); err != nil {
+		t.Fatal(err)
+	}
+	w, err := Load(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	acc, err := Accepted(root, w.Project, w.Catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err := acc.Option(acmeRedis)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fs.ReadFile(o.Files, "NOTES.md"); err == nil {
+		t.Error("Accepted serves the unreviewed update")
+	}
+}

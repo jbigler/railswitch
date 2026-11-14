@@ -31,7 +31,7 @@ Strip, Banner and Projects. */}}
 <table class="set-table">
 <thead><tr><th>Project</th><th>Worktree</th><th>Terminal</th><th></th></tr></thead>
 <tbody>
-{{range .Items}}<tr><td class="mono">{{.Prefix}}</td><td class="mono"><a href="{{.URL}}">{{.Slug}}</a></td><td>{{.Text}}{{if .Ended}} <span class="muted">exited {{.Exit}}: its worktree page shows the end</span>{{end}}</td><td>{{if not .Ended}}<form method="post" action="/ttys/{{.ID}}/end" data-post data-close><button class="ln danger" title="End this terminal's program">End</button></form>{{end}}</td></tr>
+{{range .Items}}<tr data-tty-go="{{.URL}}" data-prefix="{{.Prefix}}" data-slug="{{.Slug}}" data-tab="{{.Tab}}" title="Go to this terminal"><td class="mono">{{.Prefix}}</td><td class="mono"><a href="{{.URL}}">{{.Slug}}</a></td><td>{{.Text}}{{if .Ended}} <span class="muted">exited {{.Exit}}: its worktree page shows the end</span>{{end}}</td><td>{{if not .Ended}}<form method="post" action="/ttys/{{.ID}}/end" data-post data-close><button class="ln danger" title="End this terminal's program">End</button></form>{{end}}</td></tr>
 {{else}}<tr><td colspan="4" class="muted">No terminal is running.</td></tr>
 {{end}}</tbody>
 </table>

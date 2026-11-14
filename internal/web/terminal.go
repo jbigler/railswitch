@@ -519,6 +519,7 @@ type ttysView struct {
 
 type ttysRow struct {
 	ID, Prefix, Slug, URL, Text string
+	Tab                         string // the worktree tab that shows it (D191)
 	Ended                       bool
 	Exit                        int
 }
@@ -532,6 +533,9 @@ func (s *Server) ttysDialog(w http.ResponseWriter, r *http.Request) {
 		t.mu.Lock()
 		row := ttysRow{ID: t.id, Prefix: t.prefix, Slug: t.slug, URL: "/p/" + t.prefix + "/" + t.slug, Text: t.kind, Ended: t.done, Exit: t.exit}
 		t.mu.Unlock()
+		if row.Tab = "terminals"; t.kind == "agent" {
+			row.Tab = "agent"
+		}
 		if t.label != t.kind {
 			row.Text += ": " + t.label
 		}

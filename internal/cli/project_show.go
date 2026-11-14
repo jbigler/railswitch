@@ -52,6 +52,8 @@ type firewallRow struct {
 type agentRow struct {
 	Name  string   `json:"name"`
 	Setup []string `json:"setup"`
+	// Default: project.toml marks it default = true (D140).
+	Default bool `json:"default"`
 }
 
 // hooksRow is [hooks] (D126): each list's commands in order, never null.
@@ -225,7 +227,7 @@ func buildProjectDoc(w *workspace.Workspace, data []byte) projectDoc {
 	d.Hooks = hooksRow{Deps: append([]string{}, p.Hooks.Deps...), Start: append([]string{}, p.Hooks.Start...), Create: append([]string{}, p.Hooks.Create...)}
 	d.Agents = []agentRow{}
 	for _, n := range slices.Sorted(maps.Keys(p.Agents)) {
-		d.Agents = append(d.Agents, agentRow{Name: n, Setup: append([]string{}, p.Agents[n].Setup...)})
+		d.Agents = append(d.Agents, agentRow{Name: n, Setup: append([]string{}, p.Agents[n].Setup...), Default: p.Agents[n].Default})
 	}
 	d.Pack = packRow{Ref: p.Stack.Pack, Choices: packChoices(w.Catalog, w.Root, p, st)}
 	opts := optionRefs(w.Catalog, w.Root)

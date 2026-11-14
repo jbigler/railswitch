@@ -1,0 +1,29 @@
+package config
+
+import (
+	"strings"
+	"testing"
+)
+
+// D215: SetDefaultAgent marks one agent and unmarks the others, leaving
+// the rest of the text as it was.
+func TestSetDefaultAgent(t *testing.T) {
+	const data = "schema = 1\n\n[agents.claude]\nuse = \"claude@1\"\ndefault = true # mine\n\n[agents.probe]\nuse = \"local:probe@1\"\n\n[agents.probe.env]\nA = \"1\"\n"
+	got, err := SetDefaultAgent(data, "probe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "schema = 1\n\n[agents.claude]\nuse = \"claude@1\"\n\n[agents.probe]\nuse = \"local:probe@1\"\ndefault = true\n\n[agents.probe.env]\nA = \"1\"\n"
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+	if again, err := SetDefaultAgent(got, "probe"); err != nil || again != got {
+		t.Errorf("setting it again changed the text: %v\n%s", err, again)
+	}
+	if _, err := SetDefaultAgent(data, "nobody"); err == nil || !strings.Contains(err.Error(), "no agent nobody") {
+		t.Errorf("unknown agent: %v", err)
+	}
+	if _, err := SetDefaultAgent("schema = 1\nagents = { a = { use = \"a@1\" }, b = { use = \"b@1\" } }\n", "a"); err == nil {
+		t.Error("an inline agents table was edited")
+	}
+}

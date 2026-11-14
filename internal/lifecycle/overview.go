@@ -58,6 +58,8 @@ type Overview struct {
 	Prefix    string             `json:"prefix"`
 	Workspace string             `json:"workspace"`
 	Worktrees []OverviewWorktree `json:"worktrees"` // registry order (ID)
+	// DefaultAgent is the agent run when none is named (D140); "" for none.
+	DefaultAgent string `json:"default_agent"`
 	// ReviewPending: a package update waits for review (lock --review), D97.
 	ReviewPending bool `json:"review_pending"`
 	// SignerWarnings: locked library packages whose signer is distrusted
@@ -155,6 +157,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 		return Overview{}, err
 	}
 	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust()), DefaultsChanged: []string{}}
+	ov.DefaultAgent, _ = defaultAgent(m)
 	if rec := l.WS.Project.Template; rec != nil {
 		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
 		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()

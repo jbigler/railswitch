@@ -284,6 +284,7 @@ label.agent-setup.staged textarea{border-color:var(--accent);background:color-mi
 .lbl a.quiet-link:hover{text-decoration:underline}
 .agent-default{margin:8px 0 12px}
 .agent-default h3{margin:0 0 4px}
+.ad-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px}
 .hd-group{display:flex;flex-wrap:wrap;align-items:center;gap:2px 4px;padding:2px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
 .hd-cap{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-right:4px}
 .hd-div{width:1px;align-self:stretch;margin:2px 4px;background:var(--border)}

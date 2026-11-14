@@ -39,6 +39,7 @@ type overview struct {
 	// DefaultsChanged: Containerfiles (<name>) ejected from a default that changed since.
 	DefaultsChanged []string   `json:"defaults_changed"`
 	Worktrees       []worktree `json:"worktrees"`
+	DefaultAgent    string     `json:"default_agent"` // the agent run when none is named; "": none
 }
 
 // signerWarning is a locked library package whose signer is no longer
@@ -226,8 +227,9 @@ type projectShow struct {
 
 // agentShow is one of project show's agents: its setup commands (D133).
 type agentShow struct {
-	Name  string   `json:"name"`
-	Setup []string `json:"setup"`
+	Name    string   `json:"name"`
+	Setup   []string `json:"setup"`
+	Default bool     `json:"default"` // project.toml marks it the default
 }
 
 // hooksShow is project show's hooks (D126): each list's commands.

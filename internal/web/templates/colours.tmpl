@@ -12,5 +12,8 @@
 </form>
 <form method="post" action="/colors/reset" class="colors-reset"><input type="hidden" name="mode" value="{{.Mode}}"><button class="ln">Reset to preset</button></form>
 </div>
-{{end}}<div class="btns"><button type="button" class="ln" data-cancel>Close</button></div>
+{{end}}<h3>Terminal font</h3>
+<label>Font <input type="text" id="term-font" maxlength="60" placeholder="Maple Mono, then JetBrains Mono" autocomplete="off" spellcheck="false"></label>
+<p class="note">A font installed on this computer, by name. It is kept in this browser and used by the terminals opened from now on; empty goes back to the usual ones.</p>
+<div class="btns"><button type="button" class="ln" data-cancel>Close</button></div>
 </div>{{end}}

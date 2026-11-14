@@ -32,6 +32,7 @@ export function target(e) {
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
   if (e.op === "agent.setup") return "agent-setup " + e.key;
+  if (e.op === "agent.default") return "agent-default";
   return e.op + " " + e.label;
 }
 
@@ -71,6 +72,22 @@ export function pageQuery(sort, days) {
 // is the one shown: an agent's on the Agent tab, any other on Terminals.
 export function termShown(panel, slug, tab) {
   return slug !== "" && panel.slug === slug && tab === (panel.agent ? "agent" : "terminals");
+}
+
+// termCloses (#224) says whether a terminal panel closes by itself when
+// its program exits with code: a shell always; an agent or an editor that
+// ended well; a task never, since its output is what you ran it for. A
+// failed agent or editor stays, so what it printed last can be read.
+export function termCloses(url, code) {
+  const kind = new URL(url, "http://x").pathname.split("/").pop();
+  return kind === "shell" || (kind !== "task" && code === 0);
+}
+
+// termFont (#167) is the terminal font a browser chose, safe to put in a
+// CSS font-family list: letters, digits, spaces and - _ only; "" for none.
+export function termFont(name) {
+  name = String(name || "").trim();
+  return /^[A-Za-z0-9 _-]{1,60}$/.test(name) ? name : "";
 }
 
 // termID names a terminal by its URL, however its query is written: the

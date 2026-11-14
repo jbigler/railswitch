@@ -509,7 +509,7 @@ func TestTTYEndFromList(t *testing.T) {
 	waitPID(t, pidFile)
 	contains(t, "header", f.do(req("GET", "/p/ftest", nil)).Body.String(), `href="/ttys" data-dialog="ttys"`, "▣ 1/8")
 	list := f.do(req("GET", "/ttys", nil)).Body.String()
-	contains(t, "list", list, "1 of 8 running", `<a href="/p/ftest/b">b</a>`, "task: test x", `action="/ttys/1/end" data-post data-close`)
+	contains(t, "list", list, "1 of 8 running", `<a href="/p/ftest/b">b</a>`, `data-tty-go="/p/ftest/b" data-prefix="ftest" data-slug="b" data-tab="terminals"`, "task: test x", `action="/ttys/1/end" data-post data-close`)
 	noCSPViolation(t, "list", list)
 
 	if w := f.do(req("POST", "/ttys/9/end", nil)); w.Code != 404 {

@@ -159,8 +159,10 @@ function shell(k, scene, deco, ui) {
 
   // The glass rooms; each door slides open as the walker comes near.
   const glassDoors = [];
+  scene.userData.glass = [];
   for (const [name, x, z, ry] of GLASS) {
     const g = put(k, scene, name, x, 0, z, ry);
+    scene.userData.glass.push(g); // the overview cuts them low (world.js)
     if (name === 'Arch_GlassWall_Door_4m') glassDoors.push(g);
   }
 

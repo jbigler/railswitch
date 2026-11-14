@@ -1463,7 +1463,8 @@ any open page.
   lobby and every floor; its doors open as you walk up, and stepping in
   front of them opens the list. `Esc` closes a panel.
 - **Two views:** the overview (drag turns the floor, the wheel zooms; the
-  ceiling and the walls facing you are cut away) or first person (`V` or
+  ceiling and the walls facing you are cut away, the glass walls at 1 m, so
+  a click reaches what stands behind them) or first person (`V` or
   **walk**: `W` `A` `S` `D` or the arrows walk, `Shift` runs, drag looks, a
   click acts on what it hits or walks to that spot; furniture and walls stop
   you, and you can always walk out of one). Walking, a drag locks the

@@ -81,7 +81,17 @@ repository.
 
 To copy files git doesn't track (`.env.development.local`, a `tags` file)
 into each new worktree, list them in `[project] seed_files`: `wt add`
-copies each from the base worktree when the new one doesn't have it.
+copies each from the base worktree when the new one doesn't have it:
+
+```toml
+[project]
+seed_files = ["tags", "config/master.key", ".env.development.local"]
+```
+
+Each is a regular file inside the worktree, at most 64 MiB, copied at mode
+0600. A symlink, a file behind a symlinked folder that leaves the worktree,
+or a larger file is skipped with a warning, and a file the base worktree
+doesn't have is skipped silently.
 
 ## Git config
 

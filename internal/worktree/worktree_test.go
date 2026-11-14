@@ -265,8 +265,15 @@ func TestAddPortsConflict(t *testing.T) {
 
 func TestAddSeedFiles(t *testing.T) {
 	e := setup(t)
-	e.m.SeedFiles = []string{".env", "config/master.key"}
+	e.m.SeedFiles = []string{".env", "config/master.key", "tags", "out/passwd"}
 	writeFile(t, filepath.Join(e.base, ".env"), "SECRET=1\n")
+	writeFile(t, filepath.Join(e.base, "tags"), strings.Repeat("x", 2<<20)) // past safefile.Limit
+	// a folder that is a symlink out of the worktree: nothing below it is read
+	outside := t.TempDir()
+	writeFile(t, filepath.Join(outside, "passwd"), "host\n")
+	if err := os.Symlink(outside, filepath.Join(e.base, "out")); err != nil {
+		t.Fatal(err)
+	}
 	writeFile(t, filepath.Join(e.base, "real.key"), "key\n")
 	if err := os.MkdirAll(filepath.Join(e.base, "config"), 0o755); err != nil {
 		t.Fatal(err)
@@ -287,6 +294,12 @@ func TestAddSeedFiles(t *testing.T) {
 	}
 	if exists(filepath.Join(w.Dir, "config", "master.key")) {
 		t.Error("the symlinked config/master.key was copied")
+	}
+	if fi, err := os.Stat(filepath.Join(w.Dir, "tags")); err != nil || fi.Size() != 2<<20 {
+		t.Errorf("tags: %v", err)
+	}
+	if exists(filepath.Join(w.Dir, "out", "passwd")) || !strings.Contains(e.out.String(), "out/passwd") {
+		t.Errorf("a file behind a symlinked folder was copied, or without a warning: %q", e.out.String())
 	}
 	if !strings.Contains(e.out.String(), "config/master.key") {
 		t.Errorf("output %q does not warn about config/master.key", e.out.String())

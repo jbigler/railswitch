@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"math"
 	"net/url"
 	"slices"
@@ -202,6 +203,34 @@ type legendItem struct {
 	Muted                     bool
 }
 
+// usageColourOf is the colour of each of top, the worktrees a chart
+// colours: a worktree's rank by work over all of doc, whatever range is
+// shown, so it keeps its colour from range to range (#227); one ranked past
+// the colours takes the lowest colour left.
+func usageColourOf[T any](doc *usageDoc, top []T, name func(T) string) []int {
+	all := map[string]int64{}
+	for _, r := range doc.Rows {
+		if !r.Removed {
+			all[r.Worktree] += r.work()
+		}
+	}
+	names := slices.SortedFunc(maps.Keys(all), func(a, b string) int { return cmp.Or(cmp.Compare(all[b], all[a]), cmp.Compare(a, b)) })
+	out, taken := make([]int, len(top)), make([]bool, usageColours)
+	for i, w := range top {
+		out[i] = -1
+		if at := slices.Index(names, name(w)); at >= 0 && at < usageColours {
+			out[i], taken[at] = at, true
+		}
+	}
+	for i := range out {
+		if out[i] < 0 {
+			out[i] = slices.Index(taken, false)
+			taken[out[i]] = true
+		}
+	}
+	return out
+}
+
 // chart geometry, in viewBox units; the SVG is drawn this tall in CSS px.
 const (
 	chartW, chartH = 420, 110
@@ -264,9 +293,10 @@ func newUsage(doc *usageDoc, days int, ranges []rangeLink, link func(slug string
 	var ss []series
 	v := &usageView{Days: len(win), Total: tokenText(total), Ranges: ranges, W: chartW, H: chartH,
 		First: dayText(win[0]), Last: dayText(win[len(win)-1])}
+	colour := usageColourOf(doc, live[:min(len(live), usageColours)], func(w *wt) string { return w.name })
 	for i, w := range live {
 		if i < usageColours {
-			c := fmt.Sprintf("u-c%d", i)
+			c := fmt.Sprintf("u-c%d", colour[i])
 			ss = append(ss, series{label: w.name, class: c, url: link(w.name), slug: w.name, perDay: w.perDay})
 			v.Legend = append(v.Legend, legendItem{Name: w.name, Total: tokenText(w.total), Class: c})
 			continue

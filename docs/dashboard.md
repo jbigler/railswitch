@@ -193,7 +193,9 @@ still wider than the window scrolls its pane.
   output; cache reads, cheap rereads, are left out. The 6 worktrees
   with the most in the range get a colour each (theme colours that
   differ in lightness, blue and orange first), the rest share one muted
-  "others" segment whose tooltip lists them. A removed worktree keeps a
+  "others" segment whose tooltip lists them. A worktree's colour is its
+  rank over all 30 days, so it stays the same when you switch the range
+  (D212). A removed worktree keeps a
   segment of its own, muted, never linked, named `<name> (removed
   <day>)`. Each other segment links to its worktree's Agent tab; every
   segment's tooltip (SVG `<title>`) is its day, worktree and tokens.

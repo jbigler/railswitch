@@ -886,11 +886,12 @@ TITLE` (control characters as spaces).
 
 A worktree's office whiteboard (D151), in
 `<workspace>/.railswitch/whiteboard/<slug>/` (`board.excalidraw`, `board.png`,
-0600; read with `safefile.Read`, at most 12 MiB and 4 MiB). Run it in the
-worktree or with `-w <slug>`. `wt rm` removes the folder.
+`board-light.png`, 0600; read with `safefile.Read`, at most 12 MiB, 4 MiB
+and 4 MiB). Run it in the worktree or with `-w <slug>`. `wt rm` removes
+the folder.
 
 ```json
-{"slug": "feat", "hash": "sha256:4be1…", "scene": {"type": "excalidraw", "version": 2, "elements": […], "appState": {…}, "files": {…}}, "png": "iVBORw0KGgo…"}
+{"slug": "feat", "hash": "sha256:4be1…", "scene": {"type": "excalidraw", "version": 2, "elements": […], "appState": {…}, "files": {…}}, "png": "iVBORw0KGgo…", "png_light": "iVBORw0KGgo…"}
 ```
 
 | Field | Type | Meaning |
@@ -898,15 +899,18 @@ worktree or with `-w <slug>`. `wt rm` removes the folder.
 | `slug` | string | The worktree. |
 | `hash` | string | `sha256:<hex>` of the scene file: what `whiteboard write` and `whiteboard rm` take as `--if-hash`; `""` without a board. |
 | `scene` | object or null | The Excalidraw scene as saved (pasted pictures in its `files`); null without a board. |
-| `png` | string | The board's picture, base64 PNG, as the office shows it; `""` for none. |
+| `png` | string | The board's picture, base64 PNG, in dark mode as the office shows it; `""` for none. |
+| `png_light` | string | The same on white, for the dashboard's light theme (D218), base64 PNG; `""` for none (a board saved before D218). |
 
 `whiteboard write --if-hash <h>` reads `{"scene": <Excalidraw scene>, "png":
-"<base64>"}` on stdin and saves both when the board still has hash `h`
-(`""`: there is no board yet). The scene must say `"type": "excalidraw"`
-and have an `elements` array (at most 12 MiB); the picture must be a PNG
-of at most 4 MiB and 4096 px a side, or `""`. The picture is written
-first, then the scene, each through a temp file, under a lock.
-`whiteboard rm --if-hash <h>` clears the board. A stale hash or a refused
+"<base64>", "png_light": "<base64>"}` on stdin (`png_light` optional) and
+saves them when the board still has hash `h` (`""`: there is no board
+yet). The scene must say `"type": "excalidraw"` and have an `elements`
+array (at most 12 MiB); each picture must be a PNG of at most 4 MiB and
+4096 px a side, or `""`. The pictures are written first, then the scene,
+each through a temp file, under a lock; a picture the save has none of is
+removed, so none is left from an earlier save. `whiteboard rm --if-hash
+<h>` clears the board, all three files. A stale hash or a refused
 document exits 1 and changes nothing. With `--json` both print `{"hash":
 …}`, the next edit's `--if-hash` (`""` after `rm`).
 

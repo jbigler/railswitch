@@ -54,6 +54,7 @@ Strip, Banner and Projects. */}}
 {{with .Secrets}}{{template "secrets-needed" .}}{{end}}
 {{template "detail" .Detail}}
 {{template "jobs" .Jobs}}
+<section id="board" class="board-tab" aria-label="Whiteboard"></section>
 <div id="terms" class="terms"></div>
 <p id="terms-none" class="muted">No terminal is open in this worktree. <b>Terminal ▾</b> opens a shell or nvim here; the <kbd>:</kbd> palette runs a task in one. A terminal keeps running when you leave the page, until you close it.</p>
 </section>

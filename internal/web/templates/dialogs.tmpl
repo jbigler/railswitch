@@ -15,7 +15,8 @@
 <li>the checkout <code>{{.Dir}}</code></li>
 <li>its containers and volumes</li>
 <li>its nvim and agent homes</li>
-</ul>
+{{if .Board}}<li>its whiteboard drawing (download it from the Whiteboard tab to keep it)</li>
+{{end}}</ul>
 {{if .Dirty}}<p class="red">{{.Slug}} has uncommitted changes or untracked files. Removing it loses them.</p>
 <label class="check"><input type="checkbox" name="force" value="1" required> Discard changes</label>
 <label>Type <b>{{.Slug}}</b> to confirm <input name="confirm" required autocomplete="off" class="mono"></label>

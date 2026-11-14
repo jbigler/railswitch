@@ -36,11 +36,15 @@ type boardDoc struct {
 	Hash  string          `json:"hash"`  // the scene's sha256, "" without a board
 	Scene json.RawMessage `json:"scene"` // the Excalidraw scene, null without a board
 	PNG   string          `json:"png"`   // the board's picture, base64; "" for none
+	// Light is the picture on white, for the dashboard's light theme
+	// (D218), base64; "" for none (a board saved before it had one).
+	Light string `json:"png_light"`
 }
 
 // railswitch whiteboard show|write|rm: worktree's office whiteboard (D151),
-// <ws>/.railswitch/whiteboard/<slug>/: an Excalidraw scene and the picture
-// the office shows on the board. wt rm removes it with the worktree.
+// <ws>/.railswitch/whiteboard/<slug>/: an Excalidraw scene, the picture
+// the office shows on the board, and the same on white for the dashboard's
+// light theme (D218). wt rm removes it with the worktree.
 func cmdWhiteboard(ctx context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr("%s", whiteboardUsage)
@@ -79,12 +83,12 @@ func cmdWhiteboard(ctx context.Context, e *env, args []string) int {
 	}
 	var doc boardDoc
 	if args[0] == "write" {
-		data, err := io.ReadAll(io.LimitReader(e.stdin, boardSceneMax+boardPNGMax*4/3+4096))
+		data, err := io.ReadAll(io.LimitReader(e.stdin, boardSceneMax+2*boardPNGMax*4/3+4096))
 		if err != nil {
 			return e.fail(err)
 		}
 		if err := json.Unmarshal(data, &doc); err != nil {
-			return e.fail(fmt.Errorf("whiteboard write: stdin is not {\"scene\", \"png\"}: %w", err))
+			return e.fail(fmt.Errorf("whiteboard write: stdin is not {\"scene\", \"png\", \"png_light\"}: %w", err))
 		}
 		if doc.Scene == nil || string(doc.Scene) == "null" {
 			return e.fail(errors.New("whiteboard write: no scene (whiteboard rm clears the board)"))
@@ -93,23 +97,34 @@ func cmdWhiteboard(ctx context.Context, e *env, args []string) int {
 	return boardChange(e, dir, *hash, doc)
 }
 
-func readBoard(dir string) (scene, pic []byte, err error) {
-	scene, err = safefile.Read(filepath.Join(dir, "board.excalidraw"), boardSceneMax)
+// boardFiles are a board's files in dir: its scene, then its pictures.
+var boardFiles = []string{"board.excalidraw", "board.png", "board-light.png"}
+
+// readBoard reads the board in dir: its scene (nil: no board) and its
+// pictures, dark then light (nil: none).
+func readBoard(dir string) (scene, pic, light []byte, err error) {
+	scene, err = safefile.Read(filepath.Join(dir, boardFiles[0]), boardSceneMax)
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	pic, err = safefile.Read(filepath.Join(dir, "board.png"), boardPNGMax)
-	if errors.Is(err, fs.ErrNotExist) {
-		err = nil
+	pics := [2][]byte{}
+	for i, name := range boardFiles[1:] {
+		pics[i], err = safefile.Read(filepath.Join(dir, name), boardPNGMax)
+		if errors.Is(err, fs.ErrNotExist) {
+			err = nil
+		}
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
-	return scene, pic, err
+	return scene, pics[0], pics[1], nil
 }
 
 func boardShow(e *env, dir, slug string) int {
-	scene, pic, err := readBoard(dir)
+	scene, pic, light, err := readBoard(dir)
 	if err != nil {
 		return e.fail(err)
 	}
@@ -117,6 +132,7 @@ func boardShow(e *env, dir, slug string) int {
 	if scene != nil {
 		doc.Hash, doc.Scene = workspace.Hash(scene), scene
 		doc.PNG = base64.StdEncoding.EncodeToString(pic)
+		doc.Light = base64.StdEncoding.EncodeToString(light)
 	}
 	if e.json {
 		if err := json.NewEncoder(e.stdout).Encode(doc); err != nil {
@@ -133,32 +149,44 @@ func boardShow(e *env, dir, slug string) int {
 }
 
 // checkBoard refuses a scene that isn't an Excalidraw document or a picture
-// that isn't a PNG within the limits; it returns the picture's bytes.
-func checkBoard(doc boardDoc) ([]byte, error) {
+// that isn't a PNG within the limits; it returns the pictures' bytes, dark
+// then light.
+func checkBoard(doc boardDoc) (pics [2][]byte, err error) {
 	if len(doc.Scene) > boardSceneMax {
-		return nil, fmt.Errorf("whiteboard write: the scene is over %d MiB", boardSceneMax>>20)
+		return pics, fmt.Errorf("whiteboard write: the scene is over %d MiB", boardSceneMax>>20)
 	}
 	var head struct {
 		Type     string            `json:"type"`
 		Elements []json.RawMessage `json:"elements"`
 	}
 	if err := json.Unmarshal(doc.Scene, &head); err != nil || head.Type != "excalidraw" || head.Elements == nil {
-		return nil, errors.New("whiteboard write: the scene is not an Excalidraw document")
+		return pics, errors.New("whiteboard write: the scene is not an Excalidraw document")
 	}
-	pic, err := base64.StdEncoding.DecodeString(doc.PNG)
+	for i, b64 := range []string{doc.PNG, doc.Light} {
+		if pics[i], err = checkPNG(b64); err != nil {
+			return pics, fmt.Errorf("whiteboard write: %s: %w", []string{"the picture", "the light picture"}[i], err)
+		}
+	}
+	return pics, nil
+}
+
+// checkPNG is b64's PNG, refused unless it is one within the limits; ""
+// is no picture.
+func checkPNG(b64 string) ([]byte, error) {
+	pic, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		return nil, errors.New("whiteboard write: the picture is not base64")
+		return nil, errors.New("not base64")
 	}
 	if len(pic) > boardPNGMax {
-		return nil, fmt.Errorf("whiteboard write: the picture is over %d MiB", boardPNGMax>>20)
+		return nil, fmt.Errorf("over %d MiB", boardPNGMax>>20)
 	}
 	if len(pic) > 0 {
 		c, err := png.DecodeConfig(bytes.NewReader(pic))
 		if err != nil {
-			return nil, fmt.Errorf("whiteboard write: the picture is not a PNG: %w", err)
+			return nil, fmt.Errorf("not a PNG: %w", err)
 		}
 		if c.Width < 1 || c.Height < 1 || c.Width > boardSideMax || c.Height > boardSideMax {
-			return nil, fmt.Errorf("whiteboard write: the picture is %d×%d; at most %d a side", c.Width, c.Height, boardSideMax)
+			return nil, fmt.Errorf("%d×%d; at most %d a side", c.Width, c.Height, boardSideMax)
 		}
 	}
 	return pic, nil
@@ -167,10 +195,10 @@ func checkBoard(doc boardDoc) ([]byte, error) {
 // boardChange writes doc as the board in dir (an empty doc: removes it)
 // when the board still is what the caller read (hash; "": no board).
 func boardChange(e *env, dir, hash string, doc boardDoc) int {
-	var pic []byte
+	var pics [2][]byte
 	if doc.Scene != nil {
 		var err error
-		if pic, err = checkBoard(doc); err != nil {
+		if pics, err = checkBoard(doc); err != nil {
 			return e.fail(err)
 		}
 	}
@@ -179,7 +207,7 @@ func boardChange(e *env, dir, hash string, doc boardDoc) int {
 		return e.fail(err)
 	}
 	defer unlock()
-	cur, _, err := readBoard(dir)
+	cur, _, _, err := readBoard(dir)
 	switch {
 	case err != nil:
 		return e.fail(err)
@@ -188,32 +216,34 @@ func boardChange(e *env, dir, hash string, doc boardDoc) int {
 	case hash != "" && workspace.Hash(cur) != hash:
 		return e.fail(errors.New("the whiteboard changed since it was read: open it again"))
 	}
-	scene, picPath := filepath.Join(dir, "board.excalidraw"), filepath.Join(dir, "board.png")
 	h := ""
-	switch {
-	case doc.Scene == nil:
-		for _, p := range []string{scene, picPath} {
-			if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if doc.Scene == nil {
+		for _, name := range boardFiles {
+			if err := os.Remove(filepath.Join(dir, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return e.fail(err)
 			}
 		}
-	default:
+	} else {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return e.fail(err)
 		}
-		// the picture first: the scene's hash is the board's version
-		if len(pic) == 0 {
-			err = os.Remove(picPath)
-			if errors.Is(err, fs.ErrNotExist) {
-				err = nil
+		// the pictures first: the scene's hash is the board's version; a
+		// picture the save has none of goes, so none is left from before
+		for i, name := range boardFiles[1:] {
+			path := filepath.Join(dir, name)
+			if len(pics[i]) == 0 {
+				err = os.Remove(path)
+				if errors.Is(err, fs.ErrNotExist) {
+					err = nil
+				}
+			} else {
+				err = tomlfile.WriteAtomic(path, pics[i], 0o600)
 			}
-		} else {
-			err = tomlfile.WriteAtomic(picPath, pic, 0o600)
+			if err != nil {
+				return e.fail(err)
+			}
 		}
-		if err == nil {
-			err = tomlfile.WriteAtomic(scene, doc.Scene, 0o600)
-		}
-		if err != nil {
+		if err := tomlfile.WriteAtomic(filepath.Join(dir, boardFiles[0]), doc.Scene, 0o600); err != nil {
 			return e.fail(err)
 		}
 		h = workspace.Hash(doc.Scene)

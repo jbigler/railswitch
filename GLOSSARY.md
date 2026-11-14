@@ -17,3 +17,7 @@ _Avoid_: mutation, operation
 **Dashboard contract**:
 The set of read commands and actions the dashboard depends on, with the exact arguments it passes and the JSON fields it reads from each.
 _Avoid_: dashboard API, JSON schema
+
+**Whiteboard**:
+A worktree's one Excalidraw drawing, kept on the host with a dark and a light picture of it, shown by the Virtual Office's glass wall and the worktree page's Whiteboard tab, and deleted with the worktree.
+_Avoid_: board (alone), canvas, sketch

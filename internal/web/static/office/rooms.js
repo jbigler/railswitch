@@ -344,8 +344,9 @@ function residents(k, scene, deco, ui, androids) {
     case 'jellyfish':
       mine(put(k, scene, 'Pet_JellyfishTank', -3.3, 0, -4.0));
       break;
-    default: // the gecko's terrarium stands on the café counter
-      mine(put(k, scene, 'Pet_Gecko_Terrarium', 1.15, k.point('Furn_CoffeeCounter', 'top')[1], -7.6));
+    default: // the gecko's terrarium stands on a crate: the counter has no room for it beside the espresso machine
+      put(k, scene, 'Deco_Crate', -3.3, 0, -3.6, PI / 2);
+      mine(put(k, scene, 'Pet_Gecko_Terrarium', -3.3, k.point('Deco_Crate', 'top')[1], -3.6, PI / 2));
   }
   // the androids: each a roamer that walks wherever the floor is free
   const models = ['Char_Android_A', 'Char_Android_B', 'Char_Android_C'];
@@ -371,7 +372,7 @@ function zoneSign(scene, text, x, z, ry = 0) {
 // café (the nook at the back, open to the corridor): the vending machines
 // by the elevator's side, the coffee counter and the fridge against the
 // back wall, the clock above, a bistro table. Returns its ticks.
-function cafe(k, scene, deco, gecko) {
+function cafe(k, scene, deco) {
   zoneSign(scene, 'Café', 0, -1.3);
   const ticks = [];
   for (const [name, x, title, color, kind] of [['Tech_Vending_Ramen', -2.95, 'Ramen', 0xff3fae, 'ramen'], ['Tech_Vending_Drinks', -1.8, 'Drinks', 0x29e7ff, 'drinks']]) {
@@ -390,7 +391,6 @@ function cafe(k, scene, deco, gecko) {
   const counter = k.point('Furn_CoffeeCounter', 'top')[1];
   put(k, scene, 'Deco_Mug', 2.9, counter, -7.5);
   put(k, scene, 'Deco_Mug', 3.0, counter, -7.72);
-  if (!gecko) put(k, scene, 'Deco_PizzaBoxes', 1.2, counter, -7.6, 0.2);
   put(k, scene, 'Furn_Stool', 1.4, 0, -6.8);
   put(k, scene, 'Furn_Stool', 2.6, 0, -6.8);
   put(k, scene, 'Furn_SideTable', 0.4, 0, -4.4);
@@ -559,7 +559,7 @@ function lounge(k, scene, deco, ui, accent) {
   put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);
   put(k, scene, 'Deco_BookStack', 8.0, k.point('Furn_CoffeeTable', 'top')[1], -4.7);
   put(k, scene, 'Furn_Armchair', 5.3, 0, -5.0, PI / 2);
-  put(k, scene, 'Furn_SideTable', 5.2, 0, -3.0);
+  put(k, scene, 'Furn_SideTable', 5.3, 0, -6.0); // beside the armchair, clear of the door (x 4…6)
   put(k, scene, 'Deco_FloorLamp', 11.4, 0, -2.6, PI);
   put(k, scene, 'Deco_PizzaBoxes', 5.2, 0, -7.4, 0.3);
   put(k, scene, 'Deco_Backpack', 6.4, 0, -2.7, -1.0);
@@ -817,8 +817,7 @@ export async function lab(slug, n, ui) {
   put(k, scene.userData.ceiling, 'Deco_Plant_Trailing', -10.0, 4, 3.0, deco.r() * 6);
   const pr = station(k, scene, -7.4, 7.2, PI, 'Pull request', 'Pull request: its page (checks, reviews, merge), or all of them', () => ui.prPage(slug), 2.0, 1.1);
 
-  const which = deco.pet;
-  const cafeTicks = cafe(k, scene, deco, which === 'gecko');
+  const cafeTicks = cafe(k, scene, deco);
   const big = lounge(k, scene, deco, ui, deco.accent);
   const holo = meeting(k, scene, deco);
   const gameTicks = gameRoom(k, scene, deco, ui);
@@ -1102,8 +1101,7 @@ export async function lobby(prefix, ui) {
   dirSign.position.set(0, 2.1, 0);
   scene.add(dirSign);
 
-  const which = deco.pet;
-  const cafeTicks = cafe(k, scene, deco, which === 'gecko');
+  const cafeTicks = cafe(k, scene, deco);
   const big = lounge(k, scene, deco, ui, deco.accent);
   const holo = meeting(k, scene, deco);
   const gameTicks = gameRoom(k, scene, deco, ui);

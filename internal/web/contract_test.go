@@ -27,7 +27,7 @@ const contractDir = "../../testdata/contract"
 var contractPages = []string{
 	"/p/filial", "/p/filial/feat", "/p/filial/feat/tasks", "/p/filial/feat/agent-default",
 	"/p/filial/feat/snapshots", "/p/filial/feat/pr", "/p/filial/feat/queue", "/p/filial/feat/remove", "/p/filial/feat/whiteboard-panel",
-	"/p/filial/notes?n=a.md&w=feat&s=a.md", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy/items",
+	"/p/filial/notes?n=a.md&w=feat&s=a.md", "/p/filial/notes?q=note", "/p/filial/settings", "/p/filial/settings/blocked", "/p/filial/tidy/items",
 	"/p/filial/images", "/p/filial/images/edit/base", "/p/filial/library?ref=redis@1", "/p/filial/library?ref=rails@1",
 	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
 	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",
@@ -100,6 +100,7 @@ var contractAbsent = map[string]string{
 	"containerfile-check .used":                "containerfile write prints no used key; pack file write does",
 	"library-ls .libraries[].pending.":         "no fetch waits for trust",
 	"new-dry-run .install.":                    "the template installs no library package",
+	"notes-ls .notes[].line":                   "notes ls has no line; notes search, read into the same rows, does",
 	"office-set-ls .sets[].reason":             "omitempty: every set is valid",
 	"overview .signer_warnings[].":             "the library's signer is trusted",
 	"overview .template.":                      "the project came from no template",

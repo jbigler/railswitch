@@ -19,9 +19,13 @@ suggestion was shown at, so an edit since is refused. */}}
 {{else}}<li class="muted">No suggestions.</li>
 {{end}}</ul>
 <h3>Notes</h3>
-<ul class="lib-list striped">
-{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span><span class="muted src">{{.When}}</span></a></li>
-{{else}}<li class="muted">No notes.</li>
+<form method="get" action="{{.URL}}" class="add-row" role="search">
+<input type="search" id="note-search" name="q" value="{{.Q}}" placeholder="Search titles and text" autocomplete="off" aria-label="Search the notes">
+{{if and .Open (not .New)}}<input type="hidden" name="n" value="{{.Open.Name}}">
+{{end}}</form>
+<ul class="lib-list striped" id="notes-list">
+{{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}{{with $.Q}}&amp;q={{.}}{{end}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span><span class="muted src">{{.When}}</span>{{with .Line}}<span class="muted hit">{{.}}</span>{{end}}</a></li>
+{{else}}<li class="muted">{{if .Q}}No notes match.{{else}}No notes.{{end}}</li>
 {{end}}</ul>
 <form method="get" action="{{.URL}}" class="add-row">
 <input name="new" placeholder="Title of a new note" autocomplete="off" required maxlength="120" pattern=".*[A-Za-z0-9].*" title="A title with a letter or a digit; its file name is made from it" aria-label="New note's title">
@@ -37,7 +41,7 @@ suggestion was shown at, so an edit since is refused. */}}
 <textarea name="text" class="mono" spellcheck="false" rows="28" aria-label="{{.Name}}">
 {{.Text}}</textarea>
 <div id="note-err" class="red" hidden></div>
-<div class="btns"><a class="ln dim" href="{{$.URL}}">Close</a>{{if not $.New}}<button type="button" class="ln danger" data-note-rm>Delete</button>{{end}}<button class="ln main">Save</button></div>
+<div class="btns"><a class="ln dim" href="{{$.URL}}{{with $.Q}}?q={{.}}{{end}}">Close</a>{{if not $.New}}<button type="button" class="ln danger" data-note-rm>Delete</button>{{end}}<button class="ln main">Save</button></div>
 </form>
 {{else}}{{with .Sugg}}<form method="post" action="{{$.InboxPost}}" class="editor" autocomplete="off">
 <h2 class="ed-file">{{noteTitle .Name}} <span class="chip">suggested by {{.Worktree}}</span></h2>

@@ -1779,9 +1779,44 @@ function startNew() {
 // the CLI refuses it when the note changed since; the refusal stays shown
 // and the text stays in the box.
 
+// The notes search (D219): 250 ms after the last key, the list is the
+// page's for ?q= (notes search); an empty box puts the full list back.
+function searchNotes() {
+  const box = $("#note-search");
+  if (!box) return;
+  let full = box.value.trim() ? null : $("#notes-list").cloneNode(true);
+  let timer, seq = 0;
+  box.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const q = box.value.trim();
+      const u = new URL(location.href);
+      if (q) u.searchParams.set("q", q); else u.searchParams.delete("q");
+      history.replaceState(history.state, "", u);
+      const mine = ++seq;
+      let list = !q && full?.cloneNode(true);
+      if (!list) {
+        const r = await fetch(location.pathname + (q ? "?" + new URLSearchParams({ q }) : ""), { credentials: "same-origin" });
+        if (!r.ok) return;
+        list = new DOMParser().parseFromString(await r.text(), "text/html").getElementById("notes-list");
+      }
+      if (mine !== seq || !list) return;
+      // the open note's row stays marked
+      const open = u.searchParams.get("n");
+      for (const a of list.querySelectorAll("a")) {
+        const h = new URL(a.href, location.href);
+        a.closest("li").classList.toggle("cur", h.searchParams.get("n") === open);
+      }
+      if (!q) full = list.cloneNode(true);
+      $("#notes-list").replaceWith(document.adoptNode(list));
+    }, 250);
+  });
+}
+
 function startNotes() {
   // one column: the opened note or suggestion is under the lists.
   if (matchMedia("(max-width:800px)").matches) $(".pane .editor")?.scrollIntoView();
+  searchNotes();
   const f = $("#note");
   if (!f) return;
   const err = $("#note-err");

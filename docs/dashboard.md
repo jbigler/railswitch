@@ -1324,7 +1324,13 @@ working blue, your turn yellow, idle and off muted.
 
 `/p/<prefix>/notes` (`notes` in the header, D155) lists the agents' shared
 notes (`notes/` in the workspace, `railswitch --json notes ls`), newest
-first, and opens one. A note shows as a title made of its file name's words
+first, and opens one. **Search** above the list narrows it as you type
+(D219): 250 ms after the last key the list is `notes search -- <words>`,
+the notes whose title (file name) or text holds every word, ignoring case,
+still newest first, each with the line that matched under its title when
+the words are in its text. The words stay in the URL (`?q=`), so a reload,
+an opened note and Close keep them; an empty box shows every note again.
+**Suggested** is never filtered. A note shows as a title made of its file name's words
 (`agent_queue_design.md` is "Agent queue design": agents name notes in
 snake case) and when it last changed; the file name shows under the title of an
 open note; on a narrow window, where the note is under the lists, the

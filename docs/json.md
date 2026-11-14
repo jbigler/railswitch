@@ -995,6 +995,24 @@ folder lists none. No worktree is needed.
 | `size` | number | Bytes. |
 | `modified` | string | Its modification time, RFC 3339 UTC. |
 
+## `notes search <words>`
+
+The notes (as `notes ls` lists them, newest first) whose file name or text
+holds every word, ignoring case, in any order (D219). Each note is read as
+`notes show` reads it. Pass `--` before words that start with `-`. No words
+is a usage error.
+
+```json
+{"notes": [{"name": "run_db_prepare_after_a_schema_change.md", "modified": "2026-10-31T19:00:32Z", "line": "Run bin/rails db:prepare after…"}]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `notes` | array | Never null. |
+| `name` | string | The file name. |
+| `modified` | string | Its modification time, RFC 3339 UTC. |
+| `line` | string | The first line of the text holding any of the words, cut to about 160 characters around the first match (`…` where cut), control characters as spaces. `""` when no line does (the words are in the file name). |
+
 ## `notes show <name>`
 
 One note, read as a hostile file (`safefile.Read`: a regular file, not a

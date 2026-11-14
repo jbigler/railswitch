@@ -318,7 +318,8 @@ change it: they suggest notes, and you decide what goes in.
   index at its next start, and any agent can read it right away.
 - **They are kept:** `wt rm` and `down` never touch `notes/`; back it up,
   edit it or commit it somewhere as you like.
-- **From railswitch:** `railswitch notes ls` lists them, `notes show
+- **From railswitch:** `railswitch notes ls` lists them, `notes search
+  <words>` lists those whose file name or text holds every word, `notes show
   <name>` prints one, `notes write <name> --if-hash <hash>` replaces it
   with stdin (the hash `notes show --json` printed; `--if-hash ""` adds a
   new note), and `notes rm <name> --if-hash <hash>` removes it. A note

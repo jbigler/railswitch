@@ -247,3 +247,39 @@ func TestNotesInbox(t *testing.T) {
 		}
 	}
 }
+
+// D219: search keeps the notes whose name or text holds every word, any
+// case, newest first, with the first text line that has a word.
+func TestNotesSearch(t *testing.T) {
+	ws, dir := notesWS(t)
+	f := fakeHost()
+	long := strings.Repeat("x", 100) + " Postgres " + strings.Repeat("y", 200)
+	mustRunStdin(t, f, "intro\nRun DB prepare\x1b[31m\tnow\n", "-C", ws, "notes", "write", "agent_queue.md", "--if-hash", "")
+	mustRunStdin(t, f, long+"\nqueue\n", "-C", ws, "notes", "write", "db.md", "--if-hash", "")
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "agent_queue.md"), old, old); err != nil {
+		t.Fatal(err)
+	}
+	search := func(q ...string) []noteHit {
+		var out struct{ Notes []noteHit }
+		if err := json.Unmarshal([]byte(mustRun(t, append([]string{"-C", ws, "--json", "notes", "search", "--"}, q...)...)), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Notes
+	}
+	if h := search("QUEUE"); len(h) != 2 || h[0].Name != "db.md" || h[0].Line != "queue" || h[1].Name != "agent_queue.md" || h[1].Line != "" {
+		t.Errorf("queue: %+v", h)
+	}
+	if h := search("queue prepare"); len(h) != 1 || h[0].Line != "Run DB prepare [31m now" {
+		t.Errorf("queue prepare: %+v", h)
+	}
+	if h := search("postgres"); len(h) != 1 || !strings.HasPrefix(h[0].Line, "…") || !strings.HasSuffix(h[0].Line, "…") || !strings.Contains(h[0].Line, "Postgres") || len([]rune(h[0].Line)) != 162 {
+		t.Errorf("postgres: %+v", h)
+	}
+	if h := search("-x"); len(h) != 0 {
+		t.Errorf("-x: %+v", h)
+	}
+	if code, _, _ := runIn(t, "-C", ws, "notes", "search", " "); code != 2 {
+		t.Errorf("no words: exit %d; want 2", code)
+	}
+}

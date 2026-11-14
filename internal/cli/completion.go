@@ -45,7 +45,7 @@ var completionSubs = map[string][]string{
 	"issue":              {"ls"},
 	"library":            {"add", "fetch", "index", "ls", "rm", "rotate", "sign", "trust", "verify"},
 	"nvim":               {"reset-config", "update"},
-	"notes":              {"inbox", "ls", "rm", "show", "write"},
+	"notes":              {"inbox", "ls", "rm", "search", "show", "write"},
 	"notes inbox":        {"accept", "ls", "reject", "show"},
 	"whiteboard":         {"rm", "show", "write"},
 	"office":             {"set", "tv"},

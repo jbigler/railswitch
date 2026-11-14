@@ -26,6 +26,7 @@ var synopses = map[string]string{
 	"agent send":             "agent send [<name>]  (the text on stdin)",
 	"issue ls":               "issue ls",
 	"notes ls":               "notes ls",
+	"notes search":           "notes search <words>",
 	"notes show":             "notes show <name>",
 	"notes write":            "notes write <name> --if-hash <hash>  (the text on stdin)",
 	"notes rm":               "notes rm <name> --if-hash <hash>",

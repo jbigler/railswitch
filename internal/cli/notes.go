@@ -23,7 +23,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const notesUsage = "usage: railswitch [--json] notes ls | [--json] notes show <name> | notes write <name> --if-hash <hash> | notes rm <name> --if-hash <hash> | notes inbox ..."
+const notesUsage = "usage: railswitch [--json] notes ls | [--json] notes search <words> | [--json] notes show <name> | notes write <name> --if-hash <hash> | notes rm <name> --if-hash <hash> | notes inbox ..."
 
 // noteName is a note's file name: what railswitch shows, writes or removes.
 var noteName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.md$`)
@@ -54,6 +54,8 @@ func cmdNotes(_ context.Context, e *env, args []string) int {
 	switch args[0] {
 	case "ls":
 		return notesLs(e, args[1:])
+	case "search":
+		return notesSearch(e, args[1:])
 	case "show":
 		return notesShow(e, args[1:])
 	case "write":
@@ -133,6 +135,110 @@ func notesLs(e *env, args []string) int {
 		return e.fail(err)
 	}
 	return 0
+}
+
+// noteHit is one element of `notes search --json` notes (docs/json.md).
+type noteHit struct {
+	Name     string `json:"name"`
+	Modified string `json:"modified"`
+	Line     string `json:"line"` // the first text line with a word, cut; "": none
+}
+
+// railswitch notes search <words>: the notes whose file name or text holds
+// every word, ignoring case, newest first (D219).
+func notesSearch(e *env, args []string) int {
+	const usage = "usage: railswitch [--json] notes search <words>"
+	fset := e.flags("notes search")
+	if code, ok := parse(fset, args); !ok {
+		return code
+	}
+	words := strings.Fields(strings.ToLower(strings.Join(fset.Args(), " ")))
+	if len(words) == 0 {
+		return e.usageErr("%s", usage)
+	}
+	dir, err := e.notesDir()
+	if err != nil {
+		return e.fail(err)
+	}
+	rows, err := notesList(dir)
+	if err != nil {
+		return e.fail(err)
+	}
+	hits := []noteHit{}
+	// shortcut: reads every note (1 MiB cap each) per search; fine for the
+	// dozens agents write, an index if it ever reaches thousands.
+	for _, r := range rows {
+		data, exists, err := readNote(dir, r.Name)
+		if err != nil {
+			return e.fail(err)
+		}
+		if !exists { // removed since it was listed
+			continue
+		}
+		if line, ok := noteMatch(r.Name, string(data), words); ok {
+			hits = append(hits, noteHit{Name: r.Name, Modified: r.Modified, Line: line})
+		}
+	}
+	if e.json {
+		if err := json.NewEncoder(e.stdout).Encode(struct {
+			Notes []noteHit `json:"notes"`
+		}{hits}); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
+	tw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(tw, "NAME\tLINE")
+	for _, h := range hits {
+		fmt.Fprintf(tw, "%s\t%s\n", h.Name, h.Line)
+	}
+	if err := tw.Flush(); err != nil {
+		return e.fail(err)
+	}
+	return 0
+}
+
+// noteMatch reports whether every word (lower case) is in the note's file
+// name or text, ignoring case, and gives the first text line holding any
+// of them, cut to about 160 characters around the match and printable.
+func noteMatch(name, text string, words []string) (line string, ok bool) {
+	name, low := strings.ToLower(name), lowerRunes(text)
+	for _, w := range words {
+		if !strings.Contains(name, w) && !strings.Contains(low, w) {
+			return "", false
+		}
+	}
+	for l := range strings.Lines(text) {
+		lr := []rune(strings.TrimRight(l, "\r\n"))
+		ll := lowerRunes(string(lr))
+		at := -1
+		for _, w := range words {
+			if i := strings.Index(ll, w); i >= 0 && (at < 0 || i < at) {
+				at = i
+			}
+		}
+		if at < 0 {
+			continue
+		}
+		at = utf8.RuneCountInString(ll[:at]) // ll has a rune for each of lr's
+		from := max(0, at-60)
+		to := min(len(lr), from+160)
+		line = strings.TrimSpace(string(lr[from:to]))
+		if from > 0 {
+			line = "…" + line
+		}
+		if to < len(lr) {
+			line += "…"
+		}
+		return strings.ReplaceAll(printableText([]byte(line)), "\t", " "), true
+	}
+	return "", true
+}
+
+// lowerRunes is s in lower case rune by rune, so rune positions in it are
+// s's (strings.ToLower can change the count: "İ").
+func lowerRunes(s string) string {
+	return strings.Map(unicode.ToLower, s)
 }
 
 // readNote reads note name of dir as a hostile file; exists is false for a

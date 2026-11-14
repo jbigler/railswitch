@@ -21,3 +21,13 @@ _Avoid_: dashboard API, JSON schema
 **Whiteboard**:
 A worktree's one Excalidraw drawing, kept on the host with a dark and a light picture of it, shown by the Virtual Office's glass wall and the worktree page's Whiteboard tab, and deleted with the worktree.
 _Avoid_: board (alone), canvas, sketch
+
+### Notes
+
+**Note**:
+A Markdown file in the workspace's shared notes, which every agent reads and only the user writes. Its **title** is its file name's words ("Agent queue design" for `agent_queue_design.md`).
+_Avoid_: memo, doc, memory
+
+**Suggested note**:
+A note an agent proposes from a worktree, which the user accepts into the notes or rejects.
+_Avoid_: draft, inbox item

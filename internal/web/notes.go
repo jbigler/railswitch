@@ -26,6 +26,7 @@ type notesView struct {
 	Banner        bannerView
 
 	Error   string
+	Q       string // the search box: Notes are its matches (D219)
 	Notes   []noteRow
 	Open    *noteShow // nil: no note open
 	New     bool      // Open is a note not yet written
@@ -62,8 +63,8 @@ func validSlug(s string) bool {
 
 type noteRow struct {
 	Name     string `json:"name"`
-	Size     int64  `json:"size"`
 	Modified string `json:"modified"`
+	Line     string `json:"line"` // a search's matching line (D219)
 	Current  bool   `json:"-"`
 }
 
@@ -186,9 +187,14 @@ func (s *Server) notesPage(w http.ResponseWriter, r *http.Request) {
 		n.Current = v.Sugg != nil && n.Worktree == v.Sugg.Worktree && n.Name == v.Sugg.Name
 		v.Inbox = append(v.Inbox, n)
 	}
+	v.Q = strings.TrimSpace(q.Get("q"))
+	read := []string{"-C", p.Workspace, "notes", "ls"}
+	if v.Q != "" {
+		read = []string{"-C", p.Workspace, "notes", "search", "--", v.Q}
+	}
 	ls, err := readJSON[struct {
 		Notes []noteRow `json:"notes"`
-	}](r.Context(), s.c.CLI, "-C", p.Workspace, "notes", "ls")
+	}](r.Context(), s.c.CLI, read...)
 	if err != nil && v.Error == "" {
 		v.Error = err.Error()
 	}

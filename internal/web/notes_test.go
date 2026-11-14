@@ -14,6 +14,7 @@ func TestNotesPage(t *testing.T) {
 	f := newFixture(t)
 	f.cli.set("--json -C /ws/ftest notes ls", `{"notes":[{"name":"a.md","size":5,"modified":"2026-10-31T19:00:32Z"}]}`)
 	f.cli.set("--json -C /ws/ftest notes show a.md", `{"name":"a.md","text":"<b>hi</b>","hash":"sha256:ab"}`)
+	f.cli.set("--json -C /ws/ftest notes search -- db prep", `{"notes":[{"name":"b.md","modified":"2026-10-31T19:00:32Z","line":"<run> db prepare"}]}`)
 	f.cli.set("--json -C /ws/ftest notes inbox ls", `{"suggestions":[{"worktree":"feat","name":"a.md","size":3,"modified":"2026-10-31T19:00:32Z","replaces":true}]}`)
 	f.cli.set("--json -C /ws/ftest notes inbox show feat a.md", `{"worktree":"feat","name":"a.md","text":"<i>new</i>","hash":"sha256:ef","note":{"name":"a.md","text":"old","hash":"sha256:ab"}}`)
 	for _, c := range []struct {
@@ -23,6 +24,7 @@ func TestNotesPage(t *testing.T) {
 	}{
 		{"/p/ftest/notes", 200, []string{`href="/p/ftest/notes?n=a.md"`, "Open a note", `href="/p/ftest/notes?w=feat&amp;s=a.md"`, "replaces a note"}},
 		{"/p/ftest/notes?w=feat&s=a.md", 200, []string{`action="/p/ftest/notes/inbox/feat/a.md"`, `value="sha256:ef"`, "&lt;i&gt;new&lt;/i&gt;", "It replaces the current note"}},
+		{"/p/ftest/notes?q=+db+prep+&n=a.md", 200, []string{`href="/p/ftest/notes?n=b.md&amp;q=db%20prep"`, "&lt;run&gt; db prepare", `value="db prep"`, `name="n" value="a.md"`, `href="/p/ftest/notes?q=db%20prep">Close`}},
 		{"/p/ftest/notes?w=..&s=a.md", 400, nil},
 		{"/p/ftest/notes?n=a.md", 200, []string{`action="/p/ftest/notes/write/a.md"`, `data-hash="sha256:ab"`, "&lt;b&gt;hi&lt;/b&gt;", "data-note-rm"}},
 		{"/p/ftest/notes?new=b.md", 200, []string{`action="/p/ftest/notes/write/b.md"`, `data-hash=""`, "new note"}},

@@ -13,13 +13,17 @@ suggestion was shown at, so an edit since is refused. */}}
 <h1>Notes</h1>
 <p class="note">The workspace's <code>notes/</code>, which every agent reads. Agents can't write them: they suggest notes, and you accept or reject each.</p>
 <section class="spanel">
+<form method="get" action="{{.URL}}" class="add-row new-note">
+<input name="new" placeholder="Title of a new note" autocomplete="off" required maxlength="120" pattern=".*[A-Za-z0-9].*" title="A title with a letter or a digit; its file name is made from it" aria-label="New note's title">
+<button class="ln">New note</button>
+</form>
 <h3>Suggested{{if .Inbox}} <span class="chip yellow">{{len .Inbox}}</span>{{end}}</h3>
 <ul class="lib-list striped">
 {{range .Inbox}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?w={{.Worktree}}&amp;s={{.Name}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span>{{if .Replaces}}<span class="chip yellow">replaces a note</span>{{end}}<span class="muted src">{{.Worktree}}</span></a></li>
 {{else}}<li class="muted">No suggestions.</li>
 {{end}}</ul>
 <h3>Notes</h3>
-<form method="get" action="{{.URL}}" class="add-row" role="search">
+<form method="get" action="{{.URL}}" class="add-row note-search" role="search">
 <input type="search" id="note-search" name="q" value="{{.Q}}" placeholder="Search titles and text" autocomplete="off" aria-label="Search the notes">
 {{if and .Open (not .New)}}<input type="hidden" name="n" value="{{.Open.Name}}">
 {{end}}</form>
@@ -27,10 +31,6 @@ suggestion was shown at, so an edit since is refused. */}}
 {{range .Notes}}<li{{if .Current}} class="cur"{{end}}><a href="{{$.URL}}?n={{.Name}}{{with $.Q}}&amp;q={{.}}{{end}}"><span class="nt" title="{{.Name}}">{{.Title}}</span><span class="sp"></span><span class="muted src">{{.When}}</span>{{with .Line}}<span class="muted hit">{{.}}</span>{{end}}</a></li>
 {{else}}<li class="muted">{{if .Q}}No notes match.{{else}}No notes.{{end}}</li>
 {{end}}</ul>
-<form method="get" action="{{.URL}}" class="add-row">
-<input name="new" placeholder="Title of a new note" autocomplete="off" required maxlength="120" pattern=".*[A-Za-z0-9].*" title="A title with a letter or a digit; its file name is made from it" aria-label="New note's title">
-<button class="ln">New note</button>
-</form>
 </section>
 </section>
 <section class="pane">

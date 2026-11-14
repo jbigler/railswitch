@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,7 +78,7 @@ func TestQueueNext(t *testing.T) {
 	}
 	sent := func() int { return count(e.calls(), "podman exec "+probeCtr+" tmux -L agent set-buffer") }
 	ws := e.l.WS.Root
-	if it, why, err := e.l.QueueNext(ctx, "feat"); err != nil || it != nil || !strings.Contains(why, "empty") {
+	if it, why, err := e.l.QueueNext(ctx, "feat", nil); err != nil || it != nil || !strings.Contains(why, "empty") {
 		t.Fatalf("empty queue: %v %q %v", it, why, err)
 	}
 	for _, text := range []string{"first", "second"} {
@@ -87,7 +88,10 @@ func TestQueueNext(t *testing.T) {
 	}
 	old10 := time.Now().Add(-10 * time.Second).Unix()
 	status("idle", old10)
-	it, why, err := e.l.QueueNext(ctx, "feat")
+	it, why, err := e.l.QueueNext(ctx, "feat", func(context.Context) string { return "PR-LEAD" })
+	if !strings.Contains(fmt.Sprint(e.calls()), "-- PR-LEAD\n\nfirst]") {
+		t.Error("the lead was not typed before the item")
+	}
 	if err != nil || it == nil || it.Text != "first" || sent() != 1 {
 		t.Fatalf("idle: %+v %q %v, sent %d", it, why, err, sent())
 	}
@@ -96,11 +100,11 @@ func TestQueueNext(t *testing.T) {
 		t.Fatalf("after delivery: %+v", q)
 	}
 	// the status still is the one delivered on: never typed twice
-	if it, why, err := e.l.QueueNext(ctx, "feat"); err != nil || it != nil || !strings.Contains(why, "not reported") || sent() != 1 {
+	if it, why, err := e.l.QueueNext(ctx, "feat", nil); err != nil || it != nil || !strings.Contains(why, "not reported") || sent() != 1 {
 		t.Fatalf("again: %v %q %v, sent %d", it, why, err, sent())
 	}
 	status("permission", time.Now().Add(time.Minute).Unix())
-	if it, why, err := e.l.QueueNext(ctx, "feat"); err != nil || it != nil || !strings.Contains(why, "permission") || sent() != 1 {
+	if it, why, err := e.l.QueueNext(ctx, "feat", nil); err != nil || it != nil || !strings.Contains(why, "permission") || sent() != 1 {
 		t.Fatalf("permission: %v %q %v, sent %d", it, why, err, sent())
 	}
 	// a delivery that fails keeps its item
@@ -109,7 +113,7 @@ func TestQueueNext(t *testing.T) {
 		t.Fatal(err)
 	}
 	status("done", old10)
-	if _, _, err := e.l.QueueNext(ctx, "feat"); err == nil {
+	if _, _, err := e.l.QueueNext(ctx, "feat", nil); err == nil {
 		t.Fatal("failed delivery: no error")
 	}
 	if q, _ := agentqueue.Read(ws, "feat"); len(q.Items) != 1 || q.Items[0].Text != "second" {
@@ -121,7 +125,7 @@ func TestQueueNext(t *testing.T) {
 		t.Fatal(ok, err)
 	}
 	defer unlock()
-	if it, why, err := e.l.QueueNext(ctx, "feat"); err != nil || it != nil || !strings.Contains(why, "another delivery") {
+	if it, why, err := e.l.QueueNext(ctx, "feat", nil); err != nil || it != nil || !strings.Contains(why, "another delivery") {
 		t.Fatalf("racing: %v %q %v", it, why, err)
 	}
 }

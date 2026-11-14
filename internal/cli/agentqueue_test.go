@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/sys"
 )
 
@@ -59,5 +61,22 @@ func TestAgentQueueCLI(t *testing.T) {
 	}
 	if code, out, _ := runWith(t, f, q("next")...); code != 0 || !strings.Contains(out, "held: the queue is empty") {
 		t.Errorf("next, empty: %d %q", code, out)
+	}
+}
+
+// D213: the line a queue delivery types first, by PR state.
+func TestPRLeadLine(t *testing.T) {
+	now := time.Date(2026, 11, 14, 14, 2, 0, 0, time.Local)
+	merged := time.Date(2026, 11, 13, 9, 30, 0, 0, time.Local)
+	for want, p := range map[string]*prs.PR{
+		"Pull request status: no pull request for branch jb/x. Checked 14:02.":                   nil,
+		"Pull request status: #123 open (draft), head `abc1234`. Checked 14:02.":                 {Number: 123, State: "draft", Head: "abc1234def"},
+		"Pull request status: #7 open, head `abc1234`. Checked 14:02.":                           {Number: 7, State: "open", Head: "abc1234def"},
+		"Pull request status: #7 closed, head `abc1234`. Checked 14:02.":                         {Number: 7, State: "closed", Head: "abc1234def"},
+		"Pull request status: #7 merged 2026-11-13 09:30 by ann, head `abc1234`. Checked 14:02.": {Number: 7, State: "merged", Head: "abc1234def", Merged: merged, MergedBy: "ann\x1b"},
+	} {
+		if got := prLeadLine(p, "jb/x", now); got != want {
+			t.Errorf("got  %q\nwant %q", got, want)
+		}
 	}
 }

@@ -53,7 +53,7 @@ func TestListArgv(t *testing.T) {
 	for i, b := range []string{"main", "feat"} {
 		c := f.Cmds[i]
 		want := []string{"gh", "pr", "list", "--repo", "o/n", "--head=" + b, "--state", "all", "--limit", "20", "--json",
-			"number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup"}
+			"number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,state,reviewDecision,statusCheckRollup,mergedAt,mergedBy"}
 		if !slices.Equal(f.Calls[i], want) {
 			t.Errorf("argv = %q", f.Calls[i])
 		}
@@ -78,14 +78,14 @@ func TestParse(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []PR{
-		{1, "Draft", "https://github.com/o/n/pull/1", "draft", "", "draft", "pass", "none", ""},
-		{2, "Approved", "https://github.com/o/n/pull/2", "approved", "", "open", "pass", "approved", ""},
-		{3, "Changes", "https://github.com/o/n/pull/3", "changes", "", "open", "fail", "changes_requested", ""},
-		{4, "Running", "https://github.com/o/n/pull/4", "running", "", "open", "pending", "pending", ""},
-		{5, "Status pending", "https://github.com/o/n/pull/5", "status", "", "open", "pending", "none", ""},
-		{6, "Merged", "https://github.com/o/n/pull/6", "merged", "", "merged", "pass", "approved", ""},
-		{7, "Closed", "https://github.com/o/n/pull/7", "closed", "", "closed", "fail", "none", ""},
-		{8, "No checks", "https://github.com/o/n/pull/8", "nochecks", "", "open", "none", "none", ""},
+		{1, "Draft", "https://github.com/o/n/pull/1", "draft", "", "draft", "pass", "none", "", time.Time{}, ""},
+		{2, "Approved", "https://github.com/o/n/pull/2", "approved", "", "open", "pass", "approved", "", time.Time{}, ""},
+		{3, "Changes", "https://github.com/o/n/pull/3", "changes", "", "open", "fail", "changes_requested", "", time.Time{}, ""},
+		{4, "Running", "https://github.com/o/n/pull/4", "running", "", "open", "pending", "pending", "", time.Time{}, ""},
+		{5, "Status pending", "https://github.com/o/n/pull/5", "status", "", "open", "pending", "none", "", time.Time{}, ""},
+		{6, "Merged", "https://github.com/o/n/pull/6", "merged", "", "merged", "pass", "approved", "", time.Date(2026, 11, 13, 9, 30, 0, 0, time.UTC), "ann"},
+		{7, "Closed", "https://github.com/o/n/pull/7", "closed", "", "closed", "fail", "none", "", time.Time{}, ""},
+		{8, "No checks", "https://github.com/o/n/pull/8", "nochecks", "", "open", "none", "none", "", time.Time{}, ""},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)

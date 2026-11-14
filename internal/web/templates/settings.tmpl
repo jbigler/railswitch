@@ -64,6 +64,9 @@
 <h3>App hooks</h3>
 {{range .Hooks}}<label class="field hook cmd-row" data-list="{{.Name}}" data-orig="{{.Text}}"><span><span class="mono">{{.Name}}</span><br><span class="muted">{{.Note}}</span></span>
 <textarea class="mono hook-cmds" rows="2" spellcheck="false" autocomplete="off" placeholder="e.g. {{if eq .Name "deps"}}gem list -i retest >/dev/null || gem install retest{{else if eq .Name "start"}}bin/rails db:test:prepare{{else}}bin/rails db:seed{{end}}">{{.Text}}</textarea></label>
+{{end}}{{if gt (len .AgentSetups) 1}}<h3 id="agent-default">Default agent <span class="muted">· runs for <code>railswitch agent</code> without a name, and takes the work queue</span></h3>
+<label class="field agent-default-pick" data-orig="{{.DefaultAgent}}">Agent <select class="agent-default-sel">{{if not .DefaultAgent}}<option value="">not set</option>{{end}}{{range .AgentSetups}}<option value="{{.Name}}"{{if eq .Name $.DefaultAgent}} selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+<p class="note">A running agent keeps running. <code>up</code> starts the default agent, when it runs as a service, only in a worktree where no agent runs: stop the old one first to switch.</p>
 {{end}}{{with .AgentSetups}}<h3 id="agent-setup">Agent setup <span class="muted">· in the agent's own container before it first starts, and again when changed</span></h3>
 {{range .}}<label class="field agent-setup cmd-row" data-agent="{{.Name}}" data-orig="{{.Text}}"><span class="mono">{{.Name}}</span>
 <textarea class="mono agent-setup-cmds" rows="2" spellcheck="false" autocomplete="off" placeholder="e.g. gh extension install github/gh-stack --force">{{.Text}}</textarea></label>

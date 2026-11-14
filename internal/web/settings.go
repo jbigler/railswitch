@@ -34,7 +34,7 @@ type edit struct {
 	Values []string `json:"values,omitempty"`
 }
 
-var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "task.set", "task.unset", "task.fresh.add", "task.fresh.remove", "task.terminal.add", "task.terminal.remove", "hooks.set", "agent.setup"}
+var editOps = []string{"pack", "firewall.mode", "firewall.allow.add", "firewall.allow.remove", "option", "env.set", "env.unset", "link.add", "link.remove", "link.hide", "link.show", "task.set", "task.unset", "task.fresh.add", "task.fresh.remove", "task.terminal.add", "task.terminal.remove", "hooks.set", "agent.setup", "agent.default"}
 
 // maxEdits is the largest edit list or project.toml the page posts.
 const maxEdits = 1 << 20
@@ -89,6 +89,7 @@ type settingsView struct {
 	Firewall     firewallView
 	Hooks        []hookListView
 	AgentSetups  []hookListView // one per agent: Name, its setup as text
+	DefaultAgent string         // the default agent (D140); "": none
 	Options      []optionView
 	Links        []linkRowView
 	NewTask      string // ?task=: the Tasks card's Add name, from the palette
@@ -330,6 +331,8 @@ func editTitle(show projectShow, e edit) string {
 			return fmt.Sprintf("Task %s: back to the pack's %q", e.Name, show.Tasks[i].Pack)
 		}
 		return "Task " + e.Name + ": removed"
+	case "agent.default":
+		return "Default agent: " + e.Key
 	case "agent.setup":
 		switch n := len(e.Values); n {
 		case 0:
@@ -390,6 +393,9 @@ func (s *Server) settingsPage(w http.ResponseWriter, r *http.Request) {
 	v.Hooks = newHooksView(show.Hooks)
 	for _, a := range show.Agents {
 		v.AgentSetups = append(v.AgentSetups, hookListView{Name: a.Name, Text: strings.Join(a.Setup, "\n")})
+		if a.Default {
+			v.DefaultAgent = a.Name
+		}
 	}
 	v.Template = s.settingsTemplate(r.Context(), p)
 	if len(show.Pack.Choices) > 1 {

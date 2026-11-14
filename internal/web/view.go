@@ -50,6 +50,9 @@ type row struct {
 	PR      *pr
 	Stacked *ghStackRow // nil: its branch is in no gh stack (or gh stack is missing)
 	Now     time.Time   // the clock the tests' "5m ago" counts from
+	// DefaultAgent is the project's default agent (the overview's), which
+	// the Agent card marks; "": none.
+	DefaultAgent string
 }
 
 // Sorting.
@@ -790,6 +793,7 @@ type actionView struct{ Label, URL string }
 type agentTerm struct {
 	Name, URL string
 	Running   bool
+	Default   bool // the project's default agent, marked when there are several
 }
 
 // newDetail is row r's detail; repo is the project's PR URL prefix
@@ -888,6 +892,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		v.AgentTerms = []agentTerm{a}
 	}
 	for i := range v.AgentTerms {
+		v.AgentTerms[i].Default = len(v.AgentTerms) > 1 && v.AgentTerms[i].Name == r.DefaultAgent
 		if v.AgentTerms[i].Running && v.RunningAgent == nil {
 			v.RunningAgent = &v.AgentTerms[i]
 		}

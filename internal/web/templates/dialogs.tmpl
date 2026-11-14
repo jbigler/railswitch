@@ -42,13 +42,12 @@ or have homes take the default at their agent's next start. */}}
 <h3>{{.Name}}</h3>
 {{if .Default}}<p>Default: from <b>{{.Default.From}}</b>, {{.Promoted}}.</p>
 {{if .Pending}}<p class="yellow">Pending: {{$.Slug}}'s {{.Name}} takes the default at its next start{{if .Running}} (it runs now: stop it, then start it again){{end}}.</p>{{end}}{{else}}<p class="muted">No default yet: a new worktree's {{.Name}} starts with an empty config.</p>{{end}}
-<form method="post" action="{{$.PromoteURL}}" data-post data-close><input type="hidden" name="name" value="{{.Name}}">
-<label class="check"><input type="checkbox" name="all" value="1"> and apply it to every other worktree</label>
-<div class="btns"><button class="ln main">Make {{$.Slug}}'s {{.Name}} config the default</button></div></form>
-{{if .Default}}<form method="post" action="{{$.ApplyURL}}" data-post data-close><input type="hidden" name="name" value="{{.Name}}">
-<div class="btns"><button class="ln">Apply the default here</button><button class="ln" name="all" value="1">Apply the default to every worktree</button></div></form>{{end}}
+<form method="post" action="{{$.PromoteURL}}" data-post data-close class="ad-row"><input type="hidden" name="name" value="{{.Name}}">
+<span>Save {{$.Slug}}'s config as the default</span><button class="ln main">Save as default</button></form>
+{{if .Default}}<form method="post" action="{{$.ApplyURL}}" data-post data-close class="ad-row"><input type="hidden" name="name" value="{{.Name}}">
+<span>Replace a worktree's config with the default</span><span><button class="ln">This worktree</button><button class="ln" name="all" value="1">Every worktree</button></span></form>{{end}}
 </section>
 {{else}}<p class="muted">No agent of this project has a config to share: its package lists no <code>[config] paths</code>.</p>
-{{end}}<p class="note">The default holds the files the agent's package lists as its config, copied from one worktree's agent home. A worktree's agent takes it the next time it starts (stop a running one first), keeping what it replaces in <code>~/.railswitch-default-backup</code>; a new worktree starts from it.</p>
+{{end}}<p class="note">An agent takes the default the next time it starts (stop a running one first); what it replaces is kept in <code>~/.railswitch-default-backup</code>. A new worktree starts from the default.</p>
 <div class="btns"><button type="button" class="ln" data-cancel>Close</button></div>
 </div>{{end}}

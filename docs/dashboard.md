@@ -401,6 +401,15 @@ explanation is behind a disclosure.
   **Agent setup** (D133, only with agents): a box per agent, its
   `[agents.<name>] setup` one command per line; leaving a changed box
   stages `agent.setup` with the whole list (empty removes it).
+  **Default agent** (D215, only with two or more agents): a choice of
+  the configured agents, the default agent selected (D140: the one
+  `project.toml` marks `default = true`, else the only one whose package
+  is the built-in default; "not set" when there is none). Choosing another stages
+  `agent.default`, which marks it and unmarks the others. The default
+  runs for `railswitch agent` without a name and takes the work queue. A
+  running agent keeps running: `up` starts the default agent, when it
+  runs as a service, only in a worktree where no agent runs. The
+  worktree's Agent card marks the default agent "default".
 - **Environment:** the project's `[env]`. Editing a value stages it when
   you leave the field; Remove stages its removal; the add form (name,
   value) stages a new one, shown as a highlighted row with Undo until
@@ -998,12 +1007,17 @@ empty answer, so a program in a container never sees what you copied
 elsewhere. The browser allows the write on `railswitch.localhost` (a secure
 context); Firefox only shortly after a key press in the page, so a copy a
 program makes on its own may not arrive.
-When the program exits the panel shows
-`[exited N]` and **Reopen**; if the dashboard restarts (a new railswitch
+When the program exits the panel closes (D216): a shell's, an agent's or
+nvim's when it ended well (exit 0), and a shell's you pressed a key in
+whatever its code; the Terminal menu opens it again. A task's panel, an
+agent's or nvim's that failed, and a shell's that failed before any key
+(it could not start) stay and show `[exited N]` and **Reopen**, so what
+they printed can be read. If the
+dashboard restarts (a new railswitch
 binary), **Reconnect**: the agent and nvim pick up where they were, a shell
 starts afresh. railswitch's own refusals (another agent running, unset
 secrets) print in the panel before `[exited 1]`. In a service agent's panel `Ctrl-\` detaches,
-as in a terminal: the agent keeps running and the panel shows `[exited 0]`.
+as in a terminal: the agent keeps running and the panel closes.
 In an agent's panel Shift+Enter is sent as an extended key (CSI u), and the
 agent's session server has tmux's `extended-keys` on, so the agent sees
 Shift+Enter (a new line) rather than Enter; a host terminal attached with
@@ -1024,7 +1038,9 @@ page fullscreen API: Esc always ends it in Firefox.
 While any terminal runs, the header shows **▣ N/8** on every page: the
 terminals running across the dashboard, every project's. It opens a list
 of them, each with its project, its worktree (a link to its page) and what
-it runs, and **End**, which ends its program as its panel's ✕ does; a page
+it runs, and **End**, which ends its program as its panel's ✕ does. A
+click anywhere else on a row goes to that terminal: its worktree's page,
+on the Agent tab for an agent and the Terminals tab for any other. A page
 showing that terminal says "this terminal was ended". A program that
 exited with no page showing it is listed as exited until its worktree page
 has shown its end.
@@ -1053,11 +1069,12 @@ Every action is a job (below).
   running one restart and stop; a partial or failed one all three.
 - **Default config…** (under the detail's agents) opens a dialog
   that reads `agent ls` for the worktree: per agent with `[config]
-  paths`, where its default came from, **Make <worktree>'s <agent> config
-  the default** (`agent default promote <agent> [--all]`, the box "and
-  apply it to every other worktree" adding `--all`), and, with a default,
-  **Apply the default here** / **to every worktree** (`agent default apply
-  <agent> [--all]`). Applying takes effect at the agent's next start, so
+  paths`, where its default came from, then two rows: "Save <worktree>'s
+  config as the default" with **Save as default** (`agent default promote
+  <agent>`), and, with a default, "Replace a worktree's config with the
+  default" with **This worktree** / **Every worktree** (`agent default
+  apply <agent> [--all]`). To save and apply everywhere, save, then
+  **Every worktree**. Applying takes effect at the agent's next start, so
   while this worktree's home waits for it (`agent ls`'s
   `default_pending`) the dialog says "Pending: … takes the default at its
   next start", adding "stop it, then start it again" while it runs.
@@ -1260,6 +1277,12 @@ preset and up to eight changed colours.
   a live preview, and a warning for any text colour below 4.5:1 against
   the background (saving is still allowed). "Reset to preset" drops the
   mode's changed colours and keeps its preset.
+- **Terminal font** (the same dialog, D217): the name of a font installed
+  on the computer the browser runs on (letters, digits, spaces, `-` and
+  `_`). It goes before the usual fonts (Maple Mono, then JetBrains Mono,
+  then the system's monospace) in terminals opened from then on; an empty
+  box goes back to them. It is kept in the browser (`localStorage`), not
+  in `dashboard.toml`: another browser or computer has its own.
 - The editor runs the CLI, which you can use directly:
 
   ```sh

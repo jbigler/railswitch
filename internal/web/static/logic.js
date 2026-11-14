@@ -32,6 +32,7 @@ export function target(e) {
   if (e.op === "link.hide" || e.op === "link.show") return "show " + e.label;
   if (e.op === "hooks.set") return "hooks " + e.key;
   if (e.op === "agent.setup") return "agent-setup " + e.key;
+  if (e.op === "agent.default") return "agent-default";
   return e.op + " " + e.label;
 }
 
@@ -71,6 +72,27 @@ export function pageQuery(sort, days) {
 // is the one shown: an agent's on the Agent tab, any other on Terminals.
 export function termShown(panel, slug, tab) {
   return slug !== "" && panel.slug === slug && tab === (panel.agent ? "agent" : "terminals");
+}
+
+// termCloses (#224) says whether a terminal panel closes by itself when
+// its program exits with code: a shell, an agent or an editor that ended
+// well; a shell you typed into, whatever its code (that is its last
+// command's); a task never, since its output is what you ran it for. A
+// failed agent or editor, or a shell that failed before a key was pressed
+// (it could not start), stays, so what it printed can be read.
+export function termCloses(url, code, typed) {
+  const kind = new URL(url, "http://x").pathname.split("/").pop();
+  return kind !== "task" && (code === 0 || (kind === "shell" && !!typed));
+}
+
+// termFontKey is where a browser keeps its terminal font (localStorage).
+export const termFontKey = "railswitch.term.font";
+
+// termFont (#167) is the terminal font a browser chose, safe to put in a
+// CSS font-family list: letters, digits, spaces and - _ only; "" for none.
+export function termFont(name) {
+  name = String(name || "").trim();
+  return /^[A-Za-z0-9 _-]{1,60}$/.test(name) ? name : "";
 }
 
 // termID names a terminal by its URL, however its query is written: the

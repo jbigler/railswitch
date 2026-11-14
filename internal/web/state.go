@@ -620,7 +620,7 @@ func (s *Server) rows(prefix string, k sortKey, sel string) ([]row, string) {
 	rows := make([]row, 0, len(p.ov.Worktrees))
 	found := false
 	for _, wt := range p.ov.Worktrees {
-		rows = append(rows, row{WT: wt, PR: p.prs[wt.Slug], Stacked: p.stacks[wt.Slug], Now: s.c.Now()})
+		rows = append(rows, row{WT: wt, PR: p.prs[wt.Slug], Stacked: p.stacks[wt.Slug], Now: s.c.Now(), DefaultAgent: p.ov.DefaultAgent})
 		found = found || wt.Slug == sel
 	}
 	sortRows(rows, k)

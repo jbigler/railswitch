@@ -3,7 +3,7 @@
 // Outside static/ so the binary doesn't carry them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termID, settingsTab, noteFileName } from "../static/logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termCloses, termFont, termID, settingsTab, noteFileName } from "../static/logic.js";
 
 test("settingsTab: the hash wins, then the kept tab, then the first", () => {
   const tabs = ["stack", "firewall", "commands", "tasks"];
@@ -84,4 +84,20 @@ test("noteFileName: a title is a snake-case file name, a file name stays", () =>
   assert.equal(noteFileName("Keep_This-Name.md"), "Keep_This-Name.md");
   assert.equal(noteFileName("!!"), "");
   assert.equal(noteFileName("a".repeat(99) + " b c"), "a".repeat(99) + ".md");
+});
+
+test("termCloses: a shell typed into, anything else that ended well, a task never", () => {
+  assert.ok(termCloses("/p/a/tty/b/shell", 130, true), "exit after a failed command");
+  assert.ok(termCloses("/p/a/tty/b/shell", 0, false));
+  assert.ok(!termCloses("/p/a/tty/b/shell", 1, false), "a shell that could not start stays to be read");
+  assert.ok(termCloses("/p/a/tty/b/agent?agent=x", 0));
+  assert.ok(!termCloses("/p/a/tty/b/agent?agent=x", 1), "a failed agent stays to be read");
+  assert.ok(termCloses("/p/a/tty/b/nvim", 0));
+  assert.ok(!termCloses("/p/a/tty/b/task?task=t", 0), "a task's output stays");
+});
+
+test("termFont: a plain font name, or none", () => {
+  assert.equal(termFont("  Fira Code "), "Fira Code");
+  assert.equal(termFont('x", serif; }'), "");
+  assert.equal(termFont(""), "");
 });

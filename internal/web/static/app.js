@@ -2,7 +2,7 @@
 // only swaps them in from the event stream, and drives keys, dialogs,
 // notifications, the palette filter and the colour preview. A module
 // (strict); its page-free logic is logic.js, tested by `node --test`.
-import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termID, settingsTab, noteFileName } from "./logic.js";
+import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termCloses, termFont, termFontKey, termID, settingsTab, noteFileName } from "./logic.js";
 
 const body = document.body;
 const prefix = body.dataset.prefix;
@@ -298,6 +298,20 @@ document.addEventListener("click", (e) => {
     Notification.requestPermission().then(() => afterSwap("header"));
     return;
   }
+  // A row of the Terminals list goes to its terminal (#226): the
+  // worktree's page, on the tab that shows it.
+  const ttyRow = t.closest("tr[data-tty-go]");
+  if (ttyRow && !t.closest("button")) {
+    e.preventDefault();
+    const d = ttyRow.dataset;
+    try {
+      sessionStorage.setItem("railswitch.tab." + d.prefix + "." + d.slug, d.tab);
+    } catch {
+      // storage off: the page opens on its usual tab
+    }
+    location.href = d.ttyGo;
+    return;
+  }
   const dlgLink = t.closest("a[data-dialog]");
   if (dlgLink) {
     e.preventDefault();
@@ -476,7 +490,9 @@ async function openTermPanel(btn, again) {
   let t = null;
   try {
     const { openTerminal } = await import("/static/term/term.js");
-    t = openTerminal(host, btn.dataset.term, { quiet: !!again });
+    // Its program ended: the panel goes (#224), unless termCloses keeps it.
+    const onExit = (code, typed) => termCloses(btn.dataset.term, code, typed) && (panel.closeTerm(), true);
+    t = openTerminal(host, btn.dataset.term, { quiet: !!again, onExit });
     panel.focusTerm = () => t.focus();
   } catch (err) {
     host.textContent = String(err.message || err);
@@ -737,8 +753,28 @@ const dark = matchMedia("(prefers-color-scheme: dark)");
 
 async function openColors() {
   const d = await loadDialog("colors", "/colors");
-  if (d) showMode(d);
+  if (!d) return;
+  showMode(d);
+  try {
+    $("#term-font", d).value = localStorage.getItem(termFontKey) || "";
+  } catch {
+    // storage off: the box stays empty
+  }
 }
+
+// The Colours dialog's terminal font (#167): this browser's, by name.
+document.addEventListener("change", (e) => {
+  if (e.target.id !== "term-font") return;
+  const name = termFont(e.target.value);
+  if (e.target.value.trim() && !name) return toast("A font name has letters, digits, spaces, - and _ only.", true);
+  try {
+    if (name) localStorage.setItem(termFontKey, name);
+    else localStorage.removeItem(termFontKey);
+  } catch {
+    return toast("This browser keeps no settings: the font was not saved.", true);
+  }
+  toast(name ? "Terminals opened from now on use " + name + "." : "Terminals opened from now on use the usual fonts.", false);
+});
 
 function showMode(d) {
   const mode = dark.matches ? "dark" : "light";
@@ -973,6 +1009,11 @@ function syncLeft() {
     if (document.activeElement !== area) area.value = e ? (e.values || []).join("\n") : box.dataset.orig;
     box.classList.toggle("staged", !!e);
   });
+  $$("label.agent-default-pick").forEach((box) => {
+    const e = stagedFor("agent-default");
+    $("select", box).value = e ? e.key : box.dataset.orig;
+    box.classList.toggle("staged", !!e);
+  });
   $$("label.agent-setup").forEach((box) => {
     const e = stagedFor("agent-setup " + box.dataset.agent);
     const area = $(".agent-setup-cmds", box);
@@ -1197,6 +1238,10 @@ if (view.startsWith("settings")) {
     if (t.classList.contains("task-terminal")) {
       const row = t.closest("tr");
       return stage({ op: t.checked ? "task.terminal.add" : "task.terminal.remove", name: row.dataset.name }, t.checked === (row.dataset.terminal === "true"));
+    }
+    if (t.classList.contains("agent-default-sel")) {
+      const orig = t.closest("label").dataset.orig;
+      return stage({ op: "agent.default", key: t.value || orig }, !t.value || t.value === orig);
     }
     if (t.classList.contains("agent-setup-cmds")) {
       const box = t.closest("label.agent-setup");

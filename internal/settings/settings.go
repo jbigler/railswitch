@@ -63,6 +63,8 @@ var ops = map[string]opSpec{
 	// key is an agent's name; values its setup commands in order, none
 	// removes them (D133).
 	"agent.setup": {required: []string{"key"}},
+	// key is the agent that becomes the project's default (D215).
+	"agent.default": {required: []string{"key"}},
 }
 
 func (e Edit) fields() map[string]string {
@@ -146,6 +148,8 @@ func ApplyText(data string, e Edit) (string, error) {
 		return config.SetHooks(data, e.Key, e.Values)
 	case "agent.setup":
 		return config.SetAgentSetup(data, e.Key, e.Values)
+	case "agent.default":
+		return config.SetDefaultAgent(data, e.Key)
 	}
 	return "", fmt.Errorf("unknown op %q", e.Op)
 }

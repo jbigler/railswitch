@@ -1095,6 +1095,7 @@ row.
 |---|---|---|
 | `prefix` | string | The project's prefix. |
 | `workspace` | string | Its workspace directory as registered. |
+| `default_agent` | string | The agent run when none is named (D140): the one marked `default = true`, else the only one whose package is the built-in default; `""` for none. |
 | `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
 | `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
 | `template` | object or null | The template the project started from, as `project.toml` `[template]` records it: `ref`, `sha256` (lowercase hex, no prefix). `null` when it records none. |
@@ -1369,7 +1370,9 @@ pack's task of that name) and `task.unset` (`name`: takes the project's
 `hooks.set` (`key`: `deps`, `start` or `create`; `values`: the list's
 commands in order, absent or `[]` to remove it; D126), `agent.setup`
 (`key`: an agent's name; `values`: its setup commands in order, absent or
-`[]` to remove them; D133; no other op takes `values`); strict: an unknown field or op is an error), writes nothing and judges each edit
+`[]` to remove them; D133; no other op takes `values`), `agent.default`
+(`key`: the agent that becomes the default: `default = true` on its
+table, the key removed from every other agent's; D215); strict: an unknown field or op is an error), writes nothing and judges each edit
 against the project with the edits before it applied. Without `--json` it
 prints a short summary and the diff. Exit 0 even when an edit is blocked.
 
@@ -1423,7 +1426,7 @@ What the settings page reads: the project's choices, env and links.
   "repo": "git@github.com:[ORG]/[REPO].git", "base_branch": "master",
   "hash": "sha256:5cc7…", "file": "schema = 1\n…",
   "hooks": {"deps": [], "start": ["bin/rails db:test:prepare"], "create": []},
-  "agents": [{"name": "claude", "setup": ["gh extension install github/gh-stack"]}],
+  "agents": [{"name": "claude", "setup": ["gh extension install github/gh-stack"], "default": false}],
   "options": [
     {"key": "database", "slot": true, "ref": "postgres@1", "choices": ["postgres@1", "local:mariadb@1", "none"]},
     {"key": "jobs", "slot": true, "ref": "none", "choices": ["sidekiq@1", "none"]}
@@ -1448,7 +1451,7 @@ What the settings page reads: the project's choices, env and links.
 | `hash` | string | As `settings preview`. |
 | `file` | string | The text of `project.toml`, for the raw editor; `project write --if-hash <hash>` saves it. |
 | `hooks` | object | `deps`, `start`, `create`: each `[hooks]` list's commands in order (`[]` for none; D126). |
-| `agents` | array | Each `[agents.<name>]` by name: `name`, `setup` (its setup commands in order, never null; D133). `[]` without agents. |
+| `agents` | array | Each `[agents.<name>]` by name: `name`, `setup` (its setup commands in order, never null; D133), `default` (it is the default agent, D140: marked `default = true`, or the only one whose package is the built-in default). `[]` without agents. |
 | `firewall` | object | `mode`: `[firewall] mode` (`""`: the default); `effective`: the mode the project's services get (`enforce` with agents, else `log`, unless `mode` is set: D119); `allow`: `app`, `deps`, `agent`, each `[firewall] allow.<profile>` (`[]` for none). |
 | `pack` | object | `ref`: `[stack] pack`; `choices`: the packs Settings offers, sorted, the current one among them: the newest built-in of each name, the workspace's `packs/<name>/` as `local:<name>@N` and the libraries' packs, each that loads with the current pack's app service (so `[stack] app` stays valid) and that the project's other lines resolve with (an option's `works_with`). |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |

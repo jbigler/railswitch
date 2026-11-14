@@ -11,6 +11,7 @@ import (
 
 	"github.com/jbigler/railswitch/internal/agentstatus"
 	"github.com/jbigler/railswitch/internal/agentusage"
+	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/pack"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
@@ -348,9 +349,14 @@ func (l *L) stopIdleAgents(ctx context.Context, m *render.Model, slug string, id
 // project.toml marks default = true, else the only one whose package is the
 // built-in default (the agent project new adds).
 func defaultAgent(m *render.Model) (string, bool) {
+	return DefaultAgent(m.Inputs.Project, m.Inputs.Stack)
+}
+
+// DefaultAgent is defaultAgent of project p and its stack st.
+func DefaultAgent(p *config.Project, st *pack.Stack) (string, bool) {
 	var builtin []string
-	for _, a := range m.Inputs.Stack.Agents {
-		if m.Inputs.Project.Agents[a.Name].Default {
+	for _, a := range st.Agents {
+		if p.Agents[a.Name].Default {
 			return a.Name, true
 		}
 		if a.Agent.Default {

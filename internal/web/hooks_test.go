@@ -42,3 +42,24 @@ echo &#34;&lt;b&gt;&#34;"`)
 	body = f.do(jsonPost("/p/ftest/settings/preview", `[{"op":"agent.setup","key":"claude","values":["a","b"]}]`)).Body.String()
 	contains(t, "staged", body, "Agent claude setup: 2 commands")
 }
+
+// D215: the Default agent choice shows only with two agents or more, the
+// marked one selected; its edit is staged by name.
+func TestSettingsDefaultAgent(t *testing.T) {
+	f := settingsFixture(t)
+	one := strings.Replace(projectShowJSON, `"options":[`, `"agents":[{"name":"claude","setup":[],"default":false}],"options":[`, 1)
+	f.cli.set("--json -C /ws/ftest project show", one)
+	if body := f.do(req("GET", "/p/ftest/settings", nil)).Body.String(); strings.Contains(body, `id="agent-default"`) {
+		t.Error("a Default agent choice with one agent")
+	}
+	two := strings.Replace(one, `}],"options":[`, `},{"name":"probe","setup":[],"default":true}],"options":[`, 1)
+	f.cli.set("--json -C /ws/ftest project show", two)
+	body := f.do(req("GET", "/p/ftest/settings", nil)).Body.String()
+	contains(t, "settings", body, `id="agent-default"`, `data-orig="probe"`, `<option value="claude">claude</option><option value="probe" selected>probe</option>`)
+	noCSPViolation(t, "settings", body)
+	if strings.Contains(body, `<option value="">not set</option>`) {
+		t.Error(`"not set" offered with a default marked`)
+	}
+	body = f.do(jsonPost("/p/ftest/settings/preview", `[{"op":"agent.default","key":"claude"}]`)).Body.String()
+	contains(t, "staged", body, "Default agent: claude")
+}

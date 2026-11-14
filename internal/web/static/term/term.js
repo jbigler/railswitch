@@ -4,6 +4,8 @@
 // before a normal close. Rendered on a canvas (WebGL as the fallback):
 // xterm's DOM renderer adds <style> elements, which the dashboard's CSP blocks.
 
+import { termFont, termFontKey } from '../logic.js';
+
 const sendMax = 16 << 10; // the server reads at most 64 KiB per frame
 
 // FONT prefers Maple Mono (its Nerd Font builds first: nvim's icons, prompt
@@ -11,6 +13,14 @@ const sendMax = 16 << 10; // the server reads at most 64 KiB per frame
 // installed wins.
 const FONT = '"Maple Mono NF", "Maple Mono NF CN", "Maple Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono", ui-monospace, Menlo, monospace';
 const FONT_SIZE = 14;
+// fontFamily puts the font this browser chose in Colours (#167) first: a
+// font is the browser's machine's, so it is not in dashboard.toml.
+function fontFamily() {
+  let own = '';
+  try { own = localStorage.getItem(termFontKey) || ''; } catch { /* storage off */ }
+  own = termFont(own);
+  return own ? `"${own}", ${FONT}` : FONT;
+}
 
 let loaded = null;
 function script(src) {
@@ -32,7 +42,7 @@ function load() {
       document.head.append(css);
     }
     // the font first: the terminal measures its cell once, when it opens
-    const font = document.fonts?.load(`${FONT_SIZE}px ${FONT}`).catch(() => {}) ?? Promise.resolve();
+    const font = document.fonts?.load(`${FONT_SIZE}px ${fontFamily()}`).catch(() => {}) ?? Promise.resolve();
     loaded = Promise.all([font, script('/static/term/xterm.js')]).then(() => Promise.all([script('/static/term/addon-fit.js'), script('/static/term/addon-canvas.js'), script('/static/term/addon-webgl.js'), script('/static/term/addon-unicode11.js'), script('/static/term/addon-clipboard.js')]));
   }
   return loaded;
@@ -78,7 +88,10 @@ const clipboard = {
 };
 
 // openTerminal fills el with a terminal connected to url (a path).
-// opts.theme overrides colours; opts.quiet leaves the focus where it is.
+// opts.theme overrides colours; opts.quiet leaves the focus where it is;
+// opts.onExit(code, typed) is told the program ended and whether a key
+// was pressed in the terminal, and answers true when it took the panel
+// away (no "[exited]" then).
 // Returns {close, detach, focus}: close ends the terminal's program,
 // detach leaves it running.
 export function openTerminal(el, url, opts = {}) {
@@ -90,6 +103,7 @@ export function openTerminal(el, url, opts = {}) {
   let fit = null;
   let sock = null;
   let closed = false; // close() was called: no overlay, no reconnect
+  let typed = false; // a key was pressed here: opts.onExit is told
   let observer = null;
 
   const show = (text, again) => {
@@ -140,8 +154,9 @@ export function openTerminal(el, url, opts = {}) {
       if (sock !== ws) return;
       sock = null;
       if (closed) return;
-      if (exit !== null && exit !== undefined) show(`[exited ${exit}]`, 'Reopen');
-      else if ((ev.code >= 4000 && ev.code < 5000) || ev.code === 1011) show(ev.reason || `closed (${ev.code})`, 'Retry');
+      if (exit !== null && exit !== undefined) {
+        if (!opts.onExit?.(exit, typed)) show(`[exited ${exit}]`, 'Reopen');
+      } else if ((ev.code >= 4000 && ev.code < 5000) || ev.code === 1011) show(ev.reason || `closed (${ev.code})`, 'Retry');
       else show('Disconnected', 'Reconnect');
     };
   }
@@ -178,7 +193,7 @@ export function openTerminal(el, url, opts = {}) {
     term = new window.Terminal({
       // proposed API: term.unicode, for the Unicode 11 widths below; only this page's code reaches it
       cursorBlink: true, scrollback: 5000, allowProposedApi: true,
-      fontFamily: FONT, fontSize: FONT_SIZE,
+      fontFamily: fontFamily(), fontSize: FONT_SIZE,
       theme: { ...cssTheme(el), ...(opts.theme || {}) },
     });
     // Unicode 11 widths (an emoji is two columns), as tmux and the programs
@@ -209,6 +224,7 @@ export function openTerminal(el, url, opts = {}) {
     }
     fit.fit();
     term.onData(send);
+    term.onKey(() => { typed = true; }); // keys only: onData also carries xterm's own answers
     // xterm.js sends Shift+Enter as a plain Enter; in an agent's terminal
     // send it as CSI u, which the agent's tmux (extended-keys) passes on as
     // Shift+Enter. Not in a shell: bash would print the sequence.

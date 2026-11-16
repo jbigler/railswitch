@@ -1375,6 +1375,24 @@ The worktree's (`-w`) database snapshots (D157), newest first; none is
 | `bytes` | number | The size of its files together. |
 | `files` | array | Its dumps and volume seeds, as `db dump` names them. |
 
+## `db dump ls`
+
+The workspace's starting data (D208): the dumps in `<workspace>/db-dumps/`
+that a new worktree starts from, as `db dump` writes them (or as you put
+them there). No worktree needed. A temp file of a dump being written (a
+leading dot) is not listed. The text form is a count, size and time
+line, then a file per line, or `db-dumps/ holds no dumps`.
+
+```json
+{"modified": "2026-11-04T10:00:00+01:00", "bytes": 2500000, "files": ["app_dev.dump", "rustfs_data.tar.gz"]}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `modified` | string | When the newest file was written (RFC 3339; its modification time). Absent when there are none. |
+| `bytes` | number | The size of the files together. |
+| `files` | array | The file names, in name order; none is `[]`. |
+
 ## `settings preview`
 
 Reads an edit list on stdin (a JSON array; ops `pack` (`ref`: sets

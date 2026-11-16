@@ -510,10 +510,6 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .t-detail{font-size:13px;margin-top:2px}
 .svc-fold>summary{cursor:pointer;color:var(--muted)}
 .svc-fold[open]>summary{margin-bottom:6px}
-.db-rows td{vertical-align:middle;padding-top:8px;padding-bottom:8px}
-.db-rows .muted{font-size:13px}
-.db-rows .ln{margin:0}
-.db-rows form{display:inline}
 .spanel .add-row{max-width:48rem}
 .wt .dcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card);min-width:0} /* --card: white-ish on light, a step up on dark */
 .wt .dcard.wide{grid-column:1/-1}
@@ -524,9 +520,9 @@ body[data-pane=list] .grid>.pane,body[data-pane=detail] .grid>.left{display:none
 .wt .jobs:not(:has(.job)){display:none}
 .job-out summary{cursor:pointer;font-size:12px;padding:2px 0}
 /* Overview shows every card; another tab only its own. */
-body:where(:not([data-tab]),[data-tab=overview]) .wt :is([data-panel=tests],[data-panel=database]){display:none} /* they have their own tabs; the head's pills say the rest */
+body:where(:not([data-tab]),[data-tab=overview]) .wt [data-panel=tests]{display:none} /* they have their own tabs; the head's pills say the rest */
 body:where([data-tab]:not([data-tab=overview])) .wt [data-panel]{display:none} /* :where keeps it below the rules that show a tab's card */
-body[data-tab=agent] .wt [data-panel=agent],body[data-tab=tests] .wt [data-panel=tests],body[data-tab=database] .wt [data-panel=database],body[data-tab=jobs] .wt [data-panel=jobs]{display:block;grid-column:1/-1}
+body[data-tab=agent] .wt [data-panel=agent],body[data-tab=tests] .wt [data-panel=tests],body[data-tab=jobs] .wt [data-panel=jobs]{display:block;grid-column:1/-1}
 body[data-tab=jobs] .wt .jobs .none{display:block}
 
 /* Settings as tabs (D201): one section at a time, the staged pane beside it. */
@@ -591,6 +587,11 @@ details.more summary{cursor:pointer;color:var(--blue);font-weight:700}
 /* The Whiteboard tab (D218): outside the detail the event stream redraws, filled when the tab shows. */
 #board{display:none;margin:16px 20px} /* the margin .wt .terms has */
 body[data-tab=whiteboard] #board{display:block}
+/* The Database tab (#222): the same, its two cards side by side when there is room. */
+#dbpanel{display:none;margin:16px 20px}
+body[data-tab=database] #dbpanel{display:block}
+.db-panel td form{display:inline}
+.db-panel{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(26rem,100%),1fr));align-items:start}
 .board-pic{display:block;max-width:100%;max-height:calc(100vh - 16rem);border:1px solid var(--border);border-radius:6px}
 .board-dl{margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--muted)}
 .board-dl .ln{margin:0}

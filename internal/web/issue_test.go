@@ -37,4 +37,7 @@ func TestIssue(t *testing.T) {
 	if !strings.Contains(w.Body.String(), `href="/issue"`) {
 		t.Errorf("header lacks the Report issue link")
 	}
+	if !strings.Contains(w.Body.String(), `href="https://github.com/jbigler/railswitch/blob/main/docs/guide/README.md"`) {
+		t.Errorf("header lacks the Docs link (#205)")
+	}
 }

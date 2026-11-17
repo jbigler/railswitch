@@ -802,6 +802,12 @@ ids, key types and fingerprints are escaped like any other text.
   project's jobs mix in); one runs at a time, and the page shows them
   below the forms.
 
+## Docs
+
+Every page's header has **Docs ↗** (#205): the user guide
+(`docs/guide/README.md`) on GitHub, in a new tab. It is the `main`
+branch's, so it can describe features newer than the railswitch running.
+
 ## Reporting an issue
 
 Every page's header, and the Virtual Office's HUD, has **Report issue ↗**

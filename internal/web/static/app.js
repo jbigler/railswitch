@@ -186,29 +186,40 @@ function showTab(tab) {
   body.dataset.tab = tab;
   tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
   termsShown();
-  // The Whiteboard tab reads its board each time it is shown, not on each
-  // redraw of the detail (D218).
-  const shown = tab === "whiteboard" ? slug : "";
-  if (shown && shown !== boardShown) loadBoardPanel(shown);
-  boardShown = shown;
+  // The Whiteboard and Database tabs read their content each time they
+  // are shown, not on each redraw of the detail (D218, #222).
+  const shown = tabPanels[tab] ? tab + " " + slug : "";
+  if (shown && shown !== panelShown) {
+    panelShown = shown;
+    loadPanel();
+  }
+  panelShown = shown;
 }
 
-// The Whiteboard tab (D218): its content, read from the server.
-let boardShown = ""; // the worktree whose board the tab shows; "": the tab is hidden
-async function loadBoardPanel(slug) {
-  const box = $("#board");
+// The tabs whose content is read from the server: the box, the path
+// under the worktree's, and what the error names.
+const tabPanels = {
+  whiteboard: ["#board", "/whiteboard-panel", "The whiteboard"],
+  database: ["#dbpanel", "/database-panel", "The database tab"],
+};
+let panelShown = ""; // "<tab> <worktree>" of the panel shown; "": none
+async function loadPanel() {
+  const want = panelShown;
+  if (!want) return;
+  const [tab, slug] = want.split(" ");
+  const [sel, path, what] = tabPanels[tab];
+  const box = $(sel);
   if (!box) return;
   let html;
   try {
-    const r = await fetch("/p/" + encodeURIComponent(prefix) + "/" + encodeURIComponent(slug) + "/whiteboard-panel", { credentials: "same-origin" });
-    html = r.ok ? await r.text() : "";
-    if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+    const r = await fetch("/p/" + encodeURIComponent(prefix) + "/" + encodeURIComponent(slug) + path, { credentials: "same-origin" });
+    html = await r.text();
+    if (!r.ok) throw new Error(html.trim() || r.statusText);
   } catch (e) {
-    html = "";
-    if (boardShown === slug) box.textContent = "The whiteboard did not load: " + e.message;
+    if (panelShown === want) box.textContent = what + " did not load: " + e.message;
     return;
   }
-  if (boardShown === slug) box.innerHTML = html; // still the worktree shown
+  if (panelShown === want) box.innerHTML = html; // still the one shown
 }
 
 // The list's filter: a worktree shows while its name or branch holds the
@@ -326,10 +337,9 @@ document.addEventListener("click", (e) => {
   const clear = t.closest("[data-board-clear]");
   if (clear) {
     if (!confirm("Clear this worktree's whiteboard? The drawing is deleted.")) return;
-    const slug = clear.closest(".board-panel").dataset.slug;
     fetch(clear.dataset.boardClear, { method: "POST", credentials: "same-origin" }).then(async (r) => {
       if (!r.ok) return toast("The whiteboard was not cleared: " + ((await r.text()).trim() || r.statusText), true);
-      if (boardShown === slug) loadBoardPanel(slug);
+      loadPanel();
     }, (e) => toast("The whiteboard was not cleared: " + e.message, true));
     return;
   }
@@ -420,7 +430,8 @@ async function post(f, data, url = f.action) {
   });
   if (r.ok) {
     const j = await r.json().catch(() => ({}));
-    if (j.id) followJob(j, f.hasAttribute("data-show-job"));
+    // A job the Database tab started rereads it when it ends (#222).
+    if (j.id) followJob(j, f.hasAttribute("data-show-job"), f.closest("#dbpanel") ? loadPanel : null);
     else toast(j.label ? "Started: " + j.label : "Done", false);
     if (f.hasAttribute("data-close")) {
       const d = f.closest("dialog");
@@ -435,11 +446,13 @@ async function post(f, data, url = f.action) {
 // followJob says a started job is running until the jobs list shows it
 // ended (a click on the toast hides it sooner), and with show scrolls to
 // the job when it appears and when it ends: its output is what was asked for.
-function followJob(j, show) {
+// then, if given, runs when it ends too.
+function followJob(j, show, then) {
   toast("Running: " + j.label + ". You can keep working; its output is under Jobs.", false, true);
   if (show) reveal = j.id;
   watched.set(j.id, (state) => {
     toast(j.label + ": " + state, state !== "ok");
+    if (then) then();
     if (show) document.getElementById("job-" + j.id)?.scrollIntoView({ block: "start" });
   });
   showJob();

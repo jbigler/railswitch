@@ -247,6 +247,7 @@ func newFixture(t *testing.T) *fixture {
 		"--json -C /ws/ftest -w b task ls":        ftestTasks,
 		"--json -C /ws/ftest -w b agent ls":       ftestAgents,
 		"--json -C /ws/ftest -w b db snapshot ls": `[{"name":"before-migrate","created":"2026-11-04T10:00:00Z","bytes":2500000,"files":["app_dev.dump"]}]`,
+		"--json -C /ws/ftest db dump ls":          `{"modified":"2026-11-05T09:30:00Z","bytes":3100000,"files":["app_dev.dump","rustfs_data.tar.gz"]}`,
 		"--json -C /ws/ftest -w main task ls":     ftestTasks,
 		"--json -C /ws/ftest wt ls":               wtLS,
 		"--json dashboard colors":                 colorsJSON,

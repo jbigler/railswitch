@@ -39,6 +39,7 @@ var completionSubs = map[string][]string{
 	"dashboard":          {"colors", "serve"},
 	"dashboard colors":   {"reset", "set"},
 	"db":                 {"dump", "restore", "snapshot"},
+	"db dump":            {"ls"},
 	"db snapshot":        {"ls", "restore", "rm"},
 	"fw":                 {"allow", "show"},
 	"hooks":              {"backup", "check", "restore"},

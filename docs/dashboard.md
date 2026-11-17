@@ -314,10 +314,16 @@ still wider than the window scrolls its pane.
     table, the bars and the share.
   - **Tests:** as the list says, with the exit code, time and commit,
     and **run tests**.
-  - **Database** (its own tab, D208): **Snapshots…** (D157), and
-    **Use this worktree's data**, which after a confirm runs `railswitch
-    db dump` as a job: it writes the worktree's databases and storage to
-    the workspace's `db-dumps/`, which a new worktree starts from.
+  - **Database** (its own tab, D208): the snapshots (D157), below, and
+    the starting data: the workspace's `db-dumps/`, which a new worktree
+    starts from (`railswitch --json db dump ls`): its files, their size
+    and when the newest was written, or "There is none". **Use this
+    worktree's data**, after a confirm, runs `railswitch db dump` as a
+    job, which writes the worktree's databases and storage there. Like
+    the Whiteboard tab, its content is read from
+    `GET /p/{prefix}/{slug}/database-panel` each time the tab shows, not
+    on each redraw of the detail (#222), and again when a job it started
+    ends.
   - Tests and Database show on their own tabs, not on Overview: the
     head's pills carry the test result and the PR there.
   - Agent, Tests and Database come last, side by side: each has its own
@@ -1096,9 +1102,9 @@ Every action is a job (below).
   while this worktree's home waits for it (`agent ls`'s
   `default_pending`) the dialog says "Pending: … takes the default at its
   next start", adding "stop it, then start it again" while it runs.
-- **Snapshots…** (the detail's Database area, shown when the worktree has
-  a data service; D157) opens a dialog that reads `railswitch --json db
-  snapshot ls`: each snapshot with when it was taken and its size,
+- **Snapshots** (the Database tab, shown when the worktree has a data
+  service; D157; the down dialog's `snapshot` link opens them as a
+  dialog) read `railswitch --json db snapshot ls`: each snapshot with when it was taken and its size,
   **restore** (asks first: what the databases and storage hold now is
   lost; `db snapshot restore --yes <name>`) and **delete** (asks first;
   `db snapshot rm <name>`), and **Take a snapshot** with an optional name
@@ -1676,7 +1682,8 @@ docs/json.md.
   new worktree.
 - `railswitch [--json] db snapshot ls` (worktree), `db snapshot
   [<name>]`, `db snapshot restore --yes <name>` and `db snapshot rm
-  <name>`: the snapshots dialog (D157).
+  <name>`: the Database tab's snapshots (D157); `[--json] db dump ls`
+  (workspace): its starting data.
 - `railswitch agent queue add [--issue <n>]` (text on stdin), `agent
   queue rm <id>`, `agent queue clear` and `agent queue next` (worktree):
   the agent work queue (D159), above; `overview`'s `queue` shows it.

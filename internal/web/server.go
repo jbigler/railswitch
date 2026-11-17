@@ -130,6 +130,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/{slug}/whiteboard-panel", s.boardPanelPage)
 	m.HandleFunc("GET /p/{prefix}/{slug}/whiteboard-file", s.boardFile)
 	m.HandleFunc("GET /p/{prefix}/{slug}/snapshots", s.snapshotsDialog)
+	m.HandleFunc("GET /p/{prefix}/{slug}/database-panel", s.databasePanel)
 	m.HandleFunc("GET /p/{prefix}/{slug}/queue", s.queueDialog)
 	m.HandleFunc("GET /issue", s.issue)
 	m.HandleFunc("GET /colors", s.colorsDialog)

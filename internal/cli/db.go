@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const dbUsage = "usage: railswitch db dump | railswitch db restore [--from <dir>] [--yes] [<database>|<service>...] | railswitch db snapshot [<name>] | railswitch [--json] db snapshot ls | railswitch db snapshot restore [--yes] <name> | railswitch db snapshot rm <name>"
+const dbUsage = "usage: railswitch db dump | railswitch [--json] db dump ls | railswitch db restore [--from <dir>] [--yes] [<database>|<service>...] | railswitch db snapshot [<name>] | railswitch [--json] db snapshot ls | railswitch db snapshot restore [--yes] <name> | railswitch db snapshot rm <name>"
 
 // railswitch db dump: dump the worktree's database and its seeded volumes
 // into <workspace>/db-dumps/ (C3). railswitch db restore: put the dumps
@@ -21,6 +21,9 @@ func cmdDB(ctx context.Context, e *env, args []string) int {
 	}
 	switch args[0] {
 	case "dump":
+		if len(args) == 2 && args[1] == "ls" {
+			return cmdDBDumpLs(ctx, e) // the workspace's, so no -w needed
+		}
 		if len(args) != 1 {
 			return e.usageErr("%s", dbUsage)
 		}
@@ -146,6 +149,37 @@ func cmdDBSnapshot(ctx context.Context, e *env, args []string) int {
 	}
 	if _, err := l.DBSnapshot(ctx, slug, name); err != nil {
 		return e.fail(err)
+	}
+	return 0
+}
+
+// railswitch db dump ls: the starting data in <workspace>/db-dumps/ (D208).
+func cmdDBDumpLs(ctx context.Context, e *env) int {
+	l, code := e.projectLifecycle(ctx)
+	if code != 0 {
+		return code
+	}
+	d, err := l.StartingData()
+	if err != nil {
+		return e.fail(err)
+	}
+	if e.json {
+		if err := json.NewEncoder(e.stdout).Encode(d); err != nil {
+			return e.fail(err)
+		}
+		return 0
+	}
+	if d.Modified == nil {
+		fmt.Fprintln(e.stdout, "db-dumps/ holds no dumps")
+		return 0
+	}
+	plural := "s"
+	if len(d.Files) == 1 {
+		plural = ""
+	}
+	fmt.Fprintf(e.stdout, "%d file%s, %s, newest written %s\n", len(d.Files), plural, humanBytes(d.Bytes), d.Modified.Local().Format("2006-01-02 15:04:05"))
+	for _, f := range d.Files {
+		fmt.Fprintln(e.stdout, f)
 	}
 	return 0
 }

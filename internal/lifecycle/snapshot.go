@@ -21,6 +21,43 @@ type Snapshot struct {
 	Files   []string  `json:"files"`
 }
 
+// Dumps is the workspace's starting data (D208): the files in db-dumps/
+// that a new worktree starts from, their size together and when the newest
+// was written (absent when there are none).
+type Dumps struct {
+	Modified *time.Time `json:"modified,omitempty"`
+	Bytes    int64      `json:"bytes"`
+	Files    []string   `json:"files"`
+}
+
+// StartingData reads <workspace>/db-dumps/: its regular files, not a
+// temp file of a dump being written (a leading dot). No dir is none.
+func (l *L) StartingData() (Dumps, error) {
+	d := Dumps{Files: []string{}}
+	ents, err := os.ReadDir(filepath.Join(l.WS.Root, "db-dumps"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return d, nil
+	}
+	if err != nil {
+		return d, err
+	}
+	for _, ent := range ents {
+		if !ent.Type().IsRegular() || ent.Name()[0] == '.' {
+			continue
+		}
+		fi, err := ent.Info()
+		if err != nil {
+			return d, err
+		}
+		d.Files = append(d.Files, ent.Name())
+		d.Bytes += fi.Size()
+		if m := fi.ModTime(); d.Modified == nil || m.After(*d.Modified) {
+			d.Modified = &m
+		}
+	}
+	return d, nil
+}
+
 // snapshotName is a snapshot's name: a bare file name, no leading dot or
 // dash. ls, restore and rm are the subcommands' words.
 var snapshotName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)

@@ -217,7 +217,7 @@ func TestPages(t *testing.T) {
 	}{
 		{"/p/ftest", 200, []string{`id="row-main"`, `id="row-b"`, `id="detail"`, `/static/app.js`, `/theme.css`, "<h1>main</h1>", `data-pane="list"`, `<a class="back" href="/p/ftest">`, `<form method="post" action="/p/ftest/prs/refresh" data-post><button class="ln dim" title="Refresh PRs" aria-label="Refresh PRs">↻</button></form>`, `<div id="conn" class="banner conn" hidden></div>`}},
 		{"/p/ftest/images", 200, []string{`<nav class="hd-group" aria-label="Project"><span class="hd-cap">project</span>`, `<a class="hb" href="/p/ftest">Worktrees</a>`, `<span class="hd-div" aria-hidden="true"></span>`, `href="/p/ftest/notes"`, `>Office</a>`, `<details class="menu" data-keep="machine" aria-label="This machine"><summary class="hb">Machine ▾</summary>`}},
-		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `data-pane="detail"`, `<a class="back" href="/p/ftest?sort=-name">`, `href="/p/ftest/b/snapshots" data-dialog="snapshots"`, `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
+		{"/p/ftest/b?sort=-name", 200, []string{"<h1>b</h1>", `data-pane="detail"`, `<a class="back" href="/p/ftest?sort=-name">`, `<button type="button" data-tab="database"`, `<section id="dbpanel"`, `class="sel"`, "Flipper", `href="/p/ftest/b?sort=name"`}},
 		{"/p/nope", 404, nil},
 		{"/p/nope/b", 404, nil},
 		{"/p/ftest/b/remove", 200, []string{"Discard changes", `name="confirm"`, "/ws/ftest/b"}},
@@ -226,6 +226,7 @@ func TestPages(t *testing.T) {
 		{"/p/ftest/b/tasks", 200, []string{"console", "bin/rails test", `name="args"`, `<button formaction="/p/ftest/b/act/restart" class="pal-task" data-action>`, `<button formaction="/p/ftest/b/act/term" class="pal-task" data-action><span class="pal-kind">action</span> <b>terminal window</b>`, `<a href="/p/ftest/main" class="pal-task"><span class="pal-kind">worktree</span>`, `<a href="/p/ftest/notes" class="pal-task"><span class="pal-kind">page</span> <b>notes</b>`, `href="/machine"`, `<li class="pal-new" hidden><a class="pal-task" href="/p/ftest/settings#tasks" data-base="/p/ftest/settings">`}},
 		{"/p/ftest/palette", 200, []string{`href="/p/ftest/b"`, `href="/p/ftest/virtual-office"`}},
 		{"/p/ftest/b/snapshots", 200, []string{"before-migrate", "2.5 MB", `action="/p/ftest/b/snapshots/restore"`, `data-confirm="Restore before-migrate into b?`, `action="/p/ftest/b/snapshots/take"`}},
+		{"/p/ftest/b/database-panel", 200, []string{"before-migrate", "2.5 MB", `action="/p/ftest/b/snapshots/restore"`, `action="/p/ftest/b/snapshots/take"`, "2 files, 3.1 MB, last written", "<code>app_dev.dump</code>, <code>rustfs_data.tar.gz</code>", `action="/p/ftest/b/snapshots/dump"`}},
 		{"/p/ftest/b/agent-default", 200, []string{"<h3>claude</h3>", "from <b>main</b>", `action="/p/ftest/b/agent-default/promote"`, `name="name" value="claude"`, `<button class="ln" name="all" value="1">Every worktree</button>`, "Save b's config as the default", "Pending: b's claude takes the default at its next start (it runs now: stop it, then start it again)."}},
 		{"/colors", 200, []string{`value="#BC5215"`, "paper", "solar", "contrast"}},
 		{"/theme.css", 200, []string{"--accent:#BC5215", "prefers-color-scheme: dark", "--accent:#DA702C"}},

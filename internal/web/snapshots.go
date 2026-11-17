@@ -21,12 +21,50 @@ func readSnapshots(ctx context.Context, c CLI, ws, slug string) ([]snapshot, err
 	return readJSON[[]snapshot](ctx, c, "-C", ws, "-w", slug, "db", "snapshot", "ls")
 }
 
+// dumps is `db dump ls`: the starting data in db-dumps/ (D208).
+type dumps struct {
+	Modified *time.Time `json:"modified"`
+	Bytes    int64      `json:"bytes"`
+	Files    []string   `json:"files"`
+}
+
 type snapshotsView struct {
 	Slug, TakeURL, RestoreURL, RmURL string
 	Snapshots                        []snapshotRow
+	// The Database tab's panel only: the starting data, its POST, and
+	// Written "" when db-dumps/ holds none.
+	DumpURL, Written, DumpSize string
+	DumpFiles                  []string
 }
 
 type snapshotRow struct{ Name, Created, Size string }
+
+func megabytes(n int64) string { return fmt.Sprintf("%.1f MB", float64(n)/1e6) }
+
+// snapshotsOf is worktree slug's snapshots dialog, or with panel the
+// Database tab's content, which shows the starting data too.
+func (s *Server) snapshotsOf(r *http.Request, p projectRow, slug string, panel bool) (snapshotsView, error) {
+	snaps, err := readSnapshots(r.Context(), s.c.CLI, p.Workspace, slug)
+	if err != nil {
+		return snapshotsView{}, err
+	}
+	base := worktreePath(p, slug) + "/snapshots/"
+	v := snapshotsView{Slug: slug, TakeURL: base + "take", RestoreURL: base + "restore", RmURL: base + "rm"}
+	for _, sn := range snaps {
+		v.Snapshots = append(v.Snapshots, snapshotRow{Name: sn.Name, Created: sn.Created.Local().Format("2006-01-02 15:04"), Size: megabytes(sn.Bytes)})
+	}
+	if panel {
+		d, err := readJSON[dumps](r.Context(), s.c.CLI, "-C", p.Workspace, "db", "dump", "ls")
+		if err != nil {
+			return snapshotsView{}, err
+		}
+		v.DumpURL, v.DumpFiles, v.DumpSize = base+"dump", d.Files, megabytes(d.Bytes)
+		if d.Modified != nil {
+			v.Written = d.Modified.Local().Format("2006-01-02 15:04")
+		}
+	}
+	return v, nil
+}
 
 // snapshotsDialog lists the worktree's database snapshots, each with
 // restore and delete, and takes a new one.
@@ -35,17 +73,29 @@ func (s *Server) snapshotsDialog(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	snaps, err := readSnapshots(r.Context(), s.c.CLI, p.Workspace, wt.Slug)
+	v, err := s.snapshotsOf(r, p, wt.Slug, false)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	base := worktreePath(p, wt.Slug) + "/snapshots/"
-	v := snapshotsView{Slug: wt.Slug, TakeURL: base + "take", RestoreURL: base + "restore", RmURL: base + "rm"}
-	for _, sn := range snaps {
-		v.Snapshots = append(v.Snapshots, snapshotRow{Name: sn.Name, Created: sn.Created.Local().Format("2006-01-02 15:04"), Size: fmt.Sprintf("%.1f MB", float64(sn.Bytes)/1e6)})
-	}
 	s.html(w, http.StatusOK, "snapshots", v)
+}
+
+// databasePanel is GET /p/{prefix}/{slug}/database-panel: the Database
+// tab's content (#222), which the page loads each time the tab shows, as
+// the Whiteboard's (D218).
+func (s *Server) databasePanel(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	v, err := s.snapshotsOf(r, p, wt.Slug, true)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	s.html(w, http.StatusOK, "db-panel", v)
 }
 
 // snapshotAction runs `db snapshot [<name>]`, `db snapshot restore --yes

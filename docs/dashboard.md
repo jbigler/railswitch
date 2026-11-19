@@ -758,9 +758,53 @@ accepted until the update is accepted.
   page goes to the project page. When it exits 3 (accepted, restart
   failed) the page goes there too, with a notice.
 
+## Welcome
+
+`/` while no project is registered is the **welcome page** (D223), for
+someone who has just installed railswitch. Once a project exists, `/`
+opens a project as before, and the welcome page is gone; its checks stay
+on the Machine page. It has three parts:
+
+- **Your machine**: the machine checks (below), loaded after the page.
+- **Start your first project**, two ways in:
+  - **From a repository**: a URL field that opens `/new?repo=<url>`. The
+    form comes filled in and reads the repository at once.
+  - **From a template folder**: a path field that opens the template
+    review, `/machine/templates/import?next=new&dir=<path>`. With
+    `next=new` the review's way back is `/`, and once imported it goes on
+    to `/new?template=<ref>` with that template picked. A template already
+    here (`same`) links there instead. `next` takes no other value, so it
+    can't send the page anywhere else.
+  - The templates already on the machine, each a link to
+    `/new?template=<ref>`.
+- **What happens next**: what a prefix, a worktree, a pack and secrets
+  are. Secrets come after Create: the project page's "Set these secrets to
+  start" card asks for them.
+
+While there are no projects the switcher's "No projects yet: start here"
+links to `/`.
+
+### Machine checks
+
+`GET /machine/checks` is a fragment: `railswitch --json -C / doctor`, so
+the host checks only, never a workspace's. It lists the failures first,
+then the warnings, each with its detail and its fix in a box with
+**Copy**; the passing checks fold into "N checks pass". A failure says
+"N to fix before a project can start"; with none, "Ready". **Check
+again** reads it anew. The dashboard never runs a fix: most need a
+terminal, some root (`railswitch allow-ports`). Nothing waits on the
+checks: they show while the rest of the page is usable. `doctor --json`
+exits 0 with failures in the document (D223), so the dashboard can read
+it; the text form still exits 1.
+
+The welcome page and the Machine page load it into their **Your
+machine** box after drawing (doctor takes a few seconds). The header's
+Machine menu has **Checks**, which opens `/machine#checks`.
+
 ## Machine
 
-`/machine` (`Settings` in the header's Machine menu; no project needed) has a
+`/machine` (`Settings` in the header's Machine menu; no project needed)
+starts with **Your machine**, the machine checks above. It has a
 **Templates** section (D113): the templates from `railswitch --json
 template ls`, and **Import from a folder**, a path field that opens
 `/machine/templates/import?dir=<path>`. That page reads `railswitch
@@ -822,7 +866,9 @@ edit everything on GitHub before you submit it.
 ## New project
 
 `/new` creates a project. Open it from the switcher ("New project…", the
-last entry) or from `/` when no project is registered. The page has two
+last entry) or from the welcome page. `?repo=<url>` fills in the
+repository and reads it at once; `?template=<ref>` picks an installed
+template (one not installed picks nothing). The page has two
 panels: step 1 on the left, step 2 on the right. Nothing is created
 until you press Create project.
 

@@ -42,7 +42,7 @@ function connect() {
   if (es) es.close();
   clearTimeout(retry);
   // The new page has a prefix only once Create starts its job.
-  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", days: body.dataset.days || "", view: view === "new" || view === "machine" || view === "import" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
+  const q = new URLSearchParams({ p: body.dataset.prefix, w: body.dataset.sel || "", sort: body.dataset.sort || "name", days: body.dataset.days || "", view: view === "new" || view === "machine" || view === "import" || view === "welcome" ? "new" : view === "library" ? "library" : view ? "settings" : "" });
   es = new EventSource("/events?" + q);
   es.onopen = () => {
     failures = 0;
@@ -922,6 +922,54 @@ function startSettings() {
   loadBlocked();
 }
 
+// startChecks fills the machine checks box (D223) from doctor, after the
+// page is drawn: doctor takes a few seconds. Check again reads it anew;
+// Copy puts a fix on the clipboard. Nothing here runs a fix.
+function startChecks() {
+  const box = $("[data-checks]");
+  if (!box) return;
+  async function load() {
+    let html;
+    try {
+      const r = await fetch("/machine/checks", { credentials: "same-origin" });
+      html = await r.text();
+      if (!r.ok) throw new Error(html.trim() || r.statusText);
+    } catch (e) {
+      // A restarting dashboard, say: the message, and a way to try again.
+      const p = document.createElement("p");
+      p.className = "red";
+      p.textContent = "The checks did not load: " + e.message;
+      const again = document.createElement("button");
+      again.type = "button";
+      again.className = "ln";
+      again.dataset.checksAgain = "";
+      again.textContent = "Check again";
+      const h = document.createElement("h2");
+      h.textContent = "Your machine";
+      box.replaceChildren(h, p, again);
+      return;
+    }
+    box.innerHTML = html; // the dashboard's own template, escaped
+  }
+  box.addEventListener("click", async (e) => {
+    const again = e.target.closest("[data-checks-again]");
+    if (again) {
+      again.disabled = true;
+      again.textContent = "Checking…";
+      return load();
+    }
+    const copy = e.target.closest("[data-copy]");
+    if (!copy) return;
+    try {
+      await navigator.clipboard.writeText(copy.dataset.copy);
+      toast("Copied: " + copy.dataset.copy);
+    } catch {
+      toast("The browser refused the clipboard: select the text instead.", true);
+    }
+  });
+  load();
+}
+
 // startStabs opens a tabbed page (Settings, Library) on its tab.
 function startStabs() {
   let kept = "";
@@ -1790,6 +1838,9 @@ function startNew() {
     if (!started) btn.disabled = false;
   });
 
+  // From the welcome page (D223): its template picked, or its repository read.
+  if (el.template.value) pickTemplate();
+  else if (el.repo.value.trim()) detect(false);
   ready();
 }
 
@@ -1897,6 +1948,7 @@ function startNotes() {
     if (view === "library") startStabs();
     if (view === "editor") startEditor();
     if (view === "notes") startNotes();
+    if (view === "welcome" || view === "machine") startChecks();
     connect();
     return;
   }

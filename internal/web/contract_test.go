@@ -32,7 +32,7 @@ var contractPages = []string{
 	"/p/filial/library/rails@1/pack.toml", "/p/filial/review", "/p/filial/virtual-office",
 	"/p/filial/virtual-office/cyberpunk/", "/office/set.json", "/office/tv.json",
 	"/p/filial/library?template=filial-stack@1", "/p/filial/library/import?dir=/home/user/redis&as=myredis",
-	"/machine", "/machine/templates/import?dir=/home/user/given", "/new", "/colors",
+	"/machine", "/machine/checks", "/machine/templates/import?dir=/home/user/given", "/new", "/colors",
 }
 
 // contractPosts are the POST requests behind reads, by contract file:

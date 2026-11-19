@@ -190,6 +190,9 @@ type newView struct {
 	AgentsError    string
 	Stack          newStackView
 	Review         newReviewView
+	// Repo and Template come from the query (the welcome page, D223): the
+	// page's script reads the repository, or picks the template, at once.
+	Repo, Template string
 }
 
 type agentChoice struct {
@@ -304,6 +307,7 @@ func (s *Server) newPage(w http.ResponseWriter, r *http.Request) {
 	v := newView{
 		Title: "New project · RailSwitch", Header: pv.Header, Projects: pv.Projects, Strip: pv.Strip, Banner: pv.Banner,
 		Home: s.c.Home, Review: newReviewView{Empty: true},
+		Repo: strings.TrimSpace(r.URL.Query().Get("repo")), Template: r.URL.Query().Get("template"),
 	}
 	if ls, err := readTemplates(r.Context(), s.c.CLI); err != nil {
 		v.TemplatesError = err.Error()

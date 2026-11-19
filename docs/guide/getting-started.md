@@ -77,7 +77,17 @@ instead (an older dashboard of your own, say). Stop it, then
 
 ## A first project
 
-In the dashboard, choose **New project**:
+With no project yet, the dashboard opens on its welcome page. Its **Your
+machine** box runs the same checks as `railswitch doctor` and shows each
+fix to copy into a terminal (the Machine menu's **Checks** shows them
+again later). Then start in one of two ways:
+
+- **From a repository**: paste its URL, then follow the steps below.
+- **From a template folder**: a teammate's `template export --to`
+  folder. You review every file, import it, and land on the same steps
+  with the template picked: its pack and options are filled in for you.
+
+Later projects start from **New project** in the switcher:
 
 1. Give it the repository URL. railswitch reads only the files that say
    which stack it is (a `Gemfile`, `package.json` and so on), without

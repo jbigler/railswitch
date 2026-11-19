@@ -18,10 +18,14 @@ func TestDoctorJSON(t *testing.T) {
 	ws, _ := filialWS(t)
 	mustRun(t, "-C", ws, "lock")
 	mustRun(t, "-C", ws, "render")
-	// The fake podman reports no version, so doctor fails.
+	// The fake podman reports no version, so a check fails: the text
+	// form exits 1, --json 0 with the failure in the document.
+	if code, _, _ := runIn(t, "-C", ws, "doctor"); code != 1 {
+		t.Errorf("doctor: exit %d, want 1", code)
+	}
 	code, out, errs := runIn(t, "-C", ws, "--json", "doctor")
-	if code != 1 {
-		t.Fatalf("doctor --json: exit %d, want 1\nstdout: %s\nstderr: %s", code, out, errs)
+	if code != 0 {
+		t.Fatalf("doctor --json: exit %d, want 0\nstdout: %s\nstderr: %s", code, out, errs)
 	}
 	var rows []map[string]any
 	if err := json.Unmarshal([]byte(out), &rows); err != nil {
@@ -92,7 +96,12 @@ func TestDoctorWarnLevel(t *testing.T) {
 	if r := rows[1]; r["warn"] != true || r["ok"] != false {
 		t.Errorf("git-guard row = %v", r)
 	}
-	if code := e.printChecks(append(checks, doctor.Check{Name: "cgroup v2"})); code != 1 {
+	failed := append(checks, doctor.Check{Name: "cgroup v2"})
+	if code := e.printChecks(failed); code != 0 {
+		t.Errorf("json, a failed check besides: exit %d, want 0 (the document says it)", code)
+	}
+	e.json = false
+	if code := e.printChecks(failed); code != 1 {
 		t.Errorf("a failed check besides: exit %d, want 1", code)
 	}
 }
@@ -208,7 +217,7 @@ func TestDoctorOutsideWorkspace(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
 	code, rows := doctorRows(t, "-C", tmp)
 	names := rowNames(rows)
-	if code != 1 || len(names) == 0 || names[0] != "podman >= 5.3" {
+	if code != 0 || len(names) == 0 || names[0] != "podman >= 5.3" {
 		t.Fatalf("doctor outside a workspace: exit %d, checks %q", code, names)
 	}
 	for _, n := range []string{"workspace", "firewall descriptor", "units current", "proxy subnet"} {
@@ -222,7 +231,7 @@ func TestDoctorWorkspaceLoadFails(t *testing.T) {
 	ws, _ := filialWS(t) // no stack.lock
 	code, rows := doctorRows(t, "-C", ws)
 	names := rowNames(rows)
-	if code != 1 || len(rows) == 0 || names[0] != "workspace" {
+	if code != 0 || len(rows) == 0 || names[0] != "workspace" {
 		t.Fatalf("doctor in a workspace without a lock: exit %d, checks %q", code, names)
 	}
 	if rows[0]["ok"] != false || rows[0]["fix"] != "railswitch lock" || !strings.Contains(rows[0]["detail"].(string), "railswitch lock") {

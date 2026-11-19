@@ -1664,6 +1664,9 @@ name (D182), so a failure is a warning.
 `ssh-keygen -Y` checks that `ssh-keygen` supports `-Y verify` (OpenSSH 8.2
 or newer), which `library verify` and `library sign` need; a failure is a
 warning, since nothing else needs it.
+`gh logged in` runs `gh auth status`: the PR column, issues,
+`wt add --issue` and stacks need the GitHub CLI logged in; a missing or
+logged-out `gh` is a warning, since a project runs without it.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.
 

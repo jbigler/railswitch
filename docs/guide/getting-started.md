@@ -35,8 +35,9 @@ dashboard` and then `systemctl --user restart railswitch-dashboard`. From a clon
 with Go instead: `make build && install -m755 railswitch ~/.local/bin/`.
 
 `doctor` checks podman, its socket and Quadlet, cgroup v2, port 80, the
-firewall's tools and `ssh-keygen -Y` (for signed libraries). Every check
-should say `ok`. Two common fixes:
+firewall's tools, `ssh-keygen -Y` (for signed libraries) and whether the
+GitHub CLI is logged in (`gh auth login`; for PRs, issues and stacks). Every
+check should say `ok`. Two common fixes:
 
 - **Port 80.** Every app is served on `http://<worktree>.<prefix>.localhost`
   through one proxy on 127.0.0.1:80, which is a privileged port:

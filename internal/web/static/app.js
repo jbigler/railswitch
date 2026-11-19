@@ -939,7 +939,9 @@ function startChecks() {
       again.className = "ln";
       again.dataset.checksAgain = "";
       again.textContent = "Check again";
-      box.replaceChildren(p, again);
+      const h = document.createElement("h2");
+      h.textContent = "Your machine";
+      box.replaceChildren(h, p, again);
       return;
     }
     box.innerHTML = html; // the dashboard's own template, escaped

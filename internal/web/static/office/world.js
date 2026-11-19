@@ -44,6 +44,9 @@ export function useSet(set, pieces) {
 export function look(key, fallback) {
   return office.set?.look?.[key] ?? fallback;
 }
+// lightMode: the set asks for the bright room and daytime city (look mode =
+// "light", the modern set) instead of cyberpunk's dark.
+export const lightMode = () => look('mode', 'dark') === 'light';
 export function kit(names) {
   kitP ??= loadOfficeKit(office.set, office.pieces, names, new THREE.GLTFLoader(), THREE).then((k) => {
     for (const n of names) {
@@ -152,13 +155,18 @@ export function screen(width, height, opts = {}) {
 
 // label is a sprite with text that always faces the camera; walls and
 // boards hide it like anything else.
-export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,.75)' } = {}) {
+// flat: a plane to fix on a wall (facing +z) instead, for a long name that a
+// turning sprite would push through the wall behind it. Text with "\n" is
+// rows, each `size` tall.
+export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,.75)', flat = false } = {}) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
   const font = '600 44px ui-sans-serif, system-ui, sans-serif';
+  const rows = text.split('\n');
   g.font = font;
-  c.width = Math.ceil(g.measureText(text).width) + 36;
-  c.height = 64;
+  c.width = Math.ceil(Math.max(...rows.map((row) => g.measureText(row).width))) + 36;
+  c.height = 64 * rows.length;
+  size *= rows.length;
   g.font = font;
   g.fillStyle = bg;
   g.beginPath();
@@ -166,9 +174,10 @@ export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,
   g.fill();
   g.fillStyle = color;
   g.textBaseline = 'middle';
-  g.fillText(text, 18, 34);
+  rows.forEach((row, i) => g.fillText(row, 18, 34 + 64 * i));
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  if (flat) return new THREE.Mesh(new THREE.PlaneGeometry(size * c.width / c.height, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, toneMapped: false }));
   s.scale.set(size * c.width / c.height, size, 1);
   s.renderOrder = 10;
@@ -241,12 +250,14 @@ export class World {
   }
 
   // officeEnv is a dim, generic office for metal to reflect, built once: a
-  // dark room, rows of ceiling panels, the windows' cool city glow on one
-  // side and a warm lamp on the other.
+  // dark room (a pale one in light mode), rows of ceiling panels, the
+  // windows' cool city glow (or daylight) on one side and a warm lamp on
+  // the other.
   officeEnv() {
     if (this.env) return this.env;
+    const light = lightMode();
     const s = new THREE.Scene();
-    s.add(new THREE.Mesh(new THREE.BoxGeometry(24, 4, 16), new THREE.MeshBasicMaterial({ color: 0x141a28, side: THREE.BackSide })));
+    s.add(new THREE.Mesh(new THREE.BoxGeometry(24, 4, 16), new THREE.MeshBasicMaterial({ color: light ? 0xc8ccd0 : 0x141a28, side: THREE.BackSide })));
     const glow = (color, w, h, x, y, z, rx, ry) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
       m.position.set(x, y, z);
@@ -254,7 +265,7 @@ export class World {
       s.add(m);
     };
     for (const x of [-8, 0, 8]) for (const z of [-4, 4]) glow(0xb8c6e6, 2.4, 0.6, x, 1.95, z, Math.PI / 2, 0);
-    glow(0x3d6cc4, 14, 2.4, 11.9, 0.4, 0, 0, -Math.PI / 2); // windows
+    glow(light ? 0xcfe6ff : 0x3d6cc4, 14, 2.4, 11.9, 0.4, 0, 0, -Math.PI / 2); // windows
     glow(0xd08a40, 2, 1.2, -11.9, 0.2, 2, 0, Math.PI / 2); // a warm lamp
     const pm = new THREE.PMREMGenerator(this.renderer);
     this.env = pm.fromScene(s, 0.04).texture;

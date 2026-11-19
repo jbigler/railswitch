@@ -1382,8 +1382,10 @@ is static files in the binary, and the server only polls the project as for
 any open page.
 
 - **The lobby** is the project. Its wall screen lists every floor
-  (worktree) with its stack and agent state; the directory in the middle has
-  a beacon per floor (click one to ride there); an android concierge stands
+  (worktree) with its stack and agent state; the directory in the middle is
+  a two-faced board with a line per floor (number, name, stack; a running
+  one in green; click one to ride there), in one or two columns whose
+  lines shrink to fit as floors are added; an android concierge stands
   at its desk; the big screen faces a lounge. **Pull requests**: a board on
   the left wall lists every open PR with its checks and review, and opens
   the worktrees' PRs as `pr ls` reads them, with Refresh PRs. **Your work:** the Issues kiosk and the PR board show
@@ -1410,7 +1412,7 @@ any open page.
   ceiling gear and some furniture come from the name, so a floor always
   looks the same and floors look different.
   - Back side: the **server room** (glass, windowless) is a data hall: a
-    rack per service, 1 m apart in two rows of seven facing a cold aisle (a
+    rack per service, 1 m apart in two rows of seven facing each other across a 2 m aisle (a
     stack with more than 14 services shows the first 14). Each rack's LEDs
     and accent bar show the service's state, its display names it, cables
     loop out of its sides and up into the ceiling's tray, and a hologram
@@ -1458,11 +1460,15 @@ any open page.
     walking). Left out of the vendored editor: Mermaid import, the CJK
     hand-drawn font (such text uses a system font), and its WebAssembly
     font subsetting (an SVG export embeds whole fonts). The
-    **meeting** room (glass) holds the **holo-table**: over a chunky
-    console a wireframe terrain rises in the floor's main colour (its trim in
-    the second neon), with a
-    pin per service (in the lobby, per floor) coloured by its state, which
-    opens it, and a halo above with the floor's summary. The **game room**
+    **meeting** room (glass) holds the **meeting table**, which shows the
+    agents' usage (D221) as a chart of bars standing on it: new tokens and
+    output per day, a row per worktree for the six busiest of the range. The
+    plates above it choose the last **7**, **14** or **30 days**; a bar's
+    tip gives its day and tokens. In the lobby each row has a colour and a
+    click on a bar goes to that floor; on a floor its own row is in the
+    floor's colour and the others grey. The page gets the numbers in its
+    state (`usage`: `days` and, per worktree that still exists, `work` per
+    day, from the `agent usage` read the 2D charts use). The **game room**
     (glass): two bartop arcades on their stands, a sofa facing them. A click
     on a cabinet plays it over the office (D154): the first is
     **Minesweeper** (click opens, right-click flags, the first click is
@@ -1510,7 +1516,7 @@ can drive the agent, as it can start a job. Nothing else can (Security
 model above). Text from the CLI (PR and issue titles, notes, the agent's
 screen) is shown as text, never as markup.
 
-The models are the office kit (`static/office/sets/cyberpunk/`, built by
+The models are the office kit (`static/office/sets/cyberpunk/` and `modern/`, built by
 `tools/office-kit/`), served as glTF with their textures as separate files:
 the content policy (`default-src 'self'`) refuses the `blob:` URLs three.js
 makes for textures embedded in a GLB. three.js is MIT
@@ -1520,7 +1526,13 @@ bloom passes as one module by `internal/web/static/office/vendor.sh`.
 ### Sets
 
 The office's art is a **set** (D153): one look's models plus its colours,
-fog, lights and bloom. `cyberpunk` is built in; others are installed on
+fog, lights and bloom. Two are built in: `cyberpunk`, the default, and
+`modern` (D220), its light mode: the same pieces with white walls, grey
+and graphite furniture, oak and aluminium, a daytime city outside, an
+evenly lit room, and no neon: each floor's colours are muted paint, signs
+are plain boards, the racks are silver-grey under plain cards with their
+cabling managed (finger ducts, wire baskets, closed risers), and the café
+has snack and drink machines. Others are installed on
 the machine with `railswitch office set add <folder>` (built and checked
 as in `docs/office-kit.md`), and the **Office set** card on the Machine
 page picks the active one (an `office set use` job; `dashboard.toml`

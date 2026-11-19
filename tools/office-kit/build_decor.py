@@ -551,6 +551,7 @@ def wall_pipes(a, length=4.0, top=4.0):
     a.cyl(.02, .02, .05, M['red'], .8, 2.45 + dy, .105, 8, rx=math.pi / 2)
 
 
+globals().update(SHAPES)  # the set's own builders (build_kit.py)
 DECOR = [
     ('Tech_MonitorWall_A', monitor_wall), ('Tech_MonitorWall_B', lambda a: monitor_wall(a, 5)),
     ('Tech_MonitorBank', monitor_bank), ('Tech_MonitorStack', monitor_stack),

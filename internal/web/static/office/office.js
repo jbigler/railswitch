@@ -619,6 +619,7 @@ let setNote = '';
   }
   if (set.fallback) setNote = `Office set: ${set.fallback}; showing ${set.name}.`;
   useSet(set, pieces);
+  if (set.look?.mode === 'light') document.body.dataset.mode = 'light'; // office.css: the HUD's text over a pale scene
 }
 
 const es = new EventSource(`/events?p=${encodeURIComponent(prefix)}&view=office`);

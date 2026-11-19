@@ -140,6 +140,38 @@ func TestCyberpunkState(t *testing.T) {
 	if st := f.s.cyberData("nope"); st.Error == "" {
 		t.Error("unknown project has no error")
 	}
+	// D221: the usage for the meeting table's chart: a row per worktree that
+	// still exists, the busiest first, a number per day of the 30
+	if st.Usage != nil {
+		t.Errorf("usage before it is read: %+v", st.Usage)
+	}
+	var doc usageDoc
+	if err := json.Unmarshal([]byte(ftestUsage()), &doc); err != nil {
+		t.Fatal(err)
+	}
+	f.s.mu.Lock()
+	f.s.state["ftest"].usage = &doc
+	u := f.s.cyberData("ftest").Usage
+	f.s.mu.Unlock()
+	if u == nil || len(u.Days) != 30 || len(u.Rows) == 0 {
+		t.Fatalf("usage: %+v", u)
+	}
+	sum := func(w []int64) (n int64) {
+		for _, v := range w {
+			n += v
+		}
+		return n
+	}
+	for i, r := range u.Rows {
+		if len(r.Work) != 30 || sum(r.Work) == 0 || (i > 0 && sum(u.Rows[i-1].Work) < sum(r.Work)) {
+			t.Errorf("row %d %s: %v", i, r.Slug, r.Work)
+		}
+		for _, row := range doc.Rows {
+			if row.Removed && row.Worktree == r.Slug {
+				t.Errorf("removed worktree %s has a row", r.Slug)
+			}
+		}
+	}
 }
 
 // TestCyberpunkStoppedAgent: an agent whose container doesn't run isn't

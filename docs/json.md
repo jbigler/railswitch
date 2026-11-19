@@ -930,7 +930,7 @@ A Virtual Office set's folder checked against the piece list (D153,
 
 | Field | Type | Meaning |
 |---|---|---|
-| `name`, `version`, `pieces`, `look` | | From `set.toml` (empty when it is missing or refused): the set's name, its own version, the piece list version it was built for, its look (each key only when set). |
+| `name`, `version`, `pieces`, `look` | | From `set.toml` (empty when it is missing or refused): the set's name, its own version, the piece list version it was built for, its look (each key only when set: `mode` (`dark` or `light`), `background`, `fog`, `fog_density`, `ambient`, `ambient_intensity`, `key`, `key_intensity`, `bloom`, `scanlines`). |
 | `results[]` | array | One per piece of the list, plus one per `.gltf` the list doesn't have, by name. `status` is `ok`, `missing` (drawn as a box) or `refused` with a `reason`; `min` and `max` are the model's box (colliders left out) when it was read. |
 | `errors[]` | array of strings | Problems with the folder or `set.toml`: a symlink, a special file, more than 1,000 files, a file over 16 MiB or 256 MiB in all, a stray file, a glTF URI with a scheme (`data:` included), absolute or leaving the folder, a `pieces` other than the list's version. A piece is also refused when its glTF requires Draco, Meshopt or KTX2 (`extensionsRequired`): the page sets no decoder for them. |
 
@@ -949,7 +949,8 @@ The built-in sets, then the installed ones, by name.
 
 ```json
 {"active": "cyberpunk", "sets": [
- {"name": "cyberpunk", "source": "builtin", "version": 1, "pieces": 1, "present": 109, "missing": 0, "status": "ok", "description": "Neon, worn metal and a city in the smog", "look": {…}, "have": ["Arch_CeilingDuct_4m", …]},
+ {"name": "cyberpunk", "source": "builtin", "version": 1, "pieces": 1, "present": 110, "missing": 0, "status": "ok", "description": "Neon, worn metal and a city in the smog", "look": {…}, "have": ["Arch_CeilingDuct_4m", …]},
+ {"name": "modern", "source": "builtin", "version": 1, "pieces": 1, "present": 110, "missing": 0, "status": "ok", "description": "White, oak and daylight", "look": {"mode": "light", …}, "have": ["Arch_CeilingDuct_4m", …]},
  {"name": "cabin", "source": "installed", "version": 3, "pieces": 1, "present": 12, "missing": 97, "status": "broken", "reason": "Furn_Desk.bin: changed since it was added", "description": "Pine, wool and lamplight", "look": {…}, "have": ["Furn_Desk", …]}]}
 ```
 
@@ -1664,6 +1665,11 @@ name (D182), so a failure is a warning.
 `ssh-keygen -Y` checks that `ssh-keygen` supports `-Y verify` (OpenSSH 8.2
 or newer), which `library verify` and `library sign` need; a failure is a
 warning, since nothing else needs it.
+`gh logged in` runs `gh auth status --hostname github.com --active`
+(only the account railswitch uses: a stale second account or another host
+doesn't count; offline it warns too): the PR column, issues,
+`wt add --issue` and stacks need the GitHub CLI logged in; a missing or
+logged-out `gh` is a warning, since a project runs without it.
 `doctor` exits 1 when any check fails; a warning never changes the exit
 code, and the text output shows it as `warn`.
 

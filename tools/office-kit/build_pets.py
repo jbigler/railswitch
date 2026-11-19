@@ -164,9 +164,10 @@ def parrot(prefix='Parrot', root=None, folded=True):
         .003, [P['red'], P['yellow'], P['blue']], color=color, target=1800 if folded else 1300, details=parrot_tail)
     if not folded:
         for s, side in ((1, 'L'), (-1, 'R')):  # Wing_L at +x
-            w = meta(f'{prefix}_Wing_{side}', [('e', (s * .006, -.035, -.008), .04, (.42, 1.35, .9))], .003, [P['yellow'], P['blue']],
-                     color=lambda c, n: 0 if c.y > -.02 else 1, target=350,
-                     details=lambda a, s=s: a.box(.01, .08, .045, P['blue'], s * .008, -.085, -.012))
+            # a macaw's wing, 0.3 m from shoulder to tip: folded it hangs down the body as far as the tail
+            w = meta(f'{prefix}_Wing_{side}', [('e', (s * .006, -.07, -.008), .05, (.35, 2.6, 1.3))], .003, [P['yellow'], P['blue']],
+                     color=lambda c, n: 0 if c.y > -.06 else 1, target=450,
+                     details=lambda a, s=s: a.box(.01, .14, .09, P['blue'], s * .008, -.215, -.014))
             attach(w, body, (s * .037, .135, -.012))
     head = meta(f'{prefix}_Head', [('e', (0, .025, .005), .04, (.95, 1, 1.05)), ('e', (0, .012, .032), .024, (.9, .85, .8))], .0025,
                 [P['red'], P['eyeW']], color=lambda c, n: 1 if abs(c.x) > .018 and c.z > .005 and c.y < .04 else 0,

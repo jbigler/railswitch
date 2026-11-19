@@ -29,12 +29,14 @@ var (
 	podmanVersion = []string{"podman", "version", "--format", "{{.Client.Version}}"}
 	socketActive  = []string{"systemctl", "--user", "is-active", "podman.socket"}
 	networkLs     = []string{"podman", "network", "ls", "--format", "json"}
+	ghAuthStatus  = []string{"gh", "auth", "status", "--hostname", "github.com", "--active"}
 )
 
 // fakeHost answers podman info (render's graph root) and nothing else.
 func fakeHost() *systest.Fake {
 	f := &systest.Fake{}
 	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{ExitCode: 1, Stderr: []byte("usage: ssh-keygen -Y verify -f allowed_signers_file\n")}, fmt.Errorf("ssh-keygen: %w (exit 1)", sys.ErrExit))
+	f.On(ghAuthStatus, sys.Result{}, nil)
 	f.On([]string{"podman", "info", "--format", "{{.Store.GraphRoot}}"}, sys.Result{Stdout: []byte(graphRoot + "\n")}, nil)
 	f.On([]string{"systemctl", "--user", "is-enabled", "railswitch-dashboard.service"}, sys.Result{Stdout: []byte("enabled\n")}, nil)
 	f.On([]string{"loginctl", "show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value"}, sys.Result{Stdout: []byte("yes\n")}, nil)
@@ -175,7 +177,7 @@ func names(cs []Check) []string {
 
 var hostChecks = []string{
 	"podman >= 5.3", "quadlet generator", "podman.socket active", "unprivileged port 80",
-	"nft", "nsenter", "getent", "jq", "curl", "dnsmasq (DNS filter)", "ssh-keygen -Y", "dashboard enabled", "dashboard answers", "user services outlive logout", "machine subnet free", "networks isolated",
+	"nft", "nsenter", "getent", "jq", "curl", "dnsmasq (DNS filter)", "ssh-keygen -Y", "gh logged in", "dashboard enabled", "dashboard answers", "user services outlive logout", "machine subnet free", "networks isolated",
 }
 
 func TestAllOK(t *testing.T) {
@@ -231,6 +233,7 @@ func TestAllFail(t *testing.T) {
 	f.On(networkLs, sys.Result{Stdout: []byte(`[{"name":"old_proxy","subnets":[{"subnet":"10.214.0.0/24"}]},{"name":"other","subnets":[{"subnet":"10.214.255.0/24"}]}]`)}, nil)
 	inspect(f, "filial_proxy", `"mtu": "1400"`)
 	f.On([]string{"ssh-keygen", "-Y"}, sys.Result{}, fmt.Errorf("ssh-keygen: %w", exec.ErrNotFound))
+	f.On(ghAuthStatus, sys.Result{}, fmt.Errorf("gh: %w", exec.ErrNotFound))
 	h := host(t, "1024", false)
 	h.Dashboards = []string{dashboardServer(t, http.StatusForbidden, "forbidden host\n")}
 
@@ -653,5 +656,28 @@ func TestDNSFilterCheck(t *testing.T) {
 	h.HookDirs = []string{t.TempDir()}
 	if c := h.dnsFilter(context.Background(), f); c.OK || !strings.Contains(c.Detail, "no dnsmasq") {
 		t.Errorf("no dnsmasq: %+v", c)
+	}
+}
+
+// TestDoctorGhAuth: gh logged in passes; gh missing or logged out is a
+// warning (no PRs, issues or stacks), never a failure.
+func TestDoctorGhAuth(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err    error
+		ok     bool
+		detail string
+	}{
+		"in":      {nil, true, "passes"},
+		"out":     {fmt.Errorf("gh: %w (exit 1)", sys.ErrExit), false, "not logged in"},
+		"missing": {fmt.Errorf("gh: %w", exec.ErrNotFound), false, "not installed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &systest.Fake{}
+			f.On(ghAuthStatus, sys.Result{}, tc.err)
+			c := ghAuth(context.Background(), f)
+			if c.Name != "gh logged in" || c.OK != tc.ok || c.Warn == tc.ok || !strings.Contains(c.Detail, tc.detail) {
+				t.Errorf("%+v", c)
+			}
+		})
 	}
 }

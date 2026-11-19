@@ -120,6 +120,7 @@ def hand(length, width, m):
 
 
 objs = {}
+globals().update(SHAPES)  # the set's own builders (build_kit.py)
 for name, fn, col in [
     ('Tech_Vending_Ramen', lambda a: vending(a, 1), [(1.0, 1.9, .8, 0, .95, 0)]),
     ('Tech_Vending_Drinks', lambda a: vending(a, 2), [(1.0, 1.9, .8, 0, .95, 0)]),

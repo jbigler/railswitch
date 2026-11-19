@@ -206,7 +206,7 @@ export function animate(root, t) {
     if (leg) { // trot: front-left with back-right, front-right with back-left
       const r = rest(o), u = motion(o);
       const off = (leg[1] === 'F') === (leg[2] === 'L') ? 0 : Math.PI;
-      // The foot swings back through the stance (the angle rising) about as far as the body
+      // The paw swings back through the stance (the angle rising) about as far as the body
       // moves, and the leg draws up a little as it comes forward, so it steps rather than rocks.
       const ph = (u.phase ?? 0) * Math.PI * 2 + off, g = u.gait ?? 0;
       o.rotation.x = r.r.x + Math.sin(ph) * 0.42 * g;

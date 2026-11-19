@@ -930,15 +930,19 @@ function startChecks() {
       html = await r.text();
       if (!r.ok) throw new Error(html.trim() || r.statusText);
     } catch (e) {
-      box.replaceChildren();
+      // A restarting dashboard, say: the message, and a way to try again.
       const p = document.createElement("p");
       p.className = "red";
       p.textContent = "The checks did not load: " + e.message;
-      box.append(p);
+      const again = document.createElement("button");
+      again.type = "button";
+      again.className = "ln";
+      again.dataset.checksAgain = "";
+      again.textContent = "Check again";
+      box.replaceChildren(p, again);
       return;
     }
     box.innerHTML = html; // the dashboard's own template, escaped
-    if (location.hash === "#checks") box.scrollIntoView({ block: "start" });
   }
   box.addEventListener("click", async (e) => {
     const again = e.target.closest("[data-checks-again]");

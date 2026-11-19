@@ -56,7 +56,7 @@ func (c doctorCheck) Cmd() string {
 	cmd, _, _ = strings.Cut(cmd, ";")
 	cmd = strings.TrimSpace(cmd)
 	first, _, _ := strings.Cut(cmd, " ")
-	if !slices.Contains([]string{"railswitch", "systemctl", "loginctl", "gh", "podman"}, first) {
+	if !slices.Contains([]string{"railswitch", "systemctl", "loginctl", "gh"}, first) {
 		return ""
 	}
 	return cmd

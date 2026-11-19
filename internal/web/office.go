@@ -1,6 +1,7 @@
 package web
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"github.com/jbigler/railswitch/internal/office"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -32,6 +34,51 @@ type cyberState struct {
 	Worktrees []cyberFloor `json:"worktrees"`
 	Jobs      []cyberJob   `json:"jobs"`
 	Banner    []string     `json:"banner"`
+	Usage     *cyberUsage  `json:"usage,omitempty"` // nil until the usage is read
+}
+
+// cyberUsage is the agents' usage for the meeting table's chart (D221):
+// each worktree's work (new tokens and output, usageRow.work) on each of
+// the last usageMax days, the busiest worktree first. Removed worktrees
+// are left out: a floor that is gone has no row to walk to.
+type cyberUsage struct {
+	Days []string        `json:"days"` // oldest first
+	Rows []cyberUsageRow `json:"rows"`
+}
+
+type cyberUsageRow struct {
+	Slug string  `json:"slug"`
+	Work []int64 `json:"work"` // one per day of Days
+}
+
+func newCyberUsage(doc *usageDoc) *cyberUsage {
+	if doc == nil {
+		return nil
+	}
+	u := &cyberUsage{Days: append([]string{}, doc.window(usageMax)...), Rows: []cyberUsageRow{}}
+	day := map[string]int{}
+	for i, d := range u.Days {
+		day[d] = i
+	}
+	work, total := map[string][]int64{}, map[string]int64{}
+	for _, r := range doc.Rows {
+		i, ok := day[r.Day]
+		if !ok || r.Removed {
+			continue
+		}
+		if work[r.Worktree] == nil {
+			work[r.Worktree] = make([]int64, len(u.Days))
+		}
+		work[r.Worktree][i] += r.work()
+		total[r.Worktree] += r.work()
+	}
+	for slug, w := range work {
+		u.Rows = append(u.Rows, cyberUsageRow{slug, w})
+	}
+	slices.SortFunc(u.Rows, func(a, b cyberUsageRow) int {
+		return cmp.Or(cmp.Compare(total[b.Slug], total[a.Slug]), cmp.Compare(a.Slug, b.Slug))
+	})
+	return u
 }
 
 type cyberFloor struct {
@@ -86,6 +133,7 @@ func (s *Server) cyberData(prefix string) cyberState {
 	for _, j := range s.c.Jobs.Jobs(prefix, "") {
 		st.Jobs = append(st.Jobs, cyberJob{ID: j.ID, Slug: j.Spec.Slug, Label: j.Spec.Label, State: string(j.State)})
 	}
+	st.Usage = newCyberUsage(p.usage)
 	return st
 }
 

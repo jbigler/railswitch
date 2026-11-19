@@ -24,6 +24,7 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--cp-edge); bord
 .hud-top > * { pointer-events: auto; }
 .hud-where { flex: 1; text-align: center; font: 600 15px/1.2 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase;
   text-shadow: 0 0 8px var(--cp-accent); }
+body[data-mode="light"] .hud-where { color: #1c2430; text-shadow: none; }
 .hud-btn { background: var(--cp-glass); color: var(--cp-ink); border: 1px solid var(--cp-edge); border-radius: 6px; padding: 6px 10px;
   font: inherit; cursor: pointer; text-decoration: none; display: inline-block; }
 .hud-btn:hover, .hud-btn:focus-visible { border-color: var(--cp-accent); outline: none; box-shadow: 0 0 0 2px rgba(34, 230, 255, .3); }

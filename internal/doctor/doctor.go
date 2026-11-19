@@ -16,12 +16,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jbigler/railswitch/internal/config"
 	"github.com/jbigler/railswitch/internal/firewall"
 	"github.com/jbigler/railswitch/internal/machine"
 	"github.com/jbigler/railswitch/internal/naming"
 	"github.com/jbigler/railswitch/internal/podman"
+	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/workspace"
@@ -79,7 +81,7 @@ func (h Host) Run(ctx context.Context, r sys.Runner, ws *workspace.Workspace) []
 	for _, t := range tools {
 		out = append(out, h.onPath(t, "install "+t+" (the egress firewall hook runs it on the host)"))
 	}
-	out = append(out, h.dnsFilter(ctx, r), sshKeygen(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
+	out = append(out, h.dnsFilter(ctx, r), sshKeygen(ctx, r), ghAuth(ctx, r), dashboard(ctx, r), h.dashboardAnswers(ctx), linger(ctx, r), machineSubnet(ctx, r), h.networksIsolatedIn(ctx, r, ws))
 	if ws != nil {
 		out = append(out, descriptor(ws), units(ctx, r, ws), proxySubnet(ctx, r, ws), gitGuard(ctx, r, ws), worktreeNames(ws))
 	}
@@ -251,6 +253,25 @@ func (h Host) port() Check {
 	}
 	c.Detail = "net.ipv4.ip_unprivileged_port_start = " + v
 	c.OK = n <= 80
+	return c
+}
+
+// ghAuth checks that the GitHub CLI is logged in to github.com: the PR
+// column, issues, wt add --issue and stacks run gh. Only github.com's
+// active account (prs.Repo takes no other host): a stale second account
+// or another host would fail a bare gh auth status. A warning: a project
+// runs without it, and one on another forge never needs it.
+func ghAuth(ctx context.Context, r sys.Runner) Check {
+	c := Check{Name: "gh logged in", Warn: true, Fix: "gh auth login (install the GitHub CLI first if it is missing)"}
+	_, err := r.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"auth", "status", "--hostname", "github.com", "--active"}, Dir: prs.NeutralDir, Env: append(os.Environ(), "GH_PROMPT_DISABLED=1"), Timeout: 10 * time.Second})
+	switch {
+	case errors.Is(err, exec.ErrNotFound):
+		c.Detail = "gh is not installed: no PRs, issues or stacks"
+	case err != nil:
+		c.Detail = "gh is not logged in to github.com, or GitHub didn't answer: no PRs, issues or stacks"
+	default:
+		c.OK, c.Warn, c.Detail = true, false, "gh auth status passes"
+	}
 	return c
 }
 

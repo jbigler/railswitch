@@ -72,7 +72,7 @@ This file lists the rules a change can break. To learn how a feature behaves, re
 - `internal/machine`: dirs, registry, proxy, machine config, and the dashboard unit.
 - `internal/settings`: `settings preview`. It judges each edit by rendering before and after in memory.
 - `internal/web`: the dashboard. `internal/jobs` runs its actions, and `internal/dashconf` holds its colours.
-- `internal/web/static/office/`: the Virtual Office view (`docs/dashboard.md`); `kit/` its loader, `sets/cyberpunk/` the built-in set's models, built by the Blender scripts in `tools/office-kit/` (`docs/office-kit.md`). Regenerate the models; never edit them.
+- `internal/web/static/office/`: the Virtual Office view (`docs/dashboard.md`); `kit/` its loader, `sets/cyberpunk/` and `sets/modern/` the built-in sets' models, built by the Blender scripts in `tools/office-kit/` (`docs/office-kit.md`; `modern` is the kit under `theme_modern.py`, D220). Regenerate the models; never edit them.
 - `internal/office`: the Virtual Office's sets (D153): the piece list, glTF bounds, set checks and the store of installed sets.
 - `internal/prs`: `pr ls` and `stack ls`, through `gh`.
 - `internal/safefile`: hostile-file reads and `Printable`.

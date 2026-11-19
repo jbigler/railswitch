@@ -11,15 +11,15 @@ def line(px, x0, y0, x1, y1, col, w=3):
         px[max(0, y - w // 2):y + w // 2 + 1, max(0, x - w // 2):x + w // 2 + 1, :3] = col
 
 
-def draw_whiteboard(px, w, h):
-    """A used glass board, dark, in glowing marker: a service diagram, a
-    checklist, scribbles, ghosts of old ones."""
+def draw_whiteboard(px, w, h, bg=0.05, ghost=(0.1, 0.11, 0.13), blue=(0.2, 0.85, 1.0), red=(1.0, 0.3, 0.6), black=(0.82, 0.88, 0.96)):
+    """A used glass board, dark, in glowing marker (cyan, pink, near-white;
+    a set's theme passes its own colours): a service diagram, a checklist,
+    scribbles, ghosts of old ones."""
     r = random.Random(4)
-    px[..., :3] = 0.05
+    px[..., :3] = bg
     for _ in range(30):  # half-erased ghosts
         x, y = r.randrange(w), r.randrange(h)
-        line(px, x, y, x + r.randrange(-60, 60), y + r.randrange(-20, 20), (0.1, 0.11, 0.13), 4)
-    blue, red, black = (0.2, 0.85, 1.0), (1.0, 0.3, 0.6), (0.82, 0.88, 0.96)  # cyan, pink, near-white marker
+        line(px, x, y, x + r.randrange(-60, 60), y + r.randrange(-20, 20), ghost, 4)
     boxes = [(30, 40, 120, 90), (190, 40, 280, 90), (110, 150, 200, 200)]
     for x0, y0, x1, y1 in boxes:
         for a, b, c, d in ((x0, y0, x1, y0), (x1, y0, x1, y1), (x1, y1, x0, y1), (x0, y1, x0, y0)):
@@ -331,6 +331,7 @@ def pizza_boxes(a, seed=3):
     a.box(.12, .002, .08, M['red'], .05, .14, .05)  # the logo
 
 
+globals().update(SHAPES)  # the set's own builders (build_kit.py)
 lounge = {}
 lounge['Furn_Sofa_L'] = sofa_l('Furn_Sofa_L')
 add_colliders(lounge['Furn_Sofa_L'], [(2.9, .9, .95, 0, .45, 0), (.95, .6, 1.5, .95, .3, 1.2)])

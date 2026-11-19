@@ -32,6 +32,7 @@ func ValidName(s string) error {
 
 // Look is a set's atmosphere; a nil field is the cyberpunk value.
 type Look struct {
+	Mode             *string  `toml:"mode" json:"mode,omitempty"` // dark | light
 	Background       *string  `toml:"background" json:"background,omitempty"`
 	Fog              *string  `toml:"fog" json:"fog,omitempty"`
 	FogDensity       *float64 `toml:"fog_density" json:"fog_density,omitempty"`
@@ -92,6 +93,9 @@ func ParseSet(data []byte) (*Set, error) {
 		if c.v != nil && (*c.v < 0 || *c.v > c.max) {
 			errs = append(errs, fmt.Errorf("look.%s = %g: want 0..%g", c.key, *c.v, c.max))
 		}
+	}
+	if l.Mode != nil && *l.Mode != "dark" && *l.Mode != "light" {
+		errs = append(errs, fmt.Errorf("look.mode = %q: want dark or light", *l.Mode))
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err

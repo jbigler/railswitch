@@ -256,17 +256,19 @@ func (h Host) port() Check {
 	return c
 }
 
-// ghAuth checks that the GitHub CLI is logged in: the PR column, issues,
-// wt add --issue and stacks run gh. A warning: a project runs without it,
-// and one on another forge never needs it.
+// ghAuth checks that the GitHub CLI is logged in to github.com: the PR
+// column, issues, wt add --issue and stacks run gh. Only github.com's
+// active account (prs.Repo takes no other host): a stale second account
+// or another host would fail a bare gh auth status. A warning: a project
+// runs without it, and one on another forge never needs it.
 func ghAuth(ctx context.Context, r sys.Runner) Check {
 	c := Check{Name: "gh logged in", Warn: true, Fix: "gh auth login (install the GitHub CLI first if it is missing)"}
-	_, err := r.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"auth", "status"}, Dir: prs.NeutralDir, Env: append(os.Environ(), "GH_PROMPT_DISABLED=1"), Timeout: 10 * time.Second})
+	_, err := r.Run(ctx, sys.Cmd{Name: "gh", Args: []string{"auth", "status", "--hostname", "github.com", "--active"}, Dir: prs.NeutralDir, Env: append(os.Environ(), "GH_PROMPT_DISABLED=1"), Timeout: 10 * time.Second})
 	switch {
 	case errors.Is(err, exec.ErrNotFound):
 		c.Detail = "gh is not installed: no PRs, issues or stacks"
 	case err != nil:
-		c.Detail = "gh is not logged in: no PRs, issues or stacks"
+		c.Detail = "gh is not logged in to github.com, or GitHub didn't answer: no PRs, issues or stacks"
 	default:
 		c.OK, c.Warn, c.Detail = true, false, "gh auth status passes"
 	}

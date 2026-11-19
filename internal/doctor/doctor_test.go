@@ -29,7 +29,7 @@ var (
 	podmanVersion = []string{"podman", "version", "--format", "{{.Client.Version}}"}
 	socketActive  = []string{"systemctl", "--user", "is-active", "podman.socket"}
 	networkLs     = []string{"podman", "network", "ls", "--format", "json"}
-	ghAuthStatus  = []string{"gh", "auth", "status"}
+	ghAuthStatus  = []string{"gh", "auth", "status", "--hostname", "github.com", "--active"}
 )
 
 // fakeHost answers podman info (render's graph root) and nothing else.

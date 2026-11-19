@@ -922,7 +922,7 @@ function startSettings() {
   loadBlocked();
 }
 
-// startChecks fills the machine checks box (D220) from doctor, after the
+// startChecks fills the machine checks box (D223) from doctor, after the
 // page is drawn: doctor takes a few seconds. Check again reads it anew;
 // Copy puts a fix on the clipboard. Nothing here runs a fix.
 function startChecks() {
@@ -1838,7 +1838,7 @@ function startNew() {
     if (!started) btn.disabled = false;
   });
 
-  // From the welcome page (D220): its template picked, or its repository read.
+  // From the welcome page (D223): its template picked, or its repository read.
   if (el.template.value) pickTemplate();
   else if (el.repo.value.trim()) detect(false);
   ready();

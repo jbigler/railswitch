@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// The welcome page (D220): / while no project is registered. It checks the
+// The welcome page (D223): / while no project is registered. It checks the
 // machine (the checks fragment, also on the Machine page) and offers two
 // starts, a repository or a template folder, both into /new.
 

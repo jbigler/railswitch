@@ -321,7 +321,7 @@ func TestNewGuard(t *testing.T) {
 }
 
 // TestNewSwitcherLink: every switcher offers New project…; the root page
-// (the welcome page, D220) starts one while no project is registered.
+// (the welcome page, D223) starts one while no project is registered.
 func TestNewSwitcherLink(t *testing.T) {
 	f := newProjectFixture(t)
 	if body := f.do(req("GET", "/p/ftest", nil)).Body.String(); !strings.Contains(body, `<li class="proj-new"><a href="/new">New project…</a></li>`) {

@@ -190,7 +190,7 @@ type newView struct {
 	AgentsError    string
 	Stack          newStackView
 	Review         newReviewView
-	// Repo and Template come from the query (the welcome page, D220): the
+	// Repo and Template come from the query (the welcome page, D223): the
 	// page's script reads the repository, or picks the template, at once.
 	Repo, Template string
 }

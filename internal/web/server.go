@@ -302,7 +302,7 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 // root redirects to the first project; the page's script swaps it for
-// the one last open. With none it is the welcome page (D220).
+// the one last open. With none it is the welcome page (D223).
 func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	if _, _, err := s.project(r.Context(), ""); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

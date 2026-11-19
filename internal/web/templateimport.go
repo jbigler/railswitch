@@ -100,7 +100,7 @@ func (s *Server) templateImportPage(w http.ResponseWriter, r *http.Request) {
 		Back:      "/machine", BackText: "Machine", Heading: "Import template",
 		Intro: "A template from a folder someone gave you. Read every file before you import it: a new project started from it builds these Containerfiles and gets these firewall, route and secret lines.",
 	}
-	// From the welcome page (D220): back there, and on to /new. Only this
+	// From the welcome page (D223): back there, and on to /new. Only this
 	// one value, so ?next= can't send the page anywhere else.
 	welcome := r.URL.Query().Get("next") == "new"
 	if welcome {

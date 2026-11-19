@@ -760,7 +760,7 @@ accepted until the update is accepted.
 
 ## Welcome
 
-`/` while no project is registered is the **welcome page** (D220), for
+`/` while no project is registered is the **welcome page** (D223), for
 someone who has just installed railswitch. Once a project exists, `/`
 opens a project as before, and the welcome page is gone; its checks stay
 on the Machine page. It has three parts:
@@ -794,7 +794,7 @@ then the warnings, each with its detail and its fix in a box with
 again** reads it anew. The dashboard never runs a fix: most need a
 terminal, some root (`railswitch allow-ports`). Nothing waits on the
 checks: they show while the rest of the page is usable. `doctor --json`
-exits 0 with failures in the document (D220), so the dashboard can read
+exits 0 with failures in the document (D223), so the dashboard can read
 it; the text form still exits 1.
 
 The welcome page and the Machine page load it into their **Your

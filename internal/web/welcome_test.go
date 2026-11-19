@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestWelcome (D220): / with no project is the welcome page: the checks
+// TestWelcome (D223): / with no project is the welcome page: the checks
 // box, a repository and a template folder start into /new, the templates
 // already here as one-click starts, and the terms.
 func TestWelcome(t *testing.T) {

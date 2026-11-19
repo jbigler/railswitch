@@ -602,7 +602,7 @@ body.board-edit{margin:0;height:100vh;display:flex;flex-direction:column;backgro
 .board-edit>header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border)}
 .board-edit .board-status{flex:1;color:var(--muted)}
 .board-edit .board-host{flex:1;position:relative;min-height:0}
-/* The welcome page and the machine checks (D220). */
+/* The welcome page and the machine checks (D223). */
 .welcome-starts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
 .welcome-start{border:1px solid var(--border);border-radius:6px;padding:8px 12px;background:var(--card)}
 .welcome-start h3{font-size:13px;margin:0}

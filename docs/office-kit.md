@@ -162,8 +162,10 @@ relative to the floor piece.
   `Deco_PizzaBoxes`. No plant has a white pot.
 - **Char**: humanoid androids, simple but anatomical, jointed at the
   knees and elbows (one smooth shell for
-  chest, waist and hips; a sculpted face with glowing eyes and round ear
-  units; dark glowing joints; neck cables; about 6.7k triangles, over the
+  chest, waist and hips; a sculpted face with glowing eyes in a visor band
+  and round ear units; dark glowing joints; a ribbed neck in a high collar;
+  shoulder caps, arm and thigh bands, a belt and a back pack in a second
+  colour; about 7k triangles, over the
   hero budget). `Android_Agent` (the agent's partner: its eyes
   `RS_Android_Visor_Agent` and status ring `RS_Android_Status` are for the
   page to recolour by the agent's state), `Android_A`, `Android_B`,
@@ -274,12 +276,12 @@ pieces = 1              # the pieces.json version it was built for
 description = "Pine, wool and lamplight"
 
 [look]                  # each key optional: cyberpunk's value otherwise
-mode = "dark"           # or "light": a daytime sky and city, a bright even room (no dimmed panels, loose cables or flickering tube)
+mode = "dark"           # or "light": a daytime sky and city, a bright even room, no neon (see below)
 background = "#1b1612"
 fog = "#2a2018"
 fog_density = 0.02      # walking; 0..1
 ambient = "#ffd9a8"     # the hemisphere light
-ambient_intensity = 1.6 # times cyberpunk's levels; 0..10
+ambient_intensity = 1.6 # times cyberpunk's levels (in light mode: the level itself, in both views); 0..10
 key = "#ffb070"         # the light through the windows
 key_intensity = 1.4     # 0..10
 bloom = 0               # 0..3, 0 off
@@ -288,7 +290,13 @@ scanlines = false       # the monitors' CRT lines
 
 The neon colours aren't in the look: each floor has its own, and a set
 takes them by naming materials `RS_Neon_Accent`, `RS_LED_Accent`,
-`RS_Screen*` and `RS_Neon_Secondary` as here. Moving parts work when the
+`RS_Screen*` and `RS_Neon_Secondary` as here. In a light-mode set there is
+no neon: a floor's two colours are muted to paint, `RS_Neon_Accent` and
+`RS_Neon_Secondary` take them as their base colour instead of glowing
+(screens and LEDs still glow), signs are dark letters on white boards, a
+rack's hologram is a plain card, the café's machines sell snacks and
+drinks, the light panels stay bright, and the film set's loose cables,
+failing tube and light beams are left out. Moving parts work when the
 nodes are named as the list's `parts`; colliders are `<piece>_COL` boxes,
 else one box of the piece's size where the built-in piece has some.
 

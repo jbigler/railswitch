@@ -126,12 +126,16 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
   scene.add(hemi);
   scene.userData.hemi = hemi;
   const amb = look('ambient_intensity', 1);
-  scene.userData.levels = { walk: { hemi: 2.4 * amb, fog: look('fog_density', 0.035) }, orbit: { hemi: 9 * amb, fog: 0 } };
+  // The dark set lifts the overview far above walking (9 against 2.4): its
+  // ambient colour is dim. A light set's is near white, so one modest
+  // level serves both views, and the lamps only tint.
+  scene.userData.levels = light ? { walk: { hemi: amb, fog: look('fog_density', 0.035) }, orbit: { hemi: amb, fog: 0 } }
+    : { walk: { hemi: 2.4 * amb, fog: look('fog_density', 0.035) }, orbit: { hemi: 9 * amb, fog: 0 } };
   const city = new THREE.DirectionalLight(look('key', '#6fa0ff'), look('key_intensity', 1.1)); // the city, through the windows
   city.position.set(14, 6, 10);
   scene.add(city);
   const lamps = LAMPS.map(([x, y, z, c, i, d]) => {
-    const l = new THREE.PointLight(c, i * LIFT, d);
+    const l = new THREE.PointLight(c, i * LIFT * (light ? 0.4 : 1), d);
     l.position.set(x, y, z);
     scene.add(l);
     return l;
@@ -142,8 +146,10 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
 
   // Neon is for signs: the walls' trim strips only hint at it, and the floor
   // shines a little, as if just mopped.
-  const trim = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(accent), emissiveIntensity: 0.16 });
-  for (const w of walls) w.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_Neon_Accent') o.material = trim; });
+  if (!light) {
+    const trim = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(accent), emissiveIntensity: 0.16 });
+    for (const w of walls) w.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_Neon_Accent') o.material = trim; });
+  }
   if (!light) scene.traverse((o) => {
     const n = o.material?.name ?? '';
     if (n === 'RS_Floor') { o.material.roughness = 0.32; o.material.metalness = 0.45; }
@@ -155,10 +161,12 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
   air.visible = false;
   scene.add(air);
   scene.userData.air = air;
-  const beam = new THREE.MeshBasicMaterial({ map: stripes(), color: 0x6c9cff, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false });
+  // By day the sun lays a warm patch on the floor and no beam hangs in the air.
+  const beam = new THREE.MeshBasicMaterial({ map: stripes(), color: light ? new THREE.Color(0xffe9c4).multiplyScalar(2.5) : 0x6c9cff, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false });
   for (const w of walls) {
     if (w.userData.kit !== 'Arch_Wall_Window_4m') continue;
     const s = shaft(3.0, 1.0, 3.0, 1.15, beam);
+    if (light) s.children[0].visible = false;
     const b = blinds(3.0, 2.1, 3.0);
     for (const o of [s, b]) {
       o.position.copy(w.position);
@@ -232,25 +240,35 @@ export function neonSign(text, color, rods) {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   const css = '#' + new THREE.Color(color).getHexString();
-  g.shadowColor = css;
-  g.lineJoin = 'round';
-  // a soft halo, the tube, a pale core: wide blurs filled the letters in
-  const core = '#' + new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.65).getHexString();
-  for (const [blur, width, stroke] of [[8, 6, css], [3, 4, css], [0, 1.5, core]]) {
-    g.shadowBlur = blur;
-    g.lineWidth = width;
-    g.strokeStyle = stroke;
-    g.strokeText(text.toUpperCase(), c.width / 2, 78);
+  const plain = lightMode(); // a regular sign: dark letters on a white board, no glow
+  if (plain) {
+    g.fillStyle = '#f4f5f6';
+    g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#20262e';
+    g.fillText(text.toUpperCase(), c.width / 2, 78);
+    g.fillStyle = css;
+    g.fillRect(14, c.height - 22, c.width - 28, 8); // the floor's colour, a bar under the name
+  } else {
+    g.shadowColor = css;
+    g.lineJoin = 'round';
+    // a soft halo, the tube, a pale core: wide blurs filled the letters in
+    const core = '#' + new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.65).getHexString();
+    for (const [blur, width, stroke] of [[8, 6, css], [3, 4, css], [0, 1.5, core]]) {
+      g.shadowBlur = blur;
+      g.lineWidth = width;
+      g.strokeStyle = stroke;
+      g.strokeText(text.toUpperCase(), c.width / 2, 78);
+    }
+    g.shadowBlur = 6;
+    g.lineWidth = 2.5;
+    g.strokeStyle = css;
+    g.strokeRect(14, 14, c.width - 28, c.height - 28);
   }
-  g.shadowBlur = 6;
-  g.lineWidth = 2.5;
-  g.strokeStyle = css;
-  g.strokeRect(14, 14, c.width - 28, c.height - 28);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const h = 0.36, w = h * c.width / c.height;
   const sign = new THREE.Group();
-  const board = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, h * 0.86, 0.03), new THREE.MeshStandardMaterial({ color: 0x0a0b10, roughness: 0.4, metalness: 0.5 }));
+  const board = new THREE.Mesh(new THREE.BoxGeometry(w * 0.96, h * 0.86, 0.03), new THREE.MeshStandardMaterial({ color: plain ? 0xd9dce0 : 0x0a0b10, roughness: 0.4, metalness: 0.5 }));
   sign.add(board);
   const face = new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthWrite: false });
   for (const s of [1, -1]) {

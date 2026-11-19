@@ -27,9 +27,9 @@
 			"name":"RS_BodyDark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.5520114302635193,
-					0.5711248517036438,
-					0.6038273572921753,
+					0.07036009430885315,
+					0.07818742096424103,
+					0.09530746936798096,
 					1
 				],
 				"metallicFactor":0,
@@ -56,22 +56,12 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				0.01599629409611225,
-				0.7912979125976562,
-				1
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":1.5
-				}
-			},
 			"name":"RS_Neon_Accent",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0,
-					0,
-					0,
+					0.028426039963960648,
+					0.21223075687885284,
+					0.23839756846427917,
 					1
 				],
 				"metallicFactor":0,

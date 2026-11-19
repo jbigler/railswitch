@@ -24,13 +24,13 @@
 			"name":"RS_Cardboard",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.5520114302635193,
-					0.35153260827064514,
-					0.17464740574359894,
+					0.838798999786377,
+					0.8148465752601624,
+					0.7605245113372803,
 					1
 				],
 				"metallicFactor":0,
-				"roughnessFactor":0.949999988079071
+				"roughnessFactor":0.8999999761581421
 			}
 		},
 		{

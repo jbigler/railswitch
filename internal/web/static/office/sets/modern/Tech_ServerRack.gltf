@@ -31,50 +31,40 @@
 	"materials":[
 		{
 			"doubleSided":true,
-			"name":"RS_Body",
+			"name":"RS_Rack",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.8796223998069763,
-					0.8796223998069763,
-					0.8549926280975342,
+					0.2541520893573761,
+					0.2788942754268646,
+					0.31854677200317383,
 					1
 				],
-				"metallicFactor":0,
-				"roughnessFactor":0.44999998807907104
+				"metallicFactor":0.699999988079071,
+				"roughnessFactor":0.4000000059604645
 			}
 		},
 		{
 			"doubleSided":true,
-			"name":"RS_BodyDark",
+			"name":"RS_RackFace",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.5520114302635193,
-					0.5711248517036438,
-					0.6038273572921753,
+					0.024157632142305374,
+					0.027320891618728638,
+					0.03310476616024971,
 					1
 				],
-				"metallicFactor":0,
-				"roughnessFactor":0.550000011920929
+				"metallicFactor":0.30000001192092896,
+				"roughnessFactor":0.5
 			}
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				0.2581828534603119,
-				0.10702310502529144,
-				1
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":1.5
-				}
-			},
 			"name":"RS_Neon_Secondary",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0,
-					0,
-					0,
+					0.43415364623069763,
+					0.11697066575288773,
+					0.045186202973127365,
 					1
 				],
 				"metallicFactor":0,

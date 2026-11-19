@@ -12,7 +12,7 @@
 //          the lounge
 //   front: work (the lobby's reception) · the meeting room · the game room
 // The pet lives by the café; androids wander the corridor and the nook.
-import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer, textCanvas, free } from './world.js';
+import { THREE, kit, screen, label, rng, hash, setElevatorDoors, createRoamer, createFlyer, textCanvas, free, lightMode } from './world.js';
 import { agentAndroid, wanderer } from './actors.js';
 import { film, neonSign } from './film.js';
 import { city } from './city.js';
@@ -73,15 +73,32 @@ function decor(name) {
   const seed = hash(name);
   const r = rng(seed);
   const hue = r();
+  // a light-mode set has no neon: its two colours are regular paints from
+  // PAINTS, and its walls a pale shade of the first
   const neon = (h) => new THREE.Color().setHSL(h % 1, 0.9, 0.55).getHex();
+  const turn = r();
+  const i = Math.floor(hue * PAINTS.length);
+  const [accent, secondary] = lightMode() ? [PAINTS[i], PAINTS[(i + 3 + Math.floor(turn * 3)) % PAINTS.length]] : [neon(hue), neon(hue + 0.33 + turn * 0.34)];
   return {
     seed, r,
-    accent: neon(hue),
-    secondary: neon(hue + 0.33 + r() * 0.34),
+    accent,
+    secondary,
+    wall: lightMode() ? PASTELS[i] : null,
     pet: Object.keys(PETS)[Math.floor(r() * Object.keys(PETS).length)],
     pick: (list) => list[Math.floor(r() * list.length)],
   };
 }
+
+// PAINTS are a light-mode floor's colours: navy, teal, forest, terracotta,
+// ochre, plum, slate, burgundy. PASTELS are its walls, one to go with each:
+// blue, aqua, mint, peach, butter, lilac, powder, rose.
+const PAINTS = [0x2f4a6b, 0x2f6f73, 0x3d6b4f, 0xa8553a, 0xb98a2e, 0x5f4466, 0x4d5a6a, 0x7a3340];
+const PASTELS = [0xb7d0ea, 0xb2ddd8, 0xbfe2c2, 0xf4c9b6, 0xf3e0a6, 0xd9c6e8, 0xc6d3e3, 0xf0c0cb];
+
+// lit is a colour for a glowing edge: boosted by k, or, in light mode, as it is.
+const lit = (color, k) => new THREE.Color(color).multiplyScalar(lightMode() ? 1 : k);
+// signInk is a name sign's look: the floor's neon on dark, or dark ink on white.
+const signInk = (accent) => (lightMode() ? { color: '#20262e', bg: 'rgba(250,250,250,.95)' } : { color: css(accent) });
 
 // glowFor is the neon strength that makes a colour look as bright as the
 // others: green and cyan are far brighter to the eye than blue or magenta.
@@ -167,7 +184,7 @@ function shell(k, scene, deco, ui) {
   }
 
   const ceiling = new THREE.Group();
-  const top = new THREE.Mesh(new THREE.PlaneGeometry(24, 16), new THREE.MeshStandardMaterial({ color: 0x1a1c22, roughness: 0.9 }));
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(24, 16), new THREE.MeshStandardMaterial({ color: lightMode() ? 0xf2f2f0 : 0x1a1c22, roughness: 0.9 }));
   top.rotation.x = PI / 2;
   top.position.y = 4;
   ceiling.add(top);
@@ -227,10 +244,10 @@ function shell(k, scene, deco, ui) {
   return { ticks: [doors, glassTick, cityTick, ...ticks], pad: { x: LIFT.x + 0.75, z: LIFT.z, r: 0.55, act: ui.transport } };
 }
 
-// rug lays a dark rug with a neon edge.
+// rug lays a dark rug with a neon edge (slate with a painted edge in light mode).
 function rug(scene, x0, x1, z0, z1, accent) {
-  box(scene, x1 - x0, 0.01, z1 - z0, new THREE.MeshStandardMaterial({ color: 0x15131c, roughness: 0.95 }), (x0 + x1) / 2, 0.005, (z0 + z1) / 2);
-  const edge = new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(1.2), toneMapped: false });
+  box(scene, x1 - x0, 0.01, z1 - z0, new THREE.MeshStandardMaterial({ color: lightMode() ? 0x5d6878 : 0x15131c, roughness: 0.95 }), (x0 + x1) / 2, 0.005, (z0 + z1) / 2);
+  const edge = new THREE.MeshBasicMaterial({ color: lit(accent, 1.2), toneMapped: false });
   box(scene, x1 - x0, 0.012, 0.02, edge, (x0 + x1) / 2, 0.006, z1);
   box(scene, 0.02, 0.012, z1 - z0, edge, x0, 0.006, (z0 + z1) / 2);
 }
@@ -239,7 +256,7 @@ function rug(scene, x0, x1, z0, z1, accent) {
 function bigScreen(scene, x, y, z, ry, w, h, accent) {
   const g = new THREE.Group();
   box(g, w + 0.16, h + 0.16, 0.08, new THREE.MeshStandardMaterial({ color: 0x0b0c10, roughness: 0.5 }), 0, 0, -0.04);
-  const edge = new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(1.4), toneMapped: false });
+  const edge = new THREE.MeshBasicMaterial({ color: lit(accent, 1.4), toneMapped: false });
   box(g, w + 0.2, 0.025, 0.025, edge, 0, h / 2 + 0.09, 0);
   box(g, w + 0.2, 0.025, 0.025, edge, 0, -h / 2 - 0.09, 0);
   const sc = screen(w, h, { size: 26 });
@@ -377,7 +394,11 @@ function zoneSign(scene, text, x, z, ry = 0) {
 function cafe(k, scene, deco) {
   zoneSign(scene, 'Café', 0, -1.3);
   const ticks = [];
-  for (const [name, x, title, color, kind] of [['Tech_Vending_Ramen', -2.95, 'Ramen', 0xff3fae, 'ramen'], ['Tech_Vending_Drinks', -1.8, 'Drinks', 0x29e7ff, 'drinks']]) {
+  // light mode: snacks and drinks under plain signs; no noodle bar
+  const light = lightMode();
+  const machines = light ? [['Tech_Vending_Ramen', -2.95, 'Snacks', 0x2a3340, 'snacks'], ['Tech_Vending_Drinks', -1.8, 'Drinks', 0x2a3340, 'drinks']]
+    : [['Tech_Vending_Ramen', -2.95, 'Ramen', 0xff3fae, 'ramen'], ['Tech_Vending_Drinks', -1.8, 'Drinks', 0x29e7ff, 'drinks']];
+  for (const [name, x, title, color, kind] of machines) {
     const v = put(k, scene, name, x, 0, -7.55);
     vendScreen(v, kind, color);
     const head = neonSign(title, color, null);
@@ -385,9 +406,11 @@ function cafe(k, scene, deco) {
     head.scale.setScalar(0.85);
     scene.add(head);
   }
-  const kanji = neonSign('麺', 0xff3fae, null);
-  kanji.position.set(-3.7, 2.6, -7.9);
-  scene.add(kanji);
+  if (!light) {
+    const kanji = neonSign('麺', 0xff3fae, null);
+    kanji.position.set(-3.7, 2.6, -7.9);
+    scene.add(kanji);
+  }
   put(k, scene, 'Furn_CoffeeCounter', 2.0, 0, -7.65);
   put(k, scene, 'Deco_MiniFridge', 3.55, 0, -7.55);
   const counter = k.point('Furn_CoffeeCounter', 'top')[1];
@@ -428,12 +451,15 @@ function vendScreen(machine, kind, color) {
   cv.width = 312;
   cv.height = 380;
   const g = cv.getContext('2d');
+  const light = lightMode(); // a white touch screen, dark ink
   const tint = '#' + new THREE.Color(color).getHexString();
-  g.fillStyle = '#0c0816';
+  g.fillStyle = light ? '#f6f7f8' : '#0c0816';
   g.fillRect(0, 0, cv.width, cv.height);
-  const items = kind === 'ramen'
-    ? [['Chicken', '#ffd27a', 90], ['Veggie', '#d08cff', 100], ['Miso', '#ffb35c', 95], ['Spicy', '#ff4a4a', 110], ['Tomato', '#ff7a6a', 90], ['Curry', '#ffc93c', 99], ['Seafood', '#7ad7ff', 120], ['Extra hot', '#ff2d55', 115]]
-    : [['Cola', '#ff3b3b', 60], ['Neon', '#7dff6a', 70], ['Lemon', '#fff36a', 60], ['Grape', '#b36aff', 70], ['Cold brew', '#c08a5a', 90], ['Water', '#8ad8ff', 40], ['Energy', '#ff8a2a', 95], ['Matcha', '#9ad66a', 85]];
+  const items = {
+    ramen: [['Chicken', '#ffd27a', 90], ['Veggie', '#d08cff', 100], ['Miso', '#ffb35c', 95], ['Spicy', '#ff4a4a', 110], ['Tomato', '#ff7a6a', 90], ['Curry', '#ffc93c', 99], ['Seafood', '#7ad7ff', 120], ['Extra hot', '#ff2d55', 115]],
+    snacks: [['Chips', '#e0a23c', 90], ['Pretzels', '#b9783c', 80], ['Granola', '#8c6a3f', 110], ['Nuts', '#a8743a', 120], ['Cookies', '#6b4a35', 95], ['Popcorn', '#e6c860', 85], ['Trail mix', '#7d8f4a', 115], ['Fruit bar', '#c2553f', 100]],
+    drinks: [['Cola', '#ff3b3b', 60], [light ? 'Lime' : 'Neon', '#7dff6a', 70], ['Lemon', '#fff36a', 60], ['Grape', '#b36aff', 70], ['Cold brew', '#c08a5a', 90], ['Water', '#8ad8ff', 40], ['Energy', '#ff8a2a', 95], ['Matcha', '#9ad66a', 85]],
+  }[kind];
   items.forEach(([name, c, price], n) => {
     const x = 14 + (n % 2) * 148, y = 12 + Math.floor(n / 2) * 78;
     g.strokeStyle = tint;
@@ -444,7 +470,7 @@ function vendScreen(machine, kind, color) {
     g.fillStyle = c;
     if (kind === 'ramen') { g.beginPath(); g.moveTo(x + 12, y + 22); g.lineTo(x + 44, y + 22); g.lineTo(x + 40, y + 60); g.lineTo(x + 16, y + 60); g.closePath(); g.fill(); }
     else g.fillRect(x + 16, y + 16, 24, 46);
-    g.fillStyle = '#e8e2ff';
+    g.fillStyle = light ? '#20262e' : '#e8e2ff';
     g.font = '600 15px ui-sans-serif, system-ui, sans-serif';
     g.fillText(name, x + 52, y + 30);
     g.fillStyle = tint;
@@ -556,10 +582,12 @@ function lounge(k, scene, deco, ui, accent) {
   const big = bigScreen(scene, 8, 1.75, -7.88, 0, 4.41, 2.48, accent);
   big.userData.room = { minX: 4, maxX: 12, minZ: -8, maxZ: -2 }; // the lounge's walls, for the TV's sound
   pickable(big.screen, 'The big screen: pick something to watch', () => ui.tv(big));
-  put(k, scene, 'Deco_Rug_Geo', 8, 0, -4.6);
+  // the sectional's back is at z -2.8 and its chaise runs to z -5.25 at x 7.2…8.1: the
+  // table stands in the L's open corner, the rug under both and the sofa's front edge
+  put(k, scene, 'Deco_Rug_Geo', 8.6, 0, -4.45);
   pickable(put(k, scene, 'Furn_Sofa_L', 8.6, 0, -3.3, PI), 'The sofa: sit and watch', () => ui.sit(SOFA));
-  put(k, scene, 'Furn_CoffeeTable', 8.2, 0, -4.7);
-  put(k, scene, 'Deco_BookStack', 8.0, k.point('Furn_CoffeeTable', 'top')[1], -4.7);
+  put(k, scene, 'Furn_CoffeeTable', 9.15, 0, -4.6);
+  put(k, scene, 'Deco_BookStack', 9.0, k.point('Furn_CoffeeTable', 'top')[1], -4.6);
   put(k, scene, 'Furn_Armchair', 5.3, 0, -5.0, PI / 2);
   put(k, scene, 'Furn_SideTable', 5.3, 0, -6.0); // beside the armchair, clear of the door (x 4…6)
   put(k, scene, 'Deco_FloorLamp', 11.4, 0, -2.6, PI);
@@ -583,141 +611,81 @@ function meeting(k, scene, deco) {
   put(k, scene, 'Deco_Plant_Palm', 3.4, 0, 7.4, deco.r() * 6);
   put(k, scene, 'Deco_Plant_Snake', 3.4, 0, 2.6, deco.r() * 6);
   put(k, scene, 'Deco_Plant_Bush', -3.4, 0, 7.4, deco.r() * 6);
-  return holoTable(scene, 0.3, 5.0, deco.accent); // the floor's main colour; the table's trim keeps the secondary
+  return usageTable(scene, 0.3, 5.0, deco.accent);
 }
 
-// holoTable is the hologram over the holo-table at (x, z), in color: a
-// wireframe terrain rising from the bed, a pin per item standing out of it
-// (coloured by state, labelled, clickable), a halo ring above with a HUD
-// panel facing the door, crosshairs drifting in the air. set(items, title,
-// lines): items [{label, color, tip, act}]; tick(dt, t) moves it.
-function holoTable(scene, x, z, color) {
+// usageTable is the chart over the meeting table at (x, z) (D221): the
+// agents' work (new tokens and output) per day as bars, a row per worktree:
+// the six busiest of the range, a floor's own (focus) always among them and
+// alone in the floor's colour. The plates above it choose the last 7, 14 or
+// 30 days. A bar's tip gives its day and tokens; open(slug), the lobby's,
+// makes a bar a way to its floor. set(usage, focus, open): usage is the
+// state's {days, rows: [{slug, work}]}, undefined before it is read.
+function usageTable(scene, x, z, color) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   scene.add(g);
-  const tint = new THREE.Color(color).multiplyScalar(1.3);
-  const glow = (opacity, extra = {}) => new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, ...extra });
-  const BED = { w: 2.3, d: 1.3, y: 0.89 };
-  // the bed's grid
-  const lines = [];
-  for (let i = 0; i <= 23; i++) lines.push(-BED.w / 2 + (i * BED.w) / 23, BED.y, -BED.d / 2, -BED.w / 2 + (i * BED.w) / 23, BED.y, BED.d / 2);
-  for (let i = 0; i <= 13; i++) lines.push(-BED.w / 2, BED.y, -BED.d / 2 + (i * BED.d) / 13, BED.w / 2, BED.y, -BED.d / 2 + (i * BED.d) / 13);
-  const gridGeo = new THREE.BufferGeometry();
-  gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
-  g.add(new THREE.LineSegments(gridGeo, new THREE.LineBasicMaterial({ color: tint, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })));
-  // the terrain: heights from a few slow waves, flattened toward the rim
-  const geo = new THREE.PlaneGeometry(BED.w, BED.d, 30, 17); // sparse: dense lines add up to a solid glow
-  geo.rotateX(-PI / 2);
-  const pos = geo.attributes.position;
-  const height = (px, pz, t) => {
-    const fade = Math.max(0, 1 - (Math.abs(px) / (BED.w / 2)) ** 4) * Math.max(0, 1 - (Math.abs(pz) / (BED.d / 2)) ** 4);
-    const v = 0.1 + 0.08 * Math.sin(px * 2.1 + t * 0.25) * Math.cos(pz * 2.7 - t * 0.18) + 0.05 * Math.sin(px * 5.3 + pz * 3.1 + t * 0.4);
-    return BED.y + 0.01 + Math.max(0, v) * fade;
-  };
-  const terrain = new THREE.Mesh(geo, glow(0.16, { wireframe: true }));
-  terrain.raycast = () => {};
-  g.add(terrain);
-  // the halo and its HUD panel
-  const halo = new THREE.Group();
-  halo.position.y = 2.7;
-  for (const [w, d, hx, hz] of [[2.8, 0.025, 0, -0.8], [2.8, 0.025, 0, 0.8], [0.025, 1.6, -1.4, 0], [0.025, 1.6, 1.4, 0]]) {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.025, d), glow(0.9));
-    bar.position.set(hx, 0, hz);
-    halo.add(bar);
-  }
-  const hudCv = document.createElement('canvas');
-  hudCv.width = 512;
-  hudCv.height = 160;
-  const hudTex = new THREE.CanvasTexture(hudCv);
-  hudTex.colorSpace = THREE.SRGBColorSpace;
-  const hud = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), glow(1, { map: hudTex, color: 0xffffff }));
-  hud.position.set(0, -0.32, -0.8);
-  hud.rotation.y = PI; // faces the door (-z)
-  hud.raycast = () => {};
-  halo.add(hud);
-  g.add(halo);
-  // crosshairs in the air
-  const plus = document.createElement('canvas');
-  plus.width = plus.height = 32;
-  const pg = plus.getContext('2d');
-  pg.strokeStyle = '#fff';
-  pg.lineWidth = 3;
-  pg.beginPath();
-  pg.moveTo(16, 4); pg.lineTo(16, 28); pg.moveTo(4, 16); pg.lineTo(28, 16);
-  pg.stroke();
-  const r = rng(hash(String(color)));
-  const cross = new Float32Array(40 * 3);
-  for (let i = 0; i < 40; i++) cross.set([(r() - 0.5) * 3.2, 1.2 + r() * 1.4, (r() - 0.5) * 2.0], i * 3);
-  const crossGeo = new THREE.BufferGeometry();
-  crossGeo.setAttribute('position', new THREE.BufferAttribute(cross, 3));
-  const crosses = new THREE.Points(crossGeo, new THREE.PointsMaterial({ map: new THREE.CanvasTexture(plus), color: tint, size: 0.07, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
-  crosses.raycast = () => {};
-  g.add(crosses);
-
-  const pins = new THREE.Group();
-  g.add(pins);
-  let key = '';
-  const spots = (n) => {
-    const out = [];
-    const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.8)));
-    const rows = Math.ceil(n / cols);
-    for (let i = 0; i < n; i++) {
-      const cx = i % cols, cz = Math.floor(i / cols);
-      out.push([(-0.5 + (cx + 0.5) / cols) * (BED.w - 0.4), (-0.5 + (cz + 0.5) / rows) * (BED.d - 0.3)]);
+  const BED = { w: 2.3, d: 1.3, y: 0.89 }, TALL = 0.9, ROWS = 6;
+  const light = lightMode();
+  const ink = light ? { color: '#20262e', bg: 'rgba(250,250,250,.95)' } : {};
+  const chosen = { color: light ? '#ffffff' : '#05080f', bg: css(color) };
+  const unit = new THREE.BoxGeometry(1, 1, 1);
+  unit.translate(0, 0.5, 0); // a bar grows up from the bed
+  const short = (n) => tokens({ input: n, output: 0, cache_read: 0, cache_write: 0 });
+  const sum = (r) => r.work.reduce((a, b) => a + b, 0);
+  // a bar's paint in light mode; in the dark a glow, added to what is behind it
+  const paint = (c) => (light ? new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 })
+    : new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(1.3), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+  let range = 14, last = {}, key = '';
+  const draw = () => {
+    for (const o of [...g.children]) {
+      o.material.map?.dispose();
+      o.material.dispose();
     }
-    return out;
-  };
-  const drawHud = (title, rows) => {
-    const c = hudCv.getContext('2d');
-    c.clearRect(0, 0, hudCv.width, hudCv.height);
-    c.strokeStyle = '#' + tint.getHexString();
-    c.lineWidth = 3;
-    c.strokeRect(4, 4, hudCv.width - 8, hudCv.height - 8);
-    c.fillStyle = '#' + tint.getHexString();
-    c.font = '700 34px ui-monospace, monospace';
-    c.textBaseline = 'top';
-    c.fillText(title.slice(0, 24), 18, 14);
-    c.font = '24px ui-monospace, monospace';
-    rows.slice(0, 3).forEach((l, i) => c.fillText(String(l).slice(0, 34), 18, 62 + i * 30));
-    hudTex.needsUpdate = true;
+    g.clear();
+    const place = (o, px, py, pz) => { o.position.set(px, py, pz); g.add(o); return o; };
+    const { usage, focus, open } = last;
+    const days = usage?.days?.slice(-range) ?? [];
+    let rows = (usage?.rows ?? []).map((r) => ({ slug: r.slug, work: r.work.slice(-range) })).filter((r) => sum(r) > 0).sort((a, b) => sum(b) - sum(a));
+    const mine = rows.find((r) => r.slug === focus);
+    rows = rows.slice(0, ROWS);
+    if (mine && !rows.includes(mine)) rows[ROWS - 1] = mine;
+    const peak = Math.max(1, ...rows.flatMap((r) => r.work));
+    const top = BED.y + TALL;
+    place(label(rows.length ? `Agent usage · tokens a day · tallest ${short(peak)}` : `Agent usage · none in ${range} days`, { size: 0.16, ...ink }), 0, top + 0.5, 0);
+    [7, 14, 30].forEach((d, n) => {
+      const plate = place(label(`${d} days`, { size: 0.13, ...(d === range ? chosen : ink) }), (n - 1) * 0.6, top + 0.27, 0);
+      pickable(plate, `Agent usage: the last ${d} days`, () => { range = d; draw(); });
+    });
+    if (!rows.length) return;
+    const dx = (BED.w - 0.2) / days.length, dz = (BED.d - 0.2) / ROWS;
+    // Read from the door (at -z, looking +z), where +x is on the left: the oldest day
+    // stands at +x and time runs to the right, the row's name before its first bar.
+    for (const [i, at] of [[0, 1], [days.length - 1, -1]]) place(label(days[i].slice(5), { size: 0.09, ...ink }), at * (BED.w / 2 - 0.2), BED.y + 0.08, -BED.d / 2 - 0.12);
+    rows.forEach((r, j) => {
+      // the busiest row at the back (the door is at -z), so no row hides behind a taller one
+      const zr = BED.d / 2 - 0.1 - (j + 0.5) * dz;
+      const c = focus ? (r.slug === focus ? color : 0x7d8590) : light ? PAINTS[j % PAINTS.length] : new THREE.Color().setHSL(j / ROWS, 0.9, 0.55);
+      const mat = paint(c);
+      r.work.forEach((v, i) => {
+        if (!v) return;
+        const bar = place(new THREE.Mesh(unit, mat), BED.w / 2 - 0.1 - (i + 0.5) * dx, BED.y + 0.01, zr);
+        bar.scale.set(dx * 0.7, Math.max(0.006, (v / peak) * TALL), dz * 0.6);
+        pickable(bar, `${r.slug} · ${days[i].slice(5)}: ${short(v)} tokens`, () => open?.(r.slug));
+      });
+      const name = label(r.slug.length > 24 ? r.slug.slice(0, 23) + '…' : r.slug, { size: 0.09, ...(r.slug === focus ? chosen : ink) });
+      place(name, BED.w / 2 + 0.1 + name.scale.x / 2, BED.y + 0.08, zr);
+    });
   };
   return {
-    set(items, title, rows) {
-      drawHud(title, rows);
-      const k2 = items.map((it) => `${it.label}:${it.color}`).join(' ');
-      if (k2 === key) return;
+    set(usage, focus, open) {
+      const k2 = JSON.stringify([usage ?? null, focus]);
+      if (k2 === key) return; // the poll gave the same: nothing to rebuild
       key = k2;
-      for (const p of [...pins.children]) {
-        p.traverse((o) => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); });
-        pins.remove(p);
-      }
-      spots(items.length).forEach(([px, pz], i) => {
-        const it = items[i];
-        const pin = new THREE.Group();
-        const base = height(px, pz, 0);
-        const top = base + 0.55 + (i % 3) * 0.12;
-        const c = new THREE.Color(it.color).multiplyScalar(1.5);
-        const mat = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, top - base, 6), mat);
-        pole.position.set(px, (top + base) / 2, pz);
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.01, 6, 24), mat);
-        ring.rotation.x = PI / 2;
-        ring.position.set(px, top, pz);
-        const tag = label(it.label, { size: 0.2, color: '#' + c.getHexString() });
-        tag.position.set(px, top + 0.16, pz);
-        const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, top - base + 0.2, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
-        hit.position.copy(pole.position);
-        pin.add(pole, ring, tag, hit);
-        pickable(pin, it.tip, it.act);
-        pins.add(pin);
-      });
+      last = { usage, focus, open };
+      draw();
     },
-    tick(dt, t) {
-      for (let i = 0; i < pos.count; i++) pos.setY(i, height(pos.getX(i), pos.getZ(i), t));
-      pos.needsUpdate = true;
-      halo.position.y = 2.7 + Math.sin(t * 0.8) * 0.02;
-      crosses.rotation.y = t * 0.03;
-    },
+    tick() {},
   };
 }
 
@@ -754,11 +722,15 @@ export async function lab(slug, n, ui) {
   const deco = decor(slug);
   k.setAccent(css(deco.accent));
   k.setSecondary(css(deco.secondary));
+  k.setWall(deco.wall);
   const scene = new THREE.Scene();
   const sh = shell(k, scene, deco, ui);
-  const sign = label(`Floor ${n} · ${slug}`, { size: 0.34, color: css(deco.accent) });
-  sign.position.set(-1.5, 3.4, -7.6);
+  // the floor's name, a plaque on the back wall: its right end by the café's clock,
+  // so a long name (a slug is at most 40 characters) grows away from the cove
+  const sign = label(`Floor ${n}\n${slug}`, { size: 0.28, flat: true, ...signInk(deco.accent) });
+  sign.position.set(-0.1 - sign.geometry.parameters.width / 2, 3.4, -7.97);
   scene.add(sign);
+  scene.userData.walls?.push(sign); // the overview cuts it away with its wall
 
   // Server room (back-left, windowless, behind glass): a data hall's two
   // rows of full-height racks (0.6 × 1 m), fronts facing a cold aisle along
@@ -873,10 +845,7 @@ export async function lab(slug, n, ui) {
       ...(w.pr.review_app ? [{ text: '↗ review app', color: '#9fc3ff' }] : []),
     ] : [st.pr_error ? 'PRs unavailable' : 'no pull request for this branch'], w.pr ? `#${w.pr.number} · ${w.pr.state.toLowerCase()}` : 'Pull request');
     const up = w.services.filter((s) => svcState(s.state) === 'running').length;
-    holo.set(w.services.map((svc) => ({
-      label: svc.service, color: colorOf(svcState(svc.state)),
-      tip: `${svc.service}: ${svcState(svc.state)}`, act: () => ui.service(slug, svc.service),
-    })), slug, [`stack ${w.stack} · ${up}/${w.services.length} running`, w.pr ? `PR #${w.pr.number} · ${w.pr.checks || 'no checks'}` : 'no PR', w.agent ? `agent ${w.agent.state}` : 'no agent']);
+    holo.set(st.usage, slug);
     big.screen.update([
       { text: `stack ${w.stack} · ${up}/${w.services.length} services running`, color: css(colorOf(w.stack)) },
       w.pr ? `PR #${w.pr.number} · checks ${w.pr.checks || 'none'} · review ${(w.pr.review || 'none').replace('_', ' ')}` : 'no pull request',
@@ -919,20 +888,23 @@ function rack(k, svc, i, secondary) {
   holoCv.height = 160;
   const holoTex = new THREE.CanvasTexture(holoCv);
   holoTex.colorSpace = THREE.SRGBColorSpace;
+  // light mode: a plain card over the rack, dark ink on white, not a hologram
+  const light = lightMode();
   const holo = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.45), new THREE.MeshBasicMaterial({
-    map: holoTex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
+    map: holoTex, transparent: true, blending: light ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
   }));
   holo.position.set(0, 2.5, 0.35);
   holo.rotation.x = -0.12;
   holo.raycast = () => {}; // clicks reach the rack
   g.add(holo);
-  const tint = css(secondary);
+  const tint = light ? '#20262e' : css(secondary);
   let state = '';
   let age = 1;
   const drawHolo = (t) => {
     const c = holoCv.getContext('2d');
     const w = holoCv.width, h = holoCv.height;
     c.clearRect(0, 0, w, h);
+    if (light) { c.fillStyle = 'rgba(255,255,255,.92)'; c.fillRect(0, 0, w, h); }
     c.strokeStyle = tint;
     c.globalAlpha = 0.55;
     c.lineWidth = 3;
@@ -948,7 +920,7 @@ function rack(k, svc, i, secondary) {
     c.font = '700 30px ui-monospace, monospace';
     c.textBaseline = 'top';
     c.fillText(svc.service.slice(0, 16), 16, 14);
-    c.fillStyle = css(colorOf(state));
+    c.fillStyle = light ? '#20262e' : css(colorOf(state));
     c.font = '24px ui-monospace, monospace';
     c.fillText(state || '…', 16, 52);
     c.fillStyle = tint;
@@ -1015,6 +987,7 @@ export async function lobby(prefix, ui) {
   const deco = decor('lobby:' + prefix);
   k.setAccent(css(deco.accent));
   k.setSecondary(css(deco.secondary));
+  k.setWall(deco.wall);
   const scene = new THREE.Scene();
   const sh = shell(k, scene, deco, ui);
 
@@ -1070,9 +1043,10 @@ export async function lobby(prefix, ui) {
   view.rotation.y = PI / 2;
   scene.add(view);
   put(k, scene, 'Deco_NeonSign', 2.0, 2.6, -7.97);
-  const name = label(prefix, { size: 0.5, color: css(deco.accent) });
-  name.position.set(2.0, 3.45, -7.6);
+  const name = label(prefix, { size: 0.5, flat: true, ...signInk(deco.accent) });
+  name.position.set(2.0, 3.45, -7.84); // on the front of the cove along this wall
   scene.add(name);
+  scene.userData.walls?.push(name);
   put(k, scene, 'Furn_Desk', -7.0, 0, 4.0);
   put(k, scene, 'Tech_Laptop', -7.0, k.point('Furn_Desk', 'top')[1], 4.0, PI);
   const concierge = wanderer(k, 'Char_Android_B', rng(deco.seed + 7), ui.say);
@@ -1090,7 +1064,7 @@ export async function lobby(prefix, ui) {
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 0.9, 32), new THREE.MeshStandardMaterial({ color: 0x16181e, metalness: 0.6, roughness: 0.4 }));
   stand.position.y = 0.45;
   pedestal.add(stand);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.015, 6, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(deco.accent).multiplyScalar(1.4), toneMapped: false }));
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.015, 6, 48), new THREE.MeshBasicMaterial({ color: lit(deco.accent, 1.4), toneMapped: false }));
   rim.rotation.x = PI / 2;
   rim.position.y = 0.9;
   pedestal.add(rim);
@@ -1100,8 +1074,12 @@ export async function lobby(prefix, ui) {
   const beacons = new THREE.Group();
   beacons.position.set(0, 1.0, 0);
   scene.add(beacons);
+  // The directory over the pedestal is a board with two faces, one to each
+  // end of the corridor: a line per floor (its number, name and stack; a
+  // running one in green), in one or two columns that fit the corridor's
+  // width however many floors there are. A line leads to its floor.
   const dirSign = label('Directory', { size: 0.3 });
-  dirSign.position.set(0, 2.1, 0);
+  dirSign.position.set(0, 3.2, 0);
   scene.add(dirSign);
 
   const cafeTicks = cafe(k, scene, deco);
@@ -1112,7 +1090,7 @@ export async function lobby(prefix, ui) {
   const res = residents(k, scene, deco, ui, 2);
   res.start();
 
-  const ticks = [...sh.ticks, ...res.ticks, holo.tick, ...cafeTicks, ...gameTicks, workTick, (dt) => { beacons.rotation.y += dt * 0.25; }];
+  const ticks = [...sh.ticks, ...res.ticks, holo.tick, ...cafeTicks, ...gameTicks, workTick];
   let beaconKey = '';
   const update = (st) => {
     const lines = st.worktrees.map((w, i) => ({
@@ -1121,29 +1099,37 @@ export async function lobby(prefix, ui) {
     }));
     view.update(lines.length ? lines : ['no worktrees'], `${prefix} · ${st.worktrees.length} floors`);
     const open = st.worktrees.filter((w) => w.pr);
-    holo.set(st.worktrees.map((w) => ({
-      label: w.slug, color: colorOf(w.stack), tip: `${w.slug}: ${w.stack}`, act: () => ui.toFloor(w.slug),
-    })), prefix, [`${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.stack === 'up').length} up`, `${open.length} with an open PR`, `${st.worktrees.filter((w) => w.agent).length} agents`]);
-    // the beacons change with the floors and their stacks only: rebuilt
-    // then, the old ones' GPU buffers freed
+    holo.set(st.usage, null, (s) => ui.toFloor(s));
+    // the board changes with the floors and their stacks only: rebuilt
+    // then, the old one's GPU buffers freed
     const key = st.worktrees.map((w) => `${w.slug}:${w.stack}`).join(' ');
     if (key !== beaconKey) {
       beaconKey = key;
       for (const m of beacons.children) {
+        m.material.map?.dispose();
         m.geometry.dispose();
         m.material.dispose();
       }
       beacons.clear();
+      const n = st.worktrees.length, cols = n > 12 ? 2 : 1, rows = Math.ceil(n / cols);
+      const pitch = Math.min(0.16, 1.9 / Math.max(1, rows)); // the board is at most 1.9 m tall: more floors, smaller lines
+      const ink = (up) => (lightMode() ? { color: up ? '#1f7a3d' : '#20262e', bg: 'rgba(250,250,250,.95)' } : up ? { color: '#63e07c' } : {});
+      const lines = st.worktrees.map((w, i) => label(`${i + 1} · ${w.slug.length > 26 ? w.slug.slice(0, 25) + '…' : w.slug} · ${w.stack}`, { size: pitch * 0.86, flat: true, ...ink(w.stack === 'up') }));
+      const wide = (m) => m.geometry.parameters.width;
+      const colW = Array.from({ length: cols }, (_, c) => Math.max(0, ...lines.slice(c * rows, (c + 1) * rows).map(wide)));
+      const total = colW.reduce((a, b) => a + b, 0) + 0.08 * (cols - 1);
+      lines.forEach((m, i) => {
+        const c = Math.floor(i / rows), w = st.worktrees[i];
+        const lx = -total / 2 + colW.slice(0, c).reduce((a, b) => a + b + 0.08, 0) + wide(m) / 2; // each column's lines start on one edge
+        const y = 0.15 + (rows - 1 - (i % rows)) * pitch;
+        for (const [face, s] of [[m, -1], [m.clone(), 1]]) { // s: the end of the corridor it faces; lx runs to that reader's right
+          face.rotation.y = s * PI / 2;
+          face.position.set(s * 0.03, y, -s * lx);
+          pickable(face, `Floor ${i + 1} · ${w.slug}: ${w.stack}`, () => ui.toFloor(w.slug));
+          beacons.add(face);
+        }
+      });
     }
-    if (!beacons.children.length) st.worktrees.forEach((w, i) => {
-      const a = (i / Math.max(1, st.worktrees.length)) * PI * 2;
-      const c = new THREE.Color(colorOf(w.stack));
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4 + (w.stack === 'up' ? 0.35 : 0), 8),
-        new THREE.MeshBasicMaterial({ color: c.multiplyScalar(1.6), toneMapped: false }));
-      m.position.set(Math.cos(a) * 0.32, 0.25, Math.sin(a) * 0.32);
-      pickable(m, `Floor ${i + 1} · ${w.slug}: ${w.stack}`, () => ui.toFloor(w.slug));
-      beacons.add(m);
-    });
     big.screen.update([
       `${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.stack === 'up').length} up`,
       `${open.length} floors with an open pull request`,

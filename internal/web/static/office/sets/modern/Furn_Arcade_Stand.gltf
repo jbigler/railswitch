@@ -3,9 +3,6 @@
 		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
-	"extensionsUsed":[
-		"KHR_materials_emissive_strength"
-	],
 	"scene":0,
 	"scenes":[
 		{
@@ -34,9 +31,9 @@
 			"name":"RS_BodyDark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.5520114302635193,
-					0.5711248517036438,
-					0.6038273572921753,
+					0.07036009430885315,
+					0.07818742096424103,
+					0.09530746936798096,
 					1
 				],
 				"metallicFactor":0,
@@ -48,9 +45,9 @@
 			"name":"RS_Body",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.8796223998069763,
-					0.8796223998069763,
-					0.8549926280975342,
+					0.6239603757858276,
+					0.6444796919822693,
+					0.672443151473999,
 					1
 				],
 				"metallicFactor":0,
@@ -59,22 +56,12 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				0.2581828534603119,
-				0.10702310502529144,
-				1
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":1.5
-				}
-			},
 			"name":"RS_Neon_Secondary",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0,
-					0,
-					0,
+					0.43415364623069763,
+					0.11697066575288773,
+					0.045186202973127365,
 					1
 				],
 				"metallicFactor":0,

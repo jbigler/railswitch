@@ -17,9 +17,9 @@ function windowsTexture(r, lit, day) {
   c.width = 64;
   c.height = 256;
   const g = c.getContext('2d');
-  g.fillStyle = day ? '#b9c2cc' : '#05060a';
+  g.fillStyle = day ? '#e6e9ec' : '#05060a'; // by day a pale face: each tower's own colour tints it
   g.fillRect(0, 0, 64, 256);
-  const tones = day ? ['#6f879c', '#8198ab', '#5f7890'] : ['#ffd9a0', '#9fd8ff', '#ff9ad8', '#fff2d0'];
+  const tones = day ? ['#4f6a85', '#6d88a3', '#3f5a75'] : ['#ffd9a0', '#9fd8ff', '#ff9ad8', '#fff2d0'];
   if (day) lit = 0.9;
   for (let y = 4; y < 256; y += 6) for (let x = 3; x < 64; x += 6) {
     if (r() < lit) {
@@ -108,6 +108,11 @@ export function city(scene, seed) {
     new THREE.MeshBasicMaterial({ map: skyTexture(day), side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.position.y = -40;
   root.add(sky);
+  // its lid, in the colour the dome ends on: looking up through a window finds sky, not the gap
+  const lid = new THREE.Mesh(new THREE.CircleGeometry(260, 48), new THREE.MeshBasicMaterial({ color: day ? 0x3f8fdc : 0x020205, fog: false, depthWrite: false }));
+  lid.rotation.x = PI / 2;
+  lid.position.y = 90;
+  root.add(lid);
 
   // three bands of towers, outside the right and front windows only
   const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -119,27 +124,39 @@ export function city(scene, seed) {
     { n: 110, near: 90, far: 150, w: [10, 20], top: [-25, 28], lit: 0.13, haze: 0.5 },
     { n: 140, near: 150, far: 240, w: [12, 26], top: [-15, 40], lit: 0.1, haze: 0.78 },
   ];
+  // by day each tower has a facade: sandstone, brick, blue or green glass, concrete, terracotta, steel
+  const FACADES = [0xd8c7a8, 0xb5654a, 0x7fa6c9, 0x86b8a6, 0xc9ccd1, 0xe0b58a, 0x9aa7b8];
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
+  const stood = []; // [x, z, radius] of every tower placed: none stands inside another
   for (const b of bands) {
     const tex = windowsTexture(r, b.lit, day);
-    tex.repeat.set(3, 16); // windows about 1 m apart on a mid-size tower
+    // one copy up a tower (42 storeys of about 3.5 m) and 0.4 across a face: four
+    // windows about 3 m apart on a mid-size tower, so the towers read as near as they are
+    tex.repeat.set(0.4, 1);
+    tex.magFilter = THREE.NearestFilter; // crisp panes, not a blur, at this size
     const mat = new THREE.MeshBasicMaterial({ map: tex, fog: false });
     const towers = new THREE.InstancedMesh(geo, mat, b.n);
+    let n = 0;
     for (let i = 0; i < b.n; i++) {
       // an angle from the right wall round to the front: x > 0, z > 0 mostly
       const a = -0.35 + r() * (PI / 2 + 0.7);
       const d = b.near + r() * (b.far - b.near);
       const w = b.w[0] + r() * (b.w[1] - b.w[0]);
       const top = b.top[0] + r() * (b.top[1] - b.top[0]);
-      dummy.position.set(Math.cos(a) * d, -150, Math.sin(a) * d);
-      dummy.rotation.y = r() * PI;
-      dummy.scale.set(w, top + 150, w * (0.6 + r() * 0.8));
+      const turn = r() * PI, deep = w * (0.6 + r() * 0.8), shade = b.haze + r() * 0.1, face = FACADES[Math.floor(r() * FACADES.length)];
+      const x = Math.cos(a) * d, z = Math.sin(a) * d, rad = Math.hypot(w, deep) / 2 + 1; // a street's width between them
+      if (stood.some(([sx, sz, sr]) => Math.hypot(x - sx, z - sz) < rad + sr)) continue; // the spot is taken: one tower fewer
+      stood.push([x, z, rad]);
+      dummy.position.set(x, -150, z);
+      dummy.rotation.y = turn;
+      dummy.scale.set(w, top + 150, deep);
       dummy.updateMatrix();
-      towers.setMatrixAt(i, dummy.matrix);
-      tint.setRGB(1, 1, 1).lerp(haze, b.haze + r() * 0.1);
-      towers.setColorAt(i, tint);
+      towers.setMatrixAt(n, dummy.matrix);
+      tint.set(day ? face : 0xffffff).lerp(haze, shade);
+      towers.setColorAt(n++, tint);
     }
+    towers.count = n;
     root.add(towers);
   }
   if (day) return () => {}; // no neon signs, no spinners

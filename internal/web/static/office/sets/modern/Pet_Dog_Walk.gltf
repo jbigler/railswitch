@@ -3,9 +3,6 @@
 		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
-	"extensionsUsed":[
-		"KHR_materials_emissive_strength"
-	],
 	"scene":0,
 	"scenes":[
 		{
@@ -138,22 +135,12 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				0.01599629409611225,
-				0.7912979125976562,
-				1
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":1.5
-				}
-			},
 			"name":"RS_Neon_Accent",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0,
-					0,
-					0,
+					0.028426039963960648,
+					0.21223075687885284,
+					0.23839756846427917,
 					1
 				],
 				"metallicFactor":0,

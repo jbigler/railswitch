@@ -155,13 +155,18 @@ export function screen(width, height, opts = {}) {
 
 // label is a sprite with text that always faces the camera; walls and
 // boards hide it like anything else.
-export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,.75)' } = {}) {
+// flat: a plane to fix on a wall (facing +z) instead, for a long name that a
+// turning sprite would push through the wall behind it. Text with "\n" is
+// rows, each `size` tall.
+export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,.75)', flat = false } = {}) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
   const font = '600 44px ui-sans-serif, system-ui, sans-serif';
+  const rows = text.split('\n');
   g.font = font;
-  c.width = Math.ceil(g.measureText(text).width) + 36;
-  c.height = 64;
+  c.width = Math.ceil(Math.max(...rows.map((row) => g.measureText(row).width))) + 36;
+  c.height = 64 * rows.length;
+  size *= rows.length;
   g.font = font;
   g.fillStyle = bg;
   g.beginPath();
@@ -169,9 +174,10 @@ export function label(text, { color = '#e6f6ff', size = 0.32, bg = 'rgba(5,8,16,
   g.fill();
   g.fillStyle = color;
   g.textBaseline = 'middle';
-  g.fillText(text, 18, 34);
+  rows.forEach((row, i) => g.fillText(row, 18, 34 + 64 * i));
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  if (flat) return new THREE.Mesh(new THREE.PlaneGeometry(size * c.width / c.height, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, toneMapped: false }));
   s.scale.set(size * c.width / c.height, size, 1);
   s.renderOrder = 10;

@@ -161,9 +161,9 @@
 			"name":"RS_Body",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.8796223998069763,
-					0.8796223998069763,
-					0.8549926280975342,
+					0.6239603757858276,
+					0.6444796919822693,
+					0.672443151473999,
 					1
 				],
 				"metallicFactor":0,
@@ -172,22 +172,12 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				0.01599629409611225,
-				0.7912979125976562,
-				1
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":1.5
-				}
-			},
 			"name":"RS_Neon_Accent",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0,
-					0,
-					0,
+					0.028426039963960648,
+					0.21223075687885284,
+					0.23839756846427917,
 					1
 				],
 				"metallicFactor":0,
@@ -224,9 +214,9 @@
 			"name":"RS_BodyDark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.5520114302635193,
-					0.5711248517036438,
-					0.6038273572921753,
+					0.07036009430885315,
+					0.07818742096424103,
+					0.09530746936798096,
 					1
 				],
 				"metallicFactor":0,
@@ -266,9 +256,9 @@
 			"name":"RS_Tape",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.7681511640548706,
-					0.7379103899002075,
-					0.6307571530342102,
+					0.04970656707882881,
+					0.15896083414554596,
+					0.43415364623069763,
 					1
 				],
 				"metallicFactor":0,

@@ -1,9 +1,9 @@
 # The modern set (docs/office-kit.md, Sets): the kit as a bright, clean office,
 # cyberpunk's light mode. build_all.py runs this after build_kit.py, in the
 # same globals, when OFFICE_KIT_SET=modern. Three things:
-#   - MATS: the kit's materials in white, light grey, oak and aluminium; the
-#     accent materials keep their names (each floor still has its colours) but
-#     glow far less, so they read as coloured trim.
+#   - MATS: the kit's materials as white walls, grey and graphite furniture,
+#     oak and aluminium; the accent materials keep their names (each floor
+#     still has its colours) but are paint, not neon: the page colours them.
 #   - textures: oak planks for the floor, plain plaster for the walls, a
 #     framed print, a white whiteboard, a daytime skyline.
 #   - @shape: the pieces that are cyberpunk by shape, rebuilt to the same box
@@ -25,13 +25,13 @@ def draw_oak(px, w, h):
     along = (xx + rng.integers(0, w, rows)[row]) % w
     tone = rng.random((rows, 2))[row, along // L]
     grain = smooth_noise(rng, 256, h)[:, :1] * (.6 + .4 * smooth_noise(rng, 4, w))  # streaks along the boards
-    px[..., :3] = np.array((.80, .65, .44)) * (.9 + .12 * tone + .07 * grain)[..., None]
+    px[..., :3] = np.array((.70, .54, .36)) * (.9 + .12 * tone + .07 * grain)[..., None]
     px[(yy % (h // rows) < 1) | (along % L < 1), :3] *= .62
 
 
 def draw_plaster(px, w, h):
     """Painted plaster: off-white, barely mottled."""
-    px[..., :3] = np.array((.94, .94, .92)) * (.985 + .03 * smooth_noise(np.random.default_rng(11), 12, w))[..., None]
+    px[..., :3] = np.array((.88, .88, .86)) * (.985 + .03 * smooth_noise(np.random.default_rng(11), 12, w))[..., None]
 
 
 def draw_print(px, w, h):
@@ -64,32 +64,32 @@ make_image('RS_CityNight', 2048, 1024, draw_day)  # the kit's image, repainted: 
 
 # ---------- materials: each replaces the kit's of that name, whole ----------
 MATS.update(
-    RS_Neon_Accent=dict(emit=ACCENT, strength=1.5),
-    RS_Neon_Secondary=dict(emit=SECOND, strength=1.5),
+    RS_Neon_Accent=dict(base='#2f7f86', rough=.5),      # paint: the page gives it the floor's colour
+    RS_Neon_Secondary=dict(base='#b0603c', rough=.5),
     RS_LED_Accent=dict(emit=ACCENT, strength=3),
     RS_LightPanel=dict(base='#ffffff', emit='#fff6e8', strength=6),
     RS_Glow_Warm=dict(emit='#ffd9a8', strength=3),
-    RS_Body=dict(base='#f1f1ee', rough=.45),            # white laminate
-    RS_BodyDark=dict(base='#c4c7cc', rough=.55),        # light grey
-    RS_PaintViolet=dict(base='#9fb3c2', rough=.5),      # a muted blue
+    RS_Body=dict(base='#cfd2d6', rough=.45),            # light grey laminate, off the walls' white
+    RS_BodyDark=dict(base='#4b4f57', rough=.55),        # graphite: frames, bases, housings
+    RS_PaintViolet=dict(base='#2f6f7f', rough=.5),      # a deep teal
     RS_Trim=dict(base='#b9bdc3', metal=.8, rough=.35),  # brushed aluminium
     RS_Wall=dict(base='#ffffff', rough=.9, image=make_image('RS_Trim_Wall', 1024, 1024, draw_plaster)),
     RS_Floor=dict(base='#ffffff', rough=.55, image=make_image('RS_Trim_Floor', 1024, 1024, draw_oak)),
     RS_Rubber=dict(base='#3a3d42', rough=.6),
-    RS_Fabric=dict(base='#5f6b7a', rough=.95),
-    RS_Cushion=dict(base='#b9bec6', rough=.9),
+    RS_Fabric=dict(base='#3f5873', rough=.95),
+    RS_Cushion=dict(base='#8c95a3', rough=.9),
     RS_Pot=dict(base='#eceae4', rough=.4),              # white ceramic
     RS_Pot_Concrete=dict(base='#b8b8b4', rough=.9),
     RS_Glass=dict(base='#cfe3ec', rough=.05, alpha=.14),
-    RS_BeigePlastic=dict(base='#d9dadd', rough=.5),
-    RS_Cardboard=dict(base='#c4a074', rough=.95),
+    RS_BeigePlastic=dict(base='#b9bcc2', rough=.5),
+    RS_Cardboard=dict(base='#ece9e2', rough=.9),        # white archive boxes: kraft was the floor's colour
     RS_Cork=dict(base='#b98f5e', rough=.95),
     RS_Red=dict(base='#c8372d', rough=.45),
-    RS_Tape=dict(base='#e3dfd0', rough=.7),
+    RS_Tape=dict(base='#3f6fb0', rough=.7),
     RS_Poster=dict(base='#ffffff', rough=.8, image=make_image('RS_Poster', 256, 384, draw_print)),
     RS_Leather_Dark=dict(base='#9c6238', rough=.5),     # cognac
     RS_Oxblood=dict(base='#3f6b73', rough=.85),         # a teal throw
-    RS_Wood_Panel=dict(base='#bf9f78', rough=.55),
+    RS_Wood_Panel=dict(base='#b08a60', rough=.55),
     RS_Rug_Base=dict(base='#d9d4c8', rough=.97),
     RS_Rug_Line=dict(base='#7d9aa5', rough=.95),
     RS_Rug_Line2=dict(base='#c49a2c', rough=.95),
@@ -97,9 +97,12 @@ MATS.update(
     RS_Steel_Dark=dict(base='#8f949b', metal=.85, rough=.35),
     RS_ClockFace=dict(base='#f4f4f2', rough=.5),
     RS_ClockHand=dict(base='#22252a', rough=.4),
-    RS_Android_Shell_Black=dict(base='#c8ccd3', metal=.3, rough=.3),
-    RS_Android_Core=dict(base='#7f858e', metal=.6, rough=.4),
-    RS_Android_Cable=dict(base='#555a62', metal=.4, rough=.5),
+    RS_Android_Shell_White=dict(base='#eef0f2', rough=.55),   # satin, untextured; the agent's partner
+    RS_Android_Shell_Ivory=dict(base='#d96a4f', rough=.55),   # the wanderers: coral,
+    RS_Android_Shell_Black=dict(base='#2c4a6e', rough=.55),   #   navy
+    RS_Android_Shell_Silver=dict(base='#e0aa3e', rough=.55),  #   and ochre
+    RS_Android_Core=dict(base='#33373d', metal=.5, rough=.45),
+    RS_Android_Core_Blue=dict(base='#33373d', metal=.5, rough=.45),
 )
 for i, c in enumerate(['#3f6fb0', '#d9d7d2', '#c8372d', '#e8c95a', '#52a08f', '#8a8f9c', '#f1f1ee']):
     MATS[f'RS_Book{i}'] = dict(base=c, rough=.8)
@@ -107,10 +110,12 @@ for n in MATS:
     mat(n)  # the kit made its own before this file ran
 
 T = dict(  # the set's own
-    oak=mat('RS_Oak', '#bf9f78', 0, .55),
+    oak=mat('RS_Oak', '#b08a60', 0, .55),
     bezel=mat('RS_Bezel', '#1d1f23', .2, .4),            # screens' surrounds, dark glass
     frame=mat('RS_WindowFrame', '#2a2c30', .6, .4),
     blue=mat('RS_Cable_Blue', '#3f6fb0', 0, .6),
+    rack=mat('RS_Rack', '#8a9099', .7, .4),              # silver-grey cabinets
+    rackFace=mat('RS_RackFace', '#2b2e33', .3, .5),      # their module faces: the lights read on dark
 )
 
 
@@ -162,6 +167,21 @@ def pc_tower(a):
     a.box(.22, .48, .45, M['body'], 0, .24, 0)
     a.box(.004, .4, .36, T['bezel'], .112, .25, 0)   # a dark side window
     a.box(.006, .3, .006, M['neon'], .06, .28, .226)
+
+
+_kit_rack = server_rack
+
+
+@shape
+def server_rack(a, *args, **kw):
+    """The kit's rack in silver-grey with dark faces, to stand out from the
+    white walls and let its lights read: the kit's builder, its two paints swapped."""
+    kit_mats = {k: M[k] for k in ('body', 'dark')}
+    M.update(body=T['rack'], dark=T['rackFace'])
+    try:
+        _kit_rack(a, *args, **kw)
+    finally:
+        M.update(kit_mats)
 
 
 @shape
@@ -322,6 +342,28 @@ def cable_run(a, length=2.5, seed=1):
 
 
 @shape
+def sofa_l(name):
+    """The L-shaped sectional, plainer to read: a plinth, deep seat cushions
+    with a gap between them, one solid back with a grey cushion per seat
+    leaning on it, an arm at the open end, two throw pillows. The kit's
+    footprint; the chaise runs forward on the right."""
+    a = Asset(name)
+    lth, ox = L['leatherDark'], L['oxblood']
+    a.box(2.9, .12, .95, M['dark'], 0, .08, 0)
+    a.box(.95, .12, 1.5, M['dark'], .95, .08, 1.2)
+    for x in (-.93, -.02):
+        a.box(.88, .26, .64, lth, x, .27, .11)
+    a.box(.88, .26, 2.12, lth, .95, .27, .85)
+    a.box(2.9, .6, .17, lth, 0, .44, -.39)
+    for x in (-.93, -.02, .95):
+        a.box(.84, .32, .14, M['cushion'], x, .57, -.25, rx=-.18)
+    a.box(.16, .5, .95, lth, -1.37, .39, 0)
+    a.box(.4, .32, .12, ox, -1.02, .54, -.1, rx=-.3, ry=.25)
+    a.box(.4, .32, .12, ox, .6, .54, -.1, rx=-.3, ry=-.15)
+    return a.build()
+
+
+@shape
 def crate(a):
     """Where the kit has a crate: a storage bench, oak under a cushion, its top at the crate's."""
     a.box(.92, .3, .58, T['oak'], 0, .2, 0)
@@ -433,21 +475,33 @@ def holo_table(a):
 
 @shape
 def vending(a, seed=1):
-    """A white vending machine, 1.0 × 1.9 × 0.8 m: the kit's menu screen
-    (RS_VendScreen, where the kit has it), a dark glass pick-up door with a
-    rail, a shelf, a card reader, the mount for the page's header sign."""
+    """A glass-front vending machine, 1.0 × 1.9 × 0.8 m, in graphite: five
+    shelves behind the glass (snack packs for seed 1, bottles otherwise), a
+    touch screen beside them (RS_VendScreen: the page draws the menu), a card
+    reader under it, a pick-up flap with a rail, the mount for the page's sign."""
     w, h, d = 1.0, 1.9, .8
     zf = d / 2
-    a.box(w, h, d, M['body'], 0, h / 2, 0)
-    a.box(w + .02, .08, d + .02, M['dark'], 0, .04, 0)
-    a.box(.88, 1.06, .03, T['bezel'], 0, 1.33, zf)
-    a.plane(.78, .95, M['vend'], 0, 1.32, zf + .017)
-    a.box(.88, .006, .006, M['neon2'], 0, 1.87, zf + .01)
-    a.box(.7, .46, .02, T['bezel'], 0, .4, zf)
-    a.box(.5, .02, .03, M['trim'], 0, .58, zf + .02)
-    a.box(.44, .03, .08, M['trim'], -.15, .72, zf + .04)
-    a.box(.12, .1, .03, T['bezel'], .34, .72, zf + .015)
-    a.box(.06, .02, .004, M['led'], .34, .74, zf + .032)
+    r = random.Random(seed)
+    a.box(w, h, d, M['dark'], 0, h / 2, 0)
+    a.box(w + .02, .08, d + .02, T['bezel'], 0, .04, 0)
+    wx, ww = -.17, .58  # the window
+    a.box(ww, 1.2, .01, M['body'], wx, 1.2, zf + .005)
+    for row in range(5):
+        y = .68 + row * .235
+        a.box(ww, .012, .04, M['trim'], wx, y, zf + .03)
+        for col in range(6):
+            x = wx - ww / 2 + .06 + col * .092
+            if seed == 1:
+                a.box(.07, .15, .03, r.choice(BOOKS), x, y + .081, zf + .03)
+            else:
+                a.cyl(.028, .028, .16, r.choice(BOOKS), x, y + .086, zf + .03, 10)
+    a.box(ww + .02, 1.24, .006, M['glass'], wx, 1.2, zf + .055)
+    a.box(.28, .38, .02, T['bezel'], .33, 1.45, zf + .005)
+    a.plane(.25, .31, M['vend'], .33, 1.45, zf + .017)
+    a.box(.1, .14, .03, T['bezel'], .33, 1.1, zf + .015)
+    a.box(.06, .02, .004, M['led'], .33, 1.14, zf + .032)
+    a.box(ww, .22, .02, T['bezel'], wx, .36, zf)
+    a.box(.5, .03, .08, M['trim'], wx, .5, zf + .04)
     a.box(.7, .05, .12, M['dark'], 0, h + .025, zf - .1)
 
 
@@ -470,3 +524,11 @@ def arcade_bartop(a):
     a.box(.5, .1, .05, M['body'], 0, .66, -.18)
     a.box(.44, .06, .004, M['led'], 0, .66, -.153)
     a.box(.3, .004, .004, M['dark'], 0, .1, .277)
+
+
+# ---------- androids: the kit's, in colour ----------
+@shape
+def droid_trim(shell):
+    """What an android is dressed in here: white, or on the white one the floor's colour."""
+    white = bpy.data.materials['RS_Android_Shell_White']
+    return M['neon'] if shell is white else white

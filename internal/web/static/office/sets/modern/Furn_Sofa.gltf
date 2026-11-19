@@ -3,9 +3,6 @@
 		"generator":"Khronos glTF Blender I/O v5.3.43",
 		"version":"2.0"
 	},
-	"extensionsUsed":[
-		"KHR_materials_emissive_strength"
-	],
 	"scene":0,
 	"scenes":[
 		{
@@ -34,9 +31,9 @@
 			"name":"RS_BodyDark",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.5520114302635193,
-					0.5711248517036438,
-					0.6038273572921753,
+					0.07036009430885315,
+					0.07818742096424103,
+					0.09530746936798096,
 					1
 				],
 				"metallicFactor":0,
@@ -48,9 +45,9 @@
 			"name":"RS_Cushion",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.48514994978904724,
-					0.5149176716804504,
-					0.5647115111351013,
+					0.2622506618499756,
+					0.30054378509521484,
+					0.366252601146698,
 					1
 				],
 				"metallicFactor":0,
@@ -59,22 +56,12 @@
 		},
 		{
 			"doubleSided":true,
-			"emissiveFactor":[
-				0.01599629409611225,
-				0.7912979125976562,
-				1
-			],
-			"extensions":{
-				"KHR_materials_emissive_strength":{
-					"emissiveStrength":1.5
-				}
-			},
 			"name":"RS_Neon_Accent",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0,
-					0,
-					0,
+					0.028426039963960648,
+					0.21223075687885284,
+					0.23839756846427917,
 					1
 				],
 				"metallicFactor":0,
@@ -86,9 +73,9 @@
 			"name":"RS_Fabric",
 			"pbrMetallicRoughness":{
 				"baseColorFactor":[
-					0.11443537473678589,
-					0.14702726900577545,
-					0.1946178376674652,
+					0.04970656707882881,
+					0.09758734703063965,
+					0.17144110798835754,
 					1
 				],
 				"metallicFactor":0,

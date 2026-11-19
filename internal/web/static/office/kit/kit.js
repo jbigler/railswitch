@@ -24,11 +24,22 @@ const isAccent = (n) => n === 'RS_Neon_Accent' || n === 'RS_LED_Accent' || (n.st
 const isSecondary = (n) => n === 'RS_Neon_Secondary';
 const IS_COL = /_COL\d*$/; // one box per node: <piece>_COL, <piece>_COL1, ...
 
+// tint gives the floor's colour to materials: as their glow, or, in a
+// light-mode set (matte: no neon), as paint; screens and LEDs glow in both.
+function tint(mats, color, matte) {
+  for (const m of mats) {
+    if (matte && !m.name.startsWith('RS_Screen') && m.name !== 'RS_LED_Accent') m.color.set(color);
+    else m.emissive.set(color);
+  }
+}
+
 export async function loadOfficeKit(set, pieces, names, loader, THREE) {
+  const matte = set.look?.mode === 'light';
   const templates = new Map();
   const missing = new Set(); // names drawn as boxes
   const accentMats = new Set();
   const secondaryMats = new Set();
+  const wallMats = new Set();
   const have = new Set(set.have);
   const grey = new THREE.MeshStandardMaterial({ name: 'RS_Placeholder', color: 0x9aa0a8, roughness: 0.8 });
   const red = new THREE.MeshStandardMaterial({ name: 'RS_Placeholder_Unknown', color: 0xd03030, roughness: 0.8 });
@@ -68,6 +79,7 @@ export async function loadOfficeKit(set, pieces, names, loader, THREE) {
       for (const m of [o.material].flat().filter(Boolean)) {
         if (isAccent(m.name)) accentMats.add(m);
         if (isSecondary(m.name)) secondaryMats.add(m);
+        if (m.name === 'RS_Wall') wallMats.add(m);
       }
     });
     templates.set(name, root);
@@ -89,8 +101,9 @@ export async function loadOfficeKit(set, pieces, names, loader, THREE) {
       if (!v) throw new Error(`office: no point ${name} on ${piece}`);
       return v;
     },
-    setAccent(color) { for (const m of accentMats) m.emissive.set(color); },
-    setSecondary(color) { for (const m of secondaryMats) m.emissive.set(color); },
+    setAccent(color) { tint(accentMats, color, matte); },
+    setSecondary(color) { tint(secondaryMats, color, matte); },
+    setWall(color) { if (color != null) for (const m of wallMats) m.color.set(color); }, // a floor's wall paint; null leaves the set's
     colliders(root) {
       const out = [];
       root.traverse((o) => { if (o.isMesh && IS_COL.test(o.name)) out.push(o); });
@@ -193,13 +206,18 @@ export function animate(root, t) {
     if (leg) { // trot: front-left with back-right, front-right with back-left
       const r = rest(o), u = motion(o);
       const off = (leg[1] === 'F') === (leg[2] === 'L') ? 0 : Math.PI;
-      o.rotation.x = r.r.x + Math.sin((u.phase ?? 0) * Math.PI * 2 + off) * 0.55 * (u.gait ?? 0);
+      // The foot swings back through the stance (the angle rising) about as far as the body
+      // moves, and the leg draws up a little as it comes forward, so it steps rather than rocks.
+      const ph = (u.phase ?? 0) * Math.PI * 2 + off, g = u.gait ?? 0;
+      o.rotation.x = r.r.x + Math.sin(ph) * 0.42 * g;
+      o.scale.y = r.s.y * (1 - 0.16 * Math.max(0, -Math.cos(ph)) * g);
       return;
     }
     const wing = /_Wing_([LR])$/.exec(n);
     if (wing) { // Wing_L sits at +x; folded at rest, spread and beating in flight
       const r = rest(o), f = motion(o).flap ?? 0;
       o.rotation.z = r.r.z + (wing[1] === 'L' ? 1 : -1) * f * (1.15 + Math.sin(t * 16) * 0.55);
+      o.scale.set(r.s.x, r.s.y * (0.42 + 0.58 * f), r.s.z * (0.7 + 0.3 * f)); // folded short against the body, full length in flight
       return;
     }
     if (n.endsWith('_Tail')) {

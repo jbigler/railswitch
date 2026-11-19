@@ -1021,8 +1021,13 @@ func readRegistry(dirs machine.Dirs) (*machine.Registry, error) {
 	return reg, err
 }
 
+// prefixTaken names the way out (#242): removing a worktree, or the
+// workspace folder, leaves the project registered.
 func prefixTaken(prefix, ws string) error {
-	return fmt.Errorf("prefix %q is already used by %s", prefix, ws)
+	if _, err := os.Stat(ws); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("prefix %q is still registered to %s, which no longer exists: run railswitch project rm %s to remove what is left of it, or pick another prefix", prefix, ws, prefix)
+	}
+	return fmt.Errorf("prefix %q is already used by %s: run railswitch project rm %s to remove that project, or pick another prefix", prefix, ws, prefix)
 }
 
 // remoteHead is the branch the remote's HEAD names, from

@@ -1410,7 +1410,7 @@ any open page.
   ceiling gear and some furniture come from the name, so a floor always
   looks the same and floors look different.
   - Back side: the **server room** (glass, windowless) is a data hall: a
-    rack per service, 1 m apart in two rows of seven facing a cold aisle (a
+    rack per service, 1 m apart in two rows of seven facing each other across a 2 m aisle (a
     stack with more than 14 services shows the first 14). Each rack's LEDs
     and accent bar show the service's state, its display names it, cables
     loop out of its sides and up into the ceiling's tray, and a hologram
@@ -1510,7 +1510,7 @@ can drive the agent, as it can start a job. Nothing else can (Security
 model above). Text from the CLI (PR and issue titles, notes, the agent's
 screen) is shown as text, never as markup.
 
-The models are the office kit (`static/office/sets/cyberpunk/`, built by
+The models are the office kit (`static/office/sets/cyberpunk/` and `modern/`, built by
 `tools/office-kit/`), served as glTF with their textures as separate files:
 the content policy (`default-src 'self'`) refuses the `blob:` URLs three.js
 makes for textures embedded in a GLB. three.js is MIT
@@ -1520,7 +1520,11 @@ bloom passes as one module by `internal/web/static/office/vendor.sh`.
 ### Sets
 
 The office's art is a **set** (D153): one look's models plus its colours,
-fog, lights and bloom. `cyberpunk` is built in; others are installed on
+fog, lights and bloom. Two are built in: `cyberpunk`, the default, and
+`modern` (D220), its light mode: the same pieces in white, oak and
+aluminium, a daytime city outside, an evenly lit room without the film
+set's loose cables and failing tube, and the server room's cabling managed
+(finger ducts, wire baskets, closed risers). Others are installed on
 the machine with `railswitch office set add <folder>` (built and checked
 as in `docs/office-kit.md`), and the **Office set** card on the Machine
 page picks the active one (an `office set use` job; `dashboard.toml`

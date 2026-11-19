@@ -1,23 +1,26 @@
 // The city outside the windows (the right wall, x = 12, and the front, z =
 // 8): tower bands hazier with distance, a smog-red horizon, tall flickering
-// ad signs, spinners crossing between the towers. Simple shapes and a few
+// ad signs, spinners crossing between the towers. A light-mode set (look
+// mode = "light") gets the same towers by day: a blue sky, glass faces, pale
+// haze, no signs or spinners. Simple shapes and a few
 // canvas textures; no part of it uses the room's fog (the room's would hide
 // it), each band is hazed by its distance instead. city(scene, seed)
 // returns its tick.
-import { THREE, rng } from './world.js';
+import { THREE, rng, lightMode } from './world.js';
 
 const PI = Math.PI;
-const HAZE = new THREE.Color(0x2a1420); // the smog the far towers fade into
 
-// windowsTexture is a tower face at night: dark, with lit windows in rows.
-function windowsTexture(r, lit) {
+// windowsTexture is a tower face: at night dark, with lit windows in rows;
+// by day pale, nearly every window a pane of sky-dark glass.
+function windowsTexture(r, lit, day) {
   const c = document.createElement('canvas');
   c.width = 64;
   c.height = 256;
   const g = c.getContext('2d');
-  g.fillStyle = '#05060a';
+  g.fillStyle = day ? '#b9c2cc' : '#05060a';
   g.fillRect(0, 0, 64, 256);
-  const tones = ['#ffd9a0', '#9fd8ff', '#ff9ad8', '#fff2d0'];
+  const tones = day ? ['#6f879c', '#8198ab', '#5f7890'] : ['#ffd9a0', '#9fd8ff', '#ff9ad8', '#fff2d0'];
+  if (day) lit = 0.9;
   for (let y = 4; y < 256; y += 6) for (let x = 3; x < 64; x += 6) {
     if (r() < lit) {
       g.fillStyle = tones[Math.floor(r() * tones.length)];
@@ -32,18 +35,17 @@ function windowsTexture(r, lit) {
   return t;
 }
 
-// skyTexture is the dome: smog glow at the horizon, dark above.
-function skyTexture() {
+// skyTexture is the dome: smog glow at the horizon, dark above; by day blue,
+// paling to the horizon.
+function skyTexture(day) {
   const c = document.createElement('canvas');
   c.width = 4;
   c.height = 256;
   const g = c.getContext('2d');
   const grad = g.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, '#020205');
-  grad.addColorStop(0.5, '#0a0710');
-  grad.addColorStop(0.72, '#3a1622');
-  grad.addColorStop(0.82, '#7a3020');
-  grad.addColorStop(1, '#1a0a10');
+  const stops = day ? [[0, '#3f8fdc'], [0.5, '#8fc0ea'], [0.78, '#e6f0f6'], [1, '#c9d6de']]
+    : [[0, '#020205'], [0.5, '#0a0710'], [0.72, '#3a1622'], [0.82, '#7a3020'], [1, '#1a0a10']];
+  for (const [at, color] of stops) grad.addColorStop(at, color);
   g.fillStyle = grad;
   g.fillRect(0, 0, 4, 256);
   const t = new THREE.CanvasTexture(c);
@@ -95,13 +97,15 @@ function adTexture(kind, color) {
 
 export function city(scene, seed) {
   const r = rng(seed ^ 0xc17e);
+  const day = lightMode();
+  const haze = new THREE.Color(day ? 0xcfdfec : 0x2a1420); // what the far towers fade into: smog, or daylight
   const root = new THREE.Group();
   root.userData.city = true;
   scene.add(root);
 
   // the dome, around and below the view
   const sky = new THREE.Mesh(new THREE.CylinderGeometry(260, 260, 260, 48, 1, true),
-    new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false }));
+    new THREE.MeshBasicMaterial({ map: skyTexture(day), side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.position.y = -40;
   root.add(sky);
 
@@ -118,7 +122,7 @@ export function city(scene, seed) {
   const dummy = new THREE.Object3D();
   const tint = new THREE.Color();
   for (const b of bands) {
-    const tex = windowsTexture(r, b.lit);
+    const tex = windowsTexture(r, b.lit, day);
     tex.repeat.set(3, 16); // windows about 1 m apart on a mid-size tower
     const mat = new THREE.MeshBasicMaterial({ map: tex, fog: false });
     const towers = new THREE.InstancedMesh(geo, mat, b.n);
@@ -133,11 +137,12 @@ export function city(scene, seed) {
       dummy.scale.set(w, top + 150, w * (0.6 + r() * 0.8));
       dummy.updateMatrix();
       towers.setMatrixAt(i, dummy.matrix);
-      tint.setRGB(1, 1, 1).lerp(HAZE, b.haze + r() * 0.1);
+      tint.setRGB(1, 1, 1).lerp(haze, b.haze + r() * 0.1);
       towers.setColorAt(i, tint);
     }
     root.add(towers);
   }
+  if (day) return () => {}; // no neon signs, no spinners
 
   // tall ad signs on the nearer towers' faces
   const ads = [];

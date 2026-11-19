@@ -4,7 +4,7 @@
 // cool (screens, the city), haze, light shafts through half-drawn blinds,
 // dust in the air, cables underfoot, a tube that flickers, neon kept for
 // signs. Shafts, dust, haze and sign rods show in first person only.
-import { THREE, rng, look } from './world.js';
+import { THREE, rng, look, lightMode } from './world.js';
 
 const PI = Math.PI;
 
@@ -117,11 +117,12 @@ function droop(parent, a, b, sag, mat) {
 // its ceiling light panels, the server room's first.
 export function film(scene, { walls, panels, ceiling, accent, seed }) {
   const r = rng(seed ^ 0x5eed);
+  const light = lightMode(); // an evenly lit office: none of the film's gloom, loose cables or failing tube
   // the set's look (D153); the defaults are cyberpunk's set.toml
   const fog = new THREE.FogExp2(look('fog', '#0b0f1c'), 0.04);
   scene.fog = fog;
   scene.background = new THREE.Color(look('background', '#05060c'));
-  const hemi = new THREE.HemisphereLight(look('ambient', '#4a5c88'), 0x2a1c12, 0.5);
+  const hemi = new THREE.HemisphereLight(look('ambient', '#4a5c88'), light ? 0xc9c4ba : 0x2a1c12, 0.5);
   scene.add(hemi);
   scene.userData.hemi = hemi;
   const amb = look('ambient_intensity', 1);
@@ -143,7 +144,7 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
   // shines a little, as if just mopped.
   const trim = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: new THREE.Color(accent), emissiveIntensity: 0.16 });
   for (const w of walls) w.traverse((o) => { if (o.isMesh && o.material?.name === 'RS_Neon_Accent') o.material = trim; });
-  scene.traverse((o) => {
+  if (!light) scene.traverse((o) => {
     const n = o.material?.name ?? '';
     if (n === 'RS_Floor') { o.material.roughness = 0.32; o.material.metalness = 0.45; }
     if (n === 'RS_LightPanel') { o.material.emissiveIntensity = 0.12; o.material.color.setHex(0x1a1c22); o.material.roughness = 1; o.material.metalness = 0; } // diffusers: no glare from the lamp below
@@ -183,12 +184,14 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
 
   // Cables: power and network from the server room to the desks along the
   // back, more hanging between the ceiling's services.
-  const rubber = [0x0b0b0d, 0x3a0d12, 0x0d1a33].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55 }));
-  cable(scene, [[-11.6, 3.0], [-11.3, 4.6], [-11.6, 5.8], [-11.4, 6.9]], rubber);
-  cable(scene, [[-3.6, 4.4], [-3.2, 4.9], [-2.6, 5.0]], rubber.slice(0, 2));
-  cable(scene, [[6.6, -7.7], [7.2, -7.6], [7.9, -7.75]], rubber.slice(1));
-  for (const [a, b, s] of [[[-9.5, -6.4], [-8.0, -1.2], 0.35], [[-8.0, -1.2], [-10.0, 3.5], 0.5], [[0.0, -3.0], [0.0, 3.0], 0.4], [[6.0, -4.0], [6.0, 4.0], 0.3]]) {
-    droop(ceiling, a, b, s, rubber[0]);
+  if (!light) {
+    const rubber = [0x0b0b0d, 0x3a0d12, 0x0d1a33].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55 }));
+    cable(scene, [[-11.6, 3.0], [-11.3, 4.6], [-11.6, 5.8], [-11.4, 6.9]], rubber);
+    cable(scene, [[-3.6, 4.4], [-3.2, 4.9], [-2.6, 5.0]], rubber.slice(0, 2));
+    cable(scene, [[6.6, -7.7], [7.2, -7.6], [7.9, -7.75]], rubber.slice(1));
+    for (const [a, b, s] of [[[-9.5, -6.4], [-8.0, -1.2], 0.35], [[-8.0, -1.2], [-10.0, 3.5], 0.5], [[0.0, -3.0], [0.0, 3.0], 0.4], [[6.0, -4.0], [6.0, 4.0], 0.3]]) {
+      droop(ceiling, a, b, s, rubber[0]);
+    }
   }
 
   // The server room's tube fails now and then.
@@ -210,6 +213,7 @@ export function film(scene, { walls, panels, ceiling, accent, seed }) {
     for (const m of tubeMats) m.emissiveIntensity = 0.12 * on;
   };
   const drift = (dt, t) => { air.children.at(-1).position.y = Math.sin(t * 0.13) * 0.15; air.children.at(-1).rotation.y = t * 0.004; };
+  if (light) return [drift];
   return [flicker, drift];
 }
 

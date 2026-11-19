@@ -203,6 +203,7 @@ def hanging_cables(a, seed=1):
             a.box(.03, .02, .03, M['trim'], x, -.01, z)
 
 
+globals().update(SHAPES)  # the set's own builders (build_kit.py)
 arch = build_elevator()
 for name, fn in [('Arch_Ceiling_CableTray_4m', cable_tray), ('Arch_Ceiling_PipeRun_4m', pipe_run), ('Arch_Ceiling_Vent', vent),
                  ('Arch_Ceiling_LightRun_4m', light_run), ('Arch_Ceiling_Sprinkler_4m', sprinkler),

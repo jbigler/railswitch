@@ -1,6 +1,6 @@
 # The virtual office's asset kit: shared code for the build_*.py sets.
-# Run build_all.py in Blender (docs/office-kit.md); each set exports one GLB per
-# piece into internal/web/static/office/sets/cyberpunk/. Geometry is authored in three.js coordinates (Y up, front +Z) and rotated to
+# Run build_all.py in Blender (docs/office-kit.md); each script exports one glTF per
+# piece into internal/web/static/office/sets/<SET>/. Geometry is authored in three.js coordinates (Y up, front +Z) and rotated to
 # Blender's Z up (front -Y) at the end, so the glTF export lands back in three.js
 # exactly as authored. Neon surfaces all use RS_Neon_Accent: recolor it in three.js
 # by material name (emissive) to change the highlight color.
@@ -9,8 +9,23 @@ import numpy as np
 from mathutils import Vector, Matrix, Euler
 from contextlib import contextmanager
 
+# OFFICE_KIT_SET picks the built-in set to build: cyberpunk is the kit as
+# written; another is the same kit restyled by theme_<set>.py, which
+# build_all.py runs after this file. A theme fills MATS (a material's values,
+# all of them, by name) and DRAWS (an image's painter by name), and marks its
+# own builders @shape: each build_*.py takes those in by function name
+# (globals().update(SHAPES)) before it builds, so they replace the kit's.
+SET = os.environ.get('OFFICE_KIT_SET') or 'cyberpunk'
+MATS, DRAWS, SHAPES = {}, {}, {}
+
+
+def shape(fn):
+    SHAPES[fn.__name__] = fn
+    return fn
+
+
 OUT = os.environ.get('OFFICE_KIT_OUT') or os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', '..', 'internal', 'web', 'static', 'office', 'sets', 'cyberpunk'))
+    os.path.join(os.path.dirname(__file__), '..', '..', 'internal', 'web', 'static', 'office', 'sets', SET))
 os.makedirs(OUT, exist_ok=True)
 
 # `-- --only <piece>...` builds everything but exports only these pieces
@@ -164,7 +179,12 @@ def sock(node, ident):
     return next(s for s in node.inputs if s.identifier == ident)
 
 
-def mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alpha=1.0, image=None, emit_image=False, normal=None):
+def mat(name, *args, **kw):
+    """The material `name`, made or reset to these values; the set's theme (MATS) has the last word."""
+    return _mat(name, **MATS[name]) if name in MATS else _mat(name, *args, **kw)
+
+
+def _mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alpha=1.0, image=None, emit_image=False, normal=None):
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
@@ -175,9 +195,9 @@ def mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alp
     sock(b, 'Metallic').default_value = metal
     sock(b, 'Roughness').default_value = rough
     sock(b, 'Alpha').default_value = alpha
+    sock(b, 'Emission Strength').default_value = strength if emit else 0  # reset: a Blender session keeps the last set's materials
     if emit:
         sock(b, 'Emission Color').default_value = (*lin(emit), 1)
-        sock(b, 'Emission Strength').default_value = strength
     if image:
         t = nt.nodes.new('ShaderNodeTexImage')
         t.image = image
@@ -191,13 +211,13 @@ def mat(name, base='#000000', metal=0.0, rough=0.5, emit=None, strength=0.0, alp
         nm = nt.nodes.new('ShaderNodeNormalMap')
         nt.links.new(t.outputs['Color'], nm.inputs['Color'])
         nt.links.new(nm.outputs['Normal'], sock(b, 'Normal'))
-    if alpha < 1:
-        m.surface_render_method = 'BLENDED'
+    m.surface_render_method = 'BLENDED' if alpha < 1 else 'DITHERED'
     m.diffuse_color = (*lin(emit or base), 1)
     return m
 
 
 def make_image(name, w, h, draw):
+    draw = DRAWS.get(name, draw)
     px = np.zeros((h, w, 4), np.float32)
     px[..., 3] = 1
     draw(px, w, h)  # drawn top-down
@@ -858,6 +878,12 @@ def server_rack(a, width=0.6, height=2.0, depth=1.0, seed=1):
             for k in range(7):
                 a.box(inner - .08, .014, .006, M['trim'], 0, cy - .1 + k * .033, zf - .022)
         top -= h
+    rack_dressing(a, r, width, height, depth)
+
+
+def rack_dressing(a, r, width, height, depth):
+    """What hangs off a rack's cabinet (a set's theme has its own): armoured
+    sides and loose cable bundles, to the floor and up into the ceiling's tray."""
     # armoured sides: raised plates, bolts at their corners, vent slots
     for s_ in (-1, 1):
         x = s_ * (width / 2 + .01)
@@ -992,6 +1018,11 @@ def window_insert(a, w, h, corner=.2, depth=.15):
         a.loop(w + .06, h + .06, corner + .03, .016)
 
 
+def skirting(a, w, x):
+    """The line along a wall's foot (a set's theme has its own)."""
+    a.box(w, .026, .018, M['neon'], x, .03, .009)
+
+
 def wall_trim(a, width, height, windows=(), doors=()):
     # the panel seams are in the wall texture (RS_Trim_Wall)
     segs = [(-width / 2, width / 2)]
@@ -1002,7 +1033,7 @@ def wall_trim(a, width, height, windows=(), doors=()):
                 break
     for s0, s1 in segs:
         if s1 - s0 > .05:
-            a.box(s1 - s0, .026, .018, M['neon'], (s0 + s1) / 2, .03, .009)
+            skirting(a, s1 - s0, (s0 + s1) / 2)
     a.box(width, .026, .018, M['neon'], 0, height - .04, .009)
     for wx, wy, ww, wh, c in windows:
         with a.at(wx, wy + wh / 2, 0):

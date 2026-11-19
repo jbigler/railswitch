@@ -176,7 +176,7 @@ function shell(k, scene, deco, ui) {
   // cable tray over the server aisle
   const panels = LIGHTS.map(([x, z]) => put(k, ceiling, 'Light_CeilingPanel', x, 4, z, PI / 2));
   for (const z of [3.9, 6.6]) put(k, ceiling, 'Light_PendantBox', -10.7, 4, z, PI / 2);
-  put(k, ceiling, 'Arch_Ceiling_CableTray_4m', -9.6, 4, -6.45);
+  put(k, ceiling, 'Arch_Ceiling_CableTray_4m', -9.6, 4, -5.95);
   put(k, ceiling, deco.pick(['Arch_CeilingDuct_4m', 'Arch_Ceiling_PipeRun_4m']), 2, 4, 0);
   put(k, ceiling, 'Arch_Ceiling_Sprinkler_4m', -6, 4, 0);
   put(k, ceiling, 'Arch_Ceiling_Fan', 8.4, 4, -4.4);
@@ -772,8 +772,9 @@ export async function lab(slug, n, ui) {
   scene.add(keepOut);
   const racks = new Map();
   // shortcut: room for 14 racks; a stack with more services shows the first 14
-  // 1 m apart: their cable loops stand out from their sides
-  const rackSpot = (i) => (i < 7 ? { x: -11.2 + i * 1.0, z: -7.45, ry: 0 } : i < 14 ? { x: -11.2 + (i - 7) * 1.0, z: -5.5, ry: PI } : null);
+  // 1 m apart: their cable loops stand out from their sides. The rows face
+  // each other across a 2 m aisle, with 2 m behind the second to the glass.
+  const rackSpot = (i) => (i < 7 ? { x: -11.2 + i * 1.0, z: -7.45, ry: 0 } : i < 14 ? { x: -11.2 + (i - 7) * 1.0, z: -4.45, ry: PI } : null);
 
   // Work (front-left, behind glass): your desk and the agent's against the
   // left wall, screens above them; the PR station by the windows.

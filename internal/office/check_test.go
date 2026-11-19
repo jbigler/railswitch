@@ -212,6 +212,7 @@ func TestParseSet(t *testing.T) {
 		"newer":       {"schema = 1", "schema = 2"},
 		"reserved":    {`name = "cabin"`, `name = "notes"`},
 		"bad name":    {`name = "cabin"`, `name = "Cabin"`},
+		"bad mode":    {"bloom = 0", "bloom = 0\nmode = \"dusk\""},
 	} {
 		if _, err := ParseSet([]byte(strings.Replace(goodToml, edit[0], edit[1], 1))); err == nil {
 			t.Errorf("%s: no error", name)
@@ -247,5 +248,22 @@ func TestCyberpunkMatchesPieces(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+// The modern set is the kit restyled (tools/office-kit/theme_modern.py):
+// every piece, each within the list's box.
+func TestModernMatchesPieces(t *testing.T) {
+	list, err := LoadPieces(os.DirFS("../web/static"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := Check("../web/static/office/sets/modern", list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.OK() || len(r.Have()) != len(list.Pieces) {
+		b, _ := json.MarshalIndent(r, "", " ")
+		t.Fatalf("modern against pieces.json:\n%s", b)
 	}
 }

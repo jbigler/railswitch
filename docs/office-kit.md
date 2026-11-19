@@ -181,6 +181,7 @@ converted to meshes, decimated to their budget and colored per face.
 
 ```sh
 blender --background --python tools/office-kit/build_all.py
+OFFICE_KIT_SET=modern blender --background --python tools/office-kit/build_all.py
 ```
 
 (or open `build_all.py` in Blender's Text Editor and run it). Blender 4.2 or
@@ -192,6 +193,16 @@ separate textures, not GLB: the dashboard's content policy refuses the
 (`use_active_scene`): another scene in the same file that holds pieces of
 the same names would otherwise rename the build's to `<name>.001` and
 export those.
+
+`OFFICE_KIT_SET` picks the built-in set to build (`cyberpunk` when unset).
+`modern` is the same kit restyled by `tools/office-kit/theme_modern.py`,
+which `build_all.py` runs after `build_kit.py`: it replaces materials by
+name (`MATS`), image painters by name (`DRAWS`) and builder functions by
+name (`@shape`: the pieces that are cyberpunk by shape, such as the pipes,
+ducts, loose cables, CRTs, crate and holo-table, rebuilt to the same box,
+which it reads from `pieces.json`). Only cyberpunk's build writes
+`pieces.json`; the other's `set.toml` is stamped with the list's version.
+Build cyberpunk first when a piece's box changed, then `modern`.
 
 Outside the author's machine a rebuild differs from the checked-in models
 in float noise, so check in only the models a change touched. `--only`
@@ -230,7 +241,9 @@ dashboard: from the repository root run `python3 -m http.server` and open
 ## Sets
 
 The office's models are a **set** (D153): `cyberpunk` is these, built in
-at `internal/web/static/office/sets/cyberpunk/`; another set is a folder
+at `internal/web/static/office/sets/cyberpunk/`, and `modern` (D220) is
+its light mode, built in beside it by the same scripts (Rebuilding,
+above); another set is a folder
 of the same pieces in another look, installed on one machine with
 `railswitch office set add <folder>` and chosen on the Machine page or
 with `office set use <name>`.
@@ -261,6 +274,7 @@ pieces = 1              # the pieces.json version it was built for
 description = "Pine, wool and lamplight"
 
 [look]                  # each key optional: cyberpunk's value otherwise
+mode = "dark"           # or "light": a daytime sky and city, a bright even room (no dimmed panels, loose cables or flickering tube)
 background = "#1b1612"
 fog = "#2a2018"
 fog_density = 0.02      # walking; 0..1

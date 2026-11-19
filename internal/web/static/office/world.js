@@ -44,6 +44,9 @@ export function useSet(set, pieces) {
 export function look(key, fallback) {
   return office.set?.look?.[key] ?? fallback;
 }
+// lightMode: the set asks for the bright room and daytime city (look mode =
+// "light", the modern set) instead of cyberpunk's dark.
+export const lightMode = () => look('mode', 'dark') === 'light';
 export function kit(names) {
   kitP ??= loadOfficeKit(office.set, office.pieces, names, new THREE.GLTFLoader(), THREE).then((k) => {
     for (const n of names) {
@@ -241,12 +244,14 @@ export class World {
   }
 
   // officeEnv is a dim, generic office for metal to reflect, built once: a
-  // dark room, rows of ceiling panels, the windows' cool city glow on one
-  // side and a warm lamp on the other.
+  // dark room (a pale one in light mode), rows of ceiling panels, the
+  // windows' cool city glow (or daylight) on one side and a warm lamp on
+  // the other.
   officeEnv() {
     if (this.env) return this.env;
+    const light = lightMode();
     const s = new THREE.Scene();
-    s.add(new THREE.Mesh(new THREE.BoxGeometry(24, 4, 16), new THREE.MeshBasicMaterial({ color: 0x141a28, side: THREE.BackSide })));
+    s.add(new THREE.Mesh(new THREE.BoxGeometry(24, 4, 16), new THREE.MeshBasicMaterial({ color: light ? 0xc8ccd0 : 0x141a28, side: THREE.BackSide })));
     const glow = (color, w, h, x, y, z, rx, ry) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
       m.position.set(x, y, z);
@@ -254,7 +259,7 @@ export class World {
       s.add(m);
     };
     for (const x of [-8, 0, 8]) for (const z of [-4, 4]) glow(0xb8c6e6, 2.4, 0.6, x, 1.95, z, Math.PI / 2, 0);
-    glow(0x3d6cc4, 14, 2.4, 11.9, 0.4, 0, 0, -Math.PI / 2); // windows
+    glow(light ? 0xcfe6ff : 0x3d6cc4, 14, 2.4, 11.9, 0.4, 0, 0, -Math.PI / 2); // windows
     glow(0xd08a40, 2, 1.2, -11.9, 0.2, 2, 0, Math.PI / 2); // a warm lamp
     const pm = new THREE.PMREMGenerator(this.renderer);
     this.env = pm.fromScene(s, 0.04).texture;

@@ -3,6 +3,7 @@ package web
 import (
 	"maps"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -54,6 +55,9 @@ type importView struct {
 	Warnings                          []string
 	Packages                          []reviewPkgView
 	ImportURL                         string
+	// Next is where the page goes once imported ("": Back). From the
+	// welcome page (?next=new) it is /new with the template picked.
+	Next string
 }
 
 // fill sets v from an import review read with err.
@@ -96,6 +100,12 @@ func (s *Server) templateImportPage(w http.ResponseWriter, r *http.Request) {
 		Back:      "/machine", BackText: "Machine", Heading: "Import template",
 		Intro: "A template from a folder someone gave you. Read every file before you import it: a new project started from it builds these Containerfiles and gets these firewall, route and secret lines.",
 	}
+	// From the welcome page (D220): back there, and on to /new. Only this
+	// one value, so ?next= can't send the page anywhere else.
+	welcome := r.URL.Query().Get("next") == "new"
+	if welcome {
+		v.Back, v.BackText = "/", "Welcome"
+	}
 	dir, ok := importDir(r.URL.Query().Get("dir"))
 	if !ok {
 		v.Error = "give the template folder's full path, e.g. /home/you/Downloads/rails-stack"
@@ -104,6 +114,9 @@ func (s *Server) templateImportPage(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Dir = dir
 	v.fill(readJSON[importDoc](r.Context(), s.c.CLI, "template", "import", dir))
+	if welcome && v.Ref != "" {
+		v.Next = "/new?template=" + url.QueryEscape(v.Ref)
+	}
 	s.html(w, http.StatusOK, "templateimport", v)
 }
 

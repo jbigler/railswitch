@@ -14,8 +14,12 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
+// doctorHost is the host doctor checks; the dashboard contract test fakes it.
+var doctorHost = doctor.DefaultHost
+
 // railswitch doctor: check the host (and the workspace, inside one); exit 1
-// when a check fails. A warning (C8) never changes the exit code.
+// when a check fails, with --json 0 (the document says which). A warning
+// (C8) never changes the exit code.
 func cmdDoctor(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("doctor")
 	if code, ok := parse(fs, args); !ok {
@@ -33,7 +37,7 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 			ws, checks = nil, []doctor.Check{doctor.Workspace(err)}
 		}
 	}
-	h := doctor.DefaultHost
+	h := doctorHost
 	h.Dashboards = dashboardAddrs
 	if dirs, err := machine.DefaultDirs(); err == nil {
 		h.Token, h.TokenErr = machine.ReadDashboardToken(dirs) // none: the dashboard can't prove it's yours
@@ -42,7 +46,8 @@ func cmdDoctor(ctx context.Context, e *env, args []string) int {
 }
 
 // printChecks prints doctor's checks, as JSON with --json, and returns its
-// exit code: 1 when a check failed, a warning aside.
+// exit code: 1 when a check failed, a warning aside; with --json 0, so the
+// dashboard reads the document (the welcome page, D-row in the roadmap).
 func (e *env) printChecks(checks []doctor.Check) int {
 	code := 0
 	for _, c := range checks {
@@ -54,7 +59,7 @@ func (e *env) printChecks(checks []doctor.Check) int {
 		if err := json.NewEncoder(e.stdout).Encode(checks); err != nil {
 			return e.fail(err)
 		}
-		return code
+		return 0
 	}
 	for _, c := range checks {
 		status := "ok  "

@@ -10,7 +10,7 @@
 <form id="new-form" class="new-form" method="post" action="/new/review">
 <section class="card">
 <h2>1 · Stack and options</h2>
-<label class="field">Repository <input name="repo" class="mono" required autocomplete="off" spellcheck="false" placeholder="git@github.com:owner/app.git"></label>
+<label class="field">Repository <input name="repo" class="mono" required autocomplete="off" spellcheck="false" placeholder="git@github.com:owner/app.git" value="{{.Repo}}"></label>
 <p id="repo-error" class="red set-error" hidden></p>
 <label class="field">Base branch <input name="branch" class="mono" autocomplete="off" spellcheck="false" placeholder="the repository's default branch"></label>
 <label class="field">Project name <input name="name" autocomplete="off" placeholder="the folder's name"></label>
@@ -20,7 +20,7 @@
 <span class="hint">Default <span class="mono">~/workspace/&lt;prefix&gt;</span>; the base worktree is cloned inside it.</span></label>
 <label class="field">Start from a template <select name="template" data-template>
 <option value="">None: read the repository</option>
-{{range .Templates}}<option value="{{.Ref}}">{{.Ref}}{{if .Description}} · {{.Description}}{{end}}</option>
+{{range .Templates}}<option value="{{.Ref}}"{{if eq .Ref $.Template}} selected{{end}}>{{.Ref}}{{if .Description}} · {{.Description}}{{end}}</option>
 {{end}}</select>
 <span class="hint">A template brings its pack, options and overrides and asks its questions; you can still change them in Settings later. Someone gave you a template folder? <a href="/machine#templates">Import it on the Machine page</a>.</span></label>
 {{if .TemplatesError}}<p class="red">Templates unavailable: {{.TemplatesError}}</p>

@@ -18,6 +18,14 @@ _Avoid_: mutation, operation
 The set of read commands and actions the dashboard depends on, with the exact arguments it passes and the JSON fields it reads from each.
 _Avoid_: dashboard API, JSON schema
 
+**Welcome page**:
+The dashboard's page at `/` while no project is registered: the machine checks and the two ways to start a first project.
+_Avoid_: onboarding, wizard, setup page
+
+**Machine checks**:
+`doctor`'s host checks as the dashboard shows them, each failure or warning with its fix.
+_Avoid_: health check, diagnostics
+
 **Whiteboard**:
 A worktree's one Excalidraw drawing, kept on the host with a dark and a light picture of it, shown by the Virtual Office's glass wall and the worktree page's Whiteboard tab, and deleted with the worktree.
 _Avoid_: board (alone), canvas, sketch

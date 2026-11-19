@@ -19,6 +19,7 @@
 <details class="menu" data-keep="machine" aria-label="This machine"><summary class="hb">Machine ▾</summary>
 <div class="menu-pop">
 <a class="hb" href="/machine" title="Templates, libraries and signers on this machine">Settings</a>
+<a class="hb" href="/machine#checks" title="What railswitch needs on this machine, and how to fix what's missing">Checks</a>
 <a class="hb" href="http://logs.localhost/" target="_blank" rel="noopener">Logs ↗</a>
 <button type="button" class="hb" data-notify hidden>Notifications</button>
 <button type="button" class="hb" data-colors title="Dashboard colours">Colours</button>
@@ -31,6 +32,6 @@
 <a href="{{.URL}}"{{if .N}} data-n="{{.N}}"{{end}}>{{if .N}}<kbd>{{.N}}</kbd> {{end}}<b>{{.Prefix}}</b> <span class="muted">{{.Worktrees}} worktrees · {{.Running}} running</span>{{if .Review}} <span class="yellow" title="Package update waiting for review">update</span>{{end}}{{if .Need}} <span class="need">◆ {{.Need}}</span>{{end}}</a>
 {{if .WTs}}<ul class="proj-wts">{{range .WTs}}<li class="wt-item" data-filter="{{.Slug}}" hidden><a href="{{.URL}}">{{.Slug}}{{if .Need}} <span class="need">◆</span>{{end}}</a></li>{{end}}</ul>{{end}}
 </li>
-{{else}}<li class="muted">No projects.</li>
+{{else}}<li class="muted"><a href="/">No projects yet: start here</a></li>
 {{end}}<li class="proj-new"><a href="/new">New project…</a></li>
 </ul>{{end}}

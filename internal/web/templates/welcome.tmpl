@@ -1,0 +1,76 @@
+{{/* The welcome page (D220): / while no project is registered. The
+machine's checks load after the page; both starts lead into /new. */}}
+{{define "welcome"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="welcome">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<h1>Welcome to RailSwitch</h1>
+<p class="note">RailSwitch runs your apps in containers on this machine. Each branch you work on gets its own app, database and ports, so switching branches never means stopping one to start another. Check this machine, then add your first project.</p>
+{{template "checks-box"}}
+<section class="card">
+<h2>Start your first project</h2>
+<div class="welcome-starts">
+<form method="get" action="/new" class="new-form welcome-start">
+<h3>From a repository</h3>
+<label class="field">Repository <input name="repo" class="mono" required autocomplete="off" spellcheck="false" maxlength="4096" placeholder="git@github.com:owner/app.git"></label>
+<p class="note">RailSwitch reads only the files that say which stack it is (a <code>Gemfile</code>, a <code>package.json</code>) and suggests the rest. Nothing is created until you press Create project.</p>
+<div class="btns"><button class="ln main">Read the repository</button></div>
+</form>
+<form method="get" action="/machine/templates/import" class="new-form welcome-start">
+<h3>From a template folder</h3>
+<input type="hidden" name="next" value="new">
+<label class="field">Folder <input name="dir" class="mono" required autocomplete="off" spellcheck="false" maxlength="4096" placeholder="/home/you/Downloads/rails-stack"></label>
+<p class="note">A folder a teammate made with <code>railswitch template export --to</code>. It brings the team's pack and options. You see every file before anything is saved.</p>
+<div class="btns"><button class="ln main">Review</button></div>
+</form>
+</div>
+{{if .TemplatesError}}<p class="red">Templates unavailable: {{.TemplatesError}}</p>
+{{else if .Templates}}<p class="note">Or start from a template already on this machine:</p>
+<div class="btns welcome-templates">{{range .Templates}}<a class="ln" href="/new?template={{.Ref}}" title="{{.Description}}">{{.Ref}}</a>{{end}}</div>
+{{end}}</section>
+<section class="card">
+<h2>What happens next</h2>
+<dl class="welcome-terms">
+<dt>Prefix</dt><dd>A short name you pick for the project, like <span class="mono">shop</span>. It names every container and volume, and the app's address: <span class="mono">http://main.shop.localhost/</span>.</dd>
+<dt>Worktree</dt><dd>One branch, checked out in its own folder, with its own containers, database and ports. The project starts with one for its base branch; add more from the project page.</dd>
+<dt>Pack</dt><dd>The stack: what to build and which services to run (a database, a cache). RailSwitch suggests one from the repository, and you can change it.</dd>
+<dt>Secrets</dt><dd>Some projects need a token or two (a <span class="mono">github_token</span>, an agent's key). After Create, the project page asks for them, then starts the app.</dd>
+</dl>
+</section>
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}
+
+{{/* The box the page's script fills from /machine/checks. */}}
+{{define "checks-box"}}<section class="card" id="checks" data-checks>
+<h2>Your machine</h2>
+<p class="muted">Checking this machine…</p>
+</section>{{end}}
+
+{{/* The machine checks fragment: doctor's host checks, failures first,
+each with its fix; the passing ones folded. Nothing here runs a fix. */}}
+{{define "checks"}}<h2>Your machine</h2>
+{{if .Error}}<p class="red">The checks did not run: {{.Error}}</p>
+{{else if .Failed}}<p class="red">{{len .Failed}} to fix before a project can start. Run each fix in a terminal, then check again.</p>
+{{else}}<p class="green">Ready: nothing blocks a project.{{if .Warned}} The warnings below are worth a look.{{end}}</p>
+{{end}}<ul class="checks">
+{{range .Failed}}<li class="check-fail">{{template "check-row" .}}</li>
+{{end}}{{range .Warned}}<li class="check-warn">{{template "check-row" .}}</li>
+{{end}}</ul>
+{{if .OK}}<details class="checks-ok"><summary class="muted">{{len .OK}} checks pass</summary>
+<ul class="checks">{{range .OK}}<li class="check-ok">{{template "check-row" .}}</li>
+{{end}}</ul>
+</details>
+{{end}}<div class="btns"><button type="button" class="ln" data-checks-again>Check again</button></div>{{end}}
+
+{{define "check-row"}}<span class="check-mark" aria-hidden="true"></span><b>{{.Name}}</b>{{with .Detail}} <span class="muted">{{.}}</span>{{end}}
+{{with .Fix}}<div class="check-fix"><code>{{.}}</code>{{with $.Cmd}} <button type="button" class="ln" data-copy="{{.}}" title="Copy {{.}}">Copy</button>{{end}}</div>{{end}}{{end}}

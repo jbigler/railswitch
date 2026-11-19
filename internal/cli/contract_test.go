@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jbigler/railswitch/internal/doctor"
 	"github.com/jbigler/railswitch/internal/sys"
 	"github.com/jbigler/railswitch/internal/testfixture"
 )
@@ -82,6 +84,32 @@ func TestDashboardContract(t *testing.T) {
 	// A test run, and a TV source for the office.
 	testfixture.WriteFile(t, filepath.Join(ws, ".railswitch", "tests", "feat", "last.json"), `{"exit_code":0,"started_at":"2026-01-06T09:00:00Z","ended_at":"2026-01-06T09:01:00Z","commit":"abc"}`+"\n")
 	mustRunStdin(t, f, "", "office", "tv", "jellyfin", "set", "--url", "https://media.lan/", "--playlist", "Lounge")
+	// doctor on a made-up host: port 80, Quadlet and cgroup v2 in place,
+	// every tool but jq, no dnsmasq.
+	if err := os.MkdirAll(filepath.Join(home, "host"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"port", "quadlet", "cgroup.controllers"} {
+		writeFile(t, filepath.Join(home, "host", p), "80\n")
+	}
+	oldHost := doctorHost
+	doctorHost = doctor.Host{
+		PortStart: filepath.Join(home, "host", "port"),
+		Quadlet:   []string{filepath.Join(home, "host", "quadlet")},
+		Cgroup:    filepath.Join(home, "host", "cgroup.controllers"),
+		LookPath: func(name string) (string, error) {
+			if name == "jq" {
+				return "", exec.ErrNotFound
+			}
+			return "/usr/bin/" + name, nil
+		},
+		HookDirs: []string{filepath.Join(home, "host", "sbin")},
+	}
+	oldAddrs := dashboardAddrs
+	dashboardAddrs = []string{"127.0.0.1:1"} // nothing answers: the same detail every run
+	t.Cleanup(func() { doctorHost, dashboardAddrs = oldHost, oldAddrs })
+	f.On([]string{"podman", "version"}, sys.Result{Stdout: []byte("5.4.2\n")}, nil)
+	f.On([]string{"gh", "auth", "status"}, sys.Result{}, nil)
 
 	// What one read alone needs: each returns its undo.
 	probe := filepath.Join(ws, "agents", "probe", "Containerfile.probe")
@@ -118,6 +146,7 @@ func TestDashboardContract(t *testing.T) {
 	key := regexp.MustCompile(`ssh-ed25519 [A-Za-z0-9+/=]+`)
 	install := regexp.MustCompile(`"install":\{"hash":"sha256:[0-9a-f]{64}"`) // covers the library's signature
 	bytesRe := regexp.MustCompile(`"bytes":\d+`)
+	nonce := regexp.MustCompile(`nonce=[0-9a-f]+`)          // doctor's dashboard probe
 	stamps := regexp.MustCompile(`"(ts|started)":[1-9]\d*`) // the agent status written above
 	clean := func(out string) string {
 		out = stamps.ReplaceAllStringFunc(out, func(m string) string {
@@ -130,6 +159,7 @@ func TestDashboardContract(t *testing.T) {
 		out = added.ReplaceAllString(paths.Replace(out), `"added":0`)
 		out = fingerprint.ReplaceAllString(out, "SHA256:"+strings.Repeat("A", 43))
 		out = key.ReplaceAllString(out, "ssh-ed25519 AAAA")
+		out = nonce.ReplaceAllString(out, "nonce=0")
 		return dates.ReplaceAllStringFunc(out, func(d string) string {
 			if len(d) == len("2026-01-01") {
 				return "2026-01-01"

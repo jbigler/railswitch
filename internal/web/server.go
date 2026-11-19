@@ -184,6 +184,7 @@ func New(c Config) *Server {
 	m.HandleFunc("GET /p/{prefix}/review", s.reviewPage)
 	m.HandleFunc("POST /p/{prefix}/review/accept", s.reviewAccept)
 	m.HandleFunc("GET /machine", s.machinePage)
+	m.HandleFunc("GET /machine/checks", s.checks)
 	m.HandleFunc("GET /machine/templates/import", s.templateImportPage)
 	m.HandleFunc("POST /machine/templates/import", s.templateImport)
 	m.HandleFunc("POST /machine/office/use", s.officeUse)
@@ -301,7 +302,7 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 // root redirects to the first project; the page's script swaps it for
-// the one last open.
+// the one last open. With none it is the welcome page (D220).
 func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	if _, _, err := s.project(r.Context(), ""); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -314,10 +315,7 @@ func (s *Server) root(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	if first == "" {
-		s.html(w, http.StatusOK, "simple", simpleView{
-			Lines: []string{"No project is registered on this machine yet."},
-			Next:  "/new", NextText: "Create a project",
-		})
+		s.welcome(w, r)
 		return
 	}
 	http.Redirect(w, r, "/p/"+first, http.StatusSeeOther)

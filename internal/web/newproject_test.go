@@ -321,7 +321,7 @@ func TestNewGuard(t *testing.T) {
 }
 
 // TestNewSwitcherLink: every switcher offers New project…; the root page
-// links to it while no project is registered.
+// (the welcome page, D220) starts one while no project is registered.
 func TestNewSwitcherLink(t *testing.T) {
 	f := newProjectFixture(t)
 	if body := f.do(req("GET", "/p/ftest", nil)).Body.String(); !strings.Contains(body, `<li class="proj-new"><a href="/new">New project…</a></li>`) {
@@ -330,7 +330,7 @@ func TestNewSwitcherLink(t *testing.T) {
 	g := newProjectFixture(t)
 	g.cli.set("--json project ls", "[]")
 	w := g.do(req("GET", "/", nil))
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `<a href="/new">Create a project</a>`) {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `<form method="get" action="/new"`) {
 		t.Errorf("root with no project: %d %s", w.Code, w.Body)
 	}
 }

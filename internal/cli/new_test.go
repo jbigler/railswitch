@@ -350,6 +350,22 @@ func TestNewDefaultBranch(t *testing.T) {
 	}
 }
 
+// A project whose folder was deleted is still registered (#242): the
+// refusal says so and names project rm.
+func TestNewPrefixTakenFolderGone(t *testing.T) {
+	newEnv(t)
+	repo := bareRepo(t, "main")
+	first := filepath.Join(t.TempDir(), "one")
+	mustNew(t, first, "--repo", repo, "--prefix", "x1")
+	if err := os.RemoveAll(first); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := runWith(t, gitHost(), "project", "new", "--no-detect", first, "--repo", repo, "--prefix", "x1")
+	if want := "which no longer exists: run railswitch project rm x1"; code == 0 || !strings.Contains(errs, want) {
+		t.Errorf("exit %d, stderr %q; want %q", code, errs, want)
+	}
+}
+
 func TestNewNoRemoteHead(t *testing.T) {
 	newEnv(t)
 	repo := bareRepo(t, "main")

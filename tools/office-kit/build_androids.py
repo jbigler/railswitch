@@ -1,6 +1,7 @@
 # Androids: humanoid, after the references: anatomical armour plates (metaball
-# shapes) over an exposed mechanical core, cables at the neck and waist,
-# glowing joints, a sculpted face with glowing eyes and round ear units.
+# shapes) over a mechanical core, dressed in a second colour (a high collar,
+# shoulder caps, bands, a belt, a pack on the back, a crest),
+# glowing joints, a sculpted face with glowing eyes in a visor band and round ear units.
 # Nodes Head, Arm_L/R, Leg_L/R (pivots at the neck, shoulders, hips), each
 # limb with its lower half as a child, Forearm_L/R and Shin_L/R (pivots at
 # the elbows and knees), for kit.js: a walk that bends the knees and swings
@@ -16,13 +17,18 @@ AM = dict(
     silver=mat('RS_Android_Shell_Silver', '#b9bfc9', 1.0, .16),
     core=mat('RS_Android_Core', '#15171c', .8, .35),
     coreBlue=mat('RS_Android_Core_Blue', '#24407c', .6, .4),
-    cable=mat('RS_Android_Cable', '#0e0f12', .4, .5),
     teal=mat('RS_Android_Glow_Teal', emit='#2fe0c0', strength=4),
     # the agent's eyes and status ring: the page recolours them by the agent's state
     agentVisor=mat('RS_Android_Visor_Agent', emit='#56627a', strength=3),
     status=mat('RS_Android_Status', emit='#56627a', strength=3),
 )
 NECK, SHOULDER, HIP = 1.6, 1.45, .93
+
+
+def droid_trim(shell):
+    """The second colour an android is dressed in (a set's theme has its own):
+    white on the black shell, the dark of the core on the others."""
+    return AM['white'] if shell is AM['black'] else AM['core']
 
 
 def joint(a, core, glow, x, y, z, r, axis='x'):
@@ -44,15 +50,25 @@ def capsule(a, m, p0, p1, r, seg=8):
     a.sphere(r, m, *P1, seg=seg, rings=4)
 
 
-def torso(name, shell, core, glow, cable):
+def torso(name, shell, core, glow):
     """One smooth athletic torso, after the references: chest and pectorals,
-    a ribcage tapering to a narrow waist, hips; neck, cables, a chest light."""
+    a ribcage tapering to a narrow waist, hips; a ribbed neck in a high
+    collar, so little of it shows; a chest light between two bars, a belt,
+    a pack on the back."""
     a = Asset(name)
-    a.cyl(.034, .03, .16, core, 0, 1.52, -.005, 8)                  # neck
-    for k in range(4):                                               # neck cables
-        ang = -.75 + k * .5
-        x, z = .042 * math.sin(ang), .042 * math.cos(ang)
-        a.cable([(x * 1.6, 1.44, z * 1.2), (x * 1.1, 1.52, z * 1.02), (x, 1.6, z)], .006, cable, seg=4)
+    trim = droid_trim(shell)
+    a.cyl(.04, .046, .14, core, 0, 1.53, -.005, 12)                  # neck
+    with a.at(0, 1.585, -.005, rx=math.pi / 2):
+        a.torus(.046, .009, M['trim'], 16, 5)                         # its top rib
+    a.cyl(.06, .098, .1, trim, 0, 1.52, -.005, 16)                    # the collar
+    with a.at(0, 1.02, 0, rx=math.pi / 2, s=(1, .75, 1)):
+        a.torus(.118, .014, trim, 24, 6)                              # belt
+    a.box(.03, .035, .012, core, 0, 1.02, .096)                      # its buckle
+    for dy in (-.035, .04):
+        a.box(.07, .01, .01, trim, 0, 1.31 + dy, .112)               # bars round the chest light
+    a.box(.15, .19, .05, trim, 0, 1.32, -.105)                       # the pack
+    for k in range(3):
+        a.box(.1, .008, .004, core, 0, 1.28 + k * .035, -.131)       # its vents
     a.sphere(.018, glow, 0, 1.31, .118, s=(1, 1, .5), seg=8, rings=5)   # the chest light
     for y in (1.13, 1.06):                                             # abdominal seams
         a.box(.12, .005, .006, core, 0, y, .093)
@@ -76,6 +92,8 @@ def torso(name, shell, core, glow, cable):
 def head_fn(name, shell, core, eyes, glow):
     a = Asset(name)
     a.cyl(.036, .036, .1, core, 0, -.02, -.005, 10)
+    a.box(.112, .028, .02, core, 0, .1, .078)                # a visor band the eyes sit in
+    a.box(.012, .03, .12, droid_trim(shell), 0, .224, -.02)  # a crest, no higher than the skull: the piece's box stays
     for s in (-1, 1):
         a.sphere(.013, eyes, s * .031, .1, .088, s=(1.5, .6, .5), seg=8, rings=5)     # eyes
         with a.at(s * .086, .1, -.005, rz=math.pi / 2):                                  # ear units
@@ -104,6 +122,10 @@ def arm_fn(name, fore_name, s, shell, core, glow):
     pivot the dark elbow) tapering to simple fingers. The upper arm with its
     forearm attached."""
     a = Asset(name)
+    trim = droid_trim(shell)
+    a.sphere(.066, trim, s * .012, .04, 0, s=(1, .5, 1.05), seg=12, rings=6)   # shoulder cap, within the deltoid's width
+    with a.at(s * .01, -.21, 0, rx=math.pi / 2):
+        a.torus(.045, .008, trim, 14, 4)                                        # arm band
     limb = meta(name + '_Limb', [
         ('e', (s * .02, -.015, 0), .068, (1.0, 1.05, 1.05)),           # deltoid
         ('c', (s * .015, -.06, 0), (s * .008, -.27, 0), .042),         # upper arm
@@ -137,6 +159,10 @@ def leg_fn(name, shin_name, shell, core, glow):
     the dark knee): calf, a slim ankle, a sleek foot. The thigh with its shin
     attached."""
     a = Asset(name)
+    trim = droid_trim(shell)
+    a.box(.07, .11, .012, trim, 0, -.13, .078)               # thigh plate
+    with a.at(0, -.3, .01, rx=math.pi / 2):
+        a.torus(.066, .009, trim, 16, 4)                     # thigh band
     limb = meta(name + '_Limb', [
         ('c', (0, -.03, 0), (0, -.22, .01), .078),                     # upper thigh
         ('c', (0, -.22, .01), (0, -.41, .01), .06)], .007, [shell], target=380)   # lower thigh
@@ -159,7 +185,7 @@ def leg_fn(name, shin_name, shell, core, glow):
 
 
 def android(name, prefix, shell, core, eyes, glow, ring=None):
-    root = torso(name, shell, core, glow, AM['cable'] if core is AM['core'] else AM['coreBlue'])
+    root = torso(name, shell, core, glow)
     if ring:
         a = Asset(name + '_Ring')
         with a.at(0, .02, 0, rx=math.pi / 2):
@@ -172,6 +198,7 @@ def android(name, prefix, shell, core, eyes, glow, ring=None):
     return root
 
 
+globals().update(SHAPES)  # the set's own builders (build_kit.py)
 androids = {
     'Char_Android_Agent': android('Char_Android_Agent', 'Agent', AM['white'], AM['core'], AM['agentVisor'], M['warm'], AM['status']),
     'Char_Android_A': android('Char_Android_A', 'AndroidA', AM['ivory'], AM['coreBlue'], M['warm'], M['led']),

@@ -66,7 +66,7 @@ func TestOfficeSet(t *testing.T) {
 
 	var ls officeLs
 	_, out, _ = runWith(t, f, "--json", "office", "set", "ls")
-	if err := json.Unmarshal([]byte(out), &ls); err != nil || ls.Active != "cyberpunk" || len(ls.Sets) != 2 || ls.Sets[0].Name != "cyberpunk" || len(ls.Sets[0].Have) != len(list.Pieces) || len(ls.Sets[1].Have) != 1 {
+	if err := json.Unmarshal([]byte(out), &ls); err != nil || ls.Active != "cyberpunk" || len(ls.Sets) != 3 || ls.Sets[0].Name != "cyberpunk" || len(ls.Sets[0].Have) != len(list.Pieces) || ls.Sets[1].Name != "modern" || len(ls.Sets[1].Have) != len(list.Pieces) || len(ls.Sets[2].Have) != 1 {
 		t.Fatalf("ls: %v %s", err, out)
 	}
 

@@ -309,7 +309,12 @@ document.addEventListener("click", (e) => {
     if (!d.contains(t) || t.closest(".menu-pop a, .menu-pop button")) d.open = false;
   });
   const tabBtn = t.closest("#detail [data-tab]");
-  if (tabBtn) return showTab(tabBtn.dataset.tab);
+  if (tabBtn) {
+    showTab(tabBtn.dataset.tab);
+    // A click on a tab, not a redraw, takes the focus to its terminal (#243).
+    $$("#terms .term-panel").find((p) => !p.hidden)?.focusTerm?.();
+    return;
+  }
   const row = t.closest("#list tr[data-slug]");
   if (row && !t.closest("a.pr") && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     e.preventDefault();

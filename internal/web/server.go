@@ -164,6 +164,11 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/settings/file", s.settingsFile)
 	m.HandleFunc("POST /p/{prefix}/settings/template/export", s.templateExport)
 	m.HandleFunc("POST /p/{prefix}/settings/template/accept", s.templateAccept)
+	m.HandleFunc("GET /p/{prefix}/branches", s.branchesPage)
+	m.HandleFunc("GET /p/{prefix}/branches/items", s.branchesItems)
+	m.HandleFunc("POST /p/{prefix}/branches/fetch", s.branchesFetch)
+	m.HandleFunc("POST /p/{prefix}/branches/rm", s.branchesRemove)
+	m.HandleFunc("POST /p/{prefix}/branches/pull", s.branchesPull)
 	m.HandleFunc("GET /p/{prefix}/tidy", s.tidyPage)
 	m.HandleFunc("GET /p/{prefix}/tidy/items", s.tidyItems)
 	m.HandleFunc("POST /p/{prefix}/tidy", s.tidyRemove)
@@ -471,7 +476,7 @@ func (s *Server) tasksDialog(w http.ResponseWriter, r *http.Request) {
 	base := "/p/" + p.Prefix
 	v := tasksView{Slug: wt.Slug, Pages: []actionView{
 		{"worktrees", base}, {"images", imagesURL(p.Prefix)}, {"library", base + "/library"},
-		{"settings", settingsURL(p.Prefix)}, {"notes", base + "/notes"}, {"tidy", base + "/tidy"}, {"office", base + "/virtual-office"},
+		{"settings", settingsURL(p.Prefix)}, {"notes", base + "/notes"}, {"branches", branchesURL(p.Prefix)}, {"tidy", base + "/tidy"}, {"office", base + "/virtual-office"},
 		{"machine settings", "/machine"},
 	}}
 	if wt.Slug != "" {

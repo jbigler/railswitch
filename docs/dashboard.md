@@ -139,7 +139,7 @@ still wider than the window scrolls its pane.
   scrolls (D205). "RailSwitch", then the labelled **project** group:
   the project button (the prefix, or "choose"; opens the switcher) and,
   with a project, after a thin divider, `Worktrees` (its page, at the
-  worktree last shown: kept per project in the browser's `localStorage`), `Images`,
+  worktree last shown: kept per project in the browser's `localStorage`), `Branches`, `Images`,
   `Tidy`, `Library`, `Settings`, `Notes` and `Office` (the Virtual Office; the
   project's pages, below), and `GitHub ↗` (the project's repository,
   `overview`'s `repo_url`; absent when the repo isn't on GitHub, #253).
@@ -621,6 +621,40 @@ states and sizes every image, which can take many seconds.
   refuses it otherwise, 400), which adds `--force`: that worktree goes as
   `wt rm --force` takes it, with its nvim and agent homes. The server
   refuses an id that isn't one of this project's.
+
+## Branches
+
+`/p/<prefix>/branches` (`Branches` in the header, D227) lists the
+project's local branches from `railswitch --json branch ls`, newest tip
+first. Every worktree shares one repository, so the branches are the
+project's. Like Tidy, the page shows at once and fetches the table
+(`/p/<prefix>/branches/items`) behind it: the read asks GitHub for PRs.
+
+- A bar: a filter box (by name), **Could go only** with its count, when
+  origin was last fetched ("fetched 3 min ago"), **Fetch** (`railswitch
+  branch fetch`: `git fetch --prune origin` as a job) and, when any
+  branch is behind its upstream and not ahead, **Pull all behind (N)**.
+- A row per branch: a tick box (not for the base branch or one checked
+  out anywhere); the name with `base`, `≡ stack #N` when it is in a gh
+  stack and `unmerged`; the worktree it is checked out in (a link),
+  "elsewhere" for a git worktree railswitch doesn't manage; its PR (a
+  link, coloured by state); its upstream (`↑ahead ↓behind`, `up to
+  date`, `gone`, or `—` for none); how old its tip is; why it could go
+  (upstream gone, PR merged or closed, merged into the base branch).
+- Each row's `⋯`: **Pull** when it is behind and not ahead, after a
+  confirm that says when a worktree's files change and when that
+  worktree's agent is running; **Delete** after a confirm, **Delete
+  (unmerged)** with `--force` for one that isn't merged.
+- **Delete selected** runs one `railswitch branch rm <branch>...` job for
+  the ticked branches; **Force** adds `--force` (unmerged ones too) and
+  **Also on origin** adds `--remote`. Its confirm lists the branches and
+  says what goes. The CLI judges each branch again (see
+  [`branch ls`](json.md#branch-ls)); one it refuses stays, with why in
+  the job's output.
+- When a job ends, whatever its result, the table is read again. The
+  server refuses a branch value that is empty, starts with `-`, has a
+  space or a control character, `..` or `::` (400); the CLI checks each
+  again.
 
 ## Library
 

@@ -619,3 +619,9 @@ body.board-edit{margin:0;height:100vh;display:flex;flex-direction:column;backgro
 .check-fix{margin-top:3px;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
 .check-fix code{background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 .checks-ok summary{cursor:pointer;margin:6px 0}
+/* Branches (D227) */
+.br-bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:8px}
+.br-bar form{display:inline}
+.br-filter{flex:1 1 12em;max-width:24em;min-width:0}
+.br-table td.bn{overflow-wrap:anywhere}
+.br-rm{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:8px}

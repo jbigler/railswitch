@@ -1,0 +1,61 @@
+{{define "branches"}}<!doctype html>
+<html lang="en">
+{{template "head" .}}
+<body data-prefix="{{.Prefix}}" data-view="branches">
+{{template "top" .}}
+<main class="grid settings">
+<section class="left set-left">
+<div class="crumb"><a href="/p/{{.Prefix}}">← {{.Prefix}}</a></div>
+<h1>Branches</h1>
+<div id="branches-body" data-src="{{.URL}}/items"><p class="muted"><span class="spin" aria-hidden="true"></span> Reading the branches and their PRs…</p></div>
+</section>
+<section class="pane">
+{{template "jobs" .Jobs}}
+</section>
+</main>
+{{template "common-dialogs" .}}
+</body>
+</html>
+{{end}}
+{{define "branches-body"}}<div id="branches-body" data-src="{{.URL}}/items">
+<p class="note">The project's local branches, newest first. Every worktree shares one repository, so these are the project's, not one worktree's. A branch "could go" when its upstream is gone, its PR is merged or closed, or it is merged into {{.Base}}, and no worktree has it checked out.</p>
+{{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{if .Warnings}}<div class="warnings">{{range .Warnings}}<p class="yellow">{{.}}</p>
+{{end}}</div>
+{{end}}<section class="card">
+<div class="br-bar">
+<input type="search" class="br-filter" placeholder="Filter branches" aria-label="Filter branches" autocomplete="off" spellcheck="false" data-branch-filter>
+<label class="check"><input type="checkbox" data-branch-could-go> Could go only <span class="muted">({{.CouldGo}})</span></label>
+<span class="sp"></span>
+<span class="muted">{{.Fetched}}</span>
+<form method="post" action="{{.URL}}/fetch" data-branch-job><button class="ln" title="git fetch --prune origin: every branch's upstream, and which are gone">Fetch</button></form>
+{{if .Behind}}<form method="post" action="{{.URL}}/pull" data-branch-job data-confirm="Pull {{len .Behind}} branch(es) behind their upstream? Each fast-forwards; one checked out in a worktree changes its files.">{{range .Behind}}<input type="hidden" name="branch" value="{{.}}">{{end}}<button class="ln" title="Fast-forward every branch that is behind and not ahead">Pull all behind ({{len .Behind}})</button></form>{{end}}
+</div>
+<form id="branch-rm" method="post" action="{{.URL}}/rm" data-branch-job data-branch-rm></form>
+<table class="set-table br-table">
+<thead><tr><th></th><th>Branch</th><th>Worktree</th><th>PR</th><th>Upstream</th><th>Last commit</th><th>Could go</th><th></th></tr></thead>
+<tbody>
+{{range .Rows}}{{$row := .}}<tr data-name="{{.Name}}"{{if .CouldGo}} data-could-go{{end}}>
+<td>{{if .Deletable}}<input type="checkbox" form="branch-rm" name="branch" value="{{.Name}}" aria-label="Select {{.Name}}"{{if not .Merged}} data-unmerged{{end}}>{{end}}</td>
+<td class="mono bn">{{.Name}}{{if .Base}} <span class="chip muted" title="The project's base branch">base</span>{{end}}{{with .StackText}} <span class="chip blue" title="In a gh stack">≡ {{.}}</span>{{end}}{{if and (not .Merged) (not .Base)}} <span class="muted" title="Not merged into {{$.Base}}, and no merged PR">unmerged</span>{{end}}</td>
+<td class="mono">{{if .Worktree}}<a href="/p/{{$.Prefix}}/{{.Worktree}}">{{.Worktree}}</a>{{else if .CheckedOut}}<span class="muted" title="Checked out in a git worktree railswitch doesn't manage">elsewhere</span>{{else}}<span class="muted">—</span>{{end}}</td>
+<td>{{with .PR}}<a class="pr {{$row.PRClass}}" href="{{.URL}}" target="_blank" rel="noopener">#{{.Number}} {{.State}}</a>{{else}}<span class="muted">—</span>{{end}}</td>
+<td class="mono">{{if .Gone}}<span class="yellow" title="Its branch on origin no longer exists">gone</span>{{else}}{{.Track}}{{end}}</td>
+<td class="muted">{{.Age}}</td>
+<td>{{.Why}}</td>
+<td class="act">{{if or .Deletable .Pullable}}<details class="menu" data-keep="br-{{.Name}}"><summary class="ln rm" aria-label="More for {{.Name}}" title="More for {{.Name}}">⋯</summary><div class="menu-pop">
+{{if .Pullable}}<form method="post" action="{{$.URL}}/pull" data-branch-job data-confirm="Pull {{.Name}} ({{.Behind}} new commit(s))?{{if .Worktree}} It is checked out in {{.Worktree}}: its files change.{{end}}{{if .AgentRunning}} {{.Worktree}}'s agent is running, and its files change under it.{{end}}"><input type="hidden" name="branch" value="{{.Name}}"><button title="Fast-forward to its upstream">Pull</button></form>{{end}}
+{{if .Deletable}}<form method="post" action="{{$.URL}}/rm" data-branch-job data-confirm="Delete {{.Name}}?{{if not .Merged}} It isn't merged: its commits go with it.{{end}}"><input type="hidden" name="branch" value="{{.Name}}">{{if not .Merged}}<input type="hidden" name="force" value="1">{{end}}<button class="danger">Delete{{if not .Merged}} (unmerged){{end}}</button></form>{{end}}
+</div></details>{{end}}</td>
+</tr>
+{{else}}<tr><td colspan="8" class="muted">No branches.</td></tr>
+{{end}}</tbody>
+</table>
+{{if .Rows}}<div class="br-rm">
+<label class="check"><input type="checkbox" form="branch-rm" name="force" value="1"> Force: also unmerged branches</label>
+<label class="check"><input type="checkbox" form="branch-rm" name="remote" value="1"> Also on origin, unless a PR is open on it</label>
+<button class="ln danger" form="branch-rm">Delete selected</button>
+</div>{{end}}
+<p class="note">The base branch and a branch checked out in a worktree can't be deleted here: remove the worktree first. An unmerged branch of a gh stack can't be deleted either: change the stack with gh stack. Pull only fast-forwards; a branch that has diverged needs a rebase in a terminal.</p>
+</section>
+</div>{{end}}

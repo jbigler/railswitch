@@ -147,6 +147,7 @@ func TestDashboardContract(t *testing.T) {
 	install := regexp.MustCompile(`"install":\{"hash":"sha256:[0-9a-f]{64}"`) // covers the library's signature
 	bytesRe := regexp.MustCompile(`"bytes":\d+`)
 	nonce := regexp.MustCompile(`nonce=[0-9a-f]+`)          // doctor's dashboard probe
+	commit := regexp.MustCompile(`"commit":"[0-9a-f]{40}"`) // branch ls: the fixture's commits differ per run
 	stamps := regexp.MustCompile(`"(ts|started)":[1-9]\d*`) // the agent status written above
 	clean := func(out string) string {
 		out = stamps.ReplaceAllStringFunc(out, func(m string) string {
@@ -160,6 +161,7 @@ func TestDashboardContract(t *testing.T) {
 		out = fingerprint.ReplaceAllString(out, "SHA256:"+strings.Repeat("A", 43))
 		out = key.ReplaceAllString(out, "ssh-ed25519 AAAA")
 		out = nonce.ReplaceAllString(out, "nonce=0")
+		out = commit.ReplaceAllString(out, `"commit":"`+strings.Repeat("0", 40)+`"`)
 		return dates.ReplaceAllStringFunc(out, func(d string) string {
 			if len(d) == len("2026-01-01") {
 				return "2026-01-01"

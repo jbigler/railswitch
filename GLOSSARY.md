@@ -46,6 +46,10 @@ _Avoid_: the stack (for the chosen packages)
 A chain of branches, each built on the one below, that gh stack tracks and GitHub shows as one stack of pull requests. "Stack" means only this.
 _Avoid_: stack for a worktree's services, branch stack, PR chain
 
+**Could go**:
+What Tidy offers to remove: a worktree whose pull request is done or that has sat stopped, an image no worktree uses, a branch whose upstream is gone, whose pull request is done or that is merged into the base branch. The Branches page marks the same branches.
+_Avoid_: stale, orphaned, garbage
+
 **Upstream gone**:
 A local branch whose remote branch on origin no longer exists, usually because its pull request was merged and GitHub deleted the branch.
 _Avoid_: orphan branch, stale branch

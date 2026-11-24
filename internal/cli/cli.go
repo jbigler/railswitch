@@ -78,6 +78,7 @@ var commands = map[string]command{
 	"hooks":         cmdHooks,
 	"pr":            cmdPr,
 	"stack":         cmdStack,
+	"branch":        cmdBranch,
 	"task":          cmdTask,
 	"term":          cmdTerm,
 	"signer":        cmdSigner,

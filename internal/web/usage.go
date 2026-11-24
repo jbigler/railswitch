@@ -23,11 +23,6 @@ const (
 	usageMax     = 30
 )
 
-// contextMax scales the session context meter. No agent package reports
-// its model's context window, so the meter assumes 200k and says so
-// ("of 200k"); this is the one place that number lives.
-const contextMax = 200_000
-
 // parseDays is a ?days= value: one of usageRanges, else usageDefault.
 func parseDays(s string) int {
 	if n, err := strconv.Atoi(s); err == nil && slices.Contains(usageRanges, n) {
@@ -357,20 +352,19 @@ func newUsage(doc *usageDoc, days int, ranges []rangeLink, link func(slug string
 
 // The worktree's usage card on its Agent tab (D187, design B).
 type usageCard struct {
-	Days    int
-	Ranges  []rangeLink
-	Table   []usageTableRow
-	Empty   string // "No usage in N days"; the rest is then absent
-	W, H    int
-	Bars    []segView
-	YTop    string // the axis: top, middle and 0
-	YMid    string
-	GridY   int
-	Usual   *usualLine // nil: Note says when it appears
-	Note    string
-	Days3   []string // the day labels: first, middle, last
-	Context *meterView
-	Share   *meterView
+	Days   int
+	Ranges []rangeLink
+	Table  []usageTableRow
+	Empty  string // "No usage in N days"; the rest is then absent
+	W, H   int
+	Bars   []segView
+	YTop   string // the axis: top, middle and 0
+	YMid   string
+	GridY  int
+	Usual  *usualLine // nil: Note says when it appears
+	Note   string
+	Days3  []string // the day labels: first, middle, last
+	Share  *meterView
 }
 
 type usageTableRow struct {
@@ -389,23 +383,13 @@ type meterView struct {
 }
 
 // newUsageCard is worktree slug's card for days days; a nil doc (usage
-// not read yet) is no card. ag is the worktree's agent, for the running
-// session's context.
-func newUsageCard(doc *usageDoc, slug string, days int, ranges []rangeLink, ag *agent, now time.Time) *usageCard {
+// not read yet) is no card.
+func newUsageCard(doc *usageDoc, slug string, days int, ranges []rangeLink) *usageCard {
 	if doc == nil || len(doc.Daily) == 0 {
 		return nil
 	}
 	win := doc.window(days)
 	c := &usageCard{Days: len(win), Ranges: ranges}
-	if ag != nil && ag.Running && ag.Usage != nil && ag.Usage.Session != "" {
-		label := "This session's context"
-		if ag.Usage.Started > 0 {
-			label += " · " + durationText(now.Sub(time.Unix(ag.Usage.Started, 0)))
-		}
-		n := ag.Usage.Context
-		c.Context = &meterView{Label: label, Value: tokenText(n), Of: "of " + tokenText(contextMax), Fill: percent(n, contextMax),
-			Aria: fmt.Sprintf("Context %s of %s", tokenText(n), tokenText(contextMax))}
-	}
 	at := map[string]int{}
 	for i, d := range win {
 		at[d] = i
@@ -492,18 +476,6 @@ func percent(n, of int64) int {
 		return 0
 	}
 	return int(min(100, max(0, math.Round(float64(n)*100/float64(of)))))
-}
-
-// durationText is d as "2 h 10 min", "45 min" or "3 d 2 h".
-func durationText(d time.Duration) string {
-	m := int(max(0, d.Minutes()))
-	switch {
-	case m >= 24*60:
-		return fmt.Sprintf("%d d %d h", m/(24*60), m%(24*60)/60)
-	case m >= 60:
-		return fmt.Sprintf("%d h %d min", m/60, m%60)
-	}
-	return fmt.Sprintf("%d min", m)
 }
 
 func addCost(a, b *float64) *float64 {

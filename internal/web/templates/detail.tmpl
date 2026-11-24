@@ -62,7 +62,7 @@ a secret set job's stdin; Start waits for the last one. */}}
 
 {{/* The worktree's agent usage, at the top of its Agent tab (D187): a
 table, the daily bars (new tokens below, output above) on a round axis
-with the usual day dashed, and two meters. SVG attributes and classes
+with the usual day dashed, and the worktree's share of the project. SVG attributes and classes
 only. */}}
 {{define "usage-card"}}{{with .}}<section class="dcard wide usage-card" data-panel="agent"><div class="usage-hd"><h2 class="lbl">Usage · this worktree</h2>{{template "usage-range" .Ranges}}</div>
 {{if .Empty}}<p class="muted usage-note">{{.Empty}}</p>
@@ -72,7 +72,7 @@ only. */}}
 <svg class="usage-bars" viewBox="0 0 {{.W}} {{.H}}" preserveAspectRatio="none" role="img" aria-label="New tokens and output per day for {{.Days}} days{{if .Usual}}, against the worktree's usual day{{end}}"><line class="grid" x1="0" x2="{{.W}}" y1="{{.GridY}}" y2="{{.GridY}}"/>{{range .Bars}}<rect class="{{.Class}}" x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}"><title>{{.Title}}</title></rect>{{end}}{{with .Usual}}<line class="usual" x1="0" x2="{{$.W}}" y1="{{.Y}}" y2="{{.Y}}"><title>{{.Title}}</title></line>{{end}}</svg>
 <div class="usage-days" aria-hidden="true">{{range .Days3}}<span>{{.}}</span>{{end}}</div></div></div>
 {{with .Note}}<p class="muted usage-note">{{.}}</p>{{end}}
-{{end}}<div class="usage-meters">{{with .Context}}{{template "meter" .}}{{else}}<div class="meter"><span class="muted">This session's context</span><span class="muted">No session running</span></div>{{end}}{{with .Share}}{{template "meter" .}}{{end}}</div>
+{{end}}{{with .Share}}<div class="usage-meters">{{template "meter" .}}</div>{{end}}
 </section>{{end}}{{end}}
 
 {{define "meter"}}<div class="meter"><span class="muted">{{.Label}}</span><svg class="meter-bar" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="{{.Aria}}"><rect class="track" width="100" height="8"/><rect class="fill" width="{{.Fill}}" height="8"/></svg><span><b>{{.Value}}</b> {{.Of}}</span></div>{{end}}

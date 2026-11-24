@@ -837,7 +837,7 @@ func (s *Server) refreshPRs(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	if st := s.state[p.Prefix]; st != nil {
-		st.prNow = true
+		st.prNow, st.usageNow = true, true
 	}
 	s.mu.Unlock()
 	wake(s.wakePR)

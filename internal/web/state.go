@@ -18,6 +18,7 @@ const (
 	overviewOpen  = 2 * time.Second  // a project with a page open
 	overviewIdle  = 10 * time.Second // every other project
 	prEvery       = 60 * time.Second // only with a page open
+	usageEvery    = 30 * time.Second // agent usage, only with a page open
 	projectsEvery = 10 * time.Second // project ls
 	noteMax       = 200              // characters of a notification's body
 	subBuffer     = 256              // events queued per page before it is dropped
@@ -49,11 +50,13 @@ type projectState struct {
 	// stackNow are the worktrees whose stack to read at once, alone and
 	// without GitHub's details, after their branch changed (#254).
 	stackNow map[string]bool
-	// usage is the agents' usage history (D162), read with the PRs; a
-	// failed read leaves the last one.
-	usage *usageDoc
-	kinds map[string]string // agentKind per slug at the last overview
-	known bool              // kinds holds a first overview (the baseline)
+	// usage is the agents' usage history (D162), read every usageEvery
+	// on its own (D225); a failed read leaves the last one.
+	usage    *usageDoc
+	usageAt  time.Time
+	usageNow bool              // Refresh PRs: due at once
+	kinds    map[string]string // agentKind per slug at the last overview
+	known    bool              // kinds holds a first overview (the baseline)
 	// queueTried is the agent status ts (by slug) a queue delivery last
 	// started at: one try per status (D159).
 	queueTried map[string]int64
@@ -157,10 +160,12 @@ func (s *Server) watched(prefix string) bool {
 func (s *Server) pollOnce(ctx context.Context) {
 	s.pollOverviews(ctx)
 	s.pollStacks(ctx)
+	s.pollUsage(ctx)
 	s.pollPRs(ctx)
 }
 
-// loop runs poll now, on every tick and on every wake until ctx ends.
+// loop runs poll now, on every tick and on every wake until ctx ends; a
+// nil wakeup means ticks only.
 func (s *Server) loop(ctx context.Context, wakeup <-chan struct{}, poll func(context.Context)) {
 	t := time.NewTicker(s.tick)
 	defer t.Stop()
@@ -190,6 +195,7 @@ func (s *Server) Run(ctx context.Context) error {
 	wg.Go(func() { s.loop(ctx, s.wakeOV, s.pollOverviews) })
 	wg.Go(func() { s.loop(ctx, s.wakePR, s.pollPRs) })
 	wg.Go(func() { s.loop(ctx, s.wakeST, s.pollStacks) })
+	wg.Go(func() { s.loop(ctx, nil, s.pollUsage) })
 	<-ctx.Done()
 	stop()
 	wg.Wait()
@@ -256,10 +262,6 @@ func (s *Server) pollPRs(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		usage, uerr := readUsage(ctx, s.c.CLI, j.ws)
-		if ctx.Err() != nil {
-			return
-		}
 		s.mu.Lock()
 		if p := s.state[j.prefix]; p != nil {
 			if err != nil {
@@ -270,9 +272,6 @@ func (s *Server) pollPRs(ctx context.Context) {
 				for _, r := range rows {
 					p.prs[r.Slug] = r.PR
 				}
-			}
-			if uerr == nil {
-				p.usage = &usage
 			}
 			if serr == nil {
 				was := p.stacks
@@ -501,6 +500,40 @@ func (s *Server) jobEvent(ev jobs.Event) {
 			}
 			s.publish() // ended either way: the switching mark goes
 		}
+	}
+}
+
+// pollUsage reads the agents' usage history of each project with a page
+// open, every usageEvery or at once after Refresh PRs. It is a local
+// file the overview poll adds to, so it is read on its own, not behind
+// the PR poll's GitHub queries (D225).
+func (s *Server) pollUsage(ctx context.Context) {
+	now := s.c.Now()
+	type job struct{ prefix, ws string }
+	var todo []job
+	s.mu.Lock()
+	for _, row := range s.projects {
+		p := s.state[row.Prefix]
+		if p.usageNow || s.watched(row.Prefix) && (p.usageAt.IsZero() || now.Sub(p.usageAt) >= usageEvery) {
+			p.usageNow, p.usageAt = false, now
+			todo = append(todo, job{row.Prefix, row.Workspace})
+		}
+	}
+	s.mu.Unlock()
+	for _, j := range todo {
+		usage, err := readUsage(ctx, s.c.CLI, j.ws)
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
+			continue
+		}
+		s.mu.Lock()
+		if p := s.state[j.prefix]; p != nil {
+			p.usage = &usage
+			s.publish()
+		}
+		s.mu.Unlock()
 	}
 }
 
@@ -853,7 +886,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 	for _, r := range rows {
 		if r.WT.Slug == sel {
 			pv.Detail = newDetail(prefix, r, projectPRRepo(rows))
-			pv.Detail.UsageCard = newUsageCard(usage, sel, days, usageLinks("/p/"+prefix+"/"+sel, k, days), r.WT.Agent, s.c.Now())
+			pv.Detail.UsageCard = newUsageCard(usage, sel, days, usageLinks("/p/"+prefix+"/"+sel, k, days))
 			pv.Detail.Switching = s.switching(prefix, sel)
 		}
 	}

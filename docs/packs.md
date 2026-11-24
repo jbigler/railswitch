@@ -483,6 +483,25 @@ Another pack that wants the same (an Ember pack on bun, say) declares its
 own `[runtimes.bun]` and copies the install step and the lockfile switch;
 there is no shared add-on package (user, 2026-10-27).
 
+## Environment layers
+
+A service's env is built from seven layers, lowest first. When two layers
+set the same variable, the higher one wins.
+
+| # | Layer | Where it comes from |
+|---|---|---|
+| 1 | pack | the pack's `[env]`; for deps, also `[deps] frozen_env` |
+| 2 | option | options' `[gives]` (and `[deps_env]`, `[agent_gives]`), and an option's, tool's or agent's own `[env]` |
+| 3 | project | `project.toml [env]`, plus `[agents.<n>] env` and the nvim config repo |
+| 4 | service | `project.toml [services.<id>.env]` |
+| 5 | worktree | `WORKTREE_ID`, `WORKTREE_SLUG`, `WORKTREE_HOST` and published ports |
+| 6 | secret | git wiring for secrets with `git_host` (D33) |
+| 7 | share | `[share] env` and `[share] gives`, only while the worktree is shared (D46) |
+
+Which services get which layers (least privilege: the browser gets no data
+credentials, deps no project env and no share env) is listed in the
+comment on `envSpecs` in `internal/render/env.go`, the source of truth.
+
 ## Conventions every package keeps
 
 - The app's worktree is mounted at `/app`; the working directory is `/app`.

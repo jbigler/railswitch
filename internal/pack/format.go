@@ -44,7 +44,7 @@ type Pack struct {
 	// its parallel workers' copies).
 	DumpSkip []string `toml:"dump_skip"`
 
-	Env      map[string]string `toml:"env"`       // layer 1 (HANDOFF §3.7): only what the framework itself reads (D42)
+	Env      map[string]string `toml:"env"`       // layer 1 (docs/packs.md "Environment layers"): only what the framework itself reads (D42)
 	DBScheme map[string]string `toml:"db_scheme"` // database option name → URL scheme, the {scheme} placeholder
 	// Share is the pack's [share] table: env layer 7, used only while a
 	// worktree is shared on the tailnet (D46).
@@ -56,7 +56,7 @@ type Pack struct {
 
 	Defaults map[string]string `toml:"defaults"` // slot → option ref or "none", for railswitch project new
 	Tasks    map[string]string `toml:"tasks"`    // task name → command run in the app image
-	Links    []Link            `toml:"links"`    // suggested worktree links (HANDOFF §3.10)
+	Links    []Link            `toml:"links"`    // suggested worktree links (docs/packs.md "Links and tasks")
 	Unit     Unit              `toml:"unit"`     // extras for the app unit
 	Detect   PackDetect        `toml:"detect"`   // D87: how project detect recognises a repository
 
@@ -192,7 +192,7 @@ type OptionShare struct {
 	Gives map[string]string `toml:"gives"`
 }
 
-// Link is a suggested worktree link (HANDOFF §3.10).
+// Link is a suggested worktree link (docs/packs.md "Links and tasks").
 type Link struct {
 	Label string `toml:"label"`
 	URL   string `toml:"url"`
@@ -264,7 +264,7 @@ func (p *Profiles) UnmarshalTOML(v any) error {
 	return nil
 }
 
-// Option is one choice for a slot (HANDOFF §3.5): option.toml plus its directory.
+// Option is one choice for a slot: option.toml plus its directory.
 type Option struct {
 	Name    string `toml:"name"`
 	Version int    `toml:"version"`

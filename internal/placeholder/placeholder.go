@@ -16,7 +16,7 @@ var Pattern = regexp.MustCompile(`\{[A-Za-z_][A-Za-z0-9_.]*\??\}`)
 // anchored matches Pattern at the start of a string only.
 var anchored = regexp.MustCompile(`^` + Pattern.String())
 
-// LinkNames are the placeholders a [[links]] url may use (HANDOFF §3.10).
+// LinkNames are the placeholders a [[links]] url may use (docs/packs.md "Links and tasks").
 var LinkNames = map[string]bool{"worktree.host": true, "worktree.slug": true, "branch": true}
 
 // Replace returns s with each placeholder replaced by f(name). "{{" becomes

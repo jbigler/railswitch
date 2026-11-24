@@ -24,7 +24,7 @@ var Slots = []string{"database", "cache", "storage", "jobs", "mail", "browser"}
 // subcommands: a [tasks] entry by that name could never run.
 var ReservedTasks = []string{"ls", "set", "rm", "restore"}
 
-// Project is project.toml: the choices and overrides only (HANDOFF §3.2).
+// Project is project.toml: the choices and overrides only.
 type Project struct {
 	Schema        int                         `toml:"schema"` // must be 1 (D39)
 	From          string                      `toml:"from"`
@@ -136,7 +136,7 @@ type ServiceOverride struct {
 // WorktreeOverride is one [worktrees.<slug>] table.
 type WorktreeOverride struct{ Versions map[string]string }
 
-// Link is one [[links]] entry (HANDOFF §3.10).
+// Link is one [[links]] entry (docs/packs.md "Links and tasks").
 type Link struct{ Label, URL string }
 
 // Route is one [[routes]]: the host <name>.<slug>.<prefix>.localhost routed

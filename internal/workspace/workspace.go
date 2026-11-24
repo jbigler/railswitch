@@ -369,7 +369,7 @@ var ErrStaleLock = errors.New("stack.lock is out of date")
 // resolved stack by version, content hash or where it comes from (a
 // built-in, a local and a library copy of it are different packages, even
 // byte for byte), or that lacks or has an extra one: the hash exists to
-// stop unreviewed package content (HANDOFF §3.11). The built-in source
+// stop unreviewed package content (docs/packs.md "Locking"). The built-in source
 // text, which carries the railswitch version, is not compared.
 func (w *Workspace) CheckLock() error {
 	want, err := lockEntries(w.Stack)

@@ -36,7 +36,7 @@ func TestTidyPage(t *testing.T) {
 	contains(t, "tidy items", body, `<div id="tidy-body">`, `action="/p/ftest/tidy"`, "gh: not logged in",
 		`name="id" value="wt:ftest/b" checked`, "PR #7 merged", "1.0 kB",
 		`name="dirty" value="wt:ftest/c" aria-label`, `name="id" value="wt:ftest/d" aria-label`, "stopped over 14 days", "idle since 2026-01-06 (last commit)", "≥ 0 B", ">dirty<",
-		`name="id" value="image:localhost/ftest/base:3.3-deadbeef" checked`, "no stack uses it", "3.0 kB")
+		`name="id" value="image:localhost/ftest/base:3.3-deadbeef" checked`, "no worktree uses it", "3.0 kB")
 	noCSPViolation(t, "tidy", body)
 	contains(t, "header", f.do(req("GET", "/p/ftest", nil)).Body.String(), `href="/p/ftest/tidy"`)
 

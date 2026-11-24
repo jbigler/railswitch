@@ -145,9 +145,9 @@ func lookup(cat *pack.Catalog, st *pack.Stack, name string) (builtin, error) {
 	}
 	have := slices.Sorted(maps.Keys(defs))
 	if builtinNames(cat)[name] {
-		return builtin{}, fmt.Errorf("the built-in Containerfile.%s belongs to a package this project's stack does not use (it uses: %s)", name, strings.Join(have, ", "))
+		return builtin{}, fmt.Errorf("the built-in Containerfile.%s belongs to a package this project does not use (it uses: %s)", name, strings.Join(have, ", "))
 	}
-	return builtin{}, fmt.Errorf("no built-in Containerfile.%s (this project's stack has: %s)", name, strings.Join(have, ", "))
+	return builtin{}, fmt.Errorf("no built-in Containerfile.%s (this project has: %s)", name, strings.Join(have, ", "))
 }
 
 // Eject writes the default Containerfile name of the stack st to

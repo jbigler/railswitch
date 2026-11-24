@@ -103,7 +103,7 @@ func (s *Server) tidyItems(w http.ResponseWriter, r *http.Request) {
 			case "stopped":
 				why = append(why, fmt.Sprintf("stopped over %d days", doc.Days))
 			case "unused":
-				why = append(why, "no stack uses it")
+				why = append(why, "no worktree uses it")
 			default:
 				why = append(why, rs)
 			}

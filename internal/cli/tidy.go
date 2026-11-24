@@ -62,7 +62,7 @@ type tidyItem struct {
 func cmdTidy(ctx context.Context, e *env, args []string) int {
 	fs := e.flags("tidy")
 	all := fs.Bool("all", false, "every registered project, not just this one")
-	days := fs.Int("days", 14, "a stopped stack is a candidate after `n` days idle")
+	days := fs.Int("days", 14, "a stopped worktree is a candidate after `n` days idle")
 	rm := fs.Bool("rm", false, "remove the items named (by id), each checked again first")
 	force := fs.Bool("force", false, "with --rm: also remove the dirty worktrees named, discarding their changes and homes (wt rm --force)")
 	ids, code, ok := parseMixed(fs, args)

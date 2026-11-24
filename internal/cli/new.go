@@ -69,7 +69,7 @@ func cmdNew(ctx context.Context, e *env, args []string) int {
 	prefix := fset.String("prefix", "", "the project `prefix`: unique on this machine, names every object")
 	name := fset.String("name", "", "the project `name` (default: the dir's name)")
 	branch := fset.String("branch", "", "the `base` branch (default: the remote's HEAD branch)")
-	packRef := fset.String("pack", "rails@1", "the stack's pack `ref`")
+	packRef := fset.String("pack", "rails@1", "the project's pack `ref`")
 	dryRun := fset.Bool("dry-run", false, "write nothing: print the project.toml and what the base worktree gets")
 	acceptHash := fset.String("accept-install", "", "accept the install review of its library packages with this `hash` (project new --dry-run --json install.hash)")
 	up := fset.Bool("up", false, "run up in the base worktree once it is created, unless a secret is unset (exit 3: created, up failed)")

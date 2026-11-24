@@ -35,6 +35,9 @@ type snapshotsView struct {
 	// Written "" when db-dumps/ holds none.
 	DumpURL, Written, DumpSize string
 	DumpFiles                  []string
+	// Stopped: the worktree's stack is stopped, so take, restore and Use,
+	// which need its database running, are disabled (#255).
+	Stopped bool
 }
 
 type snapshotRow struct{ Name, Created, Size string }
@@ -49,7 +52,7 @@ func (s *Server) snapshotsOf(r *http.Request, p projectRow, slug string, panel b
 		return snapshotsView{}, err
 	}
 	base := worktreePath(p, slug) + "/snapshots/"
-	v := snapshotsView{Slug: slug, TakeURL: base + "take", RestoreURL: base + "restore", RmURL: base + "rm"}
+	v := snapshotsView{Slug: slug, TakeURL: base + "take", RestoreURL: base + "restore", RmURL: base + "rm", Stopped: s.stopped(p.Prefix, slug)}
 	for _, sn := range snaps {
 		v.Snapshots = append(v.Snapshots, snapshotRow{Name: sn.Name, Created: sn.Created.Local().Format("2006-01-02 15:04"), Size: megabytes(sn.Bytes)})
 	}
@@ -64,6 +67,23 @@ func (s *Server) snapshotsOf(r *http.Request, p projectRow, slug string, panel b
 		}
 	}
 	return v, nil
+}
+
+// stopped reports whether worktree slug's stack is stopped, as the last
+// overview read it; false before one.
+func (s *Server) stopped(prefix, slug string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.state[prefix]
+	if p == nil || p.ov == nil {
+		return false
+	}
+	for _, wt := range p.ov.Worktrees {
+		if wt.Slug == slug {
+			return wt.Stack == "stopped"
+		}
+	}
+	return false
 }
 
 // snapshotsDialog lists the worktree's database snapshots, each with

@@ -156,6 +156,11 @@ function afterSwap(id) {
     if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
     showTab();
     termsShown(); // showTab returns early on a detail without tabs
+    // The Database tab's buttons need the stack running (#255): it reads
+    // its content again when the worktree shown starts or stops.
+    const state = slug + ("stopped" in $("#detail").dataset ? " stopped" : " running");
+    if (stackState && state !== stackState && stackState.startsWith(slug + " ") && panelShown === "database " + slug) loadPanel();
+    stackState = state;
     if (slug && focusOn === slug) {
       focusOn = null;
       focusShownTerm();
@@ -216,6 +221,7 @@ const tabPanels = {
   database: ["#dbpanel", "/database-panel", "The database tab"],
 };
 let panelShown = ""; // "<tab> <worktree>" of the panel shown; "": none
+let stackState = ""; // "<worktree> stopped|running" of the detail last shown
 async function loadPanel() {
   const want = panelShown;
   if (!want) return;

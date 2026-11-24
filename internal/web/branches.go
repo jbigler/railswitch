@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -57,6 +58,7 @@ type branchesView struct {
 	Jobs          jobsView
 
 	URL, Error, Base, Fetched string
+	FetchError                string // the last background fetch failed (D228)
 	Warnings                  []string
 	Rows                      []branchView
 	Behind                    []string // the branches Pull all behind pulls
@@ -98,6 +100,16 @@ func (s *Server) branchesItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := branchesView{URL: branchesURL(p.Prefix), Prefix: p.Prefix}
+	// Opening the page fetches first when the last fetch from here is
+	// over fetchEvery old (D228): the table loads after the page anyway.
+	if s.fetchDue(p.Prefix) {
+		s.fetchOrigin(r.Context(), p.Prefix, p.Workspace)
+	}
+	s.mu.Lock()
+	if st := s.state[p.Prefix]; st != nil && st.fetchErr != "" {
+		v.FetchError = "The last fetch, at " + st.fetchErrAt.Local().Format("15:04") + ", failed: " + st.fetchErr
+	}
+	s.mu.Unlock()
 	doc, err := readBranches(r.Context(), s.c.CLI, p.Workspace)
 	if err != nil {
 		v.Error = err.Error()
@@ -120,6 +132,8 @@ func (s *Server) branchesItems(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Newest tip first; the CLI lists them by name.
+	slices.SortStableFunc(doc.Branches, func(a, b branchRow) int { return strings.Compare(b.Date, a.Date) })
 	for _, b := range doc.Branches {
 		bv := branchView{branchRow: b, Deletable: !b.Base && !b.CheckedOut, AgentRunning: running[b.Worktree]}
 		bv.Pullable = b.Upstream != "" && !b.Gone && b.Behind > 0 && b.Ahead == 0 && (!b.CheckedOut || b.Worktree != "")

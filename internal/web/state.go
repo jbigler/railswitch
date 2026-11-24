@@ -19,6 +19,7 @@ const (
 	overviewIdle  = 10 * time.Second // every other project
 	prEvery       = 60 * time.Second // only with a page open
 	usageEvery    = 30 * time.Second // agent usage, only with a page open
+	fetchEvery    = 5 * time.Minute  // git fetch --prune origin, only with a page open (D228)
 	projectsEvery = 10 * time.Second // project ls
 	noteMax       = 200              // characters of a notification's body
 	subBuffer     = 256              // events queued per page before it is dropped
@@ -54,9 +55,16 @@ type projectState struct {
 	// on its own (D225); a failed read leaves the last one.
 	usage    *usageDoc
 	usageAt  time.Time
-	usageNow bool              // Refresh PRs: due at once
-	kinds    map[string]string // agentKind per slug at the last overview
-	known    bool              // kinds holds a first overview (the baseline)
+	usageNow bool // Refresh PRs: due at once
+	// fetchAt is when origin was last fetched for the project from here
+	// (D228), fetching is true while one runs, fetchErr is the last
+	// fetch's failure ("" when it went well) and fetchErrAt its time.
+	fetchAt    time.Time
+	fetching   bool
+	fetchErr   string
+	fetchErrAt time.Time
+	kinds      map[string]string // agentKind per slug at the last overview
+	known      bool              // kinds holds a first overview (the baseline)
 	// queueTried is the agent status ts (by slug) a queue delivery last
 	// started at: one try per status (D159).
 	queueTried map[string]int64
@@ -161,6 +169,7 @@ func (s *Server) pollOnce(ctx context.Context) {
 	s.pollOverviews(ctx)
 	s.pollStacks(ctx)
 	s.pollUsage(ctx)
+	s.pollFetch(ctx)
 	s.pollPRs(ctx)
 }
 
@@ -196,6 +205,7 @@ func (s *Server) Run(ctx context.Context) error {
 	wg.Go(func() { s.loop(ctx, s.wakePR, s.pollPRs) })
 	wg.Go(func() { s.loop(ctx, s.wakeST, s.pollStacks) })
 	wg.Go(func() { s.loop(ctx, nil, s.pollUsage) })
+	wg.Go(func() { s.loop(ctx, nil, s.pollFetch) })
 	<-ctx.Done()
 	stop()
 	wg.Wait()
@@ -534,6 +544,63 @@ func (s *Server) pollUsage(ctx context.Context) {
 			s.publish()
 		}
 		s.mu.Unlock()
+	}
+}
+
+// pollFetch fetches origin (`branch fetch`: git fetch --prune) for each
+// project with a page open, every fetchEvery (D228), so branch upstreams
+// and gone marks stay fresh. It is not a job: a failure is kept and the
+// Branches page shows it.
+func (s *Server) pollFetch(ctx context.Context) {
+	now := s.c.Now()
+	type job struct{ prefix, ws string }
+	var todo []job
+	s.mu.Lock()
+	for _, row := range s.projects {
+		p := s.state[row.Prefix]
+		if s.watched(row.Prefix) && !p.fetching && (p.fetchAt.IsZero() || now.Sub(p.fetchAt) >= fetchEvery) {
+			todo = append(todo, job{row.Prefix, row.Workspace})
+		}
+	}
+	s.mu.Unlock()
+	for _, j := range todo {
+		s.fetchOrigin(ctx, j.prefix, j.ws)
+		if ctx.Err() != nil {
+			return
+		}
+	}
+}
+
+// fetchDue reports whether prefix's origin was last fetched from here
+// over fetchEvery ago (or never), with no fetch running.
+func (s *Server) fetchDue(prefix string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.state[prefix]
+	return p != nil && !p.fetching && (p.fetchAt.IsZero() || s.c.Now().Sub(p.fetchAt) >= fetchEvery)
+}
+
+// fetchOrigin runs `branch fetch` for project prefix and records when and
+// how it went; one runs at a time per project.
+func (s *Server) fetchOrigin(ctx context.Context, prefix, ws string) {
+	s.mu.Lock()
+	p := s.state[prefix]
+	if p == nil || p.fetching {
+		s.mu.Unlock()
+		return
+	}
+	p.fetching, p.fetchAt = true, s.c.Now()
+	s.mu.Unlock()
+	_, err := s.c.CLI.Run(ctx, "-C", ws, "branch", "fetch")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p.fetching = false
+	if ctx.Err() != nil {
+		return
+	}
+	p.fetchErr, p.fetchErrAt = "", time.Time{}
+	if err != nil {
+		p.fetchErr, p.fetchErrAt = strings.TrimSpace(err.Error()), s.c.Now()
 	}
 }
 

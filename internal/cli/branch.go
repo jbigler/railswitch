@@ -203,7 +203,6 @@ func (e *env) branches(ctx context.Context, withPRs bool) (branchDoc, *worktree.
 		r.CouldGo = len(r.Reasons) > 0 && !r.CheckedOut && !r.Base
 		doc.Branches = append(doc.Branches, r)
 	}
-	slices.SortStableFunc(doc.Branches, func(a, b branchRow) int { return strings.Compare(b.Date, a.Date) })
 	return doc, mgr, nil
 }
 

@@ -139,6 +139,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/{slug}/act/{action}", s.act)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-stop", s.agentStop)
 	m.HandleFunc("POST /p/{prefix}/{slug}/agent-setup", s.agentSetup)
+	m.HandleFunc("POST /p/{prefix}/{slug}/agent-update", s.agentUpdate)
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
 	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
@@ -646,6 +647,13 @@ func (s *Server) agentStop(w http.ResponseWriter, r *http.Request) {
 // (`agent setup --again <name>`, D188).
 func (s *Server) agentSetup(w http.ResponseWriter, r *http.Request) {
 	s.agentJob(w, r, "setup again ", "setup", "--again")
+}
+
+// agentUpdate rebuilds the agent's image without the build cache, so it
+// downloads the agent's latest release again (`agent update <name>`,
+// D138). The image is the project's: every worktree takes it.
+func (s *Server) agentUpdate(w http.ResponseWriter, r *http.Request) {
+	s.agentJob(w, r, "update agent ", "update")
 }
 
 // agentJob runs `agent <verb...> <name>` as a job for the form's agent,

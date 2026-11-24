@@ -93,6 +93,9 @@ func TestActions(t *testing.T) {
 		{"agent stop flag", "/p/ftest/b/agent-stop", form("agent", "--all"), 404, nil, ""},
 		{"agent setup", "/p/ftest/b/agent-setup", form("agent", "claude"), 202, append(slices.Clone(wsb), "agent", "setup", "--again", "claude"), ""},
 		{"agent setup unknown", "/p/ftest/b/agent-setup", form("agent", "nope"), 404, nil, ""},
+		{"agent update", "/p/ftest/b/agent-update", form("agent", "claude"), 202, append(slices.Clone(wsb), "agent", "update", "claude"), ""},
+		{"agent update unknown", "/p/ftest/b/agent-update", form("agent", "nope"), 404, nil, ""},
+		{"agent update flag", "/p/ftest/b/agent-update", form("agent", "--all"), 404, nil, ""},
 	} {
 		f := newFixture(t)
 		w := f.do(req("POST", c.path, c.form))

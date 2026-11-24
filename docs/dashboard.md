@@ -297,7 +297,13 @@ still wider than the window scrolls its pane.
     `⋯` holds **Run setup again** (D188): after a confirm, `railswitch
     agent setup --again <name>` as a job, the name checked against
     `agent ls`; its setup commands run at the agent's next start (an
-    agent with none reports so). The running agent's message is under
+    agent with none reports so). It doesn't change the agent's own
+    version: **Update to latest** (D138) does, after a confirm, by
+    running `railswitch agent update <name>` as a job, which rebuilds the
+    agent's image without the build cache so the release its
+    Containerfile downloads is fetched again. The image is the
+    project's, so every worktree takes it; a running agent keeps the old
+    version until it stops. The running agent's message is under
     the table, then the queue and the **Default config…** link. Above it, on
     the Agent tab only, **Usage · this worktree** (D187) with the same
     7 / 14 / 30 switch as the project chart: a table, rows Today and

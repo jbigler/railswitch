@@ -199,7 +199,7 @@ still wider than the window scrolls its pane.
   segment's tooltip (SVG `<title>`) is its day, worktree and tokens.
   Under the bars, the first and last day, then a legend: colour, name,
   total. It is `agent usage --all --days 30 --json`, read on its own
-  (D225: every 10 s with a page open, and on Refresh PRs; not behind
+  (D225: every 30 s with a page open, and on Refresh PRs; not behind
   the PR poll's GitHub queries), each range cut from
   it; absent while the range has no usage. The range is the page's
   `?days=` (7, 14 or 30; 14 without one): a click on the switch changes
@@ -1700,7 +1700,7 @@ docs/json.md.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
-- `railswitch --json agent usage --all --days 30` (project, every 10 s with a page open):
+- `railswitch --json agent usage --all --days 30` (project, every 30 s with a page open):
   the agents' usage history (D162). The dashboard's `overview` poll is
   what records it: every `overview` adds each agent's session counter's
   growth to the history.

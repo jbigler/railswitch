@@ -18,7 +18,7 @@ const (
 	overviewOpen  = 2 * time.Second  // a project with a page open
 	overviewIdle  = 10 * time.Second // every other project
 	prEvery       = 60 * time.Second // only with a page open
-	usageEvery    = 10 * time.Second // agent usage, only with a page open
+	usageEvery    = 30 * time.Second // agent usage, only with a page open
 	projectsEvery = 10 * time.Second // project ls
 	noteMax       = 200              // characters of a notification's body
 	subBuffer     = 256              // events queued per page before it is dropped

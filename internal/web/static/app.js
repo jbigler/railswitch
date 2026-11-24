@@ -1599,8 +1599,9 @@ if (view === "branches") {
       const unmerged = ticked.filter((c) => c.hasAttribute("data-unmerged")).length;
       msg = "Delete " + ticked.length + " branch(es): " + ticked.map((c) => c.value).join(", ") + "?";
       if (remote) msg += " Their branches on origin go too, unless a PR is open on one.";
-      if (unmerged && force) msg += " " + unmerged + " of them aren't merged: their commits go with them.";
-      else if (unmerged) msg += " " + unmerged + " of them aren't merged and stay unless you tick Force.";
+      const which = unmerged === ticked.length ? (unmerged === 1 ? "It isn't" : "None of them is") : unmerged === 1 ? "1 of them isn't" : unmerged + " of them aren't";
+      if (unmerged && force) msg += " " + which + " merged: " + (unmerged === 1 ? "its commits go with it." : "their commits go with them.");
+      else if (unmerged) msg += " " + which + " merged, and " + (unmerged === 1 ? "it stays" : "those stay") + " unless you tick Force.";
     }
     if (msg && !confirm(msg)) return;
     startJob(f.action, new URLSearchParams(new FormData(f, e.submitter)), (state) => {

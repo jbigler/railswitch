@@ -30,6 +30,26 @@ _Avoid_: health check, diagnostics
 A worktree's one Excalidraw drawing, kept on the host with a dark and a light picture of it, shown by the Virtual Office's glass wall and the worktree page's Whiteboard tab, and deleted with the worktree.
 _Avoid_: board (alone), canvas, sketch
 
+### Worktrees
+
+**Services**:
+The containers a worktree runs, such as its app, database and agents. The worktree has their combined state: a **running** (`up`), **stopped**, **partial** or **failed** worktree.
+_Avoid_: stack, environment, runtime
+
+**Lock file**:
+`stack.lock`, the project's record of the packages it accepted and their exact content. Its filename is fixed, like `project.toml`'s `[stack]` table and a template's `stack.toml`; the packages themselves are never called a stack.
+_Avoid_: the stack (for the chosen packages)
+
+### Branches
+
+**Stack**:
+A chain of branches, each built on the one below, that gh stack tracks and GitHub shows as one stack of pull requests. "Stack" means only this.
+_Avoid_: stack for a worktree's services, branch stack, PR chain
+
+**Upstream gone**:
+A local branch whose remote branch on origin no longer exists, usually because its pull request was merged and GitHub deleted the branch.
+_Avoid_: orphan branch, stale branch
+
 ### Notes
 
 **Note**:

@@ -43,7 +43,7 @@ type tidyItem struct {
 	Branch  string   `json:"branch"`
 	Reasons []string `json:"reasons"` // pr-merged, pr-closed, stopped; unused
 	PR      int      `json:"pr"`
-	Stack   string   `json:"stack"`
+	State   string   `json:"state"` // a worktree's: up, partial, failed or stopped; "" for an image
 	// IdleSince is when the stopped stack was last seen doing anything:
 	// its units' last stop (IdleFrom "systemd"), else HEAD's commit time
 	// ("commit"); "" when unknown.
@@ -218,13 +218,13 @@ func (e *env) tidyWorktrees(ctx context.Context, ws string, cutoff time.Time, wa
 			continue
 		}
 		r := rows[i]
-		it := tidyItem{ID: "wt:" + pfx + "/" + w.Slug, Kind: "worktree", Project: pfx, Name: w.Slug, Branch: safefile.Printable(w.Branch), Reasons: []string{}, Stack: w.Stack, Dirty: r.Dirty}
+		it := tidyItem{ID: "wt:" + pfx + "/" + w.Slug, Kind: "worktree", Project: pfx, Name: w.Slug, Branch: safefile.Printable(w.Branch), Reasons: []string{}, State: w.State, Dirty: r.Dirty}
 		if w.Branch != "" && list != nil {
 			if p := prs.ForBranch(list, w.Branch, e.headCommit(ctx, r.Dir)); p != nil && (p.State == "merged" || p.State == "closed") {
 				it.Reasons, it.PR = append(it.Reasons, "pr-"+p.State), p.Number
 			}
 		}
-		if w.Stack == "stopped" {
+		if w.State == "stopped" {
 			since, from := e.idleSince(ctx, mgr.Names, w.Slug, r.Dir)
 			if !since.IsZero() {
 				it.IdleSince, it.IdleFrom = since.UTC().Format(time.RFC3339), from

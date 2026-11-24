@@ -137,7 +137,7 @@ function transport() {
     list.append(el('li', {}, btn('L · Lobby', () => go({ kind: 'lobby' })), ' ', el('span', { class: 'muted' }, 'project overview')));
     state.worktrees.forEach((w, i) => {
       list.append(el('li', {}, btn(`${i + 1} · ${w.slug}`, () => go({ kind: 'floor', slug: w.slug })), ' ',
-        el('span', { class: `state-${w.stack}` }, w.stack), ' ', el('span', { class: 'muted' }, w.branch || '')));
+        el('span', { class: `state-${w.state}` }, w.state), ' ', el('span', { class: 'muted' }, w.branch || '')));
     });
     body.append(list);
   });
@@ -253,9 +253,9 @@ function showService(slug, name) {
       body.append(el('h3', {}, 'Whole floor'));
       body.append(el('p', { class: 'muted' }, 'Services start and stop together, as `up` and `stop` run them.'));
       body.append(el('div', { class: 'row' },
-        btn('▶ Start', () => job(`${base}/${encodeURIComponent(slug)}/act/up`, body), { disabled: w.stack === 'up' }),
-        btn('↻ Restart', () => job(`${base}/${encodeURIComponent(slug)}/act/restart`, body), { disabled: w.stack === 'stopped' }),
-        btn('■ Stop', () => job(`${base}/${encodeURIComponent(slug)}/act/stop`, body), { disabled: w.stack === 'stopped', class: 'hud-btn danger' })));
+        btn('▶ Start', () => job(`${base}/${encodeURIComponent(slug)}/act/up`, body), { disabled: w.state === 'up' }),
+        btn('↻ Restart', () => job(`${base}/${encodeURIComponent(slug)}/act/restart`, body), { disabled: w.state === 'stopped' }),
+        btn('■ Stop', () => job(`${base}/${encodeURIComponent(slug)}/act/stop`, body), { disabled: w.state === 'stopped', class: 'hud-btn danger' })));
     };
     draw();
     redraw = draw;
@@ -266,7 +266,7 @@ function showService(slug, name) {
 function showDesk(slug) {
   openPanel(`Your desk · ${slug}`, (body) => {
     const w = labOf(slug);
-    body.append(el('p', {}, '⎇ ', el('strong', {}, w?.branch || slug), ' · ', el('span', { class: `state-${w?.stack}` }, w?.stack || '')));
+    body.append(el('p', {}, '⎇ ', el('strong', {}, w?.branch || slug), ' · ', el('span', { class: `state-${w?.state}` }, w?.state || '')));
     let t = null;
     const open = (kind) => { t?.detach(); body.querySelector('.term')?.remove(); t = termIn(body, ttyURL(slug, kind)); };
     const hasNvim = w?.services.some((s) => s.service === 'nvim');
@@ -417,7 +417,7 @@ function showIssues() {
           el('div', { class: 'row' }, floor
             ? btn(`Go to its floor (${floor.slug})`, () => go({ kind: 'floor', slug: floor.slug }))
             : btn('▶ Start working', () => job(`${base}/virtual-office/issues/${i.number}/start`, body),
-              { title: 'A worktree on a branch named after the issue, its stack up, and the agent working on the issue' }))));
+              { title: 'A worktree on a branch named after the issue, it up, and the agent working on the issue' }))));
       }
       if (!shown.length) list.append(el('li', { class: 'muted' }, doc.issues.length ? 'Nothing open here: try Following or All.' : 'No open issues.'));
       body.append(list);

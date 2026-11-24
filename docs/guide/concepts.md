@@ -32,7 +32,7 @@ published on 127.0.0.1 only.
 
 - A **pack** knows one framework: how to build its image, start its
   server, install its dependencies and check it's up. Rails is built in;
-  other stacks are local packs (`railswitch pack new`), and teams can
+  other frameworks are local packs (`railswitch pack new`), and teams can
   publish packs in a library.
 - An **option** fills a **slot** beside the app: `database`, `cache`,
   `storage`, `jobs`, `mail`, `browser`. Built in: PostgreSQL, MariaDB

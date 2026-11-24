@@ -6,10 +6,10 @@ import (
 )
 
 const tidyJSON = `{"days":14,"bytes":3000,"warnings":["ftest: no PR states: gh: not logged in"],"items":[
- {"id":"wt:ftest/b","kind":"worktree","project":"ftest","name":"b","branch":"jb/b","reasons":["pr-merged"],"pr":7,"stack":"up","idle_since":"","idle_from":"","dirty":false,"bytes":1000,"partial":false},
- {"id":"wt:ftest/c","kind":"worktree","project":"ftest","name":"c","branch":"c","reasons":["stopped"],"pr":0,"stack":"stopped","idle_since":"2026-01-06T09:00:00Z","idle_from":"commit","dirty":true,"bytes":0,"partial":true},
- {"id":"wt:ftest/d","kind":"worktree","project":"ftest","name":"d","branch":"d","reasons":["stopped"],"pr":0,"stack":"stopped","idle_since":"2026-01-06T09:00:00Z","idle_from":"commit","dirty":false,"bytes":0,"partial":false},
- {"id":"image:localhost/ftest/base:3.3-deadbeef","kind":"image","project":"ftest","name":"localhost/ftest/base:3.3-deadbeef","reasons":["unused"],"pr":0,"stack":"","idle_since":"","idle_from":"","dirty":false,"bytes":2000,"partial":false}]}`
+ {"id":"wt:ftest/b","kind":"worktree","project":"ftest","name":"b","branch":"jb/b","reasons":["pr-merged"],"pr":7,"state":"up","idle_since":"","idle_from":"","dirty":false,"bytes":1000,"partial":false},
+ {"id":"wt:ftest/c","kind":"worktree","project":"ftest","name":"c","branch":"c","reasons":["stopped"],"pr":0,"state":"stopped","idle_since":"2026-01-06T09:00:00Z","idle_from":"commit","dirty":true,"bytes":0,"partial":true},
+ {"id":"wt:ftest/d","kind":"worktree","project":"ftest","name":"d","branch":"d","reasons":["stopped"],"pr":0,"state":"stopped","idle_since":"2026-01-06T09:00:00Z","idle_from":"commit","dirty":false,"bytes":0,"partial":false},
+ {"id":"image:localhost/ftest/base:3.3-deadbeef","kind":"image","project":"ftest","name":"localhost/ftest/base:3.3-deadbeef","reasons":["unused"],"pr":0,"state":"","idle_since":"","idle_from":"","dirty":false,"bytes":2000,"partial":false}]}`
 
 // D160: the page lists each candidate with why and its size, the clean
 // ones whose PR is done or images ticked, the idle-only and dirty ones not; Remove selected is one tidy --rm job,

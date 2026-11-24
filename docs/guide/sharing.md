@@ -1,13 +1,13 @@
 # Sharing
 
 Teammates don't share a workspace: each person has their own editor,
-agents and secrets. They share the parts that make a stack: a
+agents and secrets. They share the parts that make a project's setup: a
 **template** to start a project from, or a **package** they keep
 customizing.
 
 ## Templates
 
-A template is a project's stack: its pack and options, pins, env, tasks,
+A template is a project's setup: its pack and options, pins, env, tasks,
 links, routes, firewall, the Containerfiles you edited, and the local
 packs and options it uses, with questions for what each new project
 answers (a time zone, which cache). It never holds the project's name,

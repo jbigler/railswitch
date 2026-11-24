@@ -56,7 +56,7 @@ type worktree struct {
 	ID       int         `json:"id"`
 	Branch   string      `json:"branch"`
 	Base     bool        `json:"base"`
-	Stack    string      `json:"stack"`
+	State    string      `json:"state"`
 	Stale    bool        `json:"stale"`
 	Services []service   `json:"services"`
 	Agent    *agent      `json:"agent"`

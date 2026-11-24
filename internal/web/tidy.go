@@ -30,7 +30,7 @@ type tidyItem struct {
 	Branch    string   `json:"branch"`
 	Reasons   []string `json:"reasons"`
 	PR        int      `json:"pr"`
-	Stack     string   `json:"stack"`
+	State     string   `json:"state"`
 	IdleSince string   `json:"idle_since"`
 	IdleFrom  string   `json:"idle_from"`
 	Dirty     bool     `json:"dirty"`

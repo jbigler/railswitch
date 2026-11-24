@@ -41,9 +41,9 @@ func TestOverviewCLI(t *testing.T) {
 	}
 	var ov struct {
 		Prefix    string
-		Worktrees []struct{ Slug, Stack string }
+		Worktrees []struct{ Slug, State string }
 	}
-	if err := json.Unmarshal([]byte(out), &ov); err != nil || ov.Prefix != "filial" || len(ov.Worktrees) == 0 || ov.Worktrees[0].Stack != "stopped" {
+	if err := json.Unmarshal([]byte(out), &ov); err != nil || ov.Prefix != "filial" || len(ov.Worktrees) == 0 || ov.Worktrees[0].State != "stopped" {
 		t.Fatalf("overview %+v %v: %s", ov, err, out)
 	}
 	if code, _, _ := runWith(t, f, "-C", ws, "overview", "x"); code != 2 {

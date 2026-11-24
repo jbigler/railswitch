@@ -14,7 +14,7 @@ import (
 	"github.com/jbigler/railswitch/internal/unithash"
 )
 
-func TestStackState(t *testing.T) {
+func TestWorktreeState(t *testing.T) {
 	row := func(role, state string) OverviewService {
 		return OverviewService{Service: role, Role: role, State: state}
 	}
@@ -36,8 +36,8 @@ func TestStackState(t *testing.T) {
 		{"no stack rows", []OverviewService{row("deps", "active/exited"), row("tool", "active/running")}, "stopped"},
 		{"no rows", nil, "stopped"},
 	} {
-		if got := StackState(c.rows); got != c.want {
-			t.Errorf("%s: StackState = %q; want %q", c.name, got, c.want)
+		if got := WorktreeState(c.rows); got != c.want {
+			t.Errorf("%s: WorktreeState = %q; want %q", c.name, got, c.want)
 		}
 	}
 }
@@ -115,10 +115,10 @@ func TestOverview(t *testing.T) {
 		t.Fatalf("worktrees %+v", ov.Worktrees)
 	}
 	a, b := ov.Worktrees[0], ov.Worktrees[1]
-	if a.Slug != "master" || a.ID != 1 || !a.Base || a.Branch != "jb/master" || a.Stack != "up" || a.Agent != nil {
+	if a.Slug != "master" || a.ID != 1 || !a.Base || a.Branch != "jb/master" || a.State != "up" || a.Agent != nil {
 		t.Errorf("master %+v", a)
 	}
-	if b.Slug != "feat" || b.ID != 2 || b.Base || b.Branch != "jb/feat" || b.Stack != "failed" {
+	if b.Slug != "feat" || b.ID != 2 || b.Base || b.Branch != "jb/feat" || b.State != "failed" {
 		t.Errorf("feat %+v", b)
 	}
 	if b.Agent == nil || b.Agent.Name != "probe" || b.Agent.State != "permission" || b.Agent.Message != "Bash: rm -rf tmp" || b.Agent.Running {
@@ -177,7 +177,7 @@ func TestOverview(t *testing.T) {
 		t.Fatalf("%v: %s", err, e.out)
 	}
 	wt := doc["worktrees"].([]any)[1].(map[string]any)
-	for _, k := range []string{"slug", "id", "branch", "base", "stack", "services", "agent", "links", "stale", "tests"} {
+	for _, k := range []string{"slug", "id", "branch", "base", "state", "services", "agent", "links", "stale", "tests"} {
 		if _, ok := wt[k]; !ok {
 			t.Errorf("worktree JSON lacks %q: %v", k, wt)
 		}
@@ -193,7 +193,7 @@ func TestOverview(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := e.out.String()
-	for _, w := range []string{"WORKTREE", "BRANCH", "STACK", "AGENT", "TESTS", "never", "master (base)", "jb/feat", "failed", "probe: permission", "\n  App ", "http://feat."} {
+	for _, w := range []string{"WORKTREE", "BRANCH", "STATE", "AGENT", "TESTS", "never", "master (base)", "jb/feat", "failed", "probe: permission", "\n  App ", "http://feat."} {
 		if !strings.Contains(text, w) {
 			t.Errorf("text lacks %q:\n%s", w, text)
 		}
@@ -213,7 +213,7 @@ func TestOverviewMissingDir(t *testing.T) {
 		t.Fatalf("worktrees %+v", ov.Worktrees)
 	}
 	b := ov.Worktrees[1]
-	if b.Slug != "feat" || b.Branch != "" || b.Stack != "stopped" || len(b.Links) == 0 {
+	if b.Slug != "feat" || b.Branch != "" || b.State != "stopped" || len(b.Links) == 0 {
 		t.Errorf("feat %+v", b)
 	}
 }

@@ -100,7 +100,7 @@ jobs, mail, browser; with rustfs, sidekiq and playwright: Storage console,
 Sidekiq, Browser (VNC)), and no Routes. In the page: App, Flipper, Jobs, stack
 links, then PR and Logs quieter; each opens its page in a new tab. On a
 stopped worktree the links are greyed out. `hide_links = ["Rotues"]` makes
-`render` fail with `hide_links: no stack link labelled "Rotues"`.
+`render` fail with `hide_links: no package link labelled "Rotues"`.
 
 ## 6. PRs match GitHub
 

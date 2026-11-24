@@ -9,7 +9,7 @@
 <p class="note">Nothing is created until you press Create project. Reading the repository fetches only the files the packages' detection rules name.</p>
 <form id="new-form" class="new-form" method="post" action="/new/review">
 <section class="card">
-<h2>1 · Stack and options</h2>
+<h2>1 · Pack and options</h2>
 <label class="field">Repository <input name="repo" class="mono" required autocomplete="off" spellcheck="false" placeholder="git@github.com:owner/app.git" value="{{.Repo}}"></label>
 <p id="repo-error" class="red set-error" hidden></p>
 <label class="field">Base branch <input name="branch" class="mono" autocomplete="off" spellcheck="false" placeholder="the repository's default branch"></label>
@@ -50,7 +50,7 @@
 {{end}}
 
 {{define "newstack"}}<section id="new-stack" class="card" data-pack="{{.Pack}}" data-branch="{{.Branch}}">
-<h2>Stack</h2>
+<h2>Pack</h2>
 {{if not .Read}}<p class="muted">Read the repository to see the pack and options it suggests.</p>
 {{else}}<div class="pack-row">{{if .Pack}}<b>Pack</b> <span class="mono">{{.Pack}}</span>{{with .Evidence}} <span class="muted">· read from the repository · {{range $i, $e := .}}{{if $i}}, {{end}}{{$e}}{{end}}</span>{{end}}{{else}}<span class="yellow">No pack matched; pick one</span>{{end}}
 <span class="sp"></span><select name="pack" data-repick aria-label="Pack">{{if not .Pack}}<option value="">Pick a pack</option>{{end}}{{range .Packs}}<option value="{{.Ref}}"{{if .Current}} selected{{end}}>{{.Ref}}</option>{{end}}</select></div>
@@ -70,10 +70,10 @@
 <p class="note">Any other key runs an option as one more service, named after the key (a second database, ClickHouse beside Postgres).</p>
 {{end}}{{end}}</section>{{end}}
 
-{{/* newtemplate is the Stack card for a picked template: one field per
+{{/* newtemplate is the Pack card for a picked template: one field per
 question, prefilled with its default. */}}
 {{define "newtemplate"}}<section id="new-stack" class="card" data-pack="" data-template="{{.Row.Ref}}">
-<h2>Stack</h2>
+<h2>Pack</h2>
 <div class="pack-row"><b>Template</b> <span class="mono">{{.Row.Ref}}</span> <span class="chip">{{.Row.Source}}</span>{{if .Row.Packages}} <span class="muted mono">· {{range $i, $p := .Row.Packages}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{end}}</div>
 {{if .Row.Description}}<p class="note">{{.Row.Description}}</p>
 {{end}}{{range .Fields}}<label class="field">{{if .Prompt}}{{.Prompt}}{{else}}{{.Key}}{{end}} <span class="muted mono">{{.Key}}</span>

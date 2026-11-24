@@ -44,7 +44,7 @@ type OverviewWorktree struct {
 	ID       int               `json:"id"`
 	Branch   string            `json:"branch"` // read from its git files; "" when detached, unreadable or gone
 	Base     bool              `json:"base"`
-	Stack    string            `json:"stack"` // StackState of Services
+	State    string            `json:"state"` // WorktreeState of Services
 	Services []OverviewService `json:"services"`
 	Agent    *AgentRow         `json:"agent"` // the running agent, else the first not off; nil: none
 	Links    []render.Link     `json:"links"`
@@ -96,16 +96,17 @@ func (l *L) trust() *signing.Trust {
 	return t
 }
 
-// stackRoles are the roles of the long-running services that make a stack.
-var stackRoles = []string{render.RoleApp, render.RoleWorker, render.RoleData}
+// stateRoles are the roles of the long-running services whose states make
+// the worktree's state.
+var stateRoles = []string{render.RoleApp, render.RoleWorker, render.RoleData}
 
-// StackState sums up the stack services (roles app, worker, data) of
-// services: failed if any unit is failed, up if all are active, stopped if
-// none is active or activating (no stack services too), else partial.
-func StackState(services []OverviewService) string {
+// WorktreeState sums up the long-running services (roles app, worker,
+// data) of services: failed if any unit is failed, up if all are active,
+// stopped if none is active or activating (none at all too), else partial.
+func WorktreeState(services []OverviewService) string {
 	var n, active, live int
 	for _, s := range services {
-		if !slices.Contains(stackRoles, s.Role) {
+		if !slices.Contains(stateRoles, s.Role) {
 			continue
 		}
 		n++
@@ -128,8 +129,8 @@ func StackState(services []OverviewService) string {
 	return "partial"
 }
 
-// Overview reports every registered worktree of the project: its stack and
-// service states from one batched `systemctl --user show`, on-demand
+// Overview reports every registered worktree of the project: its state and
+// its services' states from one batched `systemctl --user show`, on-demand
 // services, agents and stale containers (D85) from one `podman ps -a`, its
 // agent and links. It runs no git (the model is built without the host
 // git identity, which nothing here needs) and no health check: the
@@ -205,7 +206,7 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 			ow.Services = append(ow.Services, OverviewService{Service: s.ID, Role: s.Role, State: st, Container: ctr,
 				Restartable: !s.OnDemand && !s.Oneshot})
 		}
-		ow.Stack = StackState(ow.Services)
+		ow.State = WorktreeState(ow.Services)
 		names, err := m.NamesFor(w.Slug)
 		if err != nil {
 			return Overview{}, err
@@ -245,7 +246,7 @@ func chooseAgent(rows []AgentRow) *AgentRow {
 }
 
 // PrintOverview prints Overview: with asJSON one JSON document, else a
-// table WORKTREE BRANCH STACK AGENT TESTS with each worktree's links indented
+// table WORKTREE BRANCH STATE AGENT TESTS with each worktree's links indented
 // under its row.
 func (l *L) PrintOverview(ctx context.Context, asJSON bool) error {
 	ov, err := l.Overview(ctx)
@@ -262,7 +263,7 @@ func (l *L) WriteOverview(ov Overview, asJSON bool) error {
 	}
 	var table bytes.Buffer
 	tw := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, "WORKTREE\tBRANCH\tSTACK\tAGENT\tTESTS")
+	fmt.Fprintln(tw, "WORKTREE\tBRANCH\tSTATE\tAGENT\tTESTS")
 	now := time.Now()
 	for _, w := range ov.Worktrees {
 		slug, branch := w.Slug, safefile.Printable(w.Branch) // a container can write the branch
@@ -272,7 +273,7 @@ func (l *L) WriteOverview(ov Overview, asJSON bool) error {
 		if branch == "" {
 			branch = "-"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", slug, branch, w.Stack, agentCell(w.Agent), testsCell(w.Tests, now))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", slug, branch, w.State, agentCell(w.Agent), testsCell(w.Tests, now))
 	}
 	if err := tw.Flush(); err != nil {
 		return err

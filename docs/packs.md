@@ -354,12 +354,12 @@ A pack, option or tool `[[links]]` (`label`, `url`), like a project's
 is a load error naming the file. A URL without a `scheme://` gets
 `http://` (`vnc.{worktree.host}` → `http://vnc.<slug>.<prefix>.localhost`).
 A worktree's links, in order: App (`http://{worktree.host}/`), the
-project's `[[links]]` in file order, then the stack's: the pack's, the
+project's `[[links]]` in file order, then the packages': the pack's, the
 options' in slot order, then the enabled tools', each in file order.
 
-`project.toml` hides stack links by label; a label that no pack, option
+`project.toml` hides package links by label; a label that no pack, option
 or tool link of the project carries is an error at render
-(`hide_links: no stack link labelled "Nope"`):
+(`hide_links: no package link labelled "Nope"`):
 
 ```toml
 hide_links = ["Routes", "Mailer previews"]   # top level, before any table

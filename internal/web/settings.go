@@ -70,7 +70,7 @@ func parseEdits(b []byte) ([]edit, []byte, error) {
 // Tabs is the Settings page's tab bar; fw-count is the blocked hosts'.
 func (settingsView) Tabs() tabsView {
 	return tabsView{Label: "Settings sections", Stab: true, Tabs: []tabView{
-		{Key: "stack", Label: "Stack"}, {Key: "firewall", Label: "Firewall", BadgeID: "fw-count"}, {Key: "commands", Label: "Commands"},
+		{Key: "pack", Label: "Pack"}, {Key: "firewall", Label: "Firewall", BadgeID: "fw-count"}, {Key: "commands", Label: "Commands"},
 		{Key: "env", Label: "Environment"}, {Key: "links", Label: "Links"}, {Key: "tasks", Label: "Tasks"}, {Key: "secrets", Label: "Secrets"},
 	}}
 }

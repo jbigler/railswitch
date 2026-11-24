@@ -50,7 +50,7 @@ use = "local:omp@1"
 default = true
 ```
 
-`railswitch agent` starts the worktree's stack first (`up`), but doesn't
+`railswitch agent` starts the worktree first (`up`), but doesn't
 wait for the app to answer on its URL: an app that is still booting, or
 unhealthy, never holds up the agent. (It does wait while the worktree's
 `[hooks] create` haven't run yet, since they need the app.)

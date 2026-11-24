@@ -85,7 +85,7 @@ type cyberFloor struct {
 	Slug     string    `json:"slug"`
 	Branch   string    `json:"branch"`
 	Base     bool      `json:"base"`
-	Stack    string    `json:"stack"`
+	State    string    `json:"state"`
 	Services []service `json:"services"`
 	Agent    *agent    `json:"agent"`
 	Links    []link    `json:"links"`
@@ -110,7 +110,7 @@ func (s *Server) cyberData(prefix string) cyberState {
 	st.Error, st.PRError = p.ovErr, p.prErr
 	if p.ov != nil {
 		for _, wt := range p.ov.Worktrees {
-			fl := cyberFloor{Slug: wt.Slug, Branch: wt.Branch, Base: wt.Base, Stack: wt.Stack,
+			fl := cyberFloor{Slug: wt.Slug, Branch: wt.Branch, Base: wt.Base, State: wt.State,
 				Services: wt.Services, Agent: wt.Agent, Links: wt.Links, PR: p.prs[wt.Slug]}
 			if fl.Agent != nil && !fl.Agent.Running {
 				fl.Agent = nil // its status file outlives it: no agent at the desk

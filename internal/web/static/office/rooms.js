@@ -21,7 +21,7 @@ import { arcadeTitle } from './arcade/arcade.js';
 
 const PI = Math.PI;
 
-// Service and stack states, coloured.
+// Service and worktree states, coloured.
 export const stateColors = {
   running: 0x63e07c, up: 0x63e07c, starting: 0xffc857, partial: 0xffc857, activating: 0xffc857,
   failed: 0xff6b6b, error: 0xff6b6b, stopped: 0x3b4558, 'on demand': 0x4a7bd1,
@@ -743,7 +743,7 @@ export async function lab(slug, n, ui) {
   keepOut.position.set(-8, 1, -5);
   scene.add(keepOut);
   const racks = new Map();
-  // shortcut: room for 14 racks; a stack with more services shows the first 14
+  // shortcut: room for 14 racks; a worktree with more services shows the first 14
   // 1 m apart: their cable loops stand out from their sides. The rows face
   // each other across a 2 m aisle, with 2 m behind the second to the glass.
   const rackSpot = (i) => (i < 7 ? { x: -11.2 + i * 1.0, z: -7.45, ry: 0 } : i < 14 ? { x: -11.2 + (i - 7) * 1.0, z: -4.45, ry: PI } : null);
@@ -834,7 +834,7 @@ export async function lab(slug, n, ui) {
       }
     }
     mine.update([
-      { text: `stack: ${w.stack}`, color: css(colorOf(w.stack)) },
+      { text: `state: ${w.state}`, color: css(colorOf(w.state)) },
       w.pr ? `PR #${w.pr.number} ${w.pr.state.toLowerCase()}` : 'no PR',
       ...w.links.slice(0, 4).map((l) => ({ text: '↗ ' + l.label, color: '#9fc3ff' })),
     ], `⎇ ${w.branch || slug}`);
@@ -847,7 +847,7 @@ export async function lab(slug, n, ui) {
     const up = w.services.filter((s) => svcState(s.state) === 'running').length;
     holo.set(st.usage, slug);
     big.screen.update([
-      { text: `stack ${w.stack} · ${up}/${w.services.length} services running`, color: css(colorOf(w.stack)) },
+      { text: `${w.state} · ${up}/${w.services.length} services running`, color: css(colorOf(w.state)) },
       w.pr ? `PR #${w.pr.number} · checks ${w.pr.checks || 'none'} · review ${(w.pr.review || 'none').replace('_', ' ')}` : 'no pull request',
       w.agent ? `agent ${w.agent.name}: ${w.agent.state}${w.agent.usage ? ` · ${tokens(w.agent.usage)} tokens` : ''}` : 'no agent running',
       '',
@@ -1075,7 +1075,7 @@ export async function lobby(prefix, ui) {
   beacons.position.set(0, 1.0, 0);
   scene.add(beacons);
   // The directory over the pedestal is a board with two faces, one to each
-  // end of the corridor: a line per floor (its number, name and stack; a
+  // end of the corridor: a line per floor (its number, name and state; a
   // running one in green), in one or two columns that fit the corridor's
   // width however many floors there are. A line leads to its floor.
   const dirSign = label('Directory', { size: 0.3 });
@@ -1094,15 +1094,15 @@ export async function lobby(prefix, ui) {
   let beaconKey = '';
   const update = (st) => {
     const lines = st.worktrees.map((w, i) => ({
-      text: `${String(i + 1).padStart(2)} ${w.base ? '★' : '·'} ${w.slug.padEnd(18).slice(0, 18)} ${w.stack.padEnd(8)} ${w.agent ? '◆ ' + w.agent.state : ''}`,
-      color: css(colorOf(w.stack)),
+      text: `${String(i + 1).padStart(2)} ${w.base ? '★' : '·'} ${w.slug.padEnd(18).slice(0, 18)} ${w.state.padEnd(8)} ${w.agent ? '◆ ' + w.agent.state : ''}`,
+      color: css(colorOf(w.state)),
     }));
     view.update(lines.length ? lines : ['no worktrees'], `${prefix} · ${st.worktrees.length} floors`);
     const open = st.worktrees.filter((w) => w.pr);
     holo.set(st.usage, null, (s) => ui.toFloor(s));
-    // the board changes with the floors and their stacks only: rebuilt
+    // the board changes with the floors and their states only: rebuilt
     // then, the old one's GPU buffers freed
-    const key = st.worktrees.map((w) => `${w.slug}:${w.stack}`).join(' ');
+    const key = st.worktrees.map((w) => `${w.slug}:${w.state}`).join(' ');
     if (key !== beaconKey) {
       beaconKey = key;
       for (const m of beacons.children) {
@@ -1114,7 +1114,7 @@ export async function lobby(prefix, ui) {
       const n = st.worktrees.length, cols = n > 12 ? 2 : 1, rows = Math.ceil(n / cols);
       const pitch = Math.min(0.16, 1.9 / Math.max(1, rows)); // the board is at most 1.9 m tall: more floors, smaller lines
       const ink = (up) => (lightMode() ? { color: up ? '#1f7a3d' : '#20262e', bg: 'rgba(250,250,250,.95)' } : up ? { color: '#63e07c' } : {});
-      const lines = st.worktrees.map((w, i) => label(`${i + 1} · ${w.slug.length > 26 ? w.slug.slice(0, 25) + '…' : w.slug} · ${w.stack}`, { size: pitch * 0.86, flat: true, ...ink(w.stack === 'up') }));
+      const lines = st.worktrees.map((w, i) => label(`${i + 1} · ${w.slug.length > 26 ? w.slug.slice(0, 25) + '…' : w.slug} · ${w.state}`, { size: pitch * 0.86, flat: true, ...ink(w.state === 'up') }));
       const wide = (m) => m.geometry.parameters.width;
       const colW = Array.from({ length: cols }, (_, c) => Math.max(0, ...lines.slice(c * rows, (c + 1) * rows).map(wide)));
       const total = colW.reduce((a, b) => a + b, 0) + 0.08 * (cols - 1);
@@ -1125,13 +1125,13 @@ export async function lobby(prefix, ui) {
         for (const [face, s] of [[m, -1], [m.clone(), 1]]) { // s: the end of the corridor it faces; lx runs to that reader's right
           face.rotation.y = s * PI / 2;
           face.position.set(s * 0.03, y, -s * lx);
-          pickable(face, `Floor ${i + 1} · ${w.slug}: ${w.stack}`, () => ui.toFloor(w.slug));
+          pickable(face, `Floor ${i + 1} · ${w.slug}: ${w.state}`, () => ui.toFloor(w.slug));
           beacons.add(face);
         }
       });
     }
     big.screen.update([
-      `${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.stack === 'up').length} up`,
+      `${st.worktrees.length} floors · ${st.worktrees.filter((w) => w.state === 'up').length} up`,
       `${open.length} floors with an open pull request`,
       `${st.worktrees.filter((w) => w.agent).length} agents · ${tokens(st.worktrees.reduce((t, w) => {
         const u = w.agent?.usage;

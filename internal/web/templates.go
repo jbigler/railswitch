@@ -289,7 +289,7 @@ func (s *Server) templateAccept(w http.ResponseWriter, r *http.Request) {
 
 // New project.
 
-// newTemplateView is the Stack card for a picked template: its
+// newTemplateView is the Pack card for a picked template: its
 // questions, each a field with its default.
 type newTemplateView struct {
 	Row    templateRow
@@ -297,7 +297,7 @@ type newTemplateView struct {
 	Fields []askField
 }
 
-// newTemplate answers the Stack card for the posted template: its
+// newTemplate answers the Pack card for the posted template: its
 // questions, or without one the card before a read.
 func (s *Server) newTemplate(w http.ResponseWriter, r *http.Request) {
 	ref := r.PostFormValue("template")

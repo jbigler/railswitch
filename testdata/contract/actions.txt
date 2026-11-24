@@ -64,6 +64,7 @@
 ["-C","/ws/ftest","settings","apply","--if-hash","sha256:abababababababababababababababababababababababababababababababab"]
 ["-C","/ws/ftest","template","check","--accept","2222222222222222222222222222222222222222222222222222222222222222"]
 ["-C","/ws/ftest","template","export","--name","rails-pg","--version","3"]
+["-C","/ws/ftest","tidy","--rm","--force","branch:ftest/jb/done","branch:ftest/spike"]
 ["-C","/ws/ftest","tidy","--rm","--force","wt:ftest/c"]
 ["-C","/ws/ftest","tidy","--rm","wt:ftest/b","image:localhost/ftest/base:3.3-deadbeef"]
 ["-C","/ws/ftest","wt","add","--issue","118","--agent"]

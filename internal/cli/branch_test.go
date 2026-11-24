@@ -199,3 +199,68 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 	}
 	return string(res.Stdout)
 }
+
+// D229: tidy lists the branches that could go (not wip, unmerged with no
+// reason; not feat, checked out), an unmerged one dirty; tidy --rm deletes
+// them locally only, the unmerged one only with --force.
+func TestTidyBranches(t *testing.T) {
+	ws, master, origin := branchWS(t)
+	gitIn(t, master, "fetch", "-q", "--prune", "origin")
+	gitIn(t, master, "switch", "-q", "-c", "closed")
+	writeFile(t, filepath.Join(master, "closed.txt"), "x")
+	gitIn(t, master, "add", "closed.txt")
+	gitIn(t, master, "commit", "-q", "-m", "closed")
+	gitIn(t, master, "switch", "-q", "master")
+	f := branchFake(t, master)
+	head := strings.TrimSpace(gitOut(t, master, "rev-parse", "closed"))
+	f.On([]string{"gh", "pr", "list", "--repo", "[ORG]/[REPO]", "--state", "all"}, sys.Result{Stdout: []byte(`[` +
+		`{"number": 9, "headRefName": "squash", "headRefOid": "` + strings.TrimSpace(gitOut(t, master, "rev-parse", "squash")) + `", "state": "MERGED"},` +
+		`{"number": 12, "headRefName": "closed", "headRefOid": "` + head + `", "state": "CLOSED"}]`)}, nil)
+	f.On([]string{"podman", "ps"}, sys.Result{Stdout: []byte("[]")}, nil)
+	f.On([]string{"podman", "images", "--format", "json"}, sys.Result{Stdout: []byte("[]")}, nil)
+	code, out, errs := runWith(t, f, "-C", ws, "--json", "tidy")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var doc tidyDoc
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	got := map[string]tidyItem{}
+	for _, it := range doc.Items {
+		if it.Kind == "branch" {
+			got[it.ID] = it
+		}
+	}
+	if len(got) != 4 {
+		t.Fatalf("branch items %v", got)
+	}
+	d, b, s, c := got["branch:filial/done"], got["branch:filial/behind"], got["branch:filial/squash"], got["branch:filial/closed"]
+	if !slices.Equal(d.Reasons, []string{"upstream-gone", "merged"}) || d.Dirty || d.Name != "done" || d.Project != "filial" {
+		t.Errorf("done %+v", d)
+	}
+	if !slices.Equal(b.Reasons, []string{"merged"}) || b.Dirty {
+		t.Errorf("behind %+v", b)
+	}
+	if !slices.Equal(s.Reasons, []string{"pr-merged"}) || s.Dirty || s.PR != 9 {
+		t.Errorf("squash %+v", s)
+	}
+	if !slices.Equal(c.Reasons, []string{"pr-closed"}) || !c.Dirty || c.PR != 12 {
+		t.Errorf("closed %+v", c)
+	}
+	code, _, errs = runWith(t, f, "-C", ws, "tidy", "--rm", "branch:filial/closed", "branch:filial/wip")
+	if code != 1 || !strings.Contains(errs, "branch:filial/closed is not merged; kept (--force deletes its commits)") ||
+		!strings.Contains(errs, "branch:filial/wip is not a candidate now") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+	code, out, errs = runWith(t, f, "-C", ws, "tidy", "--rm", "--force", "branch:filial/closed", "branch:filial/squash", "branch:filial/behind")
+	if code != 0 || !strings.Contains(out, "deleted branch branch:filial/squash") {
+		t.Errorf("exit %d: %s %s", code, out, errs)
+	}
+	if refs := gitOut(t, master, "for-each-ref", "--format=%(refname:lstrip=2)", "refs/heads/"); refs != "done\nfeat\nmaster\nwip\n" {
+		t.Errorf("local branches left:\n%s", refs)
+	}
+	if remote := gitOut(t, origin, "for-each-ref", "--format=%(refname:lstrip=2)", "refs/heads/"); !strings.Contains(remote, "behind") {
+		t.Errorf("tidy deleted origin's behind:\n%s", remote)
+	}
+}

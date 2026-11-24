@@ -1400,6 +1400,18 @@ worktree that way right after its branch changes (#254).
 | `stack.branches` | array | Bottom (next to `trunk`) to top: `name`, `current`, `merged`, `queued` (in the merge queue), `needs_rebase`, `pr` (`null` before `gh stack submit`): `number`; `state`: `open`, `merged` or `queued` as gh-stack reports them, `draft` for an open PR GitHub says is a draft; `checks` (`pass`, `fail`, `pending`, `none`) and `review` (`approved`, `changes_requested`, `pending`, `none`) of an open PR, read with one `gh pr list --head` per open branch, `""` for a merged one or when GitHub couldn't be read (a warning on stderr). |
 | `worktrees[].error` | string | Why gh stack couldn't say (`""` otherwise). |
 
+`stack checkout <pr>` (D230) runs `gh stack checkout <pr>` in the
+worktree (`-w`): gh-stack fetches the PR's stack from GitHub, makes a
+local branch for each branch and checks the PR's out. It sees the
+repository through the same shadow as `stack ls`, with git limited to
+the https, ssh, git and file transports (`GIT_ALLOW_PROTOCOL`: origin's
+URL is in a config containers write), no prompt and 3 minutes. Then what
+gh-stack wrote in the shadow that belongs to the repository is copied
+back, nothing else: its catalog (`.git/gh-stack`) and the new branches'
+upstreams (`branch.<name>.remote` and `.merge`, values checked), each
+file written whole beside the old one and renamed over it, so a symlink
+there is replaced, never followed. Text output only.
+
 ## `task ls`
 
 The worktree's (`-w`) tasks, by name: the pack's `[tasks]` with

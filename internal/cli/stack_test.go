@@ -142,6 +142,48 @@ func TestStackSwitch(t *testing.T) {
 	}
 }
 
+// D230: stack checkout runs gh stack checkout <pr> in the worktree through
+// the shadow, git limited to safe transports and no prompt; a bad number
+// is a usage error; without gh stack it says how to install it.
+func TestStackCheckout(t *testing.T) {
+	ws, _ := gitWS(t)
+	for _, bad := range []string{"0", "-3", "x", "12abc"} {
+		if code, _, _ := runWith(t, stackFake(), "-C", ws, "-w", "feat", "stack", "checkout", bad); code != 2 {
+			t.Errorf("checkout %q: exit %d; want 2", bad, code)
+		}
+	}
+	if code, _, _ := runWith(t, stackFake(), "-C", ws, "stack", "checkout", "7"); code != 2 {
+		t.Errorf("checkout outside a worktree: exit %d; want 2", code)
+	}
+	none := fakeHost()
+	none.Passthrough = []string{"git"}
+	if code, _, errs := runWith(t, none, "-C", ws, "-w", "feat", "stack", "checkout", "7"); code != 1 || !strings.Contains(errs, "gh extension install github/gh-stack") {
+		t.Errorf("no gh stack: exit %d: %s", code, errs)
+	}
+	f := stackFake()
+	code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "stack", "checkout", "7")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	i := slices.IndexFunc(f.Calls, func(c []string) bool { return slices.Equal(c, []string{"gh", "stack", "checkout", "7"}) })
+	if i < 0 {
+		t.Fatalf("no gh stack checkout 7: %v", f.Calls)
+	}
+	c := f.Cmds[i]
+	if c.Dir != filepath.Join(ws, "worktrees", "feat") {
+		t.Errorf("ran in %s", c.Dir)
+	}
+	for _, want := range []string{"GIT_COMMON_DIR=", "GIT_ALLOW_PROTOCOL=https:ssh:git:file", "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0"} {
+		if !slices.ContainsFunc(c.Env, func(kv string) bool { return strings.HasPrefix(kv, want) }) {
+			t.Errorf("env lacks %s", want)
+		}
+	}
+	f.On([]string{"gh", "stack", "checkout"}, sys.Result{ExitCode: 1, Stderr: []byte("no stack holds #8")}, fmt.Errorf("gh: %w (exit 1)", sys.ErrExit))
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "stack", "checkout", "8"); code != 1 || !strings.Contains(errs, "no stack holds #8") {
+		t.Errorf("a failed checkout: exit %d: %s", code, errs)
+	}
+}
+
 // TestTerm: a new terminal in the worktree running the user's shell.
 func TestTerm(t *testing.T) {
 	ws, _ := gitWS(t)

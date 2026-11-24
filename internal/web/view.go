@@ -49,7 +49,9 @@ type row struct {
 	WT      worktree
 	PR      *pr
 	Stacked *ghStackRow // nil: its branch is in no gh stack (or gh stack is missing)
-	Now     time.Time   // the clock the tests' "5m ago" counts from
+	// StackAvail: gh stack is installed (the last stack read said so).
+	StackAvail bool
+	Now        time.Time // the clock the tests' "5m ago" counts from
 	// DefaultAgent is the project's default agent (the overview's), which
 	// the Agent card marks; "": none.
 	DefaultAgent string
@@ -747,6 +749,7 @@ type detailView struct {
 	SnapshotsURL                      string // the database snapshots dialog (D157); "" without a data service
 	Stacked                           *stackedView
 	SwitchURL                         string // with Stacked: posts a branch to check out
+	GetStackURL                       string // its open PR, in no stack read: stack checkout <pr> (D230)
 	Switching                         string // the branch a running stack switch checks out; "" for none
 	Merged, Stale                     bool
 	Tests                             *testsView // nil: no test task
@@ -906,6 +909,9 @@ func newDetail(prefix string, r row, repo string) detailView {
 	v.Terms = append(v.Terms, actionView{Label: "shell", URL: tty + "shell"})
 	if v.Stacked != nil && v.Stacked.Error == "" {
 		v.SwitchURL = path + "/stack/switch"
+	}
+	if r.StackAvail && r.Stacked == nil && r.PR != nil && (r.PR.State == "open" || r.PR.State == "draft") {
+		v.GetStackURL = path + "/stack/checkout"
 	}
 	if slices.ContainsFunc(wt.Services, func(s service) bool { return s.Role == "data" }) {
 		v.SnapshotsURL = path + "/snapshots"

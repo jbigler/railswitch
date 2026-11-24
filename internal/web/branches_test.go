@@ -131,3 +131,42 @@ func TestFetchPoll(t *testing.T) {
 		t.Error("a fetch that went well left the failure shown")
 	}
 }
+
+// D230: a worktree whose open PR is in no stack read, with gh stack
+// installed, offers Get its stack, which runs stack checkout with the PR
+// number the dashboard read; in a stack, or without gh stack, it doesn't.
+func TestGetStack(t *testing.T) {
+	ctx := context.Background()
+	const noStack = `{"available":true,"worktrees":[{"slug":"main","stack":null,"error":""},{"slug":"b","stack":null,"error":""}]}`
+	f := newFixture(t)
+	f.cli.set("--json -C /ws/ftest stack ls", noStack)
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	ev, ok := byID(drain(sub), "detail")
+	if !ok || !strings.Contains(ev.HTML, `action="/p/ftest/b/stack/checkout"`) || !strings.Contains(ev.HTML, "Get its stack") {
+		t.Fatalf("detail without Get its stack: %v", ok)
+	}
+	if w := f.do(req("POST", "/p/ftest/b/stack/checkout", form("pr", "1"))); w.Code != 202 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if got, want := f.run.wait(t, 1)[0], []string{testExe, "-C", "/ws/ftest", "-w", "b", "stack", "checkout", "2141"}; !slices.Equal(got, want) {
+		t.Errorf("argv %q, want %q", got, want)
+	}
+	f.ended(t)
+	if w := f.do(req("POST", "/p/ftest/main/stack/checkout", form())); w.Code != 422 {
+		t.Errorf("main, no PR: %d", w.Code)
+	}
+
+	g := newFixture(t)
+	g.cli.set("--json -C /ws/ftest stack ls", `{"available":false,"worktrees":[{"slug":"main","stack":null,"error":""},{"slug":"b","stack":null,"error":""}]}`)
+	sub2 := g.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
+	defer g.s.unsubscribe(sub2)
+	g.s.pollOnce(ctx)
+	if ev, ok := byID(drain(sub2), "detail"); ok && strings.Contains(ev.HTML, "Get its stack") {
+		t.Error("Get its stack without gh stack")
+	}
+	if w := g.do(req("POST", "/p/ftest/b/stack/checkout", form())); w.Code != 422 {
+		t.Errorf("without gh stack: %d", w.Code)
+	}
+}

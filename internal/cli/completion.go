@@ -60,7 +60,7 @@ var completionSubs = map[string][]string{
 	"settings":           {"apply", "preview"},
 	"secret":             {"add", "ls", "rm", "set"},
 	"signer":             {"add", "ls", "revoke", "rm"},
-	"stack":              {"ls", "switch"},
+	"stack":              {"ls", "switch", "checkout"},
 	"branch":             {"ls", "fetch", "rm", "pull"},
 	"task":               {"ls", "restore", "rm", "set"},
 	"template":           {"check", "export", "import", "ls", "show"},

@@ -136,6 +136,7 @@ var synopses = map[string]string{
 	"branch pull":            "branch pull <branch>...  (fast-forward only)",
 	"stack ls":               "stack ls [--no-detail]",
 	"stack switch":           "stack switch <branch>",
+	"stack checkout":         "stack checkout <pr>  (the PR's whole gh stack, with gh stack checkout)",
 	"stats":                  "stats [--all]",
 	"status":                 "status",
 	"stop":                   "stop",

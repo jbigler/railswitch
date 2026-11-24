@@ -156,7 +156,20 @@ function afterSwap(id) {
     if (slug && body.dataset.pane === "detail" && location.pathname + location.search !== pageURL(slug)) history.replaceState(null, "", pageURL(slug));
     showTab();
     termsShown(); // showTab returns early on a detail without tabs
+    if (slug && focusOn === slug) {
+      focusOn = null;
+      focusShownTerm();
+    }
   }
+}
+
+// focusShownTerm gives the focus to the terminal panel shown, if any; one
+// still loading (restored from the server) takes it once it's ready.
+function focusShownTerm() {
+  const p = $$("#terms .term-panel").find((p) => !p.hidden);
+  if (!p) return;
+  if (p.focusTerm) p.focusTerm();
+  else p.focusWanted = true;
 }
 
 // The detail's tabs: Overview shows every card, another tab only its own
@@ -254,9 +267,15 @@ function pageURL(slug) {
   return "/p/" + encodeURIComponent(prefix) + "/" + encodeURIComponent(slug) + pageQuery(body.dataset.sort, body.dataset.days);
 }
 
+// focusOn is the worktree a click selected: when its detail arrives, its
+// shown terminal takes the focus, as a click on a tab gives it (#251). ↑↓
+// leaves it, so the keys stay in the list.
+let focusOn = null;
+
 function select(slug, push) {
   $$("#list tr[data-slug]").forEach((tr) => tr.classList.toggle("sel", tr.dataset.slug === slug));
   body.dataset.sel = slug;
+  focusOn = push ? slug : null;
   hideToast(); // a "Running" toast is about the worktree left: its job is not in the next list
   // A click opens the detail (a narrow window shows one pane); ↑↓ doesn't.
   if (push) body.dataset.pane = "detail";
@@ -312,7 +331,7 @@ document.addEventListener("click", (e) => {
   if (tabBtn) {
     showTab(tabBtn.dataset.tab);
     // A click on a tab, not a redraw, takes the focus to its terminal (#243).
-    $$("#terms .term-panel").find((p) => !p.hidden)?.focusTerm?.();
+    focusShownTerm();
     return;
   }
   const row = t.closest("#list tr[data-slug]");
@@ -547,6 +566,7 @@ async function openTermPanel(btn, again) {
     const onExit = (code, typed) => termCloses(btn.dataset.term, code, typed) && (panel.closeTerm(), true);
     t = openTerminal(host, btn.dataset.term, { quiet: !!again, onExit });
     panel.focusTerm = () => t.focus();
+    if (panel.focusWanted) t.focus();
   } catch (err) {
     host.textContent = String(err.message || err);
   }

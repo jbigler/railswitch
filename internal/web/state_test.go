@@ -565,3 +565,25 @@ func TestSwitchingFromJobs(t *testing.T) {
 		t.Errorf("Switching after the job = %q, want none", got)
 	}
 }
+
+// TestHeaderRepoLink (#253): the header links the project's repository
+// on GitHub when overview has one, and shows no link otherwise.
+func TestHeaderRepoLink(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	ov := ftestOverview("jb/b", "up", agentJSON("idle", "", false))
+	f.cli.set("--json -C /ws/ftest overview", strings.Replace(ov, `"prefix":"ftest",`, `"prefix":"ftest","repo_url":"https://github.com/o/r",`, 1))
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	link := `<a class="hb" href="https://github.com/o/r" target="_blank" rel="noopener" title="The project's repository on GitHub">GitHub ↗</a>`
+	if hd, _ := byID(drain(sub), "header"); !strings.Contains(hd.HTML, link) {
+		t.Errorf("no repo link in the header:\n%s", hd.HTML)
+	}
+	f.cli.set("--json -C /ws/ftest overview", ov)
+	f.clock.Add(time.Minute)
+	f.s.pollOnce(ctx)
+	if hd, ok := byID(drain(sub), "header"); !ok || strings.Contains(hd.HTML, "GitHub ↗") {
+		t.Errorf("header without repo_url (sent %v): %s", ok, hd.HTML)
+	}
+}

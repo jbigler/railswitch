@@ -141,7 +141,9 @@ still wider than the window scrolls its pane.
   with a project, after a thin divider, `Worktrees` (its page, at the
   worktree last shown: kept per project in the browser's `localStorage`), `Images`,
   `Tidy`, `Library`, `Settings`, `Notes` and `Office` (the Virtual Office; the
-  project's pages, below). Then `◆ N need input`. On the
+  project's pages, below), and `GitHub ↗` (the project's repository,
+  `overview`'s `repo_url`; absent when the repo isn't on GitHub, #253).
+  Then `◆ N need input`. On the
   right, the **Machine ▾** menu: `Settings` (the Machine page), `Logs ↗`
   (Dozzle at `http://logs.localhost/`), `Notifications` until the browser
   permission is decided, and `Colours` (dashboard colours). A menu closes
@@ -1099,6 +1101,11 @@ kitty is not one: tmux asks the terminal for xterm's modifyOtherKeys, which
 kitty ignores, so through the session kitty sends Shift+Enter as a plain
 Enter. Map it in `kitty.conf` (`map shift+enter send_text all \x1b\r`);
 the agent takes the ESC Enter as a new line.
+
+A click on a tab takes the focus to the terminal it shows (#243), and so
+does a click on a worktree in the list, once its page shows (#251): with
+the Agent tab open, the agent's terminal. ↑↓ in the list leaves the
+focus in the list.
 
 The browser keeps `Ctrl-W`, `Ctrl-T`, `Ctrl-N` and `Ctrl-Tab` for itself.
 A `Ctrl-W` meant for the shell closes the browser tab, and the terminal

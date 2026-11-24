@@ -816,6 +816,10 @@ func (s *Server) rows(prefix string, k sortKey, sel string) ([]row, string) {
 func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 	rows, sel := s.rows(prefix, k, sel)
 	need := 0
+	repoURL := ""
+	if p := s.state[prefix]; p != nil && p.ov != nil {
+		repoURL = p.ov.RepoURL
+	}
 	var strip stripView
 	var projects projectsView
 	for i, pj := range s.projects {
@@ -871,7 +875,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 	}
 	pv := pageView{
 		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(), Days: days,
-		Header: headerView{Prefix: prefix, Need: need, Terms: s.ttyOpen(), TermsMax: ttyMax}, Projects: projects, Strip: strip, Banner: banner,
+		Header: headerView{Prefix: prefix, Need: need, Terms: s.ttyOpen(), TermsMax: ttyMax, RepoURL: repoURL}, Projects: projects, Strip: strip, Banner: banner,
 		List:   newList(prefix, rows, sel, k),
 		Detail: detailView{Empty: true},
 		Jobs:   newJobs(s.c.Jobs.Jobs(prefix, ""), rows, sel),

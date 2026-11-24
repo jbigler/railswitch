@@ -1094,6 +1094,7 @@ row.
   "prefix": "filial",
   "workspace": "/home/u/workspace/filial",
   "review_pending": false,
+  "repo_url": "https://github.com/acme/filial",
   "signer_warnings": [{"ref": "acme:django@1", "library": "github.com/acme/stack-library", "fingerprint": "SHA256:…"}],
   "worktrees": [
     {
@@ -1117,6 +1118,7 @@ row.
 | `workspace` | string | Its workspace directory as registered. |
 | `default_agent` | string | The agent run when none is named (D140): the one marked `default = true`, else the only one whose package is the built-in default; `""` for none. |
 | `review_pending` | boolean | A package update waits for review (D97): a package whose content changed under the ref `stack.lock` pins runs its accepted copy from the store, or `stack.lock` is out of date. [`lock --review`](#lock---review) shows it. |
+| `repo_url` | string | The project's repository on GitHub, `https://github.com/<owner>/<name>`, from `project.toml`'s `repo` (https, scp-style or ssh://); `""` when it isn't a GitHub repo. The dashboard's header links it (#253). |
 | `signer_warnings` | array | One `{ref, library, fingerprint}` per library package the project's `stack.lock` pins whose lock `signer` is no longer trusted for its library in `signers.toml` (distrusted with `signer rm`, or revoked) (D102): `ref` as `project.toml` names it (`acme:django@1`), `library` the library's id, `fingerprint` the lock's signer. The project keeps running it. `[]` when none (never null); a `signers.toml` that can't be read trusts nothing. |
 | `template` | object or null | The template the project started from, as `project.toml` `[template]` records it: `ref`, `sha256` (lowercase hex, no prefix). `null` when it records none. |
 | `template_update` | boolean | `template.ref` resolves to content with another hash than `template.sha256` (a library fetch changed it, D111). [`template check`](#template-check) shows the diff; nothing is applied. `false` without a template or when the ref doesn't resolve. |

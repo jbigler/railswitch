@@ -20,6 +20,7 @@
 {{define "branches-body"}}<div id="branches-body" data-src="{{.URL}}/items">
 <p class="note">The project's local branches, newest first. Every worktree shares one repository, so these are the project's, not one worktree's. A branch "could go" when its upstream is gone, its PR is merged or closed, or it is merged into {{.Base}}, and no worktree has it checked out.</p>
 {{if .Error}}<p class="red set-error">{{.Error}}</p>
+{{end}}{{with .FetchError}}<p class="yellow">{{.}}</p>
 {{end}}{{if .Warnings}}<div class="warnings">{{range .Warnings}}<p class="yellow">{{.}}</p>
 {{end}}</div>
 {{end}}<section class="card">

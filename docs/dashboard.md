@@ -634,6 +634,13 @@ project's. Like Tidy, the page shows at once and fetches the table
   origin was last fetched ("fetched 3 min ago"), **Fetch** (`railswitch
   branch fetch`: `git fetch --prune origin` as a job) and, when any
   branch is behind its upstream and not ahead, **Pull all behind (N)**.
+- Fetching on its own (D228): while any page of the project is open, the
+  dashboard runs `branch fetch` every 5 minutes, and the Branches page
+  fetches before it reads when the last fetch from this dashboard is
+  older (after the dashboard starts, too). These fetches are no jobs;
+  one that fails shows above the table ("The last fetch, at 12:04,
+  failed: …") until one goes well. Nothing is fetched while no page is
+  open.
 - A row per branch: a tick box (not for the base branch or one checked
   out anywhere); the name with `base`, `≡ stack #N` when it is in a gh
   stack and `unmerged`; the worktree it is checked out in (a link),
@@ -1772,6 +1779,12 @@ docs/json.md.
   never matches (its head branch is the fork's). Fails with gh's
   message when gh is missing or not logged in; the page then shows "PRs
   unavailable".
+- `railswitch --json branch ls` (project, the Branches page): the local
+  branches (D227). `branch fetch` runs every 5 minutes while a page of
+  the project is open, and before the Branches page reads when the last
+  fetch from this dashboard is older (D228); it is no job, and a failure
+  shows on the Branches page. `branch fetch`, `branch rm` and `branch
+  pull` from the page's buttons run as jobs.
 - `railswitch [--json] stack ls` (project): each worktree's gh stack, with
   the PRs and as often (`docs/json.md`); nothing without the gh-stack
   extension, and a failed read keeps the last stacks.

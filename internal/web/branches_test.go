@@ -1,6 +1,8 @@
 package web
 
 import (
+	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -81,5 +83,51 @@ func TestBranchesPage(t *testing.T) {
 			t.Errorf("argv %q, want %q", got, want)
 		}
 		f.ended(t)
+	}
+}
+
+// D228: origin is fetched every fetchEvery while a page of the project is
+// open, never without one; opening the Branches page fetches first when
+// the last fetch is older; a failed fetch shows there, not in Jobs.
+func TestFetchPoll(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	const fetch = "-C /ws/ftest branch fetch"
+	f.cli.set(fetch, "fetched origin\n")
+	f.cli.set("--json -C /ws/ftest branch ls", branchesJSON)
+	f.s.pollOnce(ctx) // loads the projects; no page is open
+	if n := f.cli.count(fetch); n != 0 {
+		t.Errorf("fetched with no page open: %d", n)
+	}
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
+	defer f.s.unsubscribe(sub)
+	f.s.pollFetch(ctx)
+	f.s.pollFetch(ctx)
+	if n := f.cli.count(fetch); n != 1 {
+		t.Errorf("fetches before fetchEvery = %d, want 1", n)
+	}
+	// The page within fetchEvery reads without fetching.
+	if w := f.do(req("GET", "/p/ftest/branches/items", nil)); w.Code != 200 || f.cli.count(fetch) != 1 {
+		t.Errorf("%d, fetches %d", w.Code, f.cli.count(fetch))
+	}
+	f.clock.Add(fetchEvery)
+	f.cli.fail(fetch, errors.New("git fetch --prune origin: exit status 128: Permission denied (publickey)"))
+	body := f.do(req("GET", "/p/ftest/branches/items", nil)).Body.String()
+	if n := f.cli.count(fetch); n != 2 {
+		t.Errorf("fetches after fetchEvery, on opening the page = %d, want 2", n)
+	}
+	contains(t, "items", body, "The last fetch, at ", "failed: git fetch --prune origin: exit status 128: Permission denied (publickey)")
+	if len(f.run.Argvs()) != 0 {
+		t.Errorf("a fetch ran as a job: %q", f.run.Argvs())
+	}
+	f.s.pollFetch(ctx)
+	if n := f.cli.count(fetch); n != 2 {
+		t.Errorf("the poll fetched again right after the page did: %d", n)
+	}
+	f.clock.Add(fetchEvery)
+	f.cli.set(fetch, "fetched origin\n")
+	f.s.pollFetch(ctx)
+	if body := f.do(req("GET", "/p/ftest/branches/items", nil)).Body.String(); strings.Contains(body, "The last fetch") {
+		t.Error("a fetch that went well left the failure shown")
 	}
 }

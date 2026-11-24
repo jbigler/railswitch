@@ -231,7 +231,11 @@ still wider than the window scrolls its pane.
     stack's (start, or restart and stop; the first one filled), **Open
     app ↗** (the first app link), **Run tests** (`railswitch task test`
     as a job; only with a `test` task), **Terminal ▾** (below) and **⋯**:
-    PR page, `Down…` and `Remove…` (see Actions).
+    PR page, `Down…` and `Remove…` (see Actions). While the stack is
+    stopped, Open app and Run tests are greyed and do nothing, with
+    "Start the worktree first" as their tooltip (#255); start, the
+    terminals (the agent, nvim and a shell start what they need) and ⋯
+    stay.
   - **Tabs:** Overview, Agent, Tests
     (with a `test` task), Database (with a data service), Whiteboard,
     Terminals and Jobs. Overview shows every card, each its own height; another tab only
@@ -1165,7 +1169,10 @@ Every action is a job (below).
   lost; `db snapshot restore --yes <name>`) and **delete** (asks first;
   `db snapshot rm <name>`), and **Take a snapshot** with an optional name
   (`db snapshot [<name>]`, a timestamp by default). The dashboard restores
-  or deletes only a name the list it read holds.
+  or deletes only a name the list it read holds. Take, restore and the
+  starting data's **Use this worktree's data** need the database
+  running: while the stack is stopped they are greyed (#255), and the
+  tab reads its content again when the worktree starts or stops.
 - **Queue** (under the detail's Agent, D159): the worktree's agent work
   queue from `overview`'s `queue`, each item's first line (the whole text
   as its tooltip) with **remove** (`agent queue rm <id>`), **clear**

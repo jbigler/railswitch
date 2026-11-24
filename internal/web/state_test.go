@@ -587,3 +587,40 @@ func TestHeaderRepoLink(t *testing.T) {
 		t.Errorf("header without repo_url (sent %v): %s", ok, hd.HTML)
 	}
 }
+
+// TestStoppedButtons (#255): while a worktree's stack is stopped, Open
+// app and Run tests are disabled, and so are the Database tab's take,
+// restore and Use, which need its database running; start, the
+// terminals and delete stay.
+func TestStoppedButtons(t *testing.T) {
+	ctx := context.Background()
+	for _, stack := range []string{"up", "stopped"} {
+		f := newFixture(t)
+		ov := ftestOverview("jb/b", stack, agentJSON("idle", "", false))
+		ov = strings.Replace(ov, `"slug":"b","id":2,`, `"slug":"b","id":2,"tests":{"state":"never","stale":false,"last":null},`, 1)
+		f.cli.set("--json -C /ws/ftest overview", ov)
+		sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
+		f.s.pollOnce(ctx)
+		d, _ := byID(drain(sub), "detail")
+		f.s.unsubscribe(sub)
+		stopped := stack == "stopped"
+		for want, on := range map[string]bool{
+			` data-stopped>`: stopped,
+			`<a class="ln" aria-disabled="true" title="Start the worktree first">Open app ↗</a>`:                           stopped,
+			`<a class="ln" href="http://b.ftest.localhost/" target="_blank" rel="noopener">Open app ↗</a>`:                 !stopped,
+			`<button class="ln" disabled title="Start the worktree first: the tests need its services">Run tests</button>`: stopped,
+			`<button class="ln">Run tests</button>`:                                                                        !stopped,
+		} {
+			if strings.Contains(d.HTML, want) != on {
+				t.Errorf("%s: detail has %q = %v, want %v", stack, want, !on, on)
+			}
+		}
+		panel := f.do(req("GET", "/p/ftest/b/database-panel", nil)).Body.String()
+		if n := strings.Count(panel, " disabled title=\"Start the worktree first: its database must be running\""); stopped && n != 3 || !stopped && n != 0 {
+			t.Errorf("%s: %d disabled database buttons:\n%s", stack, n, panel)
+		}
+		if !strings.Contains(panel, `<button class="ln danger">Delete</button>`) {
+			t.Errorf("%s: delete disabled:\n%s", stack, panel)
+		}
+	}
+}

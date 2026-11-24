@@ -10,20 +10,20 @@ redraws. Every button is a job; restore, delete and Use ask first. */}}
 <p class="muted">A new worktree starts from the workspace's <code>db-dumps/</code>.</p>
 {{if .Written}}<p>{{len .DumpFiles}} file{{if ne (len .DumpFiles) 1}}s{{end}}, {{.DumpSize}}, last written <span class="mono">{{.Written}}</span>: {{range $i, $f := .DumpFiles}}{{if $i}}, {{end}}<code>{{$f}}</code>{{end}}</p>
 {{else}}<p>There is none: <code>db-dumps/</code> holds no dumps.</p>
-{{end}}<form method="post" action="{{.DumpURL}}" data-post data-confirm="Use {{.Slug}}'s data as the starting data of new worktrees? It replaces the dumps in db-dumps/; the database must be running."><div class="btns start"><button class="ln">Use this worktree's data</button></div></form>
+{{end}}<form method="post" action="{{.DumpURL}}" data-post data-confirm="Use {{.Slug}}'s data as the starting data of new worktrees? It replaces the dumps in db-dumps/; the database must be running."><div class="btns start"><button class="ln"{{if .Stopped}} disabled title="Start the worktree first: its database must be running"{{end}}>Use this worktree's data</button></div></form>
 </section>
 </div>{{end}}
 
 {{define "snapshots-take"}}<form method="post" action="{{.TakeURL}}" data-post data-close>
 <label>Name <input name="name" placeholder="a timestamp" autocomplete="off" class="mono"></label>
-<div class="btns"><button class="ln main">Take a snapshot</button></div>
+<div class="btns"><button class="ln main"{{if .Stopped}} disabled title="Start the worktree first: its database must be running"{{end}}>Take a snapshot</button></div>
 </form>{{end}}
 
 {{define "snapshots-table"}}{{if .Snapshots}}<table class="set-table">
 <thead><tr><th>Name</th><th>Taken</th><th>Size</th><th></th></tr></thead>
 <tbody>
 {{range .Snapshots}}<tr><td class="mono">{{.Name}}</td><td class="mono">{{.Created}}</td><td class="mono">{{.Size}}</td>
-<td><form method="post" action="{{$.RestoreURL}}" data-post data-close data-confirm="Restore {{.Name}} into {{$.Slug}}? What its databases and storage hold now is lost."><input type="hidden" name="name" value="{{.Name}}"><button class="ln">Restore</button></form>
+<td><form method="post" action="{{$.RestoreURL}}" data-post data-close data-confirm="Restore {{.Name}} into {{$.Slug}}? What its databases and storage hold now is lost."><input type="hidden" name="name" value="{{.Name}}"><button class="ln"{{if $.Stopped}} disabled title="Start the worktree first: its database must be running"{{end}}>Restore</button></form>
 <form method="post" action="{{$.RmURL}}" data-post data-close data-confirm="Delete snapshot {{.Name}}?"><input type="hidden" name="name" value="{{.Name}}"><button class="ln danger">Delete</button></form></td></tr>
 {{end}}</tbody>
 </table>

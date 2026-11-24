@@ -157,7 +157,7 @@ a.pal-task{color:var(--text);text-decoration:none}
 .add-secret label.check{display:inline-block;margin-right:12px}
 .add-secret fieldset{border:1px solid var(--border);border-radius:4px;margin:6px 0}
 .add-secret summary{cursor:pointer;color:var(--blue);margin-top:8px}
-.ln:disabled{opacity:.5;cursor:not-allowed}
+.ln:disabled,.ln[aria-disabled=true]{opacity:.5;cursor:not-allowed}
 .set-file{margin:12px 0}
 .toml{display:block;width:100%;min-height:60vh;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;white-space:pre;tab-size:4}
 .staged h2{font-size:16px;margin:0 0 6px}

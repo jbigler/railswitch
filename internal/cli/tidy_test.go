@@ -50,7 +50,7 @@ func TestTidy(t *testing.T) {
 		t.Fatalf("items %+v", doc.Items)
 	}
 	wt, img := doc.Items[0], doc.Items[1]
-	if wt.ID != "wt:filial/feat" || !slices.Equal(wt.Reasons, []string{"pr-merged", "stopped"}) || wt.PR != 7 || wt.Stack != "stopped" ||
+	if wt.ID != "wt:filial/feat" || !slices.Equal(wt.Reasons, []string{"pr-merged", "stopped"}) || wt.PR != 7 || wt.State != "stopped" ||
 		wt.IdleFrom != "systemd" || wt.IdleSince != "2026-01-06T09:00:00Z" || wt.Dirty || wt.Bytes == 0 {
 		t.Errorf("worktree %+v", wt)
 	}

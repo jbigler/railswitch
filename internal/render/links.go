@@ -17,7 +17,7 @@ var schemeRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
 type Link struct {
 	Label string `json:"label"`
 	URL   string `json:"url"`
-	Group string `json:"group"` // "app", "project", "stack"
+	Group string `json:"group"` // "app", "project", "pack" (the pack's, options' and tools')
 }
 
 // Task is one task runnable in the app image.
@@ -36,9 +36,9 @@ type Task struct {
 	Terminal bool `json:"terminal,omitempty"`
 }
 
-// stackLinks are the pack's links, then each chosen option's in
+// packLinks are the pack's links, then each chosen option's in
 // config.Slots order, then each enabled tool's, each in file order.
-func (m *Model) stackLinks() []pack.Link {
+func (m *Model) packLinks() []pack.Link {
 	st := m.Inputs.Stack
 	links := slices.Clone(st.Pack.Links)
 	for _, ch := range st.Options {
@@ -70,12 +70,12 @@ func (b *builder) checkFreshTasks() error {
 // checkHideLinks fails on a hide_links label no stack link carries.
 func (b *builder) checkHideLinks() error {
 	have := map[string]bool{}
-	for _, l := range b.m.stackLinks() {
+	for _, l := range b.m.packLinks() {
 		have[l.Label] = true
 	}
 	for _, label := range b.in.Project.HideLinks {
 		if !have[label] {
-			return fmt.Errorf("hide_links: no stack link labelled %q", label)
+			return fmt.Errorf("hide_links: no package link labelled %q", label)
 		}
 	}
 	return nil
@@ -103,11 +103,11 @@ func (m *Model) Links(in *Instance) ([]Link, error) {
 			return nil, err
 		}
 	}
-	for _, l := range m.stackLinks() {
+	for _, l := range m.packLinks() {
 		if slices.Contains(m.Inputs.Project.HideLinks, l.Label) {
 			continue
 		}
-		if err := add(l.Label, l.URL, "stack"); err != nil {
+		if err := add(l.Label, l.URL, "pack"); err != nil {
 			return nil, err
 		}
 	}

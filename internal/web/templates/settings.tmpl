@@ -13,7 +13,7 @@
 <input name="version" type="number" min="1" step="1" value="1" class="mono" required aria-label="Template version">
 <button class="ln">Save</button>
 </form>
-<p class="note">Writes <span class="mono">~/.config/railswitch/templates/&lt;name&gt;.stack/</span> for every project on this machine: the stack, options, pins, env and secret names as questions with this project's values as defaults, and the Containerfiles you edited. The project's name, prefix and repository stay out; so do secret values. A version already saved is refused: save a higher one.</p></div>
+<p class="note">Writes <span class="mono">~/.config/railswitch/templates/&lt;name&gt;.stack/</span> for every project on this machine: the pack, options, pins, env and secret names as questions with this project's values as defaults, and the Containerfiles you edited. The project's name, prefix and repository stay out; so do secret values. A version already saved is refused: save a higher one.</p></div>
 </details>
 {{end}}<a class="ln dim" href="{{.FileURL}}" title="For services, routes, agents, image, tools and versions">Edit project.toml</a></div>
 {{if .Error}}<p class="red set-error">project.toml: {{.Error}}</p>
@@ -21,8 +21,8 @@
 {{end}}<p class="note">Changes are staged, not applied. The panel on the right shows what each one does before anything happens.</p>
 {{template "settings-template" .Template}}{{template "tabs" .Tabs}}
 
-<section class="spanel" data-spanel="stack">
-<h2>Stack and options</h2>
+<section class="spanel" data-spanel="pack">
+<h2>Pack and options</h2>
 <div class="sopts">{{with .Pack}}{{template "sopt" .}}{{end}}{{range .Options}}{{if not .Unused}}{{template "sopt" .}}{{end}}{{end}}</div>
 <div class="sopts unused">{{range .Options}}{{if .Unused}}{{template "sopt" .}}{{end}}{{end}}</div>
 <details class="more"><summary>Add another service</summary>
@@ -191,7 +191,7 @@ the project was made from it; Accept records its new version. */}}
 {{end}}</section>
 {{end}}{{end}}
 
-{{/* sopt is one stack choice: the pack or an option, as a select. */}}
+{{/* sopt is one package choice: the pack or an option, as a select. */}}
 {{define "sopt"}}<label class="sopt{{if .Unused}} muted{{end}}"{{if eq .Key "pack"}} data-pack{{end}} data-key="{{.Key}}" data-ref="{{.Ref}}"><span class="sopt-key"><b>{{.Key}}</b>{{if not .Slot}} <span class="muted">extra</span>{{end}}</span><select class="mono">{{range .Choices}}<option value="{{.Ref}}"{{if .Current}} selected{{end}}>{{.Ref}}</option>{{end}}</select></label>{{end}}
 
 {{/* fw-blocked is the Firewall tab's blocked list, loaded after the

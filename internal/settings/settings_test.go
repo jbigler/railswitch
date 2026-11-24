@@ -274,7 +274,7 @@ func TestPreviewBlocked(t *testing.T) {
 		Edit{Op: "option", Key: "cache", Ref: "nope@1"},
 		Edit{Op: "link.add", Label: "Ok", URL: "{worktree.host}/ok"},
 	)
-	for i, sub := range []string{"NOPE", "env.X", `no stack link labelled "Nope"`, "nope"} {
+	for i, sub := range []string{"NOPE", "env.X", `no package link labelled "Nope"`, "nope"} {
 		if r := p.Edits[i]; r.Impact != ImpactBlocked || !strings.Contains(r.Error, sub) {
 			t.Errorf("edit %d: %+v, want blocked naming %q", i, r, sub)
 		}

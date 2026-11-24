@@ -200,7 +200,7 @@ type agentChoice struct {
 	Default   bool
 }
 
-// newStackView is the Stack card: the pack and one row per slot, as the
+// newStackView is the Pack card: the pack and one row per slot, as the
 // repository suggests them. Read is false before a read.
 type newStackView struct {
 	Read             bool
@@ -324,7 +324,7 @@ func (s *Server) newPage(w http.ResponseWriter, r *http.Request) {
 	s.html(w, http.StatusOK, "new", v)
 }
 
-// newDetect reads the repository: the Stack card for its pack and
+// newDetect reads the repository: the Pack card for its pack and
 // options, or 422 with git's error.
 func (s *Server) newDetect(w http.ResponseWriter, r *http.Request) {
 	f, err := parseNewForm(r, s.c.Home, false)

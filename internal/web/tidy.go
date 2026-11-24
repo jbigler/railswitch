@@ -30,7 +30,7 @@ type tidyItem struct {
 	Branch    string   `json:"branch"`
 	Reasons   []string `json:"reasons"`
 	PR        int      `json:"pr"`
-	Stack     string   `json:"stack"`
+	State     string   `json:"state"`
 	IdleSince string   `json:"idle_since"`
 	IdleFrom  string   `json:"idle_from"`
 	Dirty     bool     `json:"dirty"`
@@ -103,7 +103,7 @@ func (s *Server) tidyItems(w http.ResponseWriter, r *http.Request) {
 			case "stopped":
 				why = append(why, fmt.Sprintf("stopped over %d days", doc.Days))
 			case "unused":
-				why = append(why, "no stack uses it")
+				why = append(why, "no worktree uses it")
 			default:
 				why = append(why, rs)
 			}

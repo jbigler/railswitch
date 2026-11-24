@@ -22,7 +22,7 @@ stopping and one-off commands.
 - **One environment per worktree.** `wt add feature-x` makes a git
   worktree for the branch, with its own containers, ports and data
   volumes.
-- **Stacks from packages.** A *pack* knows one framework (Rails is built
+- **Projects built from packages.** A *pack* knows one framework (Rails is built
   in); *options* fill slots such as database, cache, jobs, storage and
   browser. New projects are detected from the repository.
 - **Sandboxed agents.** Each AI agent runs in its own container with an
@@ -33,7 +33,7 @@ stopping and one-off commands.
 - **Reviewed changes.** A package update, a library you fetch or a
   template someone hands you is shown as a diff, with risky lines
   (new images, hosts, ports, scripts) flagged, before anything runs.
-- **Sharing without sharing a repo.** Export your stack as a template, or
+- **Sharing without sharing a repo.** Export your project's setup as a template, or
   a customized pack as a package; a teammate imports it, reviews it, and
   starts their own project with their own editor and agents.
 

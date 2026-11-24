@@ -553,7 +553,7 @@ func TestSettingsViewJobs(t *testing.T) {
 // apply" in its row and its detail.
 func TestStaleMarker(t *testing.T) {
 	f := newFixture(t)
-	ov := strings.Replace(ftestOverview("jb/b", "up", "null"), `"base":false,"stack":"up"`, `"base":false,"stack":"up","stale":true`, 1)
+	ov := strings.Replace(ftestOverview("jb/b", "up", "null"), `"base":false,"state":"up"`, `"base":false,"state":"up","stale":true`, 1)
 	f.cli.set("--json -C /ws/ftest overview", ov)
 	body := f.do(req("GET", "/p/ftest/b", nil)).Body.String()
 	row := body[strings.Index(body, `id="row-b"`):]

@@ -6,11 +6,11 @@ import assert from "node:assert/strict";
 import { fuzzy, target, hookLines, addTaskEdits, taskWay, pageQuery, termShown, termCloses, termFont, termID, settingsTab, noteFileName } from "../static/logic.js";
 
 test("settingsTab: the hash wins, then the kept tab, then the first", () => {
-  const tabs = ["stack", "firewall", "commands", "tasks"];
+  const tabs = ["pack", "firewall", "commands", "tasks"];
   assert.equal(settingsTab("tasks", "firewall", tabs), "tasks");
   assert.equal(settingsTab("agent-setup", "", tabs), "commands", "a card's old id");
   assert.equal(settingsTab("template", "firewall", tabs), "firewall", "a hash that is no tab");
-  assert.equal(settingsTab("", "gone", tabs), "stack");
+  assert.equal(settingsTab("", "gone", tabs), "pack");
   assert.equal(settingsTab("import", "", ["packages", "add"]), "add", "the Library's Import link");
 });
 

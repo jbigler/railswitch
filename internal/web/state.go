@@ -835,7 +835,7 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 				kind := agentKind(wt.Agent)
 				wv := switchWT{Slug: wt.Slug, URL: "/p/" + pj.Prefix + "/" + wt.Slug, Need: needsInput(kind)}
 				item.WTs = append(item.WTs, wv)
-				if wt.Stack == "up" || wt.Stack == "partial" {
+				if wt.State == "up" || wt.State == "partial" {
 					item.Running++
 				}
 				if !wv.Need {

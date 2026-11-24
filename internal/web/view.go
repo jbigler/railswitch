@@ -95,7 +95,7 @@ func (k sortKey) query() string {
 	return "?sort=" + url.QueryEscape(k.String())
 }
 
-var stackOrder = map[string]int{"failed": 0, "up": 1, "partial": 2, "stopped": 3}
+var stateOrder = map[string]int{"failed": 0, "up": 1, "partial": 2, "stopped": 3}
 
 var agentOrder = map[string]int{"permission": 0, "question": 1, "reply": 2, "turn": 3, "working": 4, "idle": 5, "off": 6}
 
@@ -123,7 +123,7 @@ func sortRows(rows []row, k sortKey) {
 	primary := func(a, b row) int { return 0 }
 	switch k.By {
 	case "running":
-		primary = func(a, b row) int { return order(stackOrder, a.WT.Stack) - order(stackOrder, b.WT.Stack) }
+		primary = func(a, b row) int { return order(stateOrder, a.WT.State) - order(stateOrder, b.WT.State) }
 	case "pr":
 		primary = func(a, b row) int {
 			switch {
@@ -219,10 +219,10 @@ var notePhrases = map[string]string{
 	"turn":       "your turn",
 }
 
-// Stack and services.
+// The worktree's state and its services.
 
-func stackClass(stack string) string {
-	switch stack {
+func stateClass(state string) string {
+	switch state {
 	case "up":
 		return "green"
 	case "partial":
@@ -233,20 +233,20 @@ func stackClass(stack string) string {
 	return "muted"
 }
 
-var stackGlyphs = map[string]string{"up": "●", "partial": "◐", "failed": "✗"}
+var stateGlyphs = map[string]string{"up": "●", "partial": "◐", "failed": "✗"}
 
-func stackGlyph(stack string) string {
-	if g, ok := stackGlyphs[stack]; ok {
+func stateGlyph(state string) string {
+	if g, ok := stateGlyphs[state]; ok {
 		return g
 	}
 	return "○"
 }
 
-// stackText is the stack's state; partial says how many of the stack's
+// stateText is the worktree's state; partial says how many of its
 // services (app, worker, data) are active.
-func stackText(wt worktree) string {
-	if wt.Stack != "partial" {
-		return wt.Stack
+func stateText(wt worktree) string {
+	if wt.State != "partial" {
+		return wt.State
 	}
 	n, active := 0, 0
 	for _, s := range wt.Services {
@@ -523,7 +523,7 @@ type listView struct {
 }
 
 // listGroup is one heading of the list: the worktrees that need you (an
-// agent waits on you, or the stack failed), the running ones, the rest.
+// agent waits on you, or the worktree failed), the running ones, the rest.
 type listGroup struct {
 	Name string
 	Rows []rowView
@@ -537,9 +537,9 @@ func listGroups(rows []rowView) []listGroup {
 	for _, r := range rows {
 		i := 2
 		switch {
-		case r.Need != "" || r.stack == "failed":
+		case r.Need != "" || r.state == "failed":
 			i = 0
-		case r.stack == "up" || r.stack == "partial":
+		case r.state == "up" || r.state == "partial":
 			i = 1
 		}
 		by[i] = append(by[i], r)
@@ -693,13 +693,13 @@ type rowView struct {
 	Stacked                           string // "2/3" in a gh stack, else ""
 	Base, Sel                         bool
 	PR                                *prView
-	StackGlyph, StackText, StackClass string
+	StateGlyph, StateText, StateClass string
 	AgentGlyph, AgentText, AgentClass string
 	AgentTitle                        string
 	Need                              string     // the agent waits on you: its label ("permission"), shown by the name
 	Stale                             bool       // runs an older unit: "restart to apply"
 	Tests                             *testsView // nil: no test task
-	stack                             string     // the stack's state, for listGroups
+	state                             string     // the worktree's state, for listGroups
 }
 
 func newRow(prefix string, r row, sel string, k sortKey) rowView {
@@ -707,10 +707,10 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 	v := rowView{
 		ID: "row-" + r.WT.Slug, Slug: r.WT.Slug, URL: "/p/" + prefix + "/" + r.WT.Slug + k.query(),
 		Branch: r.WT.Branch, Base: r.WT.Base, Sel: r.WT.Slug == sel, PR: newPR(r.PR),
-		StackGlyph: stackGlyph(r.WT.Stack), StackText: stackText(r.WT), StackClass: stackClass(r.WT.Stack),
+		StateGlyph: stateGlyph(r.WT.State), StateText: stateText(r.WT), StateClass: stateClass(r.WT.State),
 		AgentGlyph: agentGlyph(kind), AgentText: agentLabel(kind), AgentClass: agentClass(kind),
 		Stale: r.WT.Stale, Stacked: stackedRow(r), Tests: newTests(r.WT.Tests, r.Now),
-		stack: r.WT.Stack,
+		state: r.WT.State,
 	}
 	if kind != "off" { // an agent that isn't running says nothing
 		v.AgentTitle = r.WT.Agent.Name + ": " + r.WT.Agent.Message
@@ -723,10 +723,10 @@ func newRow(prefix string, r row, sel string, k sortKey) rowView {
 
 type detailView struct {
 	Empty                             bool
-	Stopped                           bool // the stack is stopped: no Links card, the services folded
+	Stopped                           bool // the worktree is stopped: no Links card, the services folded
 	Slug, Branch                      string
 	PR                                *prView
-	StackGlyph, StackText, StackClass string
+	StateGlyph, StateText, StateClass string
 	Links                             []linkView
 	AppURL                            string // the first app link: the header's Open app; "" for none
 	Services                          []serviceView
@@ -801,18 +801,18 @@ type agentTerm struct {
 // newDetail is row r's detail; repo is the project's PR URL prefix
 // (projectPRRepo), which the stack's PR numbers link through. Links: App
 // (the main button), the project's, the stack's, all greyed while the
-// stack is stopped; then PR, Review app and Logs, quieter.
+// worktree is stopped; then PR, Review app and Logs, quieter.
 func newDetail(prefix string, r row, repo string) detailView {
 	wt := r.WT
 	path := "/p/" + prefix + "/" + wt.Slug
 	v := detailView{
 		Slug: wt.Slug, Branch: wt.Branch, PR: newPR(r.PR),
-		StackGlyph: stackGlyph(wt.Stack), StackText: stackText(wt), StackClass: stackClass(wt.Stack),
+		StateGlyph: stateGlyph(wt.State), StateText: stateText(wt), StateClass: stateClass(wt.State),
 		TasksURL: path + "/tasks", PRPageURL: path + "/pr", AgentDefaultURL: path + "/agent-default", Stale: wt.Stale,
 		Stacked: newStacked(r, repo), Tests: newTests(wt.Tests, r.Now), TaskURL: path + "/task",
 	}
-	v.Stopped = wt.Stack == "stopped"
-	for _, group := range []string{"app", "project", "stack"} {
+	v.Stopped = wt.State == "stopped"
+	for _, group := range []string{"app", "project", "pack"} {
 		for _, l := range wt.Links {
 			if l.Group != group {
 				continue
@@ -830,7 +830,7 @@ func newDetail(prefix string, r row, repo string) detailView {
 		v.Links = append(v.Links, linkView{Label: "Review app", URL: r.PR.ReviewApp, Class: "ln"})
 	}
 	v.Links = append(v.Links, linkView{Label: "Logs", URL: logsURL, Class: "ln"})
-	if v.Stopped { // only what a stopped stack can still open; with neither, no card (D208)
+	if v.Stopped { // only what a stopped worktree can still open; with neither, no card (D208)
 		v.Links = slices.DeleteFunc(v.Links, func(l linkView) bool { return l.Label != "PR" && l.Label != "Review app" })
 	}
 	up := 0
@@ -862,10 +862,10 @@ func newDetail(prefix string, r row, repo string) detailView {
 		}
 	}
 	v.Queue = newQueue(prefix, wt)
-	// What the stack's state allows: a stopped one starts, a running one
+	// What the worktree's state allows: a stopped one starts, a running one
 	// restarts or stops, a partial or failed one any of the three.
 	acts := []string{"restart", "stop"}
-	switch wt.Stack {
+	switch wt.State {
 	case "stopped":
 		acts = []string{"up"}
 	case "partial", "failed":

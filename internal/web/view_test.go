@@ -25,13 +25,13 @@ func wtAgent(state string, reply bool) *agent {
 func TestSort(t *testing.T) {
 	fixture := func() []row {
 		return []row{
-			{WT: worktree{Slug: "zeta", Stack: "stopped", Agent: wtAgent("idle", false)}, PR: &pr{Number: 7}},
-			{WT: worktree{Slug: "main", Base: true, Stack: "up", Agent: wtAgent("working", false)}},
-			{WT: worktree{Slug: "beta", Stack: "partial", Agent: wtAgent("done", false)}, PR: &pr{Number: 2150}},
-			{WT: worktree{Slug: "alpha", Stack: "failed", Agent: wtAgent("permission", false)}, PR: &pr{Number: 2141}},
-			{WT: worktree{Slug: "gamma", Stack: "up", Agent: wtAgent("done", true)}},
-			{WT: worktree{Slug: "delta", Stack: "stopped", Agent: nil}},
-			{WT: worktree{Slug: "eps", Stack: "up", Agent: wtAgent("question", false)}, PR: &pr{Number: 9000}},
+			{WT: worktree{Slug: "zeta", State: "stopped", Agent: wtAgent("idle", false)}, PR: &pr{Number: 7}},
+			{WT: worktree{Slug: "main", Base: true, State: "up", Agent: wtAgent("working", false)}},
+			{WT: worktree{Slug: "beta", State: "partial", Agent: wtAgent("done", false)}, PR: &pr{Number: 2150}},
+			{WT: worktree{Slug: "alpha", State: "failed", Agent: wtAgent("permission", false)}, PR: &pr{Number: 2141}},
+			{WT: worktree{Slug: "gamma", State: "up", Agent: wtAgent("done", true)}},
+			{WT: worktree{Slug: "delta", State: "stopped", Agent: nil}},
+			{WT: worktree{Slug: "eps", State: "up", Agent: wtAgent("question", false)}, PR: &pr{Number: 9000}},
 		}
 	}
 	for _, c := range []struct {
@@ -107,8 +107,8 @@ func TestLabels(t *testing.T) {
 		}
 	}
 	for state, want := range map[string]string{"up": "green", "partial": "yellow", "stopped": "muted", "failed": "red"} {
-		if got := stackClass(state); got != want {
-			t.Errorf("stackClass(%s) = %q, want %q", state, got, want)
+		if got := stateClass(state); got != want {
+			t.Errorf("stateClass(%s) = %q, want %q", state, got, want)
 		}
 	}
 	for state, want := range map[string]string{"draft": "muted", "open": "green", "merged": "purple", "closed": "red"} {
@@ -131,14 +131,14 @@ func TestLabels(t *testing.T) {
 func fixtureRow(stack string, base bool, p *pr) row {
 	return row{
 		WT: worktree{
-			Slug: "feat-login", Branch: "jb/feat-login", Base: base, Stack: stack,
+			Slug: "feat-login", Branch: "jb/feat-login", Base: base, State: stack,
 			Services: []service{{Service: "web", Role: "app", State: "active/running"}},
 			Agent:    &agent{Name: "bot", State: "permission", Message: "Bash: <script>rm</script>", Running: true},
 			Links: []link{
 				{Label: "App", URL: "http://feat-login.ftest.localhost/", Group: "app"},
 				{Label: "Flipper", URL: "http://feat-login.ftest.localhost/flipper", Group: "project"},
 				{Label: "Evil", URL: "javascript:alert(1)", Group: "project"},
-				{Label: "Browser (VNC)", URL: "http://vnc.feat-login.ftest.localhost", Group: "stack"},
+				{Label: "Browser (VNC)", URL: "http://vnc.feat-login.ftest.localhost", Group: "pack"},
 			},
 		},
 		PR: p,
@@ -540,12 +540,12 @@ func TestDetailTerminals(t *testing.T) {
 // Stopped the rest; each group keeps the rows' order, an empty one goes.
 func TestListGroups(t *testing.T) {
 	rows := []row{
-		{WT: worktree{Slug: "a-up", Stack: "up"}},
-		{WT: worktree{Slug: "b-stopped", Stack: "stopped"}},
-		{WT: worktree{Slug: "c-partial", Stack: "partial"}},
-		{WT: worktree{Slug: "d-failed", Stack: "failed"}},
-		{WT: worktree{Slug: "e-waits", Stack: "stopped", Agent: wtAgent("done", true)}},
-		{WT: worktree{Slug: "f-up-asks", Stack: "up", Agent: wtAgent("question", false)}},
+		{WT: worktree{Slug: "a-up", State: "up"}},
+		{WT: worktree{Slug: "b-stopped", State: "stopped"}},
+		{WT: worktree{Slug: "c-partial", State: "partial"}},
+		{WT: worktree{Slug: "d-failed", State: "failed"}},
+		{WT: worktree{Slug: "e-waits", State: "stopped", Agent: wtAgent("done", true)}},
+		{WT: worktree{Slug: "f-up-asks", State: "up", Agent: wtAgent("question", false)}},
 	}
 	var got []string
 	for _, g := range newList("ftest", rows, "", sortKey{By: "name"}).Groups {
@@ -567,7 +567,7 @@ func TestListGroups(t *testing.T) {
 // off, whatever its status file last said: no "waiting for reply" in the
 // row, the detail or the Needs you group.
 func TestStoppedAgentSaysNothing(t *testing.T) {
-	r := row{WT: worktree{Slug: "w", Stack: "stopped", Agent: &agent{Name: "bot", State: "done", Reply: true, Message: "Ship it?"}}}
+	r := row{WT: worktree{Slug: "w", State: "stopped", Agent: &agent{Name: "bot", State: "done", Reply: true, Message: "Ship it?"}}}
 	if k := agentKind(r.WT.Agent); k != "off" {
 		t.Errorf("stopped agent's kind %q, want off", k)
 	}

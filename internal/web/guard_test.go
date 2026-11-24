@@ -188,16 +188,16 @@ const projectLS = `[
 
 // ftestOverview is ftest with base main and worktree b; agentB is b's
 // agent object ("null" for none).
-func ftestOverview(branchB, stackB, agentB string) string {
+func ftestOverview(branchB, stateB, agentB string) string {
 	return `{"prefix":"ftest","workspace":"/ws/ftest","worktrees":[
- {"slug":"main","id":1,"branch":"main","base":true,"stack":"up",
+ {"slug":"main","id":1,"branch":"main","base":true,"state":"up",
   "services":[{"service":"web","role":"app","state":"active/running"}],
   "agent":{"name":"bot","package":"bot@1","run":"on-demand","state":"working","message":"busy","ts":1,"reply":false,"running":true},
   "links":[{"label":"App","url":"http://main.ftest.localhost/","group":"app"}]},
- {"slug":"b","id":2,"branch":"` + branchB + `","base":false,"stack":"` + stackB + `",
+ {"slug":"b","id":2,"branch":"` + branchB + `","base":false,"state":"` + stateB + `",
   "services":[{"service":"web","role":"app","state":"active/running","container":"ftest-b-web","restartable":true},{"service":"db","role":"data","state":"inactive/dead","container":"ftest-b-db","restartable":true},{"service":"deps","role":"deps","state":"inactive/dead","container":"ftest-b-deps","restartable":false}],
   "agent":` + agentB + `,
-  "links":[{"label":"App","url":"http://b.ftest.localhost/","group":"app"},{"label":"Flipper","url":"http://b.ftest.localhost/flipper","group":"project"},{"label":"Browser (VNC)","url":"http://vnc.b.ftest.localhost","group":"stack"}]}
+  "links":[{"label":"App","url":"http://b.ftest.localhost/","group":"app"},{"label":"Flipper","url":"http://b.ftest.localhost/flipper","group":"project"},{"label":"Browser (VNC)","url":"http://vnc.b.ftest.localhost","group":"pack"}]}
 ]}`
 }
 
@@ -208,7 +208,7 @@ func agentJSON(state, message string, reply bool) string {
 
 func helloOverview(agent string) string {
 	return `{"prefix":"hello","workspace":"/ws/hello","worktrees":[
- {"slug":"master","id":3,"branch":"master","base":true,"stack":"stopped","services":[],"agent":` + agent + `,"links":[]}
+ {"slug":"master","id":3,"branch":"master","base":true,"state":"stopped","services":[],"agent":` + agent + `,"links":[]}
 ]}`
 }
 

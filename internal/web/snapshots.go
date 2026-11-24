@@ -35,7 +35,7 @@ type snapshotsView struct {
 	// Written "" when db-dumps/ holds none.
 	DumpURL, Written, DumpSize string
 	DumpFiles                  []string
-	// Stopped: the worktree's stack is stopped, so take, restore and Use,
+	// Stopped: the worktree is stopped, so take, restore and Use,
 	// which need its database running, are disabled (#255).
 	Stopped bool
 }
@@ -69,7 +69,7 @@ func (s *Server) snapshotsOf(r *http.Request, p projectRow, slug string, panel b
 	return v, nil
 }
 
-// stopped reports whether worktree slug's stack is stopped, as the last
+// stopped reports whether worktree slug is stopped, as the last
 // overview read it; false before one.
 func (s *Server) stopped(prefix, slug string) bool {
 	s.mu.Lock()
@@ -80,7 +80,7 @@ func (s *Server) stopped(prefix, slug string) bool {
 	}
 	for _, wt := range p.ov.Worktrees {
 		if wt.Slug == slug {
-			return wt.Stack == "stopped"
+			return wt.State == "stopped"
 		}
 	}
 	return false

@@ -64,7 +64,7 @@ suggested addon that is missing from `[image] addons`.
 ## `containerfile show <name>`
 
 The workspace file `containerfiles/Containerfile.<name>` (read as a hostile
-file: regular, at most 1 MiB), the built-in default the project's stack has
+file: regular, at most 1 MiB), the built-in default the project's packages have
 for that name, and the diff between them. A missing file is an error (run
 `containerfile eject` or `containerfile new` first). Without `--json` the
 command prints the file, or the default when there is none.
@@ -84,7 +84,7 @@ command prints the file, or the default when there is none.
 | `kind` | string | `base`, `addon` (an option's addon), `tool`, `standalone` (an option's own image), `agent-base`, `agent`, or `user` (a `containerfile new` addon: no default). |
 | `text` | string | The file. |
 | `hash` | string | `sha256:<hex>` of the file's bytes: `containerfile write --if-hash` takes it. |
-| `default` | object or null | The built-in default the stack has for `name`: `ref` (its package, `agent-base` or a tool's name) and `text`. `null` when there is none. |
+| `default` | object or null | The built-in default the project's packages have for `name`: `ref` (its package, `agent-base` or a tool's name) and `text`. `null` when there is none. |
 | `ejected` | object or null | The file's first line read as `containerfile eject`'s header: `ref` and the `sha256` of the default it copied. `null` without one. |
 | `default_changed` | bool | `default` and `ejected` are both present and the default's sha256 is no longer the header's: the default changed since the file was ejected. |
 | `diff` | string | A unified diff (3 lines of context) from the default to the file without its header line; `""` when they are equal or there is no default. |
@@ -171,7 +171,7 @@ would change. `--if-hash ""` adds a new file (refused when it exists).
 `<path>` must be one of the package format's files (D93,
 `docs/packs.md`); a symlinked package directory, `entrypoints/`, `initdb/`
 or file is refused. These refusals and a hash mismatch exit 1. The package
-must still load with the new text; when the project's stack uses it, every
+must still load with the new text; when the project uses it, every
 registered worktree is also rendered with it in memory. A load or render
 failure exits 0 with `errors`.
 
@@ -514,7 +514,7 @@ no document.
 | `status` | string | `new` (no local package of that name), `update` (other content), `same` (byte for byte). |
 | `replaces` | object or null | The local package there now: `ref` (its manifest's version), `sha256`; `null` for `new`. |
 | `compared_with` | string | For `new`: the built-in its files are shown against (the one of its kind with the most identical files, a manifest's name line aside); `""` for none, or when it replaces a local package. |
-| `used` | boolean | The project's stack names `ref`. |
+| `used` | boolean | The project uses `ref` (as its pack, an option or an agent). |
 | `flags` | number | The flags over every file. |
 | `packages` | array | One entry, as in `lock --review`: status `added`, `changed` or `unchanged`. |
 | `restart` | array of strings | For a used package, the running worktrees the write restarts; else `[]`. |
@@ -551,23 +551,23 @@ It removes nothing; `tidy --rm [--force] <id>...` does (text output only).
 {"days": 14, "bytes": 1390004096,
  "items": [
   {"id": "wt:shop/feature-x", "kind": "worktree", "project": "shop", "name": "feature-x", "branch": "feature/x",
-   "reasons": ["pr-merged", "stopped"], "pr": 42, "stack": "stopped",
+   "reasons": ["pr-merged", "stopped"], "pr": 42, "state": "stopped",
    "idle_since": "2026-10-01T09:00:00Z", "idle_from": "systemd", "dirty": false, "bytes": 4096, "partial": false},
   {"id": "image:localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "kind": "image", "project": "shop",
    "name": "localhost/shop/base:ruby3.4.4-node22.11.0-3a626f74", "branch": "", "reasons": ["unused"], "pr": 0,
-   "stack": "", "idle_since": "", "idle_from": "", "dirty": false, "bytes": 1390000000, "partial": false}],
+   "state": "", "idle_since": "", "idle_from": "", "dirty": false, "bytes": 1390000000, "partial": false}],
  "warnings": []}
 ```
 
 | Field | Type | Meaning |
 |---|---|---|
-| `days` | number | `--days`: a stopped stack idle longer is a candidate (default 14). |
+| `days` | number | `--days`: a stopped worktree idle longer is a candidate (default 14). |
 | `items[].id` | string | What `tidy --rm` takes: `wt:<prefix>/<slug>` or `image:<name>`. |
 | `items[].kind` | string | `worktree` or `image`. |
-| `items[].reasons` | array | A worktree: `pr-merged`, `pr-closed` (its branch's PR as `pr ls` picks it), `stopped` (the stack is stopped and idle over `days`). An image: `unused` (no worktree's current render builds it and no container uses it: `gc`'s judgement). The base worktree is never listed. |
+| `items[].reasons` | array | A worktree: `pr-merged`, `pr-closed` (its branch's PR as `pr ls` picks it), `stopped` (the worktree is stopped and idle over `days`). An image: `unused` (no worktree's current render builds it and no container uses it: `gc`'s judgement). The base worktree is never listed. |
 | `items[].pr` | number | The merged or closed PR's number; `0` for none. |
-| `items[].stack` | string | The worktree's stack state, as `overview` has it; `""` for an image. |
-| `items[].idle_since` | string | For a stopped stack, RFC 3339 UTC: the latest time one of its units stopped, as systemd remembers it (`idle_from` `systemd`; forgotten at reboot), else HEAD's commit time (`commit`); `""` when neither is known (never `stopped` then). |
+| `items[].state` | string | The worktree's state, as `overview` has it; `""` for an image. |
+| `items[].idle_since` | string | For a stopped worktree, RFC 3339 UTC: the latest time one of its units stopped, as systemd remembers it (`idle_from` `systemd`; forgotten at reboot), else HEAD's commit time (`commit`); `""` when neither is known (never `stopped` then). |
 | `items[].dirty` | boolean | Uncommitted changes or untracked files: `tidy --rm` keeps it unless `--force`. |
 | `items[].bytes` | number | A worktree: its checkout's regular files (apparent size, symlinks not followed). An image: podman's size, shared layers included. |
 | `items[].partial` | boolean | The checkout walk stopped after 200,000 entries: `bytes` is a lower bound. |
@@ -1081,11 +1081,11 @@ removed, never followed).
 ## `overview`
 
 One project (`-C`): every registered worktree, in registry order (by ID),
-with its stack state, services, agent and links. The dashboard polls it
+with its state, services, agent and links. The dashboard polls it
 every 2 s, so it is cheap: one `systemctl --user show` for every unit of
 the project, exactly one `podman ps -a --format json` (running
 on-demand services and agents, and each running container's unit-hash
-label), no health check and no git call (each worktree's HEAD commit, for `tests.stale`, is read from its git files). The text form is a table `WORKTREE BRANCH STACK AGENT TESTS` (the base
+label), no health check and no git call (each worktree's HEAD commit, for `tests.stale`, is read from its git files). The text form is a table `WORKTREE BRANCH STATE AGENT TESTS` (the base
 worktree marked `(base)`) with each worktree's links indented under its
 row.
 
@@ -1099,7 +1099,7 @@ row.
   "worktrees": [
     {
       "slug": "feat-login", "id": 2, "branch": "jb/feat-login", "base": false,
-      "stack": "up", "stale": false, "queue": [],
+      "state": "up", "stale": false, "queue": [],
       "tests": {"state": "failed", "stale": false, "last": {"exit_code": 1, "started_at": "2026-11-04T10:02:11Z", "ended_at": "2026-11-04T10:05:40Z", "commit": "9f2c…"}},
       "services": [{"service": "rails", "role": "app", "state": "active/running"}],
       "agent": {"name": "claude", "package": "claude@1", "run": "on-demand", "state": "permission", "message": "Bash: rm -rf tmp", "ts": 1793115142, "reply": false, "running": true},
@@ -1128,8 +1128,8 @@ row.
 | `worktrees[].id` | number | Its registry ID. |
 | `worktrees[].branch` | string | The branch checked out, read from its git files; `""` when detached, unreadable or the directory is gone (the worktree is still listed). |
 | `worktrees[].base` | boolean | It is the base worktree (`<workspace>/worktrees/<base_branch>`). |
-| `worktrees[].stack` | string | Over the services with roles `app`, `worker`, `data` (not `deps`, `tool`, `agent`): `failed` if any unit's ActiveState is `failed`, `up` if all are `active`, `stopped` if none is `active` or `activating` (or there are none), else `partial`. |
-| `worktrees[].stale` | boolean | A running container of a stack service (not an on-demand one) was created from an older unit than the one rendered in the Quadlet directory: its `<prefix>.unit-hash` label differs from the unit file's (a missing label counts as different, as in `up`). `up` restarts such a container; the dashboard shows "restart to apply". A container that does not run, or a unit not rendered yet, never makes it `true`. |
+| `worktrees[].state` | string | The worktree's state, over its services with roles `app`, `worker`, `data` (not `deps`, `tool`, `agent`): `failed` if any unit's ActiveState is `failed`, `up` if all are `active`, `stopped` if none is `active` or `activating` (or there are none), else `partial`. |
+| `worktrees[].stale` | boolean | A running container of one of its services (not an on-demand one) was created from an older unit than the one rendered in the Quadlet directory: its `<prefix>.unit-hash` label differs from the unit file's (a missing label counts as different, as in `up`). `up` restarts such a container; the dashboard shows "restart to apply". A container that does not run, or a unit not rendered yet, never makes it `true`. |
 | `worktrees[].services` | array | Every service in model order, as in [`status`](#status) without `health`: `service`, `role`, `state` (`<ActiveState>/<SubState>`; an on-demand service `running` or `on-demand`). |
 | `worktrees[].services[].container` | string | The service's container name (`<prefix>-<slug>-<service>`), as podman and Dozzle show it. |
 | `worktrees[].services[].restartable` | boolean | A long-lived unit, a service agent included (not an on-demand service or agent, or a oneshot like deps), that `railswitch restart <service>` restarts alone. |
@@ -1139,7 +1139,7 @@ row.
 | `worktrees[].tests.last` | object or null | `null` for `never`; else `exit_code` (number, the task's own, `0` for passed), `started_at` and `ended_at` (RFC 3339 UTC), `commit` (the full HEAD commit at the start; `""` when unreadable). |
 | `worktrees[].agent` | object or null | The worktree's running agent (D62), else the first configured agent (`[agents]` order) whose status is not `off`, else `null`. Fields as in [`agent ls`](#agent-ls). |
 | `worktrees[].queue` | array | Its agent work queue's items (D159), as [`agent queue ls`](#agent-queue-ls)'s `items`; `[]` for none, or when the queue file can't be read (`agent queue ls` says why). |
-| `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `stack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
+| `worktrees[].links` | array | The worktree's links, in order: `app` (`App`, `http://<worktree host>/`); `project` (`project.toml [[links]]`, in file order); `pack` (the pack's, then options' in slot order, then enabled tools', each in file order), minus labels in `hide_links`. Placeholders expanded; a URL without a scheme gets `http://`. Each `{"label", "url", "group"}`, `group` one of `app`, `project`, `stack`. |
 
 ## `lock --review`
 
@@ -1501,12 +1501,12 @@ What the settings page reads: the project's choices, env and links.
 | `firewall` | object | `mode`: `[firewall] mode` (`""`: the default); `effective`: the mode the project's services get (`enforce` with agents, else `log`, unless `mode` is set: D119); `allow`: `app`, `deps`, `agent`, each `[firewall] allow.<profile>` (`[]` for none). |
 | `pack` | object | `ref`: `[stack] pack`; `choices`: the packs Settings offers, sorted, the current one among them: the newest built-in of each name, the workspace's `packs/<name>/` as `local:<name>@N` and the libraries' packs, each that loads with the current pack's app service (so `[stack] app` stays valid) and that the project's other lines resolve with (an option's `works_with`). |
 | `options[]` | array | Every slot (`config.Slots` order), then the other `[options]` keys by name. A slot left out reads `ref: "none"`. |
-| `used` | string[] | The stack's refs: the pack, each option, each agent package (once). |
+| `used` | string[] | The project's package refs: the pack, each option, each agent package (once). |
 | `add_choices` | string[] | Every option a new extra key (D81) can take: built-ins at their newest version, then the workspace's `local:<name>@N`. |
 | `options[].slot` | bool | The key is a slot (otherwise an extra service, D81). |
 | `options[].choices` | string[] | For a slot, the built-in options of that slot (newest version per name) then the workspace's `options/<name>/` ones as `local:<name>@N`; for an extra key every option; always ending in `none`. The current ref is always among them. |
 | `env[]` | array | The `[env]` table by name. |
-| `links[]` | array | The project's `[[links]]` (`from: "project"`), then the stack's: pack, options in key order, tools (`pack <ref>`, `option <ref>`, `tool <name>`). URLs keep their `{placeholders}`. |
+| `links[]` | array | The project's `[[links]]` (`from: "project"`), then the packages': pack, options in key order, tools (`pack <ref>`, `option <ref>`, `tool <name>`). URLs keep their `{placeholders}`. |
 | `links[].hidden` | bool | The label is in `hide_links`. |
 | `tasks[]` | array | As `task ls`, by name, with the pack tasks the project hides too: `source: "hidden"`, `command: ""`, `pack` their command (D156). `[]` for none. |
 
@@ -1604,7 +1604,7 @@ branch (`git ls-remote`).
 | `project_toml` | string | The bytes the real run writes to `project.toml`, with `[image]` and the declared secrets. |
 | `worktree.slug` | string | The base worktree: the base branch, sanitized. |
 | `worktree.routes[]` | array | Each Traefik route of the base worktree: its host and the routed service's id. |
-| `worktree.containers[]` | array | Every service of the stack in model order, as its container name and role (`app`, `deps`, `worker`, `data`, `tool`, `agent`). An on-demand agent is listed too. |
+| `worktree.containers[]` | array | Every service of the worktree in model order, as its container name and role (`app`, `deps`, `worker`, `data`, `tool`, `agent`). An on-demand agent is listed too. |
 | `worktree.env` | string[] | The app service's env names, sorted. No values: a real run generates the passwords. |
 | `warnings` | string[] | The render's warnings. |
 | `steps` | string[] | What the real run does, in order. The last step is there only with `--up`. |

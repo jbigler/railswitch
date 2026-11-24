@@ -90,7 +90,7 @@ again later). Then start in one of two ways:
 Later projects start from **New project** in the switcher:
 
 1. Give it the repository URL. railswitch reads only the files that say
-   which stack it is (a `Gemfile`, `package.json` and so on), without
+   what kind of project it is (a `Gemfile`, `package.json` and so on), without
    cloning the whole thing.
 2. It suggests a pack and options (Rails, PostgreSQL, Redis…) and says why.
    Change anything, pick a prefix (it names every container, volume and

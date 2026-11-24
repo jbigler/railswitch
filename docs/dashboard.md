@@ -173,9 +173,9 @@ still wider than the window scrolls its pane.
   page's, so a live update keeps it), `↻` (Refresh PRs) and `+ New`;
   the sort bar; then the worktrees in three groups, each headed with
   its count and left out when empty: **Needs you** (its agent needs
-  permission, asks a question or waits for a reply, or its stack
-  failed), **Running** (stack up or partial) and **Stopped** (the rest),
-  each sorted by the sort bar. A row is the stack's state as a dot (its
+  permission, asks a question or waits for a reply, or the worktree
+  failed), **Running** (up or partial) and **Stopped** (the rest),
+  each sorted by the sort bar. A row is the worktree's state as a dot (its
   word the tooltip); the name over the branch (cut short, the full name
   as its tooltip; `≡ 15/22` in a gh stack) and, under them, `◆ <what the
   agent waits on>` or the agent's state; on the right the PR (number,
@@ -225,13 +225,13 @@ still wider than the window scrolls its pane.
   secret, so a new project with such secrets opens with this card.
 - **Detail** (the selected worktree, D170): a head, tabs and cards.
   - **Head:** the name, then pills: `⎇ branch` (left out when the branch
-    is the worktree's name), the stack state, "restart to apply", the PR
+    is the worktree's name), the worktree's state, "restart to apply", the PR
     line (`PR #2141 ready · checks ✓ · approved`, a link to the PR) and
     the tests (`✓ tests passed 1h ago`). On the right the actions: the
-    stack's (start, or restart and stop; the first one filled), **Open
+    worktree's (start, or restart and stop; the first one filled), **Open
     app ↗** (the first app link), **Run tests** (`railswitch task test`
     as a job; only with a `test` task), **Terminal ▾** (below) and **⋯**:
-    PR page, `Down…` and `Remove…` (see Actions). While the stack is
+    PR page, `Down…` and `Remove…` (see Actions). While the worktree is
     stopped, Open app and Run tests are greyed and do nothing, with
     "Start the worktree first" as their tooltip (#255); start, the
     terminals (the agent, nvim and a shell start what they need) and ⋯
@@ -264,8 +264,8 @@ still wider than the window scrolls its pane.
     tooltip, D161.
   - **Links** (Overview only; full width, under Services): the links,
     all in one style (D208): App first, then the project's and the
-    stack's, then PR, **Review app** when `pr ls` finds one (the PR's
-    GitHub deployment) and Logs. A stopped stack keeps only PR and
+    packages', then PR, **Review app** when `pr ls` finds one (the PR's
+    GitHub deployment) and Logs. A stopped worktree keeps only PR and
     Review app, and has no card with neither. Its services fold into
     one line, "9 services, stopped", that opens the list.
   - **Stack** (Overview only; with a gh stack; full width, under
@@ -370,11 +370,11 @@ shows what each one does before anything is written.
 The title row has **Save as template** and **Edit project.toml** on its
 right. Under it, one line names the project, its repository, base branch
 and prefix (read-only: the prefix names every container, volume, network
-and hostname). Then come the tabs, the same bar as a worktree's: Stack,
+and hostname). Then come the tabs, the same bar as a worktree's: Pack,
 Firewall, Commands, Environment, Links, Tasks and Secrets. One section
 shows at a time; the page opens on the tab its address names (`#tasks`,
 `#firewall`; `#hooks` and `#agent-setup` open Commands), else the one
-last shown in this browser tab, else Stack. The staged panel stays
+last shown in this browser tab, else Pack. The staged panel stays
 beside every tab. Each section starts with a one-line note; the longer
 explanation is behind a disclosure.
 
@@ -388,7 +388,7 @@ explanation is behind a disclosure.
   waiting; then it runs `railswitch template check --accept <sha>` as a
   project-level job. When the job ends ok the page reloads and the
   notice is gone.
-- **Stack and options:** first the pack (D115), when `project show`'s
+- **Pack and options:** first the pack (D115), when `project show`'s
   `pack.choices` offers another (a local copy, a library's, another
   version: each with the same app service, and only one the project's
   options work with); then one row per slot and
@@ -448,8 +448,8 @@ explanation is behind a disclosure.
   value) stages a new one, shown as a highlighted row with Undo until
   Apply writes it. The card's note says nothing is saved before Apply.
 - **Worktree links:** every link with Show, Label, Address and From
-  (`project`, or the stack part that brings it). Unticking Show on a stack
-  link stages adding it to `hide_links`; Remove is offered on the
+  (`project`, or the package that brings it). Unticking Show on a
+  package's link stages adding it to `hide_links`; Remove is offered on the
   project's own `[[links]]` only. The add form needs both a label and an
   address. Use `{worktree.host}`, `{worktree.slug}` or `{branch}`; they
   are filled in per worktree.
@@ -600,8 +600,8 @@ a local file into it, in the browser only (1 MiB at most).
 
 `/p/<prefix>/tidy` (`Tidy` in the header, D160) lists what could go, from
 `railswitch --json tidy`: each worktree whose PR is merged or closed or
-whose stack has been stopped over 14 days, and each image of the project
-no stack uses (what `gc` would remove), with why and its size, and the
+that has been stopped over 14 days, and each image of the project
+no worktree uses (what `gc` would remove), with why and its size, and the
 total. A worktree's size is its checkout's (a walk that stops after
 200,000 entries shows "≥"); an image's is podman's, shared layers
 included.
@@ -636,7 +636,7 @@ Packages lists those of
 each `built in`, `local` (the workspace's `packs/<name>/` and
 `options/<name>/`) or `library <alias>` (a library package,
 `<alias>:<name>@N`; from `pack ls`'s `library`, else the ref's prefix).
-"in use" marks the refs the project's stack uses
+"in use" marks the refs the project uses
 (`used` of `railswitch --json project show`). A library package is
 read-only like a built-in (View; a write is refused, 422), can't be the
 start of a New pack or New option, and its page says which library it
@@ -881,7 +881,7 @@ template (one not installed picks nothing). The page has two
 panels: step 1 on the left, step 2 on the right. Nothing is created
 until you press Create project.
 
-**Step 1: Stack and options**
+**Step 1: Pack and options**
 
 - **Repository**, **Base branch** (empty: the repository's default
   branch), **Project name** (empty: the folder's name), **Prefix**
@@ -891,17 +891,17 @@ until you press Create project.
 - **Start from a template** (above Read the repository) offers the
   templates of `railswitch --json template ls`. Picking one posts it to
   `POST /new/template`, which reads `railswitch --json template show
-  <ref>` and answers the Stack card for it: the template, its packages,
+  <ref>` and answers the Pack card for it: the template, its packages,
   and one field per question (`answer-<key>`), prefilled with its
   default; the Containerfiles it brings. Picking a template unticks the
   Tools and agents boxes (the template's own stand) and turns Read the
-  repository off; picking "None" puts the empty Stack card back.
+  repository off; picking "None" puts the empty Pack card back.
 - **Read the repository** runs `railswitch --json project detect <repo>
   [--branch <b>]` while you wait (it fetches only the files the packages'
   detection rules name, up to 2 minutes; the dashboard stops a read that
   runs too long with SIGTERM, then SIGKILL 3 s later, so its temp dir is
   removed). git's error shows under Repository. An empty Base branch is filled with the branch it read.
-- **Stack:** the pack it matched, with the files that matched, and a
+- **Pack:** the pack it matched, with the files that matched, and a
   picker of every pack (`railswitch --json pack ls`). When no pack
   matched, the card says "No pack matched; pick one". Picking a pack
   reads the repository again with `--pack <ref>`, which resets the slots.
@@ -982,16 +982,19 @@ The detail's Links section comes first, in this order:
    url = "{worktree.host}/flipper"
    ```
 
-3. The stack's links: the pack's, then each option's in slot order, then
+3. The packages' links: the pack's, then each option's in slot order, then
    enabled tools', each in file order (VNC, mail previews, routes …).
 4. **PR** (when the branch has one) and **Logs** (Dozzle), in a quieter
    style.
 
 Placeholders `{worktree.host}`, `{worktree.slug}` and `{branch}` are
 expanded; a URL without a scheme gets `http://`. Links are greyed out
-while the stack is stopped. All open in a new tab.
+while the worktree is stopped. All open in a new tab.
 
-To hide stack links you don't use, list their labels at the top level of
+The overview's `links[].group` names where a link comes from: `app`,
+`project` or `pack` (the pack's, options' and tools').
+
+To hide package links you don't use, list their labels at the top level of
 `project.toml` (above the first table):
 
 ```toml
@@ -999,7 +1002,7 @@ hide_links = ["Routes", "Mailer previews"]
 ```
 
 A label no pack, option or tool link of the project carries is an error
-at render (`hide_links: no stack link labelled …`), which catches typos.
+at render (`hide_links: no package link labelled …`), which catches typos.
 Run `railswitch render` (or `up`) after editing `project.toml`.
 
 ## Sorting
@@ -1155,7 +1158,7 @@ browsers): a browser with neither says so in the panel.
 Every action is a job (below).
 
 - **start, restart, stop** run `railswitch up|restart|stop` in the
-  worktree, as the stack's state allows: a stopped stack offers start; a
+  worktree, as the worktree's state allows: a stopped worktree offers start; a
   running one restart and stop; a partial or failed one all three.
 - **Default config…** (under the detail's agents) opens a dialog
   that reads `agent ls` for the worktree: per agent with `[config]
@@ -1177,7 +1180,7 @@ Every action is a job (below).
   (`db snapshot [<name>]`, a timestamp by default). The dashboard restores
   or deletes only a name the list it read holds. Take, restore and the
   starting data's **Use this worktree's data** need the database
-  running: while the stack is stopped they are greyed (#255), and the
+  running: while the worktree is stopped they are greyed (#255), and the
   tab reads its content again when the worktree starts or stops.
 - **Queue** (under the detail's Agent, D159): the worktree's agent work
   queue from `overview`'s `queue`, each item's first line (the whole text
@@ -1396,7 +1399,7 @@ preset and up to eight changed colours.
 - The page loads them as `GET /theme.css` (CSS custom properties for both
   modes; the content policy forbids inline styles).
 
-State colours: stack up/partial/stopped/failed are green/yellow/muted/red;
+State colours: worktree up/partial/stopped/failed are green/yellow/muted/red;
 PR draft/ready/merged/closed muted/green/purple/red; review
 pending/approved/changes requested yellow/blue/red; checks
 pass/pending/fail green/yellow/red; agents waiting on you use the accent,
@@ -1452,8 +1455,8 @@ is static files in the binary, and the server only polls the project as for
 any open page.
 
 - **The lobby** is the project. Its wall screen lists every floor
-  (worktree) with its stack and agent state; the directory in the middle is
-  a two-faced board with a line per floor (number, name, stack; a running
+  (worktree) with its state and its agent's; the directory in the middle is
+  a two-faced board with a line per floor (number, name, state; a running
   one in green; click one to ride there), in one or two columns whose
   lines shrink to fit as floors are added; an android concierge stands
   at its desk; the big screen faces a lounge. **Pull requests**: a board on
@@ -1466,7 +1469,7 @@ any open page.
   there: this browser keeps the list) and **All**, and the boards follow.
   An issue's **▶ Start working** runs `wt add --issue <n> --agent` as a
   job: a worktree on a branch named after the issue (`issue-<n>-<title
-  words>`), its stack up, and the default agent (a service) started in its
+  words>`), started, and the default agent (a service) started in its
   session with the issue as its first input; an issue that has a floor
   already offers that floor instead. Kiosks: **Issues**, **Notes** (the agents' shared notes,
   `notes/`: read, edit, add, delete through `notes ls|show|write|rm`, a
@@ -1483,7 +1486,7 @@ any open page.
   looks the same and floors look different.
   - Back side: the **server room** (glass, windowless) is a data hall: a
     rack per service, 1 m apart in two rows of seven facing each other across a 2 m aisle (a
-    stack with more than 14 services shows the first 14). Each rack's LEDs
+    worktree with more than 14 services shows the first 14). Each rack's LEDs
     and accent bar show the service's state, its display names it, cables
     loop out of its sides and up into the ceiling's tray, and a hologram
     floats above it in the floor's second neon (the name, the state, bars
@@ -1502,7 +1505,7 @@ any open page.
     It shows the floor's summary until you click it and pick something to
     watch (see [The lounge's TV](#the-lounges-tv)).
   - Front side, by the windows: **work** (glass): **your desk**'s wall
-    screen shows the branch, stack, PR and links; the desk shows the
+    screen shows the branch, state, PR and links; the desk shows the
     worktree's links; **Shell** and **Neovim** open a live terminal in the
     panel (D149, as on the worktree page), **Terminal window** (`term`) and
     **Neovim window** (`nvim --new-term`) a window on this machine. **The
@@ -1717,7 +1720,7 @@ docs/json.md.
 - `settings preview`'s and `project new --dry-run`'s `install` (a `lock
   --review` document, or null) and `--accept-install <hash>`: the Install
   review. `overview`'s `signer_warnings`: the banner.
-- `railswitch [--json] overview` (project): every worktree with its stack
+- `railswitch [--json] overview` (project): every worktree with its
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
 - `railswitch --json agent usage --all --days 30` (project, every 30 s with a page open):

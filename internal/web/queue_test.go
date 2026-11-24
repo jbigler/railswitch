@@ -117,7 +117,7 @@ func TestQueueDelivery(t *testing.T) {
 // D159: the detail shows the queue's items with their remove forms; the
 // add dialog posts to the queue's add.
 func TestQueueView(t *testing.T) {
-	wt := worktree{Slug: "b", Stack: "up", Queue: []queueItem{{ID: 7, Text: "fix <the> tests\nsecond line"}}}
+	wt := worktree{Slug: "b", State: "up", Queue: []queueItem{{ID: 7, Text: "fix <the> tests\nsecond line"}}}
 	html, err := render("detail", newDetail("ftest", row{WT: wt}, ""))
 	if err != nil {
 		t.Fatal(err)

@@ -83,7 +83,7 @@ func TestNewPageRenders(t *testing.T) {
 	}
 	body := w.Body.String()
 	for _, want := range []string{
-		`data-view="new" data-home="/home/u"`, `<h2>1 · Stack and options</h2>`, `<h2>2 · Review and create</h2>`,
+		`data-view="new" data-home="/home/u"`, `<h2>1 · Pack and options</h2>`, `<h2>2 · Review and create</h2>`,
 		`name="repo"`, `name="branch"`, `name="name"`, `name="prefix"`, `name="dir"`,
 		"Must be unused on this machine.", "Read the repository", "Next: review",
 		`<input type="checkbox" name="tool" value="nvim">`,
@@ -107,7 +107,7 @@ func TestNewPageRenders(t *testing.T) {
 }
 
 // TestNewDetectPost: Read runs project detect with the repository as one
-// argv entry and answers the Stack card: the pack with its evidence, a
+// argv entry and answers the Pack card: the pack with its evidence, a
 // row per slot labelled by its source, choices that work with the pack.
 func TestNewDetectPost(t *testing.T) {
 	f := newProjectFixture(t)

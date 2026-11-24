@@ -24,11 +24,11 @@ func TestLinksOrder(t *testing.T) {
 		{"Admin", "http://" + host + "/admin", "project"},
 		{"Docs", "https://docs.example.com/master", "project"},
 		{"Login", "http://" + host + "/login?return=https://x", "project"},
-		{"Mailer previews", "http://" + host + "/rails/mailers", "stack"},
-		{"Routes", "http://" + host + "/rails/info/routes", "stack"},
-		{"Storage console", "http://s3-ui." + host, "stack"},
-		{"Sidekiq", "http://" + host + "/sidekiq", "stack"},
-		{"Browser (VNC)", "http://vnc." + host + "/vnc.html?autoconnect=1&resize=scale", "stack"},
+		{"Mailer previews", "http://" + host + "/rails/mailers", "pack"},
+		{"Routes", "http://" + host + "/rails/info/routes", "pack"},
+		{"Storage console", "http://s3-ui." + host, "pack"},
+		{"Sidekiq", "http://" + host + "/sidekiq", "pack"},
+		{"Browser (VNC)", "http://vnc." + host + "/vnc.html?autoconnect=1&resize=scale", "pack"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Links =\n%+v\nwant\n%+v", got, want)
@@ -51,7 +51,7 @@ func TestHideLinks(t *testing.T) {
 	}
 
 	err = buildErr(fixtureInputs(t, fixtureWS(t), func(p *config.Project) { p.HideLinks = []string{"Nope"} }))
-	if err == nil || !strings.Contains(err.Error(), `hide_links: no stack link labelled "Nope"`) {
+	if err == nil || !strings.Contains(err.Error(), `hide_links: no package link labelled "Nope"`) {
 		t.Fatalf("Build = %v", err)
 	}
 }

@@ -66,9 +66,6 @@ func (r usageRow) work() int64 { return r.Input + r.CacheWrite + r.Output }
 
 type usageWT struct {
 	Worktree        string `json:"worktree"`
-	Today           int64  `json:"today"`
-	Median          int64  `json:"median"`
-	Runaway         bool   `json:"runaway"`
 	Removed         bool   `json:"removed"`
 	PriorDays       int    `json:"prior_days"`
 	MedianNewOutput int64  `json:"median_new_output"`
@@ -363,7 +360,6 @@ type usageCard struct {
 	Days    int
 	Ranges  []rangeLink
 	Table   []usageTableRow
-	Runaway bool
 	Empty   string // "No usage in N days"; the rest is then absent
 	W, H    int
 	Bars    []segView
@@ -448,7 +444,6 @@ func newUsageCard(doc *usageDoc, slug string, days int, ranges []rangeLink, ag *
 			w = x
 		}
 	}
-	c.Runaway = w.Runaway
 	row := func(label string, t usageRow, cost *float64) usageTableRow {
 		return usageTableRow{Label: label, New: tokenText(t.Input + t.CacheWrite), Output: tokenText(t.Output), CacheRead: tokenText(t.CacheRead), Cost: costText(cost)}
 	}
@@ -464,18 +459,14 @@ func newUsageCard(doc *usageDoc, slug string, days int, ranges []rangeLink, ag *
 	c.W, c.H, c.YTop, c.YMid, c.GridY = cardW, cardH, tokenText(top), tokenText(top/2), cardH/2
 	for i, d := range win {
 		x, bw := barGeom(i, len(win), cardW)
-		cls := ""
-		if d == doc.Today && c.Runaway {
-			cls = " runaway"
-		}
 		title := fmt.Sprintf("%s: %s new, %s output", dayText(d), tokenText(newDay[i]), tokenText(outDay[i]))
 		if newDay[i] > 0 {
 			y, h := stack(0, newDay[i], top, cardH)
-			c.Bars = append(c.Bars, segView{X: x, Y: y, W: bw, H: h, Class: "u-new" + cls, Title: title})
+			c.Bars = append(c.Bars, segView{X: x, Y: y, W: bw, H: h, Class: "u-new", Title: title})
 		}
 		if outDay[i] > 0 {
 			y, h := stack(newDay[i], newDay[i]+outDay[i], top, cardH)
-			c.Bars = append(c.Bars, segView{X: x, Y: y, W: bw, H: h, Class: "u-out" + cls, Title: title})
+			c.Bars = append(c.Bars, segView{X: x, Y: y, W: bw, H: h, Class: "u-out", Title: title})
 		}
 	}
 	if w.PriorDays >= usualMinDays {
@@ -492,7 +483,7 @@ func newUsageCard(doc *usageDoc, slug string, days int, ranges []rangeLink, ag *
 }
 
 // usualMinDays is how many earlier days with usage the usual day needs
-// (agentusage's runawayMinDays).
+// (agentusage's PriorDays).
 const usualMinDays = 3
 
 // percent is n of of, 0 to 100.
@@ -513,11 +504,6 @@ func durationText(d time.Duration) string {
 		return fmt.Sprintf("%d h %d min", m/60, m%60)
 	}
 	return fmt.Sprintf("%d min", m)
-}
-
-// runawayText is the banner's line for a runaway worktree.
-func runawayText(w usageWT) string {
-	return fmt.Sprintf("Agent usage of %s is high today: %s tokens, over 3 times its usual day (%s).", w.Worktree, tokenText(w.Today), tokenText(w.Median))
 }
 
 func addCost(a, b *float64) *float64 {

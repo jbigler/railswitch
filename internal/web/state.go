@@ -835,13 +835,6 @@ func (s *Server) pageData(prefix, sel string, k sortKey, days int) pageView {
 				banner.Template = &bannerTemplate{Ref: p.ov.Template.Ref, URL: settingsURL(prefix) + "#template"}
 			}
 		}
-		if p.usage != nil {
-			for _, w := range p.usage.Worktrees {
-				if w.Runaway {
-					banner.Lines = append(banner.Lines, runawayText(w))
-				}
-			}
-		}
 	}
 	pv := pageView{
 		Title: title(need), Prefix: prefix, Sel: sel, Sort: k.String(), Days: days,

@@ -780,7 +780,7 @@ railswitch (D39); `overview` then records nothing but still answers.
            {"day": "2026-11-04", "total": 9300000, "input": 300000, "output": 40000, "cache_read": 8900000, "cache_write": 60000, "cost": null}],
  "rows": [{"day": "2026-11-03", "worktree": "feat", "agent": "claude", "input": 100000, "output": 0, "cache_read": 2000000, "cache_write": 0, "cost": null},
           {"day": "2026-11-04", "worktree": "feat", "agent": "claude", "input": 300000, "output": 40000, "cache_read": 8900000, "cache_write": 60000, "cost": null}],
- "worktrees": [{"worktree": "feat", "total": 11400000, "input": 400000, "output": 40000, "cache_read": 10900000, "cache_write": 60000, "cost": null, "today": 9300000, "median": 2100000, "runaway": true, "removed": false, "prior_days": 3, "median_new_output": 100000}]}
+ "worktrees": [{"worktree": "feat", "total": 11400000, "input": 400000, "output": 40000, "cache_read": 10900000, "cache_write": 60000, "cost": null, "removed": false, "prior_days": 3, "median_new_output": 100000}]}
 ```
 
 | Field | Type | Meaning |
@@ -793,11 +793,8 @@ railswitch (D39); `overview` then records nothing but still answers.
 | `input`, `output`, `cache_read`, `cache_write` | number | Tokens. |
 | `total` | number | The four summed (on `daily` and `worktrees`; `rows` have the four only). |
 | `cost` | number or null | US dollars, summed over the readings whose package reported a cost; `null` when none did. railswitch never prices tokens. |
-| `today` (worktree) | number | Its total today. |
-| `median` | number | The median total of its days with usage among the 14 before today (whatever `--days`). |
-| `runaway` | boolean | Today is far above its usual day: at least 3 days with usage among those 14, today at least 1,000,000 tokens and over 3 times `median`. The text form prints `runaway: <worktree> ...` under the table. |
 | `removed` | boolean | A removed worktree's usage, its name `<name> (removed <YYYY-MM-DD>)` (D187). |
-| `prior_days` | number | How many of those 14 days have usage (D187). |
+| `prior_days` | number | How many of the 14 days before today (whatever `--days`) have usage (D187). |
 | `median_new_output` | number | The median of those days' new tokens and output: `input` + `cache_write` + `output`, cache reads left out (D187). The dashboard's "usual day" line, drawn from 3 `prior_days`. |
 
 "New" tokens, as the dashboard shows them, are `input` + `cache_write`;

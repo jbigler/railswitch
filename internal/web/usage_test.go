@@ -42,9 +42,9 @@ func ftestUsage() string {
 	row(4, "gone (removed 2026-10-25)", 2_000, 200_000, 3_000_000, 30_000, true)
 	doc["daily"], doc["rows"] = daily, rows
 	doc["worktrees"] = []map[string]any{
-		{"worktree": "b", "today": 93_750_000, "median": 40_770_000, "runaway": true, "removed": false, "prior_days": 4, "median_new_output": 770_000},
-		{"worktree": "main", "today": 2_185_000, "median": 9_710_000, "runaway": false, "removed": false, "prior_days": 1, "median_new_output": 710_000},
-		{"worktree": "gone (removed 2026-10-25)", "today": 0, "median": 0, "runaway": false, "removed": true, "prior_days": 1, "median_new_output": 232_000},
+		{"worktree": "b", "removed": false, "prior_days": 4, "median_new_output": 770_000},
+		{"worktree": "main", "removed": false, "prior_days": 1, "median_new_output": 710_000},
+		{"worktree": "gone (removed 2026-10-25)", "removed": true, "prior_days": 1, "median_new_output": 232_000},
 	}
 	b, err := json.Marshal(doc)
 	if err != nil {
@@ -60,9 +60,9 @@ const usageCmd = "--json -C /ws/ftest agent usage --all --days 30"
 var bRunning = `{"name":"bot","package":"bot@1","run":"on-demand","state":"working","message":"","ts":1,"reply":false,"running":true,
  "usage":{"input":1,"output":1,"cache_read":0,"cache_write":0,"session":"s1","context":148000,"started":` + fmt.Sprint(time.Date(2026, 10, 27, 9, 50, 0, 0, time.UTC).Unix()) + `}}`
 
-// D162, D187: the project chart, the worktree's card and the runaway
-// banner come from agent usage --json, read with the PRs, for the
-// page's range.
+// D162, D187: the project chart and the worktree's card come from agent
+// usage --json, read with the PRs, for the page's range. No usage day
+// warns (D224).
 func TestUsageViews(t *testing.T) {
 	f := newFixture(t)
 	f.cli.set(usageCmd, ftestUsage())
@@ -95,9 +95,8 @@ func TestUsageViews(t *testing.T) {
 	d, _ := byID(evs, "detail")
 	for _, want := range []string{
 		`<h2 class="lbl">Usage · this worktree</h2>`,
-		`<tr class="yellow" title="Over 3 times its usual day"><th scope="row">⚠ Today</th><td>2.9M</td><td>900k</td><td class="muted">90M</td><td class="muted">not reported</td></tr>`,
+		`<tr><th scope="row">Today</th><td>2.9M</td><td>900k</td><td class="muted">90M</td><td class="muted">not reported</td></tr>`,
 		`<th scope="row">14 days</th><td>5.3M</td><td>1.5M</td>`,
-		`class="u-new runaway"`, `class="u-out runaway"`,
 		`<line class="usual"`, "Usual day: 770k new and output",
 		"<span>5M</span><span>2.5M</span><span>0</span>",
 		"This session&#39;s context · 2 h 10 min", "<b>148k</b> of 200k", `<rect class="fill" width="74" height="8"/>`,
@@ -107,8 +106,11 @@ func TestUsageViews(t *testing.T) {
 			t.Errorf("detail lacks %q:\n%s", want, d.HTML)
 		}
 	}
-	if b, _ := byID(evs, "banner"); !strings.Contains(b.HTML, "Agent usage of b is high today: 93.8M tokens") {
-		t.Errorf("banner %q", b.HTML)
+	if b, _ := byID(evs, "banner"); strings.Contains(b.HTML, "Agent usage") {
+		t.Errorf("banner warns of usage: %q", b.HTML)
+	}
+	if strings.Contains(d.HTML, "runaway") || strings.Contains(d.HTML, "⚠") {
+		t.Errorf("the card warns of usage:\n%s", d.HTML)
 	}
 
 	// 30 days: w1's older day joins; main has no usual day yet.

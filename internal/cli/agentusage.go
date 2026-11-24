@@ -54,11 +54,6 @@ func cmdAgentUsage(ctx context.Context, e *env, args []string) int {
 	if err := tw.Flush(); err != nil {
 		return e.fail(err)
 	}
-	for _, w := range rep.Worktrees {
-		if w.Runaway {
-			fmt.Fprintf(e.stdout, "runaway: %s used %d tokens today, over 3 times its median day (%d)\n", w.Worktree, w.Today, w.Median)
-		}
-	}
 	return 0
 }
 

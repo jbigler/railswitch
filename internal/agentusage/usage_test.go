@@ -126,7 +126,9 @@ func TestApplyPrunes(t *testing.T) {
 	}
 }
 
-func TestReportRunaway(t *testing.T) {
+// TestReportUsualDay: each worktree's usual day is the median new tokens
+// and output of its days with usage among the 14 before today.
+func TestReportUsualDay(t *testing.T) {
 	f := file{Last: map[string]last{}}
 	now := at("2026-11-04", 12)
 	add := func(wt string, daysAgo int, n int64) {
@@ -138,24 +140,18 @@ func TestReportRunaway(t *testing.T) {
 	}
 	add("busy", 0, 7_000_000)
 	add("calm", 0, 5_000_000)
-	add("new", 0, 50_000_000) // no history: never runaway
-	add("small", 1, 10)
-	add("small", 2, 10)
-	add("small", 3, 10)
-	add("small", 0, 900_000) // under the floor
+	add("new", 0, 50_000_000) // no earlier day
 	rep := f.report(7, "", now)
-	got := map[string]bool{}
 	for _, w := range rep.Worktrees {
-		got[w.Worktree] = w.Runaway
-	}
-	if !got["busy"] || got["calm"] || got["new"] || got["small"] {
-		t.Errorf("runaway %v", got)
+		if w.Worktree == "new" && (w.PriorDays != 0 || w.MedianNewOutput != 0) {
+			t.Errorf("new %+v", w)
+		}
 	}
 	if len(rep.Daily) != 7 || rep.Daily[6].Day != "2026-11-04" || rep.Daily[0].Day != "2026-10-29" {
 		t.Errorf("daily %+v", rep.Daily)
 	}
-	// Day 9 is outside the window's totals but counts for the median.
-	if rep.Worktrees[0].Worktree != "busy" || rep.Worktrees[0].Total != 3*2_000_000+7_000_000 || rep.Worktrees[0].Median != 2_000_000 {
+	// Day 9 is outside the window's totals but counts for the usual day.
+	if rep.Worktrees[0].Worktree != "busy" || rep.Worktrees[0].Total != 3*2_000_000+7_000_000 || rep.Worktrees[0].PriorDays != 4 || rep.Worktrees[0].MedianNewOutput != 2_000_000 {
 		t.Errorf("busy %+v", rep.Worktrees[0])
 	}
 	f.add(Row{Day: now.AddDate(0, 0, -3).Format(time.DateOnly), Worktree: "reads", Agent: "x", Tokens: Tokens{Input: 10, CacheRead: 1000}})
@@ -167,7 +163,7 @@ func TestReportRunaway(t *testing.T) {
 				t.Errorf("busy usual day %+v", w)
 			}
 		case "reads": // cache reads count for the total, not the new tokens and output
-			if w.PriorDays != 2 || w.Median != 1030 || w.MedianNewOutput != 30 {
+			if w.PriorDays != 2 || w.MedianNewOutput != 30 {
 				t.Errorf("reads usual day %+v", w)
 			}
 		}
@@ -290,7 +286,7 @@ func TestRetire(t *testing.T) {
 		got[w.Worktree] = w
 	}
 	old := got["a (removed 2026-11-04)"]
-	if !old.Removed || old.Total != 150 || old.Today != 50 || got["a"].Removed || got["a"].Total != 40 || got["b"].Total != 7 || len(got) != 3 {
+	if !old.Removed || old.Total != 150 || got["a"].Removed || got["a"].Total != 40 || got["b"].Total != 7 || len(got) != 3 {
 		t.Errorf("worktrees %+v", rep.Worktrees)
 	}
 	for _, r := range rep.Rows {

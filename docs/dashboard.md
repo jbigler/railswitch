@@ -161,9 +161,7 @@ still wider than the window scrolls its pane.
   `overview`'s `template_update` is true: "The template <ref> changed
   since this project was made from it. See it in Settings" (the
   Settings page's Template changed notice, below; `<ref>` is
-  `overview`'s `template.ref`). One line per worktree `agent usage`
-  flags `runaway` (D162): "Agent usage of <worktree> is high today: <n>
-  tokens, over 3 times its usual day (<median>)."
+  `overview`'s `template.ref`). Agent usage never warns (D224).
 - **Strip:** one entry, `◆ <project> / <worktree> · <phrase>` (`needs
   permission`, `has a question`, `is waiting for your reply`), for every
   other project's worktree that needs input; click it to go there.
@@ -298,9 +296,8 @@ still wider than the window scrolls its pane.
     7 / 14 / 30 switch as the project chart: a table, rows Today and
     `<N> days`, columns New (input and cache writes), Output, Cache
     reads (muted) and Cost (`not reported` when the package reports
-    none); the Today row is yellow with `⚠` while `runaway`. Then the
-    daily bars, new below and output above (today's yellow while
-    runaway), on an axis rounded up to 1, 2, 2.5 or 5 times a power of
+    none). Then the
+    daily bars, new below and output above, on an axis rounded up to 1, 2, 2.5 or 5 times a power of
     ten, labelled at the top, the middle (one gridline) and 0, with the
     first, middle and last day under it, and a dashed usual-day line at
     `median_new_output` once the worktree has 3 earlier days of use

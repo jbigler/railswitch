@@ -1405,7 +1405,9 @@ worktree (`-w`): gh-stack fetches the PR's stack from GitHub, makes a
 local branch for each branch and checks the PR's out. It sees the
 repository through the same shadow as `stack ls`, with git limited to
 the https, ssh, git and file transports (`GIT_ALLOW_PROTOCOL`: origin's
-URL is in a config containers write), no prompt and 3 minutes. Then what
+URL is in a config containers write), no prompt and 3 minutes. Its
+shadow holds a private copy of the catalog, not a link: gh-stack refuses
+to write its catalog over a symlink. Then what
 gh-stack wrote in the shadow that belongs to the repository is copied
 back, nothing else: its catalog (`.git/gh-stack`) and the new branches'
 upstreams (`branch.<name>.remote` and `.merge`, values checked), each

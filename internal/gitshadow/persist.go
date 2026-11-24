@@ -25,6 +25,35 @@ var (
 	upstreamList = `^branch\..*\.(remote|merge)$`
 )
 
+// NewForWrite is New for a tool that changes gh-stack's catalog (gh stack
+// checkout, D230): the shadow holds a private copy of the catalog (none
+// when the repository has none) instead of a link, which gh-stack refuses
+// to write over. Persist then carries the new catalog back.
+func NewForWrite(ctx context.Context, r sys.Runner, gitDir string) (*Shadow, error) {
+	s, err := New(ctx, r, gitDir)
+	if err != nil {
+		return nil, err
+	}
+	cat := filepath.Join(s.Dir, "gh-stack")
+	if err := os.Remove(cat); err != nil {
+		s.Remove()
+		return nil, err
+	}
+	data, err := safefile.Read(filepath.Join(gitDir, "gh-stack"), safefile.Limit)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return s, nil
+	case err != nil:
+		s.Remove()
+		return nil, fmt.Errorf("git safety: read %s/gh-stack: %w", gitDir, err)
+	}
+	if err := writeNew(cat, data); err != nil {
+		s.Remove()
+		return nil, err
+	}
+	return s, nil
+}
+
 // Persist copies back to the repository at gitDir what a tool wrote in the
 // shadow that belongs there (gh stack checkout, D230): gh-stack's catalog,
 // when the tool wrote one in place of the link, and the branch upstreams

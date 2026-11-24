@@ -514,6 +514,17 @@ func (s *Server) jobEvent(ev jobs.Event) {
 			}
 			s.publish() // ended either way: the switching mark goes
 		}
+		if strings.HasPrefix(j.Spec.Label, checkoutLabel) {
+			// The stack is tracked now, often on the same branch, which
+			// moves no HEAD: read it at once, so Get its stack goes.
+			if p.stackNow == nil {
+				p.stackNow = map[string]bool{}
+			}
+			p.stackNow[j.Spec.Slug] = true
+			p.prNow = true
+			wake(s.wakeST)
+			wake(s.wakePR)
+		}
 	}
 }
 
@@ -721,6 +732,9 @@ func (p *projectState) quickStack(r *ghStackRow, available bool) {
 
 // switchLabel starts the label of a job checking out a stack branch.
 const switchLabel = "stack switch "
+
+// checkoutLabel starts the label of a job getting a PR's whole stack.
+const checkoutLabel = "get the stack of #"
 
 // switching is the branch a running stack switch of worktree slug checks
 // out, "" for none. s.mu is held.

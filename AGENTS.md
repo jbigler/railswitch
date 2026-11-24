@@ -4,7 +4,7 @@ railswitch is a Go CLI (module `github.com/jbigler/railswitch`) that runs Rails 
 This file lists the rules a change can break. To learn how a feature behaves, read its doc:
 
 - Decisions D1 and later, each with its reason: `docs/superpowers/plans/2026-10-25-railswitch-roadmap.md`. Search for `| D<n> |`.
-- The spec, and in its §7 the gotchas that render lints check: `handoff/HANDOFF.md`.
+- The gotchas that render lints and preflight checks guard against: `docs/gotchas.md`. Add a row when you add a guard.
 - The project's own terms: `GLOSSARY.md`. Add a term there when a change names a new concept.
 - `--json` schemas: `docs/json.md`.
 - Features: `docs/dashboard.md`, `docs/packs.md`, `docs/templates.md`, `docs/libraries.md`, `docs/firewall.md`, `docs/nvim.md`, and `docs/completion.md`. The user guide is `docs/guide/`.

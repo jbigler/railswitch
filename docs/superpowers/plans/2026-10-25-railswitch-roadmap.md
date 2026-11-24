@@ -1,6 +1,6 @@
 # railswitch: roadmap and decisions
 
-**Spec:** `handoff/HANDOFF.md` (the spec), `/tmp/rails-dev-podman/AGENTS.md` at commit `fd7336b` (the old tool's spec, which records its gotchas), `docs/reference/design-data.md` (the values pulled from the `handoff/design/*.dc.html` mock-ups).
+**Spec:** the original handoff spec, cited below as "HANDOFF §n". It has been removed from the tree; read it with `git show e49f591:handoff/HANDOFF.md`, and its mock-ups with `git show e49f591:handoff/design/<board>.dc.html`. Its §7 gotchas live on in `docs/gotchas.md`, and its env layers (§3.7) in `docs/packs.md`. Also `/tmp/rails-dev-podman/AGENTS.md` at commit `fd7336b` (the old tool's spec, which records its gotchas), `docs/reference/design-data.md` (the values pulled from the `handoff/design/*.dc.html` mock-ups).
 **Detailed plan for Stages 0–2:** `docs/superpowers/plans/2026-10-25-railswitch-stages-0-2.md`.
 Each later stage gets its own detailed plan after the stage before it is accepted. Stages 3–7 depend on design questions that HANDOFF §9 leaves open; each stage below lists the ones it must settle first.
 

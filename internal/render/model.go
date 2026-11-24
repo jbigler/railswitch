@@ -21,7 +21,7 @@ import (
 	"github.com/jbigler/railswitch/internal/version"
 )
 
-// Service roles (HANDOFF §3.3).
+// Service roles (docs/guide/concepts.md "The kinds of containers").
 const (
 	RoleApp    = "app"
 	RoleDeps   = "deps"

@@ -75,8 +75,8 @@ sharing.
   - [Shell completion](docs/completion.md)
   - [Releasing](docs/releasing.md)
 - Design: the decisions behind it are in
-  [the roadmap](docs/superpowers/plans/2026-10-25-railswitch-roadmap.md)
-  and [the handoff](handoff/HANDOFF.md).
+  [the roadmap](docs/superpowers/plans/2026-10-25-railswitch-roadmap.md),
+  and the traps it guards against in [gotchas](docs/gotchas.md).
 
 ## Versions
 

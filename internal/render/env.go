@@ -14,7 +14,7 @@ import (
 	"github.com/jbigler/railswitch/internal/pack"
 )
 
-// Layer is an env layer (HANDOFF §3.7), lowest first: a higher layer wins.
+// Layer is an env layer (docs/packs.md "Environment layers"), lowest first: a higher layer wins.
 type Layer int
 
 const (
@@ -72,8 +72,8 @@ func optionSource(o *pack.Option) string {
 	return "option " + pack.Ref{Name: o.Name, Version: o.Version}.String()
 }
 
-// envSpecs fills each service's EnvSpec, lowest layer first (HANDOFF §3.7;
-// D10, D11 decide who gets what):
+// envSpecs fills each service's EnvSpec, lowest layer first
+// (D10, D11 decide who gets what):
 //   - pack [env]: app, worker, deps, tool packages (nvim) and agents; deps
 //     also gets [deps] frozen_env;
 //   - options' [gives]: app, worker, tool packages and agents, never the

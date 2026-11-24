@@ -24,7 +24,7 @@ var ErrNoLock = errors.New("no stack.lock")
 const lockHeader = "# Written by railswitch. Do not edit; review updates in the dashboard.\n"
 
 // Lock is stack.lock: every pack and option by commit and sha256, every image
-// by digest (HANDOFF §3.11).
+// by digest (docs/packs.md "Locking").
 type Lock struct {
 	Schema     int                  `toml:"schema"` // 1 (D39)
 	Packs      map[string]LockEntry `toml:"pack"`   // key = name

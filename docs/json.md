@@ -1302,8 +1302,8 @@ the PR's URL). A number other than the worktree's PR is refused, and so
 is an agent whose status is `permission` or `question`.
 ## `branch ls`
 
-One project (`-C`): every local branch of its repository (D227), newest
-tip first. Every worktree shares the repository, so these are the
+One project (`-C`): every local branch of its repository (D227), by
+name (the dashboard shows the newest tip first). Every worktree shares the repository, so these are the
 project's. It reads only: no fetch, so the upstream state is as of
 `fetched`. PRs come from two `gh pr list` calls: every open PR (up to
 500) and the newest 300 of any state, without checks or review; a branch

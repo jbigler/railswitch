@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"slices"
 	"net/http"
 	"strings"
 	"time"
@@ -131,6 +132,8 @@ func (s *Server) branchesItems(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// Newest tip first; the CLI lists them by name.
+	slices.SortStableFunc(doc.Branches, func(a, b branchRow) int { return strings.Compare(b.Date, a.Date) })
 	for _, b := range doc.Branches {
 		bv := branchView{branchRow: b, Deletable: !b.Base && !b.CheckedOut, AgentRunning: running[b.Worktree]}
 		bv.Pullable = b.Upstream != "" && !b.Gone && b.Behind > 0 && b.Ahead == 0 && (!b.CheckedOut || b.Worktree != "")

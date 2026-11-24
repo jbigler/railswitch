@@ -4,6 +4,7 @@
 <button type="button" class="hb proj" data-open="switcher" title="Switch project (P)">{{if .Prefix}}<span class="mono">{{.Prefix}}</span>{{else}}Choose{{end}} ▾ <kbd>P</kbd></button>
 {{if .Prefix}}<span class="hd-div" aria-hidden="true"></span>
 <a class="hb" href="/p/{{.Prefix}}">Worktrees</a>
+<a class="hb" href="/p/{{.Prefix}}/branches" title="The project's local branches: status, pull, delete">Branches</a>
 <a class="hb" href="/p/{{.Prefix}}/images">Images</a>
 <a class="hb" href="/p/{{.Prefix}}/tidy" title="What could go: merged or idle worktrees, unused images">Tidy</a>
 <a class="hb" href="/p/{{.Prefix}}/library">Library</a>

@@ -26,12 +26,24 @@ type Stack struct {
 
 // StackNumber is the GitHub stack number gh-stack recorded for the stack
 // holding branch, from its catalog <gitDir>/gh-stack (gh stack view --json
-// leaves it out); 0 when there is none. The catalog is in the
-// container-writable .git: read as a hostile file, only the number used.
+// leaves it out); 0 when there is none.
 func StackNumber(gitDir, branch string) int {
+	return StackBranches(gitDir)[branch]
+}
+
+// maxCatalog bounds the branches StackBranches takes from the catalog.
+const maxCatalog = 5000
+
+// StackBranches is every branch gh-stack's catalog <gitDir>/gh-stack
+// lists in a stack, with that stack's GitHub number (0 before gh stack
+// submit); empty when there is no catalog. The catalog is in the
+// container-writable .git: read as a hostile file, only names and numbers
+// used.
+func StackBranches(gitDir string) map[string]int {
+	out := map[string]int{}
 	data, err := safefile.Read(filepath.Join(gitDir, "gh-stack"), safefile.Limit)
 	if err != nil {
-		return 0
+		return out
 	}
 	var cat struct {
 		Stacks []struct {
@@ -42,16 +54,22 @@ func StackNumber(gitDir, branch string) int {
 		} `json:"stacks"`
 	}
 	if json.Unmarshal(data, &cat) != nil {
-		return 0
+		return out
 	}
 	for _, s := range cat.Stacks {
 		for _, b := range s.Branches {
-			if b.Branch == branch && s.Number > 0 {
-				return s.Number
+			if len(out) >= maxCatalog {
+				return out
+			}
+			if b.Branch == "" {
+				continue
+			}
+			if n, ok := out[b.Branch]; !ok || n == 0 {
+				out[b.Branch] = max(s.Number, 0)
 			}
 		}
 	}
-	return 0
+	return out
 }
 
 // StackBranch is one branch of a Stack; PR is nil before `gh stack submit`.

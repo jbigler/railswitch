@@ -444,6 +444,11 @@ func readPRs(ctx context.Context, c CLI, ws string) ([]prRow, error) {
 	return readJSON[[]prRow](ctx, c, "-C", ws, "pr", "ls")
 }
 
+// readBranches is `branch ls`: the project's local branches (D227).
+func readBranches(ctx context.Context, c CLI, ws string) (branchDoc, error) {
+	return readJSON[branchDoc](ctx, c, "-C", ws, "branch", "ls")
+}
+
 func readStacks(ctx context.Context, c CLI, ws string) (ghStackDoc, error) {
 	return readJSON[ghStackDoc](ctx, c, "-C", ws, "stack", "ls")
 }

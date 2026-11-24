@@ -1559,6 +1559,57 @@ if (view === "tidy") {
     .catch(() => (el.textContent = "The candidates could not be read: the dashboard did not answer. Reload to try again."));
 }
 
+// Branches (D227): the table comes after the page (the read asks GitHub
+// for PRs); the filter and Could go only hide rows; each action is a job,
+// and when it ends the table is read again, whatever the result: a
+// delete of several branches can fail for some.
+if (view === "branches") {
+  const load = () => {
+    const el = $("#branches-body");
+    return fetch(el.dataset.src, { credentials: "same-origin" })
+      .then(async (r) => {
+        if (r.ok) {
+          swap("branches-body", await r.text());
+          filterBranches();
+        } else el.textContent = "The branches could not be read: " + (await r.text()).trim();
+      })
+      .catch(() => (el.textContent = "The branches could not be read: the dashboard did not answer. Reload to try again."));
+  };
+  const filterBranches = () => {
+    const q = ($("[data-branch-filter]")?.value || "").trim().toLowerCase();
+    const only = $("[data-branch-could-go]")?.checked;
+    for (const tr of $$(".br-table tbody tr[data-name]")) {
+      tr.hidden = (q && !tr.dataset.name.toLowerCase().includes(q)) || (only && !tr.hasAttribute("data-could-go"));
+    }
+  };
+  load();
+  document.addEventListener("input", (e) => {
+    if (e.target.matches("[data-branch-filter], [data-branch-could-go]")) filterBranches();
+  });
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (!f.matches("form[data-branch-job]")) return;
+    e.preventDefault();
+    let msg = f.dataset.confirm || "";
+    if (f.hasAttribute("data-branch-rm")) {
+      const ticked = $$('input[form="branch-rm"][name="branch"]:checked');
+      if (!ticked.length) return toast("Tick the branches to delete first.", true);
+      const force = $('input[form="branch-rm"][name="force"]').checked;
+      const remote = $('input[form="branch-rm"][name="remote"]').checked;
+      const unmerged = ticked.filter((c) => c.hasAttribute("data-unmerged")).length;
+      msg = "Delete " + ticked.length + " branch(es): " + ticked.map((c) => c.value).join(", ") + "?";
+      if (remote) msg += " Their branches on origin go too, unless a PR is open on one.";
+      if (unmerged && force) msg += " " + unmerged + " of them aren't merged: their commits go with them.";
+      else if (unmerged) msg += " " + unmerged + " of them aren't merged and stay unless you tick Force.";
+    }
+    if (msg && !confirm(msg)) return;
+    startJob(f.action, new URLSearchParams(new FormData(f, e.submitter)), (state) => {
+      if (state !== "ok") toast("It did not finish: " + state + ". The output is below.", true);
+      load();
+    });
+  });
+}
+
 if (view === "images" || view === "library" || view === "editor" || view === "machine" || view === "pr" || view === "tidy") {
   document.addEventListener("submit", (e) => {
     const f = e.target;

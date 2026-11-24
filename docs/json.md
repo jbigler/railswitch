@@ -1300,6 +1300,69 @@ line and comments, its control characters made spaces, at most 4096
 bytes (a long comment is cut; threads that don't fit are counted, with
 the PR's URL). A number other than the worktree's PR is refused, and so
 is an agent whose status is `permission` or `question`.
+## `branch ls`
+
+One project (`-C`): every local branch of its repository (D227), newest
+tip first. Every worktree shares the repository, so these are the
+project's. It reads only: no fetch, so the upstream state is as of
+`fetched`. PRs come from two `gh pr list` calls: every open PR (up to
+500) and the newest 300 of any state, without checks or review; a branch
+whose only PR is older reads as having none. No PR state (gh missing,
+not GitHub) is a warning. The gh stack comes from gh-stack's catalog
+`.git/gh-stack`, read as a hostile file. Branch names come from a
+repository containers write: the text form prints them through
+`safefile.Printable`, as a table `BRANCH WORKTREE PR UPSTREAM LAST COMMIT
+COULD GO`.
+
+```json
+{"base": "main", "fetched": "2026-11-24T09:00:00Z",
+ "branches": [
+  {"name": "jb/feat", "upstream": "origin/jb/feat", "gone": false, "ahead": 0, "behind": 2,
+   "commit": "9d0946c2…", "date": "2026-11-24T08:00:00Z", "merged": false,
+   "worktree": "feat", "checked_out": true, "base": false,
+   "pr": {"number": 42, "state": "open", "url": "https://github.com/o/r/pull/42"}, "stack": {"number": 10350},
+   "reasons": [], "could_go": false},
+  {"name": "old-fix", "upstream": "origin/old-fix", "gone": true, "ahead": 0, "behind": 0,
+   "commit": "48b0a53e…", "date": "2026-10-01T08:00:00Z", "merged": true,
+   "worktree": "", "checked_out": false, "base": false,
+   "pr": {"number": 37, "state": "merged", "url": "https://github.com/o/r/pull/37"}, "stack": null,
+   "reasons": ["upstream-gone", "pr-merged"], "could_go": true}],
+ "warnings": []}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `base` | string | The project's base branch (`[project] base_branch`). |
+| `fetched` | string | When origin was last fetched (`.git/FETCH_HEAD`'s time), RFC 3339 UTC; `""` never. |
+| `branches[].upstream` | string | The branch it tracks, as git names it (`origin/jb/feat`); `""` for none. |
+| `branches[].gone` | boolean | Its upstream no longer exists: a `fetch --prune` removed it, usually after its PR merged. |
+| `branches[].ahead`, `behind` | number | Commits it has that its upstream hasn't, and the other way; `0` with no upstream. |
+| `branches[].date` | string | Its tip commit's committer date, RFC 3339 UTC. |
+| `branches[].merged` | boolean | Reachable from the base branch (origin's when fetched, else the local one), or its PR merged: a squash merge never merges to git. |
+| `branches[].worktree` | string | The registered worktree it is checked out in; `""` for none. |
+| `branches[].checked_out` | boolean | Checked out in any git worktree, registered or not. |
+| `branches[].pr` | object or null | Its PR, as `pr ls` picks one (an open one first; a merged or closed one only while the branch is at its head commit): `number`, `state` (`draft`, `open`, `merged`, `closed`), `url`. |
+| `branches[].stack` | object or null | In a gh stack: `number`, GitHub's stack number (`0` before `gh stack submit`). |
+| `branches[].reasons` | array | Why it could go: `upstream-gone`, `pr-merged`, `pr-closed`, `merged` (into the base branch). Never for the base branch. |
+| `branches[].could_go` | boolean | It has a reason, and no worktree has it checked out. |
+| `warnings` | array | No PR states. |
+
+`branch fetch` runs `git fetch --prune origin` (no prompt, the ssh the
+user chose, https/ssh/git/file only, 2 minutes). `branch rm [--force]
+[--remote] <branch>...` judges each branch again, refusing the base
+branch, one checked out in a worktree (`wt rm` removes the worktree), an
+unmerged branch of a gh stack, and an unmerged one without `--force`; it
+asks GitHub for the PR of an unmerged branch, so a squash-merged one is
+merged. `--remote` first deletes the branch it tracks on origin (`git
+push --no-verify origin --delete`), refused while a PR is open on it,
+and keeps the local branch when that fails. `branch pull <branch>...`
+fetches, then fast-forwards each: one checked out nowhere with `git
+update-ref` (no file changes), one checked out in a registered worktree
+with `git merge --ff-only @{upstream}` there, through a private shadow
+of the common dir (as `stack switch`: no hook, filter or fsmonitor a
+container wrote runs). A branch ahead of its upstream is refused. Each
+command tries every branch named and exits 1 when any failed.
+
 ## `stack ls`
 
 One project (`-C`): every registered worktree, in registry order, with its

@@ -1279,6 +1279,8 @@ Every action is a job (below).
   server takes none from the form; 422 when there is none). For a PR to
   review that someone built in a stack, it fetches every branch of the
   stack and checks the PR's out; for a PR in no stack the job says so.
+  When the job ends, the worktree's stack is read at once (its branch
+  often stays the same), so the stack card shows and the item goes.
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
   <branch>`.

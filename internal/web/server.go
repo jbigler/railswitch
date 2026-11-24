@@ -762,7 +762,7 @@ func (s *Server) stackCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.start(w, r, jobs.Spec{
-		Project: p.Prefix, Slug: wt.Slug, Label: fmt.Sprintf("get the stack of #%d", n), Dir: p.Workspace,
+		Project: p.Prefix, Slug: wt.Slug, Label: checkoutLabel + strconv.Itoa(n), Dir: p.Workspace,
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "stack", "checkout", strconv.Itoa(n)},
 	}, nil, worktreePath(p, wt.Slug))
 }

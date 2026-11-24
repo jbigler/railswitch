@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/jobs"
 )
 
 const branchesJSON = `{"base":"main","fetched":"2026-01-01T00:00:00Z","warnings":["no PR states: gh: not logged in"],"branches":[
@@ -153,7 +155,15 @@ func TestGetStack(t *testing.T) {
 	if got, want := f.run.wait(t, 1)[0], []string{testExe, "-C", "/ws/ftest", "-w", "b", "stack", "checkout", "2141"}; !slices.Equal(got, want) {
 		t.Errorf("argv %q, want %q", got, want)
 	}
-	f.ended(t)
+	// Once it ends, the worktree's stack is read at once (its HEAD often
+	// stays put): in a stack now, Get its stack goes.
+	f.cli.set(stackQuick, stackB("jb/b", false, false))
+	f.s.jobEvent(jobs.Event{Job: f.ended(t)})
+	drain(sub)
+	f.s.pollStacks(ctx)
+	if ev, ok := byID(drain(sub), "detail"); !ok || strings.Contains(ev.HTML, "Get its stack") {
+		t.Errorf("Get its stack after the checkout: %v", ok)
+	}
 	if w := f.do(req("POST", "/p/ftest/main/stack/checkout", form())); w.Code != 422 {
 		t.Errorf("main, no PR: %d", w.Code)
 	}

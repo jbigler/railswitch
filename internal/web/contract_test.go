@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/jbigler/railswitch/internal/jobs"
 )
 
 const contractDir = "../../testdata/contract"
@@ -191,6 +193,9 @@ func TestDashboardContract(t *testing.T) {
 		t.Fatalf("prs/refresh: %d %s", w.Code, w.Body)
 	}
 	f.s.pollOnce(t.Context())
+	// A stack switch that ended ok reads the worktree's stack at once.
+	f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "contract-switch", Spec: jobs.Spec{Project: "filial", Slug: "feat", Label: switchLabel + "feat"}, State: jobs.StateOK}})
+	f.s.pollStacks(t.Context())
 	for _, p := range contractPages {
 		if w := f.do(req("GET", p, nil)); w.Code >= 400 {
 			t.Errorf("GET %s: %d %s", p, w.Code, w.Body)

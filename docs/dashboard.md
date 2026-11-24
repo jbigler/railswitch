@@ -265,7 +265,8 @@ still wider than the window scrolls its pane.
     one line, "9 services, stopped", that opens the list.
   - **Stack** (Overview only; with a gh stack; full width, under
     Links): **PR page**; the worktree's own PR is the pill in the head.
-    When its branch is in a gh stack (`stack ls`, read with the PRs),
+    When its branch is in a gh stack (`stack ls`, read with the PRs,
+    and alone at once when the worktree's branch changes, see Actions),
     the stack, in gh stack view's words: `◆ Stack #10350` (linked to the
     stack on GitHub) · `Base: master` · `22 branches (8 merged)`, and
     `⚠ restack needed` when a branch needs a rebase; then a table (D207)
@@ -1195,9 +1196,16 @@ Every action is a job (below).
   dashboard refuses a branch the stack it last read doesn't hold. While
   the job runs, the branch shows `◐ switching…` and no branch is a link,
   so a second click can't start another switch. When
-  the job ends ok the page marks the branch HEAD at once and reads the
-  stacks again behind it; when it fails, the branches are links again
-  and its output is in Jobs. Everything else (`gh stack up`, `push`,
+  the job ends ok the page marks the branch HEAD at once, reads that
+  worktree's stack alone without GitHub's details (`-w <worktree> stack
+  ls --no-detail`, keeping the checks and review it last read for the
+  same PRs), and then the PRs and every stack in full behind it; when it
+  fails, the branches are links again and its output is in Jobs. A
+  checkout in a terminal does the same once the overview shows it. A
+  stack read that began before the checkout, so it still saw the old
+  HEAD, never replaces the stack shown (#256). An overview that still
+  shows the old branch counts as one read before the switch for 10 s;
+  after that it wins (a checkout elsewhere undid the switch). Everything else (`gh stack up`, `push`,
   `rebase`) you run with gh stack in the worktree.
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
@@ -1714,6 +1722,9 @@ docs/json.md.
 - `railswitch [--json] stack ls` (project): each worktree's gh stack, with
   the PRs and as often (`docs/json.md`); nothing without the gh-stack
   extension, and a failed read keeps the last stacks.
+- `railswitch [--json] -w <worktree> stack ls --no-detail` (worktree):
+  that worktree's stack alone, without GitHub's details, right after its
+  branch changes; a failed read waits for the full one.
 - `railswitch [--json] task ls` (worktree): the pack's `[tasks]` merged
   with the project's `[tasks]` in `project.toml`; a project task replaces a
   pack task of the same name and `""` hides one; no task may be named

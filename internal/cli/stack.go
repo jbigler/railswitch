@@ -19,7 +19,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const stackUsage = "usage: railswitch [--json] stack ls | railswitch stack switch <branch>"
+const stackUsage = "usage: railswitch [--json] stack ls [--no-detail] | railswitch stack switch <branch>"
 
 // stackDoc is `stack ls --json` (docs/json.md).
 type stackDoc struct {
@@ -37,8 +37,11 @@ type stackRow struct {
 }
 
 // railswitch stack ls: each worktree of the project (-C), in registry
-// order, with its branch's stack as GitHub's gh-stack extension sees it.
-// Without the extension, available is false and no worktree is asked.
+// order, with its branch's stack as GitHub's gh-stack extension sees it;
+// with -w only that worktree. --no-detail leaves out the GitHub queries
+// for draft, checks and review: the dashboard's quick read after a
+// checkout (#254). Without the extension, available is false and no
+// worktree is asked.
 func cmdStack(ctx context.Context, e *env, args []string) int {
 	if len(args) == 0 {
 		return e.usageErr("%s", stackUsage)
@@ -51,6 +54,7 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 		return e.usageErr("%s", stackUsage)
 	}
 	fs := e.flags("stack ls")
+	noDetail := fs.Bool("no-detail", false, "leave out draft, checks and review (no GitHub query per branch)")
 	if code, ok := parse(fs, args[1:]); !ok {
 		return code
 	}
@@ -65,6 +69,14 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	if err != nil {
 		return e.fail(err)
 	}
+	wts := m.Inputs.Worktrees
+	if e.slug != "" {
+		i := slices.IndexFunc(wts, func(wt render.Worktree) bool { return wt.Slug == e.slug })
+		if i < 0 {
+			return e.fail(fmt.Errorf("worktree %s is not registered", e.slug))
+		}
+		wts = wts[i : i+1]
+	}
 	doc := stackDoc{Available: prs.StackAvailable(ctx, e.run), Worktrees: []stackRow{}}
 	// gh-stack writes into the repository's common dir and runs git with
 	// its config; both are the containers' to write: it sees the repository
@@ -72,7 +84,7 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	var env []string
 	var shadowErr error
 	var gitDir string
-	if doc.Available && len(m.Inputs.Worktrees) > 0 {
+	if doc.Available && len(wts) > 0 {
 		var in *render.Instance
 		if in, err = m.Instance(m.Inputs.Worktrees[0]); err != nil {
 			return e.fail(err)
@@ -85,7 +97,7 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 		}
 		shadowErr = err
 	}
-	for _, wt := range m.Inputs.Worktrees {
+	for _, wt := range wts {
 		r := stackRow{Slug: wt.Slug, Branch: wt.Branch}
 		switch {
 		case !doc.Available || wt.Branch == "":
@@ -108,7 +120,7 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 			stacks = append(stacks, r.Stack)
 		}
 	}
-	if repo, err := prs.Repo(w.Project.Project.Repo); err == nil && len(stacks) > 0 {
+	if repo, err := prs.Repo(w.Project.Project.Repo); err == nil && len(stacks) > 0 && !*noDetail {
 		if err := prs.Detail(ctx, e.run, repo, stacks); err != nil {
 			fmt.Fprintf(e.stderr, "warning: stack PRs' review and checks: %v\n", err)
 		}

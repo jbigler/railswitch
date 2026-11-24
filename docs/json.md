@@ -1313,6 +1313,12 @@ and objects; a lock it creates lands there). A shadow that can't be built
 is each worktree's `error`, and gh stack doesn't run. Without the
 extension (`gh extension list` has no `gh stack`) no worktree is asked.
 
+With `-w <worktree>` only that worktree is read; an unregistered one
+fails. `--no-detail` leaves out the GitHub queries for draft, checks
+and review (one `gh pr list` per open branch): `state` stays as gh-stack
+reports it and `checks` and `review` are `""`. The dashboard reads one
+worktree that way right after its branch changes (#254).
+
 ```json
 {"available": true, "worktrees": [
   {"slug": "main", "branch": "main", "stack": null, "error": ""},

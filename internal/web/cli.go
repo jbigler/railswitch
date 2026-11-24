@@ -144,9 +144,19 @@ type ghStackDoc struct {
 }
 
 type ghStackRow struct {
-	Slug  string   `json:"slug"`
-	Stack *ghStack `json:"stack"`
-	Error string   `json:"error"`
+	Slug   string   `json:"slug"`
+	Branch string   `json:"branch"` // the worktree's branch when stack ls read it
+	Stack  *ghStack `json:"stack"`
+	Error  string   `json:"error"`
+}
+
+// readBranch is the branch row was read at: gh stack's current branch,
+// else the worktree's; "" when unknown.
+func (r *ghStackRow) readBranch() string {
+	if r.Stack != nil && r.Stack.Current != "" {
+		return r.Stack.Current
+	}
+	return r.Branch
 }
 
 type ghStack struct {
@@ -448,6 +458,12 @@ func readPRs(ctx context.Context, c CLI, ws string) ([]prRow, error) {
 
 func readStacks(ctx context.Context, c CLI, ws string) (ghStackDoc, error) {
 	return readJSON[ghStackDoc](ctx, c, "-C", ws, "stack", "ls")
+}
+
+// readStackQuick is worktree slug's stack alone, without GitHub's draft,
+// checks and review: the quick read after a checkout (#254).
+func readStackQuick(ctx context.Context, c CLI, ws, slug string) (ghStackDoc, error) {
+	return readJSON[ghStackDoc](ctx, c, "-C", ws, "-w", slug, "stack", "ls", "--no-detail")
 }
 
 // agentRow is an `agent ls` row, as the agent default dialog needs it.

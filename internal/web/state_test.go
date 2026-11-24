@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -400,6 +401,142 @@ func TestGhStack(t *testing.T) {
 	ev, ok = byID(drain(sub), "detail")
 	if !ok || !strings.Contains(ev.HTML, "jb/c</strong> <strong class=\"accent\">◀ HEAD") {
 		t.Errorf("detail after the switch: %v\n%s", ok, ev.HTML)
+	}
+}
+
+// stackB is stack ls's document for ftest's worktree b, on branch cur of
+// the stack jb/b, jb/c: with GitHub's details, or as --no-detail leaves
+// them; all is the full read (every worktree), else -w b's.
+func stackB(cur string, detail, all bool) string {
+	chk := func(c, r string) string {
+		if !detail {
+			return `"checks":"","review":""`
+		}
+		return `"checks":"` + c + `","review":"` + r + `"`
+	}
+	main := ""
+	if all {
+		main = `{"slug":"main","branch":"main","stack":null,"error":""},`
+	}
+	return `{"available":true,"worktrees":[` + main + `
+ {"slug":"b","branch":"` + cur + `","stack":{"trunk":"main","current":"` + cur + `","number":10350,"branches":[
+  {"name":"jb/b","current":` + strconv.FormatBool(cur == "jb/b") + `,"merged":false,"queued":false,"needs_rebase":false,"pr":{"number":2141,"state":"open",` + chk("pass", "approved") + `}},
+  {"name":"jb/c","current":` + strconv.FormatBool(cur == "jb/c") + `,"merged":false,"queued":false,"needs_rebase":false,"pr":{"number":2142,"state":"open",` + chk("fail", "changes_requested") + `}}]},"error":""}]}`
+}
+
+const (
+	stackAll   = "--json -C /ws/ftest stack ls"
+	stackQuick = "--json -C /ws/ftest -w b stack ls --no-detail"
+)
+
+// shownHead is the branch worktree b's stack shows as HEAD.
+func shownHead(f *fixture) string {
+	f.s.mu.Lock()
+	defer f.s.mu.Unlock()
+	r := f.s.state["ftest"].stacks["b"]
+	if r == nil || r.Stack == nil {
+		return ""
+	}
+	for _, b := range r.Stack.Branches {
+		if b.Current {
+			return b.Name
+		}
+	}
+	return ""
+}
+
+// TestStaleStackRead (#256): a full stack read that began before a switch
+// ended, so it still sees the old HEAD, doesn't move HEAD back; the next
+// read, made at the new branch, is shown.
+func TestStaleStackRead(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.cli.set(stackAll, stackB("jb/b", true, true))
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "") // the PR poll reads for a page open
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "j1", Spec: jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/c"}, State: jobs.StateOK}})
+	if got := shownHead(f); got != "jb/c" {
+		t.Fatalf("HEAD after the switch = %q, want jb/c", got)
+	}
+	f.s.pollPRs(ctx) // the stale read: stack ls still answers jb/b
+	if got := shownHead(f); got != "jb/c" {
+		t.Errorf("HEAD after a read from before the switch = %q, want jb/c", got)
+	}
+	f.cli.set(stackAll, stackB("jb/c", true, true))
+	f.cli.set("--json -C /ws/ftest overview", ftestOverview("jb/c", "up", agentJSON("idle", "", false)))
+	f.s.mu.Lock()
+	f.s.state["ftest"].prNow = true
+	f.s.mu.Unlock()
+	f.s.pollOnce(ctx)
+	if got := shownHead(f); got != "jb/c" {
+		t.Errorf("HEAD after a current read = %q, want jb/c", got)
+	}
+}
+
+// TestQuickStackAfterSwitch (#254): a switch that ended ok reads that
+// worktree's stack alone, without GitHub's details, at once; the details
+// already read for the same PRs carry over.
+func TestQuickStackAfterSwitch(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.cli.set(stackAll, stackB("jb/b", true, true))
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "") // the PR poll reads for a page open
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	f.cli.set(stackQuick, stackB("jb/c", false, false))
+	f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "j1", Spec: jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/c"}, State: jobs.StateOK}})
+	full := f.cli.count(stackAll)
+	f.s.pollStacks(ctx)
+	if n := f.cli.count(stackQuick); n != 1 {
+		t.Errorf("quick reads = %d, want 1", n)
+	}
+	if n := f.cli.count(stackAll); n != full {
+		t.Errorf("pollStacks ran the full stack ls")
+	}
+	if got := shownHead(f); got != "jb/c" {
+		t.Errorf("HEAD = %q, want jb/c", got)
+	}
+	f.s.mu.Lock()
+	r := f.s.state["ftest"].stacks["b"]
+	f.s.mu.Unlock()
+	for i, want := range [][2]string{{"pass", "approved"}, {"fail", "changes_requested"}} {
+		if pr := r.Stack.Branches[i].PR; pr.Checks != want[0] || pr.Review != want[1] {
+			t.Errorf("PR %d checks, review = %q, %q; want %q", pr.Number, pr.Checks, pr.Review, want)
+		}
+	}
+	f.s.pollStacks(ctx)
+	if n := f.cli.count(stackQuick); n != 1 {
+		t.Errorf("quick reads after nothing changed = %d, want 1", n)
+	}
+}
+
+// TestCheckoutUndoneElsewhere: a switch made here that a checkout in a
+// terminal undid before the overview showed it. The overview that still
+// shows the old branch is taken for a lagging read for headGrace, then
+// for the truth.
+func TestCheckoutUndoneElsewhere(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.cli.set(stackAll, stackB("jb/b", true, true))
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "") // the PR poll reads for a page open
+	defer f.s.unsubscribe(sub)
+	f.s.pollOnce(ctx)
+	f.s.jobEvent(jobs.Event{Job: jobs.Snapshot{ID: "j1", Spec: jobs.Spec{Project: "ftest", Slug: "b", Label: switchLabel + "jb/c"}, State: jobs.StateOK}})
+	f.s.pollOverviews(ctx) // still jb/b, within headGrace
+	if got := shownHead(f); got != "jb/c" {
+		t.Errorf("HEAD within headGrace = %q, want jb/c", got)
+	}
+	f.clock.Add(headGrace + time.Second)
+	f.s.pollOverviews(ctx)
+	if got := shownHead(f); got != "jb/b" {
+		t.Errorf("HEAD after headGrace = %q, want jb/b", got)
+	}
+	f.s.mu.Lock()
+	again := f.s.state["ftest"].stackNow["b"]
+	f.s.mu.Unlock()
+	if !again {
+		t.Error("no quick read asked for after the overview moved HEAD")
 	}
 }
 

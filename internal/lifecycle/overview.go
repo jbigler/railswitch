@@ -17,6 +17,7 @@ import (
 	"github.com/jbigler/railswitch/internal/agentqueue"
 	"github.com/jbigler/railswitch/internal/agentusage"
 	"github.com/jbigler/railswitch/internal/naming"
+	"github.com/jbigler/railswitch/internal/prs"
 	"github.com/jbigler/railswitch/internal/render"
 	"github.com/jbigler/railswitch/internal/safefile"
 	"github.com/jbigler/railswitch/internal/signing"
@@ -73,6 +74,10 @@ type Overview struct {
 	// DefaultsChanged are the project's Containerfiles (by <name>) ejected
 	// from a default that changed since; never nil. The caller fills it.
 	DefaultsChanged []string `json:"defaults_changed"`
+	// RepoURL is the project's repository's page on GitHub
+	// (https://github.com/<owner>/<name>, from project.toml's repo); ""
+	// when the repo is not on GitHub (#253).
+	RepoURL string `json:"repo_url"`
 }
 
 // OverviewTemplate is a project's [template].
@@ -158,6 +163,9 @@ func (l *L) Overview(ctx context.Context) (Overview, error) {
 	}
 	ov := Overview{Prefix: m.Prefix, Workspace: m.Inputs.Workspace, Worktrees: []OverviewWorktree{}, ReviewPending: l.WS.ReviewPending(), SignerWarnings: l.WS.SignerWarnings(l.trust()), DefaultsChanged: []string{}}
 	ov.DefaultAgent, _ = defaultAgent(m)
+	if repo, err := prs.Repo(m.Inputs.Project.Project.Repo); err == nil {
+		ov.RepoURL = "https://github.com/" + repo
+	}
 	if rec := l.WS.Project.Template; rec != nil {
 		ov.Template = &OverviewTemplate{Ref: rec.Ref, SHA256: rec.SHA256}
 		ov.TemplateUpdate = template.Check(rec, l.WS.Dirs, l.WS.Catalog.Libraries).Changed()

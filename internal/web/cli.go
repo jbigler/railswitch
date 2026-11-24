@@ -40,6 +40,7 @@ type overview struct {
 	DefaultsChanged []string   `json:"defaults_changed"`
 	Worktrees       []worktree `json:"worktrees"`
 	DefaultAgent    string     `json:"default_agent"` // the agent run when none is named; "": none
+	RepoURL         string     `json:"repo_url"`      // the repository on GitHub; "": not on GitHub
 }
 
 // signerWarning is a locked library package whose signer is no longer

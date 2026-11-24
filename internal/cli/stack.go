@@ -272,7 +272,7 @@ func cmdStackCheckout(ctx context.Context, e *env, args []string) int {
 		return e.fail(err)
 	}
 	gitDir := in.Values["base.git"]
-	sh, err := gitshadow.New(ctx, e.run, gitDir)
+	sh, err := gitshadow.NewForWrite(ctx, e.run, gitDir)
 	if err != nil {
 		return e.fail(err)
 	}

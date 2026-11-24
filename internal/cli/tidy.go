@@ -182,6 +182,13 @@ func (e *env) tidy(ctx context.Context, all bool, days int) (tidyDoc, error) {
 			doc.Items = append(doc.Items, tidyItem{ID: "image:" + img.Name, Kind: "image", Project: pfx, Name: img.Name, Reasons: []string{"unused"}, Bytes: img.Size})
 		}
 	}
+	// The worktree and branch reads each warn of missing PR states: once.
+	seen := map[string]bool{}
+	doc.Warnings = slices.DeleteFunc(doc.Warnings, func(w string) bool {
+		dup := seen[w]
+		seen[w] = true
+		return dup
+	})
 	for _, it := range doc.Items {
 		doc.Bytes += it.Bytes
 	}

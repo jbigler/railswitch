@@ -2,8 +2,8 @@ package web
 
 import (
 	"fmt"
-	"slices"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode"

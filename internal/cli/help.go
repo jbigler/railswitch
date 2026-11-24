@@ -130,7 +130,7 @@ var synopses = map[string]string{
 	"signer ls":              "signer ls",
 	"signer revoke":          "signer revoke <library> <fingerprint>",
 	"signer rm":              "signer rm <library> <fingerprint>",
-	"stack ls":               "stack ls",
+	"stack ls":               "stack ls [--no-detail]",
 	"stack switch":           "stack switch <branch>",
 	"stats":                  "stats [--all]",
 	"status":                 "status",

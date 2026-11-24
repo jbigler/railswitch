@@ -122,6 +122,7 @@ var completionFlags = map[string][]string{
 	"office tv jellyfin set": {"--playlist=", "--url=", "--user="},
 	"pr ls":                  {"--all"},
 	"stats":                  {"--all"},
+	"stack ls":               {"--no-detail"},
 	"pr merge":               {"--auto", "--method="},
 	"pr review":              {"--approve", "--comment", "--request-changes"},
 	"pr agent":               {"--queue", "--thread="},

@@ -47,6 +47,45 @@ func TestStackLs(t *testing.T) {
 	}
 }
 
+// TestStackLsOne: -w reads only that worktree's stack, --no-detail asks
+// GitHub nothing per branch (#254), and an unknown worktree fails.
+func TestStackLsOne(t *testing.T) {
+	ws, _ := gitWS(t)
+	fake := func() *systest.Fake {
+		f := fakeHost()
+		f.Passthrough = []string{"git"}
+		f.On([]string{"gh", "extension", "list"}, sys.Result{Stdout: []byte("gh stack\tgithub/gh-stack\tv0.3.0\n")}, nil)
+		f.On([]string{"gh", "stack", "view", "--json"}, sys.Result{Stdout: []byte(`{"trunk":"master","currentBranch":"feat","branches":[{"name":"feat","isCurrent":true,"pr":{"number":7,"state":"OPEN"}}]}`)}, nil)
+		return f
+	}
+	prQuery := func(c []string) bool { return len(c) > 1 && c[0] == "gh" && c[1] == "pr" }
+	f := fake()
+	if code, _, errs := runWith(t, f, "-C", ws, "-w", "feat", "--json", "stack", "ls"); code != 0 || !slices.ContainsFunc(f.Calls, prQuery) {
+		t.Fatalf("without --no-detail: exit %d, PR queried %v: %s", code, slices.ContainsFunc(f.Calls, prQuery), errs)
+	}
+	f = fake()
+	code, out, errs := runWith(t, f, "-C", ws, "-w", "feat", "--json", "stack", "ls", "--no-detail")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	var doc stackDoc
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if len(doc.Worktrees) != 1 || doc.Worktrees[0].Slug != "feat" || doc.Worktrees[0].Stack == nil {
+		t.Errorf("doc = %+v", doc)
+	}
+	if n := len(slices.DeleteFunc(slices.Clone(f.Calls), func(c []string) bool { return !slices.Equal(c, []string{"gh", "stack", "view", "--json"}) })); n != 1 {
+		t.Errorf("gh stack view ran %d times; want once, for feat", n)
+	}
+	if slices.ContainsFunc(f.Calls, prQuery) {
+		t.Errorf("--no-detail queried PRs: %q", f.Calls)
+	}
+	if code, _, _ := runWith(t, fake(), "-C", ws, "-w", "nope", "--json", "stack", "ls"); code == 0 {
+		t.Error("an unknown worktree read")
+	}
+}
+
 func TestStackText(t *testing.T) {
 	// A merged branch below doesn't count; the current one is 2 of 2.
 	r := stackRow{Stack: &prs.Stack{Trunk: "main", Current: "c", Number: 12, Branches: []prs.StackBranch{

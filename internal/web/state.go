@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -20,6 +21,10 @@ const (
 	projectsEvery = 10 * time.Second // project ls
 	noteMax       = 200              // characters of a notification's body
 	subBuffer     = 256              // events queued per page before it is dropped
+	// headGrace is how long after a switch made here an overview that
+	// still shows another branch may be one read before it; after that
+	// the overview is right (a checkout elsewhere undid the switch).
+	headGrace = 10 * time.Second
 )
 
 // projectState is what the pollers know of one project.
@@ -35,6 +40,15 @@ type projectState struct {
 	// stacks are the worktrees' gh-stack stacks (by slug), read with the
 	// PRs; a failed read leaves the last ones (gh stack is a nicety).
 	stacks map[string]*ghStackRow
+	// heads are the worktrees' branches as last known (by slug): from the
+	// overview when a branch changes there, and from a stack switch that
+	// ended ok, which the overview may not show yet. A stack read made at
+	// another branch is stale and never replaces the stack shown (#256).
+	heads  map[string]string
+	headAt map[string]time.Time // when heads last moved (zero: from the overview)
+	// stackNow are the worktrees whose stack to read at once, alone and
+	// without GitHub's details, after their branch changed (#254).
+	stackNow map[string]bool
 	// usage is the agents' usage history (D162), read with the PRs; a
 	// failed read leaves the last one.
 	usage *usageDoc
@@ -142,6 +156,7 @@ func (s *Server) watched(prefix string) bool {
 // pollOnce runs both pollers once (tests).
 func (s *Server) pollOnce(ctx context.Context) {
 	s.pollOverviews(ctx)
+	s.pollStacks(ctx)
 	s.pollPRs(ctx)
 }
 
@@ -174,6 +189,7 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 	wg.Go(func() { s.loop(ctx, s.wakeOV, s.pollOverviews) })
 	wg.Go(func() { s.loop(ctx, s.wakePR, s.pollPRs) })
+	wg.Go(func() { s.loop(ctx, s.wakeST, s.pollStacks) })
 	<-ctx.Done()
 	stop()
 	wg.Wait()
@@ -259,9 +275,19 @@ func (s *Server) pollPRs(ctx context.Context) {
 				p.usage = &usage
 			}
 			if serr == nil {
+				was := p.stacks
 				p.stacks = map[string]*ghStackRow{}
 				for i := range stacks.Worktrees {
-					if r := &stacks.Worktrees[i]; stacks.Available && (r.Stack != nil || r.Error != "") {
+					r := &stacks.Worktrees[i]
+					if !p.current(r) {
+						// Read before a checkout this read didn't see: keep
+						// what is shown; the checkout asked for a new read.
+						if old := was[r.Slug]; old != nil {
+							p.stacks[r.Slug] = old
+						}
+						continue
+					}
+					if stacks.Available && (r.Stack != nil || r.Error != "") {
 						p.stacks[r.Slug] = r
 					}
 				}
@@ -389,21 +415,31 @@ func (s *Server) storeOverview(prefix string, ov overview, err error) []jobs.Spe
 	}
 	// A checkout made outside the dashboard (git switch in a terminal, #191):
 	// the PR and stack shown are the branch before's until they are read
-	// again, which is every prEvery. Read them now, and meanwhile show the
-	// stack at the new branch, as a switch made here does.
+	// again. headMoved shows the stack at the new branch and reads it
+	// again at once, as a switch made here does. An overview that still
+	// shows the branch before a switch made here is one read before it,
+	// for headGrace.
+	was := map[string]string{}
 	if p.ov != nil {
-		was := map[string]string{}
 		for _, wt := range p.ov.Worktrees {
 			was[wt.Slug] = wt.Branch
 		}
-		for _, wt := range ov.Worktrees {
-			if b, ok := was[wt.Slug]; ok && b != wt.Branch {
-				p.switched(wt.Slug, wt.Branch)
-				p.prNow = true
-			}
-		}
-		if p.prNow {
-			wake(s.wakePR)
+	}
+	if p.heads == nil {
+		p.heads = map[string]string{}
+	}
+	now := s.c.Now()
+	for _, wt := range ov.Worktrees {
+		b, seen := was[wt.Slug]
+		h, known := p.heads[wt.Slug]
+		switch {
+		case !known:
+			p.heads[wt.Slug] = wt.Branch
+		case wt.Branch == h:
+		case seen && b != wt.Branch, now.Sub(p.headAt[wt.Slug]) >= headGrace:
+			// A checkout this page didn't make, or one that undid a
+			// switch made here before the overview ever showed it.
+			s.headMoved(p, wt.Slug, wt.Branch)
 		}
 	}
 	p.kinds, p.known, p.ov = kinds, true, &ov
@@ -457,16 +493,126 @@ func (s *Server) jobEvent(ev jobs.Event) {
 		p.ovAt = time.Time{}
 		wake(s.wakeOV)
 		if branch, ok := strings.CutPrefix(j.Spec.Label, switchLabel); ok {
-			// The checkout moved HEAD: show it now, read the stacks again
-			// (gh stack asks GitHub, which takes a while) behind it.
 			if j.State == jobs.StateOK {
-				p.switched(j.Spec.Slug, branch)
+				s.headMoved(p, j.Spec.Slug, branch)
+			} else {
+				p.prNow = true
+				wake(s.wakePR)
 			}
 			s.publish() // ended either way: the switching mark goes
-			p.prNow = true
-			wake(s.wakePR)
 		}
 	}
+}
+
+// headMoved records that worktree slug is now on branch: its stack marks
+// branch HEAD at once, a quick read of that stack alone follows
+// (pollStacks), and the PRs and every stack with GitHub's details are
+// read again behind it, which takes longer. s.mu is held.
+func (s *Server) headMoved(p *projectState, slug, branch string) {
+	if p.heads == nil {
+		p.heads = map[string]string{}
+	}
+	if p.headAt == nil {
+		p.headAt = map[string]time.Time{}
+	}
+	if p.stackNow == nil {
+		p.stackNow = map[string]bool{}
+	}
+	p.heads[slug], p.headAt[slug] = branch, s.c.Now()
+	p.switched(slug, branch)
+	p.stackNow[slug] = true
+	p.prNow = true
+	wake(s.wakeST)
+	wake(s.wakePR)
+}
+
+// current reports whether stack read r was made at its worktree's branch
+// as last known; one made before a checkout is stale (#256). A read that
+// doesn't say, or a worktree whose branch isn't known yet, counts as
+// current.
+func (p *projectState) current(r *ghStackRow) bool {
+	want, read := p.heads[r.Slug], r.readBranch()
+	return want == "" || read == "" || want == read
+}
+
+// pollStacks reads, alone and without GitHub's details, the stack of each
+// worktree whose branch just changed (#254): a full stack ls reads every
+// worktree and asks GitHub once per open branch, minutes on a big stack.
+// The details already known of the same PRs carry over until the PR poll
+// reads them again.
+func (s *Server) pollStacks(ctx context.Context) {
+	type job struct{ prefix, ws, slug string }
+	var todo []job
+	s.mu.Lock()
+	for _, row := range s.projects {
+		p := s.state[row.Prefix]
+		for _, slug := range slices.Sorted(maps.Keys(p.stackNow)) {
+			todo = append(todo, job{row.Prefix, row.Workspace, slug})
+		}
+		p.stackNow = nil
+	}
+	s.mu.Unlock()
+	for _, j := range todo {
+		doc, err := readStackQuick(ctx, s.c.CLI, j.ws, j.slug)
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
+			continue // the PR poll reads it again anyway
+		}
+		s.mu.Lock()
+		if p := s.state[j.prefix]; p != nil {
+			for i := range doc.Worktrees {
+				if r := &doc.Worktrees[i]; r.Slug == j.slug {
+					p.quickStack(r, doc.Available)
+				}
+			}
+			s.publish()
+		}
+		s.mu.Unlock()
+	}
+}
+
+// quickStack stores quick read r of one worktree's stack unless it is
+// stale, with the draft, checks and review last read for the same PRs.
+// s.mu is held.
+func (p *projectState) quickStack(r *ghStackRow, available bool) {
+	if !p.current(r) {
+		return
+	}
+	if !available || r.Stack == nil && r.Error == "" {
+		delete(p.stacks, r.Slug)
+		return
+	}
+	if r.Stack != nil {
+		known := map[int]*ghStackPR{}
+		for _, old := range p.stacks {
+			if old.Stack == nil {
+				continue
+			}
+			for _, b := range old.Stack.Branches {
+				if b.PR != nil {
+					known[b.PR.Number] = b.PR
+				}
+			}
+		}
+		for i := range r.Stack.Branches {
+			b := &r.Stack.Branches[i]
+			if b.PR == nil || b.PR.State != "open" || known[b.PR.Number] == nil {
+				continue
+			}
+			k, pr := known[b.PR.Number], *b.PR
+			if k.State == "draft" {
+				pr.State = "draft"
+			}
+			pr.Checks, pr.Review = k.Checks, k.Review
+			b.PR = &pr
+		}
+	}
+	if p.stacks == nil {
+		p.stacks = map[string]*ghStackRow{}
+	}
+	p.stacks[r.Slug] = r
 }
 
 // switchLabel starts the label of a job checking out a stack branch.

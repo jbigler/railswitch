@@ -70,7 +70,7 @@ type Server struct {
 	ttys             map[string]*ttySession // by command; ended ones stay until shown (D205)
 	ttySeq           int                    // the last terminal's id
 
-	wakeOV, wakePR chan struct{}
+	wakeOV, wakePR, wakeST chan struct{}
 
 	mu             sync.Mutex
 	projects       []projectRow // project ls, in registry order
@@ -87,7 +87,7 @@ func New(c Config) *Server {
 	}
 	s := &Server{
 		c: c, tick: time.Second, ping: 15 * time.Second, ttyPing: ttyPingDef, ttyPong: ttyPongDef,
-		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1), ttyBase: context.Background(),
+		wakeOV: make(chan struct{}, 1), wakePR: make(chan struct{}, 1), wakeST: make(chan struct{}, 1), ttyBase: context.Background(),
 		state: map[string]*projectState{}, subs: map[*subscriber]struct{}{},
 	}
 	static := StaticFS()

@@ -589,11 +589,11 @@ type stackedView struct {
 	Number    int
 	NumberURL string // the stack on GitHub; "" without a number or repo
 	Trunk     string
-	Count     string // "22 branches (8 merged)"
-	Restack   bool   // a branch needs a rebase
+	Count     string          // "22 branches (8 merged)"
+	Restack   bool            // a branch needs a rebase
 	Open      []stackedBranch // top first (gh stack view's order)
 	Merged    []stackedBranch // top first, like Open
-	Error     string // gh stack couldn't say
+	Error     string          // gh stack couldn't say
 }
 
 type stackedBranch struct {

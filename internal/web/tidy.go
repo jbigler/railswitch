@@ -59,9 +59,10 @@ type tidyRow struct {
 	Ticked          bool // ticked for you: clean, and its PR is done or it's an unused image (idle alone is a guess)
 }
 
-// tidyIDRe is an id tidy prints: wt:<prefix>/<slug> or image:<a name
-// railswitch builds> (podman.BuiltPrefix's shape).
-var tidyIDRe = regexp.MustCompile(`^(wt:([a-z][a-z0-9]{1,15})/[a-z0-9][a-z0-9-]{0,39}|image:localhost/([a-z][a-z0-9]{1,15})/[a-z0-9][a-z0-9._-]*:[A-Za-z0-9._-]+-[0-9a-f]{8})$`)
+// tidyIDRe is an id tidy prints: wt:<prefix>/<slug>, image:<a name
+// railswitch builds> (podman.BuiltPrefix's shape) or branch:<prefix>/<a
+// branch name: no space, control or option dash> (D229).
+var tidyIDRe = regexp.MustCompile(`^(wt:([a-z][a-z0-9]{1,15})/[a-z0-9][a-z0-9-]{0,39}|image:localhost/([a-z][a-z0-9]{1,15})/[a-z0-9][a-z0-9._-]*:[A-Za-z0-9._-]+-[0-9a-f]{8}|branch:([a-z][a-z0-9]{1,15})/[^-\s\x00-\x1f\x7f~^:?*\[\\][^\s\x00-\x1f\x7f~^:?*\[\\]{0,254})$`)
 
 func tidyURL(prefix string) string { return "/p/" + prefix + "/tidy" }
 
@@ -104,6 +105,10 @@ func (s *Server) tidyItems(w http.ResponseWriter, r *http.Request) {
 				why = append(why, fmt.Sprintf("stopped over %d days", doc.Days))
 			case "unused":
 				why = append(why, "no worktree uses it")
+			case "upstream-gone":
+				why = append(why, "upstream gone")
+			case "merged":
+				why = append(why, "merged")
 			default:
 				why = append(why, rs)
 			}
@@ -151,7 +156,7 @@ func (s *Server) tidyRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, id := range ids {
 		m := tidyIDRe.FindStringSubmatch(id)
-		if m == nil || m[2]+m[3] != p.Prefix {
+		if m == nil || m[2]+m[3]+m[4] != p.Prefix {
 			http.Error(w, "not one of this project's tidy items", http.StatusBadRequest)
 			return
 		}

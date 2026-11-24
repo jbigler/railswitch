@@ -600,8 +600,9 @@ a local file into it, in the browser only (1 MiB at most).
 
 `/p/<prefix>/tidy` (`Tidy` in the header, D160) lists what could go, from
 `railswitch --json tidy`: each worktree whose PR is merged or closed or
-that has been stopped over 14 days, and each image of the project
-no worktree uses (what `gc` would remove), with why and its size, and the
+that has been stopped over 14 days, each image of the project
+no worktree uses (what `gc` would remove), and each local branch the
+Branches page marks as could go (D229), with why and its size, and the
 total. A worktree's size is its checkout's (a walk that stops after
 200,000 entries shows "≥"); an image's is podman's, shared layers
 included.
@@ -610,16 +611,20 @@ The page shows at once, with "Working out what could go…", and fetches
 the list (`/p/<prefix>/tidy/items`) behind it (D211): the read asks for PR
 states and sizes every image, which can take many seconds.
 
-- A clean worktree whose PR is merged or closed, and an unused image,
-  start ticked; a worktree that is only idle (the idle time can come from
-  its last commit, a guess) and a **dirty** worktree (uncommitted changes
-  or untracked files) you tick yourself.
+- A clean worktree whose PR is merged or closed, an unused image and a
+  merged branch start ticked; a worktree that is only idle (the idle
+  time can come from its last commit, a guess), a **dirty** worktree
+  (uncommitted changes or untracked files) and an **unmerged** branch
+  (its upstream gone or its PR closed, its commits on no other branch)
+  you tick yourself. A branch shows no size.
 - **Remove selected** runs one project-level job, `railswitch tidy --rm
   <id>...`, which reads the list again and removes only what is still on
   it: a worktree by `wt rm`'s path, an image by `podman rmi <name>`.
   Ticking a dirty worktree needs "Discard their changes" too (the server
   refuses it otherwise, 400), which adds `--force`: that worktree goes as
-  `wt rm --force` takes it, with its nvim and agent homes. The server
+  `wt rm --force` takes it, with its nvim and agent homes; an unmerged
+  branch needs it too. A branch is deleted from this machine only (`git
+  branch -D`), never from origin: the Branches page does that. The server
   refuses an id that isn't one of this project's.
 
 ## Branches

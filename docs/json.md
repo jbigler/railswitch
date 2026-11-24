@@ -544,8 +544,11 @@ Exit 0; a failed removal is a warning.
 ## `tidy`
 
 What `railswitch tidy [--all] [--days <n>]` suggests removing (D160):
-the project's (`--all`: every registered project's) worktrees and images.
-It removes nothing; `tidy --rm [--force] <id>...` does (text output only).
+the project's (`--all`: every registered project's) worktrees, images
+and local branches (D229). It removes nothing; `tidy --rm [--force]
+<id>...` does (text output only). A branch goes from this machine only,
+never from origin, with `git branch -D` (a squash-merged branch is never
+merged to git); an unmerged one needs `--force`.
 
 ```json
 {"days": 14, "bytes": 1390004096,
@@ -562,13 +565,13 @@ It removes nothing; `tidy --rm [--force] <id>...` does (text output only).
 | Field | Type | Meaning |
 |---|---|---|
 | `days` | number | `--days`: a stopped worktree idle longer is a candidate (default 14). |
-| `items[].id` | string | What `tidy --rm` takes: `wt:<prefix>/<slug>` or `image:<name>`. |
-| `items[].kind` | string | `worktree` or `image`. |
-| `items[].reasons` | array | A worktree: `pr-merged`, `pr-closed` (its branch's PR as `pr ls` picks it), `stopped` (the worktree is stopped and idle over `days`). An image: `unused` (no worktree's current render builds it and no container uses it: `gc`'s judgement). The base worktree is never listed. |
+| `items[].id` | string | What `tidy --rm` takes: `wt:<prefix>/<slug>`, `image:<name>` or `branch:<prefix>/<branch>`. |
+| `items[].kind` | string | `worktree`, `image` or `branch`. |
+| `items[].reasons` | array | A worktree: `pr-merged`, `pr-closed` (its branch's PR as `pr ls` picks it), `stopped` (the worktree is stopped and idle over `days`). An image: `unused` (no worktree's current render builds it and no container uses it: `gc`'s judgement). The base worktree is never listed. A branch: [`branch ls`](#branch-ls)'s reasons (`upstream-gone`, `pr-merged`, `pr-closed`, `merged`), for one that `could_go` and that `branch rm --force` would delete (not an unmerged branch of a gh stack). |
 | `items[].pr` | number | The merged or closed PR's number; `0` for none. |
 | `items[].state` | string | The worktree's state, as `overview` has it; `""` for an image. |
 | `items[].idle_since` | string | For a stopped worktree, RFC 3339 UTC: the latest time one of its units stopped, as systemd remembers it (`idle_from` `systemd`; forgotten at reboot), else HEAD's commit time (`commit`); `""` when neither is known (never `stopped` then). |
-| `items[].dirty` | boolean | Uncommitted changes or untracked files: `tidy --rm` keeps it unless `--force`. |
+| `items[].dirty` | boolean | A worktree's uncommitted changes or untracked files, a branch's commits that aren't merged (its upstream is gone or its PR closed): `tidy --rm` keeps it unless `--force`. |
 | `items[].bytes` | number | A worktree: its checkout's regular files (apparent size, symlinks not followed). An image: podman's size, shared layers included. |
 | `items[].partial` | boolean | The checkout walk stopped after 200,000 entries: `bytes` is a lower bound. |
 | `bytes` | number | The items' bytes summed. |

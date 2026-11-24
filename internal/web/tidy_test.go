@@ -9,7 +9,9 @@ const tidyJSON = `{"days":14,"bytes":3000,"warnings":["ftest: no PR states: gh: 
  {"id":"wt:ftest/b","kind":"worktree","project":"ftest","name":"b","branch":"jb/b","reasons":["pr-merged"],"pr":7,"state":"up","idle_since":"","idle_from":"","dirty":false,"bytes":1000,"partial":false},
  {"id":"wt:ftest/c","kind":"worktree","project":"ftest","name":"c","branch":"c","reasons":["stopped"],"pr":0,"state":"stopped","idle_since":"2026-01-06T09:00:00Z","idle_from":"commit","dirty":true,"bytes":0,"partial":true},
  {"id":"wt:ftest/d","kind":"worktree","project":"ftest","name":"d","branch":"d","reasons":["stopped"],"pr":0,"state":"stopped","idle_since":"2026-01-06T09:00:00Z","idle_from":"commit","dirty":false,"bytes":0,"partial":false},
- {"id":"image:localhost/ftest/base:3.3-deadbeef","kind":"image","project":"ftest","name":"localhost/ftest/base:3.3-deadbeef","reasons":["unused"],"pr":0,"state":"","idle_since":"","idle_from":"","dirty":false,"bytes":2000,"partial":false}]}`
+ {"id":"image:localhost/ftest/base:3.3-deadbeef","kind":"image","project":"ftest","name":"localhost/ftest/base:3.3-deadbeef","reasons":["unused"],"pr":0,"state":"","idle_since":"","idle_from":"","dirty":false,"bytes":2000,"partial":false},
+ {"id":"branch:ftest/jb/done","kind":"branch","project":"ftest","name":"jb/done","branch":"jb/done","reasons":["upstream-gone","pr-merged"],"pr":5,"state":"","idle_since":"","idle_from":"","dirty":false,"bytes":0,"partial":false},
+ {"id":"branch:ftest/spike","kind":"branch","project":"ftest","name":"spike","branch":"spike","reasons":["upstream-gone"],"pr":0,"state":"","idle_since":"","idle_from":"","dirty":true,"bytes":0,"partial":false}]}`
 
 // D160: the page lists each candidate with why and its size, the clean
 // ones whose PR is done or images ticked, the idle-only and dirty ones not; Remove selected is one tidy --rm job,
@@ -36,7 +38,8 @@ func TestTidyPage(t *testing.T) {
 	contains(t, "tidy items", body, `<div id="tidy-body">`, `action="/p/ftest/tidy"`, "gh: not logged in",
 		`name="id" value="wt:ftest/b" checked`, "PR #7 merged", "1.0 kB",
 		`name="dirty" value="wt:ftest/c" aria-label`, `name="id" value="wt:ftest/d" aria-label`, "stopped over 14 days", "idle since 2026-01-06 (last commit)", "≥ 0 B", ">dirty<",
-		`name="id" value="image:localhost/ftest/base:3.3-deadbeef" checked`, "no worktree uses it", "3.0 kB")
+		`name="id" value="image:localhost/ftest/base:3.3-deadbeef" checked`, "no worktree uses it", "3.0 kB",
+		`name="id" value="branch:ftest/jb/done" checked`, "upstream gone · PR #5 merged", `name="dirty" value="branch:ftest/spike" aria-label`, ">unmerged<")
 	noCSPViolation(t, "tidy", body)
 	contains(t, "header", f.do(req("GET", "/p/ftest", nil)).Body.String(), `href="/p/ftest/tidy"`)
 
@@ -49,6 +52,9 @@ func TestTidyPage(t *testing.T) {
 		{"another project", []string{"id", "wt:hello/x"}},
 		{"another project's image", []string{"id", "image:localhost/hello/base:3.3-deadbeef"}},
 		{"a flag", []string{"id", "--all"}},
+		{"another project's branch", []string{"id", "branch:hello/x"}},
+		{"a branch like a flag", []string{"id", "branch:ftest/-x"}},
+		{"a branch with a space", []string{"id", "branch:ftest/a b"}},
 	} {
 		if w := f.do(req("POST", "/p/ftest/tidy", form(c.form...))); w.Code != 400 {
 			t.Errorf("%s: %d", c.name, w.Code)
@@ -69,6 +75,13 @@ func TestTidyPage(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 	if got, want := f.run.wait(t, 2)[1], []string{testExe, "-C", "/ws/ftest", "tidy", "--rm", "--force", "wt:ftest/c"}; !slices.Equal(got, want) {
+		t.Errorf("argv %q, want %q", got, want)
+	}
+	f.ended(t)
+	if w := f.do(req("POST", "/p/ftest/tidy", form("id", "branch:ftest/jb/done", "dirty", "branch:ftest/spike", "confirm", "1"))); w.Code != 202 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if got, want := f.run.wait(t, 3)[2], []string{testExe, "-C", "/ws/ftest", "tidy", "--rm", "--force", "branch:ftest/jb/done", "branch:ftest/spike"}; !slices.Equal(got, want) {
 		t.Errorf("argv %q, want %q", got, want)
 	}
 }

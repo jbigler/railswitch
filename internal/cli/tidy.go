@@ -33,15 +33,15 @@ type tidyDoc struct {
 	Warnings []string   `json:"warnings"`
 }
 
-// tidyItem is one candidate: a worktree (wt:<prefix>/<slug>) or an image
-// (image:<name>).
+// tidyItem is one candidate: a worktree (wt:<prefix>/<slug>), an image
+// (image:<name>) or a local branch (branch:<prefix>/<name>, D229).
 type tidyItem struct {
 	ID      string   `json:"id"`
-	Kind    string   `json:"kind"` // "worktree" or "image"
+	Kind    string   `json:"kind"` // "worktree", "image" or "branch"
 	Project string   `json:"project"`
-	Name    string   `json:"name"` // the slug, or the image's name
+	Name    string   `json:"name"` // the slug, the image's name or the branch
 	Branch  string   `json:"branch"`
-	Reasons []string `json:"reasons"` // pr-merged, pr-closed, stopped; unused
+	Reasons []string `json:"reasons"` // pr-merged, pr-closed, stopped; unused; upstream-gone, pr-merged, pr-closed, merged
 	PR      int      `json:"pr"`
 	State   string   `json:"state"` // a worktree's: up, partial, failed or stopped; "" for an image
 	// IdleSince is when the stopped stack was last seen doing anything:
@@ -49,7 +49,7 @@ type tidyItem struct {
 	// ("commit"); "" when unknown.
 	IdleSince string `json:"idle_since"`
 	IdleFrom  string `json:"idle_from"`
-	Dirty     bool   `json:"dirty"`
+	Dirty     bool   `json:"dirty"` // a worktree's uncommitted work, a branch's unmerged commits: --rm keeps it without --force
 	Bytes     int64  `json:"bytes"`
 	Partial   bool   `json:"partial"` // the walk stopped at maxWalk: bytes is a lower bound
 }
@@ -93,7 +93,10 @@ func cmdTidy(ctx context.Context, e *env, args []string) int {
 			why += " #" + strconv.Itoa(it.PR)
 		}
 		var note []string
-		if it.Dirty {
+		switch {
+		case it.Dirty && it.Kind == "branch":
+			note = append(note, "unmerged: needs --force")
+		case it.Dirty:
 			note = append(note, "dirty: needs --force")
 		}
 		if it.IdleSince != "" {
@@ -103,7 +106,7 @@ func cmdTidy(ctx context.Context, e *env, args []string) int {
 		if it.Partial {
 			size = "≥" + size
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.ID, why, size, strings.Join(note, "; "))
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", safefile.Printable(it.ID), why, size, strings.Join(note, "; "))
 	}
 	if err := tw.Flush(); err != nil {
 		return e.fail(err)
@@ -154,6 +157,14 @@ func (e *env) tidy(ctx context.Context, all bool, days int) (tidyDoc, error) {
 			doc.Warnings = append(doc.Warnings, fmt.Sprintf("project %s doesn't load: %v", ws, err))
 		}
 		doc.Items = append(doc.Items, items...)
+		branches, err := e.tidyBranches(ctx, ws, &doc.Warnings)
+		if err != nil {
+			if !all {
+				return doc, err
+			}
+			doc.Warnings = append(doc.Warnings, fmt.Sprintf("project %s: no branches: %v", ws, err))
+		}
+		doc.Items = append(doc.Items, branches...)
 	}
 	// The images gc would remove: its judgement over every registered project.
 	var gd gcDoc
@@ -175,6 +186,33 @@ func (e *env) tidy(ctx context.Context, all bool, days int) (tidyDoc, error) {
 		doc.Bytes += it.Bytes
 	}
 	return doc, nil
+}
+
+// tidyBranches is workspace ws's branch candidates (D229): branch ls's
+// could-go branches that branch rm would delete, an unmerged one (gone,
+// or its PR closed) marked dirty.
+func (e *env) tidyBranches(ctx context.Context, ws string, warnings *[]string) ([]tidyItem, error) {
+	pe := *e
+	pe.dir, pe.slug = ws, ""
+	doc, mgr, err := pe.branches(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	for _, w := range doc.Warnings {
+		*warnings = append(*warnings, mgr.Pfx+": "+w)
+	}
+	var out []tidyItem
+	for _, b := range doc.Branches {
+		if !b.CouldGo || rmRefusal(b, true) != "" {
+			continue
+		}
+		it := tidyItem{ID: "branch:" + mgr.Pfx + "/" + b.Name, Kind: "branch", Project: mgr.Pfx, Name: b.Name, Branch: b.Name, Reasons: b.Reasons, Dirty: !b.Merged}
+		if b.PR != nil {
+			it.PR = b.PR.Number
+		}
+		out = append(out, it)
+	}
+	return out, nil
 }
 
 // tidyWorktrees is workspace ws's worktree candidates; no PR state (gh
@@ -303,13 +341,15 @@ func (e *env) tidyRemove(ctx context.Context, doc tidyDoc, ids []string, force b
 		switch {
 		case i < 0:
 			refuse("%s is not a candidate now; kept", safefile.Printable(id))
+		case doc.Items[i].Dirty && !force && doc.Items[i].Kind == "branch":
+			refuse("%s is not merged; kept (--force deletes its commits)", safefile.Printable(id))
 		case doc.Items[i].Dirty && !force:
 			refuse("%s has uncommitted changes or untracked files; kept (--force discards them)", id)
 		case !slices.ContainsFunc(picked, func(it tidyItem) bool { return it.ID == id }):
 			picked = append(picked, doc.Items[i])
 		}
 	}
-	slices.SortStableFunc(picked, func(a, b tidyItem) int { return strings.Compare(b.Kind, a.Kind) }) // worktrees first
+	slices.SortStableFunc(picked, func(a, b tidyItem) int { return strings.Compare(b.Kind, a.Kind) }) // worktrees, images, then branches
 	dirs, err := machine.DefaultDirs()
 	if err != nil {
 		return e.fail(err)
@@ -335,7 +375,14 @@ func (e *env) tidyRemove(ctx context.Context, doc tidyDoc, ids []string, force b
 		pe := *e
 		pe.dir, pe.slug = reg.Projects[i].Workspace, ""
 		mgr, err := pe.manager(ctx)
-		if err == nil {
+		if err == nil && it.Kind == "branch" {
+			// Local only (D229): a merged PR's branch is never merged to
+			// git after a squash merge, so -D; the judgement is done.
+			if err = mgr.DeleteBranch(ctx, it.Branch, true); err == nil {
+				fmt.Fprintf(e.stdout, "deleted branch %s\n", safefile.Printable(it.ID))
+				continue
+			}
+		} else if err == nil {
 			err = mgr.Remove(ctx, it.Name, force && it.Dirty)
 		}
 		if err != nil {

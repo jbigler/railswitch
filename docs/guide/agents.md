@@ -130,14 +130,18 @@ file's package list (`railswitch containerfile show agent-base` shows the
 default's change).
 
 **Updating it.** An agent's image holds the agent's version from when it
-was built (Claude Code's own updater is off). To take the latest release:
+was built (Claude Code's own updater is off). To take the latest release,
+use **Update to latest** in the agent's `⋯` menu on the dashboard's
+worktree page, or:
 
 ```bash
 railswitch agent update claude
 ```
 
 It rebuilds the image without the build cache, so Claude Code is
-downloaded again. Every worktree uses that image: each agent started
+downloaded again. Any agent works the same way when its Containerfile
+downloads the agent at build time. **Run setup again** is different: it
+reruns your setup commands, not the agent's install. Every worktree uses that image: each agent started
 afterwards runs the new version, and a running one keeps the old version
 until you stop it.
 

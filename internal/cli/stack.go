@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -19,7 +20,7 @@ import (
 	"github.com/jbigler/railswitch/internal/workspace"
 )
 
-const stackUsage = "usage: railswitch [--json] stack ls [--no-detail] | railswitch stack switch <branch>"
+const stackUsage = "usage: railswitch [--json] stack ls [--no-detail] | railswitch stack switch <branch> | railswitch stack checkout <pr>"
 
 // stackDoc is `stack ls --json` (docs/json.md).
 type stackDoc struct {
@@ -50,6 +51,8 @@ func cmdStack(ctx context.Context, e *env, args []string) int {
 	case "ls":
 	case "switch":
 		return cmdStackSwitch(ctx, e, args[1:])
+	case "checkout":
+		return cmdStackCheckout(ctx, e, args[1:])
 	default:
 		return e.usageErr("%s", stackUsage)
 	}
@@ -221,6 +224,72 @@ func cmdStackSwitch(ctx context.Context, e *env, args []string) int {
 		if errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
 			return res.ExitCode
 		}
+		return e.fail(err)
+	}
+	return 0
+}
+
+// railswitch stack checkout <pr>: bring pull request <pr>'s whole gh stack
+// into the worktree (-w) with gh stack checkout, which fetches the stack
+// from GitHub, makes a local branch per branch and checks the PR's out
+// (D230). It runs through a private shadow of the common dir, as stack
+// switch does, with git limited to the https, ssh, git and file transports
+// (origin's URL is in a config containers write) and no prompt; then the
+// shadow's new gh-stack catalog and branch upstreams are copied back
+// (gitshadow.Persist), nothing else.
+func cmdStackCheckout(ctx context.Context, e *env, args []string) int {
+	fs := e.flags("stack checkout")
+	if code, ok := parse(fs, args); !ok {
+		return code
+	}
+	if fs.NArg() != 1 {
+		return e.usageErr("usage: railswitch stack checkout <pr>")
+	}
+	n, err := strconv.Atoi(fs.Arg(0))
+	if err != nil || n <= 0 {
+		return e.usageErr("stack checkout: %q is not a pull request number", fs.Arg(0))
+	}
+	w, err := workspace.Load(ctx, e.dir, e.slug)
+	if err != nil {
+		return e.fail(err)
+	}
+	if w.Slug == "" {
+		return e.usageErr("stack checkout: not in a worktree; run it in <workspace>/worktrees/<worktree>/ or pass -w <worktree>")
+	}
+	if !prs.StackAvailable(ctx, e.run) {
+		return e.fail(errors.New("gh stack is not installed: gh extension install github/gh-stack"))
+	}
+	m, err := e.model(ctx, w)
+	if err != nil {
+		return e.fail(err)
+	}
+	i := slices.IndexFunc(m.Inputs.Worktrees, func(wt render.Worktree) bool { return wt.Slug == w.Slug })
+	if i < 0 {
+		return e.fail(fmt.Errorf("worktree %s is not registered", w.Slug))
+	}
+	in, err := m.Instance(m.Inputs.Worktrees[i])
+	if err != nil {
+		return e.fail(err)
+	}
+	gitDir := in.Values["base.git"]
+	sh, err := gitshadow.New(ctx, e.run, gitDir)
+	if err != nil {
+		return e.fail(err)
+	}
+	defer sh.Remove()
+	env, err := sys.GitNetEnv(ctx, e.run, sh.Env(os.Environ()))
+	if err != nil {
+		return e.fail(err)
+	}
+	env = append(env, "GIT_ALLOW_PROTOCOL=https:ssh:git:file", "GH_PROMPT_DISABLED=1")
+	c := sys.Cmd{Name: "gh", Args: []string{"stack", "checkout", strconv.Itoa(n)}, Dir: m.Inputs.Worktrees[i].Dir, Env: env, Stdout: e.stdout, Stderr: e.stderr, Timeout: 3 * time.Minute}
+	if res, err := e.run.Run(ctx, c); err != nil {
+		if errors.Is(err, sys.ErrExit) && res.ExitCode > 0 {
+			return res.ExitCode
+		}
+		return e.fail(err)
+	}
+	if err := sh.Persist(ctx, e.run, gitDir); err != nil {
 		return e.fail(err)
 	}
 	return 0

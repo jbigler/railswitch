@@ -1272,6 +1272,13 @@ Every action is a job (below).
   shows the old branch counts as one read before the switch for 10 s;
   after that it wins (a checkout elsewhere undid the switch). Everything else (`gh stack up`, `push`,
   `rebase`) you run with gh stack in the worktree.
+- **Get its stack** (D230; the head's `⋯`, when the worktree's PR is
+  open or draft, its branch is in no stack the dashboard read, and gh
+  stack is installed): after a confirm, `railswitch -w <worktree> stack
+  checkout <pr>` as a job, with the PR number the dashboard read (the
+  server takes none from the form; 422 when there is none). For a PR to
+  review that someone built in a stack, it fetches every branch of the
+  stack and checks the PR's out; for a PR in no stack the job says so.
 - **New worktree:** branch (required), name (optional) and "up after
   adding" (ticked by default) → `railswitch wt add [--name <n>] [--up]
   <branch>`.

@@ -42,6 +42,9 @@ type projectState struct {
 	// stacks are the worktrees' gh-stack stacks (by slug), read with the
 	// PRs; a failed read leaves the last ones (gh stack is a nicety).
 	stacks map[string]*ghStackRow
+	// stackAvail: the last stack read found gh stack installed, so the
+	// worktree page may offer Get its stack (D230).
+	stackAvail bool
 	// heads are the worktrees' branches as last known (by slug): from the
 	// overview when a branch changes there, and from a stack switch that
 	// ended ok, which the overview may not show yet. A stack read made at
@@ -284,6 +287,7 @@ func (s *Server) pollPRs(ctx context.Context) {
 				}
 			}
 			if serr == nil {
+				p.stackAvail = stacks.Available
 				was := p.stacks
 				p.stacks = map[string]*ghStackRow{}
 				for i := range stacks.Worktrees {
@@ -741,6 +745,22 @@ func (s *Server) stackBranch(prefix, slug, branch string) bool {
 	return slices.ContainsFunc(p.stacks[slug].Stack.Branches, func(b ghStackBranch) bool { return b.Name == branch && !b.Merged && !b.Current })
 }
 
+// stackPR is worktree slug's open PR when Get its stack may run for it
+// (D230): gh stack installed, the PR open or draft, its branch in no stack
+// read; 0 otherwise.
+func (s *Server) stackPR(prefix, slug string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p := s.state[prefix]
+	if p == nil || !p.stackAvail || p.stacks[slug] != nil {
+		return 0
+	}
+	if pr := p.prs[slug]; pr != nil && (pr.State == "open" || pr.State == "draft") {
+		return pr.Number
+	}
+	return 0
+}
+
 // switched marks branch current in worktree slug's stack, as a finished
 // switch left it, until the stacks are read again. s.mu is held.
 func (p *projectState) switched(slug, branch string) {
@@ -866,7 +886,7 @@ func (s *Server) rows(prefix string, k sortKey, sel string) ([]row, string) {
 	rows := make([]row, 0, len(p.ov.Worktrees))
 	found := false
 	for _, wt := range p.ov.Worktrees {
-		rows = append(rows, row{WT: wt, PR: p.prs[wt.Slug], Stacked: p.stacks[wt.Slug], Now: s.c.Now(), DefaultAgent: p.ov.DefaultAgent})
+		rows = append(rows, row{WT: wt, PR: p.prs[wt.Slug], Stacked: p.stacks[wt.Slug], StackAvail: p.stackAvail, Now: s.c.Now(), DefaultAgent: p.ov.DefaultAgent})
 		found = found || wt.Slug == sel
 	}
 	sortRows(rows, k)

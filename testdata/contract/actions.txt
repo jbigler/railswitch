@@ -29,6 +29,7 @@
 ["-C","/ws/ftest","-w","b","pr","unresolve","PRRT_done"]
 ["-C","/ws/ftest","-w","b","restart","web"]
 ["-C","/ws/ftest","-w","b","restart"]
+["-C","/ws/ftest","-w","b","stack","checkout","2141"]
 ["-C","/ws/ftest","-w","b","stack","switch","jb/c"]
 ["-C","/ws/ftest","-w","b","stop"]
 ["-C","/ws/ftest","-w","b","task","--new-term","console"]

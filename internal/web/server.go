@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -143,6 +144,7 @@ func New(c Config) *Server {
 	m.HandleFunc("POST /p/{prefix}/{slug}/remove", s.remove)
 	m.HandleFunc("POST /p/{prefix}/{slug}/down", s.down)
 	m.HandleFunc("POST /p/{prefix}/{slug}/stack/switch", s.stackSwitch)
+	m.HandleFunc("POST /p/{prefix}/{slug}/stack/checkout", s.stackCheckout)
 	m.HandleFunc("POST /p/{prefix}/{slug}/restart/{service}", s.restartService)
 	m.HandleFunc("POST /p/{prefix}/{slug}/logs/{service}", s.serviceLogs)
 	m.HandleFunc("POST /p/{prefix}/{slug}/fw-allow/{service}", s.fwAllowLive)
@@ -743,6 +745,25 @@ func (s *Server) stackSwitch(w http.ResponseWriter, r *http.Request) {
 	s.start(w, r, jobs.Spec{
 		Project: p.Prefix, Slug: wt.Slug, Label: switchLabel + branch, Dir: p.Workspace,
 		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "stack", "switch", branch},
+	}, nil, worktreePath(p, wt.Slug))
+}
+
+// stackCheckout runs `stack checkout <pr>` for the worktree's open PR, as
+// the dashboard last read it (never a number the form names): its whole gh
+// stack, fetched from GitHub (D230).
+func (s *Server) stackCheckout(w http.ResponseWriter, r *http.Request) {
+	p, wt, ok := s.lookup(w, r)
+	if !ok {
+		return
+	}
+	n := s.stackPR(p.Prefix, wt.Slug)
+	if n == 0 {
+		http.Error(w, wt.Slug+" has no open PR outside a stack, or gh stack is missing", http.StatusUnprocessableEntity)
+		return
+	}
+	s.start(w, r, jobs.Spec{
+		Project: p.Prefix, Slug: wt.Slug, Label: fmt.Sprintf("get the stack of #%d", n), Dir: p.Workspace,
+		Argv: []string{s.c.Exe, "-C", p.Workspace, "-w", wt.Slug, "stack", "checkout", strconv.Itoa(n)},
 	}, nil, worktreePath(p, wt.Slug))
 }
 

@@ -198,8 +198,9 @@ still wider than the window scrolls its pane.
   <day>)`. Each other segment links to its worktree's Agent tab; every
   segment's tooltip (SVG `<title>`) is its day, worktree and tokens.
   Under the bars, the first and last day, then a legend: colour, name,
-  total. It is `agent usage --all --days 30 --json`, read with the PRs
-  (every 60 s with a page open, and on Refresh PRs), each range cut from
+  total. It is `agent usage --all --days 30 --json`, read on its own
+  (D225: every 10 s with a page open, and on Refresh PRs; not behind
+  the PR poll's GitHub queries), each range cut from
   it; absent while the range has no usage. The range is the page's
   `?days=` (7, 14 or 30; 14 without one): a click on the switch changes
   it in place (the stream restarts) and this browser remembers it for
@@ -302,12 +303,10 @@ still wider than the window scrolls its pane.
     first, middle and last day under it, and a dashed usual-day line at
     `median_new_output` once the worktree has 3 earlier days of use
     among the 14 before today (until then, "Usual-day line appears with
-    3 earlier days of use (<k> so far)."). Then two meters side by side:
-    "This session's context · <how long it has run>", the running
-    agent's session context (`agent ls`'s `usage.context`) as `<n> of
-    200k` (no package reports its model's window; the meter assumes
-    200k and says so), or "No session running"; and "Share of the
+    3 earlier days of use (<k> so far)."). Then a meter, "Share of the
     project, <N> days", `<p>% · <x> of <y>` of new tokens and output.
+    The card shows no session context: no agent package reports its
+    model's context window, so a meter of it would be a guess (D225).
     With no usage in the range, "No usage in <N> days" instead of the
     table, the bars and the share.
   - **Tests:** as the list says, with the exit code, time and commit,
@@ -1701,7 +1700,7 @@ docs/json.md.
 - `railswitch [--json] overview` (project): every worktree with its stack
   state (`up`, `partial`, `stopped`, `failed`), services, agent and links.
   No git call and no health check; `status` has health.
-- `railswitch --json agent usage --all --days 14` (project, with the PRs):
+- `railswitch --json agent usage --all --days 30` (project, every 10 s with a page open):
   the agents' usage history (D162). The dashboard's `overview` poll is
   what records it: every `overview` adds each agent's session counter's
   growth to the history.

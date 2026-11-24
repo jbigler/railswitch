@@ -61,7 +61,7 @@ var bRunning = `{"name":"bot","package":"bot@1","run":"on-demand","state":"worki
  "usage":{"input":1,"output":1,"cache_read":0,"cache_write":0,"session":"s1","context":148000,"started":` + fmt.Sprint(time.Date(2026, 10, 27, 9, 50, 0, 0, time.UTC).Unix()) + `}}`
 
 // D162, D187: the project chart and the worktree's card come from agent
-// usage --json, read with the PRs, for the page's range. No usage day
+// usage --json, read every usageEvery (D225), for the page's range. No usage day
 // warns (D224).
 func TestUsageViews(t *testing.T) {
 	f := newFixture(t)
@@ -99,7 +99,6 @@ func TestUsageViews(t *testing.T) {
 		`<th scope="row">14 days</th><td>5.3M</td><td>1.5M</td>`,
 		`<line class="usual"`, "Usual day: 770k new and output",
 		"<span>5M</span><span>2.5M</span><span>0</span>",
-		"This session&#39;s context · 2 h 10 min", "<b>148k</b> of 200k", `<rect class="fill" width="74" height="8"/>`,
 		"Share of the project, 14 days",
 	} {
 		if !strings.Contains(d.HTML, want) {
@@ -109,7 +108,7 @@ func TestUsageViews(t *testing.T) {
 	if b, _ := byID(evs, "banner"); strings.Contains(b.HTML, "Agent usage") {
 		t.Errorf("banner warns of usage: %q", b.HTML)
 	}
-	if strings.Contains(d.HTML, "runaway") || strings.Contains(d.HTML, "⚠") {
+	if strings.Contains(d.HTML, "runaway") || strings.Contains(d.HTML, "⚠") || strings.Contains(d.HTML, "context") {
 		t.Errorf("the card warns of usage:\n%s", d.HTML)
 	}
 
@@ -122,7 +121,7 @@ func TestUsageViews(t *testing.T) {
 	if !strings.Contains(usage.HTML, "Agent usage · 30 days: ") || !strings.Contains(usage.HTML, `data-days="30" class="on"`) || !strings.Contains(usage.HTML, "Sep 28") {
 		t.Errorf("30 days usage %s", usage.HTML)
 	}
-	for _, want := range []string{"Usual-day line appears with 3 earlier days of use (1 so far).", "No session running", "Share of the project, 30 days"} {
+	for _, want := range []string{"Usual-day line appears with 3 earlier days of use (1 so far).", "Share of the project, 30 days"} {
 		if !strings.Contains(d.HTML, want) {
 			t.Errorf("main's card lacks %q:\n%s", want, d.HTML)
 		}
@@ -131,11 +130,11 @@ func TestUsageViews(t *testing.T) {
 
 func TestUsageCardEmpty(t *testing.T) {
 	doc := &usageDoc{Today: "2026-10-27", Daily: []usageDay{{Day: "2026-10-26"}, {Day: "2026-10-27"}}}
-	c := newUsageCard(doc, "b", 7, nil, nil, time.Now())
-	if c == nil || c.Empty != "No usage in 2 days" || c.Share != nil || c.Context != nil {
+	c := newUsageCard(doc, "b", 7, nil)
+	if c == nil || c.Empty != "No usage in 2 days" || c.Share != nil {
 		t.Errorf("card %+v", c)
 	}
-	if newUsageCard(nil, "b", 7, nil, nil, time.Now()) != nil {
+	if newUsageCard(nil, "b", 7, nil) != nil {
 		t.Error("a card before usage is read")
 	}
 	if v := newUsage(doc, 7, nil, nil); v != nil {
@@ -169,11 +168,6 @@ func TestUsageMaths(t *testing.T) {
 	}
 	if x, w := barGeom(13, 14, 420); x != 390 || w != 23 {
 		t.Errorf("barGeom = %d, %d", x, w)
-	}
-	for d, want := range map[time.Duration]string{0: "0 min", 45 * time.Minute: "45 min", 130 * time.Minute: "2 h 10 min", 50 * time.Hour: "2 d 2 h"} {
-		if got := durationText(d); got != want {
-			t.Errorf("durationText(%v) = %q; want %q", d, got, want)
-		}
 	}
 	if percent(1, 3) != 33 || percent(5, 0) != 0 || percent(300_000, 200_000) != 100 {
 		t.Error("percent")
@@ -227,5 +221,42 @@ func TestUsageColourOf(t *testing.T) {
 		if got := fmt.Sprint(usageColourOf(doc, c.top, id)); got != c.want {
 			t.Errorf("colours of %v = %s, want %s", c.top, got, c.want)
 		}
+	}
+}
+
+// TestUsagePoll (D225): with a page open the usage history is read every
+// usageEvery on its own, never behind the PR poll, and at once after
+// Refresh PRs; with no page open it isn't read.
+func TestUsagePoll(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.cli.set(usageCmd, ftestUsage())
+	const prs = "--json -C /ws/ftest pr ls"
+	f.s.pollOnce(ctx)
+	if n := f.cli.count(usageCmd); n != 0 {
+		t.Errorf("usage read with no page open: %d", n)
+	}
+	sub := f.s.subscribe("ftest", "b", parseSort("name"), usageDefault, "")
+	defer f.s.unsubscribe(sub)
+	f.s.pollUsage(ctx)
+	f.s.pollUsage(ctx)
+	if n := f.cli.count(usageCmd); n != 1 {
+		t.Errorf("usage reads before usageEvery = %d, want 1", n)
+	}
+	before := f.cli.count(prs)
+	f.clock.Add(usageEvery)
+	f.s.pollUsage(ctx)
+	if n := f.cli.count(usageCmd); n != 2 {
+		t.Errorf("usage reads after usageEvery = %d, want 2", n)
+	}
+	if n := f.cli.count(prs); n != before {
+		t.Error("the usage poll read the PRs")
+	}
+	if w := f.do(req("POST", "/p/ftest/prs/refresh", form())); w.Code >= 400 {
+		t.Fatalf("refresh: %d", w.Code)
+	}
+	f.s.pollUsage(ctx)
+	if n := f.cli.count(usageCmd); n != 3 {
+		t.Errorf("usage reads after Refresh PRs = %d, want 3", n)
 	}
 }

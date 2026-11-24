@@ -98,3 +98,41 @@ func TestPersistNothing(t *testing.T) {
 		t.Error("a catalog appeared")
 	}
 }
+
+// D230: NewForWrite's shadow holds a regular copy of the catalog (gh-stack
+// won't write over a link), none when the repository has none, and refuses
+// a catalog that is a symlink.
+func TestNewForWrite(t *testing.T) {
+	base, _ := repo(t)
+	gitDir := filepath.Join(base, ".git")
+	ctx := context.Background()
+	sh, err := NewForWrite(ctx, sys.Exec{}, gitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(sh.Dir, "gh-stack")); err == nil {
+		t.Error("a catalog in the shadow of a repository with none")
+	}
+	sh.Remove()
+	if err := os.WriteFile(filepath.Join(gitDir, "gh-stack"), []byte(`{"stacks":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sh, err = NewForWrite(ctx, sys.Exec{}, gitDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(filepath.Join(sh.Dir, "gh-stack"))
+	if err != nil || !fi.Mode().IsRegular() {
+		t.Errorf("shadow catalog: %v %v", fi, err)
+	}
+	sh.Remove()
+	if err := os.Remove(filepath.Join(gitDir, "gh-stack")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/etc/hostname", filepath.Join(gitDir, "gh-stack")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewForWrite(ctx, sys.Exec{}, gitDir); err == nil {
+		t.Error("a symlinked catalog was copied")
+	}
+}

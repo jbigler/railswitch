@@ -43,7 +43,7 @@ func TestAgentUsageCLI(t *testing.T) {
 		t.Fatalf("report %v", rep)
 	}
 	w := wts[0].(map[string]any)
-	if w["worktree"] != "feat" || w["total"] != float64(170+2) || w["input"] != float64(170) || w["cost"] != nil || w["runaway"] != false {
+	if w["worktree"] != "feat" || w["total"] != float64(170+2) || w["input"] != float64(170) || w["cost"] != nil || w["runaway"] != nil {
 		t.Errorf("feat %v", w)
 	}
 	// The overview, the dashboard's poll, records too.

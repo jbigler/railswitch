@@ -34,15 +34,9 @@ const Keep = 90
 // poll can't overflow a total.
 const maxCount = 1e15
 
-// Runaway: a worktree whose total today is over runawayFactor times the
-// median of its days with usage among the runawayWindow days before, with
-// at least runawayMinDays such days, and at least runawayFloor tokens.
-const (
-	runawayWindow  = 14
-	runawayMinDays = 3
-	runawayFactor  = 3
-	runawayFloor   = 1_000_000
-)
+// usualWindow is how many days before today a worktree's usual day is
+// taken from (WorktreeTotal.MedianNewOutput).
+const usualWindow = 14
 
 // Tokens are counts of tokens, and the cost in US dollars when the agent's
 // package reports one (nil: none did).
@@ -383,20 +377,16 @@ type DayTotal struct {
 	Tokens
 }
 
-// WorktreeTotal is one worktree's usage in the window. Today is its total
-// today, Median the median total of its days with usage among the 14
-// before; Runaway flags today far above it. PriorDays is how many such
-// days there are, MedianNewOutput the median of their new tokens and
-// output (input, cache writes and output: the dashboard's usual day,
-// D187). Removed marks a removed worktree's usage (Retire).
+// WorktreeTotal is one worktree's usage in the window. PriorDays is how
+// many days with usage it has among the usualWindow before today,
+// MedianNewOutput the median of their new tokens and output (input, cache
+// writes and output: the dashboard's usual day, D187). Removed marks a
+// removed worktree's usage (Retire).
 type WorktreeTotal struct {
 	Worktree string `json:"worktree"`
 	Total    int64  `json:"total"`
 	Tokens
-	Today   int64 `json:"today"`
-	Median  int64 `json:"median"`
-	Runaway bool  `json:"runaway"`
-	Removed bool  `json:"removed"`
+	Removed bool `json:"removed"`
 
 	PriorDays       int   `json:"prior_days"`
 	MedianNewOutput int64 `json:"median_new_output"`
@@ -457,17 +447,14 @@ func (f *file) report(days int, worktree string, now time.Time) Report {
 	})
 	for name, w := range byWT {
 		w.Total = w.Tokens.Total()
-		w.Today = daily[name][today]
-		var prior, priorWork []int64
-		for i := 1; i <= runawayWindow; i++ {
+		var priorWork []int64
+		for i := 1; i <= usualWindow; i++ {
 			d := now.AddDate(0, 0, -i).Format(time.DateOnly)
-			if n := daily[name][d]; n > 0 {
-				prior = append(prior, n)
+			if daily[name][d] > 0 {
 				priorWork = append(priorWork, work[name][d])
 			}
 		}
-		w.Median, w.PriorDays, w.MedianNewOutput = median(prior), len(prior), median(priorWork)
-		w.Runaway = len(prior) >= runawayMinDays && w.Today >= runawayFloor && w.Today > runawayFactor*w.Median
+		w.PriorDays, w.MedianNewOutput = len(priorWork), median(priorWork)
 		rep.Worktrees = append(rep.Worktrees, *w)
 	}
 	slices.SortFunc(rep.Worktrees, func(a, b WorktreeTotal) int { return cmp.Compare(a.Worktree, b.Worktree) })

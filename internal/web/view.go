@@ -589,11 +589,11 @@ type stackedView struct {
 	Number    int
 	NumberURL string // the stack on GitHub; "" without a number or repo
 	Trunk     string
-	Count     string // "22 branches (8 merged)"
-	Restack   bool   // a branch needs a rebase
-	Open      []stackedBranch
-	Merged    []stackedBranch
-	Error     string // gh stack couldn't say
+	Count     string          // "22 branches (8 merged)"
+	Restack   bool            // a branch needs a rebase
+	Open      []stackedBranch // top first (gh stack view's order)
+	Merged    []stackedBranch // top first, like Open
+	Error     string          // gh stack couldn't say
 }
 
 type stackedBranch struct {
@@ -632,7 +632,7 @@ func newStacked(r row, repo string) *stackedView {
 			queued++
 		}
 		if b.Merged && !b.Current {
-			v.Merged = append(v.Merged, sb)
+			v.Merged = append([]stackedBranch{sb}, v.Merged...) // top first, as the open ones
 			continue
 		}
 		v.Open = append([]stackedBranch{sb}, v.Open...) // top first

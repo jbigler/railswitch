@@ -279,7 +279,7 @@ still wider than the window scrolls its pane.
     (linked), its checks glyph, `draft`/`ready`, its review such as
     `approved`, and the branch, with `◀ HEAD` on the current one (its
     row shaded: it is the worktree's PR line), `queued` and `⚠ restack`.
-    The merged ones are folded under the table. Every other open
+    The merged ones are folded under the table, top first too. Every other open
     branch's name checks it out here (see Actions).
   - **Agent** (D176; full width): one agent runs per worktree (D62).
     A row per configured agent (D207): its name, `running` with its

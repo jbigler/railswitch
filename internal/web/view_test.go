@@ -583,3 +583,22 @@ func TestStoppedAgentSaysNothing(t *testing.T) {
 		t.Errorf("groups %+v, want Stopped", g)
 	}
 }
+
+// The merged branches unfold in gh stack view's order, top first, like
+// the open ones (bottom first was upside down).
+func TestStackedMergedOrder(t *testing.T) {
+	st := &ghStackRow{Slug: "b", Stack: &ghStack{Trunk: "main", Current: "jb/d", Branches: []ghStackBranch{
+		{Name: "jb/a", Merged: true}, {Name: "jb/b", Merged: true}, {Name: "jb/c"}, {Name: "jb/d", Current: true},
+	}}}
+	v := newStacked(row{Stacked: st}, "")
+	var open, merged []string
+	for _, b := range v.Open {
+		open = append(open, b.Name)
+	}
+	for _, b := range v.Merged {
+		merged = append(merged, b.Name)
+	}
+	if !slices.Equal(open, []string{"jb/d", "jb/c"}) || !slices.Equal(merged, []string{"jb/b", "jb/a"}) {
+		t.Errorf("open %v, merged %v; want top first in both", open, merged)
+	}
+}
